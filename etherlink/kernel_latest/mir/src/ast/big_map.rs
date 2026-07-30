@@ -962,12 +962,15 @@ impl<'a> TypedValue<'a> {
                             // Can contain only pushable values, thus no big maps
                             results.push(None)
                         }
-                        // `param` and `storage` are owned, not `Rc`-shared, so
-                        // they are queued directly and never memoized.
+                        // `param` and `storage` are `Rc`-shared like every other
+                        // deep value (L2-1831), so they go through
+                        // `push_child`: an operation `DUP`ed into the returned
+                        // list several times shares one payload, and that is
+                        // exactly the shape the memo exists for.
                         Operation(op) => match &op.operation {
                             crate::ast::Operation::TransferTokens(t) => {
                                 frames.push(Frame::BuildTransferTokens(op, t));
-                                frames.push(Frame::Visit(&t.param));
+                                push_child(&mut frames, &t.param);
                             }
                             crate::ast::Operation::SetDelegate(_) => results.push(None),
                             crate::ast::Operation::Emit(_) => {
@@ -976,7 +979,7 @@ impl<'a> TypedValue<'a> {
                             }
                             crate::ast::Operation::CreateContract(cc) => {
                                 frames.push(Frame::BuildCreateContract(op, cc));
-                                frames.push(Frame::Visit(&cc.storage));
+                                push_child(&mut frames, &cc.storage);
                             }
                         },
                     }
@@ -1051,8 +1054,9 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::TransferTokens(TransferTokens {
-                                // Sole owner of a freshly built value: moves.
-                                param: TypedValue::unwrap_rc(param),
+                                // Already an `Rc`, and freshly built: stored
+                                // as is, no unwrap and no copy.
+                                param,
                                 destination_address: t.destination_address.clone(),
                                 amount: t.amount,
                             }),
@@ -1066,7 +1070,7 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::CreateContract(CreateContract {
-                                storage: TypedValue::unwrap_rc(storage),
+                                storage,
                                 delegate: cc.delegate.clone(),
                                 amount: cc.amount,
                                 code: cc.code.clone(),
@@ -1248,6 +1252,30 @@ pub fn dump_big_map_updates<'a>(
     Ok(())
 }
 
+/// [dump_big_map_updates] against a value held behind an `Rc`, returning the
+/// rebuilt root rather than assigning it back.
+///
+/// Returns `None` when the value held no big map, leaving `root` untouched and
+/// still shared. This is the form an internal `CREATE_CONTRACT` needs: its
+/// storage is shared with the other occurrences of a `DUP`ed operation, so
+/// taking it by value to dump it would deep-copy it — unmetered, and before
+/// the walk charges anything (L2-1836).
+pub fn dump_big_map_updates_shared<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    started_with_map_ids: &[BigMapId],
+    root: &Rc<TypedValue<'a>>,
+    temporary: bool,
+) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+    // Same three phases as [dump_big_map_updates], which documents the policy
+    // driving each of them.
+    let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
+    let (updated, deferred) =
+        dump_big_map_walk_shared(storage, root, temporary, &mut seen_source_ids)?;
+    remove_unreferenced_big_maps(storage, started_with_map_ids, &seen_source_ids)?;
+    apply_deferred_big_map_updates(storage, deferred)?;
+    Ok(updated)
+}
+
 /// Deferred first-occurrence in-place overlays from [dump_big_map_walk],
 /// applied once every walk sharing the lazy storage has run.
 pub type DeferredBigMapUpdates<'a> = Vec<(
@@ -1306,6 +1334,38 @@ pub fn dump_big_map_walk<'a>(
     // Return the deferred updates so a multi-walk caller applies them only
     // after every walk has copied from the pre-update source (L2-1761).
     Ok(deferred_in_place_updates)
+}
+
+/// [dump_big_map_walk] against a value held behind an `Rc`, returning the
+/// rebuilt root rather than assigning it back.
+///
+/// Returns `None` when the value held no big map, in which case `root` is
+/// untouched and still shared. Callers that only need to read the result can
+/// then keep using `root` itself, which is what makes this usable on a value
+/// shared with the other occurrences of a `DUP`ed operation: taking it by
+/// value to walk it would deep-copy it, unmetered, before the walk charges
+/// anything (L2-1836).
+pub fn dump_big_map_walk_shared<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    root: &Rc<TypedValue<'a>>,
+    temporary: bool,
+    seen_source_ids: &mut BTreeSet<BigMapId>,
+) -> Result<(Option<Rc<TypedValue<'a>>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
+    let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
+    // Same visitor contract as [dump_big_map_walk]; only the ownership of the
+    // root differs, so the two stay in lock-step.
+    let updated =
+        root.update_big_maps(storage, &mut |storage, map: &mut BigMap<'a>| {
+            dump_one_big_map(
+                map,
+                storage,
+                temporary,
+                seen_source_ids,
+                &mut deferred_in_place_updates,
+            )
+        })?;
+
+    Ok((updated, deferred_in_place_updates))
 }
 
 /// Runs the mutable walk against a throwaway unmetered storage, for tests that
@@ -1809,6 +1869,71 @@ mod review_verification {
         );
     }
 
+    /// Sharing an operation's payload behind an `Rc` only helps if the walk
+    /// then leaves it shared. Reaching the payload through
+    /// `Rc::make_mut(&mut t.param)` would not: `make_mut` copies whenever the
+    /// payload is shared, it runs before anything inspects the payload's type,
+    /// and it writes the clone back into the field — and since
+    /// `TypedValue::Bytes` holds its buffer inline, that "shallow" node clone
+    /// *is* the whole payload for exactly the flat values this targets. The
+    /// copy would be relocated from the instruction to the walk, not removed
+    /// (L2-1836).
+    ///
+    /// The copy-on-write walk returns `None` for a payload with no big map
+    /// under it, so the payload is never touched, however many operations
+    /// share it — and `push_child` means it is walked once rather than once
+    /// per operation.
+    #[test]
+    fn walk_leaves_shared_operation_payloads_shared() {
+        let payload = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        let transfer = |param: Rc<TypedValue<'static>>, counter| {
+            TypedValue::new_operation(
+                crate::ast::Operation::TransferTokens(TransferTokens {
+                    param,
+                    destination_address:
+                        crate::ast::michelson_address::Address::try_from(
+                            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+                        )
+                        .unwrap(),
+                    amount: 0,
+                }),
+                counter,
+            )
+        };
+        // One payload, three operations — the `DUP`ed `list operation` shape.
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            Rc::new(transfer(payload.clone(), 0)),
+            Rc::new(transfer(payload.clone(), 1)),
+            Rc::new(transfer(payload.clone(), 2)),
+        ]));
+        let shared_before = Rc::strong_count(&payload);
+
+        walk_big_maps(&mut root, &mut |_| {
+            panic!("the value holds no big map, so `f` must not be called")
+        });
+
+        assert_eq!(
+            Rc::strong_count(&payload),
+            shared_before,
+            "the walk copied a shared operation payload"
+        );
+        let TypedValue::List(operations) = &root else {
+            panic!("root is no longer a list")
+        };
+        for operation in operations.iter() {
+            let TypedValue::Operation(info) = &**operation else {
+                panic!("element is no longer an operation")
+            };
+            let crate::ast::Operation::TransferTokens(t) = &info.operation else {
+                panic!("element is no longer a transfer")
+            };
+            assert!(
+                Rc::ptr_eq(&t.param, &payload),
+                "an operation's payload was replaced by a copy"
+            );
+        }
+    }
+
     /// The mutable walk must not unshare a subtree that holds no big map:
     /// `DUP` is an `Rc::clone`, so a duplicated multi-gigabyte value would
     /// otherwise be deep-copied once per occurrence and exhaust the kernel's
@@ -1860,7 +1985,7 @@ mod review_verification {
         let operation_carrying = |inner: TypedValue<'static>| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
-                    param: inner,
+                    param: Rc::new(inner),
                     destination_address:
                         crate::ast::michelson_address::Address::try_from(
                             "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
@@ -2491,7 +2616,7 @@ mod review_verification {
         .unwrap();
         let mut root = TypedValue::new_operation(
             crate::ast::Operation::TransferTokens(TransferTokens {
-                param: leaf_big_map(3),
+                param: Rc::new(leaf_big_map(3)),
                 destination_address: destination.clone(),
                 amount: 123_456,
             }),
@@ -2547,7 +2672,7 @@ mod review_verification {
             crate::ast::Operation::CreateContract(CreateContract {
                 delegate: Some(delegate.clone()),
                 amount: 999,
-                storage: leaf_big_map(4),
+                storage: Rc::new(leaf_big_map(4)),
                 code: code.clone(),
                 micheline_code: &micheline_code,
                 address: address.clone(),

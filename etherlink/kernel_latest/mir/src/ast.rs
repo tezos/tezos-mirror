@@ -1375,7 +1375,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 frames.push(TvImFrame::Visit(TV::Address(
                                     tt.destination_address,
                                 )));
-                                frames.push(TvImFrame::Visit(tt.param));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    tt.param,
+                                )));
                             }
                             Operation::SetDelegate(sd) => {
                                 // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
@@ -1406,7 +1408,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     arg_ty_mich,
                                     tag: em.tag,
                                 });
-                                frames.push(TvImFrame::Visit(em.value));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    em.value,
+                                )));
                             }
                             Operation::CreateContract(cc) => {
                                 let delegate_mich = match cc.delegate {
@@ -1431,7 +1435,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     delegate_mich,
                                     mutez_mich,
                                 });
-                                frames.push(TvImFrame::Visit(cc.storage));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    cc.storage,
+                                )));
                             }
                         }
                     }
@@ -1875,7 +1881,11 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
+    /// Take ownership of an `Rc`-shared value: moves it out when this is the
+    /// last reference, clones it otherwise. Prefer keeping the `Rc` when the
+    /// value is only read or forwarded — the clone is a deep copy of every
+    /// inline payload, and those are unbounded.
+    pub fn unwrap_rc(rc: Rc<Self>) -> Self {
         Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
     }
 
@@ -2213,16 +2223,16 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
         }
         TV::Operation(info) => {
             // Operations carry `TypedValue` payloads (transfer parameter, emit
-            // value, originated storage) that may be deep; drain them.
+            // value, originated storage) that may be deep; drain them. They are
+            // `Rc`-shared, so only the last owner actually drains one.
+            let unit = || Rc::new(TV::Unit);
             match &mut info.operation {
                 Operation::TransferTokens(tt) => {
-                    stack.push(DropNode::Value(replace(&mut tt.param, TV::Unit)))
+                    push_rc(replace(&mut tt.param, unit()), stack)
                 }
-                Operation::Emit(e) => {
-                    stack.push(DropNode::Value(replace(&mut e.value, TV::Unit)))
-                }
+                Operation::Emit(e) => push_rc(replace(&mut e.value, unit()), stack),
                 Operation::CreateContract(c) => {
-                    stack.push(DropNode::Value(replace(&mut c.storage, TV::Unit)))
+                    push_rc(replace(&mut c.storage, unit()), stack)
                 }
                 Operation::SetDelegate(_) => {}
             }
@@ -3048,7 +3058,7 @@ mod test_untypers {
             TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag,
-                    value: TypedValue::Unit,
+                    value: Rc::new(TypedValue::Unit),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3277,7 +3287,7 @@ mod drop_safety {
             let mut tv = TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag: None,
-                    value: deep_pair(DEPTH),
+                    value: Rc::new(deep_pair(DEPTH)),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,

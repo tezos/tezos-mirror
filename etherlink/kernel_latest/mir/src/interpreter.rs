@@ -3090,7 +3090,10 @@ fn interpret_one<'a>(
             stack.push(V::Bool(key.verify_signature(&sig, msg).unwrap_or(false)));
         }
         I::TransferTokens => {
-            let param = pop!();
+            // Forwarded into the operation as-is: `pop_rc!` keeps the
+            // parameter shared instead of `unwrap_rc`-ing a still-`DUP`ed
+            // value into a full copy (L2-1831).
+            let param = pop_rc!();
             let mutez_amount = pop!(V::Mutez);
             let contract_address = pop!(V::Contract);
             let counter = fresh_operation_counter(ctx)?;
@@ -3448,7 +3451,7 @@ fn interpret_one<'a>(
         }
         I::Emit { tag, arg_ty } => {
             let counter = fresh_operation_counter(ctx)?;
-            let emit_val = pop!();
+            let emit_val = pop_rc!();
             ctx.gas().consume(interpret_cost::EMIT)?;
             stack.push(TypedValue::new_operation(
                 Operation::Emit(Emit {
@@ -3517,7 +3520,7 @@ fn interpret_one<'a>(
                 })
                 .transpose()?;
             let amount = pop!(V::Mutez);
-            let storage = pop!();
+            let storage = pop_rc!();
             let origination_counter = ctx.origination_counter();
             let address =
                 compute_contract_address(ctx.operation_group_hash(), origination_counter);
@@ -7686,7 +7689,7 @@ mod interpreter_tests {
     #[test]
     fn transfer_tokens() {
         let tt = super::TransferTokens {
-            param: TypedValue::nat(42),
+            param: Rc::new(TypedValue::nat(42)),
             destination_address: addr::Address::try_from(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
             )
@@ -7696,7 +7699,7 @@ mod interpreter_tests {
         let stk = &mut stk![
             V::Contract(tt.destination_address.clone()),
             V::Mutez(tt.amount),
-            tt.param.clone()
+            (*tt.param).clone()
         ];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
@@ -9325,7 +9328,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: TypedValue::nat(20),
+                    value: Rc::new(TypedValue::nat(20)),
                     arg_ty: Left(Type::Nat)
                 }),
                 100
@@ -9360,7 +9363,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: TypedValue::nat(20),
+                    value: Rc::new(TypedValue::nat(20)),
                     arg_ty: Or::Right(emit_type_mich)
                 }),
                 100
@@ -10509,7 +10512,7 @@ mod interpreter_tests {
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: TypedValue::Unit,
+                storage: Rc::new(TypedValue::Unit),
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -10540,6 +10543,57 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    /// `operation` is duplicable, so a contract can `DUP` one into the
+    /// returned `list operation`. Extracting the operations must then not
+    /// deep-copy the shared payload once per occurrence: that is unmetered
+    /// and unbounded, and a few copies of a large enough parameter exhaust
+    /// the kernel's `wasm32` heap, aborting it (L2-1831).
+    ///
+    /// Asserted on pointer identity — a deep copy still compares equal.
+    #[test]
+    fn duplicated_outgoing_operations_share_their_parameter() {
+        use crate::parser::test_helpers::{parse, parse_contract_script};
+
+        let arena = Arena::new();
+        let script = parse_contract_script(
+            "parameter bytes;
+             storage unit;
+             code { DROP ;
+                    SELF ; PUSH mutez 0 ; PUSH bytes 0xaabbccdd ;
+                    TRANSFER_TOKENS ;
+                    NIL operation ; DUP 2 ; CONS ; SWAP ; CONS ;
+                    UNIT ; SWAP ; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, true)
+        .unwrap();
+
+        let (ops, _storage) = script
+            .interpret(
+                &mut Ctx::default(),
+                &arena,
+                parse("0x").unwrap(),
+                &Entrypoint::default(),
+                &parse("Unit").unwrap(),
+                crate::typechecker::AllowForgedLazyStorageId::No,
+            )
+            .unwrap();
+
+        let params: Vec<Rc<TypedValue>> = ops
+            .map(|op| match op.operation {
+                Operation::TransferTokens(tt) => tt.param,
+                other => panic!("expected TransferTokens, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(params.len(), 2);
+        assert!(
+            Rc::ptr_eq(&params[0], &params[1]),
+            "the duplicated operation's parameter was copied"
         );
     }
 
