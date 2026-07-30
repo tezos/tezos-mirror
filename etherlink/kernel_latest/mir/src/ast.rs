@@ -1421,34 +1421,31 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     // an untyped representation that is the shortest.
                     TV::Pair(l, r) => {
                         frames.push(TvImFrame::BuildPrim2(Prim::Pair));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(r),
-                        )));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(l),
-                        )));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(r).unwrap_or_clone()));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(l).unwrap_or_clone()));
                     }
                     TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
                     TV::Option(Some(rc)) => {
                         frames.push(TvImFrame::BuildPrim1(Prim::Some));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(rc),
-                        )));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(rc).unwrap_or_clone()));
                     }
                     TV::Or(or) => match std::mem::take(or) {
                         Or::Left(x) => {
                             frames.push(TvImFrame::BuildPrim1(Prim::Left));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                            frames.push(TvImFrame::Visit(x.unwrap_or_clone()));
                         }
                         Or::Right(x) => {
                             frames.push(TvImFrame::BuildPrim1(Prim::Right));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                            frames.push(TvImFrame::Visit(x.unwrap_or_clone()));
                         }
                     },
                     TV::List(l) => {
                         let mut elems: Vec<TypedValue<'a>> = std::mem::take(l)
                             .into_iter()
-                            .map(TypedValue::unwrap_rc)
+                            .map(RcTypedValue::unwrap_or_clone)
                             .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1459,7 +1456,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         let mut elems: Vec<TypedValue<'a>> =
                             rb_set_into_vec(std::mem::take(s))
                                 .into_iter()
-                                .map(TypedValue::unwrap_rc)
+                                .map(RcTypedValue::unwrap_or_clone)
                                 .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1474,8 +1471,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         });
                         while let Some((key, val)) = entries.pop() {
                             frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                            frames.push(TvImFrame::Visit(val.unwrap_or_clone()));
+                            frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                         }
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
@@ -1487,8 +1484,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             });
                             while let Some((key, val)) = entries.pop() {
                                 frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                                frames.push(TvImFrame::Visit(val.unwrap_or_clone()));
+                                frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                             }
                         }
                         big_map::BigMapContent::FromId(m) => {
@@ -1511,7 +1508,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             frames
                                                 .push(TvImFrame::BuildPrim1(Prim::Some));
                                             frames.push(TvImFrame::Visit(
-                                                TypedValue::unwrap_rc(v),
+                                                v.unwrap_or_clone(),
                                             ));
                                         }
                                         None => {
@@ -1521,9 +1518,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             )?));
                                         }
                                     }
-                                    frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                        key,
-                                    )));
+                                    frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                                 }
                             }
                         }
@@ -1542,9 +1537,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 frames.push(TvImFrame::Visit(TV::Address(
                                     tt.destination_address,
                                 )));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    tt.param,
-                                )));
+                                frames.push(TvImFrame::Visit(tt.param.unwrap_or_clone()));
                             }
                             Operation::SetDelegate(sd) => {
                                 // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
@@ -1575,9 +1568,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     arg_ty_mich,
                                     tag: em.tag,
                                 });
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    em.value,
-                                )));
+                                frames.push(TvImFrame::Visit(em.value.unwrap_or_clone()));
                             }
                             Operation::CreateContract(cc) => {
                                 let delegate_mich = match cc.delegate {
@@ -1602,9 +1593,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     delegate_mich,
                                     mutez_mich,
                                 });
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    cc.storage,
-                                )));
+                                frames
+                                    .push(TvImFrame::Visit(cc.storage.unwrap_or_clone()));
                             }
                         }
                     }
@@ -2025,7 +2015,7 @@ impl From<OutOfGas> for BorrowedUnparseError {
 
 /// Drain a persistent [RedBlackTreeSet] into a `Vec`. rpds exposes no owning
 /// iterator, so we clone the element handles (cheap `Rc` bumps); when the set
-/// was unique a later [TypedValue::unwrap_rc] then moves rather than clones.
+/// was unique a later [RcTypedValue::unwrap_or_clone] then moves rather than clones.
 pub(crate) fn rb_set_into_vec<T: Ord + Clone>(s: RedBlackTreeSet<T>) -> Vec<T> {
     s.iter().cloned().collect()
 }
@@ -2049,14 +2039,6 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Take ownership of a shared value: moves it out when this is the last
-    /// reference, clones it otherwise. Prefer keeping the [RcTypedValue] when
-    /// the value is only read or forwarded — the clone is a deep copy of every
-    /// inline payload, and those are unbounded.
-    pub fn unwrap_rc(rc: RcTypedValue<'a>) -> Self {
-        rc.unwrap_or_clone()
-    }
-
     /// Convenience function to construct a new [Self::Pair].
     pub fn new_pair(l: Self, r: Self) -> Self {
         Self::Pair(RcTypedValue::new(l), RcTypedValue::new(r))

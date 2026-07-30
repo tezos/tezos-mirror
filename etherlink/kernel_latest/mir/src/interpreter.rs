@@ -311,10 +311,12 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        let result = TypedValue::unwrap_rc(stack.pop().ok_or(
-            InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
-        )?);
-        let mut result = result;
+        let mut result = stack
+            .pop()
+            .ok_or(InterpretError::InternalError(
+                InterpretInvariant::EmptyValueStackPop,
+            ))?
+            .unwrap_or_clone();
         let (operation_list, mut storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
@@ -326,7 +328,7 @@ impl<'a> ContractScript<'a> {
                 .into())
             }
         };
-        let mut operation_list = TypedValue::unwrap_rc(operation_list);
+        let mut operation_list = operation_list.unwrap_or_clone();
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
         // removal decision. A big map can be moved out of the
@@ -385,7 +387,7 @@ impl<'a> ContractScript<'a> {
 
         let mut ops = Vec::with_capacity(vec.len());
         for op in vec {
-            let mut op = TypedValue::unwrap_rc(op);
+            let mut op = op.unwrap_or_clone();
             match &mut op {
                 V::Operation(op) => ops.push(*std::mem::take(op)),
                 _ => {
@@ -987,7 +989,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let cond = match TypedValue::unwrap_rc(pop_value(stk)?) {
+                let cond = match pop_value(stk)?.unwrap_or_clone() {
                     TypedValue::Bool(b) => b,
                     _ => {
                         return Err(InterpretError::InternalError(
@@ -1010,7 +1012,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopLeftBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?);
+                let mut or_v = pop_value(stk)?.unwrap_or_clone();
                 let or = match &mut or_v {
                     TypedValue::Or(or) => std::mem::take(or),
                     _ => {
@@ -1391,7 +1393,7 @@ fn interpret_step<'a, 'b>(
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
             // pattern match (E0509); borrow the field and `take_out` it,
             // leaving the drained value to drop trivially at end of block.
-            let mut v = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut v = pop_value(stack)?.unwrap_or_clone();
             match &mut v {
                 #[allow(unused_parens)]
                 $p(i) => $crate::ast::TakeOut::take_out(i),
@@ -1755,19 +1757,19 @@ fn interpret_one<'a>(
     use TypedValue as V;
 
     // Two macros: `pop_rc!` keeps the `RcTypedValue`, `pop!` calls
-    // `unwrap_rc` on it. Prefer `pop_rc!` for read-only / forwarding
+    // `unwrap_or_clone` on it. Prefer `pop_rc!` for read-only / forwarding
     // access (no risk of deep-cloning a shared collection); use `pop!`
     // only when the value is consumed by value.
     //
     // Usage:
     // `pop_rc!()` pops the top element from the stack, propagating
     //   `InterpretError::InternalError(EmptyValueStackPop)` on `?` if empty.
-    // `pop!()` pops and `unwrap_rc`s the top element, propagating the same
+    // `pop!()` pops and `unwrap_or_clone`s the top element, propagating the same
     //   error on `?`.
-    // `pop!(T::Foo)` pops, `unwrap_rc`s, then matches `T::Foo(x)` returning
+    // `pop!(T::Foo)` pops, `unwrap_or_clone`s, then matches `T::Foo(x)` returning
     //   `x`; on type mismatch propagates
     //   `InterpretError::InternalError(TypeMismatchOnPop { expected })`.
-    // `pop!(T::Bar, x, y, z)` pops, `unwrap_rc`s, matches `T::Bar(x, y, z)`
+    // `pop!(T::Bar, x, y, z)` pops, `unwrap_or_clone`s, matches `T::Bar(x, y, z)`
     //   and binds the fields in the surrounding scope (statement form).
     //
     // `top_mut!(T::Foo)` borrows the top of the stack as `&mut Foo`'s inner
@@ -1784,7 +1786,7 @@ fn interpret_one<'a>(
 
     macro_rules! pop {
         () => {{
-            TypedValue::unwrap_rc(pop_rc!())
+            pop_rc!().unwrap_or_clone()
         }};
         ($p:path) => {{
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
@@ -3105,7 +3107,7 @@ fn interpret_one<'a>(
         }
         I::TransferTokens => {
             // Forwarded into the operation as-is: `pop_rc!` keeps the
-            // parameter shared instead of `unwrap_rc`-ing a still-`DUP`ed
+            // parameter shared instead of `unwrap_or_clone`-ing a still-`DUP`ed
             // value into a full copy (L2-1831).
             let param = pop_rc!();
             let mutez_amount = pop!(V::Mutez);
@@ -3123,7 +3125,7 @@ fn interpret_one<'a>(
         }
         I::SetDelegate => {
             let opt_keyhash = pop!(V::Option)
-                .map(|kh| match &mut TypedValue::unwrap_rc(kh) {
+                .map(|kh| match &mut kh.unwrap_or_clone() {
                     V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3285,7 +3287,7 @@ fn interpret_one<'a>(
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
             pop!(V::Pair, amount_left, amount_right);
-            let amount_left = match &mut TypedValue::unwrap_rc(amount_left) {
+            let amount_left = match &mut amount_left.unwrap_or_clone() {
                 V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3293,7 +3295,7 @@ fn interpret_one<'a>(
                     ))
                 }
             };
-            let amount_right = match &mut TypedValue::unwrap_rc(amount_right) {
+            let amount_right = match &mut amount_right.unwrap_or_clone() {
                 V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3324,7 +3326,7 @@ fn interpret_one<'a>(
         }
         I::JoinTickets => {
             pop!(V::Pair, ticket_left, ticket_right);
-            let mut ticket_left = match &mut TypedValue::unwrap_rc(ticket_left) {
+            let mut ticket_left = match &mut ticket_left.unwrap_or_clone() {
                 V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3334,7 +3336,7 @@ fn interpret_one<'a>(
                     ))
                 }
             };
-            let ticket_right = match &mut TypedValue::unwrap_rc(ticket_right) {
+            let ticket_right = match &mut ticket_right.unwrap_or_clone() {
                 V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3524,7 +3526,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter = fresh_operation_counter(ctx)?;
             let opt_keyhash = pop!(V::Option)
-                .map(|keyhash| match &mut TypedValue::unwrap_rc(keyhash) {
+                .map(|keyhash| match &mut keyhash.unwrap_or_clone() {
                     V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3810,7 +3812,7 @@ mod interpreter_tests {
 
     /// L2-1837: `FAILWITH` on a shared value must embed it behind its `Rc`,
     /// not deep-copy it. A `DUP` leaves the operand shared (refcount 2); pre-
-    /// fix `FAILWITH` popped with `pop!` -> `unwrap_rc`, deep-cloning the
+    /// fix `FAILWITH` popped with `pop!` -> `unwrap_or_clone`, deep-cloning the
     /// whole `~SIZE`-byte value into a second allocation — enough coexisting
     /// copies exceed the 4 GiB wasm heap and trap the kernel. Post-fix
     /// `FAILWITH` pops with `pop_rc!`, so the allocation is O(1) in `SIZE`.
@@ -7790,7 +7792,7 @@ mod interpreter_tests {
     /// L2-1838: `PACK` on a shared value must read it through its `Rc`, not
     /// deep-copy it. With a gas budget too small to serialize the value, PACK
     /// must run out of gas *without* first cloning the shared operand. Pre-fix
-    /// `pop!` -> `unwrap_rc` clones the whole `~SIZE`-byte value (an uncharged
+    /// `pop!` -> `unwrap_or_clone` clones the whole `~SIZE`-byte value (an uncharged
     /// allocation that can exhaust the heap) before any serialization gas is
     /// charged; post-fix the borrowed unparse charges before cloning any leaf,
     /// so the out-of-gas fires after only `O(gas)` allocation.
@@ -8565,7 +8567,7 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        TypedValue::unwrap_rc(stack.pop().unwrap())
+        stack.pop().unwrap().unwrap_or_clone()
     }
 
     #[test]
@@ -8574,7 +8576,7 @@ mod interpreter_tests {
         //
         // The attack is `APPLY large_capture; loop k { DUP; EXEC }`. Each
         // `EXEC` of a `DUP`'d (refcount >= 2) applied closure has to clone the
-        // closure out of its shared `Rc` (`pop_v!`/`unwrap_rc`). Because
+        // closure out of its shared `Rc` (`pop_v!`/`unwrap_or_clone`). Because
         // `Closure::Apply` now stores its capture in an `Rc`, that clone bumps
         // a refcount (O(1)) instead of deep-copying the whole capture. With the
         // previous `Box`, every `EXEC` deep-copied the capture: O(k * |capture|)

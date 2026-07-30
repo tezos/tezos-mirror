@@ -783,7 +783,7 @@ impl<'a> TypedValue<'a> {
     ) -> Result<(), LazyStorageError> {
         if let Some(updated) = self.update_big_maps(storage, f)? {
             // Sole owner of a freshly built value, so this moves, never clones.
-            *self = TypedValue::unwrap_rc(updated);
+            *self = updated.unwrap_or_clone();
         }
         Ok(())
     }
@@ -2282,7 +2282,7 @@ mod review_verification {
                 node,
             ])));
         }
-        TypedValue::unwrap_rc(node)
+        node.unwrap_or_clone()
     }
 
     /// A value's in-memory DAG can unfold to a tree exponentially larger than

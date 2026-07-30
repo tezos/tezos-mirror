@@ -1158,7 +1158,7 @@ where
                             Some(&script.code),
                             // Shared, not unwrapped: the other occurrences of
                             // a `DUP`ed operation hold the same payload, so
-                            // `unwrap_rc` here would deep-copy it, unmetered
+                            // `unwrap_or_clone` here would deep-copy it, unmetered
                             // and before anything charges for it (L2-1836).
                             storage,
                             &Origin::Native,
@@ -2821,7 +2821,7 @@ fn interpret_encoded_script<'a>(
 
     // Encode the new storage
     // Unparse through the borrowed walk: the consuming `IntoMicheline`
-    // `unwrap_rc`s each child, which deep-copies one that is still shared
+    // `unwrap_or_clone`s each child, which deep-copies one that is still shared
     // (`DUP ; PAIR` leaves `Pair(V, V)` sharing a single allocation) *before*
     // any gas is charged for it. The borrowed walk reads through the `Rc` and
     // clones only leaf payloads, through constructors that charge first, so an
@@ -13883,7 +13883,7 @@ mod tests {
     /// consuming and borrowing unparsers are observationally equivalent —
     /// same output, same charged gas — and differ only in peak heap. So no
     /// test here can detect which one a receipt site calls, and reverting a
-    /// site to `TypedValue::unwrap_rc(..)` would leave these green. What they
+    /// site to `...unwrap_or_clone()` would leave these green. What they
     /// do guard is the contract that makes borrowing worth doing: that
     /// reading through the `Rc` copies nothing, retains nothing, and charges
     /// before it allocates. Break any of those and the sites become unsafe
@@ -13912,7 +13912,7 @@ mod tests {
         /// L2-1831: a `DUP`ed operation's occurrences share one parameter, and
         /// unparsing each occurrence's receipt must leave that sharing intact.
         ///
-        /// Reverting the site to `TypedValue::unwrap_rc(param)` fails this:
+        /// Reverting the site to `param.unwrap_or_clone()` fails this:
         /// at a strong count above one `try_unwrap` cannot succeed, so it
         /// deep-copies the 64 KiB buffer — unmetered — once per occurrence.
         #[test]
@@ -13951,7 +13951,7 @@ mod tests {
         /// no reference, so a `CREATE_CONTRACT` that was never `DUP`ed still
         /// holds its storage alone afterwards.
         ///
-        /// The previous code was `unwrap_rc(storage.clone())`, where the clone
+        /// The previous code was `unwrap_or_clone` on a fresh clone, where the clone
         /// bumps the count before `try_unwrap` inspects it — so it could never
         /// succeed, and *every* origination paid a copy, shared or not.
         ///
@@ -13978,7 +13978,7 @@ mod tests {
                 storage.strong_count(),
                 1,
                 "the receipt must not retain a reference, so the origination's \
-                 unwrap_rc moves rather than copying the storage a second time"
+                 unwrap_or_clone moves rather than copying the storage a second time"
             );
             // The move is now possible: nothing else holds the payload.
             assert!(storage.try_unwrap().is_ok());
@@ -13994,7 +13994,7 @@ mod tests {
         /// ```
         ///
         /// Both occurrences' `OperationInfo` hold `Rc` clones of one payload,
-        /// so a `TypedValue::unwrap_rc(storage)` feeding `originate_contract`
+        /// so a `storage.unwrap_or_clone()` feeding `originate_contract`
         /// finds a strong count above one, fails to `try_unwrap`, and
         /// deep-copies — unmetered, and before `handle_storage_with_big_maps`
         /// charges anything. Threading the `Rc` through instead is what
@@ -14017,7 +14017,7 @@ mod tests {
             );
             assert!(
                 occurrences[0].strong_count() >= 2,
-                "so unwrap_rc on this path could never move — it would copy"
+                "so unwrap_or_clone on this path could never move — it would copy"
             );
 
             // Unparsing the first occurrence's receipt must leave the second

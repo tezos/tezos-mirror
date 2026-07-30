@@ -5529,7 +5529,7 @@ fn step_typecheck_value<'a, 'b>(
             match &mut pair {
                 TV::Pair(left, right) => {
                     let (left, right) = (std::mem::take(left), std::mem::take(right));
-                    let address = match &mut TypedValue::unwrap_rc(left) {
+                    let address = match &mut left.unwrap_or_clone() {
                         TV::Address(a) => std::mem::take(a),
                         _ => {
                             return Err(TcError::InternalError(
@@ -5539,7 +5539,7 @@ fn step_typecheck_value<'a, 'b>(
                             ))
                         }
                     };
-                    let (content, amount) = match &mut TypedValue::unwrap_rc(right) {
+                    let (content, amount) = match &mut right.unwrap_or_clone() {
                         TV::Pair(c, a) => (std::mem::take(c), std::mem::take(a)),
                         _ => {
                             return Err(TcError::InternalError(
@@ -5547,7 +5547,7 @@ fn step_typecheck_value<'a, 'b>(
                             ))
                         }
                     };
-                    let amount = match &mut TypedValue::unwrap_rc(amount) {
+                    let amount = match &mut amount.unwrap_or_clone() {
                         TV::Nat(n) => std::mem::take(n),
                         _ => {
                             return Err(TcError::InternalError(
@@ -5558,7 +5558,7 @@ fn step_typecheck_value<'a, 'b>(
                     results.push(TV::new_ticket(Ticket {
                         ticketer: address.hash,
                         content_type,
-                        content: TypedValue::unwrap_rc(content),
+                        content: content.unwrap_or_clone(),
                         amount,
                     }));
                     Ok(())
