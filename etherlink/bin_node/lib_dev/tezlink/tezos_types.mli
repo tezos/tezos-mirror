@@ -37,21 +37,21 @@ val convert_using_serialization :
 module Contract : sig
   type t = Tezlink_imports.Imported_context.Contract.t
 
-  type implicit = Signature.V2.Public_key_hash.t
+  type implicit = Signature.V3.Public_key_hash.t
 
   val encoding : t Data_encoding.t
 
-  val implicit_encoding : Signature.V2.public_key_hash Data_encoding.t
+  val implicit_encoding : Signature.V3.public_key_hash Data_encoding.t
 
   val to_b58check : t -> string
 
   val of_b58check : string -> t tzresult
 
-  val of_implicit : Signature.V2.public_key_hash -> t
+  val of_implicit : Signature.V3.public_key_hash -> t
 
   val of_originated : Tezlink_imports.Imported_protocol.Contract_hash.t -> t
 
-  val of_hex : string -> Signature.V2.public_key_hash option
+  val of_hex : string -> Signature.V3.public_key_hash option
 end
 
 module Tez : sig
@@ -78,7 +78,7 @@ end
 
 module Operation : sig
   type t = {
-    source : Signature.V2.public_key_hash;
+    source : Signature.V3.public_key_hash;
     first_counter : Z.t;
     length : int;
     op : Tezlink_imports.Imported_context.packed_operation;

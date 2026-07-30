@@ -61,13 +61,15 @@ module type S = sig
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Tezlink_imports.Imported_context.Script.t option tzresult Lwt.t
+    Tezlink_imports.Imported_context.Script.michelson_with_storage option
+    tzresult
+    Lwt.t
 
   val manager_key :
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Signature.V2.Public_key.t option tzresult Lwt.t
+    Signature.V3.Public_key.t option tzresult Lwt.t
 
   val counter :
     [`Main] ->

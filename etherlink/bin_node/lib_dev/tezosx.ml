@@ -55,18 +55,18 @@ module Ethereum_runtime = struct
 end
 
 module Tezos_runtime = struct
-  type address = Signature.V2.public_key_hash
+  type address = Signature.V3.public_key_hash
 
   let address_of_string address =
     let open Result_syntax in
-    match Tezos_crypto.Signature.V2.Public_key_hash.of_b58check address with
+    match Tezos_crypto.Signature.V3.Public_key_hash.of_b58check address with
     | Ok tezos_kh -> return tezos_kh
     | Error _ -> tzfail (error_of_fmt "%s is not a valid Tezos address" address)
 
   type account_info = {
     balance : Tezos_types.Tez.t;
     nonce : int64;
-    public_key : Signature.V2.public_key option;
+    public_key : Signature.V3.public_key option;
   }
 
   let decode_account_info bytes =
@@ -92,7 +92,7 @@ module Tezos_runtime = struct
             | Value b when b = Bytes.empty -> return_none
             | Value value ->
                 return_some
-                  (Signature.V2.Public_key.of_b58check_exn
+                  (Signature.V3.Public_key.of_b58check_exn
                      (Bytes.unsafe_to_string value))
             | _ -> fail "public key" ()
           in
@@ -126,7 +126,7 @@ module Tezos_runtime = struct
       match public_key with
       | Some public_key ->
           Rlp.Value
-            (Bytes.of_string (Signature.V2.Public_key.to_b58check public_key))
+            (Bytes.of_string (Signature.V3.Public_key.to_b58check public_key))
       | None -> Value Bytes.empty
     in
     Rlp.encode Rlp.(List [Value balance; Value nonce; public_key])
@@ -160,7 +160,7 @@ module Foreign_address = struct
                Value (Bytes.unsafe_of_string "\x01");
                Value
                  (Bytes.of_string
-                    (Signature.V2.Public_key_hash.to_b58check pkh));
+                    (Signature.V3.Public_key_hash.to_b58check pkh));
              ])
 end
 
@@ -169,13 +169,13 @@ module Durable_storage_path = struct
     module Tezos = struct
       let info pkh =
         Durable_storage_path.michelson_ledger_root ^ "/"
-        ^ Signature.V2.Public_key_hash.to_b58check pkh
+        ^ Signature.V3.Public_key_hash.to_b58check pkh
         ^ "/info"
 
       let ethereum_alias pkh =
         let (Address (Hex alias)) =
           Ethereum_runtime.generate_alias
-            (Signature.V2.Public_key_hash.to_b58check pkh)
+            (Signature.V3.Public_key_hash.to_b58check pkh)
         in
         Durable_storage_path.michelson_ledger_root ^ "/native/ethereum/0x"
         ^ alias
