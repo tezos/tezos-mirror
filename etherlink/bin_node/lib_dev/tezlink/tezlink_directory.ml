@@ -495,10 +495,12 @@ let build_block_static_directory ~l2_chain_id
                input,
                unlimited_gas,
                chain_id,
-               (* On L1 the "source" JSON field carries the *sender*, but
-                  `VIEW` overrides `SENDER` with the viewed contract in
-                  this RPC, so for an ordinary view the field is inert. *)
-               _sender,
+               (* The "source" JSON field carries L1's *sender*. It is
+                  inert for an ordinary view — `VIEW` overrides `SENDER`
+                  with the viewed contract in this RPC — but the enshrined
+                  synthetic views are dispatched before that override and
+                  read it as the calling contract. *)
+               sender,
                payer,
                gas,
                unparsing_mode,
@@ -531,6 +533,7 @@ let build_block_static_directory ~l2_chain_id
                 Tezlink_imports.Imported_context.Gas.Arith.integral_to_z
                 gas)
            ~payer
+           ~sender
            ~now:
              (Option.map
                 Tezlink_imports.Imported_protocol.Script_timestamp.to_zint

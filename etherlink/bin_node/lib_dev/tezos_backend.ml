@@ -796,7 +796,7 @@ let make (ctxt : Evm_ro_context.t) =
        script runs — the kernel's `run_code` entrypoint rather than an
        in-process `Script_interpreter.execute`. *)
     let run_script_view chain block ~contract ~view ~input ~chain_id
-        ~unlimited_gas ~gas ~payer ~now ~level ~unparsing_mode =
+        ~unlimited_gas ~gas ~payer ~sender ~now ~level ~unparsing_mode =
       let open Lwt_result_syntax in
       let `Main = chain in
       let module Imported = Tezlink_imports.Imported_protocol in
@@ -872,6 +872,19 @@ let make (ctxt : Evm_ro_context.t) =
          runtime's own per-operation cap is lower and the kernel clamps to
          it, so [None] already expresses "as much as allowed". *)
       let gas = if unlimited_gas then None else gas in
+      (* [sender] is inert for an ordinary view but is what the enshrined
+         synthetic views report as the caller — see
+         [Tezlink_backend_sig.S.run_script_view]. [on_chain_code] is
+         [None] exactly for an enshrined target: an unknown address
+         already failed above. *)
+      let self =
+        match (on_chain_code, sender) with
+        | ( None,
+            Some (Tezlink_imports.Imported_context.Contract.Originated _ as s)
+          ) ->
+            s
+        | _ -> contract
+      in
       let unit_parameter =
         Micheline.strip_locations
           (Micheline.Prim (0, Imported.Michelson_v1_primitives.D_Unit, [], []))
@@ -883,9 +896,9 @@ let make (ctxt : Evm_ro_context.t) =
           ~input:unit_parameter
           ~entrypoint:"default"
           ~chain_id
-          ~self:contract
+          ~self
           ~amount:0L
-          ~sender:None
+          ~sender
           ~payer
           ~balance:None
           ~gas

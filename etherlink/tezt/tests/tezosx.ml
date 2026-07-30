@@ -7223,6 +7223,81 @@ let test_run_script_view_crac_step_constants () =
   let* () = check ~what:"block.number inside the CRAC" number_kt1 level in
   unit
 
+(** [run_script_view] on an *enshrined* contract's synthetic view.
+
+    The gateway's `staticcall_evm` is dispatched by
+    [try_dispatch_enshrined_view] before `VIEW` overwrites the execution
+    context, so unlike an ordinary script view it reads the calling
+    address straight off `self_address` and forwards it to the EVM as
+    `msg.sender`. That makes the RPC's `source` field observable here —
+    the one place it is not inert — so this asserts it differentially:
+    the same call with and without `--source` must report different
+    senders, and each must be the deterministic alias of the address
+    asked for. Without the fix both answer with the gateway's own alias. *)
+let test_run_script_view_enshrined_sender () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view honours source for an enshrined synthetic view"
+    ~tags:["rpc"; "run_script_view"; "staticcall_evm"; "view"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  (* Same 9-byte runtime as the nested-view test: CALLER / MSTORE /
+     RETURN, i.e. `msg.sender` left-padded into a 32-byte word. *)
+  let init_code = "600980600b6000396000f33360005260206000f3" in
+  let evm_sender = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract_address =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender:evm_sender
+      ~nonce:0
+      ~init_code
+      ()
+  in
+  (* An unrelated KT1, used only as the caller identity to pass as
+     `--source`. *)
+  let* caller_kt1 =
+    sandbox_originate_michelson_contract
+      ~source:Constant.bootstrap5
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"0"
+      sandbox
+  in
+  let* client = tezlink_client sandbox in
+  (* `staticcall_evm : (pair string bytes) -> bytes` — the EVM target
+     and the calldata. The contract ignores the calldata. *)
+  let input = sf {|(Pair "%s" 0xa87d942c)|} evm_contract_address in
+  let run ?payer ?source () =
+    Client.run_view
+      ?payer
+      ?source
+      ~view:"staticcall_evm"
+      ~contract:gateway_address
+      ~input
+      client
+  in
+  (* EVM `MSTORE` of a 20-byte address left-pads it with 12 zero bytes. *)
+  let expected_for address =
+    sf
+      "0x%s%s"
+      (String.make 24 '0')
+      Test_helpers.(remove_0x (evm_alias_of_tezos_address address))
+  in
+  let* default_sender = run () in
+  Check.(
+    (String.trim default_sender = expected_for gateway_address)
+      string
+      ~error_msg:"Expected the gateway's own alias as msg.sender: %R, got %L") ;
+  let* explicit_sender = run ~source:caller_kt1 () in
+  Check.(
+    (String.trim explicit_sender = expected_for caller_kt1)
+      string
+      ~error_msg:"Expected --source's alias as msg.sender: %R, got %L") ;
+  Check.(
+    (String.trim explicit_sender <> String.trim default_sender)
+      string
+      ~error_msg:"--source made no difference to msg.sender (%L)") ;
+  unit
+
 (** [run_script_view] rejects the two L1 fields the Michelson runtime
     cannot honour, rather than silently computing against a different
     state than the caller asked for. *)
@@ -7356,4 +7431,5 @@ let () =
   test_tezosx_single_tx_execution_input () ;
   test_run_script_view () ;
   test_run_script_view_crac_step_constants () ;
-  test_run_script_view_unsupported_fields ()
+  test_run_script_view_unsupported_fields () ;
+  test_run_script_view_enshrined_sender ()
