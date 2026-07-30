@@ -5558,7 +5558,7 @@ ocaml-check:
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
     DUNE_CACHE_STORAGE_MODE: hardlink
 
-release_page.build:
+release_site.build:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: build
   tags:
@@ -5592,7 +5592,7 @@ release_page.build:
     - _build/default/release_site/src/release_page.exe
     when: on_success
 
-release_page.build_tezt:
+release_site.build_tezt:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: build
   tags:
@@ -5634,7 +5634,7 @@ release_page.build_tezt:
     - _build/default/release_site/tezt/main.exe
     when: on_success
 
-release_page.tezt:
+release_site.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -5646,12 +5646,12 @@ release_page.tezt:
   needs:
   - oc.docker:ci:amd64
   - trigger
-  - release_page.build
-  - release_page.build_tezt
+  - release_site.build
+  - release_site.build_tezt
   dependencies:
   - oc.docker:ci:amd64
-  - release_page.build
-  - release_page.build_tezt
+  - release_site.build
+  - release_site.build_tezt
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -5663,13 +5663,13 @@ release_page.tezt:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'release_site/tezt/main.exe' --without-select-tezts
-    -- "${TESTS}" --from-record tezt/records/release_page --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    -- "${TESTS}" --from-record tezt/records/release_site --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    ${JUNIT} --datadog-service release_page --tezt-exe 'release_site/tezt/main.exe'
+    ${JUNIT} --datadog-service release_site --tezt-exe 'release_site/tezt/main.exe'
     --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
-    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/release_page
+    fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/release_site
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
     ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
     --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'

@@ -1,9 +1,33 @@
-# Octez Release Page
+# Release site
+
+`release_site` is the component that owns the whole release website served at
+[`/releases/`](https://octez.tezos.com/releases/). It contains one tab for Octez
+and one for each other component (rollup node, teztale, grafazos, …), rendered
+from the components' `versions.json` manifests.
 
 The release assets are distributed either all at once (typically with Octez major releases) or for individual components (typically with Octez minor releases).
 
 To make these assets easily accessible, release pages can be generated using the `release_site/release_page.ml` script.
 This script enables the creation of release pages for any given component, specifying a set of asset types and the storage location where the assets are distributed.
+
+## Vocabulary and naming convention
+
+To remove the ambiguity between "the whole site" and "one component's page", we fix the following vocabulary:
+
+- **Release site**: the whole website served at `/releases/`. It is owned by the `release_site` component.
+- **Tab**: the per-component section of the release site (one for Octez, one per component). A tab is rendered from that component's `versions.json`.
+- **Assets**: the released files of a component together with its `versions.json` manifest.
+- **Deployment**: uploading a component's assets to the storage bucket. A deployment does not render any HTML.
+- **Rendering**: producing the release site's HTML from every component's `versions.json`. This is the responsibility of `release_site`.
+
+In Cacio, a job's fully-qualified name is prefixed by the name of the component that owns it, so the prefix tells us which component is responsible for the job:
+
+- A job prefixed by a component name acts only on that component's own assets.
+  In particular, each component owns a `<component>.deploy-assets` job that uploads its assets and updates its own `versions.json`, because deploying assets is the component's concern.
+- A job prefixed by `release_site` acts on the whole site.
+  In particular, `release_site.render` re-renders the entire site from every component's `versions.json`, because rendering is owned by the `release_site` component.
+
+Consequently there is no per-component render/publish job (e.g. no `teztale.release-page-publish`): components only deploy their assets, and the site is always rendered as a whole by `release_site`.
 
 ## Usage
 

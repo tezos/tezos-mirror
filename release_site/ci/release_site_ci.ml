@@ -8,7 +8,7 @@
 open Tezos_ci
 
 module CI = Cacio.Make (struct
-  let name = "release_page"
+  let name = "release_site"
 
   let paths = ["release_site/**/*"]
 end)
