@@ -485,11 +485,7 @@ impl TezosXChainConfig {
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(host);
-        let safe_roots = self
-            .storage_root_paths(level.into())
-            .iter()
-            .map(OwnedPath::from)
-            .collect();
+        let safe_roots = self.world_states(level.into());
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.evm_chain_id,
@@ -731,6 +727,15 @@ impl TezosXChainConfig {
         Host: StorageV1 + WasmHost,
     {
         start_simulation_mode(host, base, registry, &self.spec_id)
+    }
+
+    /// The durable roots the failsafe mirror shadows: the world-state roots
+    /// this chain configuration owns at `block_number`.
+    pub fn world_states(&self, block_number: U256) -> Vec<OwnedPath> {
+        self.storage_root_paths(block_number)
+            .iter()
+            .map(OwnedPath::from)
+            .collect()
     }
 
     pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {

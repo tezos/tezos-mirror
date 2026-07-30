@@ -40,7 +40,6 @@ use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
@@ -162,11 +161,7 @@ where
         .map_err(|_| Error::InvalidConversion)?;
     let michelson_to_evm_gas_multiplier = read_michelson_to_evm_gas_multiplier(host)
         .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
-    let safe_roots = config
-        .storage_root_paths(number)
-        .iter()
-        .map(OwnedPath::from)
-        .collect();
+    let safe_roots = config.world_states(number);
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
         da_fee_per_byte_mutez,
@@ -232,11 +227,7 @@ where
 
     let mut safe_host = SafeStorage {
         host,
-        world_states: config
-            .storage_root_paths(input_data.block_number)
-            .into_iter()
-            .map(OwnedPath::from)
-            .collect(),
+        world_states: config.world_states(input_data.block_number),
     };
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
@@ -354,11 +345,7 @@ where
     let mut configuration = fetch_configuration(host, base);
     let mut safe_host = SafeStorage {
         host,
-        world_states: config
-            .storage_root_paths(input_data.block_number)
-            .into_iter()
-            .map(OwnedPath::from)
-            .collect(),
+        world_states: config.world_states(input_data.block_number),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?

@@ -38,7 +38,7 @@ use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
-use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -568,11 +568,7 @@ where
 
     let mut safe_host = SafeStorage {
         host,
-        world_states: chain_config
-            .storage_root_paths(next_bip_number)
-            .iter()
-            .map(OwnedPath::from)
-            .collect(),
+        world_states: chain_config.world_states(next_bip_number),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
@@ -2931,11 +2927,7 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_states: chain_config
-                .storage_root_paths(U256::zero())
-                .iter()
-                .map(OwnedPath::from)
-                .collect(),
+            world_states: chain_config.world_states(U256::zero()),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
@@ -3046,11 +3038,7 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_states: chain_config
-                .storage_root_paths(U256::zero())
-                .iter()
-                .map(OwnedPath::from)
-                .collect(),
+            world_states: chain_config.world_states(U256::zero()),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
