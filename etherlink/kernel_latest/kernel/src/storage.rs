@@ -69,6 +69,7 @@ pub enum StorageVersion {
     V60,
     V61,
     V62,
+    V63,
 }
 
 impl From<StorageVersion> for u64 {
@@ -83,7 +84,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V62;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V63;
 
 /// Name of the `/base` keyspace, holding kernel configuration and
 /// node-interaction values that do not belong to any world state.

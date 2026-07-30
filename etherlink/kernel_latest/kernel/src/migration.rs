@@ -533,6 +533,12 @@ where
             }
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V63 => {
+            const ENABLE_TEZOS_RUNTIME_V63: RefPath =
+                RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
+            host.store_write(&ENABLE_TEZOS_RUNTIME_V63, &[], 0)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
