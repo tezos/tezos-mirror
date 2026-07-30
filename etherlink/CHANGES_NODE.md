@@ -1,29 +1,27 @@
 # Changelog
 
-## Unreleased
+## Version 0.64 (2026-07-30)
 
-### Breaking changes
+This new release notably add minimal support for the incoming next Etherlink
+kernel proposal. It is a requirement for running a node for Tezos X Previewnet.
 
-### Configuration changes
+This release will not apply any migration to the node’s store (version
+24), meaning it is possible to downgrade to previous versions.
 
 ### RPCs changes
 
-### Monitoring changes
-
-### Command-line interface changes
+- Fix the `/constants` RPC of the Michelson runtime reporting an incorrect
+  `cost_per_byte` value (was 250mutez instead of 1). (!22549)
+- Expose the address registry through a read-only RPC, `GET
+  .../context/destination/<address>/index`, mirroring L1's RPC. It returns the
+  index assigned to the address by the `INDEX_ADDRESS` opcode, or `null` when
+  the address was never indexed. Destinations cover implicit accounts, and
+  originated contracts. (!22621)
 
 ### Execution changes
 
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Add support for kernels exporting blocks compatible with the Ushuaia Tezos.
+  protocol (!22596)
 
 ## Version 0.63 (2026-07-22)
 
@@ -48,8 +46,6 @@ This release will not apply any migration to the node’s store (version
   advances by exactly one per change: at scheduling time for a precompile
   change (so its signed calldata is immediately single-use) and at activation
   time for a governance change.
-- Fix the `/constants` RPC of the Michelson runtime reporting an incorrect
-  `cost_per_byte` value (was 250mutez instead of 1). (!22549)
 
 ### Monitoring changes
 
