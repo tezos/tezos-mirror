@@ -23,9 +23,30 @@ use super::{
     CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
     TypedValue,
 };
+use crate::ast::BorrowedUnparseError;
 use crate::gas::{tc_cost, OutOfGas};
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
+
+#[cfg(test)]
+pub(crate) fn in_memory_entries<'a>(
+    entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
+) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>> {
+    entries
+        .into_iter()
+        .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+        .collect()
+}
+
+#[cfg(test)]
+pub(crate) fn overlay_entries<'a>(
+    entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>> {
+    entries
+        .into_iter()
+        .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+        .collect()
+}
 
 /// Id of big map in the lazy storage.
 #[derive(BinWriter, NomReader, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -121,7 +142,7 @@ pub struct BigMapFromId<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    pub overlay: RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    pub overlay: RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
 }
 
 /// The content of a big map, either backed by a map in the lazy
@@ -130,7 +151,7 @@ pub struct BigMapFromId<'a> {
 pub enum BigMapContent<'a> {
     /// Big map can be backed by no map in the lazy storage and yet
     /// stay fully in memory.
-    InMemory(RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>),
+    InMemory(RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
     /// Otherwise they come from the lazy storage and have both an
     /// identifier and an overlay
     FromId(BigMapFromId<'a>),
@@ -162,7 +183,7 @@ impl<'a> BigMap<'a> {
     pub fn new(
         key_type: Type,
         value_type: Type,
-        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     ) -> Self {
         Self {
             content: BigMapContent::InMemory(map),
@@ -182,7 +203,7 @@ impl<'a> BigMap<'a> {
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
         storage: &mut (impl LazyStorage<'a> + ?Sized),
-    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
+    ) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
             BigMapContent::FromId(BigMapFromId { id, overlay }) => {
@@ -191,7 +212,9 @@ impl<'a> BigMap<'a> {
                     // always used, even if it is `None` (and `get` returned
                     // `Some(None)`) which means removal.
                     Some(change) => change.clone(),
-                    None => storage.big_map_get(arena, id, key, &self.value_type)?,
+                    None => storage
+                        .big_map_get(arena, id, key, &self.value_type)?
+                        .map(Rc::new),
                 }
             }
         })
@@ -218,7 +241,7 @@ impl<'a> BigMap<'a> {
     }
 
     /// Michelson's `UPDATE`.
-    pub fn update(&mut self, key: TypedValue<'a>, value: Option<TypedValue<'a>>) {
+    pub fn update(&mut self, key: Rc<TypedValue<'a>>, value: Option<Rc<TypedValue<'a>>>) {
         match &mut self.content {
             BigMapContent::InMemory(m) => match value {
                 Some(value) => {
@@ -274,6 +297,21 @@ pub enum LazyStorageError {
     /// Gas exhaustion while serializing a key.
     #[error("{0}")]
     OutOfGasError(#[from] OutOfGas),
+    /// A big_map entry carried a value that cannot be unparsed for storage.
+    #[error("big_map entry value is not storable")]
+    NonStorableValue,
+}
+
+impl From<BorrowedUnparseError> for LazyStorageError {
+    fn from(err: BorrowedUnparseError) -> Self {
+        match err {
+            BorrowedUnparseError::OutOfGas => LazyStorageError::OutOfGasError(OutOfGas),
+            BorrowedUnparseError::UnsupportedUnparsing
+            | BorrowedUnparseError::UnsatisfiedProperty(_) => {
+                LazyStorageError::NonStorableValue
+            }
+        }
+    }
 }
 
 impl From<tezos_data_encoding::enc::BinError> for LazyStorageError {
@@ -331,12 +369,22 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key and value types must match the type of key of the stored map.
+    fn big_map_update_ref(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue<'a>,
+        value: Option<&TypedValue<'a>>,
+    ) -> Result<(), LazyStorageError>;
+
+    /// Owned-value convenience wrapper over [LazyStorage::big_map_update_ref].
     fn big_map_update(
         &mut self,
         id: &BigMapId,
         key: TypedValue<'a>,
         value: Option<TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError>;
+    ) -> Result<(), LazyStorageError> {
+        self.big_map_update_ref(id, &key, value.as_ref())
+    }
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -390,13 +438,18 @@ pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key and value types must match the type of key of the stored map.
-    fn big_map_bulk_update(
+    fn big_map_bulk_update<'b>(
         &mut self,
         id: &BigMapId,
-        entries_iter: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-    ) -> Result<(), LazyStorageError> {
+        entries_iter: impl IntoIterator<
+            Item = (&'b TypedValue<'a>, Option<&'b TypedValue<'a>>),
+        >,
+    ) -> Result<(), LazyStorageError>
+    where
+        'a: 'b,
+    {
         for (k, v) in entries_iter {
-            self.big_map_update(id, k, v)?
+            self.big_map_update_ref(id, k, v)?
         }
         Ok(())
     }
@@ -407,7 +460,7 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct MapInfo<'a> {
-    map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+    map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     key_type: Type,
     value_type: Type,
 }
@@ -415,7 +468,7 @@ pub(crate) struct MapInfo<'a> {
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
-        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         key_type: Type,
         value_type: Type,
     ) -> Self {
@@ -523,7 +576,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         _value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let info = self.access_big_map(id)?;
-        Ok(info.map.get(key).cloned())
+        Ok(info.map.get(key).map(|v| (**v).clone()))
     }
 
     fn big_map_mem(
@@ -535,19 +588,20 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(info.map.contains_key(key))
     }
 
-    fn big_map_update(
+    fn big_map_update_ref(
         &mut self,
         id: &BigMapId,
-        key: TypedValue<'a>,
-        value: Option<TypedValue<'a>>,
+        key: &TypedValue<'a>,
+        value: Option<&TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
         let info = self.access_big_map_mut(id)?;
         match value {
             None => {
-                info.map.remove_mut(&key);
+                info.map.remove_mut(key);
             }
             Some(value) => {
-                info.map.insert_mut(key, value);
+                info.map
+                    .insert_mut(Rc::new(key.clone()), Rc::new(value.clone()));
             }
         }
         Ok(())
@@ -630,7 +684,10 @@ mod test_big_map_operations {
         key: TypedValue,
         expected_val: Option<TypedValue<'a>>,
     ) {
-        assert_eq!(map.get(arena, &key, storage).unwrap(), expected_val);
+        assert_eq!(
+            map.get(arena, &key, storage).unwrap(),
+            expected_val.clone().map(Rc::new)
+        );
         assert_eq!(map.mem(&key, storage).unwrap(), expected_val.is_some());
     }
 
@@ -638,7 +695,7 @@ mod test_big_map_operations {
     fn test_get_mem_in_memory() {
         let arena = &Arena::new();
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([(
+        let content = BigMapContent::InMemory(in_memory_entries([(
             TypedValue::int(1),
             TypedValue::int(1),
         )]));
@@ -674,7 +731,7 @@ mod test_big_map_operations {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: RedBlackTreeMap::from_iter([
+            overlay: overlay_entries([
                 (TypedValue::int(1), Some(TypedValue::int(-1))),
                 (TypedValue::int(2), None),
                 (TypedValue::int(3), Some(TypedValue::int(3))),
@@ -1280,7 +1337,7 @@ pub fn dump_big_map_updates_shared<'a>(
 /// applied once every walk sharing the lazy storage has run.
 pub type DeferredBigMapUpdates<'a> = Vec<(
     BigMapId,
-    RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
 )>;
 
 /// Apply the deferred in-place overlays returned by [dump_big_map_walk].
@@ -1291,7 +1348,9 @@ pub fn apply_deferred_big_map_updates<'a>(
     for (id, overlay) in deferred {
         storage.big_map_bulk_update(
             &id,
-            overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+            overlay
+                .iter()
+                .map(|(k, v)| (&**k, v.as_ref().map(|x| &**x))),
         )?;
     }
     Ok(())
@@ -1400,7 +1459,9 @@ fn dump_one_big_map<'a>(
                 let overlay = mem::take(&mut m.overlay);
                 storage.big_map_bulk_update(
                     &new_id,
-                    overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+                    overlay
+                        .iter()
+                        .map(|(k, v)| (&**k, v.as_ref().map(|x| &**x))),
                 )?;
                 m.id = new_id;
             } else {
@@ -1424,7 +1485,7 @@ fn dump_one_big_map<'a>(
                 &id,
                 in_memory
                     .iter()
-                    .map(|(key, value)| (key.clone(), Some(value.clone()))),
+                    .map(|(key, value)| (&**key, Some(&**value))),
             )?;
             map.content = BigMapContent::FromId(BigMapFromId {
                 id,
@@ -1505,7 +1566,7 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_map_from_memory() {
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([
+        let content = BigMapContent::InMemory(in_memory_entries([
             (TypedValue::int(1), TypedValue::int(1)),
             (TypedValue::int(2), TypedValue::int(2)),
         ]));
@@ -1522,7 +1583,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(1), TypedValue::int(1)),
                         (TypedValue::int(2), TypedValue::int(2))
                     ]),
@@ -1545,7 +1606,7 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: RedBlackTreeMap::from_iter([
+            overlay: overlay_entries([
                 (TypedValue::int(0), None),
                 (TypedValue::int(1), Some(TypedValue::int(5))),
                 (TypedValue::int(2), None),
@@ -1565,7 +1626,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(1), TypedValue::int(5)),
                         (TypedValue::int(3), TypedValue::int(3))
                     ]),
@@ -1583,10 +1644,7 @@ mod test_big_map_to_storage_update {
         let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(11),
-                Some(TypedValue::int(11)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(11), Some(TypedValue::int(11)))]),
         });
         let map1_1 = BigMap {
             content,
@@ -1595,10 +1653,7 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1,
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(12),
-                Some(TypedValue::int(12)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(12), Some(TypedValue::int(12)))]),
         });
         let map1_2 = BigMap {
             content,
@@ -1607,10 +1662,7 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id2,
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(2),
-                Some(TypedValue::int(2)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(2), Some(TypedValue::int(2)))]),
         });
         let map2 = BigMap {
             content,
@@ -1633,7 +1685,7 @@ mod test_big_map_to_storage_update {
                 (
                     0.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(11),
                             TypedValue::int(11)
                         )]),
@@ -1644,7 +1696,7 @@ mod test_big_map_to_storage_update {
                 (
                     1.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(2),
                             TypedValue::int(2)
                         )]),
@@ -1655,7 +1707,7 @@ mod test_big_map_to_storage_update {
                 (
                     2.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(12),
                             TypedValue::int(12)
                         )]),
@@ -1680,10 +1732,7 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(1),
-                Some(TypedValue::int(1)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
         let map1 = BigMap {
             content,
@@ -1697,7 +1746,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(0), TypedValue::int(0)),
                         (TypedValue::int(1), TypedValue::int(1))
                     ]),
@@ -2368,13 +2417,13 @@ mod review_verification {
             self.inner.big_map_mem(id, key)
         }
 
-        fn big_map_update(
+        fn big_map_update_ref(
             &mut self,
             id: &BigMapId,
-            key: TypedValue<'a>,
-            value: std::option::Option<TypedValue<'a>>,
+            key: &TypedValue<'a>,
+            value: std::option::Option<&TypedValue<'a>>,
         ) -> Result<(), LazyStorageError> {
-            self.inner.big_map_update(id, key, value)
+            self.inner.big_map_update_ref(id, key, value)
         }
 
         fn big_map_new(
