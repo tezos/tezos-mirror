@@ -34,7 +34,7 @@ RUN opam install --yes \
         --assume-depexts \
         $(opam list --all --short | grep -v ocaml-option-) \
     # Pin Tezt to its development version.
-    && opam pin --yes tezt https://gitlab.com/nomadic-labs/tezt.git#52549ad611cf24062c8221162ec360c446a34481 \
+    && opam pin --yes tezt https://gitlab.com/nomadic-labs/tezt.git#8bb6f6cb6f3e22c7db335113ef9758220e34a2fd \
     && opam clean
 
 # ENTRYPOINT and CMD already set in prebuild
