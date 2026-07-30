@@ -800,6 +800,186 @@ impl Default for TypedValue<'_> {
     }
 }
 
+/// A [TypedValue] shared behind an [Rc]. This is the type everything outside
+/// this module uses to handle Michelson values: cloning is a reference-count
+/// bump, reading goes through [Deref](std::ops::Deref) (or
+/// [RcTypedValue::as_ref]), and ownership is recovered with
+/// [RcTypedValue::unwrap_or_clone] (move when unique, deep clone otherwise) or
+/// obtained in place with [RcTypedValue::make_mut] (clone-on-write).
+///
+/// The wrapped `Rc` is deliberately private: keeping every sharing decision
+/// behind this one type means the move-when-unique optimizations cannot be
+/// bypassed by accident at call sites.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RcTypedValue<'a>(Rc<TypedValue<'a>>);
+
+impl<'a> RcTypedValue<'a> {
+    /// Wrap a value, making it shareable.
+    pub fn new(v: TypedValue<'a>) -> Self {
+        RcTypedValue(Rc::new(v))
+    }
+
+    /// Mutably borrow the shared value, cloning it first if it is shared
+    /// (clone-on-write, see [Rc::make_mut]). Prefer this over
+    /// [RcTypedValue::unwrap_or_clone] when editing in place: a unique value
+    /// is mutated directly with no move.
+    pub fn make_mut(&mut self) -> &mut TypedValue<'a> {
+        Rc::make_mut(&mut self.0)
+    }
+
+    /// Take ownership of the shared value: moves it out when this is the last
+    /// reference, clones it otherwise. Prefer keeping the `RcTypedValue` when
+    /// the value is only read or forwarded — the clone is a deep copy of every
+    /// inline payload, and those are unbounded.
+    pub fn unwrap_or_clone(self) -> TypedValue<'a> {
+        Rc::unwrap_or_clone(self.0)
+    }
+
+    /// Take ownership of the shared value only when this is the last
+    /// reference, returning the untouched `self` otherwise. Prefer
+    /// [RcTypedValue::unwrap_or_clone] unless the shared case genuinely takes
+    /// a different path (e.g. the iterative drop drain, which leaves shared
+    /// values to their remaining owners).
+    pub fn try_unwrap(self) -> Result<TypedValue<'a>, Self> {
+        Rc::try_unwrap(self.0).map_err(RcTypedValue)
+    }
+
+    /// Whether two handles share the same allocation (see [Rc::ptr_eq]).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// The allocation's address, as a sharing identity (see [Rc::as_ptr]).
+    /// Prefer [RcTypedValue::ptr_eq] for pairwise checks; this exists for
+    /// identity sets keyed by more than two handles.
+    pub fn as_ptr(&self) -> *const TypedValue<'a> {
+        Rc::as_ptr(&self.0)
+    }
+
+    /// Number of handles sharing the value (see [Rc::strong_count]). Useful
+    /// mostly for asserting sharing behavior in tests.
+    pub fn strong_count(&self) -> usize {
+        Rc::strong_count(&self.0)
+    }
+
+    /// Drain the value's (possibly deep) children onto an iterative worklist
+    /// when this is the last reference, leaving the shallow husk to drop
+    /// trivially; a still-shared value is left to its remaining owners. Used
+    /// on teardown paths that release values before they fall out of scope.
+    pub(crate) fn drain_if_unique(&mut self) {
+        if let Some(inner) = Rc::get_mut(&mut self.0) {
+            drain_deep_typed_value(inner);
+        }
+    }
+}
+
+/// Borrow the shared value for reading (typically to match on it).
+impl<'a> AsRef<TypedValue<'a>> for RcTypedValue<'a> {
+    fn as_ref(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+/// Lets collections keyed by [RcTypedValue] (interpreter maps and sets) be
+/// probed with a plain borrowed [TypedValue]. The [Eq]/[Ord] forwarding impls
+/// keep the two views consistent, as [std::borrow::Borrow] requires.
+impl<'a> std::borrow::Borrow<TypedValue<'a>> for RcTypedValue<'a> {
+    fn borrow(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+impl<'a> From<TypedValue<'a>> for RcTypedValue<'a> {
+    fn from(v: TypedValue<'a>) -> Self {
+        RcTypedValue::new(v)
+    }
+}
+
+/// Migration scaffolding: free bridges (the `Rc` moves, nothing is cloned)
+/// between the raw `Rc<TypedValue>` spelling and the newtype, so call sites
+/// can be converted one module at a time with each step compiling. Removed
+/// by the last step of the migration.
+impl<'a> From<Rc<TypedValue<'a>>> for RcTypedValue<'a> {
+    fn from(rc: Rc<TypedValue<'a>>) -> Self {
+        RcTypedValue(rc)
+    }
+}
+
+/// Migration scaffolding, see [`From<Rc<TypedValue>> for RcTypedValue`].
+impl<'a> From<RcTypedValue<'a>> for Rc<TypedValue<'a>> {
+    fn from(v: RcTypedValue<'a>) -> Self {
+        v.0
+    }
+}
+
+impl<'a> std::ops::Deref for RcTypedValue<'a> {
+    type Target = TypedValue<'a>;
+
+    fn deref(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+/// Shared `Unit` placeholder, mirroring [TypedValue]'s [Default]; used when
+/// moving a value out of a `&mut RcTypedValue` field so the drained-out parent
+/// drops without recursing.
+impl Default for RcTypedValue<'_> {
+    fn default() -> Self {
+        RcTypedValue::new(TypedValue::Unit)
+    }
+}
+
+/// Forwards to the wrapped value's iterative [TypedValue] `Debug`; the `Rc`
+/// indirection is implementation detail and is elided.
+impl std::fmt::Debug for RcTypedValue<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod test_rc_typed_value {
+    use super::*;
+
+    #[test]
+    fn make_mut_unique_edits_in_place() {
+        let mut v = RcTypedValue::new(TypedValue::int(1));
+        *v.make_mut() = TypedValue::int(2);
+        assert_eq!(v.as_ref(), &TypedValue::int(2));
+    }
+
+    #[test]
+    fn make_mut_shared_clones_first() {
+        let mut v = RcTypedValue::new(TypedValue::int(1));
+        let shared = v.clone();
+        *v.make_mut() = TypedValue::int(2);
+        assert_eq!(v.as_ref(), &TypedValue::int(2));
+        assert_eq!(shared.as_ref(), &TypedValue::int(1));
+    }
+
+    #[test]
+    fn unwrap_or_clone_shared_clones() {
+        let v = RcTypedValue::new(TypedValue::int(1));
+        let shared = v.clone();
+        assert_eq!(v.unwrap_or_clone(), TypedValue::int(1));
+        assert_eq!(shared.as_ref(), &TypedValue::int(1));
+    }
+
+    #[test]
+    fn comparisons_and_debug_forward_to_the_value() {
+        let one = RcTypedValue::new(TypedValue::int(1));
+        let two = RcTypedValue::new(TypedValue::int(2));
+        assert_eq!(one, RcTypedValue::new(TypedValue::int(1)));
+        assert!(one < two);
+        assert_eq!(format!("{one:?}"), format!("{:?}", TypedValue::int(1)));
+    }
+
+    #[test]
+    fn default_is_unit() {
+        assert_eq!(RcTypedValue::default().as_ref(), &TypedValue::Unit);
+    }
+}
+
 /// Iterative `Debug` so deeply nested values do not blow the WASM call
 /// stack when formatted for error output. `InterpretError::FailedWith`
 /// embeds a `TypedValue` via `{1:?}` and the kernel formats those errors
