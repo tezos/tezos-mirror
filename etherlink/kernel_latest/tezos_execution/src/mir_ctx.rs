@@ -1540,25 +1540,24 @@ pub mod tests {
         apply_deferred_big_map_updates, dump_big_map_updates, dump_big_map_walk,
         remove_unreferenced_big_maps, BigMap, BigMapContent, BigMapFromId, BigMapId,
     };
-    use mir::ast::Type;
+    use mir::ast::{RcTypedValue, Type};
     use rpds::RedBlackTreeMap;
 
     fn in_memory_entries<'a>(
         entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
-    ) -> RedBlackTreeMap<std::rc::Rc<TypedValue<'a>>, std::rc::Rc<TypedValue<'a>>> {
+    ) -> RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>> {
         entries
             .into_iter()
-            .map(|(k, v)| (std::rc::Rc::new(k), std::rc::Rc::new(v)))
+            .map(|(k, v)| (RcTypedValue::new(k), RcTypedValue::new(v)))
             .collect()
     }
 
     fn overlay_entries<'a>(
         entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-    ) -> RedBlackTreeMap<std::rc::Rc<TypedValue<'a>>, Option<std::rc::Rc<TypedValue<'a>>>>
-    {
+    ) -> RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>> {
         entries
             .into_iter()
-            .map(|(k, v)| (std::rc::Rc::new(k), v.map(std::rc::Rc::new)))
+            .map(|(k, v)| (RcTypedValue::new(k), v.map(RcTypedValue::new)))
             .collect()
     }
     use std::collections::{BTreeMap, BTreeSet};

@@ -31,20 +31,20 @@ use crate::typechecker::TcError;
 #[cfg(test)]
 pub(crate) fn in_memory_entries<'a>(
     entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
-) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>> {
+) -> RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>> {
     entries
         .into_iter()
-        .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+        .map(|(k, v)| (RcTypedValue::new(k), RcTypedValue::new(v)))
         .collect()
 }
 
 #[cfg(test)]
 pub(crate) fn overlay_entries<'a>(
     entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>> {
+) -> RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>> {
     entries
         .into_iter()
-        .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+        .map(|(k, v)| (RcTypedValue::new(k), v.map(RcTypedValue::new)))
         .collect()
 }
 
@@ -142,7 +142,7 @@ pub struct BigMapFromId<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    pub overlay: RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
+    pub overlay: RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>>,
 }
 
 /// The content of a big map, either backed by a map in the lazy
@@ -151,7 +151,7 @@ pub struct BigMapFromId<'a> {
 pub enum BigMapContent<'a> {
     /// Big map can be backed by no map in the lazy storage and yet
     /// stay fully in memory.
-    InMemory(RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+    InMemory(RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
     /// Otherwise they come from the lazy storage and have both an
     /// identifier and an overlay
     FromId(BigMapFromId<'a>),
@@ -183,7 +183,7 @@ impl<'a> BigMap<'a> {
     pub fn new(
         key_type: Type,
         value_type: Type,
-        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
     ) -> Self {
         Self {
             content: BigMapContent::InMemory(map),
@@ -203,7 +203,7 @@ impl<'a> BigMap<'a> {
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
         storage: &mut (impl LazyStorage<'a> + ?Sized),
-    ) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+    ) -> Result<Option<RcTypedValue<'a>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
             BigMapContent::FromId(BigMapFromId { id, overlay }) => {
@@ -214,7 +214,7 @@ impl<'a> BigMap<'a> {
                     Some(change) => change.clone(),
                     None => storage
                         .big_map_get(arena, id, key, &self.value_type)?
-                        .map(Rc::new),
+                        .map(RcTypedValue::new),
                 }
             }
         })
@@ -241,7 +241,7 @@ impl<'a> BigMap<'a> {
     }
 
     /// Michelson's `UPDATE`.
-    pub fn update(&mut self, key: Rc<TypedValue<'a>>, value: Option<Rc<TypedValue<'a>>>) {
+    pub fn update(&mut self, key: RcTypedValue<'a>, value: Option<RcTypedValue<'a>>) {
         match &mut self.content {
             BigMapContent::InMemory(m) => match value {
                 Some(value) => {
@@ -463,7 +463,7 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct MapInfo<'a> {
-    map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
     key_type: Type,
     value_type: Type,
 }
@@ -471,7 +471,7 @@ pub(crate) struct MapInfo<'a> {
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
-        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
         key_type: Type,
         value_type: Type,
     ) -> Self {
@@ -603,8 +603,10 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
                 info.map.remove_mut(key);
             }
             Some(value) => {
-                info.map
-                    .insert_mut(Rc::new(key.clone()), Rc::new(value.clone()));
+                info.map.insert_mut(
+                    RcTypedValue::new(key.clone()),
+                    RcTypedValue::new(value.clone()),
+                );
             }
         }
         Ok(())
@@ -689,7 +691,7 @@ mod test_big_map_operations {
     ) {
         assert_eq!(
             map.get(arena, &key, storage).unwrap(),
-            expected_val.clone().map(Rc::new)
+            expected_val.clone().map(RcTypedValue::new)
         );
         assert_eq!(map.mem(&key, storage).unwrap(), expected_val.is_some());
     }
@@ -1351,7 +1353,7 @@ pub fn dump_big_map_updates_shared<'a>(
 /// applied once every walk sharing the lazy storage has run.
 pub type DeferredBigMapUpdates<'a> = Vec<(
     BigMapId,
-    RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
+    RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>>,
 )>;
 
 /// Apply the deferred in-place overlays returned by [dump_big_map_walk].

@@ -5322,7 +5322,9 @@ fn step_typecheck_value<'a, 'b>(
                                 tk,
                                 tv,
                                 acc.into_iter()
-                                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                                    .map(|(k, v)| {
+                                        (RcTypedValue::new(k), RcTypedValue::new(v))
+                                    })
                                     .collect(),
                             )));
                         }
@@ -5401,7 +5403,12 @@ fn step_typecheck_value<'a, 'b>(
                                         id: big_map_id,
                                         overlay: acc
                                             .into_iter()
-                                            .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+                                            .map(|(k, v)| {
+                                                (
+                                                    RcTypedValue::new(k),
+                                                    v.map(RcTypedValue::new),
+                                                )
+                                            })
                                             .collect(),
                                     },
                                 ),
@@ -5455,7 +5462,9 @@ fn step_typecheck_value<'a, 'b>(
                             id: big_map_id,
                             overlay: acc
                                 .into_iter()
-                                .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+                                .map(|(k, v)| {
+                                    (RcTypedValue::new(k), v.map(RcTypedValue::new))
+                                })
                                 .collect(),
                         }),
                         key_type: tk_final,

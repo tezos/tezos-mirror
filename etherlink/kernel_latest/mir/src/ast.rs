@@ -1497,21 +1497,15 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
-                            let mut entries: Vec<(
-                                Rc<TypedValue<'a>>,
-                                Rc<TypedValue<'a>>,
-                            )> = rb_map_into_vec(m);
+                            let mut entries: Vec<(RcTypedValue<'a>, RcTypedValue<'a>)> =
+                                rb_map_into_vec(m);
                             frames.push(TvImFrame::BuildSeqOf {
                                 count: entries.len(),
                             });
                             while let Some((key, val)) = entries.pop() {
                                 frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    val.into(),
-                                )));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    key.into(),
-                                )));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
                             }
                         }
                         big_map::BigMapContent::FromId(m) => {
@@ -1520,8 +1514,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 results.push(id_part);
                             } else {
                                 let mut overlay: Vec<(
-                                    Rc<TypedValue<'a>>,
-                                    Option<Rc<TypedValue<'a>>>,
+                                    RcTypedValue<'a>,
+                                    Option<RcTypedValue<'a>>,
                                 )> = rb_map_into_vec(m.overlay);
                                 frames.push(TvImFrame::BuildBigMapFromId {
                                     id_part,
@@ -1534,7 +1528,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             frames
                                                 .push(TvImFrame::BuildPrim1(Prim::Some));
                                             frames.push(TvImFrame::Visit(
-                                                TypedValue::unwrap_rc(v.into()),
+                                                TypedValue::unwrap_rc(v),
                                             ));
                                         }
                                         None => {
@@ -1545,7 +1539,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                         }
                                     }
                                     frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                        key.into(),
+                                        key,
                                     )));
                                 }
                             }
@@ -1780,15 +1774,12 @@ impl<'a> TypedValue<'a> {
             /// A big map's in-memory entries. Distinct from [Frame::MapNext]
             /// only in the container it drains; both hold `Rc`-shared entries.
             BigMapEltNext(
-                std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>,
+                std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v RcTypedValue<'a>)>,
             ),
             /// A `FromId` big map's pending overlay; a `None` value marks a
             /// removal.
             OverlayNext(
-                std::vec::IntoIter<(
-                    &'v Rc<TypedValue<'a>>,
-                    &'v Option<Rc<TypedValue<'a>>>,
-                )>,
+                std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v Option<RcTypedValue<'a>>)>,
             ),
             /// Emit an already-built node (the `None` arm of an overlay entry).
             Leaf(Micheline<'a>),
@@ -2446,15 +2437,15 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
                     for (k, v) in take(map).drain_owned() {
-                        push_rc(k.into(), stack);
-                        push_rc(v.into(), stack);
+                        push_rc(k, stack);
+                        push_rc(v, stack);
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
                     for (k, v) in take(&mut from_id.overlay).drain_owned() {
-                        push_rc(k.into(), stack);
+                        push_rc(k, stack);
                         if let Some(v) = v {
-                            push_rc(v.into(), stack);
+                            push_rc(v, stack);
                         }
                     }
                 }
@@ -3203,7 +3194,7 @@ mod test_untypers {
         let arena = Arena::new();
         let mut gas = Gas::default();
         let mut m = BigMap::empty(Type::Nat, Type::Unit);
-        m.update(Rc::new(TypedValue::Nat(0u32.into())), None);
+        m.update(RcTypedValue::new(TypedValue::Nat(0u32.into())), None);
         TypedValue::BigMap(m)
             .into_micheline_optimized_legacy(&arena, &mut gas)
             .unwrap();
@@ -3506,7 +3497,10 @@ mod drop_safety {
         // A big_map's in-memory values are owned `TypedValue`s that may be deep.
         on_kernel_stack(|| {
             let mut map = RedBlackTreeMap::new();
-            map.insert_mut(Rc::new(TypedValue::Unit), Rc::new(deep_pair(DEPTH)));
+            map.insert_mut(
+                RcTypedValue::new(TypedValue::Unit),
+                RcTypedValue::new(deep_pair(DEPTH)),
+            );
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
         });

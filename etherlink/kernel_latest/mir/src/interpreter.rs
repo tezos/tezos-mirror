@@ -2941,7 +2941,7 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
                 let result = map.get(arena, &key_rc, *ctx.lazy_storage())?;
-                stack.push(V::new_option_rc(result.map(Into::into)));
+                stack.push(V::new_option_rc(result));
             }
         },
         I::GetN(n) => {
@@ -2985,7 +2985,7 @@ fn interpret_one<'a>(
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
-                map.update(key.into(), opt_new_val.map(Into::into));
+                map.update(key, opt_new_val);
             }
         },
         I::GetAndUpdate(overload) => match overload {
@@ -3015,8 +3015,8 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
-                map.update(key.into(), opt_new_val.map(Into::into));
-                stack.push(V::new_option_rc(opt_old_val.map(Into::into)));
+                map.update(key, opt_new_val);
+                stack.push(V::new_option_rc(opt_old_val));
             }
         },
         I::Size(overload) => {
