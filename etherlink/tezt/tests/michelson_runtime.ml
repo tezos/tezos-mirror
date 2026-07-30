@@ -137,18 +137,6 @@ let register_tezosx_regression_test ~title ~tags ?bootstrap_accounts
   let* () = produce_block_and_wait_for ~sequencer:setup.sequencer 1 in
   scenario setup protocol
 
-let tezlink_foreign_endpoint_from_evm_node evm_node =
-  let evm_node_endpoint = Evm_node.rpc_endpoint_record evm_node in
-  {evm_node_endpoint with path = "/tezlink"}
-
-let tezlink_endpoint_from_evm_node evm_node =
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node evm_node in
-  Client.Foreign_endpoint tezlink_endpoint
-
-let tezlink_client_from_evm_node evm_node =
-  let endpoint = tezlink_endpoint_from_evm_node evm_node in
-  Client.init ~endpoint
-
 (* Fetches the current Michelson-runtime head hash to use as a native
    operation branch, matching how octez-client sources it from the chain. *)
 let tez_branch client_tezlink =
@@ -173,7 +161,7 @@ let test_describe_endpoint =
   let root_endpoint = Client.(Foreign_endpoint sequencer_endpoint) in
   let* (_ : string) = Client.rpc_list ~hooks ~endpoint:root_endpoint client in
   (* List the endpoints of the /tezlink directory *)
-  let tezlink_endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_endpoint sequencer in
   let* (_ : string) =
     Client.rpc_list ~hooks ~endpoint:tezlink_endpoint client
   in
@@ -204,7 +192,7 @@ let test_current_level =
     ~tags:["rpc"; "current_level"]
   @@ fun {sequencer; _} _protocol ->
   (* call the current_level rpc and parse the result *)
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
 
   let rpc_current_level ?offset block =
     let* response =
@@ -290,7 +278,7 @@ let test_protocols =
     ~title:"Test of the protocols rpc"
     ~tags:["rpc"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
 
   let* res =
@@ -307,7 +295,7 @@ let test_genesis_block_arg =
     ~title:"Test of the genesis block argument"
     ~tags:["rpc"; "genesis"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let rpc_protocols block =
     RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_protocols ~block ()
   in
@@ -327,7 +315,7 @@ let test_expected_issuance =
     ~title:"Test the mocked expected issuance rpc"
     ~tags:["rpc"; "issuance"; "mock"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let* res =
     RPC_core.call tezlink_endpoint
     @@ RPC.get_chain_block_context_issuance_expected_issuance ()
@@ -352,7 +340,7 @@ let test_balance =
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   (* call the balance rpc and parse the result *)
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* valid_res =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
@@ -375,7 +363,7 @@ let test_storage_via_client =
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* storage = Client.contract_storage ~endpoint contract.address client in
   Check.(
     (String.trim storage = String.trim contract.initial_storage)
@@ -389,7 +377,7 @@ let test_contract_info =
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   (* call the contract info rpc and check the result *)
   let* valid_info =
     RPC_core.call tezlink_endpoint
@@ -412,7 +400,7 @@ let test_list_entrypoints =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   (* call the list_entrypoint rpc and check the result *)
   let* entrypoints =
     RPC_core.call tezlink_endpoint
@@ -434,7 +422,7 @@ let test_contract_info_script =
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   (* call the contract info rpc and check the result *)
   let* valid_info =
     RPC_core.call tezlink_endpoint
@@ -464,7 +452,7 @@ let test_manager_key =
     ~tags:["rpc"; "manager_key"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let get_contract_manager_key account =
     let* res =
       RPC_core.call_json tezlink_endpoint
@@ -492,7 +480,7 @@ let test_counter =
     ~tags:["evm"; "rpc"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let get_contract_counter account =
     RPC_core.call tezlink_endpoint
     @@ RPC.get_chain_block_context_contract_counter
@@ -524,7 +512,7 @@ let test_counter =
 let test_version =
   register_tezosx_test ~title:"Test of the version rpc" ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let* res = RPC_core.call tezlink_endpoint RPC.get_version in
   Check.(
     JSON.(res |-> "version" |-> "major" |> as_int = 0)
@@ -554,7 +542,7 @@ let test_constants =
       protocol
   in
   let hooks = Tezos_regression.hooks in
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* _ =
     Client.RPC.call ~hooks ~endpoint client
     @@ RPC.get_chain_block_context_constants ()
@@ -567,7 +555,7 @@ let test_storage_rpc =
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
   (* Helper to get storage of a contract. Returns None if 404. *)
   let storage_rpc contract =
@@ -629,7 +617,7 @@ let test_used_space_rpc =
     ~tags:["rpc"; "storage"; "used_space"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
   (* 1. An originated contract reports its used space. *)
   (* The binary Micheline of the code of concat_hello is 66 bytes. *)
@@ -695,7 +683,7 @@ let test_paid_space_rpc =
     ~tags:["rpc"; "storage"; "paid_space"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
   (* 1. An originated contract reports code_size + storage_size. *)
   (* The binary Micheline of the code of concat_hello is 66 bytes. *)
@@ -762,7 +750,7 @@ let test_bootstrap_contract_storage_space =
     ~tags:["rpc"; "storage"; "bootstrap"; "used_space"; "paid_space"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let code_size = 66 in
   let initial_storage_size = 17 in
   let expected_space = code_size + initial_storage_size in
@@ -790,7 +778,7 @@ let test_chain_id =
     ~tags:["rpc"; "chain_id"]
   @@ fun {sequencer; client; l2_chain; _} _protocol ->
   let expected_chain_id = l2_chain.l2_chain_id in
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* chain_id =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_chain_id ()
   in
@@ -803,7 +791,7 @@ let test_contracts_rpc =
     ~tags:["rpc"; "contracts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Helper to get contracts as a list of strings. *)
   let contracts_rpc () =
     let* contracts =
@@ -907,7 +895,7 @@ let test_header =
   @@ fun {sequencer; client; l2_chain; _} _protocol ->
   let chain_id = Some l2_chain.l2_chain_id in
 
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* () = produce_block_and_wait_for ~sequencer 3 in
   let current_timestamp =
@@ -937,7 +925,7 @@ let test_block_metadata =
     ~title:"Test of the metadata rpc"
     ~tags:["rpc"; "metadata"; "offset"]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let check_current_block_metadata () =
     let* block_metadata_raw =
       Client.RPC.call ~hooks ~endpoint client
@@ -972,7 +960,7 @@ let test_block_info =
   @@ fun {sequencer; client; l2_chain; _} _protocol ->
   let chain_id = Some l2_chain.l2_chain_id in
 
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* () = produce_block_and_wait_for ~sequencer 3 in
   let current_timestamp =
@@ -1003,7 +991,7 @@ let test_bootstrapped =
     ~title:"Test of the bootstrapped rpc"
     ~tags:["rpc"; "bootstrapped"]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let current_timestamp =
     Tezos_base.Time.(
@@ -1038,7 +1026,7 @@ let test_monitor_heads =
   @@ fun {sequencer; client; _} _protocol ->
   let open Lwt.Syntax in
   (* Prepare the RPC endpoint *)
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
   (* A syntactically valid protocol hash that is *not* the Michelson runtime
      protocol, used to exercise the [protocol]/[next_protocol] query filters. *)
@@ -1161,7 +1149,7 @@ let test_produceBlock =
     ~title:"Test Michelson runtime production block"
     ~tags:["kernel"; "produce_block"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let rpc_current_level_head () =
     let* json =
       RPC_core.call_json tezlink_endpoint
@@ -1183,7 +1171,7 @@ let test_hash_rpc =
     ~title:"Test Michelson runtime hash rpc"
     ~tags:["rpc"; "hash"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let rpc_hash block =
     RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash ~block ()
   in
@@ -1217,7 +1205,7 @@ let test_script_rpc =
     ~tags:["rpc"; "script"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
   (* Helper to get the script of a contract. Returns None if 404. *)
   let script_rpc contract =
@@ -1291,7 +1279,7 @@ let test_blocks_list =
     ~title:"Test of the blocks list rpc"
     ~tags:["rpc"; "blocks"; "list"]
   @@ fun {sequencer; _} _protocol ->
-  let* client = tezlink_client_from_evm_node sequencer () in
+  let* client = tezlink_client sequencer in
 
   let rpc_hash block =
     Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
@@ -1473,7 +1461,7 @@ let test_contract_storage_normalization =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
-  let foreign_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
   let address_readable = sf "%S" Constant.bootstrap1.public_key_hash in
   let* address_optimized =
@@ -1516,7 +1504,7 @@ let test_contract_counter =
     ~tags:["rpc"; "counter"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let* valid_res =
     RPC_core.call tezlink_endpoint
     @@ RPC.get_chain_block_context_contract ~id:contract.address ()
@@ -1532,7 +1520,7 @@ let test_raw_json_cycle =
     ~title:"Test Michelson runtime raw json cycle rpc"
     ~tags:["rpc"; "cycle"; "raw"]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let*@ _ = produce_block sequencer in
   let* cycle_0 =
     RPC_core.call tezlink_endpoint
@@ -1557,7 +1545,7 @@ let test_transfer =
     ~tags:["kernel"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let amount = Tez.one in
   let fee = Tez.one in
   let* () =
@@ -1596,7 +1584,7 @@ let test_observer_transfer =
     ~tags:["observer"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; observer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node observer in
+  let endpoint = tezlink_endpoint observer in
   let amount = Tez.one in
   let fee = Tez.one in
   (* Send a transaction to the observer and wait for it to be relayed to the sequencer *)
@@ -1642,7 +1630,7 @@ let test_transfer_and_wait =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~time_between_blocks:(Time_between_blocks 0.1)
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let amount = Tez.one in
   let fee = Tez.one in
   (* The branch of the operation injected by the client is the
@@ -1685,7 +1673,7 @@ let test_reveal =
     ~tags:["kernel"; "reveal"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let get_contract_manager_key account =
     RPC_core.call tezlink_endpoint
@@ -1729,7 +1717,7 @@ let test_bootstrap_block_info =
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let*@ _ = produce_block sequencer in
   let*@ _ = produce_block sequencer in
   let* info =
@@ -1751,7 +1739,7 @@ let test_execution =
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let expected_result = "{ \"Hello world\" }" in
   let* () =
     Client.transfer
@@ -1781,7 +1769,7 @@ let test_bigmap_option =
     ~bootstrap_contracts:[option_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let expected_result = "Some 0" in
   let* () =
     Client.transfer
@@ -1814,7 +1802,7 @@ let test_bigmap_counter =
      It relies on the counter.tz invariant that a counter with a matching key
      exists in the stored big_map. The contract is called twice to ensure
      that the big_map is committed to durable storage between calls. *)
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* () =
     Client.transfer
       ~endpoint
@@ -1872,7 +1860,7 @@ let test_bootstrap_kt1_is_executable =
     ~bootstrap_contracts:[counter_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Installer-set bootstrap balance for tez accounts, in mutez. *)
   let bootstrap_balance_mutez = 3_800_000_000_000 in
   let transfer_mutez = 10_000_000 in
@@ -1934,7 +1922,7 @@ let test_bigmap_rpcs =
     ~tags:["rpc"; "big_map"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Originate the contract at runtime (rather than as a bootstrap contract)
      so the big-map is allocated and populated through the kernel's lazy
      storage path, which is what maintains the [total_bytes] counter. A
@@ -2003,7 +1991,7 @@ let test_pack_data =
     ~tags:["rpc"; "pack_data"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_endpoint sequencer in
   (* Test cases: (data, type) as Micheline JSON *)
   let test_cases =
     [
@@ -2037,7 +2025,7 @@ let test_run_operation =
     ~tags:["rpc"; "run_operation"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_endpoint sequencer in
   (* Get Tezlink chain_id *)
   let* tezlink_chain_id =
     Client.RPC.call ~endpoint:tezlink_endpoint client
@@ -2108,7 +2096,7 @@ let test_reveal_transfer_batch =
     ~tags:["kernel"; "reveal"; "transfer"; "batch"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   (* Unfortunately, the client does not allow us to stipulate fees when revealing
      an account with a batch, so we need to capture this information from the log *)
@@ -2197,7 +2185,7 @@ let test_batch =
     ~tags:["batch"; "multiple_transfers"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let fee_2 = Tez.of_mutez_int 100_000 in
   let fee_3 = Tez.of_mutez_int 200_000 in
   let amount2 = Tez.of_mutez_int 1_000_000 in
@@ -2278,7 +2266,7 @@ let test_long_batch =
     ~tags:["transaction"; "long"; "batch"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let batch_size = 64 in
   let json_transfer =
@@ -2323,7 +2311,7 @@ let test_internal_operation =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[faucet]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* () =
     Client.transfer
       ~endpoint
@@ -2354,9 +2342,9 @@ let test_internal_receipts =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[faucet]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_foreign_endpoint = tezlink_foreign_endpoint sequencer in
   let amount = 1000000 in
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* () =
     Client.transfer
       ~endpoint
@@ -2372,7 +2360,7 @@ let test_internal_receipts =
   let*@ _ = produce_block sequencer in
 
   let* operation =
-    RPC_core.call tezlink_endpoint
+    RPC_core.call tezlink_foreign_endpoint
     @@ RPC.get_chain_block_operations_validation_pass
          ~validation_pass:3
          ~operation_offset:0
@@ -2475,7 +2463,7 @@ let test_origination =
     ~tags:["origination"; "operation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* deployed_faucet =
     Client.originate_contract
       ~endpoint
@@ -2524,7 +2512,7 @@ let test_operation_hashes_in_pass =
     ~tags:["rpc"; "operation_hashes"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* transfer_hash =
     let process =
@@ -2596,8 +2584,8 @@ let test_event =
     ~tags:["operation"; "event"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_foreign_endpoint = tezlink_foreign_endpoint sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* deployed_emit_events_contract =
     Client.originate_contract
       ~endpoint
@@ -2623,7 +2611,7 @@ let test_event =
   let*@ _l2_level = produce_block sequencer in
 
   let* first_manager_operation =
-    RPC_core.call tezlink_endpoint
+    RPC_core.call tezlink_foreign_endpoint
     @@ RPC.get_chain_block_operations_validation_pass
          ~validation_pass:3
          ~operation_offset:0
@@ -2698,7 +2686,7 @@ let test_forge_operations =
     ~tags:["rpc"; "forge"; "operations"]
     ~additional_uses:[Constant.octez_codec]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   (* call the forge/operations rpc and parse the result *)
   let json_data =
     Ezjsonm.value_from_string
@@ -2752,8 +2740,8 @@ let test_prevalidation =
     ~tags:["kernel"; "prevalidation"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let endpoint = tezlink_endpoint sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   (* - Setup - *)
   (* An implicit address completely unknown from network*)
   let* unknown = Client.gen_and_show_keys ~sig_alg:"p256" client_tezlink in
@@ -3181,7 +3169,7 @@ let test_prevalidation_gas_limit_lower_bound =
     Tezt.Log.(info ~color:Color.(bold ++ FG.green) ~prefix:"NEW TEST")
   in
 
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
   let build_and_inject ?error operations =
     let* branch = tez_branch client_tezlink in
     let* op = Operation.Manager.operation ~branch operations client in
@@ -3326,7 +3314,7 @@ let test_validation_gas_limit =
     ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
   let hard_gas_limit_per_block = 660_000 in
 
   (* make sure there are no transactions in the queue *)
@@ -3413,7 +3401,7 @@ let test_validation_counter =
     ~tags:["kernel"; "validation"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
 
   (* make sure there are no transactions in the queue *)
   let* () = produce_block_and_wait_for ~sequencer 1 in
@@ -3463,7 +3451,7 @@ let test_validation_balance =
     ~tags:["kernel"; "validation"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
   let new_account = Constant.bootstrap3 in
 
   (* make sure there are no transactions in the queue *)
@@ -3588,7 +3576,7 @@ let test_insufficient_da_fee =
     ~da_fee:(Wei.of_eth_int 4)
   (* For da fees, anything superior to zero works for testing. *)
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let process =
     Client.spawn_transfer
       ~endpoint
@@ -3618,7 +3606,7 @@ let test_da_fee_credited_to_pool =
     ~da_fee:(Wei.of_eth_int da_fee_eth_int)
     ~sequencer_pool_address
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Check initial balance of pool address is zero. *)
   let*@ initial_balance =
     Rpc.get_balance ~address:sequencer_pool_address sequencer
@@ -3668,7 +3656,7 @@ let test_simulation_with_da_fee =
     ~da_fee:(Wei.of_string "1000000000000000")
   (* 1000 mutez/byte = 1000 * 10^12 wei *)
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* 1000 nanotez/byte = 1 mutez/byte (L1 default), below the DA fee of
      1000 mutez/byte: the total fee doesn't cover the DA cost. *)
   let process =
@@ -3721,7 +3709,7 @@ let test_michelson_gas_backlog =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~michelson_to_evm_gas_multiplier:1_000_000L
   @@ fun {sequencer; _} _protocol ->
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
   let* initial_result = Rpc.get_block_by_number ~block:"latest" sequencer in
   let initial_base_fee =
     match initial_result with
@@ -3774,8 +3762,8 @@ let test_michelson_gas_backlog_on_failed_op =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~michelson_to_evm_gas_multiplier:1_000_000L
   @@ fun {sequencer; _} protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let endpoint = tezlink_endpoint sequencer in
+  let* client_tezlink = tezlink_client sequencer in
   (* Use fixed timestamps so the backlog decay is deterministic
      (independent of wall-clock / CI speed). *)
   let next_timestamp =
@@ -3901,7 +3889,7 @@ let test_michelson_execution_gas_fee =
     ~tags:["kernel"; "validation"; "execution"; "gas"; "fee"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Fee = 1_000 mutez: below execution gas cost → rejected at
      simulation. *)
   let process =
@@ -3948,7 +3936,7 @@ let test_michelson_gas_exhaustion =
     ~tags:["gas"; "exhaustion"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let script_path =
     Michelson_script.(find ["mini_scenarios"; "loop"] protocol |> path)
   in
@@ -4039,7 +4027,7 @@ let test_michelson_oom_concat =
      cost exceed the per-op gas cap, so the operation runs out of gas before it
      allocates. *)
   let n = 3 in
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let doublings = String.concat " " (List.init 25 (fun _ -> "DUP; CONCAT;")) in
   let script =
     Format.sprintf
@@ -4083,6 +4071,187 @@ let test_michelson_oom_concat =
     ~error_msg:"Expected a gas-exhaustion failure, got %L" ;
   unit
 
+(* Runs PACK on a large value kept live alongside a DUP'd copy: PACK only reads
+   the value to serialize it, so the kernel must read it through its shared [Rc]
+   rather than deep-copy it. Without that, the extra copy pushes past the WASM
+   heap and traps the kernel; with it the serialization is gas-charged, so an
+   oversized value runs out of gas cleanly instead (L2-1838). *)
+let test_michelson_oom_pack =
+  register_tezosx_test
+    ~title:"Michelson PACK does not exhaust memory on a shared operand"
+    ~tags:["gas"; "exhaustion"; "oom"; "pack"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let script =
+    {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PACK ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"pack_oom"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:script
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:660_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "Gas_exhaustion")
+    ~error_msg:"Expected a clean out-of-gas failure, got %L" ;
+  unit
+
+(* Runs FAILWITH on a large value kept live alongside a DUP'd copy: the failure
+   value is only carried for reporting, so the kernel must hold it behind its
+   shared [Rc] rather than deep-copy it. Without that, the extra copy pushes
+   past the WASM heap and traps the kernel; with it, the operation fails
+   cleanly with the FAILWITH error (L2-1837). *)
+let test_michelson_oom_failwith =
+  register_tezosx_test
+    ~title:"Michelson FAILWITH does not exhaust memory on a shared operand"
+    ~tags:["gas"; "exhaustion"; "oom"; "failwith"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let script =
+    {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       FAILWITH
+     }|}
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"failwith_oom"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:script
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:660_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "runtime failure while running the script")
+    ~error_msg:"Expected a clean FAILWITH failure, got %L" ;
+  unit
+
+(* Returns a storage holding a large value twice, [Pair (Pair V V) W], built
+   with [DUP ; PAIR] so both halves of the inner pair are one allocation. The
+   end-of-execution walk that looks for big maps to persist descends the whole
+   returned value; it must do so through the shared [Rc]s rather than unsharing
+   each container child, which would deep-copy [V] even though no big map, and
+   no operation, is involved anywhere. Without that, the extra copy pushes past
+   the WASM heap and traps the kernel; with it the result is serialized under
+   gas, so an oversized storage runs out of gas cleanly instead (L2-1840). *)
+let test_michelson_oom_big_map_walk =
+  register_tezosx_test
+    ~title:
+      "Michelson finalization walk does not exhaust memory on a shared leaf"
+    ~tags:["gas"; "exhaustion"; "oom"; "big_map"; "walk"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let script =
+    {|
+parameter unit ;
+storage (pair (pair bytes bytes) bytes) ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ; PAIR ; PAIR ;
+       NIL operation ;
+       PAIR
+     }|}
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"big_map_walk_oom"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Pair (Pair 0x 0x) 0x"
+      ~prg:script
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:660_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  (* The Michelson runtime surfaces this as [Transfer(OutOfGas(OutOfGas))]
+     rather than the protocol's [Gas_exhaustion]; what matters is that it is a
+     bounded error at all, where before the fix the kernel trapped. *)
+  Check.(err =~ rex "OutOfGas")
+    ~error_msg:"Expected a clean out-of-gas failure, got %L" ;
+  unit
+
 (* Tests that the [/mempool/filter] RPC returns the expected
     [minimal_nanotez_per_gas_unit] and [minimal_nanotez_per_byte] computed
     from the kernel's [base_fee_per_gas] and [michelson_to_evm_gas_multiplier]
@@ -4101,7 +4270,7 @@ let test_mempool_filter_fields =
     ~da_fee:(Wei.of_string "5000000000000000")
     ~michelson_to_evm_gas_multiplier:25L
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* json =
     Client.RPC.call ~endpoint client
@@ -4189,7 +4358,7 @@ let test_gas_refund_on_transfer ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let amount = Tez.one in
   let fee = Tez.one in
   let gas_limit = 10_000 in
@@ -4232,7 +4401,7 @@ let test_gas_refund_on_failwith ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
@@ -4287,7 +4456,7 @@ let test_gas_refund_on_out_of_gas =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:true
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
@@ -4451,7 +4620,7 @@ let test_gas_refund_in_run_operation ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let* branch =
     Client.RPC.call ~endpoint client @@ RPC.get_chain_block_hash ()
   in
@@ -4536,7 +4705,7 @@ let test_gas_refund_in_preapply ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let fee = 1_000_000 in
   let gas_limit = 10_000 in
   let amount = 10 in
@@ -4623,7 +4792,7 @@ let test_gas_vs_l1 =
     ~tags:["kernel"; "gas"; "l1"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _ ->
-  let* client_tezlink = tezlink_client_from_evm_node sequencer () in
+  let* client_tezlink = tezlink_client sequencer in
 
   let get_consumed_gas operations =
     JSON.(
@@ -4842,7 +5011,7 @@ let test_delayed_deposit_is_included =
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   let* balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
@@ -4901,7 +5070,7 @@ let test_bridged_tez_transfer =
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
 
   (* Check that account is empty and not revealed. *)
@@ -5020,7 +5189,7 @@ let test_big_map_transfer =
   let*@ _ = produce_block sequencer in
   let*@ _ = produce_block sequencer in
 
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
 
   (* This code comes from tezt/tests/contract_big_map_transfer.ml *)
   let* () =
@@ -5140,7 +5309,7 @@ code { UNPAIR ;
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:[Constant.bootstrap1]
   @@ fun evm_node ->
-  let* client = tezlink_client_from_evm_node evm_node () in
+  let* client = tezlink_client evm_node in
   (* Octez-client defaults to a 3_000_000 gas limit, which the node rejects
      with [GasLimitSetError]; cap every Tezlink-targeted call at the
      per-operation hard limit. *)
@@ -5299,7 +5468,7 @@ let test_entrypoints_originated =
     ~tags:["rpc"; "entrypoints"; "originated"]
     ~bootstrap_contracts:[faucet]
   @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let* ep_json =
     RPC_core.call tezlink_endpoint
     @@ RPC.get_chain_block_context_contract_entrypoints ~id:faucet.address ()
@@ -5322,7 +5491,7 @@ let test_entrypoints_normalize_types =
     ~tags:["rpc"; "entrypoints"; "originated"; "normalize_types"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
   let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let* _alias, kt1_address =
     Client.originate_contract_at
@@ -5479,7 +5648,7 @@ let test_deep_pair_param =
     ~tags:["stack_overflow"; "origination"; "typecheck"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     write_temp_michelson
       ~name:"deep_pair_param"
@@ -5505,7 +5674,7 @@ let test_deep_if_code =
     ~tags:["stack_overflow"; "origination"; "typecheck"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     write_temp_michelson
       ~name:"deep_if_code"
@@ -5532,7 +5701,7 @@ let test_deep_or_param =
     ~tags:["stack_overflow"; "origination"; "typecheck"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     write_temp_michelson
       ~name:"deep_or_param"
@@ -5576,7 +5745,7 @@ let register_deep_container_lambda_storage_test ~title ?(extra_tags = []) ~alias
     ~tags:(["stack_overflow"; "origination"; "typecheck"] @ extra_tags)
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     write_temp_michelson
       ~name:alias
@@ -5644,7 +5813,7 @@ let test_recursive_lambda_exhausts_gas =
     ~tags:["stack_overflow"; "execution"; "interpret"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; sc_rollup_node; client; _} protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     Michelson_script.(
       find ["mini_scenarios"; "diverging_lambda"] protocol |> path)
@@ -5730,7 +5899,7 @@ let test_deep_type_in_invalid_arg_error =
     ~tags:["stack_overflow"; "typecheck"; "error_format"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let path =
     write_temp_michelson
       ~name:"deep_pair_param_wrong_arg"
@@ -5830,7 +5999,7 @@ code { CDR ;
     ~tags:["big_map"; "lazy_storage_diff"; "receipt"; "l1_comparison"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; node; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* bootstrap1 is the rollup's L1 operator in this setup, so the L1 chain uses
      a different, uncontended account. The source account never appears in
      [lazy_storage_diff], so the two chains may use different sources. *)
@@ -6006,7 +6175,7 @@ code { CDR ; UNPAIR ;
     ~tags:["big_map"; "lazy_storage_diff"; "receipt"; "l1_comparison"; "order"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; node; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   let l1_src = Constant.bootstrap2.public_key_hash in
   let tezosx_src = Constant.bootstrap1.public_key_hash in
   let extract ~name ~contract operations =
@@ -6142,7 +6311,7 @@ code { UNPAIR ;
     ~tags:["big_map"; "operations"; "l1_comparison"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; node; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let endpoint = tezlink_endpoint sequencer in
   (* Cap gas: octez-client's 3M default is rejected by the Tezlink node. *)
   let gas_limit = 660_000 in
   (* Originate the receiver and the parent, call the parent (which emits the
@@ -6220,6 +6389,642 @@ code { UNPAIR ;
         "Tezos X receiver storage %L must match L1 %R (pre-update copy)") ;
   unit
 
+(** [test_concat_rejects_oversized_result] registers a Tezt test that, for each
+    of the four CONCAT overloads (bytes and string, list and pair), originates a
+    contract whose CONCAT result exceeds the maximum size allocatable on the
+    kernel's wasm32 target (2^31 - 1 bytes), submits a call to it, and checks the
+    runtime rejects it with a bounded Overflow error. *)
+let test_concat_rejects_oversized_result =
+  register_tezosx_test
+    ~title:"Michelson CONCAT rejects an over-sized result with Overflow"
+    ~tags:["michelson"; "concat"; "overflow"; "oom"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let check_overflow ~alias ~contract =
+    let* c =
+      Client.originate_contract
+        ~endpoint
+        ~amount:Tez.zero
+        ~alias
+        ~src:Constant.bootstrap1.public_key_hash
+        ~init:"Unit"
+        ~prg:contract
+        ~burn_cap:Tez.one
+        client
+    in
+    let*@ _ = Rpc.produce_block sequencer in
+    let process =
+      Client.spawn_transfer
+        ~endpoint
+        ~amount:Tez.zero
+        ~fee:(Tez.of_mutez_int 100_000)
+        ~gas_limit:660_000
+        ~storage_limit:0
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:c
+        ~arg:"Unit"
+        ~burn_cap:Tez.one
+        client
+    in
+    let* err = Process.check_and_read_stderr ~expect_failure:true process in
+    Check.(err =~ rex "Overflow")
+      ~error_msg:"Expected a bounded Overflow error, got %L" ;
+    unit
+  in
+  (* List overload, bytes: 2048 copies of a 2^20 chunk concatenate to 2^31. *)
+  Log.info "Check overflow for CONCAT on bytes list" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_bytes_list"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build a list of 2048 copies of a 2^20-byte value; total = 2048 * 2^20 = 2^31 = isize::MAX + 1.
+       ## Build the 2^20-byte value.
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Build the list of 2048 copies of the value.
+       NIL bytes ; PUSH int 2048 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ;
+       DIP { DROP } ;
+       CONCAT ;   # result is 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* List overload, string: 2048 copies of a 2^20 chunk concatenate to 2^31. *)
+  Log.info "Check overflow for CONCAT on string list" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_string_list"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build a list of 2048 copies of a 2^20-character value; total = 2048 * 2^20 = 2^31 = isize::MAX + 1.
+       ## Build the 2^20-character value.
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Build the list of 2048 copies of the value.
+       NIL string ; PUSH int 2048 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ;
+       DIP { DROP } ;
+       CONCAT ;   # result is 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* Pair overload, bytes: a 2^30 value concatenated with itself makes 2^31. *)
+  Log.info "Check overflow for CONCAT on bytes pair" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_bytes_pair"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build b1, a 2^30-byte value: 1024 copies of a 2^20-byte chunk, concatenated.
+       ## Build the 2^20-byte chunk.
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Concatenate 1024 copies of the chunk into b1 (2^30 bytes, < isize::MAX).
+       NIL bytes ; PUSH int 1024 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;      # b2 = b1, so |b1| + |b2| = 2^31 = isize::MAX + 1
+       CONCAT ;   # |b1| + |b2| = 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  (* Pair overload, string: a 2^30 value concatenated with itself makes 2^31. *)
+  Log.info "Check overflow for CONCAT on string pair" ;
+  let* () =
+    check_overflow
+      ~alias:"concat_string_pair"
+      ~contract:
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       # Build s1, a 2^30-character value: 1024 copies of a 2^20-character chunk, concatenated.
+       ## Build the 2^20-character chunk.
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       ## Concatenate 1024 copies of the chunk into s1 (2^30 characters, < isize::MAX).
+       NIL string ; PUSH int 1024 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;      # s2 = s1, so |s1| + |s2| = 2^31 = isize::MAX + 1
+       CONCAT ;   # |s1| + |s2| = 2^31 > isize::MAX  =>  rejected with Overflow
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+  in
+  unit
+
+(* Regression tests for the value-clone OOM class. *)
+module Oom_regression_tests = struct
+  let hard_gas_limit = 660_000
+
+  type outcome = Succeeds | Fails_with of string
+
+  let check ~sequencer ~client ~alias ?(init = "Unit") ?(arg = "Unit") ~outcome
+      contract =
+    let endpoint = tezlink_endpoint sequencer in
+    let* c =
+      Client.originate_contract
+        ~endpoint
+        ~amount:Tez.zero
+        ~alias
+        ~src:Constant.bootstrap1.public_key_hash
+        ~init
+        ~prg:contract
+        ~burn_cap:Tez.one
+        client
+    in
+    let*@ _ = Rpc.produce_block sequencer in
+    let process =
+      Client.spawn_transfer
+        ~endpoint
+        ~amount:Tez.zero
+        ~fee:(Tez.of_mutez_int 100_000)
+        ~gas_limit:hard_gas_limit
+        ~storage_limit:0
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:c
+        ~arg
+        ~burn_cap:Tez.one
+        client
+    in
+    match outcome with
+    | Succeeds -> Process.check process
+    | Fails_with expected ->
+        let* err = Process.check_and_read_stderr ~expect_failure:true process in
+        Check.(err =~ rex expected)
+          ~error_msg:
+            (sf "%s: expected kernel error matching %S, got %%L" alias expected) ;
+        unit
+
+  let test_hashes =
+    let hash_contract ~op =
+      sf
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       %s ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+        op
+    in
+    register_tezosx_test
+      ~title:
+        "Michelson hash instructions do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "hash"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"blake2b"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ hash_contract ~op:"BLAKE2B"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"keccak"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"KECCAK"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha256"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"SHA256"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha3"
+        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+      @@ hash_contract ~op:"SHA3"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"sha512"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ hash_contract ~op:"SHA512"
+    in
+    unit
+
+  let test_check_signature =
+    register_tezosx_test
+      ~title:
+        "Michelson CHECK_SIGNATURE does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "check_signature"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"checksignature"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH signature "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7" ;
+       PUSH key "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ;
+       CHECK_SIGNATURE ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_unpack =
+    register_tezosx_test
+      ~title:"Michelson UNPACK does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "unpack"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"unpack"
+      ~outcome:Succeeds
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       UNPACK nat ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_shift_bytes =
+    register_tezosx_test
+      ~title:"Michelson LSL/LSR bytes do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "shift"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsl"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       DIP { PUSH nat 8 } ;
+       LSL ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"lsr"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH nat 8 ;
+       SWAP ;
+       LSR ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+    in
+    unit
+
+  let test_concat_pair =
+    register_tezosx_test
+      ~title:
+        "Michelson CONCAT (two operands) does not exhaust memory on a shared \
+         operand"
+      ~tags:["michelson"; "oom"; "concat"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"concatstring"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH string "0" ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL string ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL string ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH string "0" ;
+       DUP 2 ;
+       CONCAT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"concatbytes"
+        ~outcome:(Fails_with "Gas_exhaustion")
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       PUSH bytes 0x ;
+       CONCAT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+    in
+    unit
+
+  let test_not_bytes =
+    register_tezosx_test
+      ~title:"Michelson NOT bytes does not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "not"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"not"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 450 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       SWAP ;
+       NIL bytes ; PUSH int 1900 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       NOT ;
+       DROP ; DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+
+  let test_bitwise_bytes =
+    let bitwise_contract ~op =
+      sf
+        {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP; CONCAT }; DUP; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1; SWAP; SUB; DIP { DUP 2; CONS }; DUP; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ;
+       %s ;
+       DROP ; UNIT ; NIL operation ; PAIR
+     }|}
+        op
+    in
+    register_tezosx_test
+      ~title:
+        "Michelson AND/OR/XOR bytes do not exhaust memory on a shared operand"
+      ~tags:["michelson"; "oom"; "bitwise"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"and"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"AND"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"or"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"OR"
+    in
+    let* () =
+      check
+        ~sequencer
+        ~client
+        ~alias:"xor"
+        ~outcome:(Fails_with "Gas_exhaustion")
+      @@ bitwise_contract ~op:"XOR"
+    in
+    unit
+
+  let test_slice =
+    register_tezosx_test
+      ~title:"Michelson SLICE does not exhaust memory on a full-length slice"
+      ~tags:["michelson"; "oom"; "slice"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"slice"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       DUP ; SIZE ; PUSH nat 0 ; SLICE ;
+       IF_NONE { PUSH string "slice out of bounds" ; FAILWITH } {} ;
+       DROP ; DROP ; UNIT ; NIL operation ; PAIR
+     }
+|}
+
+  let test_finalize_storage =
+    register_tezosx_test
+      ~title:
+        "Michelson storage finalization does not exhaust memory on a shared \
+         storage"
+      ~tags:["michelson"; "oom"; "finalize"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"finalizestorage"
+      ~init:"0x"
+      ~arg:"Pair 0x 0x"
+      ~outcome:(Fails_with "OutOfGas")
+      {|
+parameter (pair bytes bytes) ;
+storage bytes ;
+code {
+       DROP ;
+       SENDER ; SELF_ADDRESS ; COMPARE ; EQ ;
+       IF { PUSH bytes 0x ; NIL operation ; PAIR }
+          {
+            PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+            NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+            DIP { DROP } ;
+            PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+            NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+            DIP { DROP } ;
+            DUP ;
+            DIP { PAIR } ;
+            SWAP ;
+            DIP { SELF ; PUSH mutez 0 } ;
+            TRANSFER_TOKENS ;
+            NIL operation ; SWAP ; CONS ;
+            PAIR }
+     }
+|}
+
+  let test_big_map_dump =
+    register_tezosx_test
+      ~title:"Michelson big-map dump does not exhaust memory on a shared value"
+      ~tags:["michelson"; "oom"; "big_map"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"bigmapdump"
+      ~init:"Pair {} 0x"
+      ~arg:"Unit"
+      ~outcome:(Fails_with "Gas_exhaustion")
+      {|
+parameter unit ;
+storage (pair (big_map bytes bytes) bytes) ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       EMPTY_BIG_MAP bytes bytes ;
+       SWAP ;
+       SOME ;
+       PUSH bytes 0x ;
+       UPDATE ;
+       PAIR ;
+       NIL operation ;
+       PAIR
+     }
+|}
+
+  let test_big_map_drop =
+    register_tezosx_test
+      ~title:"Michelson big-map drop does not exhaust memory on a shared value"
+      ~tags:["michelson"; "oom"; "big_map"]
+      ~bootstrap_accounts:[Constant.bootstrap1]
+    @@ fun {sequencer; client; _} _protocol ->
+    check
+      ~sequencer
+      ~client
+      ~alias:"bigmapdrop"
+      ~init:"Unit"
+      ~arg:"Unit"
+      ~outcome:Succeeds
+      {|
+parameter unit ;
+storage unit ;
+code {
+       DROP ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       PUSH bytes 0x00 ; PUSH int 20 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP ; CONCAT } ; DUP ; GT } ; DROP ;
+       NIL bytes ; PUSH int 1536 ; DUP ; GT ; LOOP { PUSH int 1 ; SWAP ; SUB ; DIP { DUP 2 ; CONS } ; DUP ; GT } ; DROP ; CONCAT ;
+       DIP { DROP } ;
+       EMPTY_BIG_MAP bytes bytes ;
+       SWAP ;
+       SOME ;
+       PUSH bytes 0x ;
+       UPDATE ;
+       DROP ;
+       DROP ;
+       UNIT ; NIL operation ; PAIR
+     }
+|}
+
+  let register () =
+    test_hashes [Alpha] ;
+    test_check_signature [Alpha] ;
+    test_unpack [Alpha] ;
+    test_shift_bytes [Alpha] ;
+    test_concat_pair [Alpha] ;
+    test_not_bytes [Alpha] ;
+    test_bitwise_bytes [Alpha] ;
+    test_slice [Alpha] ;
+    test_finalize_storage [Alpha] ;
+    test_big_map_dump [Alpha] ;
+    test_big_map_drop [Alpha]
+end
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -6291,6 +7096,9 @@ let () =
   test_michelson_execution_gas_fee [Alpha] ;
   test_michelson_gas_exhaustion [Alpha] ;
   test_michelson_oom_concat [Alpha] ;
+  test_michelson_oom_pack [Alpha] ;
+  test_michelson_oom_failwith [Alpha] ;
+  test_michelson_oom_big_map_walk [Alpha] ;
   test_mempool_filter_fields [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:true [Alpha] ;
   test_gas_refund_on_transfer ~enable_refund:false [Alpha] ;
@@ -6316,4 +7124,6 @@ let () =
   test_deep_container_lambda_storage [Alpha] ;
   test_deep_container_lambda_storage_drop [Alpha] ;
   test_recursive_lambda_exhausts_gas [Alpha] ;
-  test_deep_type_in_invalid_arg_error [Alpha]
+  test_deep_type_in_invalid_arg_error [Alpha] ;
+  test_concat_rejects_oversized_result [Alpha] ;
+  Oom_regression_tests.register ()

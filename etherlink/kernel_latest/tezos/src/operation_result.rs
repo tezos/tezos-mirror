@@ -229,6 +229,53 @@ impl From<mir::serializer::DecodeError> for TransferError {
     }
 }
 
+/// Apart from running out of gas, the borrowed unparser only fails on values the
+/// typechecker already rejected: an `operation`, or a sub-value lacking the
+/// property the caller restricted the walk to. Neither can appear in a value
+/// reaching these paths. Map both to a serialization error rather than panicking:
+/// the kernel must not abort on any input, however unreachable.
+impl From<mir::ast::BorrowedUnparseError> for TransferError {
+    fn from(err: mir::ast::BorrowedUnparseError) -> Self {
+        match err {
+            mir::ast::BorrowedUnparseError::OutOfGas => Self::OutOfGas(gas::OutOfGas),
+            mir::ast::BorrowedUnparseError::UnsupportedUnparsing => {
+                Self::MichelineSerializationError(
+                    "value carries an operation, which is not storable".to_string(),
+                )
+            }
+            mir::ast::BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                Self::MichelineSerializationError(format!(
+                    "value carries a sub-value that is not {prop}"
+                ))
+            }
+        }
+    }
+}
+
+/// The originated storage is unparsed through the borrowed walk, so its
+/// refusals have to land somewhere. Both are unreachable: a storage type is
+/// `Storable`, `operation` is not, and the property the walk is restricted to
+/// was already checked at typecheck time. Map them to a serialization error
+/// rather than panicking, on the same reasoning as the [TransferError] impl
+/// above: the kernel must not abort on any input, however unreachable.
+impl From<mir::ast::BorrowedUnparseError> for OriginationError {
+    fn from(err: mir::ast::BorrowedUnparseError) -> Self {
+        match err {
+            mir::ast::BorrowedUnparseError::OutOfGas => Self::OutOfGas(gas::OutOfGas),
+            mir::ast::BorrowedUnparseError::UnsupportedUnparsing => {
+                Self::MichelineSerializationError(
+                    "value carries an operation, which is not storable".to_string(),
+                )
+            }
+            mir::ast::BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                Self::MichelineSerializationError(format!(
+                    "value carries a sub-value that is not {prop}"
+                ))
+            }
+        }
+    }
+}
+
 impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
     fn from(err: mir::interpreter::ContractInterpretError) -> Self {
         use mir::interpreter::{

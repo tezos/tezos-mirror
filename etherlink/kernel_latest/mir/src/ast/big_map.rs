@@ -19,10 +19,34 @@ use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
-use super::{Micheline, Type, TypedValue};
-use crate::gas::OutOfGas;
+use super::{
+    CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
+    TypedValue,
+};
+use crate::ast::BorrowedUnparseError;
+use crate::gas::{tc_cost, OutOfGas};
 use crate::serializer::DecodeError;
 use crate::typechecker::TcError;
+
+#[cfg(test)]
+pub(crate) fn in_memory_entries<'a>(
+    entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
+) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>> {
+    entries
+        .into_iter()
+        .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+        .collect()
+}
+
+#[cfg(test)]
+pub(crate) fn overlay_entries<'a>(
+    entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
+) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>> {
+    entries
+        .into_iter()
+        .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+        .collect()
+}
 
 /// Id of big map in the lazy storage.
 #[derive(BinWriter, NomReader, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -118,7 +142,7 @@ pub struct BigMapFromId<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    pub overlay: RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    pub overlay: RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
 }
 
 /// The content of a big map, either backed by a map in the lazy
@@ -127,7 +151,7 @@ pub struct BigMapFromId<'a> {
 pub enum BigMapContent<'a> {
     /// Big map can be backed by no map in the lazy storage and yet
     /// stay fully in memory.
-    InMemory(RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>),
+    InMemory(RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
     /// Otherwise they come from the lazy storage and have both an
     /// identifier and an overlay
     FromId(BigMapFromId<'a>),
@@ -159,7 +183,7 @@ impl<'a> BigMap<'a> {
     pub fn new(
         key_type: Type,
         value_type: Type,
-        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     ) -> Self {
         Self {
             content: BigMapContent::InMemory(map),
@@ -179,7 +203,7 @@ impl<'a> BigMap<'a> {
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
         storage: &mut (impl LazyStorage<'a> + ?Sized),
-    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
+    ) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
             BigMapContent::FromId(BigMapFromId { id, overlay }) => {
@@ -188,7 +212,9 @@ impl<'a> BigMap<'a> {
                     // always used, even if it is `None` (and `get` returned
                     // `Some(None)`) which means removal.
                     Some(change) => change.clone(),
-                    None => storage.big_map_get(arena, id, key, &self.value_type)?,
+                    None => storage
+                        .big_map_get(arena, id, key, &self.value_type)?
+                        .map(Rc::new),
                 }
             }
         })
@@ -215,7 +241,7 @@ impl<'a> BigMap<'a> {
     }
 
     /// Michelson's `UPDATE`.
-    pub fn update(&mut self, key: TypedValue<'a>, value: Option<TypedValue<'a>>) {
+    pub fn update(&mut self, key: Rc<TypedValue<'a>>, value: Option<Rc<TypedValue<'a>>>) {
         match &mut self.content {
             BigMapContent::InMemory(m) => match value {
                 Some(value) => {
@@ -271,6 +297,21 @@ pub enum LazyStorageError {
     /// Gas exhaustion while serializing a key.
     #[error("{0}")]
     OutOfGasError(#[from] OutOfGas),
+    /// A big_map entry carried a value that cannot be unparsed for storage.
+    #[error("big_map entry value is not storable")]
+    NonStorableValue,
+}
+
+impl From<BorrowedUnparseError> for LazyStorageError {
+    fn from(err: BorrowedUnparseError) -> Self {
+        match err {
+            BorrowedUnparseError::OutOfGas => LazyStorageError::OutOfGasError(OutOfGas),
+            BorrowedUnparseError::UnsupportedUnparsing
+            | BorrowedUnparseError::UnsatisfiedProperty(_) => {
+                LazyStorageError::NonStorableValue
+            }
+        }
+    }
 }
 
 impl From<tezos_data_encoding::enc::BinError> for LazyStorageError {
@@ -328,12 +369,22 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key and value types must match the type of key of the stored map.
+    fn big_map_update_ref(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue<'a>,
+        value: Option<&TypedValue<'a>>,
+    ) -> Result<(), LazyStorageError>;
+
+    /// Owned-value convenience wrapper over [LazyStorage::big_map_update_ref].
     fn big_map_update(
         &mut self,
         id: &BigMapId,
         key: TypedValue<'a>,
         value: Option<TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError>;
+    ) -> Result<(), LazyStorageError> {
+        self.big_map_update_ref(id, &key, value.as_ref())
+    }
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -362,6 +413,21 @@ pub trait LazyStorage<'a> {
     /// Record a big map's id at its position in the dump walk (AST pre-order);
     /// the receipt builder reverses it to match L1's order. Default: no-op.
     fn record_diff_order(&mut self, _id: &BigMapId) {}
+
+    /// Charge `milligas` for one step of the end-of-execution lazy-storage
+    /// walk. Called once per node visited, with
+    /// [crate::gas::tc_cost::LAZY_STORAGE_CYCLE].
+    ///
+    /// The walk runs on every successful execution, over the returned storage
+    /// and every outgoing operation, on a value whose shape the contract
+    /// chooses — so it is the only traversal in the result pipeline that must
+    /// price its own work. L1 charges `Typecheck_costs.parse_instr_cycle` per
+    /// node in `extract_lazy_storage_updates` for the same reason.
+    ///
+    /// It lives on this trait rather than as a `&mut Gas` parameter because
+    /// the kernel's lazy storage *is* its gas holder, so the two cannot be
+    /// borrowed separately at the call site.
+    fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError>;
 }
 
 /// Bulk-update the big_map. This trait exists mostly for convenience, and has a
@@ -372,13 +438,18 @@ pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key and value types must match the type of key of the stored map.
-    fn big_map_bulk_update(
+    fn big_map_bulk_update<'b>(
         &mut self,
         id: &BigMapId,
-        entries_iter: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-    ) -> Result<(), LazyStorageError> {
+        entries_iter: impl IntoIterator<
+            Item = (&'b TypedValue<'a>, Option<&'b TypedValue<'a>>),
+        >,
+    ) -> Result<(), LazyStorageError>
+    where
+        'a: 'b,
+    {
         for (k, v) in entries_iter {
-            self.big_map_update(id, k, v)?
+            self.big_map_update_ref(id, k, v)?
         }
         Ok(())
     }
@@ -389,7 +460,7 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct MapInfo<'a> {
-    map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+    map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     key_type: Type,
     value_type: Type,
 }
@@ -397,7 +468,7 @@ pub(crate) struct MapInfo<'a> {
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
-        map: RedBlackTreeMap<TypedValue<'a>, TypedValue<'a>>,
+        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
         key_type: Type,
         value_type: Type,
     ) -> Self {
@@ -488,6 +559,15 @@ impl<'a> InMemoryLazyStorage<'a> {
 }
 
 impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
+    /// Unmetered: this storage holds no gas counter, and none of its users —
+    /// the tzt runner, `Ctx`'s default storage, unit tests — runs inside the
+    /// kernel's bounded heap. The kernel's own implementation
+    /// (`tezos_execution`'s `TcCtx`) is where the charge has to bite; a test
+    /// that needs a metered walk wraps this in a counting storage of its own.
+    fn consume_gas(&mut self, _milligas: u32) -> Result<(), LazyStorageError> {
+        Ok(())
+    }
+
     fn big_map_get(
         &mut self,
         _arena: &'a Arena<Micheline<'a>>,
@@ -496,7 +576,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         _value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let info = self.access_big_map(id)?;
-        Ok(info.map.get(key).cloned())
+        Ok(info.map.get(key).map(|v| (**v).clone()))
     }
 
     fn big_map_mem(
@@ -508,19 +588,20 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(info.map.contains_key(key))
     }
 
-    fn big_map_update(
+    fn big_map_update_ref(
         &mut self,
         id: &BigMapId,
-        key: TypedValue<'a>,
-        value: Option<TypedValue<'a>>,
+        key: &TypedValue<'a>,
+        value: Option<&TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
         let info = self.access_big_map_mut(id)?;
         match value {
             None => {
-                info.map.remove_mut(&key);
+                info.map.remove_mut(key);
             }
             Some(value) => {
-                info.map.insert_mut(key, value);
+                info.map
+                    .insert_mut(Rc::new(key.clone()), Rc::new(value.clone()));
             }
         }
         Ok(())
@@ -603,7 +684,10 @@ mod test_big_map_operations {
         key: TypedValue,
         expected_val: Option<TypedValue<'a>>,
     ) {
-        assert_eq!(map.get(arena, &key, storage).unwrap(), expected_val);
+        assert_eq!(
+            map.get(arena, &key, storage).unwrap(),
+            expected_val.clone().map(Rc::new)
+        );
         assert_eq!(map.mem(&key, storage).unwrap(), expected_val.is_some());
     }
 
@@ -611,7 +695,7 @@ mod test_big_map_operations {
     fn test_get_mem_in_memory() {
         let arena = &Arena::new();
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([(
+        let content = BigMapContent::InMemory(in_memory_entries([(
             TypedValue::int(1),
             TypedValue::int(1),
         )]));
@@ -647,7 +731,7 @@ mod test_big_map_operations {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: RedBlackTreeMap::from_iter([
+            overlay: overlay_entries([
                 (TypedValue::int(1), Some(TypedValue::int(-1))),
                 (TypedValue::int(2), None),
                 (TypedValue::int(3), Some(TypedValue::int(3))),
@@ -686,96 +770,407 @@ mod test_big_map_operations {
 
 impl<'a> TypedValue<'a> {
     /// Traverses a `TypedValue` in AST pre-order and applies `f` to every big
-    /// map inside it. Big maps nested in a map value are reached via
-    /// [RedBlackTreeMap::get_mut], which path-copies the node so `f`'s writes
-    /// stick.
-    fn for_each_big_map_mut(&mut self, f: &mut impl FnMut(&mut BigMap<'a>)) {
-        use crate::ast::Or::*;
-        use TypedValue::*;
-        match self {
-            Int(_) => {}
-            Nat(_) => {}
-            Mutez(_) => {}
-            Bool(_) => {}
-            Unit => {}
-            String(_) => {}
-            Bytes(_) => {}
-            Address(_) => {}
-            KeyHash(_) => {}
-            Key(_) => {}
-            Signature(_) => {}
-            ChainId(_) => {}
-            Contract(_) => {}
-            Timestamp(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381Fr(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G1(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G2(_) => {}
-            Pair(l, r) => {
-                Rc::make_mut(l).for_each_big_map_mut(f);
-                Rc::make_mut(r).for_each_big_map_mut(f);
-            }
-            Or(p) => match p {
-                Left(l) => Rc::make_mut(l).for_each_big_map_mut(f),
-                Right(r) => Rc::make_mut(r).for_each_big_map_mut(f),
-            },
-            Option(p) => {
-                if let Some(x) = p.as_mut() {
-                    Rc::make_mut(x).for_each_big_map_mut(f)
-                }
-            }
-            List(l) => l
-                .iter_mut()
-                .for_each(|v| Rc::make_mut(v).for_each_big_map_mut(f)),
-            Set(_) => {
-                // Elements are comparable and so have no big maps
-            }
-            Map(m) => {
-                // Keys are comparable (no big maps); visit each value via
-                // get_mut. Collect the keys first so we can call get_mut,
-                // which borrows the map mutably, one at a time.
-                let keys: Vec<Rc<TypedValue<'a>>> = m.keys().cloned().collect();
-                for k in keys {
-                    if let Some(v) = m.get_mut(&k) {
-                        Rc::make_mut(v).for_each_big_map_mut(f)
-                    }
-                }
-            }
-            BigMap(m) => f(m),
-            Ticket(_) => {
-                // Value is comparable, has no big map
-            }
-            Lambda(_) => {
-                // Can contain only pushable values, thus no big maps
-            }
-            Operation(op) => match &mut op.as_mut().operation {
-                crate::ast::Operation::TransferTokens(t) => {
-                    t.param.for_each_big_map_mut(f)
-                }
-                crate::ast::Operation::SetDelegate(_) => {}
-                crate::ast::Operation::Emit(_) => {
-                    // Can contain only pushable values, thus no big maps
-                }
-                crate::ast::Operation::CreateContract(cc) => {
-                    cc.storage.for_each_big_map_mut(f)
-                }
-            },
+    /// map inside it, replacing self with the updated value — or leaving it
+    /// untouched, if it held no big map at all.
+    fn for_each_big_map_mut<S: LazyStorage<'a> + ?Sized>(
+        &mut self,
+        storage: &mut S,
+        f: &mut impl FnMut(&mut S, &mut BigMap<'a>) -> Result<(), LazyStorageError>,
+    ) -> Result<(), LazyStorageError> {
+        if let Some(updated) = self.update_big_maps(storage, f)? {
+            // Sole owner of a freshly built value, so this moves, never clones.
+            *self = TypedValue::unwrap_rc(updated);
         }
+        Ok(())
     }
 
-    /// Read-only counterpart of [TypedValue::for_each_big_map_mut]: applies
+    /// Copy-on-write core of [TypedValue::for_each_big_map_mut]: applies `f`
+    /// to every big map in self, in AST pre-order, and returns
+    /// `Some(rebuilt)` when self held at least one big map, `None` when it
+    /// held none (in which case self is left untouched).
+    ///
+    /// Only the spine leading to a big map is rebuilt; every other child is
+    /// carried over as an `Rc::clone`. Descending with [Rc::make_mut]
+    /// instead would deep-copy *every* shared child on the way down, big map
+    /// below it or not — including leaves that can hold gigabytes, such as
+    /// `bytes`. A value duplicated N times then cost N full copies, enough to
+    /// exhaust the kernel's `wasm32` heap and abort it (L2-1831).
+    ///
+    /// A shared subtree is still visited once per occurrence and each
+    /// occurrence gets its own rebuilt big map, so [dump_one_big_map]'s dedup
+    /// sees them separately exactly as the `Rc::make_mut` walk made it. Only
+    /// the *absence* of a big map is ever memoized, never a rebuild — see
+    /// `big_map_free` below.
+    ///
+    /// Kept exhaustive (no catch-all) and in lock-step with
+    /// [TypedValue::for_each_big_map], see that function's comment.
+    ///
+    /// # Why this is iterative
+    ///
+    /// The walk descends once per level of a value whose depth the contract
+    /// chooses, against the kernel's 1 MiB `wasm32` stack. Michelson has no
+    /// recursive types, so a value's depth is bounded by its type's depth —
+    /// but this walk only ever sees values at *declared* types (the returned
+    /// storage, a callee's parameter, a `CREATE_CONTRACT` storage), and
+    /// `MICHELSON_MAXIMUM_TYPE_SIZE` still permits about 2 000 levels through
+    /// a `list` spine, which a recursive formulation does not survive. So the
+    /// walk runs on an explicit `frames`/`results` worklist, in the same shape
+    /// as the iterative `Drop`, `Debug`, comparison and untyper walks
+    /// (L2-1446, L2-1672); depth now costs heap, which is already bounded by
+    /// the size of the value being walked.
+    ///
+    /// # Why this is metered
+    ///
+    /// Every visited node is charged
+    /// [crate::gas::tc_cost::LAZY_STORAGE_CYCLE] through
+    /// [LazyStorage::consume_gas], mirroring L1's
+    /// `extract_lazy_storage_updates`. The charge happens *before* the
+    /// `big_map_free` lookup, as L1 charges before its `has_lazy_storage`
+    /// match, so a memo hit still costs a cycle — which is what makes the
+    /// bound hold independently of the memo being correct.
+    ///
+    /// The memo alone does not bound this walk. It caches only the *absence*
+    /// of a big map, so a value with one under a shared spine is still
+    /// unfolded once per occurrence, and `DUP`-sharing puts `2^K` occurrences
+    /// within `O(K²)` gas. Metering is what makes that run out of gas rather
+    /// than out of heap or time.
+    fn update_big_maps<'b, S: LazyStorage<'a> + ?Sized>(
+        &'b self,
+        storage: &mut S,
+        f: &mut impl FnMut(&mut S, &mut BigMap<'a>) -> Result<(), LazyStorageError>,
+    ) -> Result<Option<Rc<Self>>, LazyStorageError> {
+        use crate::ast::Or::*;
+        use TypedValue::*;
+
+        /// One step of the walk. `Visit` descends a source node and pushes
+        /// exactly one result; each `Build*` pops the results its children
+        /// pushed and assembles the replacement node from them.
+        enum Frame<'b, 'a> {
+            Visit(&'b TypedValue<'a>),
+            /// Pops 2: the left child's result, then the right one's.
+            BuildPair(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>),
+            /// Pops 1.
+            BuildOr {
+                is_left: bool,
+            },
+            /// Pops 1.
+            BuildOption,
+            /// Pops one per element, in element order.
+            BuildList(&'b MichelsonList<Rc<TypedValue<'a>>>),
+            /// Pops one per entry, in ascending key order.
+            BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+            /// Pops 1: the transfer parameter.
+            BuildTransferTokens(&'b OperationInfo<'a>, &'b TransferTokens<'a>),
+            /// Pops 1: the originated storage.
+            BuildCreateContract(&'b OperationInfo<'a>, &'b CreateContract<'a>),
+            /// Pops nothing, peeks: records a shared subtree that turned out
+            /// to hold no big map.
+            Memoize(*const TypedValue<'a>),
+        }
+
+        // Subtrees already known to hold no big map, keyed by address.
+        //
+        // Sound because the walk never mutates the source and the caller keeps
+        // it alive throughout, so every address here denotes one live node for
+        // the whole walk and cannot be recycled under us. Sound to *act* on
+        // because "holds no big map" is a property of an immutable subtree,
+        // independent of which occurrence we reached it by: skipping a repeat
+        // visit calls no `f`, allocates no id, records nothing in
+        // `seen_source_ids` and rebuilds nothing, so it is unobservable.
+        //
+        // Caching a `Some` would *not* be: each occurrence of a shared big map
+        // must get its own rebuilt copy, which is what `dump_one_big_map`'s
+        // dedup keys off.
+        //
+        // Without this, a value whose in-memory DAG unfolds to a `2^K`-node
+        // tree — `DUP` is an `Rc::clone`, so `DUP; NIL t; SWAP; CONS; SWAP;
+        // CONS` doubles the occurrence count per level for `O(K²)` gas while
+        // the *type* grows by one node — is walked as that tree (L2-1831).
+        //
+        // The memo turns that into `O(distinct nodes)`, but only while no big
+        // map is present: with one under the shared spine every result is
+        // `Some`, nothing is cacheable, and the `2^K` unfolding is back. The
+        // per-node gas charge is what bounds that case, and the memo is what
+        // keeps the ordinary case from paying for the bound.
+        let mut big_map_free: BTreeSet<*const TypedValue<'a>> = BTreeSet::new();
+        let mut frames: Vec<Frame<'b, 'a>> = vec![Frame::Visit(self)];
+        let mut results: Vec<std::option::Option<Rc<TypedValue<'a>>>> = Vec::new();
+
+        /// Queues `child`, remembering the answer if it is shared.
+        ///
+        /// The gate is an optimisation, not a correctness condition, and it is
+        /// deliberately not an exact "can be reached twice" test — a uniquely
+        /// held child of a shared parent has `strong_count == 1` and is still
+        /// reached once per occurrence of that parent. It costs nothing to
+        /// miss: if such a child is re-reached, some ancestor on those paths
+        /// *is* shared, and the topmost one was memoized on its first visit,
+        /// so the descent stops there. The exception is an ancestor holding a
+        /// big map, which is never memoized — and that case is bounded by gas,
+        /// not by the memo.
+        ///
+        /// Getting the gate wrong in the other direction is equally harmless:
+        /// memoizing a node reached only once wastes one `BTreeSet` insert,
+        /// since "holds no big map" does not depend on how it was reached.
+        fn push_child<'b, 'a>(
+            frames: &mut Vec<Frame<'b, 'a>>,
+            child: &'b Rc<TypedValue<'a>>,
+        ) {
+            if Rc::strong_count(child) > 1 {
+                frames.push(Frame::Memoize(Rc::as_ptr(child)));
+            }
+            frames.push(Frame::Visit(child.as_ref()));
+        }
+
+        /// Wraps a rebuilt operation back up, carrying the nonce over.
+        fn rebuilt_operation<'a>(
+            op: &OperationInfo<'a>,
+            operation: crate::ast::Operation<'a>,
+        ) -> std::option::Option<Rc<TypedValue<'a>>> {
+            Some(Rc::new(TypedValue::Operation(Box::new(OperationInfo {
+                operation,
+                counter: op.counter,
+            }))))
+        }
+
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::Visit(v) => {
+                    // Charged before the memo lookup, as L1 charges before its
+                    // `has_lazy_storage` match: a skipped subtree still costs
+                    // its root, so the bound does not rest on the memo.
+                    storage.consume_gas(tc_cost::LAZY_STORAGE_CYCLE)?;
+                    if big_map_free.contains(&(v as *const TypedValue<'a>)) {
+                        results.push(None);
+                        continue;
+                    }
+                    match v {
+                        Int(_) => results.push(None),
+                        Nat(_) => results.push(None),
+                        Mutez(_) => results.push(None),
+                        Bool(_) => results.push(None),
+                        Unit => results.push(None),
+                        String(_) => results.push(None),
+                        Bytes(_) => results.push(None),
+                        Address(_) => results.push(None),
+                        KeyHash(_) => results.push(None),
+                        Key(_) => results.push(None),
+                        Signature(_) => results.push(None),
+                        ChainId(_) => results.push(None),
+                        Contract(_) => results.push(None),
+                        Timestamp(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381Fr(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G1(_) => results.push(None),
+                        #[cfg(feature = "bls")]
+                        Bls12381G2(_) => results.push(None),
+                        // Children are queued back-to-front throughout, so
+                        // they are visited front-to-back: [dump_one_big_map]
+                        // allocates lazy-storage ids in visit order, which
+                        // makes that order consensus-observable.
+                        Pair(l, r) => {
+                            frames.push(Frame::BuildPair(l, r));
+                            push_child(&mut frames, r);
+                            push_child(&mut frames, l);
+                        }
+                        Or(p) => match p {
+                            Left(x) => {
+                                frames.push(Frame::BuildOr { is_left: true });
+                                push_child(&mut frames, x);
+                            }
+                            Right(x) => {
+                                frames.push(Frame::BuildOr { is_left: false });
+                                push_child(&mut frames, x);
+                            }
+                        },
+                        Option(None) => results.push(None),
+                        Option(Some(x)) => {
+                            frames.push(Frame::BuildOption);
+                            push_child(&mut frames, x);
+                        }
+                        List(l) => {
+                            frames.push(Frame::BuildList(l));
+                            for x in l.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        Set(_) => {
+                            // Elements are comparable and so have no big maps
+                            results.push(None)
+                        }
+                        Map(m) => {
+                            // Keys are comparable (no big maps); only values
+                            // are visited.
+                            frames.push(Frame::BuildMap(m));
+                            for (_, x) in m.iter().rev() {
+                                push_child(&mut frames, x);
+                            }
+                        }
+                        BigMap(m) => {
+                            let mut m = m.clone();
+                            f(storage, &mut m)?;
+                            results.push(Some(Rc::new(BigMap(m))));
+                        }
+                        Ticket(_) => {
+                            // Value is comparable, has no big map
+                            results.push(None)
+                        }
+                        Lambda(_) => {
+                            // Can contain only pushable values, thus no big maps
+                            results.push(None)
+                        }
+                        // `param` and `storage` are `Rc`-shared like every other
+                        // deep value (L2-1831), so they go through
+                        // `push_child`: an operation `DUP`ed into the returned
+                        // list several times shares one payload, and that is
+                        // exactly the shape the memo exists for.
+                        Operation(op) => match &op.operation {
+                            crate::ast::Operation::TransferTokens(t) => {
+                                frames.push(Frame::BuildTransferTokens(op, t));
+                                push_child(&mut frames, &t.param);
+                            }
+                            crate::ast::Operation::SetDelegate(_) => results.push(None),
+                            crate::ast::Operation::Emit(_) => {
+                                // Can contain only pushable values, thus no big maps
+                                results.push(None)
+                            }
+                            crate::ast::Operation::CreateContract(cc) => {
+                                frames.push(Frame::BuildCreateContract(op, cc));
+                                push_child(&mut frames, &cc.storage);
+                            }
+                        },
+                    }
+                }
+                Frame::Memoize(node) => {
+                    // The result just pushed is this node's, since the `Visit`
+                    // this frame was queued behind pushes exactly one.
+                    if matches!(results.last(), Some(None)) {
+                        big_map_free.insert(node);
+                    }
+                }
+                Frame::BuildPair(l, r) => {
+                    let new_r = results.pop().expect("BuildPair: missing right");
+                    let new_l = results.pop().expect("BuildPair: missing left");
+                    results.push(match (new_l, new_r) {
+                        (None, None) => None,
+                        (new_l, new_r) => Some(Rc::new(Pair(
+                            new_l.unwrap_or_else(|| l.clone()),
+                            new_r.unwrap_or_else(|| r.clone()),
+                        ))),
+                    });
+                }
+                Frame::BuildOr { is_left } => {
+                    let new = results.pop().expect("BuildOr: missing child");
+                    results.push(
+                        new.map(|x| {
+                            Rc::new(Or(if is_left { Left(x) } else { Right(x) }))
+                        }),
+                    );
+                }
+                Frame::BuildOption => {
+                    let new = results.pop().expect("BuildOption: missing child");
+                    results.push(new.map(|x| Rc::new(Option(Some(x)))));
+                }
+                Frame::BuildList(orig) => {
+                    let at = results.len() - orig.len();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        // No big map anywhere in the list: leave it shared,
+                        // without even allocating one pointer per element.
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        let new: Vec<Rc<TypedValue<'a>>> = orig
+                            .iter()
+                            .zip(results.drain(at..))
+                            .map(|(x, new_x)| new_x.unwrap_or_else(|| x.clone()))
+                            .collect();
+                        results.push(Some(Rc::new(List(new.into()))));
+                    }
+                }
+                Frame::BuildMap(orig) => {
+                    let at = results.len() - orig.size();
+                    if results[at..].iter().all(std::option::Option::is_none) {
+                        results.truncate(at);
+                        results.push(None);
+                    } else {
+                        // `insert_mut` path-copies, so `orig` and every other
+                        // holder of it are left untouched; the entries that
+                        // did not change stay shared with it.
+                        let mut new = orig.clone();
+                        for ((k, _), new_v) in orig.iter().zip(results.drain(at..)) {
+                            if let Some(new_v) = new_v {
+                                new.insert_mut(k.clone(), new_v);
+                            }
+                        }
+                        results.push(Some(Rc::new(Map(new))));
+                    }
+                }
+                Frame::BuildTransferTokens(op, t) => {
+                    let new = results.pop().expect("BuildTransferTokens: missing param");
+                    results.push(new.and_then(|param| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::TransferTokens(TransferTokens {
+                                // Already an `Rc`, and freshly built: stored
+                                // as is, no unwrap and no copy.
+                                param,
+                                destination_address: t.destination_address.clone(),
+                                amount: t.amount,
+                            }),
+                        )
+                    }));
+                }
+                Frame::BuildCreateContract(op, cc) => {
+                    let new =
+                        results.pop().expect("BuildCreateContract: missing storage");
+                    results.push(new.and_then(|storage| {
+                        rebuilt_operation(
+                            op,
+                            crate::ast::Operation::CreateContract(CreateContract {
+                                storage,
+                                delegate: cc.delegate.clone(),
+                                amount: cc.amount,
+                                code: cc.code.clone(),
+                                micheline_code: cc.micheline_code,
+                                address: cc.address.clone(),
+                            }),
+                        )
+                    }));
+                }
+            }
+        }
+
+        // The root's `Visit` pushed exactly one result and every `Build*`
+        // replaces the ones it popped, so this is the whole answer.
+        Ok(results.pop().flatten())
+    }
+
+    /// Read-only counterpart of [TypedValue::update_big_maps]: applies
     /// `f` to every big map inside self in AST order without mutating it. Map
     /// values are walked via [RedBlackTreeMap::values].
     ///
     /// Kept exhaustive (no catch-all) and in lock-step with
-    /// [TypedValue::for_each_big_map_mut] on purpose: this read-only walk feeds
-    /// `started_with_map_ids` while the mutable walk feeds `seen_source_ids`,
-    /// and [dump_big_map_updates] removes ids present in the former but not the
-    /// latter. A new big-map-carrying variant must be added to both walks or a
-    /// dropped big map could leak; a wildcard here would silently skip it while
-    /// the mutable walk still compile-errored, so the two would diverge.
+    /// [TypedValue::update_big_maps] **on which variants it visits**: this
+    /// read-only walk feeds `started_with_map_ids` while the mutable walk feeds
+    /// `seen_source_ids`, and [dump_big_map_updates] removes ids present in the
+    /// former but not the latter. A new big-map-carrying variant must be added
+    /// to both walks or a dropped big map could leak; a wildcard here would
+    /// silently skip it while the mutable walk still compile-errored, so the
+    /// two would diverge.
+    ///
+    /// The lock-step is on variant coverage only. This walk is still
+    /// recursive, and it neither memoizes nor is bounded by anything, where
+    /// the mutable walk is iterative and memoized. That is deliberate rather
+    /// than an oversight, because the two see different values: this one runs
+    /// on the storage returned by `typecheck_storage`, parsed from Micheline
+    /// before the contract body runs, so it is a tree with no `Rc` sharing and
+    /// no `DUP`-built DAG can reach it. Its depth is bounded by the storage
+    /// type, hence by `MICHELSON_MAXIMUM_TYPE_SIZE`, and at that depth its
+    /// frame fits the kernel's 1 MiB stack with room to spare — which the
+    /// mutable walk's did not once it grew a rebuild, which is what forced
+    /// that one onto a worklist. Converting this one too would be tidier and
+    /// costs little; it is left alone here to keep the diff to the walk that
+    /// had to change.
     fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
@@ -914,11 +1309,35 @@ pub fn dump_big_map_updates<'a>(
     Ok(())
 }
 
+/// [dump_big_map_updates] against a value held behind an `Rc`, returning the
+/// rebuilt root rather than assigning it back.
+///
+/// Returns `None` when the value held no big map, leaving `root` untouched and
+/// still shared. This is the form an internal `CREATE_CONTRACT` needs: its
+/// storage is shared with the other occurrences of a `DUP`ed operation, so
+/// taking it by value to dump it would deep-copy it — unmetered, and before
+/// the walk charges anything (L2-1836).
+pub fn dump_big_map_updates_shared<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    started_with_map_ids: &[BigMapId],
+    root: &Rc<TypedValue<'a>>,
+    temporary: bool,
+) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+    // Same three phases as [dump_big_map_updates], which documents the policy
+    // driving each of them.
+    let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
+    let (updated, deferred) =
+        dump_big_map_walk_shared(storage, root, temporary, &mut seen_source_ids)?;
+    remove_unreferenced_big_maps(storage, started_with_map_ids, &seen_source_ids)?;
+    apply_deferred_big_map_updates(storage, deferred)?;
+    Ok(updated)
+}
+
 /// Deferred first-occurrence in-place overlays from [dump_big_map_walk],
 /// applied once every walk sharing the lazy storage has run.
 pub type DeferredBigMapUpdates<'a> = Vec<(
     BigMapId,
-    RedBlackTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>,
+    RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
 )>;
 
 /// Apply the deferred in-place overlays returned by [dump_big_map_walk].
@@ -929,7 +1348,9 @@ pub fn apply_deferred_big_map_updates<'a>(
     for (id, overlay) in deferred {
         storage.big_map_bulk_update(
             &id,
-            overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+            overlay
+                .iter()
+                .map(|(k, v)| (&**k, v.as_ref().map(|x| &**x))),
         )?;
     }
     Ok(())
@@ -955,31 +1376,72 @@ pub fn dump_big_map_walk<'a>(
     seen_source_ids: &mut BTreeSet<BigMapId>,
 ) -> Result<DeferredBigMapUpdates<'a>, LazyStorageError> {
     let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
-    // The per-big-map work is fallible, but for_each_big_map_mut takes an
-    // infallible closure, so the first error is captured here and later big
-    // maps are skipped (the tree walk still completes harmlessly).
-    let mut result: Result<(), LazyStorageError> = Ok(());
-    root.for_each_big_map_mut(&mut |map: &mut BigMap<'a>| {
-        if result.is_ok() {
-            result = dump_one_big_map(
-                map,
-                storage,
-                temporary,
-                seen_source_ids,
-                &mut deferred_in_place_updates,
-            );
-        }
-    });
-    result?;
+    // The walk hands `storage` to the visitor rather than letting it capture
+    // one, so the per-big-map work can be fallible and stop the walk on the
+    // first error — and so the walk itself can charge gas through the same
+    // `&mut` (see [LazyStorage::consume_gas]).
+    root.for_each_big_map_mut(storage, &mut |storage, map: &mut BigMap<'a>| {
+        dump_one_big_map(
+            map,
+            storage,
+            temporary,
+            seen_source_ids,
+            &mut deferred_in_place_updates,
+        )
+    })?;
 
     // Return the deferred updates so a multi-walk caller applies them only
     // after every walk has copied from the pre-update source (L2-1761).
     Ok(deferred_in_place_updates)
 }
 
+/// [dump_big_map_walk] against a value held behind an `Rc`, returning the
+/// rebuilt root rather than assigning it back.
+///
+/// Returns `None` when the value held no big map, in which case `root` is
+/// untouched and still shared. Callers that only need to read the result can
+/// then keep using `root` itself, which is what makes this usable on a value
+/// shared with the other occurrences of a `DUP`ed operation: taking it by
+/// value to walk it would deep-copy it, unmetered, before the walk charges
+/// anything (L2-1836).
+pub fn dump_big_map_walk_shared<'a>(
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
+    root: &Rc<TypedValue<'a>>,
+    temporary: bool,
+    seen_source_ids: &mut BTreeSet<BigMapId>,
+) -> Result<(Option<Rc<TypedValue<'a>>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
+    let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
+    // Same visitor contract as [dump_big_map_walk]; only the ownership of the
+    // root differs, so the two stay in lock-step.
+    let updated =
+        root.update_big_maps(storage, &mut |storage, map: &mut BigMap<'a>| {
+            dump_one_big_map(
+                map,
+                storage,
+                temporary,
+                seen_source_ids,
+                &mut deferred_in_place_updates,
+            )
+        })?;
+
+    Ok((updated, deferred_in_place_updates))
+}
+
+/// Runs the mutable walk against a throwaway unmetered storage, for tests that
+/// care only about which big maps are visited and in what order. Tests that
+/// need the gas charge to bite supply a metered storage of their own.
+#[cfg(test)]
+fn walk_big_maps<'a>(root: &mut TypedValue<'a>, f: &mut impl FnMut(&mut BigMap<'a>)) {
+    let mut storage = InMemoryLazyStorage::new();
+    root.for_each_big_map_mut(&mut storage, &mut |_, map| {
+        f(map);
+        Ok(())
+    })
+    .expect("InMemoryLazyStorage is unmetered and this visitor cannot fail")
+}
+
 /// Dump a single big map to the lazy storage, threading the dedup state across
-/// maps. Split from [dump_big_map_walk] so the fallible per-map work can use
-/// `?` inside the infallible [TypedValue::for_each_big_map_mut] closure.
+/// maps. Split from [dump_big_map_walk] to keep the per-map work readable.
 fn dump_one_big_map<'a>(
     map: &mut BigMap<'a>,
     storage: &mut (impl LazyStorage<'a> + ?Sized),
@@ -997,7 +1459,9 @@ fn dump_one_big_map<'a>(
                 let overlay = mem::take(&mut m.overlay);
                 storage.big_map_bulk_update(
                     &new_id,
-                    overlay.iter().map(|(k, v)| (k.clone(), v.clone())),
+                    overlay
+                        .iter()
+                        .map(|(k, v)| (&**k, v.as_ref().map(|x| &**x))),
                 )?;
                 m.id = new_id;
             } else {
@@ -1021,7 +1485,7 @@ fn dump_one_big_map<'a>(
                 &id,
                 in_memory
                     .iter()
-                    .map(|(key, value)| (key.clone(), Some(value.clone()))),
+                    .map(|(key, value)| (&**key, Some(&**value))),
             )?;
             map.content = BigMapContent::FromId(BigMapFromId {
                 id,
@@ -1093,7 +1557,7 @@ mod test_big_map_to_storage_update {
         // because `TypedValue` implements `Drop` (L2-1672), so we visit through
         // [TypedValue::for_each_big_map_mut] and swap a placeholder in instead.
         let mut out = Vec::new();
-        root.for_each_big_map_mut(&mut |m| {
+        walk_big_maps(&mut root, &mut |m| {
             out.push(mem::replace(m, BigMap::empty(Type::Unit, Type::Unit)));
         });
         out
@@ -1102,7 +1566,7 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_map_from_memory() {
         let storage = &mut InMemoryLazyStorage::new();
-        let content = BigMapContent::InMemory(RedBlackTreeMap::from_iter([
+        let content = BigMapContent::InMemory(in_memory_entries([
             (TypedValue::int(1), TypedValue::int(1)),
             (TypedValue::int(2), TypedValue::int(2)),
         ]));
@@ -1119,7 +1583,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(1), TypedValue::int(1)),
                         (TypedValue::int(2), TypedValue::int(2))
                     ]),
@@ -1142,7 +1606,7 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id,
-            overlay: RedBlackTreeMap::from_iter([
+            overlay: overlay_entries([
                 (TypedValue::int(0), None),
                 (TypedValue::int(1), Some(TypedValue::int(5))),
                 (TypedValue::int(2), None),
@@ -1162,7 +1626,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(1), TypedValue::int(5)),
                         (TypedValue::int(3), TypedValue::int(3))
                     ]),
@@ -1180,10 +1644,7 @@ mod test_big_map_to_storage_update {
         let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(11),
-                Some(TypedValue::int(11)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(11), Some(TypedValue::int(11)))]),
         });
         let map1_1 = BigMap {
             content,
@@ -1192,10 +1653,7 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1,
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(12),
-                Some(TypedValue::int(12)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(12), Some(TypedValue::int(12)))]),
         });
         let map1_2 = BigMap {
             content,
@@ -1204,10 +1662,7 @@ mod test_big_map_to_storage_update {
         };
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id2,
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(2),
-                Some(TypedValue::int(2)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(2), Some(TypedValue::int(2)))]),
         });
         let map2 = BigMap {
             content,
@@ -1230,7 +1685,7 @@ mod test_big_map_to_storage_update {
                 (
                     0.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(11),
                             TypedValue::int(11)
                         )]),
@@ -1241,7 +1696,7 @@ mod test_big_map_to_storage_update {
                 (
                     1.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(2),
                             TypedValue::int(2)
                         )]),
@@ -1252,7 +1707,7 @@ mod test_big_map_to_storage_update {
                 (
                     2.into(),
                     MapInfo {
-                        map: RedBlackTreeMap::from_iter([(
+                        map: in_memory_entries([(
                             TypedValue::int(12),
                             TypedValue::int(12)
                         )]),
@@ -1277,10 +1732,7 @@ mod test_big_map_to_storage_update {
             .unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
-            overlay: RedBlackTreeMap::from_iter([(
-                TypedValue::int(1),
-                Some(TypedValue::int(1)),
-            )]),
+            overlay: overlay_entries([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
         let map1 = BigMap {
             content,
@@ -1294,7 +1746,7 @@ mod test_big_map_to_storage_update {
             BTreeMap::from([(
                 0.into(),
                 MapInfo {
-                    map: RedBlackTreeMap::from_iter([
+                    map: in_memory_entries([
                         (TypedValue::int(0), TypedValue::int(0)),
                         (TypedValue::int(1), TypedValue::int(1))
                     ]),
@@ -1363,8 +1815,21 @@ mod review_verification {
     //! replaced, and that the read-only big-map walk reaches every position
     //! the mutable walk does.
     use super::*;
-    use crate::ast::{MichelsonList, Or, Type};
+    use crate::ast::{CreateContract, MichelsonList, Or, TransferTokens, Type};
     use rpds::RedBlackTreeSet;
+
+    /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
+    /// keys off, with no overlay to complicate what a rebuild has to preserve.
+    fn leaf_big_map(id: i64) -> TypedValue<'static> {
+        TypedValue::BigMap(BigMap {
+            content: BigMapContent::FromId(BigMapFromId {
+                id: id.into(),
+                overlay: RedBlackTreeMap::new(),
+            }),
+            key_type: Type::Int,
+            value_type: Type::Int,
+        })
+    }
 
     /// Consensus-critical invariant behind the whole migration: `rpds`
     /// `RedBlackTreeMap`/`RedBlackTreeSet` must iterate in ascending key
@@ -1451,5 +1916,842 @@ mod review_verification {
             (0..=5).map(BigMapId::from).collect::<Vec<_>>(),
             "view_big_map_ids missed a big map in some container position"
         );
+    }
+
+    /// Sharing an operation's payload behind an `Rc` only helps if the walk
+    /// then leaves it shared. Reaching the payload through
+    /// `Rc::make_mut(&mut t.param)` would not: `make_mut` copies whenever the
+    /// payload is shared, it runs before anything inspects the payload's type,
+    /// and it writes the clone back into the field — and since
+    /// `TypedValue::Bytes` holds its buffer inline, that "shallow" node clone
+    /// *is* the whole payload for exactly the flat values this targets. The
+    /// copy would be relocated from the instruction to the walk, not removed
+    /// (L2-1836).
+    ///
+    /// The copy-on-write walk returns `None` for a payload with no big map
+    /// under it, so the payload is never touched, however many operations
+    /// share it — and `push_child` means it is walked once rather than once
+    /// per operation.
+    #[test]
+    fn walk_leaves_shared_operation_payloads_shared() {
+        let payload = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        let transfer = |param: Rc<TypedValue<'static>>, counter| {
+            TypedValue::new_operation(
+                crate::ast::Operation::TransferTokens(TransferTokens {
+                    param,
+                    destination_address:
+                        crate::ast::michelson_address::Address::try_from(
+                            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+                        )
+                        .unwrap(),
+                    amount: 0,
+                }),
+                counter,
+            )
+        };
+        // One payload, three operations — the `DUP`ed `list operation` shape.
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            Rc::new(transfer(payload.clone(), 0)),
+            Rc::new(transfer(payload.clone(), 1)),
+            Rc::new(transfer(payload.clone(), 2)),
+        ]));
+        let shared_before = Rc::strong_count(&payload);
+
+        walk_big_maps(&mut root, &mut |_| {
+            panic!("the value holds no big map, so `f` must not be called")
+        });
+
+        assert_eq!(
+            Rc::strong_count(&payload),
+            shared_before,
+            "the walk copied a shared operation payload"
+        );
+        let TypedValue::List(operations) = &root else {
+            panic!("root is no longer a list")
+        };
+        for operation in operations.iter() {
+            let TypedValue::Operation(info) = &**operation else {
+                panic!("element is no longer an operation")
+            };
+            let crate::ast::Operation::TransferTokens(t) = &info.operation else {
+                panic!("element is no longer a transfer")
+            };
+            assert!(
+                Rc::ptr_eq(&t.param, &payload),
+                "an operation's payload was replaced by a copy"
+            );
+        }
+    }
+
+    /// The mutable walk must not unshare a subtree that holds no big map:
+    /// `DUP` is an `Rc::clone`, so a duplicated multi-gigabyte value would
+    /// otherwise be deep-copied once per occurrence and exhaust the kernel's
+    /// `wasm32` heap (L2-1831). Asserted on pointer identity rather than
+    /// value equality, which a deep copy would still satisfy.
+    #[test]
+    fn walk_leaves_big_map_free_subtrees_shared() {
+        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        // The value shape of the L2-1831 reproduction: one operation `DUP`ed
+        // into a three-element `list operation`, all three elements pointing
+        // at a single allocation.
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            shared.clone(),
+            shared.clone(),
+            shared.clone(),
+        ]));
+        let strong_before = Rc::strong_count(&shared);
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |_| visited += 1);
+
+        assert_eq!(visited, 0, "no big map to visit");
+        assert_eq!(
+            Rc::strong_count(&shared),
+            strong_before,
+            "the walk copied a big-map-free subtree"
+        );
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        for element in elements.iter() {
+            assert!(Rc::ptr_eq(element, &shared));
+        }
+    }
+
+    /// Mutable-walk counterpart of
+    /// [view_big_map_ids_covers_all_container_positions]: a big map sitting in
+    /// any container position must be visited by `for_each_big_map_mut`, and
+    /// in AST pre-order. [dump_one_big_map] allocates lazy-storage ids in
+    /// visit order, so this order is consensus-observable — a container arm
+    /// that visits out of order, or not at all, changes execution results.
+    ///
+    /// `test_big_map_to_storage_update::dump_maps` only ever builds a
+    /// right-nested comb of `Pair`s, so without this the `Or` / `Option` /
+    /// `List` / `Map` / `Operation` arms have no ordering coverage.
+    #[test]
+    fn mutable_walk_visits_every_container_position_in_order() {
+        let bm = leaf_big_map;
+        let operation_carrying = |inner: TypedValue<'static>| {
+            TypedValue::new_operation(
+                crate::ast::Operation::TransferTokens(TransferTokens {
+                    param: Rc::new(inner),
+                    destination_address:
+                        crate::ast::michelson_address::Address::try_from(
+                            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+                        )
+                        .unwrap(),
+                    // Nonzero, so a rebuild that dropped either would show up
+                    // here rather than matching the zero default. What they
+                    // survive is asserted in `walk_preserves_operation_fields`.
+                    amount: 1_000,
+                }),
+                42,
+            )
+        };
+        // Distinct ids, laid out so that AST pre-order is 0,1,2,3,4,5,6.
+        let mut value = TypedValue::new_pair(
+            TypedValue::new_pair(bm(0), bm(1)),
+            TypedValue::new_pair(
+                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::new_pair(
+                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::new_pair(
+                        TypedValue::List(MichelsonList::from(vec![
+                            Rc::new(bm(4)),
+                            Rc::new(operation_carrying(bm(5))),
+                        ])),
+                        TypedValue::Map(RedBlackTreeMap::from_iter([(
+                            Rc::new(TypedValue::int(0)),
+                            Rc::new(bm(6)),
+                        )])),
+                    ),
+                ),
+            ),
+        );
+
+        let mut visit_order = vec![];
+        walk_big_maps(&mut value, &mut |map| {
+            if let BigMapContent::FromId(ref m) = map.content {
+                visit_order.push(m.id.clone())
+            }
+        });
+        assert_eq!(
+            visit_order,
+            (0..=6).map(BigMapId::from).collect::<Vec<_>>(),
+            "the mutable walk missed a container position or visited out of order"
+        );
+        // The rebuilt value must still expose the same big maps in the same
+        // order, i.e. the rebuild put every child back where it belongs.
+        let mut ids_after = vec![];
+        value.view_big_map_ids(&mut ids_after);
+        assert_eq!(ids_after, (0..=6).map(BigMapId::from).collect::<Vec<_>>());
+    }
+
+    /// The walk descends once per level of a value whose depth the contract
+    /// chooses, against the kernel's 1 MiB stack. It runs on an explicit
+    /// worklist rather than the call stack, so depth costs heap — already
+    /// bounded by the size of the value being walked — rather than stack, and
+    /// `DEPTH` matches `drop_safety`'s to pin that.
+    ///
+    /// A recursive formulation did not survive the depths reachable here: a
+    /// value only ever reaches this walk at a *declared* type (the returned
+    /// storage, a callee's parameter, a `CREATE_CONTRACT` storage), and
+    /// `MICHELSON_MAXIMUM_TYPE_SIZE` still permits about 2 000 levels through
+    /// a `list` spine and about 1 000 through a `map` — well past what a
+    /// frame of a few hundred bytes per level affords.
+    ///
+    /// Both paths are exercised for each container: a big-map-free spine,
+    /// which returns `None` the whole way up and rebuilds nothing, and the
+    /// same spine with a big map at its base, so every level is rebuilt.
+    #[test]
+    fn walk_survives_a_deep_spine_on_the_kernel_stack() {
+        // Matches `drop_safety`: nothing about the walk is depth-bounded now.
+        const DEPTH: usize = 100_000;
+
+        fn deep_pair(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| TypedValue::new_pair(TypedValue::Unit, acc))
+        }
+        fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+            })
+        }
+        fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::Map(RedBlackTreeMap::from_iter([(
+                    Rc::new(TypedValue::int(0)),
+                    Rc::new(acc),
+                )]))
+            })
+        }
+
+        for build in [deep_pair, deep_list, deep_map] {
+            for with_big_map in [false, true] {
+                std::thread::Builder::new()
+                    // The WASM kernel stack budget.
+                    .stack_size(1024 * 1024)
+                    .spawn(move || {
+                        // Built inside the worker: `TypedValue` is `Rc`-backed
+                        // and so not `Send`.
+                        let base = if with_big_map {
+                            leaf_big_map(0)
+                        } else {
+                            TypedValue::Unit
+                        };
+                        let mut value = build(base, DEPTH);
+                        let mut visited = 0;
+                        walk_big_maps(&mut value, &mut |_| visited += 1);
+                        assert_eq!(visited, usize::from(with_big_map));
+                    })
+                    .unwrap()
+                    .join()
+                    .expect("worker thread completes without stack overflow");
+            }
+        }
+    }
+
+    /// [TypedValue::for_each_big_map] is still recursive, where the mutable
+    /// walk is not, so its depth budget is a live constraint rather than a
+    /// formality — and nothing pinned it.
+    ///
+    /// What makes it safe is that the value it walks is bounded twice over.
+    /// Michelson has no recursive types, so a value is never deeper than its
+    /// type; and this walk only ever sees the *committed* storage, parsed at a
+    /// declared type, so [MICHELSON_MAXIMUM_TYPE_SIZE] applies to it — unlike
+    /// instruction-synthesised types, which escape that cap. The depths below
+    /// are what the cap actually permits, per shape: `list t` costs one type
+    /// node per level, `pair a b` and `map k v` cost two. So these are the
+    /// deepest values that can reach this function at all.
+    ///
+    /// The margin is real but not generous, which is the point of deriving the
+    /// depths rather than picking them: `map` is the most expensive shape, and
+    /// at twice its reachable depth this test overflows. Safety here is
+    /// arithmetic — cap times frame size against 1 MiB — where
+    /// [TypedValue::update_big_maps] is depth-independent by construction. A
+    /// few extra locals in this function would eat the margin silently, and
+    /// this is what would catch that.
+    #[test]
+    fn read_only_walk_survives_the_deepest_reachable_spine() {
+        use crate::typechecker::MICHELSON_MAXIMUM_TYPE_SIZE as MAX_TY;
+
+        /// `list t` is one type node per level, so it nests deepest.
+        const LIST_DEPTH: usize = MAX_TY - 1;
+        /// `pair a b` and `map k v` are two nodes per level.
+        const PAIR_DEPTH: usize = (MAX_TY - 1) / 2;
+        const MAP_DEPTH: usize = PAIR_DEPTH;
+
+        fn deep_pair(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| TypedValue::new_pair(TypedValue::Unit, acc))
+        }
+        fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+            })
+        }
+        fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
+            (0..depth).fold(base, |acc, _| {
+                TypedValue::Map(RedBlackTreeMap::from_iter([(
+                    Rc::new(TypedValue::int(0)),
+                    Rc::new(acc),
+                )]))
+            })
+        }
+
+        for (build, depth) in [
+            (
+                deep_pair as fn(TypedValue<'static>, usize) -> TypedValue<'static>,
+                PAIR_DEPTH,
+            ),
+            (deep_list, LIST_DEPTH),
+            (deep_map, MAP_DEPTH),
+        ] {
+            std::thread::Builder::new()
+                // The WASM kernel stack budget.
+                .stack_size(1024 * 1024)
+                .spawn(move || {
+                    // Built inside the worker: `TypedValue` is `Rc`-backed and
+                    // so not `Send`. A big map at the base, so the walk runs
+                    // its `f` at the deepest point rather than stopping short.
+                    let value = build(leaf_big_map(0), depth);
+                    let mut ids = vec![];
+                    value.view_big_map_ids(&mut ids);
+                    assert_eq!(ids, vec![BigMapId::from(0)]);
+                })
+                .unwrap()
+                .join()
+                .expect("worker thread completes without stack overflow");
+        }
+    }
+
+    /// The flip side of [walk_leaves_big_map_free_subtrees_shared]: a big map
+    /// under a shared spine is still reached, still visited once per
+    /// occurrence, and the rebuilt value carries `f`'s writes — while the
+    /// big-map-free sibling stays shared.
+    #[test]
+    fn walk_updates_big_maps_under_a_shared_spine() {
+        let big_map = leaf_big_map;
+        let shared_payload = Rc::new(TypedValue::Bytes(vec![0xcd; 64]));
+        let shared_spine = Rc::new(TypedValue::new_pair_rc(
+            Rc::new(big_map(7)),
+            shared_payload.clone(),
+        ));
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            shared_spine.clone(),
+            shared_spine.clone(),
+        ]));
+
+        // Renumber every visited big map, so each visit is observable.
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(100 + visited);
+            }
+        });
+
+        assert_eq!(visited, 2, "each occurrence must be visited on its own");
+        // Only the pair spine is rebuilt; its big-map-free half is carried
+        // over as an `Rc::clone`, never copied.
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        for element in elements.iter() {
+            let TypedValue::Pair(_, payload) = &**element else {
+                panic!("element is no longer a pair")
+            };
+            assert!(
+                Rc::ptr_eq(payload, &shared_payload),
+                "the big-map-free half of the pair was copied"
+            );
+        }
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(101), BigMapId::from(102)]);
+        // The original is untouched: rebuilding is copy-on-write.
+        let mut original_ids = vec![];
+        shared_spine.view_big_map_ids(&mut original_ids);
+        assert_eq!(original_ids, vec![BigMapId::from(7)]);
+    }
+
+    /// Builds `LEVELS` nested two-element lists whose elements are, at every
+    /// level, the *same* allocation — the in-memory shape of
+    /// `DUP; NIL t; SWAP; CONS; SWAP; CONS` repeated. `LEVELS` nodes, `2^LEVELS`
+    /// occurrences.
+    fn shared_dag(leaf: TypedValue<'static>, levels: usize) -> TypedValue<'static> {
+        let mut node = Rc::new(leaf);
+        for _ in 0..levels {
+            node = Rc::new(TypedValue::List(MichelsonList::from(vec![
+                node.clone(),
+                node,
+            ])));
+        }
+        TypedValue::unwrap_rc(node)
+    }
+
+    /// A value's in-memory DAG can unfold to a tree exponentially larger than
+    /// itself, and the walk must not pay for the unfolding. `DUP` is an
+    /// `Rc::clone`, so the shape above doubles the occurrence count per level
+    /// while the *type* grows by a single node — putting `2^K` occurrences
+    /// within `O(K²)` gas, since `list t` costs one type node per level and so
+    /// stays far under `MICHELSON_MAXIMUM_TYPE_SIZE`.
+    ///
+    /// Nothing else bounds it: the walk is charged no gas, and it no longer
+    /// allocates per visit, so it cannot exhaust the heap the way the
+    /// `Rc::make_mut` walk did. Only the big-map-free memo does.
+    ///
+    /// **Finishing at all is the assertion**, which is why the walk runs on a
+    /// worker under a deadline rather than inline. At `LEVELS` 40 the DAG
+    /// unfolds to `2^40` ≈ 10^12 occurrences, so a walk that explored each of
+    /// them does not finish — measured at ~8 hours on release, and worse in
+    /// debug. Nothing else here can express the property: the value holds no
+    /// big map, so `f` is never called, nothing is rebuilt and nothing is
+    /// allocated. Re-exploration has no observable effect except time.
+    ///
+    /// Without the deadline this test would *hang* instead of failing, and
+    /// since `libtest` has no per-test timeout and the suite runs with
+    /// `RUST_TEST_THREADS=1`, that means the whole binary stalls until CI kills
+    /// the job an hour later — reporting no result for this test or any test
+    /// after it. A regression would look like flaky infrastructure rather than
+    /// like this function.
+    ///
+    /// The deadline is wall-clock, which is normally a poor thing to assert
+    /// on. It is sound here only because the two outcomes are about six orders
+    /// of magnitude apart: microseconds when memoized, hours when not. The
+    /// deterministic form needs the walk to price its own steps, so it arrives
+    /// with the per-node gas charge, where an unmemoized walk exhausts its
+    /// budget immediately and the assertion becomes a visit count.
+    ///
+    /// Note in particular that asserting the two list elements still point at
+    /// one allocation would *not* say anything about re-exploration — that is
+    /// the copy-on-write property, and
+    /// [walk_leaves_big_map_free_subtrees_shared] already covers it.
+    #[test]
+    fn walk_terminates_on_an_exponentially_shared_subtree() {
+        const LEVELS: usize = 40;
+        /// Far above the memoized cost and far below the unmemoized one, so
+        /// neither a slow runner nor a warm cache can move the verdict.
+        const BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
+
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::Builder::new()
+            // The WASM kernel stack budget, as elsewhere in this module.
+            .stack_size(1024 * 1024)
+            .spawn(move || {
+                // Built inside the worker: `TypedValue` is `Rc`-backed and so
+                // not `Send`. Only the count crosses the channel.
+                let mut root = shared_dag(TypedValue::Unit, LEVELS);
+                let mut visited = 0;
+                walk_big_maps(&mut root, &mut |_| visited += 1);
+                let _ = done.send(visited);
+            })
+            .unwrap();
+
+        // On timeout the worker is left running — a thread cannot be killed —
+        // so it burns one core until the binary exits. That is the price of
+        // failing at all, and it beats stalling the suite.
+        match finished.recv_timeout(BUDGET) {
+            Ok(visited) => assert_eq!(visited, 0, "no big map to visit"),
+            Err(_) => panic!(
+                "the walk did not finish within {BUDGET:?}; at {LEVELS} levels \
+                 the value's in-memory DAG unfolds to 2^{LEVELS} occurrences, \
+                 so it is exploring shared subtrees once per path instead of \
+                 once — the big-map-free memo has regressed"
+            ),
+        }
+    }
+
+    /// The flip side of [walk_terminates_on_an_exponentially_shared_subtree]:
+    /// the memo
+    /// records only the *absence* of a big map, so a shared subtree that holds
+    /// one is still visited once per occurrence. That multiplicity is
+    /// consensus-observable — [dump_one_big_map] gives each occurrence its own
+    /// id and keys its dedup off having seen the source before.
+    ///
+    /// Deliberately shallow, and deliberately unmetered: this one really is
+    /// exponential by design, and what stops it in the kernel is gas — see
+    /// [metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map].
+    #[test]
+    fn walk_still_visits_every_occurrence_of_a_shared_big_map() {
+        const LEVELS: u32 = 4;
+
+        let mut root = shared_dag(leaf_big_map(0), LEVELS as usize);
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |_| visited += 1);
+
+        assert_eq!(
+            visited,
+            2usize.pow(LEVELS),
+            "the memo skipped an occurrence of a shared big map"
+        );
+    }
+
+    /// [InMemoryLazyStorage] with a gas budget, so a test can watch the walk
+    /// exhaust one. The in-memory storage is unmetered by design, and the
+    /// kernel's own metered implementation lives in another crate.
+    struct MeteredStorage<'a> {
+        inner: InMemoryLazyStorage<'a>,
+        gas: crate::gas::Gas,
+    }
+
+    impl<'a> LazyStorage<'a> for MeteredStorage<'a> {
+        fn consume_gas(&mut self, milligas: u32) -> Result<(), LazyStorageError> {
+            Ok(self.gas.consume(milligas)?)
+        }
+
+        fn big_map_get(
+            &mut self,
+            arena: &'a Arena<Micheline<'a>>,
+            id: &BigMapId,
+            key: &TypedValue,
+            value_type: &Type,
+        ) -> Result<std::option::Option<TypedValue<'a>>, LazyStorageError> {
+            self.inner.big_map_get(arena, id, key, value_type)
+        }
+
+        fn big_map_mem(
+            &mut self,
+            id: &BigMapId,
+            key: &TypedValue,
+        ) -> Result<bool, LazyStorageError> {
+            self.inner.big_map_mem(id, key)
+        }
+
+        fn big_map_update_ref(
+            &mut self,
+            id: &BigMapId,
+            key: &TypedValue<'a>,
+            value: std::option::Option<&TypedValue<'a>>,
+        ) -> Result<(), LazyStorageError> {
+            self.inner.big_map_update_ref(id, key, value)
+        }
+
+        fn big_map_new(
+            &mut self,
+            key_type: &Type,
+            value_type: &Type,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_new(key_type, value_type, temporary)
+        }
+
+        fn big_map_copy(
+            &mut self,
+            id: &BigMapId,
+            temporary: bool,
+        ) -> Result<BigMapId, LazyStorageError> {
+            self.inner.big_map_copy(id, temporary)
+        }
+
+        fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+            self.inner.big_map_remove(id)
+        }
+    }
+
+    /// The memo bounds a big-map-*free* DAG, but put a big map under the
+    /// shared spine and every result is `Some`, so nothing is cacheable and
+    /// the `2^K` unfolding is back — that is
+    /// [walk_still_visits_every_occurrence_of_a_shared_big_map], and the
+    /// multiplicity is required, since each occurrence needs its own id.
+    ///
+    /// What bounds *that* is the per-node gas charge. `DUP` is an `Rc::clone`
+    /// and `list t` costs one type node per level, so the shape is `O(K²)`
+    /// gas to build for `2^K` occurrences; the walk must run out of gas
+    /// rather than out of heap or time. At `LEVELS` 20 an unmetered walk
+    /// would visit over a million nodes.
+    #[test]
+    fn metered_walk_runs_out_of_gas_on_an_exponentially_shared_big_map() {
+        const LEVELS: usize = 20;
+        const BUDGET: u32 = 1_000_000;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(BUDGET),
+        };
+        let mut root = shared_dag(leaf_big_map(0), LEVELS);
+
+        let mut visited = 0;
+        let result = root.for_each_big_map_mut(&mut storage, &mut |_, _| {
+            visited += 1;
+            Ok(())
+        });
+
+        assert!(
+            matches!(result, Err(LazyStorageError::OutOfGasError(_))),
+            "the walk completed instead of exhausting its budget: {result:?}"
+        );
+        // It stopped when the budget ran out, not after unfolding the DAG.
+        let affordable = (BUDGET / tc_cost::LAZY_STORAGE_CYCLE) as usize;
+        assert!(
+            visited <= affordable,
+            "visited {visited} big maps, but the budget only pays for {affordable} nodes"
+        );
+        assert!(
+            visited < 2usize.pow(LEVELS as u32),
+            "the walk unfolded the whole DAG despite running out of gas"
+        );
+    }
+
+    /// The charge must not price ordinary contracts out: a storage of a few
+    /// hundred nodes costs a few hundred cycles, not a meaningful fraction of
+    /// an operation's budget.
+    #[test]
+    fn metered_walk_completes_on_an_ordinary_value() {
+        const WIDTH: usize = 200;
+
+        let mut storage = MeteredStorage {
+            inner: InMemoryLazyStorage::new(),
+            gas: crate::gas::Gas::new(crate::gas::DEFAULT_GAS_AMOUNT),
+        };
+        let mut root = TypedValue::List(MichelsonList::from(
+            (0..WIDTH)
+                .map(|i| Rc::new(TypedValue::int(i as i64)))
+                .collect::<Vec<_>>(),
+        ));
+
+        let before = storage.gas.milligas().expect("budget is set");
+        root.for_each_big_map_mut(&mut storage, &mut |_, _| Ok(()))
+            .expect("an ordinary value must not exhaust the budget");
+        let spent = before - storage.gas.milligas().expect("budget is set");
+
+        // One cycle for the list itself plus one per element.
+        assert_eq!(spent, (WIDTH as u32 + 1) * tc_cost::LAZY_STORAGE_CYCLE);
+    }
+
+    /// Only the elements holding a big map are rebuilt; everything around them
+    /// is carried over as an `Rc::clone`. The big map sits in the *middle*, so
+    /// both the prefix carried over before it and the suffix after it are
+    /// exercised — a big map at either end would leave one of them empty.
+    #[test]
+    fn walk_carries_over_unchanged_list_elements() {
+        let first = Rc::new(TypedValue::Bytes(vec![0x01; 32]));
+        let last = Rc::new(TypedValue::Bytes(vec![0x02; 32]));
+        let mut root = TypedValue::List(MichelsonList::from(vec![
+            first.clone(),
+            Rc::new(leaf_big_map(5)),
+            last.clone(),
+        ]));
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(50);
+            }
+        });
+
+        assert_eq!(visited, 1);
+        let TypedValue::List(elements) = &root else {
+            panic!("root is no longer a list")
+        };
+        let elements: Vec<_> = elements.iter().collect();
+        assert_eq!(elements.len(), 3, "the rebuild changed the list length");
+        assert!(Rc::ptr_eq(elements[0], &first), "the prefix was copied");
+        assert!(Rc::ptr_eq(elements[2], &last), "the suffix was copied");
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(50)]);
+    }
+
+    /// `Map` values are visited in ascending key order, and the rebuild must
+    /// put each one back under the key it came from. A single-entry map — all
+    /// the other tests here build one — cannot catch a key/value mispairing,
+    /// nor an out-of-order visit.
+    ///
+    /// **The ascending order pins MIR's behaviour, which diverges from L1.**
+    /// L1's `extract_lazy_storage_updates` walks a map's values *descending*:
+    /// it builds its worklist with `M.OPS.fold (fun k v bs -> (k, v) :: bs)`,
+    /// and since `fold` is ascending, prepending reverses it — then it folds
+    /// left over the result without reversing back. (The same idiom in
+    /// `script_ir_unparser.ml` *does* reverse, via `unparse_items`, which is
+    /// how Michelson map literals come out ascending — so the direction is
+    /// deliberate on both sides.) Because ids are allocated at visit time, a
+    /// `map k (big_map …)` with several entries therefore gets different ids
+    /// on MIR than on L1, and a different `lazy_storage_diff` order.
+    ///
+    /// Pre-existing — the `m.keys()` walk this replaced was ascending too —
+    /// and out of scope here, since changing it is consensus-observable and
+    /// touches the receipt-ordering work of L2-1735. This test exists so the
+    /// current order cannot drift silently while that is decided; it is not
+    /// an assertion that ascending is right.
+    #[test]
+    fn walk_visits_map_values_in_key_order_and_keeps_them_paired() {
+        let key = |k: i64| Rc::new(TypedValue::int(k));
+        // Inserted out of order on purpose: iteration order must come from the
+        // tree, not from insertion.
+        let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
+            (key(2), Rc::new(leaf_big_map(2))),
+            (key(0), Rc::new(leaf_big_map(0))),
+            (key(1), Rc::new(leaf_big_map(1))),
+        ]));
+
+        // Renumber each big map to id + 10, so the rebuilt map shows where
+        // each visited value landed.
+        let mut visit_order = vec![];
+        walk_big_maps(&mut root, &mut |map| {
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                visit_order.push(m.id.clone());
+                let BigMapId {
+                    value: Zarith(ref id),
+                } = m.id;
+                let renumbered: i64 = id.try_into().expect("small test id");
+                m.id = BigMapId::from(renumbered + 10);
+            }
+        });
+
+        assert_eq!(
+            visit_order,
+            (0..=2).map(BigMapId::from).collect::<Vec<_>>(),
+            "map values were visited out of key order"
+        );
+        let TypedValue::Map(m) = &root else {
+            panic!("root is no longer a map")
+        };
+        assert_eq!(m.size(), 3, "the rebuild changed the map size");
+        for k in 0..=2 {
+            let mut ids = vec![];
+            m.get(&key(k))
+                .expect("key went missing from the rebuilt map")
+                .view_big_map_ids(&mut ids);
+            assert_eq!(
+                ids,
+                vec![BigMapId::from(k + 10)],
+                "the rebuilt map paired a value with the wrong key"
+            );
+        }
+    }
+
+    /// Only one entry is rebuilt; the others stay shared with the original
+    /// map, which is what makes the rebuild copy-on-write rather than a copy.
+    #[test]
+    fn walk_rebuilds_only_the_changed_map_entry() {
+        let key = |k: i64| Rc::new(TypedValue::int(k));
+        let low = Rc::new(TypedValue::Bytes(vec![0x0a; 32]));
+        let high = Rc::new(TypedValue::Bytes(vec![0x0b; 32]));
+        let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
+            (key(0), low.clone()),
+            (key(1), Rc::new(leaf_big_map(9))),
+            (key(2), high.clone()),
+        ]));
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |_| visited += 1);
+
+        assert_eq!(visited, 1);
+        let TypedValue::Map(m) = &root else {
+            panic!("root is no longer a map")
+        };
+        assert!(
+            Rc::ptr_eq(m.get(&key(0)).unwrap(), &low),
+            "a big-map-free entry was copied"
+        );
+        assert!(
+            Rc::ptr_eq(m.get(&key(2)).unwrap(), &high),
+            "a big-map-free entry was copied"
+        );
+    }
+
+    /// The `Operation` arms rebuild their struct field by field, so the
+    /// compiler enforces that no field is *missing* — but not that each is
+    /// carried over rather than defaulted. `counter` is the one that matters
+    /// most: it is the DFS nonce that orders receipts, so a regression to `0`
+    /// is consensus-observable, and every other test here builds its operation
+    /// with `counter: 0` and never reads it back.
+    #[test]
+    fn walk_preserves_operation_fields() {
+        let destination = crate::ast::michelson_address::Address::try_from(
+            "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
+        )
+        .unwrap();
+        let mut root = TypedValue::new_operation(
+            crate::ast::Operation::TransferTokens(TransferTokens {
+                param: Rc::new(leaf_big_map(3)),
+                destination_address: destination.clone(),
+                amount: 123_456,
+            }),
+            77,
+        );
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(30);
+            }
+        });
+
+        assert_eq!(visited, 1, "the transfer parameter was not visited");
+        let TypedValue::Operation(info) = &root else {
+            panic!("root is no longer an operation")
+        };
+        assert_eq!(info.counter, 77, "the operation nonce was not carried over");
+        let crate::ast::Operation::TransferTokens(t) = &info.operation else {
+            panic!("the operation is no longer a transfer")
+        };
+        assert_eq!(t.amount, 123_456, "the amount was not carried over");
+        assert_eq!(
+            t.destination_address, destination,
+            "the destination was not carried over"
+        );
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(30)]);
+    }
+
+    /// Same, for the `CREATE_CONTRACT` arm, which had no coverage at all: its
+    /// storage must be walked and its five other fields carried over.
+    #[test]
+    fn walk_preserves_create_contract_fields() {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        let micheline_code = Micheline::Seq(&[]);
+        let code = Rc::new(crate::ast::ContractScript {
+            parameter: Type::Unit,
+            storage: Type::Unit,
+            code: crate::ast::Instruction::Seq(Vec::new()),
+            annotations: Default::default(),
+            views: Default::default(),
+        });
+        let delegate =
+            crate::ast::PublicKeyHash::try_from("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")
+                .unwrap();
+        let address =
+            ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap();
+        let mut root = TypedValue::new_operation(
+            crate::ast::Operation::CreateContract(CreateContract {
+                delegate: Some(delegate.clone()),
+                amount: 999,
+                storage: Rc::new(leaf_big_map(4)),
+                code: code.clone(),
+                micheline_code: &micheline_code,
+                address: address.clone(),
+            }),
+            88,
+        );
+
+        let mut visited = 0;
+        walk_big_maps(&mut root, &mut |map| {
+            visited += 1;
+            if let BigMapContent::FromId(ref mut m) = map.content {
+                m.id = BigMapId::from(40);
+            }
+        });
+
+        assert_eq!(visited, 1, "the originated storage was not visited");
+        let TypedValue::Operation(info) = &root else {
+            panic!("root is no longer an operation")
+        };
+        assert_eq!(info.counter, 88, "the operation nonce was not carried over");
+        let crate::ast::Operation::CreateContract(cc) = &info.operation else {
+            panic!("the operation is no longer an origination")
+        };
+        assert_eq!(cc.delegate, Some(delegate));
+        assert_eq!(cc.amount, 999);
+        assert_eq!(cc.address, address);
+        assert!(Rc::ptr_eq(&cc.code, &code), "the code was copied");
+        assert_eq!(cc.micheline_code, &micheline_code);
+        let mut ids = vec![];
+        root.view_big_map_ids(&mut ids);
+        assert_eq!(ids, vec![BigMapId::from(40)]);
     }
 }

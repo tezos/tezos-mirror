@@ -32,6 +32,7 @@ use typed_arena::Arena;
 use crate::{
     gas::{Gas, OutOfGas},
     lexer::Prim,
+    typechecker::type_props::TypeProperty,
 };
 
 #[cfg(feature = "bls")]
@@ -1319,14 +1320,15 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
-                            let mut entries: Vec<(Self, Self)> = rb_map_into_vec(m);
+                            let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
+                                rb_map_into_vec(m);
                             frames.push(TvImFrame::BuildSeqOf {
                                 count: entries.len(),
                             });
                             while let Some((key, val)) = entries.pop() {
                                 frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                                frames.push(TvImFrame::Visit(val));
-                                frames.push(TvImFrame::Visit(key));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
                             }
                         }
                         big_map::BigMapContent::FromId(m) => {
@@ -1334,7 +1336,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             if m.overlay.is_empty() {
                                 results.push(id_part);
                             } else {
-                                let mut overlay: Vec<(Self, Option<Self>)> =
+                                let mut overlay: Vec<(Rc<Self>, Option<Rc<Self>>)> =
                                     rb_map_into_vec(m.overlay);
                                 frames.push(TvImFrame::BuildBigMapFromId {
                                     id_part,
@@ -1346,7 +1348,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                         Some(v) => {
                                             frames
                                                 .push(TvImFrame::BuildPrim1(Prim::Some));
-                                            frames.push(TvImFrame::Visit(v));
+                                            frames.push(TvImFrame::Visit(
+                                                TypedValue::unwrap_rc(v),
+                                            ));
                                         }
                                         None => {
                                             frames.push(TvImFrame::Leaf(V::prim0(
@@ -1355,7 +1359,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             )?));
                                         }
                                     }
-                                    frames.push(TvImFrame::Visit(key));
+                                    frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                        key,
+                                    )));
                                 }
                             }
                         }
@@ -1374,7 +1380,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 frames.push(TvImFrame::Visit(TV::Address(
                                     tt.destination_address,
                                 )));
-                                frames.push(TvImFrame::Visit(tt.param));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    tt.param,
+                                )));
                             }
                             Operation::SetDelegate(sd) => {
                                 // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
@@ -1405,7 +1413,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     arg_ty_mich,
                                     tag: em.tag,
                                 });
-                                frames.push(TvImFrame::Visit(em.value));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    em.value,
+                                )));
                             }
                             Operation::CreateContract(cc) => {
                                 let delegate_mich = match cc.delegate {
@@ -1430,7 +1440,9 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     delegate_mich,
                                     mutez_mich,
                                 });
-                                frames.push(TvImFrame::Visit(cc.storage));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    cc.storage,
+                                )));
                             }
                         }
                     }
@@ -1511,8 +1523,46 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Unparse a pushable value while retaining the typed value, charging
-    /// before cloning any size-dependent leaf payload.
+    /// Whether this value's own outermost constructor is admissible under
+    /// `prop`.
+    fn head_admits_prop(&self, prop: TypeProperty) -> bool {
+        use TypeProperty as P;
+        use TypedValue::*;
+        match self {
+            Int(_) | Nat(_) | Mutez(_) | Bool(_) | String(_) | Unit | Bytes(_)
+            | Address(_) | ChainId(_) | Key(_) | Signature(_) | KeyHash(_)
+            | Timestamp(_) => true,
+            // Transparent: the walk checks the children on their own frames.
+            Pair(_, _) | Option(_) | Or(_) => true,
+            #[cfg(feature = "bls")]
+            Bls12381Fr(_) | Bls12381G1(_) | Bls12381G2(_) => prop != P::Comparable,
+            List(_) | Set(_) | Map(_) | Lambda(_) => prop != P::Comparable,
+            Ticket(_) => matches!(prop, P::Passable | P::Storable | P::BigMapValue),
+            Contract(_) => matches!(
+                prop,
+                P::Passable | P::Packable | P::Duplicable | P::ViewOutput | P::ViewInput
+            ),
+            BigMap(_) => match prop {
+                P::Duplicable | P::Storable => true,
+                #[cfg(feature = "allow_lazy_storage_transfer")]
+                P::Passable => true,
+                #[cfg(not(feature = "allow_lazy_storage_transfer"))]
+                P::Passable => false,
+                P::Comparable
+                | P::BigMapValue
+                | P::Packable
+                | P::Pushable
+                | P::ViewOutput
+                | P::ViewInput => false,
+            },
+            // `operation` is only ever duplicable — and this walk refuses it
+            // outright regardless, see [BorrowedUnparseError::UnsupportedUnparsing].
+            Operation(_) => prop == P::Duplicable,
+        }
+    }
+
+    /// Unparse a value while retaining the typed value, charging before cloning
+    /// any size-dependent leaf payload.
     ///
     /// `APPLY` needs both representations of its capture: the typed value for
     /// `EXEC`, and Micheline for later `PACK`s. Cloning the whole value before
@@ -1520,10 +1570,19 @@ impl<'a> TypedValue<'a> {
     /// arbitrarily large integers and collection structure before their
     /// unparsing gas was charged. This borrowed worklist walks collections in
     /// place and only clones leaf payloads through charged constructors.
-    pub(crate) fn clone_into_micheline_optimized_legacy(
+    ///
+    /// `restrict_to` optionally holds the walk to a [TypeProperty]: every
+    /// sub-value reached is checked against it, and the walk fails with
+    /// [BorrowedUnparseError::UnsatisfiedProperty] on the first offending
+    /// sub-part — before that sub-part is cloned. Pass `None` to unparse
+    /// whatever the value happens to hold. Value should already have been
+    /// constrained at typecheck time, so this is a defence in depth rather
+    /// than the primary check.
+    pub fn clone_into_micheline_optimized_legacy(
         &self,
         arena: &'a Arena<Micheline<'a>>,
         gas: &mut Gas,
+        restrict_to: Option<TypeProperty>,
     ) -> Result<Micheline<'a>, BorrowedUnparseError> {
         use Micheline as V;
         use TypedValue as TV;
@@ -1533,15 +1592,43 @@ impl<'a> TypedValue<'a> {
             ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
             SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
             MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
+            /// A big map's in-memory entries. Distinct from [Frame::MapNext]
+            /// only in the container it drains; both hold `Rc`-shared entries.
+            BigMapEltNext(
+                std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>,
+            ),
+            /// A `FromId` big map's pending overlay; a `None` value marks a
+            /// removal.
+            OverlayNext(
+                std::vec::IntoIter<(
+                    &'v Rc<TypedValue<'a>>,
+                    &'v Option<Rc<TypedValue<'a>>>,
+                )>,
+            ),
+            /// Emit an already-built node (the `None` arm of an overlay entry).
+            Leaf(Micheline<'a>),
             BuildPrim1(Prim),
             BuildPrim2(Prim),
-            BuildSeqOf { count: usize },
+            BuildSeqOf {
+                count: usize,
+            },
+            /// Pops `count`: assembles `prim2(Pair, id_part, Seq([elts]))`.
+            BuildBigMapFromId {
+                id_part: Micheline<'a>,
+                count: usize,
+            },
         }
 
         let mut frames = vec![Frame::Visit(self)];
         let mut results = Vec::new();
 
         while let Some(frame) = frames.pop() {
+            if let (Some(prop), Frame::Visit(value)) = (restrict_to, &frame) {
+                if !value.head_admits_prop(prop) {
+                    return Err(BorrowedUnparseError::UnsatisfiedProperty(prop));
+                }
+            }
+
             match frame {
                 Frame::ListNext(mut iter) => {
                     if let Some(value) = iter.next() {
@@ -1563,6 +1650,29 @@ impl<'a> TypedValue<'a> {
                         frames.push(Frame::Visit(key));
                     }
                 }
+                Frame::BigMapEltNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::BigMapEltNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        frames.push(Frame::Visit(value));
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::OverlayNext(mut iter) => {
+                    if let Some((key, value)) = iter.next() {
+                        frames.push(Frame::OverlayNext(iter));
+                        frames.push(Frame::BuildPrim2(Prim::Elt));
+                        match value {
+                            Some(value) => {
+                                frames.push(Frame::BuildPrim1(Prim::Some));
+                                frames.push(Frame::Visit(value));
+                            }
+                            None => frames.push(Frame::Leaf(V::prim0(Prim::None, gas)?)),
+                        }
+                        frames.push(Frame::Visit(key));
+                    }
+                }
+                Frame::Leaf(node) => results.push(node),
                 Frame::Visit(value) => match value {
                     TV::Int(i) | TV::Timestamp(i) => results.push(V::int_cloned(i, gas)?),
                     TV::Nat(i) => results.push(V::nat_cloned(i, gas)?),
@@ -1643,10 +1753,60 @@ impl<'a> TypedValue<'a> {
                             values.iter().collect::<Vec<_>>().into_iter(),
                         ));
                     }
-                    // The typechecker only emits `APPLY` for pushable capture
-                    // types, which exclude these variants.
-                    TV::BigMap(_) | TV::Operation(_) | TV::Ticket(_) => {
-                        return Err(BorrowedUnparseError::NonPushable);
+                    TV::BigMap(map) => match &map.content {
+                        big_map::BigMapContent::InMemory(entries) => {
+                            frames.push(Frame::BuildSeqOf {
+                                count: entries.size(),
+                            });
+                            frames.push(Frame::BigMapEltNext(
+                                entries.iter().collect::<Vec<_>>().into_iter(),
+                            ));
+                        }
+                        big_map::BigMapContent::FromId(from_id) => {
+                            let id_part = V::int_cloned(&from_id.id.value.0, gas)?;
+                            if from_id.overlay.is_empty() {
+                                results.push(id_part);
+                            } else {
+                                frames.push(Frame::BuildBigMapFromId {
+                                    id_part,
+                                    count: from_id.overlay.size(),
+                                });
+                                frames.push(Frame::OverlayNext(
+                                    from_id
+                                        .overlay
+                                        .iter()
+                                        .collect::<Vec<_>>()
+                                        .into_iter(),
+                                ));
+                            }
+                        }
+                    },
+                    TV::Ticket(ticket) => {
+                        // Mirrors `unwrap_ticket`: Pair(ticketer, Pair(content,
+                        // amount)). The two leaves are charged eagerly; only
+                        // the content is walked, so it is never copied whole.
+                        let ticketer = V::bytes(
+                            Address {
+                                hash: ticket.ticketer.clone(),
+                                entrypoint: Entrypoint::default(),
+                            }
+                            .to_bytes_vec(),
+                            gas,
+                        )?;
+                        let amount = V::nat_cloned(&ticket.amount, gas)?;
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::BuildPrim2(Prim::Pair));
+                        frames.push(Frame::Leaf(amount));
+                        frames.push(Frame::Visit(&ticket.content));
+                        frames.push(Frame::Leaf(ticketer));
+                    }
+                    // `operation` has a Micheline form (the consuming
+                    // `IntoMicheline` builds it), but this walk deliberately does
+                    // not: `operation` is neither pushable, packable nor storable,
+                    // so no caller can hand one over, and mirroring the arm would
+                    // be untested dead code kept in lock-step for nothing.
+                    TV::Operation(_) => {
+                        return Err(BorrowedUnparseError::UnsupportedUnparsing);
                     }
                 },
                 Frame::BuildPrim1(prim) => {
@@ -1664,6 +1824,13 @@ impl<'a> TypedValue<'a> {
                     let values = arena.alloc_extend(results.drain(start..));
                     results.push(V::seq(values, gas)?);
                 }
+                Frame::BuildBigMapFromId { id_part, count } => {
+                    let start = results.len() - count;
+                    #[allow(clippy::disallowed_methods)]
+                    let values = arena.alloc_extend(results.drain(start..));
+                    let map_part = V::seq(values, gas)?;
+                    results.push(V::prim2(arena, Prim::Pair, id_part, map_part, gas)?);
+                }
             }
         }
 
@@ -1671,10 +1838,24 @@ impl<'a> TypedValue<'a> {
     }
 }
 
+/// Why [TypedValue::clone_into_micheline_optimized_legacy] could not produce a
+/// [Micheline].
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(crate) enum BorrowedUnparseError {
+pub enum BorrowedUnparseError {
+    /// The unparsing gas charged along the way exceeded the budget. Because
+    /// this walk charges *before* cloning a leaf payload, running out here
+    /// means the copy was never attempted.
     OutOfGas,
-    NonPushable,
+    /// The walk does not cover the submitted typed value. Limited to the
+    /// [Operation] value.
+    UnsupportedUnparsing,
+    /// A sub-value does not satisfy the [TypeProperty] the caller restricted
+    /// the walk to. Carries the property rather than the offending sub-value so
+    /// the error stays `Copy`; the value itself was not cloned.
+    ///
+    /// Unreachable in practice: each caller passes the property its value was
+    /// already checked against at typecheck time.
+    UnsatisfiedProperty(TypeProperty),
 }
 
 impl From<OutOfGas> for BorrowedUnparseError {
@@ -1709,7 +1890,11 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
+    /// Take ownership of an `Rc`-shared value: moves it out when this is the
+    /// last reference, clones it otherwise. Prefer keeping the `Rc` when the
+    /// value is only read or forwarded — the clone is a deep copy of every
+    /// inline payload, and those are unbounded.
+    pub fn unwrap_rc(rc: Rc<Self>) -> Self {
         Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
     }
 
@@ -2047,35 +2232,36 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
         }
         TV::Operation(info) => {
             // Operations carry `TypedValue` payloads (transfer parameter, emit
-            // value, originated storage) that may be deep; drain them.
+            // value, originated storage) that may be deep; drain them. They are
+            // `Rc`-shared, so only the last owner actually drains one.
+            let unit = || Rc::new(TV::Unit);
             match &mut info.operation {
                 Operation::TransferTokens(tt) => {
-                    stack.push(DropNode::Value(replace(&mut tt.param, TV::Unit)))
+                    push_rc(replace(&mut tt.param, unit()), stack)
                 }
-                Operation::Emit(e) => {
-                    stack.push(DropNode::Value(replace(&mut e.value, TV::Unit)))
-                }
+                Operation::Emit(e) => push_rc(replace(&mut e.value, unit()), stack),
                 Operation::CreateContract(c) => {
-                    stack.push(DropNode::Value(replace(&mut c.storage, TV::Unit)))
+                    push_rc(replace(&mut c.storage, unit()), stack)
                 }
                 Operation::SetDelegate(_) => {}
             }
         }
         TV::BigMap(m) => {
             // The in-memory keys/values (and the lazy-storage overlay diff) are
-            // owned `TypedValue`s that may be deep; drain them.
+            // held behind `Rc`; push the handles so a deep value drops
+            // iteratively without being cloned first.
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
                     for (k, v) in rb_map_into_vec(take(map)) {
-                        stack.push(DropNode::Value(k));
-                        stack.push(DropNode::Value(v));
+                        push_rc(k, stack);
+                        push_rc(v, stack);
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
                     for (k, v) in rb_map_into_vec(take(&mut from_id.overlay)) {
-                        stack.push(DropNode::Value(k));
+                        push_rc(k, stack);
                         if let Some(v) = v {
-                            stack.push(DropNode::Value(v));
+                            push_rc(v, stack);
                         }
                     }
                 }
@@ -2512,7 +2698,7 @@ pub mod test_strategies {
                     .prop_map(|(key_type, value_type, map)|
                               {
                                   let content =
-                                      big_map::BigMapContent::InMemory(map.into_iter().collect());
+                                      big_map::BigMapContent::InMemory(big_map::in_memory_entries(map));
                                   V::BigMap(BigMap {
                                       content,
                                       key_type,
@@ -2623,7 +2809,11 @@ mod test_untypers {
             .into_micheline_optimized_legacy(&owned_arena, &mut owned_gas)
             .unwrap();
         let borrowed = value
-            .clone_into_micheline_optimized_legacy(&borrowed_arena, &mut borrowed_gas)
+            .clone_into_micheline_optimized_legacy(
+                &borrowed_arena,
+                &mut borrowed_gas,
+                None,
+            )
             .unwrap();
 
         assert_eq!(borrowed, owned);
@@ -2644,12 +2834,7 @@ mod test_untypers {
         }
 
         #[test]
-        fn borrowed_and_owned_pushable_unparsers_match(
-            typed in TS::typed_value_and_type().prop_filter(
-                "APPLY accepts only pushable captures",
-                |typed| typed.ty.ensure_prop(&mut Gas::unmetered(), TypeProperty::Pushable).is_ok(),
-            )
-        ) {
+        fn borrowed_and_owned_unparsers_match(typed in TS::typed_value_and_type()) {
             assert_borrowed_owned_unparse_match(&typed.val);
         }
     }
@@ -2729,13 +2914,93 @@ mod test_untypers {
 
     #[test]
     fn borrowed_unparser_rejects_non_pushable_values_without_panicking() {
+        // `operation` is the only variant the borrowed walk refuses. A caller
+        // that restricts the walk is told so through the property check, which
+        // fires before the arm is reached; under `restrict_to: None` the arm
+        // itself answers `UnsupportedUnparsing`. `big_map` and `ticket` are the
+        // converse case: refused outright until the returned storage started
+        // being unparsed through here (L2-1840) — see
+        // `borrowed_unparser_matches_owned_on_storage_values`.
         let arena = Arena::new();
-        let value = TypedValue::BigMap(BigMap::empty(Type::Nat, Type::Unit));
+        let value = TypedValue::new_operation(
+            Operation::SetDelegate(michelson_operation::SetDelegate(None)),
+            0,
+        );
 
         assert_eq!(
-            value.clone_into_micheline_optimized_legacy(&arena, &mut Gas::default()),
-            Err(BorrowedUnparseError::NonPushable)
+            value.clone_into_micheline_optimized_legacy(
+                &arena,
+                &mut Gas::default(),
+                Some(TypeProperty::Pushable)
+            ),
+            Err(BorrowedUnparseError::UnsatisfiedProperty(
+                TypeProperty::Pushable
+            ))
         );
+    }
+
+    /// The borrowed unparser must agree with the consuming one on every shape
+    /// the *returned storage* can hold, not just the pushable ones it was
+    /// originally written for. `assert_borrowed_owned_unparse_match` compares
+    /// both the Micheline and the gas charged, so a divergence in either the
+    /// node order or the cost of the new `BigMap` / `Ticket` arms fails here.
+    ///
+    /// Storage is now unparsed through the borrowed walk so that a shared
+    /// child is not deep-copied before its cost is charged (L2-1840).
+    #[test]
+    fn borrowed_unparser_matches_owned_on_storage_values() {
+        let in_memory = |entries: Vec<(TypedValue<'static>, TypedValue<'static>)>| {
+            TypedValue::BigMap(BigMap::new(
+                Type::Nat,
+                Type::Unit,
+                big_map::in_memory_entries(entries),
+            ))
+        };
+        // `InMemory`: empty, one entry, several entries.
+        assert_borrowed_owned_unparse_match(&in_memory(vec![]));
+        assert_borrowed_owned_unparse_match(&in_memory(vec![(
+            TypedValue::nat(1u64),
+            TypedValue::Unit,
+        )]));
+        assert_borrowed_owned_unparse_match(&in_memory(vec![
+            (TypedValue::nat(2u64), TypedValue::Unit),
+            (TypedValue::nat(1u64), TypedValue::Unit),
+            (TypedValue::nat(3u64), TypedValue::Unit),
+        ]));
+
+        // `FromId`: bare id, and an overlay carrying both an update and a
+        // removal — the `None` arm is the one that needs its own frame.
+        let from_id =
+            |overlay: Vec<(TypedValue<'static>, Option<TypedValue<'static>>)>| {
+                TypedValue::BigMap(BigMap {
+                    content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                        id: 4i64.into(),
+                        overlay: big_map::overlay_entries(overlay),
+                    }),
+                    key_type: Type::Nat,
+                    value_type: Type::Unit,
+                })
+            };
+        assert_borrowed_owned_unparse_match(&from_id(vec![]));
+        assert_borrowed_owned_unparse_match(&from_id(vec![
+            (TypedValue::nat(1u64), Some(TypedValue::Unit)),
+            (TypedValue::nat(2u64), None),
+        ]));
+
+        // Nested under containers, and beside a shared leaf — the shape the
+        // fix exists for.
+        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 32]));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair_rc(
+            shared.clone(),
+            shared.clone(),
+        ));
+        assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
+            in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
+            TypedValue::List(MichelsonList::from(vec![
+                Rc::new(from_id(vec![])),
+                shared.clone(),
+            ])),
+        ));
     }
 
     // We used to have a bug in which a panic was raised in the
@@ -2745,7 +3010,7 @@ mod test_untypers {
         let arena = Arena::new();
         let mut gas = Gas::default();
         let mut m = BigMap::empty(Type::Nat, Type::Unit);
-        m.update(TypedValue::Nat(0u32.into()), None);
+        m.update(Rc::new(TypedValue::Nat(0u32.into())), None);
         TypedValue::BigMap(m)
             .into_micheline_optimized_legacy(&arena, &mut gas)
             .unwrap();
@@ -2803,7 +3068,7 @@ mod test_untypers {
             TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag,
-                    value: TypedValue::Unit,
+                    value: Rc::new(TypedValue::Unit),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3032,7 +3297,7 @@ mod drop_safety {
             let mut tv = TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag: None,
-                    value: deep_pair(DEPTH),
+                    value: Rc::new(deep_pair(DEPTH)),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3046,7 +3311,7 @@ mod drop_safety {
         // A big_map's in-memory values are owned `TypedValue`s that may be deep.
         on_kernel_stack(|| {
             let mut map = RedBlackTreeMap::new();
-            map.insert_mut(TypedValue::Unit, deep_pair(DEPTH));
+            map.insert_mut(Rc::new(TypedValue::Unit), Rc::new(deep_pair(DEPTH)));
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
         });

@@ -641,7 +641,7 @@ fn dispatch_callback<'a>(
     let counter = ctx.operation_counter();
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
-            param: TypedValue::Bytes(response_body),
+            param: Rc::new(TypedValue::Bytes(response_body)),
             destination_address: destination,
             // The callback only delivers the response body.
             // Any value transfers from the EVM side happen as
@@ -1811,10 +1811,10 @@ fn make_invalid_runtime_id_error<'a>(
 ) -> mir::interpreter::InterpretError<'a> {
     mir::interpreter::InterpretError::FailedWith(
         mir::ast::Type::new_pair(mir::ast::Type::String, mir::ast::Type::Nat),
-        TypedValue::new_pair(
+        Rc::new(TypedValue::new_pair(
             TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
             TypedValue::Nat(received.clone()),
-        ),
+        )),
     )
 }
 
@@ -4827,7 +4827,7 @@ pub(crate) mod tests {
         );
         match &op.operation {
             Operation::TransferTokens(tt) => {
-                assert_eq!(tt.param, TypedValue::Bytes(body));
+                assert_eq!(*tt.param, TypedValue::Bytes(body));
                 assert_eq!(tt.destination_address, destination);
                 assert_eq!(tt.amount, 0);
             }
@@ -5471,7 +5471,7 @@ pub(crate) mod tests {
         );
         match result {
             Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv else {
+                let TypedValue::Pair(msg, received) = tv.as_ref() else {
                     panic!("expected Pair payload, got: {tv:?}")
                 };
                 assert!(
@@ -5789,7 +5789,7 @@ pub(crate) mod tests {
         );
         match result {
             Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv else {
+                let TypedValue::Pair(msg, received) = tv.as_ref() else {
                     panic!("expected Pair payload, got: {tv:?}")
                 };
                 assert!(

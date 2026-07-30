@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- Michelson runtime: a contract that duplicates a large value and then builds
+  an operation from it — `TRANSFER_TOKENS`, `EMIT` or `CREATE_CONTRACT` — no
+  longer copies the payload. Building the operation took ownership of the
+  payload, which deep-copies it while the stack copy is still live, and the
+  copy was not gas-charged, so a large enough payload exhausted the kernel heap
+  and aborted it instead of running out of gas. The payload is now shared
+  behind a pointer, and every site that serializes it reads through that
+  pointer rather than taking it by value: the three receipts, and the
+  origination an internal `CREATE_CONTRACT` performs — which a `DUP`ed
+  operation left sharing its storage across occurrences, so taking it by value
+  there copied it whatever the receipt did (!22617).
+- Michelson runtime: **gas change.** The end-of-execution walk that persists
+  big maps is now charged per node visited, as L1 charges the same walk, and
+  no longer copies values it does not rewrite, revisits a big-map-free subtree
+  reachable by several pointers, or recurses. A contract could previously use
+  it to exhaust the kernel's heap, stall it for an unbounded time, or overflow
+  its stack, none of it gas-charged. Contracts now pay for the walk: 220
+  milligas per node of the returned storage and of each outgoing operation, so
+  an operation returning a large storage consumes marginally more gas than
+  before. Big-map identifiers are still allocated in the same order (!22602).
+- Michelson runtime: a contract that duplicates a large value and returns it can
+  no longer exhaust the kernel heap. Serializing the returned storage took
+  ownership of each child, which deep-copies one that is still shared —
+  `DUP ; PAIR` leaves `Pair(V, V)` as a single allocation — and did so before
+  charging any gas for it, so the copy could push past the 4 GiB limit and abort
+  the kernel on a WASM trap. The storage is now unparsed through a walk that
+  reads through the shared pointers and clones only leaf payloads, charging
+  before it allocates. Together with the copy-on-write walk above, such a
+  contract now fails with a bounded out-of-gas error instead of aborting the
+  kernel (!22603).
+- Michelson runtime: `CONCAT` now rejects a result larger than the maximum
+  allocatable size with a bounded `Overflow` error, instead of aborting the
+  kernel with a capacity-overflow panic (!22534).
 - Michelson runtime: support the `INDEX_ADDRESS` and `GET_ADDRESS_INDEX`
   instructions. `INDEX_ADDRESS` registers an address in the global address
   registry and returns its unique index (idempotently); `GET_ADDRESS_INDEX`

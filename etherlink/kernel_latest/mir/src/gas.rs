@@ -192,6 +192,21 @@ pub mod tc_cost {
     // charged twice as often as in MIR.
     pub const INSTR_STEP: u32 = 220 * 2;
 
+    // Charged once per node visited by the end-of-execution lazy-storage walk
+    // (`crate::ast::big_map::dump_big_map_walk`).
+    //
+    // Corresponds to `Typecheck_costs.parse_instr_cycle` in the Tezos
+    // protocol, which `extract_lazy_storage_updates` consumes at the top of
+    // every recursion step, before it even matches on the node
+    // (`script_ir_translator.ml`). Unlike `INSTR_STEP` the protocol charges
+    // this once per node rather than twice, so it is `cost_TYPECHECKING_CODE`
+    // unscaled.
+    //
+    // Without it the walk is free, and since `DUP` shares a pointer, a value
+    // whose in-memory graph unfolds to a `2^K`-node tree costs `O(K²)` gas to
+    // build and `2^K` uncharged visits to walk.
+    pub const LAZY_STORAGE_CYCLE: u32 = 220;
+
     pub const VALUE_STEP: u32 = 100;
 
     // Corresponds to cost_PARSE_TYPE1 in the Tezos protocol.
@@ -750,16 +765,20 @@ pub mod interpret_cost {
         (w + (w >> 1) + (w >> 3) + 60).as_gas_cost()
     }
 
-    // corresponds to cost_N_INot_int in the Tezos protocol
+    // corresponds to cost_N_INot_int in the Tezos protocol, floored by the
+    // allocation gas
     pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(n.byte_size());
-        ((sz >> 4) + (sz >> 6) + (sz >> 7) + (sz >> 8) + 90).as_gas_cost()
+        let sz = Checked::from(n.byte_size() as usize);
+        let time = ((sz >> 4) + (sz >> 6) + (sz >> 7) + (sz >> 8) + 90).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
-    // corresponds to cost_N_INot_bytes in the Tezos protocol
+    // corresponds to cost_N_INot_bytes in the Tezos protocol, floored by the
+    // allocation gas
     pub fn not_bytes(b: &[u8]) -> Result<u32, CostOverflow> {
         let sz = Checked::from(b.len());
-        ((sz >> 4) + (sz >> 5) + (sz >> 7) + (sz >> 9) + 40).as_gas_cost()
+        let time = ((sz >> 4) + (sz >> 5) + (sz >> 7) + (sz >> 9) + 40).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
     // corresponds to cost_N_ILsl_nat in the Tezos protocol
@@ -1273,13 +1292,15 @@ pub mod interpret_cost {
     // corresponds to cost_N_ISlice_string in the Tezos protocol
     pub fn slice_string(length: usize) -> Result<u32, CostOverflow> {
         let s = Checked::from(length);
-        ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()
+        let time = ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()?;
+        Ok(time.max(alloc_cost(s)?))
     }
 
     // corresponds to cost_N_ISlice_bytes in the Tezos protocol
     pub fn slice_bytes(length: usize) -> Result<u32, CostOverflow> {
         let s = Checked::from(length);
-        ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()
+        let time = ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()?;
+        Ok(time.max(alloc_cost(s)?))
     }
 
     // corresponds to cost_N_IBlake2b in the Tezos protocol
@@ -1508,6 +1529,17 @@ mod test {
 
         // Consuming after exhaustion returns OutOfGas without panicking.
         assert_eq!(gas.consume(1000), Err(OutOfGas));
+    }
+
+    // Negating a large integer or natural allocates a result of the operand
+    // width, so the cost must be floored to the allocation gas like the byte
+    // case; at this size the floor dominates and both costs coincide.
+    #[test]
+    fn not_num_is_floored_to_allocation() {
+        let sz = 1_000_000;
+        let nat = num_bigint::BigUint::from_bytes_be(&vec![0xFFu8; sz]);
+        let floored = interpret_cost::not_bytes(&vec![0u8; sz]).unwrap();
+        assert_eq!(interpret_cost::not_num(&nat).unwrap(), floored);
     }
 
     #[test]

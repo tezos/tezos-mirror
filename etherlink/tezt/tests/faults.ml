@@ -10,8 +10,10 @@
    Requirement:  make -f etherlink.mk build
                  make octez-node octez-client octez-smart-rollup-node octez-evm-node
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file faults.ml
-   Subject:      Exercise the kernel's behaviour when the "panic" debug
-                 precompile deliberately triggers unrecoverable WASM traps.
+   Subject:      Exercise the kernel's behaviour when an operation
+                 deliberately triggers an unrecoverable WASM trap, submitted
+                 directly or through the delayed inbox, and the operator's
+                 recovery from a delayed one.
  *)
 
 open Test_helpers

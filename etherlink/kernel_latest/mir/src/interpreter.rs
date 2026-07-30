@@ -23,8 +23,8 @@ use tezos_crypto_rs::{
 use typed_arena::Arena;
 
 use crate::ast::big_map::{
-    apply_deferred_big_map_updates, dump_big_map_walk, remove_unreferenced_big_maps,
-    BigMap, LazyStorageError,
+    apply_deferred_big_map_updates, dump_big_map_walk, dump_big_map_walk_shared,
+    remove_unreferenced_big_maps, BigMap, LazyStorageError,
 };
 use crate::ast::*;
 #[cfg(feature = "bls")]
@@ -36,8 +36,8 @@ use crate::lexer::Prim;
 use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{
-    typecheck_contract_address, typecheck_value, typecheck_value_with_views,
-    AllowForgedLazyStorageId, TcError, TypecheckViews,
+    type_props::TypeProperty, typecheck_contract_address, typecheck_value,
+    typecheck_value_with_views, AllowForgedLazyStorageId, TcError, TypecheckViews,
 };
 
 /// Errors possible during interpretation.
@@ -57,7 +57,7 @@ pub enum InterpretError<'a> {
     NegativeMutez,
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, TypedValue<'a>),
+    FailedWith(Type, Rc<TypedValue<'a>>),
     /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
     #[error("Overflow")]
     Overflow,
@@ -135,42 +135,22 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
     }
 }
 
-/// `FAILWITH` embeds its popped argument directly in
-/// `InterpretError::FailedWith(_, TypedValue<'a>)`. A deep runtime-built
-/// value -- e.g. a `LOOP`-built right-comb of `PAIR` cells -- would
-/// otherwise overflow the kernel's ~1 MiB Rust stack on the auto-derived
-/// `TypedValue` destructor when the error is dropped (L2-1446). Draining
-/// here, at the last drop point, lets the kernel's `#[error]` formatter
-/// observe the value's original structural shape (matching L1 protocol
-/// observability and the TZT `expectation` matcher) before the children
-/// are flattened to unit sentinels by [`drain_deep_typed_value`].
+/// The `FailedWith` payload is held behind a shared `Rc`, so this `Drop` must
+/// not mutate a value that other holders still see. It drains the deep spine
+/// in place — severing a `LOOP`/`PAIR`-built comb so the derived destructor
+/// cannot recurse and overflow the kernel's Rust stack — only when the error
+/// uniquely owns the value (`Rc::get_mut`). A still-shared value is dropped as
+/// a plain refcount decrement and torn down later by its last owner's own
+/// iterative `TypedValue` `Drop`.
 ///
-/// The `Drop` impl forbids partial-move destructuring of `InterpretError`
-/// anywhere in the workspace. Existing match sites all consume the error
-/// by *reference*: `tzt/expectation.rs::unify_interpreter_error` takes
-/// `err: &InterpretError`, and the kernel's
-/// `tezosx-tezos-runtime::view::classify_interpret_error` matches on
-/// `&e`. Both use match-ergonomics auto-borrow on the inner fields, so
-/// `Drop` is irrelevant to their soundness.
-///
-/// Scope note: this `Drop` closes the *drop-time* overflow on a deep
-/// `FailedWith` payload. The *observation-time* overflow via the auto-
-/// derived `Debug` walk on `TypedValue` (reached by the kernel's
-/// `BadRequest(format!("{e:?}"))` and the `#[error("…{1:?}…")]` derive)
-/// is independent and is closed by !21988 (iterative `Debug for
-/// TypedValue`, Linear L2-1436). The two MRs are conjugate: this MR
-/// makes the drop safe; !21988 makes the observation safe.
+/// The impl also forbids partial-move destructuring of `InterpretError`; every
+/// match site consumes the error by reference.
 impl<'a> Drop for InterpretError<'a> {
     fn drop(&mut self) {
-        // Only `FailedWith` currently carries a `TypedValue` payload that
-        // can be deep at runtime. If a future variant gains an owned
-        // `TypedValue` / `Rc<TypedValue>` reachable from attacker input
-        // (e.g. a richer FAILWITH-with-context variant, or a Closure-
-        // returning error), extend this match — otherwise its
-        // auto-derived destructor would re-introduce the L2-1446
-        // overflow on `Drop` of the `Err`.
-        if let InterpretError::FailedWith(_, ref mut v) = self {
-            crate::ast::drain_deep_typed_value(v);
+        if let InterpretError::FailedWith(_, v) = self {
+            if let Some(inner) = Rc::get_mut(v) {
+                crate::ast::drain_deep_typed_value(inner);
+            }
         }
     }
 }
@@ -201,8 +181,10 @@ pub enum InterpretInvariant {
     ExpectedListOperation,
     #[error("script result's operation list contained a non-operation element")]
     ExpectedOperationElement,
-    #[error("APPLY reached the borrowed unparser with a non-pushable capture")]
-    NonPushableApplyCapture,
+    #[error("borrowed unparser reached a value it does not unparse")]
+    UnsupportedUnparsing,
+    #[error("borrowed unparser reached a value that is not {0}")]
+    UnparsedValueLacksProperty(TypeProperty),
 }
 
 #[allow(missing_docs)]
@@ -238,8 +220,15 @@ impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
     fn from(error: BorrowedUnparseError) -> Self {
         match error {
             BorrowedUnparseError::OutOfGas => InterpretError::OutOfGas,
-            BorrowedUnparseError::NonPushable => {
-                InterpretError::InternalError(InterpretInvariant::NonPushableApplyCapture)
+            BorrowedUnparseError::UnsupportedUnparsing => {
+                InterpretError::InternalError(InterpretInvariant::UnsupportedUnparsing)
+            }
+            // The typechecker already rejected such a value; reaching it here
+            // is an internal invariant break, not a script error.
+            BorrowedUnparseError::UnsatisfiedProperty(prop) => {
+                InterpretError::InternalError(
+                    InterpretInvariant::UnparsedValueLacksProperty(prop),
+                )
             }
         }
     }
@@ -298,7 +287,7 @@ impl<'a> ContractScript<'a> {
         // typechecked with forged ids allowed.
         parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
-        (impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>),
+        (impl Iterator<Item = OperationInfo<'a>>, Rc<TypedValue<'a>>),
         ContractInterpretError<'a>,
     > {
         let wrapped_parameter = self.wrap_parameter(
@@ -328,7 +317,7 @@ impl<'a> ContractScript<'a> {
             InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
         )?);
         let mut result = result;
-        let (operation_list, storage) = match &mut result {
+        let (operation_list, mut storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
             }
@@ -340,7 +329,6 @@ impl<'a> ContractScript<'a> {
             }
         };
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
-        let mut storage = TypedValue::unwrap_rc(storage);
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
         // removal decision. A big map can be moved out of the
@@ -355,8 +343,15 @@ impl<'a> ContractScript<'a> {
         // storage.
         let mut seen_in_storage = BTreeSet::new();
         // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
-        let deferred_storage =
-            dump_big_map_walk(lazy_storage, &mut storage, false, &mut seen_in_storage)?;
+        let (updated_storage, deferred_storage) = dump_big_map_walk_shared(
+            lazy_storage,
+            &storage,
+            false,
+            &mut seen_in_storage,
+        )?;
+        if let Some(updated_storage) = updated_storage {
+            storage = updated_storage;
+        }
         // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
         // the internal operation to determine what to do with it
         let mut seen_in_operations = BTreeSet::new();
@@ -1119,7 +1114,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::MapOptionAfter => {
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                stk.push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                stk.push(TypedValue::new_option_rc(Some(result)));
             }
             InterpFrame::MapMapAccum {
                 body,
@@ -1175,8 +1170,7 @@ fn run_interp_driver<'a, 'b>(
                     saved_balance,
                 );
                 let result = pop_value(&mut sub)?;
-                active_stack_mut(stacks)?
-                    .push(TypedValue::new_option(Some(TypedValue::unwrap_rc(result))));
+                active_stack_mut(stacks)?.push(TypedValue::new_option_rc(Some(result)));
             }
         }
     }
@@ -1574,7 +1568,7 @@ fn interpret_step<'a, 'b>(
         },
         I::Exec => {
             ctx.gas().consume(interpret_cost::EXEC)?;
-            let mut arg = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut arg = pop_value(stack)?;
             let mut closure = pop_v!(V::Lambda);
             // Inline APPLY unwrapping (constant work, not stack recursive).
             loop {
@@ -1589,22 +1583,22 @@ fn interpret_step<'a, 'b>(
                             let code_clone = Rc::clone(&code);
                             // Recursive lambdas put themselves on top of
                             // the body's stack so the body can EXEC again.
-                            let initial = stk![
-                                V::Lambda(Closure::Lambda(Lambda::LambdaRec {
-                                    in_ty,
-                                    out_ty,
-                                    micheline_code,
-                                    code,
-                                })),
-                                arg
-                            ];
+                            let mut initial = IStack::new();
+                            initial.push(V::Lambda(Closure::Lambda(Lambda::LambdaRec {
+                                in_ty,
+                                out_ty,
+                                micheline_code,
+                                code,
+                            })));
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec {
                                 code: code_clone,
                                 initial,
                             });
                         }
                         Lambda::Lambda { code, .. } => {
-                            let initial = stk![arg];
+                            let mut initial = IStack::new();
+                            initial.push(arg);
                             return Ok(StepResult::OpenExec { code, initial });
                         }
                     },
@@ -1619,7 +1613,7 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = V::new_pair_rc(Rc::clone(capture.arg_val()), Rc::new(arg));
+                        arg = Rc::new(V::new_pair_rc(Rc::clone(capture.arg_val()), arg));
                         closure = Closure::unwrap_rc(inner);
                     }
                 }
@@ -1630,7 +1624,7 @@ fn interpret_step<'a, 'b>(
             arg_type,
             return_type,
         } => {
-            let input = TypedValue::unwrap_rc(pop_value(stack)?);
+            let input = pop_value(stack)?;
             let Address {
                 hash,
                 entrypoint: _,
@@ -1712,7 +1706,7 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair(input, storage)];
+            let initial = stk![TypedValue::new_pair_rc(input, Rc::new(storage))];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -2292,7 +2286,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
             overloads::Lsl::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 if o2 > BigUint::from(64000u16) {
@@ -2301,7 +2295,7 @@ fn interpret_one<'a>(
 
                 let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas()
-                    .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsl_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = o2_usize / 8;
                 let bit_shifts = o2_usize % 8;
@@ -2340,7 +2334,7 @@ fn interpret_one<'a>(
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
             overloads::Lsr::Bytes => {
-                let o1 = pop!(V::Bytes);
+                pop_ref!(o1, Bytes);
                 let o2 = pop!(V::Nat);
 
                 // L1 deliberately leaves `LSR bytes` unbounded on the shift
@@ -2354,7 +2348,7 @@ fn interpret_one<'a>(
                 // an empty vector.
                 let o2_usize = o2.to_usize().unwrap_or(usize::MAX);
                 ctx.gas()
-                    .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
+                    .consume(interpret_cost::lsr_bytes(o1, &o2_usize)?)?;
 
                 let byte_shifts = min(o2_usize / 8, o1.len());
                 let bit_shifts = o2_usize % 8;
@@ -2394,35 +2388,34 @@ fn interpret_one<'a>(
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_nat(&o1, o2)?)?;
-                *o2 &= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::and_nat(o1, o2)?)?;
+                stack.push(V::Nat(o1 & o2));
             }
             overloads::And::IntNat => {
-                let o1 = pop!(V::Int);
-                let o2 = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::and_int_nat(&o1, &o2)?)?;
-                let res = BigUint::try_from(o1 & BigInt::from(o2))
-                    // safe, `neg` & `pos` = `pos`
-                    .unwrap();
+                pop_ref!(o1, Int);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::and_int_nat(o1, o2)?)?;
+                let res = if o1.sign() == Sign::Minus {
+                    // Negative operand needs an owned signed value
+                    BigUint::try_from(BigInt::from(o2.clone()) & o1).unwrap()
+                } else {
+                    o1.magnitude() & o2
+                };
                 stack.push(V::Nat(res));
             }
             overloads::And::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the smallest length among the
-                // operands, so to reuse memory we put the smallest vector to
-                // the result (`o2`).
-                if o1.len() < o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::and_bytes(o1, o2)?)?;
+                // Result length is the smaller operand's; bytes align at the right.
+                let n = min(o1.len(), o2.len());
+                let mut res = vec![0u8; n];
+                for k in 1..=n {
+                    res[n - k] = o1[o1.len() - k] & o2[o2.len() - k];
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 &= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Or(overload) => match overload {
@@ -2433,26 +2426,27 @@ fn interpret_one<'a>(
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
-                *o2 |= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::or_num(o1, o2)?)?;
+                stack.push(V::Nat(o1 | o2));
             }
             overloads::Or::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the largest length among the
-                // operands, so to reuse memory we put the largest vector to
-                // the result (`o2`).
-                if o1.len() > o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::or_bytes(o1, o2)?)?;
+                // Result length is the larger operand's; shorter combines at the right.
+                let (long, short) = if o1.len() >= o2.len() {
+                    (o1, o2)
+                } else {
+                    (o2, o1)
+                };
+                let mut res = long.to_vec();
+                let off = long.len() - short.len();
+                for (k, b) in short.iter().enumerate() {
+                    res[off + k] |= b;
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 |= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Xor(overloads) => match overloads {
@@ -2463,26 +2457,27 @@ fn interpret_one<'a>(
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
-                let o1 = pop!(V::Nat);
-                let o2 = top_mut!(V::Nat);
-                ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
-                *o2 ^= o1;
+                pop_ref!(o1, Nat);
+                pop_ref!(o2, Nat);
+                ctx.gas().consume(interpret_cost::xor_nat(o1, o2)?)?;
+                stack.push(V::Nat(o1 ^ o2));
             }
             overloads::Xor::Bytes => {
-                let mut o1 = pop!(V::Bytes);
-                let o2 = top_mut!(V::Bytes);
-                ctx.gas().consume(interpret_cost::xor_bytes(&o1, o2)?)?;
-
-                // The resulting vector length is the largest length among the
-                // operands, so to reuse memory we put the largest vector to
-                // the result (`o2`).
-                if o1.len() > o2.len() {
-                    std::mem::swap(&mut o1, o2)
+                pop_ref!(o1, Bytes);
+                pop_ref!(o2, Bytes);
+                ctx.gas().consume(interpret_cost::xor_bytes(o1, o2)?)?;
+                // Result length is the larger operand's; shorter combines at the right.
+                let (long, short) = if o1.len() >= o2.len() {
+                    (o1, o2)
+                } else {
+                    (o2, o1)
+                };
+                let mut res = long.to_vec();
+                let off = long.len() - short.len();
+                for (k, b) in short.iter().enumerate() {
+                    res[off + k] ^= b;
                 }
-                for (b1, b2) in std::iter::zip(o1.into_iter().rev(), o2.iter_mut().rev())
-                {
-                    *b2 ^= b1;
-                }
+                stack.push(V::Bytes(res));
             }
         },
         I::Not(overload) => match overload {
@@ -2492,21 +2487,20 @@ fn interpret_one<'a>(
                 *o = !*o;
             }
             overloads::Not::Int => {
-                let o = pop!(V::Int);
-                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
+                pop_ref!(o, Int);
+                ctx.gas().consume(interpret_cost::not_num(o)?)?;
                 stack.push(V::Int(!o));
             }
             overloads::Not::Nat => {
-                let o = pop!(V::Nat);
-                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
-                stack.push(V::Int(!BigInt::from(o)))
+                pop_ref!(o, Nat);
+                ctx.gas().consume(interpret_cost::not_num(o)?)?;
+                // NOT of a nat is `-(n + 1)`, read without owning the operand.
+                stack.push(V::Int(BigInt::from_biguint(Sign::Minus, o + 1u32)))
             }
             overloads::Not::Bytes => {
-                let o = top_mut!(V::Bytes);
+                pop_ref!(o, Bytes);
                 ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
-                for b in o.iter_mut() {
-                    *b = !*b
-                }
+                stack.push(V::Bytes(o.iter().map(|b| !b).collect()));
             }
         },
         // Control-flow / sub-stack instructions are handled by the iterative
@@ -2643,7 +2637,8 @@ fn interpret_one<'a>(
             stack.swap(0, 1)?;
         }
         I::Failwith(ty) => {
-            let x = pop!();
+            // `pop_rc!` keeps the value shared instead of deep-copying it.
+            let x = pop_rc!();
             return Err(InterpretError::FailedWith(ty.clone(), x));
         }
         I::Never => {
@@ -2761,20 +2756,38 @@ fn interpret_one<'a>(
         }
         I::Concat(overload) => match overload {
             overloads::Concat::TwoStrings => {
-                let mut s1 = pop!(V::String);
-                let s2 = pop!(V::String);
+                pop_ref!(s1, String);
+                pop_ref!(s2, String);
                 ctx.gas()
                     .consume(interpret_cost::concat_string_pair(s1.len(), s2.len())?)?;
-                s1.push_str(&s2);
-                stack.push(V::String(s1));
+                let total = s1
+                    .len()
+                    .checked_add(s2.len())
+                    .ok_or(InterpretError::Overflow)?;
+                let mut result = String::new();
+                result
+                    .try_reserve_exact(total)
+                    .map_err(|_| InterpretError::Overflow)?;
+                result.push_str(s1);
+                result.push_str(s2);
+                stack.push(V::String(result));
             }
             overloads::Concat::TwoBytes => {
-                let mut bs1 = pop!(V::Bytes);
-                let bs2 = pop!(V::Bytes);
+                pop_ref!(bs1, Bytes);
+                pop_ref!(bs2, Bytes);
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_pair(bs1.len(), bs2.len())?)?;
-                bs1.extend_from_slice(&bs2);
-                stack.push(V::Bytes(bs1))
+                let total = bs1
+                    .len()
+                    .checked_add(bs2.len())
+                    .ok_or(InterpretError::Overflow)?;
+                let mut result = Vec::new();
+                result
+                    .try_reserve_exact(total)
+                    .map_err(|_| InterpretError::Overflow)?;
+                result.extend_from_slice(bs1);
+                result.extend_from_slice(bs2);
+                stack.push(V::Bytes(result))
             }
             overloads::Concat::ListOfStrings => {
                 pop_ref!(list, List);
@@ -2798,7 +2811,11 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::concat_string_list(total_len)?)?;
 
-                let mut result = String::with_capacity(total_len.ok_or(OutOfGas)?);
+                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let mut result = String::new();
+                result
+                    .try_reserve_exact(total_len)
+                    .map_err(|_| InterpretError::Overflow)?;
                 for val in list {
                     let s = match val.as_ref() {
                         V::String(s) => s,
@@ -2836,7 +2853,11 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
-                let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
+                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let mut result = Vec::new();
+                result
+                    .try_reserve_exact(total_len)
+                    .map_err(|_| InterpretError::Overflow)?;
                 for val in list {
                     let bs = match val.as_ref() {
                         V::Bytes(bs) => bs,
@@ -2912,7 +2933,7 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
                 let result = map.get(arena, &key_rc, *ctx.lazy_storage())?;
-                stack.push(V::new_option(result));
+                stack.push(V::new_option_rc(result));
             }
         },
         I::GetN(n) => {
@@ -2950,8 +2971,8 @@ fn interpret_one<'a>(
                 }
             }
             overloads::Update::BigMap => {
-                let key = pop!();
-                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
+                let key = pop_rc!();
+                let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -2978,8 +2999,8 @@ fn interpret_one<'a>(
                 stack.push(V::new_option_rc(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
-                let key = pop!();
-                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
+                let key = pop_rc!();
+                let opt_new_val = pop!(V::Option);
                 let map = top_mut!(V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -2987,7 +3008,7 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
                 map.update(key, opt_new_val);
-                stack.push(V::new_option(opt_old_val));
+                stack.push(V::new_option_rc(opt_old_val));
             }
         },
         I::Size(overload) => {
@@ -3009,9 +3030,9 @@ fn interpret_one<'a>(
         }
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
-            let new_val = pop!();
-            let field = get_nth_field_ref(*n, Rc::make_mut(stack.get_mut(0)?))?;
-            *field = new_val;
+            let new_val = pop_rc!();
+            let slot = get_nth_field_slot_mut(*n, stack.get_mut(0)?)?;
+            *slot = new_val;
         }
         I::ChainId => {
             ctx.gas().consume(interpret_cost::CHAIN_ID)?;
@@ -3026,18 +3047,24 @@ fn interpret_one<'a>(
         }
         I::Pack => {
             ctx.gas().consume(interpret_cost::PACK)?;
-            let v = pop!();
-            let arena = Arena::new();
-            let mich = v.into_micheline_optimized_legacy(&arena, ctx.gas())?;
+            // `pop_rc!` + borrowed unparse: read the value through its shared
+            // `Rc` instead of deep-copying it, charging gas before cloning any
+            // leaf so an oversized value runs out of gas rather than out of heap.
+            let v = pop_rc!();
+            let mich = v.clone_into_micheline_optimized_legacy(
+                arena,
+                ctx.gas(),
+                Some(TypeProperty::Packable),
+            )?;
             let encoded = mich.encode_for_pack()??;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
-            let bytes = pop!(V::Bytes);
+            pop_ref!(bytes, Bytes);
             ctx.gas()
                 .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
-                let mich = Micheline::decode_packed(arena, &bytes, ctx.gas())
+                let mich = Micheline::decode_packed(arena, bytes, ctx.gas())
                     .ok()?
                     .ok()?;
                 // UNPACK must not accept forged lazy-storage ids (mirrors L1's
@@ -3063,13 +3090,16 @@ fn interpret_one<'a>(
         I::CheckSignature => {
             let key = pop!(V::Key);
             let sig = pop!(V::Signature);
-            let msg = pop!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas()
-                .consume(interpret_cost::check_signature(&key, &msg)?)?;
-            stack.push(V::Bool(key.verify_signature(&sig, &msg).unwrap_or(false)));
+                .consume(interpret_cost::check_signature(&key, msg)?)?;
+            stack.push(V::Bool(key.verify_signature(&sig, msg).unwrap_or(false)));
         }
         I::TransferTokens => {
-            let param = pop!();
+            // Forwarded into the operation as-is: `pop_rc!` keeps the
+            // parameter shared instead of `unwrap_rc`-ing a still-`DUP`ed
+            // value into a full copy (L2-1831).
+            let param = pop_rc!();
             let mutez_amount = pop!(V::Mutez);
             let contract_address = pop!(V::Contract);
             let counter = fresh_operation_counter(ctx)?;
@@ -3187,8 +3217,11 @@ fn interpret_one<'a>(
             // charges size-dependent leaves before cloning them into the
             // cache.
             let before_val = ctx.gas().milligas().ok_or(OutOfGas)?;
-            let arg_val_micheline =
-                arg_val.clone_into_micheline_optimized_legacy(arena, ctx.gas())?;
+            let arg_val_micheline = arg_val.clone_into_micheline_optimized_legacy(
+                arena,
+                ctx.gas(),
+                Some(TypeProperty::Pushable),
+            )?;
             let val_cost = before_val - ctx.gas().milligas().ok_or(OutOfGas)?;
             let cached_unparse_cost =
                 ty_cost.checked_add(val_cost).ok_or(CostOverflow)?;
@@ -3315,29 +3348,29 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
-            *msg = blake2b_256(msg).to_vec();
+            stack.push(V::Bytes(blake2b_256(msg).to_vec()));
         }
         I::Keccak => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
-            *msg = keccak256(msg).to_vec();
+            stack.push(V::Bytes(keccak256(msg).to_vec()));
         }
         I::Sha256 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
-            *msg = sha256(msg).to_vec();
+            stack.push(V::Bytes(sha256(msg).to_vec()));
         }
         I::Sha3 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
-            *msg = sha3_256(msg).to_vec();
+            stack.push(V::Bytes(sha3_256(msg).to_vec()));
         }
         I::Sha512 => {
-            let msg = top_mut!(V::Bytes);
+            pop_ref!(msg, Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
-            *msg = sha512(msg).to_vec();
+            stack.push(V::Bytes(sha512(msg).to_vec()));
         }
         I::Balance => {
             ctx.gas().consume(interpret_cost::BALANCE)?;
@@ -3424,7 +3457,7 @@ fn interpret_one<'a>(
         }
         I::Emit { tag, arg_ty } => {
             let counter = fresh_operation_counter(ctx)?;
-            let emit_val = pop!();
+            let emit_val = pop_rc!();
             ctx.gas().consume(interpret_cost::EMIT)?;
             stack.push(TypedValue::new_operation(
                 Operation::Emit(Emit {
@@ -3493,7 +3526,7 @@ fn interpret_one<'a>(
                 })
                 .transpose()?;
             let amount = pop!(V::Mutez);
-            let storage = pop!();
+            let storage = pop_rc!();
             let origination_counter = ctx.origination_counter();
             let address =
                 compute_contract_address(ctx.operation_group_hash(), origination_counter);
@@ -3538,24 +3571,25 @@ pub fn compute_contract_address(
     ContractKt1Hash::from(digest_160(&input))
 }
 
-fn get_nth_field_ref<'a, 'b>(
+fn get_nth_field_slot_mut<'a, 'b>(
     mut m: u16,
-    mut val: &'a mut TypedValue<'b>,
-) -> Result<&'a mut TypedValue<'b>, InterpretError<'b>> {
+    mut slot: &'a mut Rc<TypedValue<'b>>,
+) -> Result<&'a mut Rc<TypedValue<'b>>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
-        match (m, val) {
-            (0, val_) => break Ok(val_),
-            (1, V::Pair(l, _)) => {
-                break Ok(Rc::make_mut(l));
-            }
-
-            (_, V::Pair(_, r)) => {
-                val = Rc::make_mut(r);
+        if m == 0 {
+            return Ok(slot);
+        }
+        match Rc::make_mut(slot) {
+            V::Pair(l, r) => {
+                if m == 1 {
+                    return Ok(l);
+                }
+                slot = r;
                 m -= 2;
             }
             _ => {
-                break Err(InterpretError::InternalError(
+                return Err(InterpretError::InternalError(
                     InterpretInvariant::TypeMismatch {
                         expected: "V::Pair",
                     },
@@ -3764,6 +3798,39 @@ mod interpreter_tests {
              {depth_large}/{depth_small}: memory grows like n, not log n, so the shared \
              operand is deep-cloned instead of structurally shared.",
         );
+    }
+
+    /// L2-1837: `FAILWITH` on a shared value must embed it behind its `Rc`,
+    /// not deep-copy it. A `DUP` leaves the operand shared (refcount 2); pre-
+    /// fix `FAILWITH` popped with `pop!` -> `unwrap_rc`, deep-cloning the
+    /// whole `~SIZE`-byte value into a second allocation — enough coexisting
+    /// copies exceed the 4 GiB wasm heap and trap the kernel. Post-fix
+    /// `FAILWITH` pops with `pop_rc!`, so the allocation is O(1) in `SIZE`.
+    /// The bound is far below `SIZE`, so a linear deep copy fails it while
+    /// the shared-`Rc` path passes.
+    #[test]
+    fn failwith_shared_value_is_not_deep_copied() {
+        const SIZE: usize = 16 * 1024 * 1024; // 16 MiB leaf value
+        let mut stack = stk![V::Bytes(vec![0u8; SIZE])];
+        let mut ctx = Ctx::default();
+        // DUP shares the operand; FAILWITH then embeds the (still shared)
+        // value in the error. Built before measuring so only interpretation
+        // is counted.
+        let prog = [Dup(None), Failwith(Type::Bytes)];
+        let bytes_before = thread_allocated_bytes();
+        let outcome = interpret(&prog, &mut ctx, &mut stack);
+        let allocated = thread_allocated_bytes() - bytes_before;
+        assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+        assert!(
+            allocated < (SIZE as u64) / 8,
+            "FAILWITH on a shared {SIZE}-byte value allocated {allocated} bytes \
+             (bound {}): the shared operand was deep-copied instead of being \
+             held behind its Rc.",
+            SIZE / 8,
+        );
+        // Keep both alive until after the measurement, then drop explicitly.
+        drop(outcome);
+        drop(stack);
     }
 
     fn unparse_type_cost(ty: &Type) -> u32 {
@@ -4000,7 +4067,7 @@ mod interpreter_tests {
         // through the full `ContractInterpretError` Display chain.
         let cie = ContractInterpretError::from(InterpretError::FailedWith(
             Type::Int,
-            value.clone(),
+            Rc::new(value.clone()),
         ));
         let rendered = display_bounded(&cie, CAP);
         assert!(
@@ -4019,7 +4086,7 @@ mod interpreter_tests {
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
-        let err = InterpretError::FailedWith(Type::Int, value);
+        let err = InterpretError::FailedWith(Type::Int, Rc::new(value));
         let rendered_dbg = debug_bounded(&err, CAP);
         assert!(
             rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
@@ -4607,6 +4674,14 @@ mod interpreter_tests {
             check(And(o::And::IntNat), V::int(-8), V::nat(1003), V::nat(1000));
             // large neg int & small nat
             check(And(o::And::IntNat), V::int(-1001), V::nat(12), V::nat(4));
+            // negative operand whose magnitude decrement borrows across a
+            // BigUint digit boundary
+            check(
+                And(o::And::IntNat),
+                V::Int(-(BigInt::from(1u8) << 64u32)),
+                V::Nat((BigUint::from(1u8) << 65u32) - 1u8),
+                V::Nat(BigUint::from(1u8) << 64u32),
+            );
             // large nats (several "digits" in BigUint)
             check(
                 And(o::And::NatNat),
@@ -5104,6 +5179,373 @@ mod interpreter_tests {
                  clone work is unbounded (L2-1794)",
             );
         }
+    }
+
+    // A large operand kept live by extra copies on the stack must not be
+    // copied by the op. A reintroduced operand copy shows up as one extra buffer.
+    #[test]
+    fn dup_shared_bitwise_operands_are_not_copied() {
+        const OPERAND: usize = 262144;
+
+        fn bytes_v() -> TypedValue<'static> {
+            V::Bytes(vec![0xABu8; OPERAND])
+        }
+
+        // Top byte kept clear so increment of the magnitude cannot grow
+        // the limb vector, which would count a reallocation as a copy.
+        fn nat_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Nat(BigUint::from_bytes_be(&be))
+        }
+
+        fn int_neg_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x80;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn int_pos_v() -> TypedValue<'static> {
+            let mut be = vec![0xFFu8; OPERAND];
+            be[0] = 0x7F;
+            V::Int(BigInt::from_signed_bytes_be(&be))
+        }
+
+        fn buffers<'a>(mut stack: IStack<'a>, prog: &[Instruction<'a>]) -> u64 {
+            let mut ctx = Ctx::default();
+            let before = thread_allocated_bytes();
+            interpret(prog, &mut ctx, &mut stack).unwrap();
+            (thread_allocated_bytes() - before) / OPERAND as u64
+        }
+
+        let binary = |op| vec![Dup(None), Dup(None), op];
+        let unary = |op| vec![Dup(None), op];
+        let int_nat = || vec![Dip(None, vec![Dup(None)]), And(overloads::And::IntNat)];
+        for (name, stack, prog, expected_buffers) in [
+            (
+                "AND bytes",
+                stk![bytes_v()],
+                binary(And(overloads::And::Bytes)),
+                1,
+            ),
+            (
+                "AND nat-nat",
+                stk![nat_v()],
+                binary(And(overloads::And::NatNat)),
+                1,
+            ),
+            ("AND int-nat pos", stk![nat_v(), int_pos_v()], int_nat(), 1),
+            ("AND int-nat neg", stk![nat_v(), int_neg_v()], int_nat(), 1),
+            (
+                "OR bytes",
+                stk![bytes_v()],
+                binary(Or(overloads::Or::Bytes)),
+                1,
+            ),
+            ("OR nat", stk![nat_v()], binary(Or(overloads::Or::Nat)), 1),
+            (
+                "XOR bytes",
+                stk![bytes_v()],
+                binary(Xor(overloads::Xor::Bytes)),
+                1,
+            ),
+            (
+                "XOR nat",
+                stk![nat_v()],
+                binary(Xor(overloads::Xor::Nat)),
+                1,
+            ),
+            (
+                "NOT bytes",
+                stk![bytes_v()],
+                unary(Not(overloads::Not::Bytes)),
+                1,
+            ),
+            (
+                "NOT int",
+                stk![int_neg_v()],
+                unary(Not(overloads::Not::Int)),
+                1,
+            ),
+            ("NOT nat", stk![nat_v()], unary(Not(overloads::Not::Nat)), 1),
+        ] {
+            let allocated = buffers(stack, &prog);
+            assert_eq!(
+                allocated, expected_buffers,
+                "{name}: allocated {allocated} operand-width buffers, expected \
+                 {expected_buffers}; an operand is being copied",
+            );
+        }
+    }
+
+    #[test]
+    fn exec_forwards_shared_argument_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let lambda = V::Lambda(Closure::Lambda(Lambda::Lambda {
+            micheline_code: Micheline::Seq(&[]),
+            code: vec![Drop(None), Unit].into(),
+        }));
+        stack.push(lambda);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // argument on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Exec], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "EXEC deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_input_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let address = V::Address(addr::Address {
+            hash: "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap(),
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: "someview".to_string(),
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW input deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn map_option_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_option_rc(Some(Rc::clone(&operand)))); // option holding a leaf shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[Map(overloads::Map::Option, vec![])], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "MAP over option deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn view_forwards_shared_result_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let kt1: AddressHash = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye".try_into().unwrap();
+        let view_name = "someview".to_string();
+        let car_body = [Micheline::prim0_uncarbonated(Prim::CAR)];
+        let view = crate::ast::View {
+            input_type: Type::Bytes,
+            output_type: Type::Bytes,
+            code: Micheline::Seq(&car_body),
+        };
+        let mut kt1_views = HashMap::new();
+        kt1_views.insert(view_name.clone(), view);
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        ctx.views.insert(kt1.clone(), kt1_views);
+        ctx.storage.insert(kt1.clone(), (Type::Unit, V::Unit));
+        let address = V::Address(addr::Address {
+            hash: kt1,
+            entrypoint: Entrypoint::default(),
+        });
+        stack.push(address);
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(Rc::clone(&operand)); // view input on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(
+            &[IView {
+                name: view_name,
+                arg_type: Type::Bytes,
+                return_type: Type::Bytes,
+            }],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "VIEW result deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must forward it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn update_n_forwards_shared_value_without_copy() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        let mut ctx = Ctx::default();
+        let mut stack = IStack::new();
+        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_pair(V::Bytes(vec![]), V::Unit));
+        stack.push(Rc::clone(&operand)); // new field value on top, shared with `operand`
+        let before = thread_allocated_bytes();
+        interpret(&[UpdateN(1)], &mut ctx, &mut stack).unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        drop(operand);
+        assert!(
+            allocated < SIZE as u64,
+            "UPDATE n deep-copied its {SIZE}-byte shared operand \
+             ({allocated} bytes allocated); it must store it behind its Rc.",
+        );
+    }
+
+    #[test]
+    fn concat_pair_does_not_clone_a_shared_operand() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // strings: the shared operand is the first (top) operand.
+        {
+            let operand = Rc::new(V::String("0".repeat(SIZE)));
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(1000); // below concat_string_pair(SIZE)
+            let mut stack = IStack::new();
+            stack.push(V::String(String::new())); // second operand (small)
+            stack.push(Rc::clone(&operand)); // first operand on top, shared
+            let before = thread_allocated_bytes();
+            let outcome = interpret(
+                &[Concat(overloads::Concat::TwoStrings)],
+                &mut ctx,
+                &mut stack,
+            );
+            let allocated = thread_allocated_bytes() - before;
+            drop(operand);
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "CONCAT (strings) cloned its {SIZE}-byte shared operand \
+                 ({allocated} bytes) before the gas charge; read it borrowed.",
+            );
+        }
+        // bytes: the shared operand is the second operand.
+        {
+            let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(1000); // below concat_bytes_pair(SIZE)
+            let mut stack = IStack::new();
+            stack.push(Rc::clone(&operand)); // second operand, shared
+            stack.push(V::Bytes(vec![])); // first operand on top (small)
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Concat(overloads::Concat::TwoBytes)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            drop(operand);
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "CONCAT (bytes) cloned its {SIZE}-byte shared operand \
+                 ({allocated} bytes) before the gas charge; read it borrowed.",
+            );
+        }
+    }
+
+    #[test]
+    fn slice_charges_for_the_buffer_it_allocates() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Gas above the slice's pre-floor time cost but below the cost of
+        // allocating its SIZE-byte result. Without the `alloc_cost` floor the
+        // charge passes and the buffer is allocated; with it the slice runs
+        // out of gas before allocating.
+        {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(2_000_000);
+            let mut stack = IStack::new();
+            stack.push(V::Bytes(vec![0u8; SIZE])); // source
+            stack.push(V::Nat(BigUint::from(SIZE))); // length: full slice
+            stack.push(V::nat(0)); // offset
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Slice(overloads::Slice::Bytes)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "SLICE (bytes) allocated its {SIZE}-byte result ({allocated} \
+                 bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+        {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(2_000_000);
+            let mut stack = IStack::new();
+            stack.push(V::String("0".repeat(SIZE))); // source
+            stack.push(V::Nat(BigUint::from(SIZE))); // length: full slice
+            stack.push(V::nat(0)); // offset
+            let before = thread_allocated_bytes();
+            let outcome =
+                interpret(&[Slice(overloads::Slice::String)], &mut ctx, &mut stack);
+            let allocated = thread_allocated_bytes() - before;
+            assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+            assert!(
+                allocated < SIZE as u64,
+                "SLICE (strings) allocated its {SIZE}-byte result ({allocated} \
+                 bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+    }
+
+    #[test]
+    fn interpret_does_not_clone_the_returned_storage() {
+        use Instruction as I;
+        const SIZE: usize = 16 * 1024 * 1024;
+        let value = Rc::new(V::String("0".repeat(SIZE)));
+        let contract: ContractScript = ContractScript {
+            code: Seq(vec![I::Drop(None), I::Push(value.clone()), I::Nil, I::Pair]),
+            parameter: Type::Unit,
+            storage: Type::String,
+            annotations: HashMap::from([(
+                FieldAnnotation::default(),
+                (vec![], Type::Unit),
+            )]),
+            views: HashMap::new(),
+        };
+        let arena = typed_arena::Arena::new();
+        let ctx = &mut Ctx::default();
+        let param = ().into();
+        let storage_in = "".into();
+        let before = thread_allocated_bytes();
+        let (_, storage) = contract
+            .interpret(
+                ctx,
+                &arena,
+                param,
+                &Entrypoint::default(),
+                &storage_in,
+                crate::typechecker::AllowForgedLazyStorageId::No,
+            )
+            .unwrap();
+        let allocated = thread_allocated_bytes() - before;
+        assert!(
+            std::rc::Rc::ptr_eq(&storage, &value),
+            "finalization deep-copied the shared returned storage"
+        );
+        assert!(
+            allocated < SIZE as u64,
+            "interpret cloned the {SIZE}-byte returned storage ({allocated} bytes allocated)",
+        );
     }
 
     #[test]
@@ -5645,7 +6087,7 @@ mod interpreter_tests {
                 &mut Ctx::default(),
                 &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(Type::Nat, V::nat(20)))
+            Err(InterpretError::FailedWith(Type::Nat, Rc::new(V::nat(20))))
         );
     }
 
@@ -6233,7 +6675,7 @@ mod interpreter_tests {
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
             id: big_map_id,
-            overlay: RedBlackTreeMap::from_iter([(
+            overlay: big_map::overlay_entries([(
                 TypedValue::int(2),
                 Some(TypedValue::String("bar".to_owned())),
             )]),
@@ -6410,19 +6852,20 @@ mod interpreter_tests {
             .big_map_storage
             .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
+        let entries = [
+            (
+                TypedValue::int(1),
+                Some(TypedValue::String("foo".to_owned())),
+            ),
+            (
+                TypedValue::int(2),
+                Some(TypedValue::String("bar".to_owned())),
+            ),
+        ];
         ctx.big_map_storage
             .big_map_bulk_update(
                 &big_map_id,
-                [
-                    (
-                        TypedValue::int(1),
-                        Some(TypedValue::String("foo".to_owned())),
-                    ),
-                    (
-                        TypedValue::int(2),
-                        Some(TypedValue::String("bar".to_owned())),
-                    ),
-                ],
+                entries.iter().map(|(k, v)| (k, v.as_ref())),
             )
             .unwrap();
         let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
@@ -6868,12 +7311,13 @@ mod interpreter_tests {
                 .big_map_storage
                 .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
+            let content: Vec<_> = content.into_iter().collect();
             ctx.big_map_storage
-                .big_map_bulk_update(&id, content)
+                .big_map_bulk_update(&id, content.iter().map(|(k, v)| (k, v.as_ref())))
                 .unwrap();
             let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
                 id: id.clone(),
-                overlay: overlay.into_iter().collect(),
+                overlay: big_map::overlay_entries(overlay),
             });
             let big_map = BigMap {
                 content,
@@ -6894,7 +7338,7 @@ mod interpreter_tests {
                 stk![TypedValue::BigMap(BigMap {
                     content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                         id,
-                        overlay: result.into_iter().collect()
+                        overlay: big_map::overlay_entries(result)
                     }),
                     key_type: Type::Int,
                     value_type: Type::String,
@@ -6954,12 +7398,13 @@ mod interpreter_tests {
                 .big_map_storage
                 .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
+            let content: Vec<_> = content.into_iter().collect();
             ctx.big_map_storage
-                .big_map_bulk_update(&id, content)
+                .big_map_bulk_update(&id, content.iter().map(|(k, v)| (k, v.as_ref())))
                 .unwrap();
             let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
                 id: id.clone(),
-                overlay: overlay.into_iter().collect(),
+                overlay: big_map::overlay_entries(overlay),
             });
             let big_map = BigMap {
                 content,
@@ -6985,7 +7430,7 @@ mod interpreter_tests {
                     TypedValue::BigMap(BigMap {
                         content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                             id,
-                            overlay: result.into_iter().collect()
+                            overlay: big_map::overlay_entries(result)
                         }),
                         key_type: Type::Int,
                         value_type: Type::String,
@@ -7290,6 +7735,35 @@ mod interpreter_tests {
         assert_eq!(pack_gas(n2) - pack_gas(n1), 10 * (n2 - n1) as u32);
     }
 
+    /// L2-1838: `PACK` on a shared value must read it through its `Rc`, not
+    /// deep-copy it. With a gas budget too small to serialize the value, PACK
+    /// must run out of gas *without* first cloning the shared operand. Pre-fix
+    /// `pop!` -> `unwrap_rc` clones the whole `~SIZE`-byte value (an uncharged
+    /// allocation that can exhaust the heap) before any serialization gas is
+    /// charged; post-fix the borrowed unparse charges before cloning any leaf,
+    /// so the out-of-gas fires after only `O(gas)` allocation.
+    #[test]
+    fn pack_shared_value_is_not_deep_copied() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Two `Rc` siblings (refcount 2) — the runtime shape of `DUP ; PACK`.
+        let shared = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let mut stack: IStack = Stack::new();
+        stack.push(Rc::clone(&shared));
+        stack.push(shared);
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(1000); // far too little to serialize 16 MiB
+        let bytes_before = thread_allocated_bytes();
+        let outcome = interpret_one(&Pack, &mut ctx, &mut stack);
+        let allocated = thread_allocated_bytes() - bytes_before;
+        assert!(matches!(outcome, Err(InterpretError::OutOfGas)));
+        assert!(
+            allocated < (SIZE as u64) / 8,
+            "PACK on a shared {SIZE}-byte value allocated {allocated} bytes before \
+             running out of gas: the shared operand was deep-copied instead of \
+             being read through its Rc.",
+        );
+    }
+
     #[test]
     fn self_instr() {
         let mut stk = Stack::new();
@@ -7310,7 +7784,7 @@ mod interpreter_tests {
     #[test]
     fn transfer_tokens() {
         let tt = super::TransferTokens {
-            param: TypedValue::nat(42),
+            param: Rc::new(TypedValue::nat(42)),
             destination_address: addr::Address::try_from(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
             )
@@ -7320,7 +7794,7 @@ mod interpreter_tests {
         let stk = &mut stk![
             V::Contract(tt.destination_address.clone()),
             V::Mutez(tt.amount),
-            tt.param.clone()
+            (*tt.param).clone()
         ];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
@@ -8949,7 +9423,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: TypedValue::nat(20),
+                    value: Rc::new(TypedValue::nat(20)),
                     arg_ty: Left(Type::Nat)
                 }),
                 100
@@ -8984,7 +9458,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: TypedValue::nat(20),
+                    value: Rc::new(TypedValue::nat(20)),
                     arg_ty: Or::Right(emit_type_mich)
                 }),
                 100
@@ -10133,7 +10607,7 @@ mod interpreter_tests {
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: TypedValue::Unit,
+                storage: Rc::new(TypedValue::Unit),
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -10164,6 +10638,57 @@ mod interpreter_tests {
         assert_eq!(
             start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
+        );
+    }
+
+    /// `operation` is duplicable, so a contract can `DUP` one into the
+    /// returned `list operation`. Extracting the operations must then not
+    /// deep-copy the shared payload once per occurrence: that is unmetered
+    /// and unbounded, and a few copies of a large enough parameter exhaust
+    /// the kernel's `wasm32` heap, aborting it (L2-1831).
+    ///
+    /// Asserted on pointer identity — a deep copy still compares equal.
+    #[test]
+    fn duplicated_outgoing_operations_share_their_parameter() {
+        use crate::parser::test_helpers::{parse, parse_contract_script};
+
+        let arena = Arena::new();
+        let script = parse_contract_script(
+            "parameter bytes;
+             storage unit;
+             code { DROP ;
+                    SELF ; PUSH mutez 0 ; PUSH bytes 0xaabbccdd ;
+                    TRANSFER_TOKENS ;
+                    NIL operation ; DUP 2 ; CONS ; SWAP ; CONS ;
+                    UNIT ; SWAP ; PAIR }",
+        )
+        .unwrap()
+        .split_script()
+        .unwrap()
+        .typecheck_script(&mut Gas::default(), true, true)
+        .unwrap();
+
+        let (ops, _storage) = script
+            .interpret(
+                &mut Ctx::default(),
+                &arena,
+                parse("0x").unwrap(),
+                &Entrypoint::default(),
+                &parse("Unit").unwrap(),
+                crate::typechecker::AllowForgedLazyStorageId::No,
+            )
+            .unwrap();
+
+        let params: Vec<Rc<TypedValue>> = ops
+            .map(|op| match op.operation {
+                Operation::TransferTokens(tt) => tt.param,
+                other => panic!("expected TransferTokens, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(params.len(), 2);
+        assert!(
+            Rc::ptr_eq(&params[0], &params[1]),
+            "the duplicated operation's parameter was copied"
         );
     }
 

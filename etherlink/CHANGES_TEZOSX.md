@@ -140,6 +140,42 @@
 
 ### Michelson Runtime
 
+- **Security fix:** big-map keys and values are no longer deep-cloned when
+  a big map is persisted or freed — applying its deferred updates, dumping
+  it to durable storage, or dropping it (an OOM-crash vector); entries are
+  now held behind their shared pointers. (!22642)
+- **Security fix:** the returned storage is no longer deep-cloned during
+  end-of-execution finalization when it is `DUP`-shared with an outgoing
+  operation (an OOM-crash vector); it is now handed on behind its shared
+  pointer. (!22636)
+- **Security fix:** `SLICE` no longer under-charges for the buffer it
+  allocates on a large `string`/`bytes` (an OOM-crash vector); its gas
+  cost is now floored by the allocation cost. (!22640)
+- **Security fix:** the two-operand overloads of `CONCAT` (string and
+  bytes) no longer deep-clone a `DUP`-shared operand (an OOM-crash
+  vector); the operands are now read borrowed. (!22594)
+- **Security fix:** `UPDATE n` no longer deep-clones the new field value
+  when it is `DUP`-shared (an OOM-crash vector); the value is now stored
+  in the field behind its shared pointer. (!22590)
+- **Security fix:** the instructions that only forward a value without
+  reading it no longer deep-clone that value when it is `DUP`-shared
+  (an OOM-crash vector); it is now forwarded behind its shared
+  pointer. (!22585)
+- **Bug fix:** `FAILWITH` no longer deep-copies its failure value. The value is
+  only carried in the error for reporting, so it is now held behind the shared
+  `Rc` it already lives behind on the stack; a large shared value (e.g.
+  duplicated with `DUP`) could otherwise be copied into a second full allocation
+  and push the interpreter past the 4 GiB wasm heap, trapping the kernel before
+  it runs out of gas. (!22582)
+- **Security fix:** the instructions that only read a bytes operand no
+  longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
+  the operand is now read borrowed. (!22580)
+- **Bug fix:** `PACK` no longer deep-copies the value it serializes. The value
+  is only read to produce its serialization, so it is now read through the
+  shared `Rc` it already lives behind on the stack; a large shared value (e.g.
+  duplicated with `DUP`) could otherwise be copied into a second full allocation
+  and trap the kernel on the 4 GiB wasm heap. The copy is now gas-charged, so an
+  oversized value runs out of gas first. (!22587)
 - **Bug fix:** an operation whose internal-operation subtree failed is no longer
   reported `applied` because the last internal receipt happens to be applied. An
   internal operation that raises — an unsupported `SET_DELEGATE`, or an
