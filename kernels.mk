@@ -19,6 +19,7 @@ all: build-dev-deps check test build
 kernel_sdk:
 	@make -C src/kernel_sdk build
 	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-installer .
+	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-instrument .
 
 .PHONY: tx_demo_collector
 tx_demo_collector:
@@ -103,4 +104,4 @@ clean:
 	@make -C ${SDK_DIR} clean
 	@make -C ${DEMO_DIR} clean
 	@make -C ${RISCV_KERNELS_DIR} clean
-	@rm -f smart-rollup-installer tx-demo-collector
+	@rm -f smart-rollup-installer smart-rollup-instrument tx-demo-collector
