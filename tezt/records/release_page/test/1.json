@@ -1,6 +1,6 @@
 [
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: add stable version",
     "tags": [
       "version_manager",
@@ -12,7 +12,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: add release candidate",
     "tags": [
       "version_manager",
@@ -25,7 +25,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: adding a duplicate version fails",
     "tags": [
       "version_manager",
@@ -38,7 +38,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: set-latest marks one version and clears others",
     "tags": [
       "version_manager",
@@ -50,7 +50,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: set-active and set-inactive",
     "tags": [
       "version_manager",
@@ -63,7 +63,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: update-build-number sets build mark",
     "tags": [
       "version_manager",
@@ -75,7 +75,7 @@
     }
   },
   {
-    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "file": "release_site/tezt/test_version_manager.ml",
     "title": "version_manager: generate-rss",
     "tags": [
       "version_manager",

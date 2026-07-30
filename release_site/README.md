@@ -2,7 +2,7 @@
 
 The release assets are distributed either all at once (typically with Octez major releases) or for individual components (typically with Octez minor releases).
 
-To make these assets easily accessible, release pages can be generated using the `ci/bin_release_page/release_page.ml` script.
+To make these assets easily accessible, release pages can be generated using the `release_site/release_page.ml` script.
 This script enables the creation of release pages for any given component, specifying a set of asset types and the storage location where the assets are distributed.
 
 ## Usage

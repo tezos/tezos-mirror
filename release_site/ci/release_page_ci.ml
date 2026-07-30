@@ -10,7 +10,7 @@ open Tezos_ci
 module CI = Cacio.Make (struct
   let name = "release_page"
 
-  let paths = ["ci/bin_release_page/**/*"]
+  let paths = ["release_site/**/*"]
 end)
 
 let job_build =
@@ -26,10 +26,10 @@ let job_build =
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
          [
-           "_build/default/ci/bin_release_page/src/version_manager.exe";
-           "_build/default/ci/bin_release_page/src/release_page.exe";
+           "_build/default/release_site/src/version_manager.exe";
+           "_build/default/release_site/src/release_page.exe";
          ])
-    ~script:["eval $(opam env)"; "make -C ci/bin_release_page/ build"]
+    ~script:["eval $(opam env)"; "make -C release_site/ build"]
 
 let job_build_tezt =
   CI.job
@@ -43,9 +43,9 @@ let job_build_tezt =
          ~name:"release_page_tezt_exe"
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
-         ["_build/default/ci/bin_release_page/tezt/main.exe"])
+         ["_build/default/release_site/tezt/main.exe"])
     ~sccache:(Cacio.sccache ())
-    ~script:["eval $(opam env)"; "dune build ci/bin_release_page/tezt/"]
+    ~script:["eval $(opam env)"; "dune build release_site/tezt/"]
 
 let job_test =
   CI.tezt_job
@@ -55,7 +55,7 @@ let job_test =
     ~pipeline:`merge_request
     ~needs:[(Artifacts, job_build); (Artifacts, job_build_tezt)]
     ~select_tezts:false
-    ~tezt_exe:"ci/bin_release_page/tezt/main.exe"
+    ~tezt_exe:"release_site/tezt/main.exe"
 
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_test)] ;

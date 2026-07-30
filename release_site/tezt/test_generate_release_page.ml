@@ -8,12 +8,12 @@
 (** Testing
     -------
     Component:    Release Page / generate-release-page.sh
-    Invocation:   dune exec ci/bin_release_page/tezt/main.exe --file test_generate_release_page.ml
+    Invocation:   dune exec release_site/tezt/main.exe --file test_generate_release_page.ml
     Subject:      Integration test for the generate-release-page.sh script
 *)
 
 let version_manager =
-  project_root // "_build/default/ci/bin_release_page/src/version_manager.exe"
+  project_root // "_build/default/release_site/src/version_manager.exe"
 
 let generate_release_page_sh =
   project_root // "scripts/releases/generate-release-page.sh"

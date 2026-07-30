@@ -27,8 +27,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-VM="_build/default/ci/bin_release_page/src/version_manager.exe"
-RELEASE_PAGE="_build/default/ci/bin_release_page/src/release_page.exe"
+VM="_build/default/release_site/src/version_manager.exe"
+RELEASE_PAGE="_build/default/release_site/src/release_page.exe"
 S3_BUCKET="${S3_BUCKET:-release-page-test.nomadic-labs.com}"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
