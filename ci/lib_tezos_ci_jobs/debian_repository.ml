@@ -66,15 +66,29 @@ let build_dependency_image =
          "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-%s"
          Tezos_ci.Images.Base_images.base_images_tag)
 
-let make_debian_variables distribution image_kind release version =
+(* Points to the plain [(debian|ubuntu):<release>] base images. The
+   [$DISTRIBUTION] and [$RELEASE] variables in the image path are expanded by
+   GitLab when the job starts, from the values set by the job's
+   [parallel:matrix]; this lets a single job definition iterate over
+   releases. *)
+let base_distro_image =
+  Image.mk_external
+    ~image_path:
+      (sf
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-%s"
+         Tezos_ci.Images.Base_images.base_images_tag)
+
+(* [RELEASE] is intentionally not set here: it is provided by the
+   [parallel:matrix] of the jobs that use these variables, and is only
+   referenced (as [$RELEASE]) in [DEP_IMAGE]. *)
+let make_debian_variables distribution image_kind version =
   ( "DEP_IMAGE",
     sf
-      "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-%s:%s-%s"
+      "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-%s:$RELEASE-%s"
       distribution
       image_kind
-      release
       version )
-  :: [("PREFIX", ""); ("DISTRIBUTION", distribution); ("RELEASE", release)]
+  :: [("PREFIX", ""); ("DISTRIBUTION", distribution)]
 
 (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
@@ -265,42 +279,38 @@ let job_reproducibility_debian =
     ~script:[cargo_network_hack; "./scripts/ci/test-debian-reproducibility.sh"]
 
 let job_install_bin =
-  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun (name : Distro.name) ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
-    (sf "oc.install_bin_%s" (Distro.full_name_with_underscores distro))
+    (sf "oc.install_bin_%s" (Distro.name_for_scripts name))
     ~__POS__
     ~only_if_changed
     ~stage:Test_publication
     ~description:
       (sf
          "Check that %s packages can be installed."
-         (Distro.name_for_humans distro.name))
-    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
-    ~image:(Distro.image distro)
-    ~variables:[("PREFIX", "")]
-    ~script:
-      [
-        "./docs/introduction/install-bin-deb.sh "
-        ^ Distro.name_for_scripts distro.name
-        ^ " " ^ distro.release;
-      ]
+         (Distro.name_for_humans name))
+    ~needs:[(Job, job_apt_repo name pipeline_type)]
+    ~image:base_distro_image
+    ~variables:[("PREFIX", ""); ("DISTRIBUTION", Distro.name_for_scripts name)]
+    ~parallel:(Matrix [[("RELEASE", supported_releases name pipeline_type)]])
+    ~script:["./docs/introduction/install-bin-deb.sh $DISTRIBUTION $RELEASE"]
 
-let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
+let make_systemd_test_job ~script ~(name : Distro.name) ~pipeline_type =
   CI.job
     ~only_if_changed
     ~stage:Test_publication
-    ~needs:[(Job, job_apt_repo distro.name pipeline_type)]
+    ~needs:[(Job, job_apt_repo name pipeline_type)]
     ~image:Images.Base_images.alpine_docker_ci
     ~services:[{name = Images.Base_images.dind_service}]
     ~retry:Tezos_ci.dind_retry
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables
-          (Distro.name_for_scripts distro.name)
+          (Distro.name_for_scripts name)
           "systemd"
-          distro.release
           Tezos_ci.Images.Base_images.base_images_tag)
+    ~parallel:(Matrix [[("RELEASE", supported_releases name pipeline_type)]])
     ~script:
       [
         "./scripts/ci/docker_initialize.sh";
@@ -309,13 +319,13 @@ let make_systemd_test_job ~script ~(distro : Distro.t) ~pipeline_type =
       ]
 
 let job_install_bin_systemd =
-  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun (name : Distro.name) ->
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
-    (sf "oc.install_bin_%s_systemd" (Distro.full_name_with_underscores distro))
+    (sf "oc.install_bin_%s_systemd" (Distro.name_for_scripts name))
     ~__POS__
     ~description:"Check that packages that use systemd can be installed."
-    ~distro
+    ~name
     ~pipeline_type
     ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
 
@@ -324,45 +334,47 @@ let job_install_bin_systemd =
    Ideally we would build the images in the build stage, test them in the test stage,
    and only then publish them in the publish stage. *)
 let job_upgrade_bin_systemd =
-  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun (name : Distro.name) ->
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
-    (sf "oc.upgrade_bin_%s_systemd" (Distro.full_name_with_underscores distro))
+    (sf "oc.upgrade_bin_%s_systemd" (Distro.name_for_scripts name))
     ~__POS__
     ~description:"Check the upgrade process in a systemd enabled Docker image."
-    ~distro
+    ~name
     ~pipeline_type
     ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
 
 let job_test_keyring =
-  Cacio.parameterize @@ fun (distro : Distro.t) ->
+  Cacio.parameterize @@ fun (name : Distro.name) ->
   Cacio.parameterize @@ fun pipeline_type ->
   make_systemd_test_job
-    ("oc.test_keyring_" ^ Distro.full_name_with_underscores distro)
+    ("oc.test_keyring_" ^ Distro.name_for_scripts name)
     ~__POS__
     ~description:"Check that the keyring package works for APT authentication."
-    ~distro
+    ~name
     ~pipeline_type
     ~script:"scripts/packaging/tests/deb/test-keyring.sh"
 
-let jobs_for (distro : Distro.t) pipeline_type =
+(* Each of these jobs iterates over the releases supported by [name] for the
+   given [pipeline_type] with [parallel:matrix], so we register one job per
+   distribution rather than one per distribution/release pair. *)
+let jobs_for (name : Distro.name) pipeline_type =
   [
-    (Cacio.Auto, job_apt_repo distro.name pipeline_type);
-    (Cacio.Auto, job_lintian distro.name pipeline_type);
-    (Cacio.Auto, job_install_bin distro pipeline_type);
-    (Cacio.Auto, job_install_bin_systemd distro pipeline_type);
-    (Cacio.Auto, job_upgrade_bin_systemd distro pipeline_type);
-    (Cacio.Auto, job_test_keyring distro pipeline_type);
+    (Cacio.Auto, job_apt_repo name pipeline_type);
+    (Cacio.Auto, job_lintian name pipeline_type);
+    (Cacio.Auto, job_install_bin name pipeline_type);
+    (Cacio.Auto, job_install_bin_systemd name pipeline_type);
+    (Cacio.Auto, job_upgrade_bin_systemd name pipeline_type);
+    (Cacio.Auto, job_test_keyring name pipeline_type);
   ]
 
 let jobs pipeline_type =
   match pipeline_type with
-  | Partial -> jobs_for (Distro.debian "trixie") Partial
+  | Partial -> jobs_for Distro.Debian Partial
   | Full | Release ->
-      let concat_map l f = List.concat_map f l in
-      concat_map [Distro.Debian; Ubuntu] @@ fun distro ->
-      concat_map (supported_releases distro pipeline_type) @@ fun release ->
-      jobs_for {name = distro; release} pipeline_type
+      List.concat_map
+        (fun name -> jobs_for name pipeline_type)
+        [Distro.Debian; Ubuntu]
 
 let () =
   (* Register the Debian partial jobs directly into before_merging and

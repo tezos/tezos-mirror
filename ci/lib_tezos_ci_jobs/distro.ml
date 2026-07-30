@@ -24,11 +24,6 @@ let name_for_scripts distro = String.lowercase_ascii (name_for_humans distro)
 let full_name_for_humans distro =
   name_for_humans distro.name ^ " " ^ distro.release
 
-let full_name_with_underscores distro =
-  name_for_scripts distro.name
-  ^ "_"
-  ^ String.map (function '.' -> '_' | c -> c) distro.release
-
 let image distro =
   let open Tezos_ci.Images.Base_images in
   match distro with
