@@ -22,5 +22,6 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         instrumented.module.len(),
         instrumented.functions,
     );
+    println!("{}", instrumented.weight_report());
     Ok(())
 }
