@@ -28,6 +28,9 @@
 
 ### Michelson Runtime
 
+- **Security fix:** `SLICE` no longer under-charges for the buffer it
+  allocates on a large `string`/`bytes` (an OOM-crash vector); its gas
+  cost is now floored by the allocation cost. (!22640)
 - **Security fix:** the two-operand overloads of `CONCAT` (string and
   bytes) no longer deep-clone a `DUP`-shared operand (an OOM-crash
   vector); the operands are now read borrowed. (!22594)
