@@ -140,6 +140,10 @@
 
 ### Michelson Runtime
 
+- **Security fix:** big-map keys and values are no longer deep-cloned when
+  a big map is persisted or freed — applying its deferred updates, dumping
+  it to durable storage, or dropping it (an OOM-crash vector); entries are
+  now held behind their shared pointers. (!22642)
 - **Security fix:** the returned storage is no longer deep-cloned during
   end-of-execution finalization when it is `DUP`-shared with an outgoing
   operation (an OOM-crash vector); it is now handed on behind its shared
