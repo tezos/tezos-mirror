@@ -268,6 +268,21 @@ let job_release_page =
     ~variables:(release_page_variables ~mode)
     ~script:["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
+(* [release_site.render] needs every [deploy-assets] job in the pipeline. *)
+let job_render_site ?(components = []) mode =
+  let needs =
+    (Cacio.Job, job_deploy_release_page_assets mode)
+    :: List.map (fun deploy -> (Cacio.Job, deploy mode)) components
+  in
+  Release_site_ci.job_render mode ~needs
+
+let component_deploys =
+  [
+    Grafazos_ci.job_deploy_release_page_assets;
+    Teztale_ci.job_deploy_release_page_assets;
+    Rollup_node_ci.job_deploy_release_page_assets;
+  ]
+
 let job_dispatch_call =
   CI.job
     "dispatch-call"
@@ -302,6 +317,7 @@ let () =
       (Auto, job_gitlab_release `real);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_release_page `real `wait_for_deploy);
+      (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -314,6 +330,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_release_page `test `wait_for_deploy);
+      (Auto, job_render_site `test ~components:component_deploys);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -326,6 +343,7 @@ let () =
       (Auto, job_gitlab_release `real);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_release_page `real `wait_for_deploy);
+      (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -338,6 +356,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_release_page `test `wait_for_deploy);
+      (Auto, job_render_site `test);
       (Auto, job_docker_promote_to_latest `test_wait);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -350,6 +369,7 @@ let () =
       (Auto, job_gitlab_release `real);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_release_page `real `wait_for_deploy);
+      (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -362,6 +382,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_release_page `test `wait_for_deploy);
+      (Auto, job_render_site `test ~components:component_deploys);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
@@ -490,6 +511,11 @@ let register () =
       (Manual, job_docker_promote_to_version `real);
       (Manual, job_deploy_release_page_assets_packaging_revision `real);
       (Auto, job_release_page `real `wait_for_packaging_revision_deploy);
+      ( Auto,
+        Release_site_ci.job_render
+          `real
+          ~needs:
+            [(Job, job_deploy_release_page_assets_packaging_revision `real)] );
       (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian Release);
       (Manual, Debian_repository.job_build_ubuntu Release);
@@ -507,6 +533,11 @@ let register () =
       (Manual, job_docker_promote_to_version `test);
       (Manual, job_deploy_release_page_assets_packaging_revision `test);
       (Auto, job_release_page `test `wait_for_packaging_revision_deploy);
+      ( Auto,
+        Release_site_ci.job_render
+          `test
+          ~needs:
+            [(Job, job_deploy_release_page_assets_packaging_revision `test)] );
       (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian Release);
       (Manual, Debian_repository.job_build_ubuntu Release);
