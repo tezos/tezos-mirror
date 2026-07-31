@@ -9,6 +9,14 @@ The Octez rollup node is used by a rollup operator to deploy a
 rollup. The rollup node is responsible for making the rollup progress
 by publishing commitments and by playing refutation games.
 
+.. warning::
+
+   By default, the Octez rollup node can exposes RPCs triggering the injection
+   of Tezos L1 operations. It is not intended to be a public facing service
+   accessible from the Internet by unauthenticated, untrusted users. You should
+   always configure Octez rollup nodes you operate to only be accessible from
+   localhost or a private network under your control.
+
 A complete manual page of the rollup node is available :ref:`here <smart_rollup_node_manual>`.
 
 Just like the Octez node, the Octez rollup node provides an :doc:`RPC
