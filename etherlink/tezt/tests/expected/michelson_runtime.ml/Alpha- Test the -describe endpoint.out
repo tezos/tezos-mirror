@@ -253,6 +253,8 @@ Available services:
             signature checks. Return the operation application result,
             including the consumed gas. This RPC does not support consensus
             operations. 
+        - POST /chains/main/blocks/head/helpers/scripts/run_script_view
+            Simulate a call to a michelson view 
         - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
             Simulate running an operation at some future moment (based on the
             number of blocks given in the `latency` argument), and return the
