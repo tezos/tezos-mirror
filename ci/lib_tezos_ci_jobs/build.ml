@@ -23,7 +23,6 @@ let build_octez_source =
     ~force:true
     ~image:Tezos_ci.Images.CI.build
     ~cpu:Very_high
-    ~storage:Ramfs
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -91,7 +90,6 @@ let job_build_released =
     ~__POS__
     ~description:"Build the set of released executables for Octez, for amd64."
     ~arch
-    ~storage:Ramfs
     ~executable_files:"script-inputs/released-executables"
     ~extra_artifacts:["src/proto_*/parameters/*.json"]
 
@@ -201,7 +199,6 @@ let job_build_static_linux_released_binaries =
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
-    ~storage:Ramfs
     ~image:Tezos_ci.Images.CI.build
     ~variables:
       [
@@ -237,7 +234,6 @@ let job_build_static_linux_experimental_binaries =
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
-    ~storage:Ramfs
     ~image:Tezos_ci.Images.CI.build
     ~variables:
       [

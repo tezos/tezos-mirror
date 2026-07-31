@@ -165,7 +165,7 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-keyring_package:
@@ -238,7 +238,7 @@ oc.build-ubuntu:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.install_bin_debian:
@@ -464,7 +464,7 @@ oc.reproducibility_debian:
     SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    TAGS: gcp_very_high_cpu_ramfs
+    TAGS: gcp_very_high_cpu
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}

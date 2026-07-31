@@ -52,9 +52,7 @@ let archs_variables pipeline =
       String.concat " " (List.map Runner.Arch.show_uniform archs) );
   ]
 
-let tag_amd64 ~ramfs =
-  if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
-  else Runner.Tag.show Gcp_very_high_cpu
+let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
@@ -153,8 +151,8 @@ let job_build =
         ("RELEASE", supported_releases distro pipeline_type);
         ( "TAGS",
           match pipeline_type with
-          | Partial -> [tag_amd64 ~ramfs:true]
-          | Full | Release -> [tag_amd64 ~ramfs:true; tag_arm64] );
+          | Partial -> [tag_amd64]
+          | Full | Release -> [tag_amd64; tag_arm64] );
       ];
     ]
   in
@@ -265,7 +263,7 @@ let job_reproducibility_debian =
       [
         ("DISTRIBUTION", "debian");
         ("RELEASE", "trixie");
-        ("TAGS", tag_amd64 ~ramfs:true);
+        ("TAGS", tag_amd64);
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
       (* The rebuild includes the keyring package, whose build sources

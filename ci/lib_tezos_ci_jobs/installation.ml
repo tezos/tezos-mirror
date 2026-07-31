@@ -51,7 +51,6 @@ let compile_sources_doc_job ~name_suffix ~project ~branch ~image =
          image)
     ~stage:Test
     ~cpu:Very_high
-    ~storage:Ramfs
     ~only_if_changed:["docs/introduction/compile-sources.sh"]
     ~image
     ~variables:[("DUNE_BUILD_JOBS", "-j 12"); ("CARGO_NET_OFFLINE", "false")]

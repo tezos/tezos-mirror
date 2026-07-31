@@ -118,7 +118,7 @@ build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -501,7 +501,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -548,7 +548,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -950,7 +950,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1052,7 +1052,7 @@ oc.compile_sources_doc_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-73a6a3d6
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1124,7 +1124,7 @@ oc.compile_sources_doc_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-73a6a3d6
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs: []
   dependencies: []
   timeout: 60 minutes
