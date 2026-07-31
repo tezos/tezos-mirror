@@ -495,11 +495,10 @@ let build_block_static_directory ~l2_chain_id
                input,
                unlimited_gas,
                chain_id,
-               (* The "source" JSON field carries L1's *sender*. It is
-                  inert for an ordinary view — `VIEW` overrides `SENDER`
-                  with the viewed contract in this RPC — but the enshrined
-                  synthetic views are dispatched before that override and
-                  read it as the calling contract. *)
+               (* The "source" JSON field carries L1's *sender*: inert
+                  for an ordinary view, the calling contract for the
+                  enshrined synthetic views. See
+                  [Tezlink_backend_sig.S.run_script_view]. *)
                sender,
                payer,
                gas,

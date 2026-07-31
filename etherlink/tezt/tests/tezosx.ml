@@ -7223,17 +7223,13 @@ let test_run_script_view_crac_step_constants () =
   let* () = check ~what:"block.number inside the CRAC" number_kt1 level in
   unit
 
-(** [run_script_view] on an *enshrined* contract's synthetic view.
-
-    The gateway's `staticcall_evm` is dispatched by
-    [try_dispatch_enshrined_view] before `VIEW` overwrites the execution
-    context, so unlike an ordinary script view it reads the calling
-    address straight off `self_address` and forwards it to the EVM as
-    `msg.sender`. That makes the RPC's `source` field observable here —
-    the one place it is not inert — so this asserts it differentially:
-    the same call with and without `--source` must report different
-    senders, and each must be the deterministic alias of the address
-    asked for. Without the fix both answer with the gateway's own alias. *)
+(** The gateway's `staticcall_evm` reads the caller straight off
+    `self_address` and forwards it to the EVM as `msg.sender`, making the
+    RPC's `source` field observable — the one place it is not inert.
+    Asserted differentially: the same call with and without `--source`
+    must report different senders, each the deterministic alias of the
+    address asked for. A regression here answers with the gateway's own
+    alias — a plausible wrong address, not an error. *)
 let test_run_script_view_enshrined_sender () =
   Setup.register_sandbox_test
     ~uses_client:true
@@ -7296,7 +7292,18 @@ let test_run_script_view_enshrined_sender () =
     (String.trim explicit_sender <> String.trim default_sender)
       string
       ~error_msg:"--source made no difference to msg.sender (%L)") ;
-  unit
+  (* An implicit `--source` on an enshrined target is rejected: only an
+     originated contract can execute `VIEW`. The client does not link the
+     EVM node's error registry, so match the raw error id. *)
+  Process.check_error
+    ~exit_code:1
+    ~msg:(rex "run_script_view_unsupported_source")
+    (Client.spawn_run_view
+       ~source:Constant.bootstrap3.Account.public_key_hash
+       ~view:"staticcall_evm"
+       ~contract:gateway_address
+       ~input
+       client)
 
 (** [run_script_view] rejects the two L1 fields the Michelson runtime
     cannot honour, rather than silently computing against a different

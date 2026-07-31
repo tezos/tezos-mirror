@@ -12,6 +12,7 @@ type error +=
   | Run_script_view_decode_error of string
   | Run_script_view_failed of string
   | Run_script_view_host_error of string
+  | Run_script_view_unsupported_source of string
   | Kernel_entrypoint_unavailable of {
       entrypoint : string;
       storage_version : int;
@@ -66,6 +67,26 @@ let () =
     Data_encoding.(obj1 (req "msg" string))
     (function Run_script_view_host_error msg -> Some msg | _ -> None)
     (fun msg -> Run_script_view_host_error msg) ;
+  register_error_kind
+    (* [`Permanent]: the request itself is unanswerable, retrying cannot
+       help. Distinct from [Run_script_view_failed] so a client can tell
+       "your request is malformed" from "the view rejected". *)
+    `Permanent
+    ~id:"evm_node.dev.tezosx.run_script_view_unsupported_source"
+    ~title:"run_script_view was given an implicit source"
+    ~description:
+      "The source of a view call on an enshrined contract must be an \
+       originated contract: only an originated contract can execute VIEW."
+    ~pp:(fun ppf view ->
+      Format.fprintf
+        ppf
+        "view %s was called on an enshrined contract with an implicit \
+         `source`; only an originated contract can execute VIEW"
+        view)
+    Data_encoding.(obj1 (req "view" string))
+    (function
+      | Run_script_view_unsupported_source view -> Some view | _ -> None)
+    (fun view -> Run_script_view_unsupported_source view) ;
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezosx.kernel_entrypoint_unavailable"
@@ -877,13 +898,17 @@ let make (ctxt : Evm_ro_context.t) =
          [Tezlink_backend_sig.S.run_script_view]. [on_chain_code] is
          [None] exactly for an enshrined target: an unknown address
          already failed above. *)
-      let self =
-        match (on_chain_code, sender) with
-        | ( None,
-            Some (Tezlink_imports.Imported_context.Contract.Originated _ as s)
-          ) ->
-            s
-        | _ -> contract
+      let*? self =
+        match (sender, on_chain_code) with
+        | None, _ | _, Some _ -> Result_syntax.return contract
+        | ( Some (Tezlink_imports.Imported_context.Contract.Originated _ as s),
+            None ) ->
+            Result_syntax.return s
+        | Some (Implicit _), None ->
+            (* Only an originated contract can execute `VIEW` on chain;
+               refuse rather than quietly report the enshrined contract
+               as its own caller. *)
+            Result_syntax.tzfail (Run_script_view_unsupported_source view)
       in
       let unit_parameter =
         Micheline.strip_locations
