@@ -180,7 +180,6 @@ It happens that MIR and L1 don't provide the same results on TZT files. There ca
 * Sapling
 * Timelocks
 * Global constants
-* Address indexing
 
 #### Not applicable to an L2
 
