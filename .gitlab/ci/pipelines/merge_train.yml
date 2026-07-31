@@ -1470,7 +1470,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -2703,7 +2703,7 @@ oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - docs/introduction/compile-sources.sh
@@ -3552,7 +3552,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - teztale/**/*
@@ -4359,7 +4359,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4433,7 +4433,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml

@@ -94,7 +94,7 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 apt_repo_debian:
@@ -252,7 +252,7 @@ oc.build-ubuntu:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 apt_repo_ubuntu:

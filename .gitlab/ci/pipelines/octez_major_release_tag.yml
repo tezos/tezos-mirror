@@ -188,7 +188,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -484,7 +484,7 @@ oc.build-ubuntu:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 apt_repo_ubuntu:
@@ -559,7 +559,7 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 apt_repo_debian:
@@ -682,7 +682,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - when: manual
     allow_failure: true

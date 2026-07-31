@@ -14,9 +14,7 @@
 open Tezos_ci
 module CI = Cacio.Shared
 
-let tag_amd64 ~ramfs =
-  if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
-  else Runner.Tag.show Gcp_very_high_cpu
+let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
@@ -31,14 +29,14 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
-let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
+let debian_package_release_matrix ?(arm64 = true) = function
   | Common.Packaging.Partial ->
-      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
+      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["bookworm"; "trixie"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+          ("TAGS", tag_amd64 :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -72,14 +70,14 @@ let make_debian_variables distribution image_kind release version =
 
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
-let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
+let ubuntu_package_release_matrix ?(arm64 = true) = function
   | Common.Packaging.Partial ->
-      [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
+      [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["22.04"; "24.04"; "26.04"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+          ("TAGS", tag_amd64 :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -127,7 +125,7 @@ let job_build_debian =
     ~__POS__
     ~description:"Build the Debian packages for Debian."
     ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
+    ~parallel:(Matrix (debian_package_release_matrix pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 
@@ -138,7 +136,7 @@ let job_build_ubuntu =
     ~__POS__
     ~description:"Build the Debian packages for Ubuntu."
     ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
+    ~parallel:(Matrix (ubuntu_package_release_matrix pipeline_type))
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
 

@@ -122,9 +122,7 @@ let make_job_merge_systemd_test_dependencies ~distribution ~dependencies ~matrix
     ~parallel:(Matrix matrix)
     ["scripts/ci/docker-merge-base-images.sh"]
 
-let tag_amd64 ~ramfs =
-  if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
-  else Runner.Tag.show Gcp_very_high_cpu
+let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu
 
 let tag_arm64 = Runner.Tag.show Gcp_arm64
 
@@ -135,14 +133,13 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let rockylinux_package_release_matrix ?(ramfs = false) ?(arm64 = true) =
-  function
-  | Partial -> [[("RELEASE", ["9"; "10"]); ("TAGS", [tag_amd64 ~ramfs])]]
+let rockylinux_package_release_matrix ?(arm64 = true) = function
+  | Partial -> [[("RELEASE", ["9"; "10"]); ("TAGS", [tag_amd64])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["9"; "10"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+          ("TAGS", tag_amd64 :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -153,13 +150,13 @@ let rockylinux_package_release_matrix ?(ramfs = false) ?(arm64 = true) =
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let fedora_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial -> [[("RELEASE", ["39"]); ("TAGS", [tag_amd64 ~ramfs])]]
+let fedora_package_release_matrix ?(arm64 = true) = function
+  | Partial -> [[("RELEASE", ["39"]); ("TAGS", [tag_amd64])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["39"; "42"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+          ("TAGS", tag_amd64 :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -283,7 +280,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"rockylinux"
       ~dependencies:(Dependent [Job job_merge_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
+      ~matrix:(rockylinux_package_release_matrix pipeline_type)
       ~limit_dune_build_jobs
       ()
   in
@@ -294,7 +291,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"fedora"
       ~dependencies:(Dependent [Job job_merge_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(fedora_package_release_matrix ~ramfs:true pipeline_type)
+      ~matrix:(fedora_package_release_matrix pipeline_type)
       ~limit_dune_build_jobs
       ()
   in

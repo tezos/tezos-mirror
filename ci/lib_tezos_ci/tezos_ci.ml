@@ -1002,8 +1002,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
    with
   | ( Some "nomadic-margebot",
       ( Gcp_dev | Gcp_dev_arm64 | Gcp_not_interruptible_dev | Gcp_tezt_dev
-      | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs_dev
-        ) ) ->
+      | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev ) ) ->
       failwith
         "[job] Attempting to merge a CI configuration using development \
          runners (job: %s)"
