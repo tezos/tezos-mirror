@@ -954,8 +954,7 @@ let validate_margebot ~name tag =
   | ( Some "nomadic-margebot",
       ( Runner.Tag.Gcp_dev | Runner.Tag.Gcp_dev_arm64
       | Runner.Tag.Gcp_not_interruptible_dev | Runner.Tag.Gcp_tezt_dev
-      | Runner.Tag.Gcp_high_cpu_dev | Runner.Tag.Gcp_very_high_cpu_dev
-      | Runner.Tag.Gcp_very_high_cpu_ramfs_dev ) ) ->
+      | Runner.Tag.Gcp_high_cpu_dev | Runner.Tag.Gcp_very_high_cpu_dev ) ) ->
       failwith
         "[job] Attempting to merge a CI configuration using development \
          runners (job: %s)"

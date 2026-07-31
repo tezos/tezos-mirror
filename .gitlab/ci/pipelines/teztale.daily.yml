@@ -148,7 +148,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:

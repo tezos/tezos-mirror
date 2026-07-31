@@ -113,10 +113,7 @@ let job_build_evm_node_static =
     ~description:"Build the Etherlink executables (statically linked)."
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
-    ?storage:
-      (match (purpose, arch) with
-      | Release, _ | Test, Arm64 -> Some Ramfs
-      | Test, Amd64 -> None)
+    ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
     ~image:Images.CI.build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:

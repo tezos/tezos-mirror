@@ -2439,7 +2439,7 @@ oc.build-debian:
     - RELEASE:
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
 
 oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-73a6a3d6
@@ -2568,7 +2568,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - Makefile
@@ -2639,7 +2639,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - Makefile
@@ -2974,7 +2974,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3111,7 +3111,7 @@ oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-73a6a3d6
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - docs/introduction/compile-sources.sh
@@ -5241,7 +5241,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu
   rules:
   - changes:
     - teztale/**/*
