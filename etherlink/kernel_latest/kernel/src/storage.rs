@@ -1136,6 +1136,7 @@ pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractK
 mod tests {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -1487,24 +1488,23 @@ mod tests {
     fn init_storage_versioning_reconciles_version_into_base() {
         // Fresh storage bootstraps to the current version.
         {
-            let mut host = MockKernelHost::default();
-            let mut base = super::load_base_keyspace(&mut host).unwrap();
-            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            crate::init_storage_versioning(&mut rk).unwrap();
             assert_eq!(
-                super::read_storage_version(&base).unwrap(),
+                super::read_storage_version(rk.base()).unwrap(),
                 super::STORAGE_VERSION
             );
         }
 
         // A version already under `/base` is left untouched.
         {
-            let mut host = MockKernelHost::default();
-            let mut base = super::load_base_keyspace(&mut host).unwrap();
-            base.set(&super::STORAGE_VERSION_KEY, 46u64.to_le_bytes())
+            let mut rk = RuntimeKeyspaces::default();
+            rk.base_mut()
+                .set(&super::STORAGE_VERSION_KEY, 46u64.to_le_bytes())
                 .unwrap();
-            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            crate::init_storage_versioning(&mut rk).unwrap();
             assert_eq!(
-                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
+                rk.base().get(&super::STORAGE_VERSION_KEY).unwrap(),
                 46u64.to_le_bytes()
             );
         }
@@ -1513,23 +1513,24 @@ mod tests {
         // into `/base` (not bumped to the current version) and the legacy path
         // is cleared.
         {
-            let mut host = MockKernelHost::default();
-            let mut base = super::load_base_keyspace(&mut host).unwrap();
-            host.store_write_all(
-                &super::LEGACY_STORAGE_VERSION_PATH,
-                &46u64.to_le_bytes(),
-            )
-            .unwrap();
-            crate::init_storage_versioning(&mut host, &mut base).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            rk.host_mut()
+                .store_write_all(
+                    &super::LEGACY_STORAGE_VERSION_PATH,
+                    &46u64.to_le_bytes(),
+                )
+                .unwrap();
+            crate::init_storage_versioning(&mut rk).unwrap();
             assert_eq!(
-                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
+                rk.base().get(&super::STORAGE_VERSION_KEY).unwrap(),
                 46u64.to_le_bytes()
             );
             assert_eq!(
-                host.store_read_all(&STORAGE_VERSION_PATH).unwrap(),
+                rk.host().store_read_all(&STORAGE_VERSION_PATH).unwrap(),
                 46u64.to_le_bytes()
             );
-            assert!(host
+            assert!(rk
+                .host()
                 .store_read_all(&super::LEGACY_STORAGE_VERSION_PATH)
                 .is_err());
         }

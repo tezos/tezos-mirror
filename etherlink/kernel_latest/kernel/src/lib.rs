@@ -86,38 +86,38 @@ extern crate alloc;
 // This needs to be set to the frozen commit on snapshot time
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
-fn switch_to_public_rollup<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+fn switch_to_public_rollup<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<(), Error>
 where
     Host: StorageV1 + WasmHost,
+    KS: KeySpace,
 {
-    if base.contains(&PRIVATE_FLAG_KEY) {
+    if rk.base().contains(&PRIVATE_FLAG_KEY) {
         log!(Info, "Submitting outbox message to make the rollup public.");
         let whitelist_update: OutboxMessage<_> =
             OutboxMessage::<MichelsonUnit>::WhitelistUpdate(
                 OutboxMessageWhitelistUpdate { whitelist: None },
             );
-        OUTBOX_QUEUE.queue_message(host, whitelist_update)?;
-        OUTBOX_QUEUE.flush_queue(host);
-        base.delete(&PRIVATE_FLAG_KEY);
+        OUTBOX_QUEUE.queue_message(rk.host_mut(), whitelist_update)?;
+        OUTBOX_QUEUE.flush_queue(rk.host_mut());
+        rk.base_mut().delete(&PRIVATE_FLAG_KEY);
     }
     Ok(())
 }
 
 #[trace_kernel]
-pub fn stage_zero<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+pub fn stage_zero<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<MigrationStatus, Error>
 where
     Host: StorageV1 + WasmHost,
+    KS: KeySpace,
 {
     log!(Debug, "Entering stage zero.");
-    init_storage_versioning(host, base)?;
-    switch_to_public_rollup(host, base)?;
-    storage_migration(host)
+    init_storage_versioning(rk)?;
+    switch_to_public_rollup(rk)?;
+    storage_migration(rk.host_mut())
 }
 
 // DO NOT RENAME: function name is used during benchmark
@@ -125,21 +125,22 @@ where
 // function is visible in the profiling results.
 #[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn stage_one<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+pub fn stage_one<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost,
+    KS: KeySpace,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(base)?;
+    enter_stage_one(rk.base_mut())?;
+    let (host, base) = rk.parts_mut();
     let res = fetch_blueprints(
         host,
         base,
@@ -147,7 +148,7 @@ where
         chain_config,
         configuration,
     );
-    leave_stage_one(base)?;
+    leave_stage_one(rk.base_mut())?;
     res
 }
 
@@ -163,23 +164,26 @@ fn set_kernel_version(base: &mut impl KeySpace) -> Result<(), Error> {
     }
 }
 
-fn init_storage_versioning(
-    host: &mut impl StorageV1,
-    base: &mut impl KeySpace,
-) -> Result<(), Error> {
+fn init_storage_versioning<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
+) -> Result<(), Error>
+where
+    Host: StorageV1,
+    KS: KeySpace,
+{
     // Reconcile the storage version into the `/base` keyspace once, at stage
     // zero: this is the only place that reads the legacy /evm/ path.
     use crate::storage::{LEGACY_STORAGE_VERSION_PATH, STORAGE_VERSION_KEY};
-    if base.contains(&STORAGE_VERSION_KEY) {
+    if rk.base().contains(&STORAGE_VERSION_KEY) {
         Ok(())
-    } else if let Ok(version) = host.store_read_all(&LEGACY_STORAGE_VERSION_PATH) {
+    } else if let Ok(version) = rk.host().store_read_all(&LEGACY_STORAGE_VERSION_PATH) {
         // Upgrading from the pre-`/base` layout: carry the recorded version
         // over verbatim so the migration framework still resumes from it.
-        base.set(&STORAGE_VERSION_KEY, version)?;
-        let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
+        rk.base_mut().set(&STORAGE_VERSION_KEY, version)?;
+        let _ = rk.host_mut().store_delete(&LEGACY_STORAGE_VERSION_PATH);
         Ok(())
     } else {
-        store_storage_version(base, STORAGE_VERSION)
+        store_storage_version(rk.base_mut(), STORAGE_VERSION)
     }
 }
 
@@ -249,23 +253,27 @@ where
     Ok(block_fees)
 }
 
-pub fn run<Host>(host: &mut Host, base: &mut impl KeySpace) -> Result<(), anyhow::Error>
+pub fn run<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> Result<(), anyhow::Error>
 where
     Host: HostReveal + StorageV1 + WasmHost + WithGas,
+    KS: KeySpace,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
-    host.mark_for_reboot()
+    rk.host_mut()
+        .mark_for_reboot()
         .expect("This function should never fail");
-    match single_run(host, base) {
+    match single_run(rk) {
         Ok(SingleRunStatus::Reboot) => Ok(()),
         Ok(SingleRunStatus::Finished) => {
-            host.clear_reboot_mark()
+            rk.host_mut()
+                .clear_reboot_mark()
                 .expect("This function should never fail");
             Ok(())
         }
         Err(err) => {
-            host.clear_reboot_mark()
+            rk.host_mut()
+                .clear_reboot_mark()
                 .expect("This function should never fail");
             Err(err)
         }
@@ -277,22 +285,22 @@ pub enum SingleRunStatus {
     Finished,
 }
 
-pub fn single_run<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+pub fn single_run<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
     Host: HostReveal + StorageV1 + WasmHost + WithGas,
+    KS: KeySpace,
 {
     // We always start by doing the migration if needed.
-    match stage_zero(host, base) {
+    match stage_zero(rk) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
             // at every kernel run.
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
-            set_kernel_version(base)?;
+            set_kernel_version(rk.base_mut())?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -302,7 +310,8 @@ where
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
-            set_kernel_version(base)?;
+            set_kernel_version(rk.base_mut())?;
+            let (host, base) = rk.parts_mut();
             let configuration = fetch_configuration(host, base);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
@@ -310,6 +319,7 @@ where
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
+            let (host, base) = rk.parts_mut();
             fallback_backup_kernel(host, base)?;
             return Ok(SingleRunStatus::Reboot);
         }
@@ -328,22 +338,24 @@ where
     // Fetch kernel metadata:
 
     // 1. Fetch the smart rollup address via the host function, it cannot fail.
-    let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
+    let smart_rollup_address = rk.host_mut().reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
+    let (host, base) = rk.parts_mut();
     let chain_configuration = fetch_tezosx_configuration(host, base);
     let mut configuration = fetch_configuration(host, base);
-    let sequencer_pool_address = read_sequencer_pool_address(host);
+    let sequencer_pool_address = read_sequencer_pool_address(rk.host());
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !configuration.common.evm_node_flag {
+        let (host, base) = rk.parts_mut();
         health_check(host, base, &mut configuration)?;
     }
 
     // Initialize custom precompile
     let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();
-    init_precompile_bytecodes(host, tezosx_enabled)
+    init_precompile_bytecodes(rk.host_mut(), tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
@@ -351,8 +363,7 @@ where
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
     if let StageOneStatus::Reboot = stage_one(
-        host,
-        base,
+        rk,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
@@ -363,12 +374,13 @@ where
         return Ok(SingleRunStatus::Reboot);
     };
 
-    let trace_input = read_tracer_input(base)?;
+    let trace_input = read_tracer_input(rk.base())?;
 
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
+        let (host, base) = rk.parts_mut();
         if let block::ComputationResult::Finished = block::produce(
             host,
             base,
@@ -495,10 +507,8 @@ where
     }
 
     if is_revealed_storage(rk.base()) {
-        let (host, base) = rk.parts_mut();
         reveal_storage(
-            host,
-            base,
+            &mut rk,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -508,8 +518,7 @@ where
         );
     }
 
-    let (host, base) = rk.parts_mut();
-    match run(host, base) {
+    match run(&mut rk) {
         Ok(()) => (),
         Err(err) => {
             log!(Fatal, "The kernel produced an error: {:?}", err);
@@ -547,7 +556,7 @@ mod tests {
     use tezos_ethereum::{
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     use alloy_sol_types::SolCall;
     use tezos_protocol::contract::Contract;
@@ -603,10 +612,10 @@ mod tests {
     #[test]
     fn load_block_fees_new() {
         // Arrange
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // Act
-        let result = crate::retrieve_block_fees(&mut host);
+        let result = crate::retrieve_block_fees(rk.host_mut());
 
         // Assert
         let expected = BlockFees::new(
@@ -625,13 +634,13 @@ mod tests {
             RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 
         // Arrange
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let min_base_fee = U256::from(17);
-        tezos_storage::write_u256_le(&mut host, &min_path, min_base_fee).unwrap();
+        tezos_storage::write_u256_le(rk.host_mut(), &min_path, min_base_fee).unwrap();
 
         // Act
-        let result = crate::retrieve_block_fees(&mut host);
+        let result = crate::retrieve_block_fees(rk.host_mut());
 
         // Assert
         let expected =
@@ -644,21 +653,22 @@ mod tests {
     #[test]
     fn test_xtz_withdrawal_applied() {
         // init host
-        let mut host = MockKernelHost::default();
-        host.store_write_all(
-            &NATIVE_TOKEN_TICKETER_PATH,
-            b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
-        )
-        .unwrap();
-        store_evm_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        rk.host_mut()
+            .store_write_all(
+                &NATIVE_TOKEN_TICKETER_PATH,
+                b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+            )
+            .unwrap();
+        store_evm_chain_id(rk.host_mut(), DUMMY_CHAIN_ID).unwrap();
 
         // run level in order to initialize outbox counter (by SOL message)
-        let level = host.host.run_level(|_| ());
+        let level = rk.host_mut().host.run_level(|_| ());
 
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(&mut host, &sender, sender_initial_balance);
+        set_balance(rk.host_mut(), &sender, sender_initial_balance);
 
         // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
         let data = hex::decode(
@@ -713,15 +723,14 @@ mod tests {
             contents,
         };
 
-        host.host.add_external(message);
+        rk.host_mut().host.add_external(message);
 
         // run kernel twice to get to the stage with block creation:
-        let mut base = crate::storage::load_base_keyspace(&mut host).unwrap();
-        run(&mut host, &mut base).expect("Kernel error");
-        run(&mut host, &mut base).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
 
         // verify outbox is not empty
-        let outbox = host.host.outbox_at(level + 1);
+        let outbox = rk.host_mut().host.outbox_at(level + 1);
         assert!(!outbox.is_empty());
 
         // check message contents:
@@ -758,11 +767,11 @@ mod tests {
 
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
-        let mut mock_host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            mock_host
+            rk.host_mut()
                 .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
                 .unwrap();
         }
@@ -800,13 +809,12 @@ mod tests {
             "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
             "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
         );
-        mock_host.host.add_transfer(payload, &metadata);
+        rk.host_mut().host.add_transfer(payload, &metadata);
 
         // run kernel
-        let mut base = crate::storage::load_base_keyspace(&mut mock_host).unwrap();
-        run(&mut mock_host, &mut base).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        run(&mut mock_host, &mut base).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -828,7 +836,7 @@ mod tests {
         let deposit = FaDeposit {
             amount: 42.into(),
             proxy: Some(H160([2u8; 20])),
-            inbox_level: mock_host.host.level(), // level not yet advanced
+            inbox_level: rk.host_mut().host.level(), // level not yet advanced
             inbox_msg_id: 2,
             receiver: H160([1u8; 20]),
             ticket_hash: ticket_hash(&ticket).unwrap(),
@@ -837,7 +845,7 @@ mod tests {
         let tx_hash = deposit.hash(&[0u8; 20]);
 
         // read transaction receipt
-        read_transaction_receipt_status(&mut mock_host, &tx_hash.0).ok()
+        read_transaction_receipt_status(rk.host_mut(), &tx_hash.0).ok()
     }
 
     #[test]
@@ -852,20 +860,22 @@ mod tests {
 
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
-        let mut mock_host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            mock_host.store_write(&ENABLE_FA_BRIDGE, &[1u8], 0).unwrap();
+            rk.host_mut()
+                .store_write(&ENABLE_FA_BRIDGE, &[1u8], 0)
+                .unwrap();
         }
 
         // run level in order to initialize outbox counter (by SOL message)
-        let level = mock_host.host.run_level(|_| ());
+        let level = rk.host_mut().host.run_level(|_| ());
 
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(&mut mock_host, &sender, sender_initial_balance);
+        set_balance(rk.host_mut(), &sender, sender_initial_balance);
 
         // construct ticket
         let ticket = dummy_ticket();
@@ -878,14 +888,14 @@ mod tests {
         // patch ticket table
         let ticket_balance = system
             .read_ticket_balance(
-                &mock_host,
+                rk.host(),
                 &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
                 &h160_to_alloy(&sender),
             )
             .unwrap();
         system
             .write_ticket_balance(
-                &mut mock_host,
+                rk.host_mut(),
                 &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
                 &h160_to_alloy(&sender),
                 ticket_balance + u256_to_alloy(&amount),
@@ -948,15 +958,14 @@ mod tests {
             contents,
         };
 
-        mock_host.host.add_external(message);
+        rk.host_mut().host.add_external(message);
 
         // run kernel
-        let mut base = crate::storage::load_base_keyspace(&mut mock_host).unwrap();
-        run(&mut mock_host, &mut base).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        run(&mut mock_host, &mut base).expect("Kernel error");
+        run(&mut rk).expect("Kernel error");
 
-        mock_host.host.outbox_at(level + 1)
+        rk.host_mut().host.outbox_at(level + 1)
     }
 
     #[test]

@@ -566,8 +566,7 @@ where
             return;
         }
     };
-    let (host, base) = rk.parts_mut();
-    handle_query_entrypoints_to(host, base, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
+    handle_query_entrypoints_to(&mut rk, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
 }
 
 /// Query the entrypoints and synthetic views of a contract and write
@@ -581,14 +580,14 @@ where
 /// through `/script` directly.
 ///
 /// Input: binary-encoded contract AddressHash (22 bytes).
-fn handle_query_entrypoints_to<Host, R>(
-    host: &mut KernelHost<R, Host>,
-    base: &mut impl KeySpace,
+fn handle_query_entrypoints_to<Host, R, KS>(
+    rk: &mut RuntimeKeyspaces<KernelHost<R, Host>, KS>,
     payload: &[u8],
     result_key: &Key,
 ) where
     R: StorageV1,
     Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
+    KS: KeySpace,
 {
     let address = match mir::ast::AddressHash::try_from(payload) {
         Ok(a) => a,
@@ -608,9 +607,12 @@ fn handle_query_entrypoints_to<Host, R>(
     // on the conversion coefficient and is currently larger, so default
     // would reject RPC calls that would succeed in an operation. Use
     // Gas::unmetered() instead.
-    let entrypoints =
-        tezos_execution::get_contract_entrypoint(&*host, &address, &mut Gas::unmetered());
-    let views = tezos_execution::get_enshrined_contract_views(&*host, &address)
+    let entrypoints = tezos_execution::get_contract_entrypoint(
+        rk.host(),
+        &address,
+        &mut Gas::unmetered(),
+    );
+    let views = tezos_execution::get_enshrined_contract_views(rk.host(), &address)
         .unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,
@@ -623,7 +625,7 @@ fn handle_query_entrypoints_to<Host, R>(
             return;
         }
     };
-    if let Err(err) = base.set(result_key, result) {
+    if let Err(err) = rk.base_mut().set(result_key, result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
 }
