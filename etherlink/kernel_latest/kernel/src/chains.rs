@@ -672,7 +672,7 @@ impl TezosXChainConfig {
                     &block_in_progress.cumulative_tezos_operation_receipts.list,
                 );
                 crate::apply::apply_transaction(
-                    rk.host_mut(),
+                    rk,
                     registry,
                     outbox_queue,
                     &block_constants.evm_runtime_block_constants,

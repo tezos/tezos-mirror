@@ -546,7 +546,7 @@ impl Evaluation {
         );
 
         let run_result = revm_run_transaction(
-            rk.host_mut(),
+            rk,
             registry,
             &mut journal,
             &constants,
