@@ -42,6 +42,7 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
 use evm_inspectors::TracerInput;
 use tezos_smart_rollup::types::Timestamp;
@@ -385,10 +386,9 @@ impl Evaluation {
 
     /// Execute the simulation, returning both the result and the HTTP
     /// traces captured during cross-runtime execution.
-    pub fn run<Host>(
+    pub fn run<Host, KS>(
         &self,
-        host: &mut Host,
-        base: &impl KeySpace,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
@@ -401,15 +401,18 @@ impl Evaluation {
     >
     where
         Host: StorageV1,
+        KS: KeySpace,
     {
-        let evm_chain_id = fetch_evm_chain_id(host);
-        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
-        let da_fee = crate::retrieve_da_fee(host)?;
-        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-        let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
-        let debug_features = DebugFeatures::read_from_storage(base);
+        let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+        let minimum_base_fee_per_gas =
+            crate::retrieve_minimum_base_fee_per_gas(rk.host_mut());
+        let da_fee = crate::retrieve_da_fee(rk.host_mut())?;
+        let coinbase = read_sequencer_pool_address(rk.host()).unwrap_or_default();
+        let experimental_features = ExperimentalFeatures::read_from_storage(rk);
+        let debug_features = DebugFeatures::read_from_storage(rk.base());
 
-        let constants = match block_storage::read_current_etherlink_block(host) {
+        let current_block = block_storage::read_current_etherlink_block(rk.host_mut());
+        let constants = match current_block {
             Ok(block) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
@@ -447,7 +450,7 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| {
                         U256::from(
-                            read_last_info_per_level_timestamp(base)
+                            read_last_info_per_level_timestamp(rk.base())
                                 .unwrap_or(Timestamp::from(0))
                                 .as_u64(),
                         )
@@ -479,8 +482,8 @@ impl Evaluation {
             revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
                 &Address::from_slice(&from.0),
             )?;
-        let max_gas_limit =
-            read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
+        let max_gas_limit = read_or_set_maximum_gas_per_transaction(rk.host_mut())
+            .unwrap_or(MAXIMUM_GAS_LIMIT);
         let gas = self
             .gas
             .map_or(max_gas_limit, |gas| u64::min(gas, max_gas_limit));
@@ -495,15 +498,15 @@ impl Evaluation {
         // zero address if necessary.
         if from.is_zero() {
             if let Some(value) = self.value {
-                let mut info = simulation_caller.info(host)?;
+                let mut info = simulation_caller.info(rk.host_mut())?;
                 info.balance = u256_to_alloy(&value.saturating_add(max_gas_to_pay));
-                simulation_caller.set_info_without_code(host, info)?;
+                simulation_caller.set_info_without_code(rk.host_mut(), info)?;
             }
         }
 
-        let mut info = simulation_caller.info(host)?;
+        let mut info = simulation_caller.info(rk.host_mut())?;
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
-        simulation_caller.set_info_without_code(host, info)?;
+        simulation_caller.set_info_without_code(rk.host_mut(), info)?;
 
         // Simulation only: an inbound CREATE_CONTRACT reached from a
         // simulated call derives its KT1 from the zero seed and so
@@ -536,14 +539,14 @@ impl Evaluation {
             CracId::mock(RuntimeId::Ethereum),
             &operation_hashes,
             &constants,
-            crate::storage::is_http_trace_enabled(base),
+            crate::storage::is_http_trace_enabled(rk.base()),
             &debug_features,
             0,
             tracer_input,
         );
 
         let run_result = revm_run_transaction(
-            host,
+            rk.host_mut(),
             registry,
             &mut journal,
             &constants,
@@ -568,7 +571,7 @@ impl Evaluation {
         // Close before the fee post-processing below: a failure there must
         // not skip the tracer finalization.
         close_tezosx_journal(
-            host,
+            rk.host_mut(),
             journal,
             run_result.as_ref().ok().map(|outcome| &outcome.result),
         )?;
@@ -722,24 +725,24 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
     }
 }
 
-pub fn start_simulation_mode<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+pub fn start_simulation_mode<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
     Host: StorageV1 + WasmHost,
+    KS: KeySpace,
 {
     log!(Debug, "Starting simulation mode ");
-    let simulation = parse_inbox(host)?;
+    let simulation = parse_inbox(rk.host_mut())?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let tracer_input = read_tracer_input(base)?;
+            let tracer_input = read_tracer_input(rk.base())?;
             let (outcome, traces) =
-                simulation.run(host, base, registry, tracer_input, spec_id)?;
-            storage::store_simulation_http_traces(base, &traces)?;
-            storage::store_simulation_result(base, outcome)
+                simulation.run(rk, registry, tracer_input, spec_id)?;
+            storage::store_simulation_http_traces(rk.base_mut(), &traces)?;
+            storage::store_simulation_result(rk.base_mut(), outcome)
         }
     }
 }
@@ -753,7 +756,6 @@ mod tests {
         run_transaction, storage::world_state_handler::StorageAccount, GasData,
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_journal::TezosXJournal;
 
     use crate::registry_impl::RegistryImpl;
@@ -830,15 +832,16 @@ mod tests {
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
     #[cfg(test)]
-    fn create_contract<Host>(host: &mut Host, base: &impl KeySpace) -> H160
+    fn create_contract<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> H160
     where
         Host: StorageV1,
+        KS: KeySpace,
     {
         let timestamp =
-            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = fetch_evm_chain_id(host);
-        let block_fees = retrieve_block_fees(host);
+        let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+        let block_fees = retrieve_block_fees(rk.host_mut());
         assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(
             timestamp,
@@ -853,9 +856,11 @@ mod tests {
             Address::from_hex("0x2424242424242424242424242424242424242424").unwrap();
         // give some funds to caller
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-        let mut info = caller_account.info(host).unwrap();
+        let mut info = caller_account.info(rk.host_mut()).unwrap();
         info.balance = u256_to_alloy(&U256::MAX);
-        caller_account.set_info_without_code(host, info).unwrap();
+        caller_account
+            .set_info_without_code(rk.host_mut(), info)
+            .unwrap();
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
 
         // gas limit was estimated using Remix on Shanghai network (256,842)
@@ -866,7 +871,7 @@ mod tests {
         let registry = RegistryImpl::default();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
-            host,
+            rk.host_mut(),
             &registry,
             &mut journal,
             &block,
@@ -897,10 +902,9 @@ mod tests {
     #[test]
     fn simulation_result() {
         // setup
-        let mut host = MockKernelHost::default();
-        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut host, &base);
+        let new_address = create_contract(&mut rk);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -913,8 +917,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
+        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -940,8 +943,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
+        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -959,10 +961,9 @@ mod tests {
     #[test]
     fn evaluation_result_no_gas() {
         // setup
-        let mut host = MockKernelHost::default();
-        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut host, &base);
+        let new_address = create_contract(&mut rk);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -975,8 +976,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, &base, &registry, None, &SpecId::default());
+        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -1030,9 +1030,8 @@ mod tests {
     #[test]
     fn parse_simulation2() {
         // setup
-        let mut host = MockKernelHost::default();
-        let base = crate::storage::load_base_keyspace(&mut host).unwrap();
-        let new_address = create_contract(&mut host, &base);
+        let mut rk = RuntimeKeyspaces::default();
+        let new_address = create_contract(&mut rk);
 
         let to = Some(new_address);
         let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();

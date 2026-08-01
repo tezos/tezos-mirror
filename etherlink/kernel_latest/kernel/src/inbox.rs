@@ -603,8 +603,7 @@ where
             // simulation and all the previous and next transactions are
             // discarded.
             let registry = chain_configuration.init_registry();
-            let (host, base) = rk.parts_mut();
-            chain_configuration.start_simulation_mode(host, base, &registry)?;
+            chain_configuration.start_simulation_mode(rk, &registry)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
@@ -699,8 +698,7 @@ where
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
-    let experimental_features =
-        ExperimentalFeatures::read_from_storage(rk.host(), rk.base());
+    let experimental_features = ExperimentalFeatures::read_from_storage(rk);
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = (
         crate::storage::is_legacy_dal_signals_disabled(rk.base()),
         crate::storage::read_dal_publishers_whitelist(rk.base()).unwrap_or_default(),

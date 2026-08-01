@@ -1240,10 +1240,7 @@ mod tests {
             .store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         init_safe_storage_roots(rk.host_mut());
-        let experimental_features = {
-            let (host, base) = rk.parts_mut();
-            ExperimentalFeatures::read_from_storage(host, base)
-        };
+        let experimental_features = ExperimentalFeatures::read_from_storage(rk);
         let debug_features = DebugFeatures::read_from_storage(rk.base());
         TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,

@@ -295,10 +295,7 @@ where
     let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
     let limits = fetch_evm_limits(rk.host_mut());
     let spec_id = read_evm_version(rk.host_mut()).into();
-    let experimental_features = {
-        let (host, base) = rk.parts_mut();
-        ExperimentalFeatures::read_from_storage(host, base)
-    };
+    let experimental_features = ExperimentalFeatures::read_from_storage(rk);
     let debug_features = DebugFeatures::read_from_storage(rk.base());
     let michelson_chain_id =
         fetch_michelson_runtime_chain_id(rk.host_mut(), evm_chain_id);
