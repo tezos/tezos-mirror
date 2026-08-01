@@ -38,7 +38,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -185,13 +185,13 @@ where
 }
 
 #[trace_kernel]
-pub fn handle_run_transaction<Host>(
-    host: &mut Host,
-    base: &impl KeySpace,
+pub fn handle_run_transaction<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
     Host: StorageV1 + WithGas,
+    KS: KeySpace,
 {
     let __attrs = [
         (
@@ -214,26 +214,30 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, base);
-    let block_constants =
-        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
+    let config = {
+        let (host, base) = rk.parts_mut();
+        fetch_tezosx_configuration(host, base)
+    };
+    let block_constants = block_constants(
+        rk.host_mut(),
+        &config,
+        input_data.timestamp,
+        input_data.block_number,
+    )?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
         != H160::default())
     .then_some(block_constants.evm_runtime_block_constants.coinbase);
 
     // Read the HTTP-trace replay flag before wrapping the host in
     // [SafeStorage] — see [block::produce] for the rationale.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(base);
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(rk.base());
 
-    let mut safe_host = SafeStorage {
-        host,
-        world_states: config.world_states(input_data.block_number),
-    };
+    let mut safe_rk = rk.to_safe_host(config.world_states(input_data.block_number));
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
-    let mut block_in_progress = match crate::storage::read_block_in_progress(&safe_host)?
-    {
+    let resumed = crate::storage::read_block_in_progress(safe_rk.host())?;
+    let mut block_in_progress = match resumed {
         Some(bip) => {
             if input_data.block_number != bip.number {
                 return Err(anyhow!(
@@ -243,7 +247,7 @@ where
             bip
         }
         None => {
-            safe_host.start()?;
+            safe_rk.host_mut().start()?;
 
             BlockInProgress {
                 number: input_data.block_number,
@@ -253,7 +257,7 @@ where
                 cumulative_gas: U256::zero(),
                 index: 0,
                 michelson_index: 0,
-                ethereum_parent_hash: read_current_block_hash(&safe_host)?,
+                ethereum_parent_hash: read_current_block_hash(safe_rk.host())?,
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,
                 timestamp: input_data.timestamp,
@@ -265,7 +269,7 @@ where
                 cumulative_tx_objects: Vec::new(),
                 cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
                 tezos_parent_hash: crate::block_storage::read_current_hash(
-                    &safe_host,
+                    safe_rk.host(),
                     &crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH,
                 )
                 .unwrap_or_else(|_| {
@@ -278,7 +282,7 @@ where
     block_in_progress.repush_tx(input_data.tx);
 
     let result = compute(
-        &mut safe_host,
+        safe_rk.host_mut(),
         &registry,
         &config,
         &outbox_queue,
@@ -294,9 +298,9 @@ where
             "Critical: Reboot is required by a single transaction execution"
         )),
         BlockInProgressComputationResult::Finished { .. } => {
-            storage::store_block_in_progress(&mut safe_host, &block_in_progress)?;
+            storage::store_block_in_progress(safe_rk.host_mut(), &block_in_progress)?;
             block_storage::store_current_transactions_receipts(
-                &mut safe_host,
+                safe_rk.host_mut(),
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 &block_in_progress.cumulative_receipts,
             )?;
@@ -316,13 +320,13 @@ fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
 }
 
 #[trace_kernel]
-pub fn assemble_block<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+pub fn assemble_block<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
     Host: StorageV1 + WasmHost,
+    KS: KeySpace,
 {
     let __attrs = [
         (
@@ -338,35 +342,43 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, base);
-    let block_constants =
-        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
-
-    let mut configuration = fetch_configuration(host, base);
-    let mut safe_host = SafeStorage {
-        host,
-        world_states: config.world_states(input_data.block_number),
+    let config = {
+        let (host, base) = rk.parts_mut();
+        fetch_tezosx_configuration(host, base)
     };
+    let block_constants = block_constants(
+        rk.host_mut(),
+        &config,
+        input_data.timestamp,
+        input_data.block_number,
+    )?;
+
+    let mut configuration = {
+        let (host, base) = rk.parts_mut();
+        fetch_configuration(host, base)
+    };
+    let mut safe_rk = rk.to_safe_host(config.world_states(input_data.block_number));
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
+    let block_in_progress = crate::storage::read_block_in_progress(safe_rk.host())?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
     crate::gas_price::register_block(
-        &mut safe_host,
+        safe_rk.host_mut(),
         block_in_progress.cumulative_execution_gas,
         block_in_progress.timestamp,
         block_in_progress.queue_length(),
     )?;
     let number = block_in_progress.number;
     let block = block_in_progress.finalize_and_store(
-        &mut safe_host,
+        safe_rk.host_mut(),
         &block_constants,
         config.is_tezos_runtime_enabled(number),
     )?;
 
     let timestamp = block.timestamp();
+    let (safe_host, base) = safe_rk.parts_mut();
     promote_block(
-        &mut safe_host,
+        safe_host,
         base,
         &outbox_queue,
         &BlockInProgressProvenance::Storage,
@@ -374,7 +386,10 @@ where
         &mut configuration,
         delayed_hashes,
     )?;
-    upgrade::possible_sequencer_key_change(safe_host.host, base, timestamp)?;
+    // The mirror is promoted, so its `/tmp` copy is gone: the sequencer key
+    // change runs on the live host.
+    let (host, base) = rk.parts_mut();
+    upgrade::possible_sequencer_key_change(host, base, timestamp)?;
 
     Ok(())
 }

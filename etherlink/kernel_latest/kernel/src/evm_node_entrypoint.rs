@@ -156,8 +156,7 @@ where
             return;
         }
     };
-    let (host, base) = rk.parts_mut();
-    match sub_block::handle_run_transaction(host, base, tx_input) {
+    match sub_block::handle_run_transaction(&mut rk, tx_input) {
         Ok(()) => (),
         Err(err) => {
             log!(
@@ -200,8 +199,7 @@ where
             return;
         }
     };
-    let (host, base) = rk.parts_mut();
-    match sub_block::assemble_block(host, base, assemble_block_input) {
+    match sub_block::assemble_block(&mut rk, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
             log!(Error, "Error while assembling block: {:?}", err);
