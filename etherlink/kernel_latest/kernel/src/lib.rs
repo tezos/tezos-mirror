@@ -311,8 +311,7 @@ where
             // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(rk.base_mut())?;
-            let (host, base) = rk.parts_mut();
-            let configuration = fetch_configuration(host, base);
+            let configuration = fetch_configuration(rk);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
@@ -341,9 +340,8 @@ where
     let smart_rollup_address = rk.host_mut().reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let (host, base) = rk.parts_mut();
-    let chain_configuration = fetch_tezosx_configuration(host, base);
-    let mut configuration = fetch_configuration(host, base);
+    let chain_configuration = fetch_tezosx_configuration(rk);
+    let mut configuration = fetch_configuration(rk);
     let sequencer_pool_address = read_sequencer_pool_address(rk.host());
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it

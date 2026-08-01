@@ -84,8 +84,8 @@ where
     let payload = rk.base().get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
     let mut delayed_inbox = DelayedInbox::from_base(rk.base()).unwrap();
+    let common = fetch_common_config(&mut rk);
     let (host, base) = rk.parts_mut();
-    let common = fetch_common_config(host, base);
     delayed_inbox
         .save_transaction(host, base, transaction, 0.into(), 0u32, &common)
         .unwrap();
@@ -277,10 +277,7 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = {
-        let (host, base) = rk.parts_mut();
-        fetch_tezosx_configuration(host, base)
-    };
+    let chain_config = fetch_tezosx_configuration(&mut rk);
     let blueprint_header = match read_current_blueprint_header(rk.base()) {
         Ok(h) => h,
         Err(err) => {
