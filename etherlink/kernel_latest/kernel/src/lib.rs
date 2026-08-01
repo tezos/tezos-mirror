@@ -32,6 +32,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -406,11 +407,17 @@ pub fn kernel<Host>(host: &mut Host)
 where
     Host: StorageV1 + CoreStorage + HostReveal + WasmHost,
 {
-    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut base = crate::storage::load_base_keyspace(&mut host)
-        .expect("Failed to load the `/base` keyspace");
+    let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
+        match RuntimeKeyspaces::init(host) {
+            Ok(rk) => rk,
+            Err(err) => {
+                log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+                return;
+            }
+        };
 
-    let reboot_counter = host
+    let reboot_counter = rk
+        .host()
         .host
         .reboot_left()
         .expect("The kernel failed to get the number of reboot left");
@@ -420,7 +427,8 @@ where
         )
     }
 
-    let world_state_subkeys = host
+    let world_state_subkeys = rk
+        .host()
         .host
         .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
@@ -429,7 +437,8 @@ where
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
     if world_state_subkeys == 0 {
-        host.host
+        rk.host_mut()
+            .host
             .store_write(
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 "Un festival de GADT".as_bytes(),
@@ -438,13 +447,15 @@ where
             .unwrap();
     }
 
-    let tez_world_state_subkeys = host
+    let tez_world_state_subkeys = rk
+        .host()
         .host
         .store_count_subkeys(&chains::TEZ_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /tez/world_state subkeys");
 
     if tez_world_state_subkeys == 0 {
-        host.host
+        rk.host_mut()
+            .host
             .store_write(
                 &chains::TEZ_SAFE_STORAGE_ROOT_PATH,
                 b"Une sarabande de monades",
@@ -453,24 +464,28 @@ where
             .unwrap();
     }
 
-    let tez_tez_accounts_subkeys = host
+    let tez_tez_accounts_subkeys = rk
+        .host()
         .host
         .store_count_subkeys(&chains::TEZOS_ACCOUNTS_ROOT)
         .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
 
     if tez_tez_accounts_subkeys == 0 {
-        host.host
+        rk.host_mut()
+            .host
             .store_write(&chains::TEZOS_ACCOUNTS_ROOT, b"Un carnaval de foncteur", 0)
             .unwrap();
     }
 
-    let eth_accounts_subkeys = host
+    let eth_accounts_subkeys = rk
+        .host()
         .host
         .store_count_subkeys(&chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/eth_accounts subkeys");
 
     if eth_accounts_subkeys == 0 {
-        host.host
+        rk.host_mut()
+            .host
             .store_write(
                 &chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 "Un défilé d'isomorphismes".as_bytes(),
@@ -479,10 +494,11 @@ where
             .unwrap();
     }
 
-    if is_revealed_storage(&base) {
+    if is_revealed_storage(rk.base()) {
+        let (host, base) = rk.parts_mut();
         reveal_storage(
-            &mut host,
-            &mut base,
+            host,
+            base,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -492,7 +508,8 @@ where
         );
     }
 
-    match run(&mut host, &mut base) {
+    let (host, base) = rk.parts_mut();
+    match run(host, base) {
         Ok(()) => (),
         Err(err) => {
             log!(Fatal, "The kernel produced an error: {:?}", err);

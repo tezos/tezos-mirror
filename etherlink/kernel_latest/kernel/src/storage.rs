@@ -20,6 +20,7 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
+#[cfg(test)]
 use tezos_evm_runtime::runtime::read_logs_verbosity;
 use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
@@ -30,7 +31,9 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+#[cfg(test)]
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::{
     keyspace, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
     store_bin, store_read_slice, write_u256_le, write_u64_le,
@@ -87,6 +90,7 @@ impl StorageVersion {
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::V63;
 
 // The name of the `/base` keyspace now lives next to the handle that loads it.
+#[cfg(test)]
 use tezos_evm_runtime::runtime_keyspaces::BASE_KEYSPACE_NAME;
 
 /// Load the `/base` keyspace and apply the log verbosity it records.
@@ -96,6 +100,10 @@ use tezos_evm_runtime::runtime_keyspaces::BASE_KEYSPACE_NAME;
 /// the phase, thread it down as `&impl KeySpace` (or `&mut` for writers), and
 /// let it drop at the end; helpers must never re-load. A failure therefore
 /// signals a programming error, never a normal runtime condition.
+// Test-only from here on: the entry points go through `RuntimeKeyspaces::init`,
+// and the tests that still load `/base` by hand are converted alongside the
+// code they exercise, until the end of the series removes this helper.
+#[cfg(test)]
 pub fn load_base_keyspace<L: KeySpaceLoader>(
     loader: &mut L,
 ) -> Result<L::KeySpace, StorageError> {
