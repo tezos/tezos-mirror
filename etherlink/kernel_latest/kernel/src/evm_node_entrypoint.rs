@@ -537,11 +537,11 @@ where
 #[no_mangle]
 pub extern "C" fn tezosx_michelson_entrypoints() {
     let mut sdk_host = unsafe { RollupHost::new() };
-    tezosx_michelson_entrypoints_fn(&mut sdk_host);
+    tezosx_michelson_entrypoints_entry(&mut sdk_host);
 }
 
 #[allow(dead_code)]
-pub fn tezosx_michelson_entrypoints_fn<Host>(host: &mut Host)
+pub fn tezosx_michelson_entrypoints_entry<Host>(host: &mut Host)
 where
     Host: StorageV1 + CoreStorage,
 {
@@ -553,6 +553,19 @@ where
                 return;
             }
         };
+    tezosx_michelson_entrypoints_fn(&mut rk);
+}
+
+/// Takes the handle rather than the host: the caller owns the single `/base`
+/// load, so no second one is nested inside this query.
+#[allow(dead_code)]
+pub fn tezosx_michelson_entrypoints_fn<Host, R, KS>(
+    rk: &mut RuntimeKeyspaces<KernelHost<R, Host>, KS>,
+) where
+    R: StorageV1,
+    Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
+    KS: KeySpace,
+{
     let input = match rk.base().get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
         Some(bytes) => bytes,
         None => {
@@ -560,7 +573,7 @@ where
             return;
         }
     };
-    handle_query_entrypoints_to(&mut rk, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
+    handle_query_entrypoints_to(rk, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
 }
 
 /// Query the entrypoints and synthetic views of a contract and write
@@ -725,7 +738,7 @@ mod tests {
     use mir::gas::Gas;
     use mir::parser::Parser;
     use std::collections::HashMap;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_keyspace::KeySpace;
 
     use crate::evm_node_entrypoint::tezosx_michelson_entrypoints_fn;
@@ -985,26 +998,23 @@ mod tests {
         assert_eq!(*return_ty, Type::Bytes);
     }
 
-    fn run_entrypoints_query(host: &mut MockKernelHost, addr_hash: &[u8]) -> Vec<u8> {
+    fn run_entrypoints_query(addr_hash: &[u8]) -> Vec<u8> {
         // The node seeds the input and reads the result through the `/base`
         // keyspace, and `tezosx_michelson_entrypoints_fn` consumes/produces
         // them the same way.
-        {
-            let mut base = crate::storage::load_base_keyspace(host).unwrap();
-            base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
-                .expect("write input");
-        }
-        tezosx_michelson_entrypoints_fn(&mut host.host);
-        let base = crate::storage::load_base_keyspace(host).unwrap();
-        base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
+        let mut rk = RuntimeKeyspaces::default();
+        rk.base_mut()
+            .set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
+            .expect("write input");
+        tezosx_michelson_entrypoints_fn(&mut rk);
+        rk.base()
+            .get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }
 
     #[test]
     fn test_entrypoints_query_gateway() {
-        let mut host = MockKernelHost::default();
         let result = run_entrypoints_query(
-            &mut host,
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
         );
         let (entries, views) = decode_result(&result).expect("gateway has entrypoints");
@@ -1053,11 +1063,8 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_erc20() {
-        let mut host = MockKernelHost::default();
-        let result = run_entrypoints_query(
-            &mut host,
-            &EnshrinedContracts::ERC20Wrapper.address_hash_bytes(),
-        );
+        let result =
+            run_entrypoints_query(&EnshrinedContracts::ERC20Wrapper.address_hash_bytes());
         let (entries, views) =
             decode_result(&result).expect("ERC20 wrapper has entrypoints");
         assert_eq!(entries.len(), 2);
@@ -1069,13 +1076,12 @@ mod tests {
 
     #[test]
     fn test_entrypoints_query_unknown_contract_returns_none() {
-        let mut host = MockKernelHost::default();
         let unknown_kt1: [u8; 22] =
             hex::decode("01AABBCC000000000000000000000000000000000100")
                 .unwrap()
                 .try_into()
                 .unwrap();
-        let result = run_entrypoints_query(&mut host, &unknown_kt1);
+        let result = run_entrypoints_query(&unknown_kt1);
         // RLP empty list: 0xc0
         assert_eq!(result, vec![0xc0], "unknown contract should encode as None");
     }

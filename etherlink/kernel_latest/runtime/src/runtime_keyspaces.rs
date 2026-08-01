@@ -49,16 +49,6 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
         &mut self.host
     }
 
-    /// Both halves at once, for the functions still taking the host and the
-    /// keyspace side by side.
-    ///
-    /// Temporary: this is the migration frontier, and it moves down one
-    /// group of functions at a time. The last commit of the series removes
-    /// it, once no function takes the pair any more.
-    pub fn parts_mut(&mut self) -> (&mut Host, &mut KS) {
-        (&mut self.host, &mut self.base)
-    }
-
     /// Wrap the host in the failsafe mirror shadowing `world_states`, and
     /// lend the same `/base` to the handle it returns.
     ///
