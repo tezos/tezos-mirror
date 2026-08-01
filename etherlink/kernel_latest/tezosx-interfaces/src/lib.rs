@@ -20,6 +20,7 @@ pub use tezosx_types::{
 
 #[cfg(feature = "testing")]
 use primitive_types::U256;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 
 /// Result of an alias-resolution call.
@@ -81,9 +82,9 @@ pub trait Registry {
     /// (a legacy account from before this work), the call writes the
     /// classification only and skips the redeploy.
     #[allow(clippy::too_many_arguments)]
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -126,9 +127,9 @@ pub trait Registry {
         Host: StorageV1;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
@@ -160,10 +161,10 @@ pub trait RuntimeInterface {
     /// - otherwise the call deploys the forwarder and records the
     ///   classification.
     #[allow(clippy::too_many_arguments)]
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
         registry: &impl Registry<Journal = Self::Journal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -185,10 +186,10 @@ pub trait RuntimeInterface {
     ///
     /// Returns an HTTP response with a status code indicating success (200) or
     /// failure (4xx/5xx), along with runtime-specific response headers and body.
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
         registry: &impl Registry<Journal = Self::Journal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>

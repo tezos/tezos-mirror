@@ -32,6 +32,7 @@ use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
     __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
 };
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
@@ -44,26 +45,26 @@ pub mod journal;
 pub mod precompiles;
 pub mod storage;
 
-type EVMInnerContext<'a, Host, R> = Context<
+type EVMInnerContext<'a, Host, KS, R> = Context<
     &'a BlockEnv,
     &'a TxEnv,
     CfgEnv,
-    EtherlinkVMDB<'a, Host, R>,
-    Journal<'a, Host, R>,
+    EtherlinkVMDB<'a, Host, KS, R>,
+    Journal<'a, Host, KS, R>,
 >;
 
-type EvmContext<'a, Host, R> = Evm<
-    EVMInnerContext<'a, Host, R>,
+type EvmContext<'a, Host, KS, R> = Evm<
+    EVMInnerContext<'a, Host, KS, R>,
     (),
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, KS, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
 
-pub type EvmInspection<'a, Host, INSP, R> = Evm<
-    EVMInnerContext<'a, Host, R>,
+pub type EvmInspection<'a, Host, KS, INSP, R> = Evm<
+    EVMInnerContext<'a, Host, KS, R>,
     INSP,
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, KS, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
@@ -241,10 +242,10 @@ const ORIGIN_STATIC_GAS: u64 = 2;
 /// alias, exactly as they did before L2-1363). See L2-1441 for the
 /// design rationale that replaces the earlier `TxEnv.caller`-overload
 /// approach.
-fn etherlink_origin<'a, Host, R>(
+fn etherlink_origin<'a, Host, KS, R>(
     context: revm::interpreter::InstructionContext<
         '_,
-        EVMInnerContext<'a, Host, R>,
+        EVMInnerContext<'a, Host, KS, R>,
         EthInterpreter,
     >,
 ) where
@@ -269,15 +270,16 @@ fn etherlink_origin<'a, Host, R>(
 /// [`EvmInspection`] as the type alias for the etherlink-shaped `Evm`;
 /// the non-inspector [`EvmContext`] is just `EvmInspection` with
 /// `INSP = ()`, so the same function covers both call sites.
-fn install_etherlink_origin<'a, Host, R, INSP>(evm: &mut EvmInspection<'a, Host, INSP, R>)
-where
+fn install_etherlink_origin<'a, Host, KS, R, INSP>(
+    evm: &mut EvmInspection<'a, Host, KS, INSP, R>,
+) where
     Host: StorageV1,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
         ORIGIN_OPCODE,
         revm::interpreter::Instruction::new(
-            etherlink_origin::<Host, R>,
+            etherlink_origin::<Host, KS, R>,
             ORIGIN_STATIC_GAS,
         ),
     );
@@ -304,10 +306,10 @@ const GASPRICE_STATIC_GAS: u64 = 2;
 /// `TxEnv.gas_price` stays `0`, so the caller debit and basefee burn
 /// (role: accounting) are untouched. Mirrors the `ORIGIN` override,
 /// which likewise reports a value distinct from what the `TxEnv` drives.
-fn etherlink_gasprice<'a, Host, R>(
+fn etherlink_gasprice<'a, Host, KS, R>(
     context: revm::interpreter::InstructionContext<
         '_,
-        EVMInnerContext<'a, Host, R>,
+        EVMInnerContext<'a, Host, KS, R>,
         EthInterpreter,
     >,
 ) where
@@ -325,8 +327,8 @@ fn etherlink_gasprice<'a, Host, R>(
 /// the context builders only for cross-runtime origins, so a native EVM
 /// transaction keeps the stock handler (reading the real
 /// `TxEnv.gas_price`) and is left completely untouched.
-fn install_etherlink_gasprice<'a, Host, R, INSP>(
-    evm: &mut EvmInspection<'a, Host, INSP, R>,
+fn install_etherlink_gasprice<'a, Host, KS, R, INSP>(
+    evm: &mut EvmInspection<'a, Host, KS, INSP, R>,
 ) where
     Host: StorageV1,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -334,7 +336,7 @@ fn install_etherlink_gasprice<'a, Host, R, INSP>(
     evm.instruction.insert_instruction(
         GASPRICE_OPCODE,
         revm::interpreter::Instruction::new(
-            etherlink_gasprice::<Host, R>,
+            etherlink_gasprice::<Host, KS, R>,
             GASPRICE_STATIC_GAS,
         ),
     );
@@ -342,8 +344,8 @@ fn install_etherlink_gasprice<'a, Host, R, INSP>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_inspector_context<'a, Host, R>(
-    db: EtherlinkVMDB<'a, Host, R>,
+fn build_evm_inspector_context<'a, Host, KS, R>(
+    db: EtherlinkVMDB<'a, Host, KS, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -354,7 +356,7 @@ fn build_evm_inspector_context<'a, Host, R>(
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmInspection<'a, Host, TracerInspector, R>, EvmRunError>
+) -> Result<EvmInspection<'a, Host, KS, TracerInspector, R>, EvmRunError>
 where
     Host: StorageV1,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -403,8 +405,8 @@ where
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_context<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
-    db: EtherlinkVMDB<'a, Host, R>,
+fn build_evm_context<'a, Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
+    db: EtherlinkVMDB<'a, Host, KS, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -415,7 +417,7 @@ fn build_evm_context<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJourn
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmContext<'a, Host, R>, EvmRunError>
+) -> Result<EvmContext<'a, Host, KS, R>, EvmRunError>
 where
     Host: StorageV1,
 {
@@ -459,8 +461,13 @@ where
 /// override actually fires when `is_static_top_frame` is set, and so
 /// the starting REVM call depth can be seeded from the cross-runtime
 /// chain depth carried on `TezosXJournal`.
-fn execute_transaction<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
-    evm_context: &mut EvmContext<'a, Host, R>,
+fn execute_transaction<
+    'a,
+    Host,
+    KS,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
+    evm_context: &mut EvmContext<'a, Host, KS, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     is_static_top_frame: bool,
@@ -486,7 +493,7 @@ where
             Box::new(|__host| ())
         };
     __trace_kernel!("evm_context.transact_commit", {
-        opt_attrs_fun(evm_context.db_mut().host);
+        opt_attrs_fun(evm_context.db_mut().rk.host_mut());
         evm_context.set_tx(tx);
         let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
             if is_static_top_frame {
@@ -504,9 +511,10 @@ where
 /// transaction and reverts with the frame.
 fn install_alias_delegation<
     Host: StorageV1,
+    KS,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    journaled_state: &mut Journal<'_, Host, R>,
+    journaled_state: &mut Journal<'_, Host, KS, R>,
     alias: Option<Address>,
 ) -> Result<(), EvmRunError> {
     if let Some(alias) = alias {
@@ -524,8 +532,13 @@ fn install_alias_delegation<
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn run_transaction<'a, Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>(
-    host: &'a mut Host,
+pub fn run_transaction<
+    'a,
+    Host,
+    KS,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
+    rk: &'a mut RuntimeKeyspaces<Host, KS>,
     registry: &'a R,
     journal: &'a mut TezosXJournal,
     block_constants: &'a BlockConstants,
@@ -549,7 +562,7 @@ where
     let block_env = block_env(block_constants)?;
     let call_depth = journal.evm.revm_call_depth().unwrap_or(0) as usize;
     let tx = tx_env(
-        host,
+        rk.host_mut(),
         journal,
         caller,
         destination,
@@ -570,7 +583,7 @@ where
     // rides the info write the nonce bump forces anyway, so this
     // costs no host call — unlike a pre-execution /origin check.
     let classify_native = (!is_cross_runtime).then_some(caller);
-    let db = EtherlinkVMDB::new(host, registry, block_constants, classify_native)?;
+    let db = EtherlinkVMDB::new(rk, registry, block_constants, classify_native)?;
 
     if journal.evm.has_tracer() {
         let precompiles =
@@ -735,7 +748,7 @@ mod test {
         public_key::PublicKey,
     };
     use tezos_data_encoding::enc::BinWriter;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
@@ -788,6 +801,7 @@ mod test {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
         use revm::primitives::{hardfork::SpecId, Address, U256};
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -862,9 +876,9 @@ mod test {
         impl RegistryTrait for Registry {
             type Journal = TezosXJournal;
 
-            fn ensure_alias<Host>(
+            fn ensure_alias<Host, KS>(
                 &self,
-                host: &mut Host,
+                rk: &mut RuntimeKeyspaces<Host, KS>,
                 journal: &mut TezosXJournal,
                 alias_info: AliasInfo,
                 native_public_key: Option<&[u8]>,
@@ -878,7 +892,7 @@ mod test {
                 match target_runtime {
                     RuntimeId::Tezos => self.mock_tezos.ensure_alias(
                         self,
-                        host,
+                        rk,
                         journal,
                         alias_info,
                         native_public_key,
@@ -887,7 +901,7 @@ mod test {
                     ),
                     RuntimeId::Ethereum => self.ethereum.ensure_alias(
                         self,
-                        host,
+                        rk,
                         journal,
                         alias_info,
                         native_public_key,
@@ -940,9 +954,9 @@ mod test {
                 }
             }
 
-            fn serve<Host>(
+            fn serve<Host, KS>(
                 &self,
-                host: &mut Host,
+                rk: &mut RuntimeKeyspaces<Host, KS>,
                 journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
@@ -951,7 +965,7 @@ mod test {
             {
                 match request.uri().host() {
                     Some("tezos") | Some("stub") => {
-                        self.mock_tezos.serve(self, host, journal, request)
+                        self.mock_tezos.serve(self, rk, journal, request)
                     }
                     unknown => http::Response::builder()
                         .status(http::StatusCode::NOT_FOUND)
@@ -1010,10 +1024,10 @@ mod test {
         impl RuntimeInterface for MockTezosRuntime {
             type Journal = TezosXJournal;
 
-            fn ensure_alias<Host>(
+            fn ensure_alias<Host, KS>(
                 &self,
-                _registry: &impl RegistryTrait<Journal = TezosXJournal>,
-                _host: &mut Host,
+                _registry: &impl RegistryTrait,
+                _rk: &mut RuntimeKeyspaces<Host, KS>,
                 _journal: &mut TezosXJournal,
                 alias_info: AliasInfo,
                 _native_public_key: Option<&[u8]>,
@@ -1044,10 +1058,10 @@ mod test {
                 Ok(kt1.to_base58_check())
             }
 
-            fn serve<Host>(
+            fn serve<Host, KS>(
                 &self,
-                _registry: &impl RegistryTrait<Journal = TezosXJournal>,
-                host: &mut Host,
+                _registry: &impl RegistryTrait,
+                rk: &mut RuntimeKeyspaces<Host, KS>,
                 _journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
@@ -1083,7 +1097,7 @@ mod test {
                 let path = OwnedPath::try_from(format!("/{address_hex}")).unwrap();
                 let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path).unwrap();
 
-                let current_balance = match host.store_read_all(&full_path) {
+                let current_balance = match rk.host().store_read_all(&full_path) {
                     Ok(bytes) if bytes.len() == 32 => {
                         primitive_types::U256::from_little_endian(&bytes)
                     }
@@ -1095,7 +1109,9 @@ mod test {
                     .expect("Balance overflow");
                 let mut balance_bytes = [0u8; 32];
                 new_balance.to_little_endian(&mut balance_bytes);
-                host.store_write_all(&full_path, &balance_bytes).unwrap();
+                rk.host_mut()
+                    .store_write_all(&full_path, &balance_bytes)
+                    .unwrap();
 
                 // Record the trusted identity headers so a test can
                 // assert what the outgoing CRAC actually forwarded.
@@ -1112,7 +1128,9 @@ mod test {
                     if let Some(value) =
                         request.headers().get(header).and_then(|v| v.to_str().ok())
                     {
-                        host.store_write_all(path, value.as_bytes()).unwrap();
+                        rk.host_mut()
+                            .store_write_all(path, value.as_bytes())
+                            .unwrap();
                     }
                 }
 
@@ -1200,7 +1218,7 @@ mod test {
 
     #[test]
     fn test_simple_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
@@ -1223,11 +1241,11 @@ mod test {
         let destination_account = StorageAccount::from_address(&destination).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
-        let caller_info = caller_account.info(&mut host).unwrap();
-        let destination_info = destination_account.info(&mut host).unwrap();
+        let caller_info = caller_account.info(rk.host_mut()).unwrap();
+        let destination_info = destination_account.info(rk.host_mut()).unwrap();
         // Check balances before executing the transfer
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
@@ -1235,7 +1253,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1261,26 +1279,26 @@ mod test {
             }
         }
 
-        let caller_info = caller_account.info(&mut host).unwrap();
+        let caller_info = caller_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             caller_info.balance,
             U256::MAX.checked_sub(value_sent).unwrap()
         );
-        let destination_info = destination_account.info(&mut host).unwrap();
+        let destination_info = destination_account.info(rk.host_mut()).unwrap();
         assert_eq!(destination_info.balance, value_sent);
 
         // Caller is classified Native in its info record at commit.
         // The destination only received funds, so it stays
         // unclassified.
-        let caller_origin = caller_account.info(&mut host).unwrap().origin;
+        let caller_origin = caller_account.info(rk.host_mut()).unwrap().origin;
         assert_eq!(caller_origin, AccountOrigin::Native);
-        let destination_origin = destination_account.info(&mut host).unwrap().origin;
+        let destination_origin = destination_account.info(rk.host_mut()).unwrap().origin;
         assert_eq!(destination_origin, AccountOrigin::Unclassified);
     }
 
     #[test]
     fn test_tezosx_simple_transfer_to_mapped_address() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
@@ -1304,11 +1322,11 @@ mod test {
         let destination_account = StorageAccount::from_address(&destination).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
-        let caller_info = caller_account.info(&mut host).unwrap();
-        let destination_info = destination_account.info(&mut host).unwrap();
+        let caller_info = caller_account.info(rk.host_mut()).unwrap();
+        let destination_info = destination_account.info(rk.host_mut()).unwrap();
         // Check balances before executing the transfer
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
@@ -1316,7 +1334,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1345,7 +1363,7 @@ mod test {
 
     #[test]
     fn test_tezosx_transfer_gateway_to_implicit_address() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
@@ -1355,7 +1373,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias = registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Ethereum,
@@ -1377,7 +1395,7 @@ mod test {
         };
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         // Create a mock implicit address string for the test (hex-encoded for URL safety)
@@ -1396,7 +1414,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1436,7 +1454,7 @@ mod test {
         );
         let balance = registry
             .get_balance(
-                &mut host,
+                rk.host_mut(),
                 implicit_address.as_bytes(),
                 tezosx_interfaces::RuntimeId::Tezos,
             )
@@ -1445,7 +1463,7 @@ mod test {
 
         let precompile_account =
             StorageAccount::from_address(&RUNTIME_GATEWAY_PRECOMPILE_ADDRESS).unwrap();
-        let precompile_info = precompile_account.info(&mut host).unwrap();
+        let precompile_info = precompile_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             precompile_info.balance,
             U256::ZERO,
@@ -1455,7 +1473,7 @@ mod test {
 
     #[test]
     fn test_contract_call_sload_sstore() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
@@ -1476,7 +1494,7 @@ mod test {
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
@@ -1499,12 +1517,14 @@ mod test {
             )),
         };
 
-        contract_account.set_info(&mut host, contract_info).unwrap();
+        contract_account
+            .set_info(rk.host_mut(), contract_info)
+            .unwrap();
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1533,8 +1553,9 @@ mod test {
         }
 
         // Check that the storage slot at 0x01 was updated with 0x42
-        let storage_slot_value =
-            contract_account.get_storage(&host, &U256::from(1)).unwrap();
+        let storage_slot_value = contract_account
+            .get_storage(rk.host(), &U256::from(1))
+            .unwrap();
 
         assert_eq!(storage_slot_value, U256::from(66));
     }
@@ -1566,7 +1587,7 @@ mod test {
         let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
 
         let run_with_journal_depth = |seed_depth: Option<u32>| -> U256 {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let block_constants = BlockConstants::test_block_with_no_fees();
             let caller =
                 Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1577,7 +1598,7 @@ mod test {
             StorageAccount::from_address(&caller)
                 .unwrap()
                 .set_info_without_code(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::MAX,
                         nonce: 0,
@@ -1590,7 +1611,7 @@ mod test {
             StorageAccount::from_address(&contract)
                 .unwrap()
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::ZERO,
                         nonce: 0,
@@ -1603,7 +1624,7 @@ mod test {
             StorageAccount::from_address(&callee)
                 .unwrap()
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::ZERO,
                         nonce: 0,
@@ -1622,7 +1643,7 @@ mod test {
             journal.evm.set_revm_call_depth(seed_depth);
 
             let outcome = run_transaction(
-                &mut host,
+                &mut rk,
                 &registry,
                 &mut journal,
                 &block_constants,
@@ -1697,7 +1718,7 @@ mod test {
         let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
 
         let run_with_credit = |credit: Option<(Address, U256)>| -> Vec<Vec<u8>> {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let block_constants = BlockConstants::test_block_with_no_fees();
             let caller =
                 Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1708,7 +1729,7 @@ mod test {
             StorageAccount::from_address(&caller)
                 .unwrap()
                 .set_info_without_code(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::MAX,
                         nonce: 0,
@@ -1721,7 +1742,7 @@ mod test {
             StorageAccount::from_address(&contract)
                 .unwrap()
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::ZERO,
                         nonce: 0,
@@ -1734,7 +1755,7 @@ mod test {
             StorageAccount::from_address(&callee)
                 .unwrap()
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::ZERO,
                         nonce: 0,
@@ -1757,7 +1778,7 @@ mod test {
             )));
 
             let outcome = run_transaction(
-                &mut host,
+                &mut rk,
                 &registry,
                 &mut journal,
                 &block_constants,
@@ -1777,7 +1798,7 @@ mod test {
                 .evm
                 .take_tracer()
                 .expect("tracer should still be attached")
-                .finalize(&mut host, &outcome.result)
+                .finalize(rk.host_mut(), &outcome.result)
                 .expect("tracer finalization should succeed");
 
             // With no tx hash on the tracer the traces land under the base
@@ -1785,9 +1806,9 @@ mod test {
             let path =
                 trace_tx_path(&None, &RefPath::assert_from(b"/call_trace")).unwrap();
             let store = IndexableStorage::new_owned_path(path);
-            let len = store.length(&host).unwrap();
+            let len = store.length(rk.host()).unwrap();
             (0..len)
-                .map(|i| store.get_value(&host, i).unwrap())
+                .map(|i| store.get_value(rk.host(), i).unwrap())
                 .collect()
         };
 
@@ -1808,7 +1829,7 @@ mod test {
 
     #[test]
     fn test_contract_deployment() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
@@ -1824,13 +1845,13 @@ mod test {
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
 
         storage_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1866,13 +1887,13 @@ mod test {
                 ..
             }) => {
                 let contract_account = StorageAccount::from_address(&address).unwrap();
-                let info = contract_account.info(&mut host).unwrap();
+                let info = contract_account.info(rk.host_mut()).unwrap();
 
                 assert_eq!(
                     bytecode,
                     CodeStorage::new(&info.code_hash)
                         .unwrap()
-                        .get_code(&host)
+                        .get_code(rk.host())
                         .unwrap()
                         .unwrap()
                         .original_bytes()
@@ -1880,10 +1901,11 @@ mod test {
 
                 // Deployed contract is classified Native via the code
                 // presence; caller is classified Native as the signer.
-                let contract_origin = contract_account.info(&mut host).unwrap().origin;
+                let contract_origin =
+                    contract_account.info(rk.host_mut()).unwrap().origin;
                 assert_eq!(contract_origin, AccountOrigin::Native);
                 let caller_account = StorageAccount::from_address(&caller).unwrap();
-                let caller_origin = caller_account.info(&mut host).unwrap().origin;
+                let caller_origin = caller_account.info(rk.host_mut()).unwrap().origin;
                 assert_eq!(caller_origin, AccountOrigin::Native);
             }
             other => panic!("ERROR: ended up in {other:?}"),
@@ -1892,10 +1914,10 @@ mod test {
 
     #[test]
     fn test_withdrawal_contract() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         // Insert account information
         let caller =
@@ -1909,16 +1931,17 @@ mod test {
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
         storage_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         // Store the ticketer address required to build the outbox message
-        host.store_write(
-            &NATIVE_TOKEN_TICKETER_PATH,
-            "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
-            0,
-        )
-        .unwrap();
+        rk.host_mut()
+            .store_write(
+                &NATIVE_TOKEN_TICKETER_PATH,
+                "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
+                0,
+            )
+            .unwrap();
 
         // Call the created address with data generated from:
         // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
@@ -1932,7 +1955,7 @@ mod test {
             result,
             withdrawals,
         } = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -1956,14 +1979,14 @@ mod test {
         //  - zero address received the burned amound
         //  - outbox message has been built and sent
         assert!(result.is_success());
-        let info = storage_account.info(&mut host).unwrap();
+        let info = storage_account.info(rk.host_mut()).unwrap();
         assert_eq!(info.balance, U256::MAX.saturating_sub(withdrawn_amount));
         let created_account = StorageAccount::from_address(&XTZ_BRIDGE_SOL_ADDR).unwrap();
-        let created_account_info = created_account.info(&mut host).unwrap();
+        let created_account_info = created_account.info(rk.host_mut()).unwrap();
         assert_eq!(created_account_info.balance, U256::ZERO);
         let zero_account =
             StorageAccount::from_address(&PRECOMPILE_BURN_ADDRESS).unwrap();
-        let zero_account_info = zero_account.info(&mut host).unwrap();
+        let zero_account_info = zero_account.info(rk.host_mut()).unwrap();
         assert_eq!(zero_account_info.balance, withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
         assert_eq!(format!("{withdrawals:?}"), raw_expected_withdrawals);
@@ -1971,10 +1994,10 @@ mod test {
 
     #[test]
     fn test_call_update_sequencer_key() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
         // Insert account information
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1986,7 +2009,9 @@ mod test {
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info(rk.host_mut(), caller_info)
+            .unwrap();
 
         let private_key = SecretKeyEd25519::from_b58check(
             "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6",
@@ -2001,7 +2026,8 @@ mod test {
 
         let pk_b58 = PublicKey::to_b58check(&public_key);
         let storage_bytes = String::as_bytes(&pk_b58);
-        host.store_write_all(&SEQUENCER_KEY_PATH, storage_bytes)
+        rk.host_mut()
+            .store_write_all(&SEQUENCER_KEY_PATH, storage_bytes)
             .unwrap();
 
         // The sequencer signs the new key bound to the chain id and the current
@@ -2024,10 +2050,10 @@ mod test {
         };
 
         let registry = Registry::new();
-        let submit = |host: &mut MockKernelHost, calldata: Vec<u8>| {
+        let submit = |rk: &mut MockRuntimeKeyspaces, calldata: Vec<u8>| {
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &block_constants,
@@ -2048,7 +2074,7 @@ mod test {
 
         // No change has happened yet on this fresh host, so the counter is 0.
         let initial_calldata = build_calldata(U256::ZERO);
-        let ExecutionOutcome { result, .. } = submit(&mut host, initial_calldata.clone());
+        let ExecutionOutcome { result, .. } = submit(&mut rk, initial_calldata.clone());
 
         assert!(result.is_success());
         assert!(result.logs().len() == 1);
@@ -2063,39 +2089,48 @@ mod test {
                 .unwrap()
                 == &ChangeSequencerKeyEvent::SIGNATURE_HASH
         );
-        let value = host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).unwrap();
+        let value = rk
+            .host()
+            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
+            .unwrap();
         let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
         assert_eq!(stored_change.sequencer_key(), &public_key);
 
         // Storing the pending change bumps the change counter immediately,
         // even though the change has not been applied yet.
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // Replaying the exact same calldata is now rejected: its signature was
         // made against counter 0, which is stale, so it can no longer be used to
         // grief the pending change (e.g. resetting its activation delay).
-        let ExecutionOutcome { result, .. } = submit(&mut host, initial_calldata);
+        let ExecutionOutcome { result, .. } = submit(&mut rk, initial_calldata);
         assert!(!result.is_success());
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // The owner can still overwrite their own pending change by signing
         // against the new counter with the (still unchanged) current key. No
         // "a change is already pending" guard stands in the way.
         let overwrite_calldata = build_calldata(U256::ONE);
-        let ExecutionOutcome { result, .. } = submit(&mut host, overwrite_calldata);
+        let ExecutionOutcome { result, .. } = submit(&mut rk, overwrite_calldata);
         assert!(result.is_success());
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::from(2));
-        let value = host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).unwrap();
+        assert_eq!(
+            read_sequencer_change_counter(rk.host()).unwrap(),
+            U256::from(2)
+        );
+        let value = rk
+            .host()
+            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
+            .unwrap();
         let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
         assert_eq!(stored_change.sequencer_key(), &public_key);
     }
 
     #[test]
     fn test_call_update_sequencer_key_invalid_point() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let caller_info = AccountInfo {
@@ -2106,7 +2141,9 @@ mod test {
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info(rk.host_mut(), caller_info)
+            .unwrap();
 
         // Current sequencer key.
         let private_key = SecretKeyEd25519::from_b58check(
@@ -2118,7 +2155,8 @@ mod test {
         )
         .unwrap();
         let pk_b58 = PublicKey::to_b58check(&public_key);
-        host.store_write_all(&SEQUENCER_KEY_PATH, String::as_bytes(&pk_b58))
+        rk.host_mut()
+            .store_write_all(&SEQUENCER_KEY_PATH, String::as_bytes(&pk_b58))
             .unwrap();
 
         // Replacement key: secp256k1 tag (0x01), compression byte 0x02, then 32
@@ -2140,7 +2178,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome { result, .. } = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2161,12 +2199,15 @@ mod test {
         // The precompile reverts: no event is emitted and no pending key change
         // is stored.
         assert!(result.logs().is_empty());
-        assert!(host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).is_err());
+        assert!(rk
+            .host()
+            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
+            .is_err());
     }
 
     #[test]
     fn test_call_mint_erc20() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
@@ -2182,13 +2223,13 @@ mod test {
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
 
         storage_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2219,7 +2260,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_call = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2256,18 +2297,18 @@ mod test {
     /// Test the revert behavior of the precompile state changes.
     #[test]
     fn test_revert_precompile_state_changes() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_call_and_revert_bytecode =
             Bytes::from_hex(CALL_AND_REVERT_INIT_CODE).unwrap();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2309,11 +2350,11 @@ mod test {
         let id = U256::ZERO;
         let mut account_zero = StorageAccount::from_address(&Address::ZERO).unwrap();
         account_zero
-            .write_deposit(&mut host, &id, &deposit)
+            .write_deposit(rk.host_mut(), &id, &deposit)
             .unwrap();
         account_zero
             .write_ticket_balance(
-                &mut host,
+                rk.host_mut(),
                 &U256::from_be_bytes(ticket_hash.0),
                 &caller,
                 default_ticket_balance,
@@ -2342,7 +2383,7 @@ mod test {
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
         storage_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         let registry = Registry::new();
@@ -2352,7 +2393,7 @@ mod test {
             result,
             withdrawals: _,
         } = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2386,12 +2427,18 @@ mod test {
         let storage_account = StorageAccount::from_address(&Address::ZERO).unwrap();
 
         // Should still be present because reverting cancelled the usage of this deposit
-        storage_account.read_deposit_from_queue(&host, &id).unwrap();
+        storage_account
+            .read_deposit_from_queue(rk.host(), &id)
+            .unwrap();
 
         // Check that ticket balance didn't increased
         assert_eq!(
             storage_account
-                .read_ticket_balance(&host, &U256::from_be_bytes(ticket_hash.0), &caller)
+                .read_ticket_balance(
+                    rk.host(),
+                    &U256::from_be_bytes(ticket_hash.0),
+                    &caller
+                )
                 .unwrap(),
             default_ticket_balance
         );
@@ -2399,10 +2446,10 @@ mod test {
 
     #[test]
     fn test_revert_delete_created_bytecode() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_create_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506102b38061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80634f8c2d0e1461002d575b5f5ffd5b610047600480360381019061004291906101de565b610049565b005b5f815f523660a05ff09050806040517f9f8aa6e50000000000000000000000000000000000000000000000000000000081526004016100889190610264565b60405180910390fd5b5f604051905090565b5f5ffd5b5f5ffd5b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6100f0826100aa565b810181811067ffffffffffffffff8211171561010f5761010e6100ba565b5b80604052505050565b5f610121610091565b905061012d82826100e7565b919050565b5f67ffffffffffffffff82111561014c5761014b6100ba565b5b610155826100aa565b9050602081019050919050565b828183375f83830152505050565b5f61018261017d84610132565b610118565b90508281526020810184848401111561019e5761019d6100a6565b5b6101a9848285610162565b509392505050565b5f82601f8301126101c5576101c46100a2565b5b81356101d5848260208601610170565b91505092915050565b5f602082840312156101f3576101f261009a565b5b5f82013567ffffffffffffffff8111156102105761020f61009e565b5b61021c848285016101b1565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61024e82610225565b9050919050565b61025e81610244565b82525050565b5f6020820190506102775f830184610255565b9291505056fea264697066735822122053059908becc543c4f8d8f401652f4888f3e356e7d1c6567a4f53fcdf0ea6ea364736f6c634300081e0033").unwrap();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -2410,7 +2457,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result_create = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2451,7 +2498,7 @@ mod test {
             result,
             withdrawals: _,
         } = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2480,17 +2527,17 @@ mod test {
         let storage_account =
             StorageAccount::from_address(&addr_deployed_bytecode).unwrap();
         assert_eq!(
-            storage_account.info(&mut host).unwrap(),
+            storage_account.info(rk.host_mut()).unwrap(),
             AccountInfo::default()
         );
     }
 
     #[test]
     fn test_store_and_claim_fa_deposit_wrong_id() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         // Initialize dummy deposit, store it in the deposits table with id 1
 
@@ -2501,7 +2548,7 @@ mod test {
         let mut system = StorageAccount::from_address(&Address::ZERO).unwrap();
 
         system
-            .write_deposit(&mut host, &deposit_id, &dummy_deposit)
+            .write_deposit(rk.host_mut(), &deposit_id, &dummy_deposit)
             .unwrap();
 
         // Initialize caller with infinite balance to claim deposit
@@ -2521,7 +2568,7 @@ mod test {
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         // Claim deposit with id 2 (wrong id), revert is expected
@@ -2529,7 +2576,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let registry = Registry::new();
         run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2551,13 +2598,13 @@ mod test {
         )
         .unwrap();
 
-        let caller_account_info = caller_account.info(&mut host).unwrap();
+        let caller_account_info = caller_account.info(rk.host_mut()).unwrap();
         assert_eq!(initial_balance, caller_account_info.balance);
     }
 
     #[test]
     fn test_empty_authorization_list_are_prohibited() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
@@ -2580,11 +2627,11 @@ mod test {
         let destination_account = StorageAccount::from_address(&destination).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
-        let caller_info = caller_account.info(&mut host).unwrap();
-        let destination_info = destination_account.info(&mut host).unwrap();
+        let caller_info = caller_account.info(rk.host_mut()).unwrap();
+        let destination_info = destination_account.info(rk.host_mut()).unwrap();
         // Check balances before executing the transfer
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
@@ -2592,7 +2639,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2617,14 +2664,14 @@ mod test {
 
     #[test]
     fn deposit_and_claim_fa_with_empty_proxy() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
         let proxy = Address::from(&[1u8; 20]);
         let caller = Address::from(&[2u8; 20]);
         let receiver = Address::from(&[3u8; 20]);
 
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let deposit = ITable::FaDepositWithProxy {
             amount: U256::ONE,
@@ -2638,7 +2685,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2660,7 +2707,7 @@ mod test {
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2712,9 +2759,9 @@ mod test {
     // reverted zero balance must delete the node rather than persist a zero.
     #[test]
     fn test_reverted_fresh_ticket_balance_add_leaves_no_orphan_node() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let caller = Address::from(&[2u8; 20]);
         let receiver = Address::from(&[3u8; 20]);
@@ -2729,7 +2776,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let deploy_bytecode = Bytes::from_hex(CALL_AND_REVERT_INIT_CODE).unwrap();
         let result_create = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2768,7 +2815,7 @@ mod test {
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2790,14 +2837,14 @@ mod test {
         // Precondition: the ticket node for (hash, proxy) does not exist.
         let system = StorageAccount::from_address(&Address::ZERO).unwrap();
         assert!(!system
-            .ticket_balance_node_exists(&host, &ticket_hash, &proxy)
+            .ticket_balance_node_exists(rk.host(), &ticket_hash, &proxy)
             .unwrap());
 
         // Fund the caller so the wrapping call executes.
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
         caller_account
             .set_info_without_code(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     balance: U256::MAX,
                     nonce: 0,
@@ -2820,7 +2867,7 @@ mod test {
             });
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let ExecutionOutcome { result, .. } = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -2856,7 +2903,7 @@ mod test {
         // the pre-fix kernel (the node is present holding zero).
         let system = StorageAccount::from_address(&Address::ZERO).unwrap();
         assert!(!system
-            .ticket_balance_node_exists(&host, &ticket_hash, &proxy)
+            .ticket_balance_node_exists(rk.host(), &ticket_hash, &proxy)
             .unwrap());
     }
 
@@ -2877,6 +2924,9 @@ mod test {
         use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::{
+            MockRuntimeKeyspaces, RuntimeKeyspaces,
+        };
         use tezos_protocol::contract::Contract;
         use tezos_smart_rollup_encoding::michelson::{
             ticket::FA2_1Ticket, MichelsonOption, MichelsonPair,
@@ -2965,24 +3015,17 @@ mod test {
         }
 
         fn execute_fa_bridge(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             call_data: Bytes,
             gas_limit: u64,
             value: U256,
         ) -> ExecutionOutcome {
-            execute_call(
-                host,
-                caller,
-                call_data,
-                gas_limit,
-                value,
-                FA_BRIDGE_SOL_ADDR,
-            )
+            execute_call(rk, caller, call_data, gas_limit, value, FA_BRIDGE_SOL_ADDR)
         }
 
         fn execute_fa_deposit(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             deposit: FaDepositWithProxy,
         ) -> ExecutionOutcome {
@@ -2990,7 +3033,7 @@ mod test {
                 StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
             feed_deposit_addr
                 .set_info(
-                    host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::MAX,
                         ..Default::default()
@@ -3000,7 +3043,7 @@ mod test {
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let outcome = run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &BlockConstants::test_block_with_no_fees(),
@@ -3023,7 +3066,7 @@ mod test {
             let mut caller_account = StorageAccount::from_address(&caller).unwrap();
             caller_account
                 .set_info(
-                    host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::MAX,
                         ..Default::default()
@@ -3033,7 +3076,7 @@ mod test {
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let registry = Registry::new();
             run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &BlockConstants::test_block_with_no_fees(),
@@ -3057,7 +3100,7 @@ mod test {
         }
 
         fn execute_call(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             call_data: Bytes,
             gas_limit: u64,
@@ -3067,7 +3110,7 @@ mod test {
             let mut caller_account = StorageAccount::from_address(&caller).unwrap();
             caller_account
                 .set_info(
-                    host,
+                    rk.host_mut(),
                     AccountInfo {
                         balance: U256::MAX,
                         ..Default::default()
@@ -3077,7 +3120,7 @@ mod test {
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let registry = Registry::new();
             run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &BlockConstants::test_block_with_no_fees(),
@@ -3097,15 +3140,15 @@ mod test {
         }
 
         fn deploy_contract(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             calldata: Bytes,
         ) -> Address {
-            fund(host, caller);
+            fund(rk.host_mut(), caller);
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let result_create = run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &BlockConstants::test_block_with_no_fees(),
@@ -3153,13 +3196,13 @@ mod test {
 
         #[test]
         fn fa_bridge_precompile_fails_due_to_low_gas_limit() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             // Cover basic costs
             let gas_limit = 23460;
             let res = execute_fa_bridge(
-                &mut host,
+                &mut rk,
                 Address::ZERO,
                 withdrawCall::new((
                     Address::ZERO,
@@ -3183,19 +3226,19 @@ mod test {
 
         #[test]
         fn fa_bridge_precompile_fails_due_to_static_call() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let static_call_bytecode = Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap();
-            let static_caller = deploy_contract(&mut host, caller, static_call_bytecode);
+            let static_caller = deploy_contract(&mut rk, caller, static_call_bytecode);
 
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, ticket_owner, amount);
+                setup_ticket(rk.host_mut(), ticket_owner, amount);
             let res = execute_call(
-                &mut host,
+                &mut rk,
                 caller,
                 makeStaticCallCall::new((
                     FA_BRIDGE_SOL_ADDR,
@@ -3223,19 +3266,19 @@ mod test {
 
         #[test]
         fn fa_bridge_precompile_fails_due_to_delegate_call() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let delegate_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033").unwrap();
             let delegate_caller =
-                deploy_contract(&mut host, caller, delegate_call_bytecode);
+                deploy_contract(&mut rk, caller, delegate_call_bytecode);
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, ticket_owner, amount);
+                setup_ticket(rk.host_mut(), ticket_owner, amount);
             let res = execute_call(
-                &mut host,
+                &mut rk,
                 caller,
                 makeDelegateCallCall::new((
                     FA_BRIDGE_SOL_ADDR,
@@ -3263,16 +3306,16 @@ mod test {
 
         #[test]
         fn fa_bridge_precompile_succeeds_without_l2_proxy_contract() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, ticket_owner, amount);
+                setup_ticket(rk.host_mut(), ticket_owner, amount);
 
             let res = execute_fa_bridge(
-                &mut host,
+                &mut rk,
                 ticket_owner,
                 withdrawCall::new((
                     ticket_owner,
@@ -3304,8 +3347,8 @@ mod test {
 
         #[test]
         fn fa_bridge_precompile_cannot_call_itself() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let reentrancy_tester_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b5060405161156d38038061156d83398181016040528101906100319190610323565b61004586868686868661005060201b60201c565b5050505050506106ba565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550846001908161009e91906105eb565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c021790555081600490816100e491906105eb565b5080600581905550505050505050565b5f604051905090565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61012e82610105565b9050919050565b61013e81610124565b8114610148575f5ffd5b50565b5f8151905061015981610135565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101ad82610167565b810181811067ffffffffffffffff821117156101cc576101cb610177565b5b80604052505050565b5f6101de6100f4565b90506101ea82826101a4565b919050565b5f67ffffffffffffffff82111561020957610208610177565b5b61021282610167565b9050602081019050919050565b8281835e5f83830152505050565b5f61023f61023a846101ef565b6101d5565b90508281526020810184848401111561025b5761025a610163565b5b61026684828561021f565b509392505050565b5f82601f8301126102825761028161015f565b5b815161029284826020860161022d565b91505092915050565b5f819050919050565b6102ad8161029b565b81146102b7575f5ffd5b50565b5f815190506102c8816102a4565b92915050565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b610302816102ce565b811461030c575f5ffd5b50565b5f8151905061031d816102f9565b92915050565b5f5f5f5f5f5f60c0878903121561033d5761033c6100fd565b5b5f61034a89828a0161014b565b965050602087015167ffffffffffffffff81111561036b5761036a610101565b5b61037789828a0161026e565b955050604061038889828a016102ba565b945050606061039989828a0161030f565b935050608087015167ffffffffffffffff8111156103ba576103b9610101565b5b6103c689828a0161026e565b92505060a06103d789828a016102ba565b9150509295509295509295565b5f81519050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f600282049050600182168061043257607f821691505b602082108103610445576104446103ee565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f600883026104a77fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8261046c565b6104b1868361046c565b95508019841693508086168417925050509392505050565b5f819050919050565b5f6104ec6104e76104e28461029b565b6104c9565b61029b565b9050919050565b5f819050919050565b610505836104d2565b610519610511826104f3565b848454610478565b825550505050565b5f5f905090565b610530610521565b61053b8184846104fc565b505050565b5b8181101561055e576105535f82610528565b600181019050610541565b5050565b601f8211156105a3576105748161044b565b61057d8461045d565b8101602085101561058c578190505b6105a06105988561045d565b830182610540565b50505b505050565b5f82821c905092915050565b5f6105c35f19846008026105a8565b1980831691505092915050565b5f6105db83836105b4565b9150826002028217905092915050565b6105f4826103e4565b67ffffffffffffffff81111561060d5761060c610177565b5b610617825461041b565b610622828285610562565b5f60209050601f831160018114610653575f8415610641578287015190505b61064b85826105d0565b8655506106b2565b601f1984166106618661044b565b5f5b8281101561068857848901518255600182019150602085019450602081019050610663565b868310156106a557848901516106a1601f8916826105b4565b8355505b6001600288020188555050505b505050505050565b610ea6806106c75f395ff3fe608060405234801561000f575f5ffd5b5060043610610091575f3560e01c806359537d491161006457806359537d491461010b57806373af3851146101275780638a4d5a6714610145578063aa8c217c14610163578063b5c5f6721461018157610091565b8063071c9308146100955780630be69fcd146100b35780630efe6a8b146100d15780633f70f347146100ed575b5f5ffd5b61009d61019d565b6040516100aa91906105a3565b60405180910390f35b6100bb6101c1565b6040516100c891906105d4565b60405180910390f35b6100eb60048036038101906100e69190610652565b6101c7565b005b6100f56101d4565b60405161010291906106dc565b60405180910390f35b6101256004803603810190610120919061085b565b6101e6565b005b61012f61028a565b60405161013c919061097c565b60405180910390f35b61014d610316565b60405161015a919061097c565b60405180910390f35b61016b6103a2565b60405161017891906105d4565b60405180910390f35b61019b60048036038101906101969190610652565b6103a8565b005b5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60055481565b6101cf6103b5565b505050565b60035f9054906101000a900460501b81565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555084600190816102349190610b99565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c0217905550816004908161027a9190610b99565b5080600581905550505050505050565b60018054610297906109c9565b80601f01602080910402602001604051908101604052809291908181526020018280546102c3906109c9565b801561030e5780601f106102e55761010080835404028352916020019161030e565b820191905f5260205f20905b8154815290600101906020018083116102f157829003601f168201915b505050505081565b60048054610323906109c9565b80601f016020809104026020016040519081016040528092919081815260200182805461034f906109c9565b801561039a5780601f106103715761010080835404028352916020019161039a565b820191905f5260205f20905b81548152906001019060200180831161037d57829003601f168201915b505050505081565b60025481565b6103b06103b5565b505050565b5f30600160025460035f9054906101000a900460501b60046040516024016103e1959493929190610ce9565b6040516020818303038152906040527f80fc1fe3000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff8381831617835250505050905061048e5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16825f600554610491565b50565b5f600190505b81811161055d575f8573ffffffffffffffffffffffffffffffffffffffff1684866040516104c59190610d82565b5f6040518083038185875af1925050503d805f81146104ff576040519150601f19603f3d011682016040523d82523d5f602084013e610504565b606091505b5050905080610548576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161053f90610df2565b60405180910390fd5b6001826105559190610e3d565b915050610497565b5050505050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61058d82610564565b9050919050565b61059d81610583565b82525050565b5f6020820190506105b65f830184610594565b92915050565b5f819050919050565b6105ce816105bc565b82525050565b5f6020820190506105e75f8301846105c5565b92915050565b5f604051905090565b5f5ffd5b5f5ffd5b61060781610583565b8114610611575f5ffd5b50565b5f81359050610622816105fe565b92915050565b610631816105bc565b811461063b575f5ffd5b50565b5f8135905061064c81610628565b92915050565b5f5f5f60608486031215610669576106686105f6565b5b5f61067686828701610614565b93505060206106878682870161063e565b92505060406106988682870161063e565b9150509250925092565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b6106d6816106a2565b82525050565b5f6020820190506106ef5f8301846106cd565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b610743826106fd565b810181811067ffffffffffffffff821117156107625761076161070d565b5b80604052505050565b5f6107746105ed565b9050610780828261073a565b919050565b5f67ffffffffffffffff82111561079f5761079e61070d565b5b6107a8826106fd565b9050602081019050919050565b828183375f83830152505050565b5f6107d56107d084610785565b61076b565b9050828152602081018484840111156107f1576107f06106f9565b5b6107fc8482856107b5565b509392505050565b5f82601f830112610818576108176106f5565b5b81356108288482602086016107c3565b91505092915050565b61083a816106a2565b8114610844575f5ffd5b50565b5f8135905061085581610831565b92915050565b5f5f5f5f5f5f60c08789031215610875576108746105f6565b5b5f61088289828a01610614565b965050602087013567ffffffffffffffff8111156108a3576108a26105fa565b5b6108af89828a01610804565b95505060406108c089828a0161063e565b94505060606108d189828a01610847565b935050608087013567ffffffffffffffff8111156108f2576108f16105fa565b5b6108fe89828a01610804565b92505060a061090f89828a0161063e565b9150509295509295509295565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f61094e8261091c565b6109588185610926565b9350610968818560208601610936565b610971816106fd565b840191505092915050565b5f6020820190508181035f8301526109948184610944565b905092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806109e057607f821691505b6020821081036109f3576109f261099c565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f60088302610a557fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82610a1a565b610a5f8683610a1a565b95508019841693508086168417925050509392505050565b5f819050919050565b5f610a9a610a95610a90846105bc565b610a77565b6105bc565b9050919050565b5f819050919050565b610ab383610a80565b610ac7610abf82610aa1565b848454610a26565b825550505050565b5f5f905090565b610ade610acf565b610ae9818484610aaa565b505050565b5b81811015610b0c57610b015f82610ad6565b600181019050610aef565b5050565b601f821115610b5157610b22816109f9565b610b2b84610a0b565b81016020851015610b3a578190505b610b4e610b4685610a0b565b830182610aee565b50505b505050565b5f82821c905092915050565b5f610b715f1984600802610b56565b1980831691505092915050565b5f610b898383610b62565b9150826002028217905092915050565b610ba28261091c565b67ffffffffffffffff811115610bbb57610bba61070d565b5b610bc582546109c9565b610bd0828285610b10565b5f60209050601f831160018114610c01575f8415610bef578287015190505b610bf98582610b7e565b865550610c60565b601f198416610c0f866109f9565b5f5b82811015610c3657848901518255600182019150602085019450602081019050610c11565b86831015610c535784890151610c4f601f891682610b62565b8355505b6001600288020188555050505b505050505050565b5f8154610c74816109c9565b610c7e8186610926565b9450600182165f8114610c985760018114610cae57610ce0565b60ff198316865281151560200286019350610ce0565b610cb7856109f9565b5f5b83811015610cd857815481890152600182019150602081019050610cb9565b808801955050505b50505092915050565b5f60a082019050610cfc5f830188610594565b8181036020830152610d0e8187610c68565b9050610d1d60408301866105c5565b610d2a60608301856106cd565b8181036080830152610d3c8184610c68565b90509695505050505050565b5f81905092915050565b5f610d5c8261091c565b610d668185610d48565b9350610d76818560208601610936565b80840191505092915050565b5f610d8d8284610d52565b915081905092915050565b5f82825260208201905092915050565b7f43616c6c20746f2074617267657420636f6e7472616374206661696c656400005f82015250565b5f610ddc601e83610d98565b9150610de782610da8565b602082019050919050565b5f6020820190508181035f830152610e0981610dd0565b9050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f610e47826105bc565b9150610e52836105bc565b9250828201905080821115610e6a57610e69610e10565b5b9291505056fea264697066735822122030849f76b9e4e5acaa2fa563f76431ebe5059d03f496c9d7d864978421d72a6e64736f6c634300081e0033").unwrap();
@@ -3331,7 +3374,7 @@ mod test {
             .abi_encode()
             .into();
             let reentrancy_tester = deploy_contract(
-                &mut host,
+                &mut rk,
                 caller,
                 [reentrancy_tester_bytecode, calldata].concat().into(),
             );
@@ -3339,14 +3382,14 @@ mod test {
                 StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
                 .write_ticket_balance(
-                    &mut host,
+                    rk.host_mut(),
                     &ticket_hash(&ticket),
                     &reentrancy_tester,
                     U256::from(100),
                 )
                 .unwrap();
             let res = execute_fa_bridge(
-                &mut host,
+                &mut rk,
                 caller,
                 withdrawCall::new((
                     reentrancy_tester,
@@ -3439,8 +3482,8 @@ mod test {
 
         #[test]
         fn fa_deposit_reached_wrapper_contract() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -3457,7 +3500,7 @@ mod test {
             .into();
 
             let proxy = deploy_contract(
-                &mut host,
+                &mut rk,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -3472,20 +3515,20 @@ mod test {
                 inboxMsgId: U256::ZERO,
             };
 
-            let outcome = execute_fa_deposit(&mut host, caller, deposit.clone());
+            let outcome = execute_fa_deposit(&mut rk, caller, deposit.clone());
             assert!(outcome.result.is_success());
             assert_eq!(outcome.result.logs().len(), 2);
 
-            let flag = get_storage_flag(&host, proxy);
+            let flag = get_storage_flag(rk.host(), proxy);
             assert_eq!(deposit.amount, flag);
 
             let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let receiver_balance = system_account
-                .read_ticket_balance(&host, &ticket_hash(&ticket), &caller)
+                .read_ticket_balance(rk.host(), &ticket_hash(&ticket), &caller)
                 .unwrap();
             assert_eq!(receiver_balance, U256::ZERO);
             let proxy_balance = system_account
-                .read_ticket_balance(&host, &ticket_hash(&ticket), &proxy)
+                .read_ticket_balance(rk.host(), &ticket_hash(&ticket), &proxy)
                 .unwrap();
             assert_eq!(proxy_balance, deposit.amount);
 
@@ -3505,8 +3548,8 @@ mod test {
 
         #[test]
         fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -3523,7 +3566,7 @@ mod test {
             .into();
 
             let proxy = deploy_contract(
-                &mut host,
+                &mut rk,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -3540,18 +3583,23 @@ mod test {
             let mut system_account =
                 StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
-                .write_ticket_balance(&mut host, &ticket_hash(&ticket), &proxy, U256::MAX)
+                .write_ticket_balance(
+                    rk.host_mut(),
+                    &ticket_hash(&ticket),
+                    &proxy,
+                    U256::MAX,
+                )
                 .unwrap();
 
-            let outcome = execute_fa_deposit(&mut host, caller, deposit);
+            let outcome = execute_fa_deposit(&mut rk, caller, deposit);
             dbg!(&outcome);
             assert_eq!(RevertReason::decode(outcome.result.output().unwrap()).unwrap().to_string(), "revert: Failed to increment ticket balance: ticket_balance_add call was unsuccessful".to_string());
         }
 
         #[test]
         fn fa_deposit_refused_non_compatible_interface() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
@@ -3568,30 +3616,30 @@ mod test {
             // Making it look as a smart contract
             let bytecode: Bytes = [208u8; 1024].to_vec().into();
             let code_hash = keccak256(&bytecode);
-            CodeStorage::add(&mut host, &bytecode, Some(code_hash)).unwrap();
+            CodeStorage::add(rk.host_mut(), &bytecode, Some(code_hash)).unwrap();
             let mut account = StorageAccount::from_address(&proxy).unwrap();
-            let mut info = account.info(&mut host).unwrap();
+            let mut info = account.info(rk.host_mut()).unwrap();
             info.code_hash = code_hash;
-            account.set_info(&mut host, info).unwrap();
+            account.set_info(rk.host_mut(), info).unwrap();
 
-            let outcome = execute_fa_deposit(&mut host, caller, deposit.clone());
+            let outcome = execute_fa_deposit(&mut rk, caller, deposit.clone());
             assert_eq!(outcome.result.logs().len(), 1);
 
             let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let receiver_balance = system_account
-                .read_ticket_balance(&host, &ticket_hash(&ticket), &caller)
+                .read_ticket_balance(rk.host(), &ticket_hash(&ticket), &caller)
                 .unwrap();
             assert_eq!(receiver_balance, deposit.amount);
             let proxy_balance = system_account
-                .read_ticket_balance(&host, &ticket_hash(&ticket), &proxy)
+                .read_ticket_balance(rk.host(), &ticket_hash(&ticket), &proxy)
                 .unwrap();
             assert_eq!(proxy_balance, U256::ZERO);
         }
 
         #[test]
         fn fa_withdrawal_executed_via_l2_proxy_contract() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -3609,7 +3657,7 @@ mod test {
             .into();
 
             let proxy = deploy_contract(
-                &mut host,
+                &mut rk,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -3643,7 +3691,7 @@ mod test {
                 StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
                 .write_ticket_balance(
-                    &mut host,
+                    rk.host_mut(),
                     &ticket_hash(&ticket),
                     &proxy,
                     fa_withdrawal.amount,
@@ -3658,7 +3706,7 @@ mod test {
             ]
             .concat();
             let outcome = execute_fa_bridge(
-                &mut host,
+                &mut rk,
                 caller,
                 withdrawCall::new((
                     proxy,
@@ -3676,14 +3724,14 @@ mod test {
             assert!(!outcome.withdrawals.is_empty());
 
             // Ensure proxy contract state changed
-            let flag = get_storage_flag(&host, proxy);
+            let flag = get_storage_flag(rk.host(), proxy);
             assert_eq!(fa_withdrawal.amount, flag);
 
             let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let balance = system_account
-                .read_ticket_balance(&host, &ticket_hash(&ticket), &proxy)
+                .read_ticket_balance(rk.host(), &ticket_hash(&ticket), &proxy)
                 .unwrap();
-            let global_counter = system_account.read_global_counter(&host).unwrap();
+            let global_counter = system_account.read_global_counter(rk.host()).unwrap();
             assert_eq!(balance, U256::ZERO);
 
             let burn_event =
@@ -3704,17 +3752,17 @@ mod test {
 
         #[test]
         fn fa_withdrawal_fails_due_to_insufficient_balance() {
-            let mut host = MockKernelHost::default();
-            init_precompile_bytecodes(&mut host, true).unwrap();
+            let mut rk = RuntimeKeyspaces::default();
+            init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
             let amount = U256::from(10u64);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, caller, amount);
+                setup_ticket(rk.host_mut(), caller, amount);
 
             let outcome = execute_fa_bridge(
-                &mut host,
+                &mut rk,
                 caller,
                 withdrawCall::new((
                     proxy,
@@ -3732,7 +3780,8 @@ mod test {
             assert!(outcome.withdrawals.is_empty());
             assert!(outcome.result.logs().is_empty());
             let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
-            let withdrawal_counter = system_account.read_global_counter(&host).unwrap();
+            let withdrawal_counter =
+                system_account.read_global_counter(rk.host()).unwrap();
             assert_eq!(withdrawal_counter, U256::ZERO);
         }
     }
@@ -3767,7 +3816,9 @@ mod test {
             primitives::{hex::FromHex, Address, Bytes, U256},
         };
         use tezos_ethereum::block::BlockConstants;
-        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::{
+            MockRuntimeKeyspaces, RuntimeKeyspaces,
+        };
         use tezosx_journal::TezosXJournal;
 
         use crate::{
@@ -3809,7 +3860,7 @@ mod test {
         }
 
         fn deploy(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             bytecode_hex: &str,
         ) -> Address {
@@ -3817,7 +3868,7 @@ mod test {
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             let outcome = run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &block_constants(),
@@ -3844,7 +3895,7 @@ mod test {
         }
 
         fn call_into(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             destination: Address,
             calldata: Bytes,
@@ -3852,7 +3903,7 @@ mod test {
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &block_constants(),
@@ -3911,10 +3962,10 @@ mod test {
         /// DELEGATECALL/CALLCODE exclusively.
         #[test]
         fn runtime_gateway_rejects_delegate_call_on_call_michelson() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let delegate_caller = deploy(&mut rk, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -3923,7 +3974,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, delegate_caller, outer);
+            let res = call_into(&mut rk, caller, delegate_caller, outer);
             match res.result {
                 ExecutionResult::Revert { .. } => { /* expected */ }
                 other => {
@@ -3936,10 +3987,10 @@ mod test {
         /// even view selectors, before any per-selector dispatch.
         #[test]
         fn runtime_gateway_rejects_delegate_call_on_call_michelson_view() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let delegate_caller = deploy(&mut host, caller, DELEGATE_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let delegate_caller = deploy(&mut rk, caller, DELEGATE_CALLER_BYTECODE);
 
             let outer = makeDelegateCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -3948,7 +3999,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, delegate_caller, outer);
+            let res = call_into(&mut rk, caller, delegate_caller, outer);
             match res.result {
                 ExecutionResult::Revert { .. } => { /* expected */ }
                 other => {
@@ -3965,10 +4016,10 @@ mod test {
         /// state-mutating effects forbidden under STATICCALL.
         #[test]
         fn runtime_gateway_rejects_static_call_on_call_michelson() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let static_caller = deploy(&mut rk, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -3977,7 +4028,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, static_caller, outer);
+            let res = call_into(&mut rk, caller, static_caller, outer);
             match res.result {
                 ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                     /* expected */
@@ -3993,10 +4044,10 @@ mod test {
         /// `burn_gateway_residual`. STATICCALL must revert.
         #[test]
         fn runtime_gateway_rejects_static_call_on_call_post() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let static_caller = deploy(&mut rk, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -4005,7 +4056,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, static_caller, outer);
+            let res = call_into(&mut rk, caller, static_caller, outer);
             match res.result {
                 ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                     /* expected */
@@ -4024,10 +4075,10 @@ mod test {
         /// residual balance.
         #[test]
         fn runtime_gateway_allows_static_call_on_call_michelson_view() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let static_caller = deploy(&mut rk, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -4036,7 +4087,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, static_caller, outer);
+            let res = call_into(&mut rk, caller, static_caller, outer);
             assert!(
                 res.result.is_success(),
                 "STATICCALL on callMichelsonView (view) should succeed, \
@@ -4049,10 +4100,10 @@ mod test {
         /// of `callMichelsonView`. STATICCALL must succeed.
         #[test]
         fn runtime_gateway_allows_static_call_on_call_get() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
-            let static_caller = deploy(&mut host, caller, STATIC_CALLER_BYTECODE);
+            fund(rk.host_mut(), caller);
+            let static_caller = deploy(&mut rk, caller, STATIC_CALLER_BYTECODE);
 
             let outer = makeStaticCallCall::new((
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -4061,7 +4112,7 @@ mod test {
             .abi_encode()
             .into();
 
-            let res = call_into(&mut host, caller, static_caller, outer);
+            let res = call_into(&mut rk, caller, static_caller, outer);
             assert!(
                 res.result.is_success(),
                 "STATICCALL on call(GET) (view) should succeed, got {:?}",
@@ -4075,7 +4126,7 @@ mod test {
         /// pre-seeded `cross_runtime_originator`, mirroring an inbound
         /// Michelson → EVM CRAC frame.
         fn call_gateway_with_originator(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             originator: Address,
             calldata: Bytes,
@@ -4084,7 +4135,7 @@ mod test {
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             journal.evm.set_cross_runtime_originator(Some(originator));
             run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &block_constants(),
@@ -4125,13 +4176,13 @@ mod test {
         /// between source and sender.
         #[test]
         fn call_michelson_view_forwards_transitive_source_not_immediate_sender() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]); // immediate sender
             let originator = Address::from([2u8; 20]); // transitive source
-            fund(&mut host, caller);
+            fund(rk.host_mut(), caller);
 
             let res = call_gateway_with_originator(
-                &mut host,
+                &mut rk,
                 caller,
                 originator,
                 call_michelson_view_payload(),
@@ -4150,12 +4201,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(&host).as_deref(),
+                last_recorded_source(rk.host()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(&host).as_deref(),
+                last_recorded_sender(rk.host()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -4165,13 +4216,13 @@ mod test {
         /// selector, which shares the read-only forwarding path.
         #[test]
         fn generic_get_forwards_transitive_source_not_immediate_sender() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
             let originator = Address::from([2u8; 20]);
-            fund(&mut host, caller);
+            fund(rk.host_mut(), caller);
 
             let res = call_gateway_with_originator(
-                &mut host,
+                &mut rk,
                 caller,
                 originator,
                 call_payload(0),
@@ -4188,12 +4239,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(&host).as_deref(),
+                last_recorded_source(rk.host()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(&host).as_deref(),
+                last_recorded_sender(rk.host()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -4217,9 +4268,9 @@ mod test {
         #[test]
         fn call_michelson_view_matches_call_get_payload_slope() {
             fn view_gas(input_len: usize) -> u64 {
-                let mut host = MockKernelHost::default();
+                let mut rk = RuntimeKeyspaces::default();
                 let caller = Address::from([1u8; 20]);
-                fund(&mut host, caller);
+                fund(rk.host_mut(), caller);
                 let payload =
                     RuntimeGatewayCalls::callMichelsonView(callMichelsonViewCall {
                         destination: "KT1abc".to_string(),
@@ -4229,7 +4280,7 @@ mod test {
                     .abi_encode()
                     .into();
                 let res = call_into(
-                    &mut host,
+                    &mut rk,
                     caller,
                     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
                     payload,
@@ -4243,9 +4294,9 @@ mod test {
             }
 
             fn get_gas(body_len: usize) -> u64 {
-                let mut host = MockKernelHost::default();
+                let mut rk = RuntimeKeyspaces::default();
                 let caller = Address::from([1u8; 20]);
-                fund(&mut host, caller);
+                fund(rk.host_mut(), caller);
                 let payload = RuntimeGatewayCalls::call(callCall {
                     url: "http://tezos/KT1abc/balanceOf".to_string(),
                     headers: vec![],
@@ -4255,7 +4306,7 @@ mod test {
                 .abi_encode()
                 .into();
                 let res = call_into(
-                    &mut host,
+                    &mut rk,
                     caller,
                     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
                     payload,
@@ -4315,11 +4366,11 @@ mod test {
             const ENTRYPOINT: &str = "foo";
 
             // Typed surface: callMichelson(destination, entrypoint, params).
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([1u8; 20]);
-            fund(&mut host, caller);
+            fund(rk.host_mut(), caller);
             let typed = call_into(
-                &mut host,
+                &mut rk,
                 caller,
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
                 RuntimeGatewayCalls::callMichelson(callMichelsonCall {
@@ -4338,10 +4389,10 @@ mod test {
             let typed_target = cracsent_target_address(&typed);
 
             // Generic surface: call(POST) to the same contract+entrypoint.
-            let mut host = MockKernelHost::default();
-            fund(&mut host, caller);
+            let mut rk = RuntimeKeyspaces::default();
+            fund(rk.host_mut(), caller);
             let generic = call_into(
-                &mut host,
+                &mut rk,
                 caller,
                 RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
                 RuntimeGatewayCalls::call(callCall {
@@ -4392,6 +4443,9 @@ mod test {
         use rlp::Rlp;
         use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::{
+            MockRuntimeKeyspaces, RuntimeKeyspaces,
+        };
         use tezos_indexable_storage::IndexableStorage;
         use tezos_smart_rollup_host::path::RefPath;
         use tezosx_interfaces::RuntimeId;
@@ -4417,7 +4471,7 @@ mod test {
         // they differ only in the destination (`None` creates a contract)
         // and whether a tracer is attached.
         fn run(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             to: Option<Address>,
             calldata: Bytes,
@@ -4429,7 +4483,7 @@ mod test {
                 journal.evm.set_tracer(tracer);
             }
             let outcome = run_transaction(
-                host,
+                rk,
                 &registry,
                 &mut journal,
                 &BlockConstants::test_block_with_no_fees(),
@@ -4449,15 +4503,15 @@ mod test {
 
             if let Some(mut tracer) = journal.evm.take_tracer() {
                 tracer
-                    .finalize(host, &outcome.result)
+                    .finalize(rk.host_mut(), &outcome.result)
                     .expect("tracer finalization should succeed");
             }
             outcome
         }
 
-        fn deploy(host: &mut MockKernelHost, caller: Address) -> Address {
+        fn deploy(rk: &mut MockRuntimeKeyspaces, caller: Address) -> Address {
             let outcome = run(
-                host,
+                rk,
                 caller,
                 None,
                 Bytes::from_hex(STATIC_CALLER_BYTECODE).unwrap(),
@@ -4473,13 +4527,13 @@ mod test {
         }
 
         fn run_traced(
-            host: &mut MockKernelHost,
+            rk: &mut MockRuntimeKeyspaces,
             caller: Address,
             destination: Address,
             calldata: Bytes,
             tracer: Tracer,
         ) -> ExecutionOutcome {
-            run(host, caller, Some(destination), calldata, Some(tracer))
+            run(rk, caller, Some(destination), calldata, Some(tracer))
         }
 
         fn call_tracer(tx_hash: B256) -> Tracer {
@@ -4537,10 +4591,10 @@ mod test {
         /// as its own child frame carrying the precompile's real output.
         #[test]
         fn nested_precompile_call_records_real_outcome() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([0x11; 20]);
-            fund(&mut host, caller);
-            let static_caller = deploy(&mut host, caller);
+            fund(rk.host_mut(), caller);
+            let static_caller = deploy(&mut rk, caller);
 
             let identity = identity_precompile();
             let payload = Bytes::from(vec![0xAB; 64]);
@@ -4550,13 +4604,13 @@ mod test {
 
             let tx_hash = B256::from([0xC1; 32]);
             let tracer = call_tracer(tx_hash);
-            let outcome = run_traced(&mut host, caller, static_caller, calldata, tracer);
+            let outcome = run_traced(&mut rk, caller, static_caller, calldata, tracer);
             assert!(
                 outcome.result.is_success(),
                 "static call to the identity precompile should succeed"
             );
 
-            let traces = read_traces(&host, tx_hash);
+            let traces = read_traces(rk.host(), tx_hash);
             assert_eq!(
                 traces.len(),
                 2,
@@ -4582,22 +4636,22 @@ mod test {
         /// a single top-level frame carrying the precompile's real output.
         #[test]
         fn top_level_precompile_call_records_real_outcome() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let caller = Address::from([0x11; 20]);
-            fund(&mut host, caller);
+            fund(rk.host_mut(), caller);
 
             let identity = identity_precompile();
             let input = Bytes::from(vec![0x42; 96]);
 
             let tx_hash = B256::from([0xD2; 32]);
             let tracer = call_tracer(tx_hash);
-            let outcome = run_traced(&mut host, caller, identity, input.clone(), tracer);
+            let outcome = run_traced(&mut rk, caller, identity, input.clone(), tracer);
             assert!(
                 outcome.result.is_success(),
                 "call to the identity precompile should succeed"
             );
 
-            let traces = read_traces(&host, tx_hash);
+            let traces = read_traces(rk.host(), tx_hash);
             assert_eq!(traces.len(), 1, "expected a single top-level frame");
 
             let frame = Rlp::new(&traces[0]);
@@ -4649,7 +4703,7 @@ mod test {
         };
         use rlp::Rlp;
         use tezos_ethereum::block::BlockConstants;
-        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_indexable_storage::IndexableStorage;
         use tezos_smart_rollup_host::path::RefPath;
         use tezosx_interfaces::RuntimeId;
@@ -4709,7 +4763,7 @@ mod test {
 
         #[test]
         fn outer_frame_keeps_its_own_intrinsic_gas_across_crossing() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let registry = Registry::new();
             let block_constants = BlockConstants::test_block_with_no_fees();
             let block = block_env(&block_constants).unwrap();
@@ -4753,7 +4807,7 @@ mod test {
             );
 
             {
-                let db = EtherlinkVMDB::new(&mut host, &registry, &block_constants, None)
+                let db = EtherlinkVMDB::new(&mut rk, &registry, &block_constants, None)
                     .unwrap();
                 let mut evm_journal = TezosXJournal::mock(RuntimeId::Ethereum);
                 let mut journaled_state = Journal::new_with_inner(db, &mut evm_journal);
@@ -4827,7 +4881,7 @@ mod test {
                 output: Output::Call(Bytes::new()),
             };
             tracer
-                .finalize(&mut host, &result)
+                .finalize(rk.host_mut(), &result)
                 .expect("tracer finalization should succeed");
 
             // Read the flushed traces back and locate the top frame.
@@ -4835,9 +4889,9 @@ mod test {
                 trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
                     .unwrap();
             let storage = IndexableStorage::new_owned_path(path);
-            let length = storage.length(&host).unwrap();
+            let length = storage.length(rk.host()).unwrap();
             let traces: Vec<Vec<u8>> = (0..length)
-                .map(|index| storage.get_value(&host, index).unwrap())
+                .map(|index| storage.get_value(rk.host(), index).unwrap())
                 .collect();
             assert_eq!(traces.len(), 2, "expected the outer and inner frames");
 
@@ -4858,7 +4912,7 @@ mod test {
 
     #[test]
     fn test_osaka_clz_is_enabled() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
@@ -4879,7 +4933,7 @@ mod test {
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
         caller_account
-            .set_info_without_code(&mut host, caller_info)
+            .set_info_without_code(rk.host_mut(), caller_info)
             .unwrap();
 
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
@@ -4900,12 +4954,14 @@ mod test {
             code: Some(bytecode),
         };
 
-        contract_account.set_info(&mut host, contract_info).unwrap();
+        contract_account
+            .set_info(rk.host_mut(), contract_info)
+            .unwrap();
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -4937,10 +4993,10 @@ mod test {
     /// and that it points to the AliasForwarder implementation.
     #[test]
     fn test_alias_forwarder_proxy_is_correctly_deployed() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // Initialize all precompiles (including AliasForwarder)
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         // Native Tezos address
         let native_address = "tz1TestForwarder123";
@@ -4950,7 +5006,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -4971,7 +5027,7 @@ mod test {
         // successful parent operation.
         let block_constants = BlockConstants::test_block_with_no_fees();
         crate::journal::commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -4980,7 +5036,7 @@ mod test {
 
         // Verify the alias has code (delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();
-        let alias_info = alias_account.info(&mut host).unwrap();
+        let alias_info = alias_account.info(rk.host_mut()).unwrap();
         assert_ne!(
             alias_info.code_hash,
             revm::primitives::KECCAK_EMPTY,
@@ -5001,7 +5057,7 @@ mod test {
         use crate::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
         let precompile_account =
             StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS).unwrap();
-        let precompile_info = precompile_account.info(&mut host).unwrap();
+        let precompile_info = precompile_account.info(rk.host_mut()).unwrap();
         assert_ne!(
             precompile_info.code_hash,
             revm::primitives::KECCAK_EMPTY,
@@ -5013,8 +5069,8 @@ mod test {
     /// Native — a natively signing account cannot become an alias.
     #[test]
     fn test_ensure_alias_refuses_native_tagged_address() {
-        let mut host = MockKernelHost::default();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let native_address = "tz1NativeTagged";
         let alias = {
@@ -5024,7 +5080,7 @@ mod test {
         StorageAccount::from_address(&alias)
             .unwrap()
             .set_info_without_code(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     nonce: 1,
                     origin: AccountOrigin::Native,
@@ -5036,7 +5092,7 @@ mod test {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let result = registry.ensure_alias(
-            &mut host,
+            &mut rk,
             &mut journal,
             AliasInfo {
                 runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5062,8 +5118,8 @@ mod test {
             alias_forwarder_delegation, alias_forwarder_delegation_code_hash,
         };
 
-        let mut host = MockKernelHost::default();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let native_address = "tz1Branch2Forwarder";
         let alias = {
@@ -5073,18 +5129,18 @@ mod test {
 
         // Branch 2 precondition: delegation code present, classification empty.
         CodeStorage::add(
-            &mut host,
+            rk.host_mut(),
             alias_forwarder_delegation().original_byte_slice(),
             Some(alias_forwarder_delegation_code_hash()),
         )
         .unwrap();
         let mut alias_account = StorageAccount::from_address(&alias).unwrap();
-        let mut info = alias_account.info(&mut host).unwrap();
+        let mut info = alias_account.info(rk.host_mut()).unwrap();
         info.code_hash = alias_forwarder_delegation_code_hash();
         alias_account
-            .set_info_without_code(&mut host, info)
+            .set_info_without_code(rk.host_mut(), info)
             .unwrap();
-        let precondition_origin = alias_account.info(&mut host).unwrap().origin;
+        let precondition_origin = alias_account.info(rk.host_mut()).unwrap().origin;
         assert_eq!(
             precondition_origin,
             AccountOrigin::Unclassified,
@@ -5095,7 +5151,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5111,7 +5167,7 @@ mod test {
         // The classification is staged, not yet durable.
         let staged_origin = StorageAccount::from_address(&alias)
             .unwrap()
-            .info(&mut host)
+            .info(rk.host_mut())
             .unwrap()
             .origin;
         assert_eq!(
@@ -5122,7 +5178,7 @@ mod test {
 
         let block_constants = BlockConstants::test_block_with_no_fees();
         crate::journal::commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -5134,7 +5190,7 @@ mod test {
         // EVM run (leftover staged alias).
         let origin = StorageAccount::from_address(&alias)
             .unwrap()
-            .info(&mut host)
+            .info(rk.host_mut())
             .unwrap()
             .origin;
         match origin {
@@ -5161,7 +5217,7 @@ mod test {
         use revm::state::{Account, AccountStatus};
         use revm::DatabaseCommit;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let block = BlockConstants::test_block_with_no_fees();
         let registry = Registry::new();
 
@@ -5175,10 +5231,10 @@ mod test {
             code: None,
         };
         account
-            .set_info_without_code(&mut host, info.clone())
+            .set_info_without_code(rk.host_mut(), info.clone())
             .unwrap();
 
-        let mut db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
+        let mut db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
         let mut touched = Account {
             info: info.into(),
             ..Account::default()
@@ -5186,7 +5242,7 @@ mod test {
         touched.status = AccountStatus::Touched;
         DatabaseCommit::commit(&mut db, AddressMap::from_iter([(eoa, touched)]));
 
-        let origin = account.info(&mut host).unwrap().origin;
+        let origin = account.info(rk.host_mut()).unwrap().origin;
         assert_eq!(
             origin,
             AccountOrigin::Native,
@@ -5201,8 +5257,8 @@ mod test {
     fn test_alias_materialization_dropped_on_outer_frame_revert() {
         use crate::precompiles::constants::alias_forwarder_delegation_code_hash;
 
-        let mut host = MockKernelHost::default();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let native_address = "tz1OuterRevertForwarder";
         let alias = {
@@ -5221,7 +5277,7 @@ mod test {
         // Branch 3: full materialization of a fresh alias.
         registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5242,7 +5298,7 @@ mod test {
             .is_some());
         let staged_origin = StorageAccount::from_address(&alias)
             .unwrap()
-            .info(&mut host)
+            .info(rk.host_mut())
             .unwrap()
             .origin;
         assert_eq!(staged_origin, AccountOrigin::Unclassified);
@@ -5263,7 +5319,7 @@ mod test {
         // contribute nothing durable.
         let block_constants = BlockConstants::test_block_with_no_fees();
         crate::journal::commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -5272,11 +5328,11 @@ mod test {
 
         let alias_account = StorageAccount::from_address(&alias).unwrap();
         assert_ne!(
-            alias_account.info(&mut host).unwrap().code_hash,
+            alias_account.info(rk.host_mut()).unwrap().code_hash,
             alias_forwarder_delegation_code_hash(),
             "no delegation code_hash may survive an outer-frame revert"
         );
-        let reverted_origin = alias_account.info(&mut host).unwrap().origin;
+        let reverted_origin = alias_account.info(rk.host_mut()).unwrap().origin;
         assert_eq!(
             reverted_origin,
             AccountOrigin::Unclassified,
@@ -5293,14 +5349,14 @@ mod test {
         use crate::journal::{CrossRuntimeCall, Journal};
         use tezosx_interfaces::{Origin, RuntimeId};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = Address::from_slice(&[0xab; 20]);
 
         // Durable fallback classification: a distinct native address.
         StorageAccount::from_address(&source)
             .unwrap()
             .set_info_without_code(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     origin: AccountOrigin::Alias(AliasInfo {
                         runtime: RuntimeId::Tezos,
@@ -5326,7 +5382,7 @@ mod test {
 
         // Overlay hit: resolves to the staged native, not the durable one.
         {
-            let db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
+            let db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
             let journal = Journal::new_with_inner(db, &mut tj);
             let target = journal
                 .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
@@ -5337,7 +5393,7 @@ mod test {
         // Frame revert drops the staging; the same call falls back to durable.
         tj.evm.layered_state.checkpoint_revert();
         {
-            let db = EtherlinkVMDB::new(&mut host, &registry, &block, None).unwrap();
+            let db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
             let journal = Journal::new_with_inner(db, &mut tj);
             let target = journal
                 .tezosx_resolve_source_alias_readonly(source, RuntimeId::Tezos, 1_000_000)
@@ -5377,7 +5433,7 @@ mod test {
         use tezos_smart_rollup_host::path::OwnedPath;
         use tezos_smart_rollup_host::storage::StorageV1;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = Registry::new();
         let block_constants = BlockConstants::test_block_with_no_fees();
 
@@ -5385,11 +5441,11 @@ mod test {
         // under /tez/tez_accounts. v0 = pre-forwarder state.
         let world =
             OwnedPath::try_from("/tez/tez_accounts/forwarder".to_string()).unwrap();
-        host.store_write_all(&world, b"v0").unwrap();
+        rk.host_mut().store_write_all(&world, b"v0").unwrap();
 
         let mut tjournal = TezosXJournal::mock(RuntimeId::Ethereum);
         let db = crate::database::EtherlinkVMDB::new(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             None,
@@ -5415,11 +5471,12 @@ mod test {
         journal
             .journal
             .michelson
-            .checkpoint(journal.database.host, &world)
+            .checkpoint(journal.database.rk.host_mut(), &world)
             .expect("michelson world-state snapshot");
         journal
             .database
-            .host
+            .rk
+            .host_mut()
             .store_write_all(&world, b"v1")
             .unwrap();
 
@@ -5439,7 +5496,7 @@ mod test {
 
         // The forwarder write MUST be rolled back with the reverted
         // constructor.
-        let after = journal.database.host.store_read_all(&world).unwrap();
+        let after = journal.database.rk.host().store_read_all(&world).unwrap();
         assert_eq!(
             after, b"v0",
             "BLOCKER: alias forwarder write survived the enclosing CREATE-frame \
@@ -5452,12 +5509,12 @@ mod test {
     /// native Tezos address when the alias is created.
     #[test]
     fn test_alias_forwarder_transfers_preexisting_balance() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         // Initialize all precompiles (including AliasForwarder)
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         // Native Tezos address that should receive the funds
         let native_address = "tz1PreexistingBal";
@@ -5472,14 +5529,14 @@ mod test {
         // Set pre-existing balance at the alias address BEFORE creating the alias
         let preexisting_balance = U256::from(5_000_000_000_000_000_000u128); // 5 ETH
         let mut alias_account = StorageAccount::from_address(&alias).unwrap();
-        let mut alias_info = alias_account.info(&mut host).unwrap();
+        let mut alias_info = alias_account.info(rk.host_mut()).unwrap();
         alias_info.balance = preexisting_balance;
         alias_account
-            .set_info_without_code(&mut host, alias_info)
+            .set_info_without_code(rk.host_mut(), alias_info)
             .unwrap();
 
         // Verify pre-existing balance is set
-        let alias_info_before = alias_account.info(&mut host).unwrap();
+        let alias_info_before = alias_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             alias_info_before.balance, preexisting_balance,
             "Pre-existing balance should be set"
@@ -5490,7 +5547,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5516,7 +5573,7 @@ mod test {
         let native_addr_str = native_address.to_string();
         let tezos_balance = registry
             .get_balance(
-                &mut host,
+                rk.host_mut(),
                 native_addr_str.as_bytes(),
                 tezosx_interfaces::RuntimeId::Tezos,
             )
@@ -5533,12 +5590,12 @@ mod test {
     /// to the associated Tezos account via the AliasForwarder contract.
     #[test]
     fn test_alias_forwarder_forwards_funds_after_creation() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         // Initialize all precompiles (including AliasForwarder)
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         // Native Tezos address that should receive the funds
         let native_address = "tz1TestForwarder123";
@@ -5548,7 +5605,7 @@ mod test {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let alias_bytes = registry
             .ensure_alias(
-                &mut host,
+                &mut rk,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5568,7 +5625,7 @@ mod test {
         // storage only at commit; flush it as the kernel does on a
         // successful parent operation.
         crate::journal::commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -5577,7 +5634,7 @@ mod test {
 
         // Verify the alias has code (EIP-7702 delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();
-        let alias_info = alias_account.info(&mut host).unwrap();
+        let alias_info = alias_account.info(rk.host_mut()).unwrap();
         assert_ne!(
             alias_info.code_hash,
             revm::primitives::KECCAK_EMPTY,
@@ -5595,7 +5652,7 @@ mod test {
         };
         let mut sender_account = StorageAccount::from_address(&sender).unwrap();
         sender_account
-            .set_info_without_code(&mut host, sender_info)
+            .set_info_without_code(rk.host_mut(), sender_info)
             .unwrap();
 
         let value_to_send = U256::from(1_000_000_000_000_000_000u128); // 1 ETH
@@ -5603,7 +5660,7 @@ mod test {
         // Send funds to the alias address
         let registry = Registry::new();
         let execution_result = run_transaction(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             &block_constants,
@@ -5628,7 +5685,7 @@ mod test {
                 let native_addr_str = native_address.to_string();
                 let tezos_balance = registry
                     .get_balance(
-                        &mut host,
+                        rk.host_mut(),
                         native_addr_str.as_bytes(),
                         tezosx_interfaces::RuntimeId::Tezos,
                     )

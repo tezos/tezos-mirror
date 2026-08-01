@@ -871,7 +871,7 @@ mod tests {
         let registry = RegistryImpl::default();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let outcome = run_transaction(
-            rk.host_mut(),
+            rk,
             &registry,
             &mut journal,
             &block,

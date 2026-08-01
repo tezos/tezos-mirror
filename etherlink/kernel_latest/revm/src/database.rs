@@ -28,7 +28,7 @@ use revm::{
     state::{
         Account, AccountInfo as RevmAccountInfo, Bytecode, EvmStorage, EvmStorageSlot,
     },
-    Database, DatabaseCommit,
+    Database as RevmDatabase, DatabaseCommit,
 };
 use tezos_crypto_rs::{
     hash::{ContractKt1Hash, HashTrait},
@@ -36,13 +36,15 @@ use tezos_crypto_rs::{
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
 use tezosx_interfaces::{AliasInfo, Origin, Registry};
 
-pub struct EtherlinkVMDB<'a, Host, R> {
+pub struct EtherlinkVMDB<'a, Host, KS, R> {
     pub registry: &'a R,
-    /// Runtime host
-    pub host: &'a mut Host,
+    /// Runtime keyspaces handle. Durable access goes through
+    /// `self.rk.host()` / `self.rk.host_mut()` (the wrapped storage).
+    pub rk: &'a mut RuntimeKeyspaces<Host, KS>,
     /// Constants for the current block
     pub(crate) block: &'a BlockConstants,
     /// Commit guard, the `DatabaseCommit` trait and in particular
@@ -73,11 +75,11 @@ pub struct EtherlinkVMDB<'a, Host, R> {
     staged_alias_origins: HashMap<Address, AliasInfo>,
 }
 
-impl<'a, Host, R> HasHost for EtherlinkVMDB<'a, Host, R> {
+impl<'a, Host, KS, R> HasHost for EtherlinkVMDB<'a, Host, KS, R> {
     type H = Host;
 
     fn as_host_mut(&mut self) -> &mut Self::H {
-        self.host
+        self.rk.host_mut()
     }
 }
 
@@ -86,20 +88,20 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, Host, R> EtherlinkVMDB<'a, Host, R>
+impl<'a, Host, KS, R> EtherlinkVMDB<'a, Host, KS, R>
 where
     Host: StorageV1,
 {
     #[instrument(skip_all)]
     pub fn new(
-        host: &'a mut Host,
+        rk: &'a mut RuntimeKeyspaces<Host, KS>,
         registry: &'a R,
         block: &'a BlockConstants,
         classify_native: Option<Address>,
     ) -> Result<Self, EvmDbError> {
         let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
-            host,
+            rk,
             registry,
             block,
             commit_status: true,
@@ -122,8 +124,8 @@ macro_rules! abort_on_error {
     };
 }
 
-impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    EtherlinkVMDB<'_, Host, R>
+impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    EtherlinkVMDB<'_, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -154,7 +156,7 @@ where
             None => {
                 let storage_account = StorageAccount::from_address(address)?;
                 Ok(storage_account
-                    .info_without_migration(self.host)?
+                    .info_without_migration(self.rk.host())?
                     .map(|info| info.origin)
                     .unwrap_or_default())
             }
@@ -180,7 +182,7 @@ where
                         abort_on_error!(
                             self,
                             CodeStorage::add(
-                                self.host,
+                                self.rk.host_mut(),
                                 code.original_byte_slice(),
                                 Some(info.code_hash)
                             ),
@@ -216,7 +218,8 @@ where
                     if !unchanged {
                         abort_on_error!(
                             self,
-                            storage_account.set_info_without_code(self.host, info),
+                            storage_account
+                                .set_info_without_code(self.rk.host_mut(), info),
                             "DatabaseCommit `set_info_without_code`"
                         );
                     }
@@ -234,7 +237,7 @@ where
                             abort_on_error!(
                                 self,
                                 storage_account.set_storage(
-                                    self.host,
+                                    self.rk.host_mut(),
                                     &key,
                                     &present_value,
                                 ),
@@ -248,7 +251,7 @@ where
                     abort_on_error!(
                         self,
                         storage_account.set_info_without_code(
-                            self.host,
+                            self.rk.host_mut(),
                             AccountInfo {
                                 origin: existing_origin,
                                 ..AccountInfo::default()
@@ -267,8 +270,8 @@ where
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
+impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -277,7 +280,7 @@ where
     }
 
     fn global_counter(&self) -> Result<U256, PrecompileStateError> {
-        self.system.read_global_counter(self.host)
+        self.system.read_global_counter(self.rk.host())
     }
 
     fn ticket_balance(
@@ -286,32 +289,38 @@ where
         owner: &Address,
     ) -> Result<U256, PrecompileStateError> {
         self.system
-            .read_ticket_balance(self.host, ticket_hash, owner)
+            .read_ticket_balance(self.rk.host(), ticket_hash, owner)
     }
 
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, PrecompileStateError> {
-        self.system.read_deposit_from_queue(self.host, deposit_id)
+        self.system
+            .read_deposit_from_queue(self.rk.host(), deposit_id)
     }
 
     fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
         let ticketer =
-            self.host
+            self.rk
+                .host()
                 .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
         let kt1_b58 = std::str::from_utf8(&ticketer)?;
         Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
     }
 
     fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
-        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
+        let bytes = self.rk.host().store_read_all(&SEQUENCER_KEY_PATH)?;
         let s = std::str::from_utf8(&bytes)?;
         Ok(PublicKey::from_b58check(s)?)
     }
 
     fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError> {
-        match self.host.store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH) {
+        match self
+            .rk
+            .host()
+            .store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
+        {
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
             Err(e) => Err(e.into()),
@@ -320,14 +329,14 @@ where
 
     fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {
         Ok(read_u256_le_default(
-            self.host,
+            self.rk.host(),
             &SEQUENCER_KEY_CHANGE_COUNTER_PATH,
             U256::ZERO,
         )?)
     }
 }
 
-impl<Host, R> Database for EtherlinkVMDB<'_, Host, R>
+impl<Host, KS, R> RevmDatabase for EtherlinkVMDB<'_, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -338,7 +347,7 @@ where
         address: Address,
     ) -> Result<Option<RevmAccountInfo>, Self::Error> {
         let storage_account = StorageAccount::from_address(&address)?;
-        let account_info = storage_account.info(self.host)?;
+        let account_info = storage_account.info(self.rk.host_mut())?;
 
         self.original_account_infos
             .insert(address, account_info.clone());
@@ -348,7 +357,7 @@ where
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
         let code_storage = CodeStorage::new(&code_hash)?;
-        let bytecode = code_storage.get_code(self.host)?;
+        let bytecode = code_storage.get_code(self.rk.host())?;
         Ok(bytecode.unwrap_or_default())
     }
 
@@ -358,7 +367,7 @@ where
         index: StorageKey,
     ) -> Result<StorageValue, Self::Error> {
         let storage_account = StorageAccount::from_address(&address)?;
-        storage_account.get_storage(self.host, &index)
+        storage_account.get_storage(self.rk.host(), &index)
     }
 
     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
@@ -369,14 +378,14 @@ where
             Some(block_diff)
                 if block_diff <= BLOCKS_STORED.into() && !block_diff.is_zero() =>
             {
-                get_block_hash(self.host, number)
+                get_block_hash(self.rk.host(), number)
             }
             _ => Ok(B256::ZERO),
         }
     }
 }
-impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
+impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -385,7 +394,7 @@ where
         if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
             abort_on_error!(
                 self,
-                store_sequencer_key_change(self.host, new_sequencer_key_change),
+                store_sequencer_key_change(self.rk.host_mut(), new_sequencer_key_change),
                 "DatabaseCommitPrecompileStateChanges `store_sequencer_key_change`"
             );
         }
@@ -399,14 +408,18 @@ where
         if let Some(sequencer_change_counter) = etherlink_data.sequencer_change_counter {
             abort_on_error!(
                 self,
-                write_sequencer_change_counter(self.host, sequencer_change_counter),
+                write_sequencer_change_counter(
+                    self.rk.host_mut(),
+                    sequencer_change_counter
+                ),
                 "DatabaseCommitPrecompileStateChanges `write_sequencer_change_counter`"
             );
         }
         if let Some(global_counter) = etherlink_data.global_counter {
             abort_on_error!(
                 self,
-                self.system.write_global_counter(self.host, global_counter),
+                self.system
+                    .write_global_counter(self.rk.host_mut(), global_counter),
                 "DatabaseCommitPrecompileStateChanges `write_global_counter`"
             );
         }
@@ -414,15 +427,18 @@ where
             if amount.is_zero() {
                 abort_on_error!(
                     self,
-                    self.system
-                        .delete_ticket_balance(self.host, &ticket_hash, &owner),
+                    self.system.delete_ticket_balance(
+                        self.rk.host_mut(),
+                        &ticket_hash,
+                        &owner
+                    ),
                     "DatabaseCommitPrecompileStateChanges `delete_ticket_balance`"
                 );
             } else {
                 abort_on_error!(
                     self,
                     self.system.write_ticket_balance(
-                        self.host,
+                        self.rk.host_mut(),
                         &ticket_hash,
                         &owner,
                         amount
@@ -434,7 +450,8 @@ where
         for (deposit_id, deposit) in etherlink_data.deposits.iter() {
             abort_on_error!(
                 self,
-                self.system.write_deposit(self.host, deposit_id, deposit),
+                self.system
+                    .write_deposit(self.rk.host_mut(), deposit_id, deposit),
                 "DatabaseCommitPrecompileStateChanges `write_deposit`"
             );
         }
@@ -442,7 +459,7 @@ where
             abort_on_error!(
                 self,
                 self.system
-                    .remove_deposit_from_queue(self.host, &deposit_id),
+                    .remove_deposit_from_queue(self.rk.host_mut(), &deposit_id),
                 "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
             );
         }
@@ -468,8 +485,8 @@ where
     }
 }
 
-impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>> DatabaseCommit
-    for EtherlinkVMDB<'_, Host, R>
+impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> DatabaseCommit
+    for EtherlinkVMDB<'_, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -500,7 +517,7 @@ where
         for (address, alias_info) in std::mem::take(&mut self.staged_alias_origins) {
             abort_on_error!(
                 self,
-                write_alias_origin(self.host, &address, alias_info),
+                write_alias_origin(self.rk.host_mut(), &address, alias_info),
                 "DatabaseCommit `write_alias_origin`"
             );
         }

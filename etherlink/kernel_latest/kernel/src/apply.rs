@@ -592,7 +592,7 @@ where
     let gas_data =
         GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
     revm_etherlink::run_transaction(
-        rk.host_mut(),
+        rk,
         registry,
         journal,
         block_constants,

@@ -10,6 +10,7 @@
 //! a configurable mock with call tracking.
 
 use std::cell::{Cell, RefCell};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
@@ -25,10 +26,9 @@ pub struct UnimplementedRegistry;
 
 impl Registry for UnimplementedRegistry {
     type Journal = TezosXJournal;
-
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -70,9 +70,9 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
 
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
@@ -92,10 +92,9 @@ pub struct NotWiredRegistry;
 
 impl Registry for NotWiredRegistry {
     type Journal = TezosXJournal;
-
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -134,9 +133,9 @@ impl Registry for NotWiredRegistry {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
 
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
@@ -218,10 +217,9 @@ impl MockRegistry {
 
 impl Registry for MockRegistry {
     type Journal = TezosXJournal;
-
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -274,9 +272,9 @@ impl Registry for MockRegistry {
         Ok((crate::Classification::Unknown, 0))
     }
 
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
-        _host: &mut Host,
+        _rk: &mut RuntimeKeyspaces<Host, KS>,
         _journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
@@ -361,10 +359,9 @@ impl StubRegistry {
 
 impl Registry for StubRegistry {
     type Journal = TezosXJournal;
-
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -376,7 +373,7 @@ impl Registry for StubRegistry {
         Host: StorageV1,
     {
         self.inner.ensure_alias(
-            host,
+            rk,
             journal,
             alias_info,
             native_public_key,
@@ -444,15 +441,15 @@ impl Registry for StubRegistry {
         Ok((classification, 0))
     }
 
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1,
     {
-        self.inner.serve(host, journal, request)
+        self.inner.serve(rk, journal, request)
     }
 }

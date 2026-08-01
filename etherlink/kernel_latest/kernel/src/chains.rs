@@ -1213,7 +1213,7 @@ where
             let safe_roots =
                 operation_safe_roots(&operation, &block_constants.safe_roots);
             let processed_operations = match tezos_execution::validate_and_apply_operation(
-                rk.host_mut(),
+                rk,
                 registry,
                 journal,
                 operation,
@@ -1270,7 +1270,7 @@ where
                 (outbox_queue, evm_block_constants)
             {
                 let etherlink_withdrawals = commit_evm_journal_from_external(
-                    rk.host_mut(),
+                    rk,
                     registry,
                     evm_block_constants,
                     journal,

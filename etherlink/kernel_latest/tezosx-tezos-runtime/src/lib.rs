@@ -11,6 +11,7 @@ use tezos_crypto_rs::{
     blake2b,
     hash::{BlockHash, ChainId, ContractKt1Hash, OperationHash, UnknownSignature},
 };
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 // UnknownSignature has a private constructor; use try_from to build one.
 const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
 use tezos_data_encoding::{
@@ -625,10 +626,10 @@ where
 /// The consumed milligas rides in the return type, in
 /// [`ExecuteRequestOutcome`] on success or [`RequestFailure`] on error;
 /// a failure before metering carries no value and reports as unset.
-fn execute_request<Host>(
+fn execute_request<Host, KS>(
     chain_id: &ChainId,
     registry: &impl Registry<Journal = TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
@@ -637,7 +638,7 @@ where
 {
     match *request.method() {
         http::Method::POST => {
-            execute_entrypoint_call(chain_id, registry, host, journal, request)
+            execute_entrypoint_call(chain_id, registry, rk, journal, request)
         }
         http::Method::GET => {
             // The view path doesn't mutate storage or push a CRAC
@@ -648,7 +649,7 @@ where
             // too so the view can issue nested cross-runtime reads
             // through the gateway's `staticcall_evm` synthetic view
             // (L2-1259).
-            view::execute_view_call(chain_id, registry, host, journal, request)
+            view::execute_view_call(chain_id, registry, rk, journal, request)
         }
         ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
             "HTTP method {other} not allowed (use POST for entrypoint calls or GET for views)"
@@ -662,10 +663,10 @@ where
 /// total mutez storage cost this frame delegates upward — the sum
 /// of the values received from inner outgoing CRACs and the
 /// standalone cost of this frame's own internal operations.
-fn execute_entrypoint_call<Host>(
+fn execute_entrypoint_call<Host, KS>(
     chain_id: &ChainId,
     registry: &impl Registry<Journal = TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
@@ -759,7 +760,7 @@ where
         value: Zarith((-1).into()),
     };
     let mut tc_ctx = TcCtx {
-        host: &mut *host,
+        rk: &mut *rk,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
@@ -999,7 +1000,7 @@ where
     // `cross_runtime_transfer` reverts the world-state checkpoint,
     // which already removes any temp big-maps written during the
     // reverted execution.
-    if let Err(e) = clear_temporary_big_maps(host, &mut next_temp_id) {
+    if let Err(e) = clear_temporary_big_maps(rk.host_mut(), &mut next_temp_id) {
         log!(
             Error,
             "Failed to clear temporary big-maps after cross-runtime call: {e}"
@@ -1137,10 +1138,10 @@ const STORAGE_WRITE_BASE_MILLIGAS: u64 = 2_000;
 impl RuntimeInterface for TezosRuntime {
     type Journal = TezosXJournal;
 
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
         _registry: &impl Registry<Journal = TezosXJournal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -1188,7 +1189,7 @@ impl RuntimeInterface for TezosRuntime {
 
         // Branch 1: already classified as alias. Returning early
         // preserves the gas budget and performs no durable writes.
-        match account.origin(host)? {
+        match account.origin(rk.host())? {
             Some(Origin::Alias(_)) => {
                 return Ok((kt1_str, AliasResolution::build(remaining)));
             }
@@ -1203,7 +1204,7 @@ impl RuntimeInterface for TezosRuntime {
         let world_state = OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
         journal
             .michelson
-            .checkpoint(host, &world_state)
+            .checkpoint(rk.host_mut(), &world_state)
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to snapshot world state for alias: {e:?}"
@@ -1213,12 +1214,12 @@ impl RuntimeInterface for TezosRuntime {
         // Branch 2: a forwarder is already deployed but the
         // classification path is empty. Write the classification only
         // and skip the redeploy. The patch costs one durable write.
-        if account.exists(host).map_err(|e| {
+        if account.exists(rk.host()).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to check alias existence: {e}"))
         })? {
             consume(&mut remaining, STORAGE_WRITE_BASE_MILLIGAS)?;
             let new_origin = Origin::Alias(alias_info);
-            account.set_origin(host, &new_origin)?;
+            account.set_origin(rk.host_mut(), &new_origin)?;
             return Ok((kt1_str, AliasResolution::build(remaining)));
         }
 
@@ -1232,7 +1233,7 @@ impl RuntimeInterface for TezosRuntime {
         // resolution fail). Idempotent — a no-op once the slot exists (seeded
         // at runtime activation / migration). This makes "seed precedes alias"
         // hold by construction, on every network.
-        crate::alias_forwarder::init_alias_implementation(host)?;
+        crate::alias_forwarder::init_alias_implementation(rk.host_mut())?;
 
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
@@ -1289,7 +1290,7 @@ impl RuntimeInterface for TezosRuntime {
                 value: Zarith((-1).into()),
             };
             let mut tc_ctx = TcCtx {
-                host: &mut *host,
+                rk: &mut *rk,
                 operation_gas: &mut gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: InterpretContext::new(),
@@ -1373,10 +1374,10 @@ impl RuntimeInterface for TezosRuntime {
     /// debited by the calling runtime (e.g. EVM gateway). This handles both
     /// implicit and originated destinations, including Michelson code execution
     /// and internal operations.
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
@@ -1398,7 +1399,7 @@ impl RuntimeInterface for TezosRuntime {
             .get(X_TEZOS_GAS_LIMIT)
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse::<u64>().ok());
-        let result = execute_request(&self.0, registry, host, journal, request);
+        let result = execute_request(&self.0, registry, rk, journal, request);
         finalize_response(result, op_gas, journal.michelson.take_dispatch_result())
     }
 
@@ -1499,6 +1500,7 @@ impl TezosRuntime {
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_ethereum::block::BlockConstants;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
 
     use super::*;
     use tezos_tezlink::operation_result::OperationKind;
@@ -1806,7 +1808,6 @@ mod tests {
     // --- ensure_alias tests ---
 
     use tezos_crypto_rs::hash::ChainId;
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::testing::NotWiredRegistry;
     use tezosx_interfaces::{AliasInfo, RuntimeId};
 
@@ -1831,24 +1832,24 @@ mod tests {
 
     // Seed the Michelson world state so the alias snapshot has a subtree
     // to copy, as in production where migration creates it.
-    fn test_host() -> MockKernelHost {
-        let mut host = MockKernelHost::default();
+    fn test_rk() -> MockRuntimeKeyspaces {
+        let mut rk = RuntimeKeyspaces::default();
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&null_pkh).unwrap();
-        account.allocate(&mut host).unwrap();
-        host
+        account.allocate(rk.host_mut()).unwrap();
+        rk
     }
 
     #[test]
     fn ensure_alias_returns_valid_kt1_string() {
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
 
         let alias = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info("0x1234567890abcdef1234567890abcdef12345678"),
                 None,
@@ -1867,7 +1868,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_materializes_code_less() {
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x1234567890abcdef1234567890abcdef12345678";
@@ -1875,7 +1876,7 @@ mod tests {
         runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -1892,7 +1893,7 @@ mod tests {
         // implementation.
         let code_path = tezos_execution::context::code::code_path(&account).unwrap();
         assert!(
-            host.store_has(&code_path).unwrap().is_none(),
+            rk.host().store_has(&code_path).unwrap().is_none(),
             "a materialized alias must not store its own /data/code"
         );
 
@@ -1900,25 +1901,25 @@ mod tests {
         // code is not charged per alias), and used/paid bytes account for the
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
-        let storage_len = account.storage(&host).unwrap().len() as u64;
-        assert_eq!(account.code_size(&host).unwrap(), Zarith::from(0u64));
+        let storage_len = account.storage(rk.host()).unwrap().len() as u64;
+        assert_eq!(account.code_size(rk.host()).unwrap(), Zarith::from(0u64));
         assert_eq!(
-            account.used_bytes(&host).unwrap(),
+            account.used_bytes(rk.host()).unwrap(),
             Zarith::from(storage_len)
         );
         assert_eq!(
-            account.paid_bytes(&host).unwrap(),
+            account.paid_bytes(rk.host()).unwrap(),
             Zarith::from(storage_len)
         );
 
         // It is classified as an alias, so once the shared slot is seeded its
         // code resolves to the forwarder.
         assert!(matches!(
-            account.origin(&host).unwrap(),
+            account.origin(rk.host()).unwrap(),
             Some(Origin::Alias(_))
         ));
-        crate::alias_forwarder::init_alias_implementation(&mut host).unwrap();
-        match account.code(&host).unwrap() {
+        crate::alias_forwarder::init_alias_implementation(rk.host_mut()).unwrap();
+        match account.code(rk.host()).unwrap() {
             tezos_execution::account_storage::Code::Code(bytes) => assert_eq!(
                 bytes,
                 alias_forwarder::forwarder_code()
@@ -1930,7 +1931,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_stores_evm_address_in_storage() {
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
@@ -1938,7 +1939,7 @@ mod tests {
         runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -1950,7 +1951,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        let storage = account.storage(&host).unwrap();
+        let storage = account.storage(rk.host()).unwrap();
         let expected =
             alias_forwarder::forwarder_storage(evm_address, &mut Gas::default())
                 .unwrap()
@@ -1960,7 +1961,7 @@ mod tests {
 
     #[test]
     fn ensure_alias_sets_zero_balance() {
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0xabcdef";
@@ -1968,7 +1969,7 @@ mod tests {
         runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -1978,15 +1979,15 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let balance = TezosRuntime::get_originated_account_balance(&host, &kt1)
+        let balance = TezosRuntime::get_originated_account_balance(rk.host(), &kt1)
             .expect("should read balance");
         assert_eq!(balance, U256::zero());
     }
 
     #[test]
     fn ensure_alias_is_deterministic() {
-        let mut host1 = test_host();
-        let mut host2 = test_host();
+        let mut rk1 = test_rk();
+        let mut rk2 = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x1111111111111111111111111111111111111111";
@@ -1994,7 +1995,7 @@ mod tests {
         let alias1 = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host1,
+                &mut rk1,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2005,7 +2006,7 @@ mod tests {
         let alias2 = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host2,
+                &mut rk2,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2019,14 +2020,14 @@ mod tests {
 
     #[test]
     fn ensure_alias_different_addresses_produce_different_aliases() {
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
 
         let alias1 = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info("0x1111111111111111111111111111111111111111"),
                 None,
@@ -2037,7 +2038,7 @@ mod tests {
         let alias2 = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info("0x2222222222222222222222222222222222222222"),
                 None,
@@ -2055,7 +2056,7 @@ mod tests {
         // input must return the same address with the gas budget
         // unchanged. The first call deploys; the second is just a
         // read of the classification path.
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x3333333333333333333333333333333333333333";
@@ -2063,7 +2064,7 @@ mod tests {
         let first = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2075,7 +2076,7 @@ mod tests {
         let second = runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2108,7 +2109,7 @@ mod tests {
         use tezos_execution::context::code::ORIGIN_PATH;
         use tezos_smart_rollup_host::path::concat;
 
-        let mut host = test_host();
+        let mut rk = test_rk();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x4444444444444444444444444444444444444444";
@@ -2116,7 +2117,7 @@ mod tests {
         runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2130,14 +2131,14 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
         let origin_path = concat(account.path(), &ORIGIN_PATH).unwrap();
-        host.store_delete(&origin_path).unwrap();
-        assert!(account.origin(&host).unwrap().is_none());
+        rk.host_mut().store_delete(&origin_path).unwrap();
+        assert!(account.origin(rk.host()).unwrap().is_none());
 
         // Run again. The patch branch must re-record the classification.
         runtime
             .ensure_alias(
                 &NotWiredRegistry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 evm_alias_info(evm_address),
                 None,
@@ -2146,7 +2147,7 @@ mod tests {
             )
             .unwrap();
 
-        match account.origin(&host).unwrap() {
+        match account.origin(rk.host()).unwrap() {
             Some(Origin::Alias(info)) => {
                 assert_eq!(info.runtime, RuntimeId::Ethereum);
                 assert_eq!(info.native_address, evm_address.as_bytes().to_vec());
@@ -2160,18 +2161,18 @@ mod tests {
         // The kernel must never reach an alias address that has been
         // classified as Native. If it does, the call returns an error
         // rather than overwriting the classification.
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let runtime = test_runtime();
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        account.set_origin(&mut host, &Origin::Native).unwrap();
+        account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
 
         let res = runtime.ensure_alias(
             &NotWiredRegistry,
-            &mut host,
+            &mut rk,
             &mut journal,
             evm_alias_info(evm_address),
             None,
@@ -2829,7 +2830,7 @@ mod tests {
     // slot-stack discipline.
     #[test]
     fn serve_does_not_touch_outer_dispatch_slot() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
@@ -2847,7 +2848,7 @@ mod tests {
             .uri("http://evm/KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
             .body(vec![])
             .unwrap();
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(
@@ -2873,7 +2874,7 @@ mod tests {
     fn serve_early_4xx_reports_op_limit() {
         use crate::headers::X_TEZOS_GAS_LIMIT;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -2884,7 +2885,7 @@ mod tests {
             .header(X_TEZOS_GAS_LIMIT, "150")
             .body(vec![])
             .unwrap();
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert_eq!(
@@ -2912,7 +2913,7 @@ mod tests {
         const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
         const GAS_LIMIT: u64 = 600_000_000;
 
-        let mut host = test_host();
+        let mut rk = test_rk();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -2927,7 +2928,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut host,
+            rk.host_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -2947,7 +2948,7 @@ mod tests {
             .header(X_TEZOS_SENDER, SENDER_KT1)
             .body(vec![])
             .unwrap();
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let consumed: u64 = resp
@@ -2977,7 +2978,7 @@ mod tests {
         const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
         const GAS_LIMIT: u64 = 600_000_000;
 
-        let mut host = test_host();
+        let mut rk = test_rk();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -2993,7 +2994,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut host,
+            rk.host_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3013,7 +3014,7 @@ mod tests {
             .header(X_TEZOS_SENDER, SENDER_KT1)
             .body(vec![])
             .unwrap();
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let consumed: u64 = resp
@@ -3064,7 +3065,7 @@ mod tests {
         // Never originated in this host → ContractDoesNotExist on transfer.
         const MISSING_DEST_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
@@ -3108,7 +3109,7 @@ mod tests {
             .body(body)
             .unwrap();
 
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         // The EVM caller still observes a catchable failure ...
         assert_eq!(
@@ -3190,7 +3191,7 @@ mod tests {
         const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
         const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
@@ -3207,7 +3208,7 @@ mod tests {
             .unwrap();
         receiver
             .init(
-                &mut host,
+                rk.host_mut(),
                 Some(
                     &receiver_script
                         .encode(&mut Gas::default())
@@ -3249,7 +3250,7 @@ mod tests {
             .unwrap();
         parent
             .init(
-                &mut host,
+                rk.host_mut(),
                 Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                 &Micheline::from(())
                     .encode(&mut Gas::default())
@@ -3293,7 +3294,7 @@ mod tests {
             .body(body)
             .unwrap();
 
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
 
         assert_eq!(
             resp.status(),
@@ -3345,7 +3346,7 @@ mod tests {
         // transfer, with the journal counter pre-seeded to `base` (the block's
         // prior internal-op count). Returns the CRAC's HTTP status.
         let run = |base: u128| {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = test_runtime();
             let registry = NotWiredRegistry;
             let parser = mir::parser::Parser::new();
@@ -3359,7 +3360,7 @@ mod tests {
                 .unwrap();
             receiver
                 .init(
-                    &mut host,
+                    rk.host_mut(),
                     Some(
                         &receiver_script
                             .encode(&mut Gas::default())
@@ -3398,7 +3399,7 @@ mod tests {
                 .unwrap();
             parent
                 .init(
-                    &mut host,
+                    rk.host_mut(),
                     Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                     &Micheline::from(())
                         .encode(&mut Gas::default())
@@ -3436,7 +3437,7 @@ mod tests {
                 .unwrap();
 
             runtime
-                .serve(&registry, &mut host, &mut journal, request)
+                .serve(&registry, &mut rk, &mut journal, request)
                 .status()
         };
 

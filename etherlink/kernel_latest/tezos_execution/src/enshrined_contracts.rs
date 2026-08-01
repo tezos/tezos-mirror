@@ -20,6 +20,7 @@ use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
@@ -219,7 +220,7 @@ fn typecheck_entrypoint_value<'a>(
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
-pub(crate) fn execute_enshrined_contract<'a, Host>(
+pub(crate) fn execute_enshrined_contract<'a, Host, KS>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
@@ -229,7 +230,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>
+              + HasCrossRuntime<Host, KS>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
@@ -1036,14 +1037,14 @@ fn inject_context_headers_raw(
 /// The target runtime is derived from the request URI host (e.g. `"ethereum"`,
 /// `"tezos"`). Gas is converted from Tezos milligas to the target runtime's
 /// units before being written to `X-Tezos-Gas-Limit`.
-fn inject_context_headers<'a, Host>(
+fn inject_context_headers<'a, Host, KS>(
     mut request: http::Request<Vec<u8>>,
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>
+              + HasCrossRuntime<Host, KS>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
@@ -1145,10 +1146,10 @@ where
             None
         };
         let (sender_alias, sender_resolution) = {
-            let (host, journal, registry) = ctx.cross_runtime_split();
+            let (rk, journal, registry) = ctx.cross_runtime_split();
             registry
                 .ensure_alias(
-                    host,
+                    rk,
                     journal,
                     alias_info,
                     sender_pubkey,
@@ -1205,10 +1206,10 @@ where
                 convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
                     .ok_or(OutOfGas)?;
             let (source_alias, source_resolution) = {
-                let (host, journal, registry) = ctx.cross_runtime_split();
+                let (rk, journal, registry) = ctx.cross_runtime_split();
                 registry
                     .ensure_alias(
-                        host,
+                        rk,
                         journal,
                         alias_info,
                         Some(&source_public_key),
@@ -1453,14 +1454,14 @@ fn build_ethereum_request(
 /// caller's frame — equivalent to a same-runtime synchronous call (EVM
 /// `CALL`) or a same-runtime DFS-expanded `TRANSFER_TOKENS` (Michelson
 /// since Florence).
-fn dispatch_crac_call<'a, Host>(
+fn dispatch_crac_call<'a, Host, KS>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<Host>
+              + HasCrossRuntime<Host, KS>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
     request: http::Request<Vec<u8>>,
@@ -1476,8 +1477,8 @@ where
     let request = inject_context_headers(request, ctx)?;
 
     let response = {
-        let (host, journal, registry) = ctx.cross_runtime_split();
-        registry.serve(host, journal, request)
+        let (rk, journal, registry) = ctx.cross_runtime_split();
+        registry.serve(rk, journal, request)
     };
     let response_body =
         classify_and_charge_crac_response(response, target_host.as_deref(), ctx)?;
@@ -1922,8 +1923,8 @@ fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
 /// at call time, so it scales with the outer view's remaining
 /// budget rather than a hardcoded magic.
 #[allow(clippy::too_many_arguments)]
-pub fn dispatch_staticcall_evm_get<'a, Host, R>(
-    host: &mut Host,
+pub fn dispatch_staticcall_evm_get<'a, Host, KS, R>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     journal: &mut TezosXJournal,
@@ -1969,7 +1970,7 @@ where
     // reads (`ALIAS_LOOKUP_MILLIGAS`); the read-only path skips only the
     // alias *generation* (write) cost. The target is always Ethereum here,
     // so the read always happens (no Tezos short-circuit to skip).
-    let lookup = ViewOriginLookup { host: &*host };
+    let lookup = ViewOriginLookup { host: rk.host() };
     operation_gas
         .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
         .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
@@ -2076,7 +2077,7 @@ where
         .body(calldata.to_vec())
         .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::DispatchSetup)?;
 
-    let response = registry.serve(host, journal, request);
+    let response = registry.serve(rk, journal, request);
     let status = response.status().as_u16();
 
     // Charge the inner EVM execution cost back to the operation gas —
@@ -2293,6 +2294,7 @@ pub(crate) mod tests {
     use num_bigint::BigInt;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::{MockKeySpace, MockRuntimeKeyspaces};
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::{Origin, RuntimeId};
     use tezosx_journal::{DispatchSlotError, OriginalSource, TezosXJournal};
@@ -2404,7 +2406,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_dispatch_crac_call_passes_calldata() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2427,7 +2429,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result = dispatch_crac_call(
             &mut ctx,
             build_ethereum_request(dest, &calldata).unwrap(),
@@ -2470,7 +2472,7 @@ pub(crate) mod tests {
     /// the null operation source, failing the assertion.
     #[test]
     fn test_dispatch_crac_call_forwards_crac_origin_as_source() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         // Immediate caller (sender), distinct from the originator.
@@ -2483,7 +2485,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, sender, 0);
         ctx.crac_origin = Some(tezos_protocol::contract::Contract::Originated(
             crac_origin_kt1.clone(),
         ));
@@ -2510,7 +2512,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tezosx_transfer_creates_alias_when_absent() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         // tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb as AddressHash
@@ -2528,7 +2530,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx =
-            MockCtx::new(&mut host, &mut journal, &registry, source, amount as i64);
+            MockCtx::new(&mut rk, &mut journal, &registry, source, amount as i64);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
@@ -2551,7 +2553,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tezosx_transfer_calls_ensure_alias_per_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2567,7 +2569,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
 
         // First transfer creates aliases (sender + source)
         let result1 =
@@ -2591,7 +2593,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_alias_generation_consumes_gas() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2603,7 +2605,7 @@ pub(crate) mod tests {
         let amount = 500i64;
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
 
         let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
         let result =
@@ -2626,7 +2628,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_alias_lookup_cost_caps_per_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2638,7 +2640,7 @@ pub(crate) mod tests {
         let amount = 500i64;
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
 
         let result1 =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
@@ -2727,7 +2729,7 @@ pub(crate) mod tests {
     /// and dropped before the result returns.
     fn typecheck_call<'a>(
         value: &Micheline<'a>,
-        host: &mut MockKernelHost,
+        rk: &mut MockRuntimeKeyspaces,
     ) -> Result<TypedValue<'a>, TransferError> {
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -2736,7 +2738,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(rk, &mut journal, &registry, source, 0);
         typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("call").unwrap(),
@@ -2755,8 +2757,8 @@ pub(crate) mod tests {
             &[0x01, 0x02],
             1,
         );
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
@@ -2772,8 +2774,8 @@ pub(crate) mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc");
         assert_eq!(request.method(), http::Method::GET);
@@ -2794,8 +2796,8 @@ pub(crate) mod tests {
             &[0xDE, 0xAD],
             42,
         );
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         // Unknown method defaults to POST
         assert_eq!(request.method(), http::Method::POST);
@@ -2809,10 +2811,10 @@ pub(crate) mod tests {
 
     #[test]
     fn test_http_call_malformed_parameters() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let result = typecheck_call(
             &Micheline::String("not a valid http_call".to_string()),
-            &mut host,
+            &mut rk,
         );
         assert!(result.is_err());
     }
@@ -2909,8 +2911,8 @@ pub(crate) mod tests {
             &[],
             0,
         );
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -2930,8 +2932,8 @@ pub(crate) mod tests {
             &[],
             0,
         );
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
@@ -2940,7 +2942,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_zero_amount() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2956,7 +2958,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
@@ -2968,7 +2970,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_negative_amount_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -2984,7 +2986,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
@@ -3002,7 +3004,7 @@ pub(crate) mod tests {
     /// by the incoming receipt builder, not by the gateway itself.
     #[test]
     fn test_outgoing_crac_via_call_entrypoint() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let generated_alias = "KT1_mock_alias".to_string();
         let registry = MockRegistry::new(generated_alias);
 
@@ -3019,7 +3021,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
 
         let entrypoint = Entrypoint::try_from("call").unwrap();
         let arena = typed_arena::Arena::new();
@@ -3055,7 +3057,7 @@ pub(crate) mod tests {
     /// dispatching it must fail with an unknown-entrypoint error.
     #[test]
     fn test_default_entrypoint_is_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -3069,8 +3071,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx =
-            MockCtx::new(&mut host, &mut journal, &registry, source, 100_000_000);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 100_000_000);
 
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -3090,7 +3091,7 @@ pub(crate) mod tests {
     /// gateway dispatches the call without emitting events.
     #[test]
     fn test_outgoing_crac_via_call_evm_entrypoint() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let generated_alias = "KT1_mock_alias".to_string();
         let registry = MockRegistry::new(generated_alias);
 
@@ -3106,7 +3107,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let mut gas = Gas::default();
 
         let arena = typed_arena::Arena::new();
@@ -3155,7 +3156,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_non_success_response() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias")
             .with_serve_response(500, b"internal server error".to_vec());
 
@@ -3171,7 +3172,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
@@ -3184,7 +3185,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_400_response() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias")
             .with_serve_response(400, b"bad request".to_vec());
 
@@ -3200,7 +3201,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_err());
@@ -3217,7 +3218,7 @@ pub(crate) mod tests {
             .status(429)
             .body(b"OOG".to_vec())
             .unwrap();
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias");
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -3225,7 +3226,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx = MockCtx::new(
-            &mut host,
+            &mut rk,
             &mut journal,
             &registry,
             AddressHash::from_bytes(&[0u8; 22]).unwrap(),
@@ -3255,7 +3256,7 @@ pub(crate) mod tests {
         // No callee-gas header, so the only charge is the body surcharge:
         // body_len * PERSISTED_ERROR_PER_BYTE_MILLIGAS (persisted-error bound).
         let start = 10_000_000;
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias");
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -3263,7 +3264,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx = MockCtx::new(
-            &mut host,
+            &mut rk,
             &mut journal,
             &registry,
             AddressHash::from_bytes(&[0u8; 22]).unwrap(),
@@ -3294,7 +3295,7 @@ pub(crate) mod tests {
             .body(body.clone())
             .unwrap();
         let start = 10_000_000;
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias");
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -3302,7 +3303,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx = MockCtx::new(
-            &mut host,
+            &mut rk,
             &mut journal,
             &registry,
             AddressHash::from_bytes(&[0u8; 22]).unwrap(),
@@ -3338,7 +3339,7 @@ pub(crate) mod tests {
     /// distinct from source path here because sender != source).
     #[test]
     fn test_dispatch_crac_call_accumulates_delegated_alias_storage_cost() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry =
             MockRegistry::new("KT1_mock_alias").with_alias_delegated_storage_cost(777);
         let source = AddressHash::from_bytes(&[
@@ -3352,7 +3353,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
         )
@@ -3373,7 +3374,7 @@ pub(crate) mod tests {
     /// `with_alias_delegated_storage_cost` builder.
     #[test]
     fn test_dispatch_crac_call_no_accumulation_when_callee_absorbs() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias");
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -3386,7 +3387,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
         )
@@ -3405,7 +3406,7 @@ pub(crate) mod tests {
             .status(400)
             .body(vec![b'A'; 1_000_000])
             .unwrap();
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias");
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -3413,7 +3414,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut ctx = MockCtx::new(
-            &mut host,
+            &mut rk,
             &mut journal,
             &registry,
             AddressHash::from_bytes(&[0u8; 22]).unwrap(),
@@ -3436,7 +3437,7 @@ pub(crate) mod tests {
     fn run_staticcall_evm_get(
         status: u16,
     ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'static>> {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string())
             .with_serve_response(status, b"body".to_vec());
         let mut journal = TezosXJournal::new(
@@ -3450,7 +3451,7 @@ pub(crate) mod tests {
         let mut operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000_000).unwrap();
         dispatch_staticcall_evm_get(
-            &mut host,
+            &mut rk,
             &mut operation_gas,
             &registry,
             &mut journal,
@@ -3505,7 +3506,7 @@ pub(crate) mod tests {
         String,
         String,
     ) {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("unused").with_injective_aliases();
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -3520,7 +3521,7 @@ pub(crate) mod tests {
         let gas_before = operation_gas.remaining.milligas().unwrap();
 
         let result = dispatch_staticcall_evm_get(
-            &mut host,
+            &mut rk,
             &mut operation_gas,
             &registry,
             &mut journal,
@@ -3909,8 +3910,8 @@ pub(crate) mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::GET);
     }
@@ -3920,8 +3921,8 @@ pub(crate) mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 1);
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
@@ -3931,8 +3932,8 @@ pub(crate) mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 99);
-        let mut host = MockKernelHost::default();
-        let typed = typecheck_call(&value, &mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        let typed = typecheck_call(&value, &mut rk).unwrap();
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
@@ -3941,7 +3942,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_large_amount_header() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -3958,7 +3959,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
@@ -3969,7 +3970,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_cross_runtime_call_fractional_amount_header() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -3986,7 +3987,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, amount);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, amount);
         let result =
             dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap());
         assert!(result.is_ok());
@@ -4002,7 +4003,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_typecheck_unknown_entrypoint_returns_error() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -4010,7 +4011,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::String("hello".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -4028,7 +4029,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_typecheck_default_entrypoint_is_unknown() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -4036,7 +4037,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         // The legacy %default (simple transfer) entrypoint was removed:
         // it no longer typechecks against any parameter.
         let value = Micheline::String("0xabc".into());
@@ -4067,7 +4068,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_typechecks_bytes() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -4075,7 +4076,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -4088,7 +4089,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_rejects_non_bytes() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
@@ -4096,7 +4097,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::String("not bytes".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
@@ -4109,7 +4110,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_execute_succeeds() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -4131,7 +4132,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4151,7 +4152,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_execute_empty_bytes() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -4173,7 +4174,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4187,7 +4188,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_execute_without_frame_fails() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -4204,7 +4205,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4223,7 +4224,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_execute_already_set_fails() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -4245,7 +4246,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         // First dispatch deposits the payload.
         let first = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4280,7 +4281,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_collect_result_rejects_nonzero_amount() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
@@ -4299,7 +4300,7 @@ pub(crate) mod tests {
         journal.michelson.push_dispatch_slot();
         // Non-zero amount: %collect_result has no recipient and is not
         // a CRAC, so any positive amount must fail.
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 1);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 1);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4331,7 +4332,7 @@ pub(crate) mod tests {
     // (460) + 1.5 * 256 (384) = 944 mgas total consumed.
     #[test]
     fn test_collect_result_charges_size_dependent() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -4343,7 +4344,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         let result = execute_enshrined_contract(
@@ -4360,7 +4361,7 @@ pub(crate) mod tests {
     // base (460). Remaining gas must be zero after a successful deposit.
     #[test]
     fn test_collect_result_charges_exact_budget_zero_bytes() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -4372,7 +4373,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS + COLLECT_RESULT_SIZE_BASE_MILLIGAS,
         )
@@ -4392,7 +4393,7 @@ pub(crate) mod tests {
     // dispatch slot stays empty.
     #[test]
     fn test_collect_result_out_of_gas_on_size_charge() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -4401,7 +4402,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.michelson.push_dispatch_slot();
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
             TYPECHECK_VALUE_STEP_MILLIGAS,
         )
@@ -4445,7 +4446,7 @@ pub(crate) mod tests {
     // kernel did the validation work and the caller pays for it.
     #[test]
     fn test_collect_result_charges_gas_when_no_frame() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         // No `push_dispatch_slot` — `set_dispatch_result` fails.
@@ -4454,7 +4455,7 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         let result = execute_enshrined_contract(
@@ -4477,7 +4478,7 @@ pub(crate) mod tests {
     // `AlreadySet` branch of `set_dispatch_result` is reached.
     #[test]
     fn test_collect_result_charges_gas_when_already_set() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
         let mut journal = TezosXJournal::new(
@@ -4489,7 +4490,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&source));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         // First deposit succeeds. 2-byte payload:
@@ -4532,7 +4533,7 @@ pub(crate) mod tests {
     // to have. The slot is never written.
     #[test]
     fn test_collect_result_mismatched_sender_reverts() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
@@ -4548,7 +4549,7 @@ pub(crate) mod tests {
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&owner));
         let mut ctx =
-            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+            MockCtx::new(&mut rk, &mut journal, &registry, mismatched_sender, 0);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -4573,7 +4574,7 @@ pub(crate) mod tests {
     // free probe.
     #[test]
     fn test_collect_result_mismatched_sender_still_charges_gas() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
@@ -4589,7 +4590,7 @@ pub(crate) mod tests {
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&owner));
         let mut ctx =
-            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+            MockCtx::new(&mut rk, &mut journal, &registry, mismatched_sender, 0);
         ctx.operation_gas =
             crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
         let result = execute_enshrined_contract(
@@ -4610,7 +4611,7 @@ pub(crate) mod tests {
     // same as a mismatch: rejected with an `Err`, slot not written.
     #[test]
     fn test_collect_result_unassigned_owner_reverts() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let sender = AddressHash::Kt1(ContractKt1Hash::from([0xCC; 20]));
 
@@ -4621,7 +4622,7 @@ pub(crate) mod tests {
         );
         // Slot is open, but no owner was ever assigned.
         journal.michelson.push_dispatch_slot();
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, sender, 0);
         let result = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -4644,7 +4645,7 @@ pub(crate) mod tests {
     // unauthorized caller's owner-mismatch rejection.
     #[test]
     fn test_collect_result_owner_double_collect_still_errors() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
 
@@ -4657,7 +4658,7 @@ pub(crate) mod tests {
         journal
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&owner));
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, owner, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, owner, 0);
         let first = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -4689,7 +4690,7 @@ pub(crate) mod tests {
     // owner's bytes stay untouched by the rejected write.
     #[test]
     fn test_collect_result_mismatched_sender_after_owner_collect_reverts() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
         let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
@@ -4704,7 +4705,7 @@ pub(crate) mod tests {
             .michelson
             .set_current_dispatch_owner(address_hash_bytes(&owner));
 
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, owner, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, owner, 0);
         let owner_collect = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -4741,7 +4742,7 @@ pub(crate) mod tests {
     // the slot, so the owner's own collect right after still lands.
     #[test]
     fn test_collect_result_owner_collect_after_mismatched_sender_lands() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let owner = AddressHash::Kt1(ContractKt1Hash::from([0xAA; 20]));
         let mismatched_sender = AddressHash::Kt1(ContractKt1Hash::from([0xBB; 20]));
@@ -4757,7 +4758,7 @@ pub(crate) mod tests {
             .set_current_dispatch_owner(address_hash_bytes(&owner));
 
         let mut ctx =
-            MockCtx::new(&mut host, &mut journal, &registry, mismatched_sender, 0);
+            MockCtx::new(&mut rk, &mut journal, &registry, mismatched_sender, 0);
         let grief_collect = execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
@@ -4801,7 +4802,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_dispatch_callback() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
@@ -4813,7 +4814,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         let destination = make_test_address();
         let body = vec![0xDE, 0xAD];
         let ops =
@@ -4837,7 +4838,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_dispatch_callback_out_of_gas() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
@@ -4849,7 +4850,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         // Drain almost all gas so there isn't enough for the callback
         let remaining = ctx.operation_gas().remaining.milligas().unwrap();
         let to_consume = remaining - 1;
@@ -4862,7 +4863,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_dispatch_callback_counter_increments() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
@@ -4874,7 +4875,7 @@ pub(crate) mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
         // Simulate prior internal operations having consumed counters
         let _ = ctx.operation_counter(); // 0
         let _ = ctx.operation_counter(); // 1
@@ -4912,7 +4913,7 @@ pub(crate) mod tests {
     /// because the CRAC-ID is determined by the top-level transaction.
     #[test]
     fn test_same_tx_gateway_calls_share_crac_id() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let generated_alias = "KT1_mock_alias".to_string();
         let registry = MockRegistry::new(generated_alias);
 
@@ -4932,13 +4933,8 @@ pub(crate) mod tests {
         let arena = typed_arena::Arena::new();
 
         // Two gateway calls in the same tx
-        let mut ctx1 = MockCtx::new(
-            &mut host,
-            &mut journal,
-            &registry,
-            source.clone(),
-            10_000_000,
-        );
+        let mut ctx1 =
+            MockCtx::new(&mut rk, &mut journal, &registry, source.clone(), 10_000_000);
         let dest_a = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -4954,8 +4950,7 @@ pub(crate) mod tests {
         )
         .unwrap();
 
-        let mut ctx2 =
-            MockCtx::new(&mut host, &mut journal, &registry, source, 10_000_000);
+        let mut ctx2 = MockCtx::new(&mut rk, &mut journal, &registry, source, 10_000_000);
         let dest_b = "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
         execute_enshrined_contract(
             EnshrinedContracts::TezosXGateway,
@@ -5185,7 +5180,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tezosx_resolve_source_alias_readonly() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -5197,13 +5192,8 @@ pub(crate) mod tests {
             tezos_crypto_rs::hash::OperationHash::default(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        let ctx = MockCtx::new(
-            &mut host,
-            &mut journal,
-            &registry,
-            source.clone(),
-            10_000_000,
-        );
+        let ctx =
+            MockCtx::new(&mut rk, &mut journal, &registry, source.clone(), 10_000_000);
         let (_alias, runtime) = tezosx_resolve_source_alias_readonly(
             &ctx,
             &registry,
@@ -5328,11 +5318,11 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_tezos_native() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5347,7 +5337,7 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_tezos_alias_to_evm() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let evm_addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let alias_info = tezosx_interfaces::AliasInfo {
             runtime: RuntimeId::Ethereum,
@@ -5357,7 +5347,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5373,11 +5363,11 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_evm_native() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5392,11 +5382,11 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_evm_unknown_no_backstop() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5410,7 +5400,7 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_evm_with_backstop_native() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         // When the code-presence back-stop fires on an unclassified EVM
         // address, `read_origin` classifies the address as Native. The
         // actual gas accounting (ALIAS_LOOKUP_COST) is tested in
@@ -5420,7 +5410,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -5434,7 +5424,7 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_evm_alias_to_tezos() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let tezos_addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
         let alias_info = tezosx_interfaces::AliasInfo {
             runtime: RuntimeId::Tezos,
@@ -5444,7 +5434,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5459,11 +5449,11 @@ pub(crate) mod tests {
 
     #[test]
     fn origin_of_invalid_runtime_id_returns_failwith() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1abc",
@@ -5491,12 +5481,12 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_same_source_valid() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             addr,
@@ -5514,11 +5504,11 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_same_source_malformed() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "not-an-address",
@@ -5535,7 +5525,7 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_alias_direct_to_target() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let evm_addr = "0xcccccccccccccccccccccccccccccccccccccccc";
         let alias_info = tezosx_interfaces::AliasInfo {
             runtime: RuntimeId::Ethereum,
@@ -5545,7 +5535,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5562,7 +5552,7 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_native_derives_recorded() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let derived = "0xdddddddddddddddddddddddddddddddddddddddd";
         let tezos_addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
         // Destination check returns an alias pointing back to source → Recorded.
@@ -5578,7 +5568,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             tezos_addr,
@@ -5595,7 +5585,7 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_native_derives_unrecorded() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let derived = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
         let tezos_addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
         // Destination check returns Unknown → Derived (1).
@@ -5607,7 +5597,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             tezos_addr,
@@ -5624,11 +5614,11 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_unknown_returns_none() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5648,11 +5638,11 @@ pub(crate) mod tests {
     fn origin_of_tezos_unknown_returns_unknown() {
         // Tezos source, no `/origin` record → Unknown (Left Unit).
         // No code-presence back-stop for Tezos sources (back-stop only applies to EVM).
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5666,11 +5656,11 @@ pub(crate) mod tests {
     #[test]
     fn origin_of_malformed_addr_tezos_returns_unknown() {
         // Tezos source, malformed address (neither tz1*/KT1* nor 0x*) → Unknown.
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "not_a_valid_address_at_all",
@@ -5687,11 +5677,11 @@ pub(crate) mod tests {
     #[test]
     fn origin_of_malformed_addr_evm_returns_unknown() {
         // EVM source, malformed address → Unknown.
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "not_a_valid_address_at_all",
@@ -5711,7 +5701,7 @@ pub(crate) mod tests {
         // effective origin becomes Native, derivation runs.
         // No inverse alias on the destination side → Derived (1).
         // The actual gas accounting of the back-stop is tested in tezosx-ethereum-runtime.
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let derived = "0xffffffffffffffffffffffffffffffffffffffff";
         // source_classification = Native (back-stop result), destination_classification = Unknown.
         let registry = StubRegistry::with_alias_and_expected_runtime(
@@ -5722,7 +5712,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5747,7 +5737,7 @@ pub(crate) mod tests {
         // a Michelson caller passing `0xDDdd...` and a Solidity caller
         // passing the same address would derive different KT1 aliases.
         // The StubRegistry asserts the basis passed to `compute_alias`.
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let mixed_case = "0xDDddDDddDDddDDddDDddDDddDDddDDddDDddDDdd";
         let lowercase = "0xdddddddddddddddddddddddddddddddddddddddd";
         let derived = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
@@ -5760,7 +5750,7 @@ pub(crate) mod tests {
         .expecting_native_address(lowercase.as_bytes().to_vec());
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             mixed_case,
@@ -5776,11 +5766,11 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_address_invalid_runtime_id() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            &host,
+            rk.host(),
             &mut gas,
             &registry,
             "tz1abc",
@@ -5809,12 +5799,12 @@ pub(crate) mod tests {
     /// counter so the focus of the storage-cost tests stays on the
     /// accumulator, not on gas exhaustion.
     fn classify_test_ctx<'h, 'j, 'r>(
-        host: &'h mut MockKernelHost,
+        rk: &'h mut MockRuntimeKeyspaces,
         journal: &'j mut TezosXJournal,
         registry: &'r MockRegistry,
-    ) -> MockCtx<'h, 'j, 'r, MockKernelHost, MockRegistry> {
+    ) -> MockCtx<'h, 'j, 'r, MockKernelHost, MockKeySpace, MockRegistry> {
         let mut ctx = MockCtx::new(
-            host,
+            rk,
             journal,
             registry,
             AddressHash::from_bytes(&[0u8; 22]).unwrap(),
@@ -5845,10 +5835,10 @@ pub(crate) mod tests {
             .header(X_TEZOS_STORAGE_COST, "12345")
             .body(vec![])
             .unwrap();
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = make_journal();
         let registry = MockRegistry::new("KT1_mock_alias");
-        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
         assert_eq!(ctx.delegated_storage_cost(), 0);
         classify_and_charge_crac_response(response, Some("tezos"), &mut ctx)
             .expect("2xx response must not error");
@@ -5864,10 +5854,10 @@ pub(crate) mod tests {
             .header(X_TEZOS_GAS_CONSUMED, "1000")
             .body(vec![])
             .unwrap();
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = make_journal();
         let registry = MockRegistry::new("KT1_mock_alias");
-        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
         classify_and_charge_crac_response(response, Some("tezos"), &mut ctx)
             .expect("2xx response must not error");
         assert_eq!(ctx.delegated_storage_cost(), 0);
@@ -5877,10 +5867,10 @@ pub(crate) mod tests {
     /// storage costs into the accumulator.
     #[test]
     fn test_classify_and_charge_crac_response_sums_across_returns() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = make_journal();
         let registry = MockRegistry::new("KT1_mock_alias");
-        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
 
         let first = http::Response::builder()
             .status(http::status::StatusCode::OK)
@@ -5909,10 +5899,10 @@ pub(crate) mod tests {
             .header(X_TEZOS_STORAGE_COST, "999")
             .body(b"bad".to_vec())
             .unwrap();
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = make_journal();
         let registry = MockRegistry::new("KT1_mock_alias");
-        let mut ctx = classify_test_ctx(&mut host, &mut journal, &registry);
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
         let result = classify_and_charge_crac_response(response, Some("tezos"), &mut ctx);
         assert!(result.is_err(), "4xx must surface an error");
         assert_eq!(

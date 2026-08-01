@@ -32,15 +32,19 @@ sol! {
     }
 }
 
-pub(crate) fn global_counter_precompile<'j, CTX, Host, R>(
+pub(crate) fn global_counter_precompile<'j, CTX, Host, KS, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let mut gas = Gas::new(inputs.gas_limit);
     guard(

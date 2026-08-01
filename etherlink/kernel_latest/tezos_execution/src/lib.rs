@@ -32,7 +32,7 @@ use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -440,8 +440,8 @@ pub(crate) fn consume_storage_read_milligas(
 /// charging gas for these operations, we use an upper-bound of their size.
 const COUNTER_SIZE: u64 = 32;
 
-fn reveal<Host>(
-    tc_ctx: &mut TcCtx<'_, Host>,
+fn reveal<Host, KS>(
+    tc_ctx: &mut TcCtx<'_, Host, KS>,
     source_account: &TezosImplicitAccount,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError>
@@ -450,7 +450,7 @@ where
 {
     log!(Debug, "Applying a reveal operation");
     let manager = source_account
-        .manager(tc_ctx.host)
+        .manager(tc_ctx.rk.host())
         .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
@@ -471,7 +471,7 @@ where
 
     // Set the public key as the manager
     source_account
-        .set_manager_public_key(tc_ctx.host, public_key)
+        .set_manager_public_key(tc_ctx.rk.host_mut(), public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
 
     log!(Debug, "Reveal operation succeed");
@@ -828,8 +828,8 @@ fn settle_parent_transfer(
 /// which the caller needs to decide the enclosing operation's status and cannot
 /// rederive from the receipts. See [`SubtreeStatus`].
 #[allow(clippy::too_many_arguments)]
-fn execute_internal_operations<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+fn execute_internal_operations<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -908,8 +908,8 @@ where
 /// returned frame has drained. `frame` keeps its iterator, so a later call
 /// resumes this batch where it left off.
 #[allow(clippy::too_many_arguments)]
-fn execute_pending_operations<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+fn execute_pending_operations<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -1307,8 +1307,8 @@ struct TransferOutcome {
 /// through [`transfer_step`] driven by [`execute_internal_operations`], so
 /// that a Michelson call chain does not recurse on the native stack.
 #[allow(clippy::too_many_arguments)]
-fn transfer<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+fn transfer<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -1391,8 +1391,8 @@ where
 /// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
 /// where the sender's balance was already debited by the calling runtime.
 #[allow(clippy::too_many_arguments)]
-fn transfer_step<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+fn transfer_step<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -1435,16 +1435,16 @@ where
             let dest_account = context::implicit_from_public_key_hash(pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let already_allocated = dest_account
-                .allocate(tc_ctx.host)
+                .allocate(tc_ctx.rk.host_mut())
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.host,
+                    tc_ctx.rk.host_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
             };
             Ok(TransferStep {
                 success: TransferSuccess {
@@ -1472,7 +1472,7 @@ where
             // — a user-controllable block-abort handle. Mirrors Tezos's
             // `Contract.Non_existing_contract`.
             if !dest_account
-                .exists(tc_ctx.host)
+                .exists(tc_ctx.rk.host())
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
             {
                 return Err(TransferError::ContractDoesNotExist(Contract::Originated(
@@ -1482,15 +1482,15 @@ where
             }
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.host,
+                    tc_ctx.rk.host_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
             };
             let code = dest_account
-                .code(tc_ctx.host)
+                .code(tc_ctx.rk.host())
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let (code_read_count, code_size) = match &code {
                 Code::Code(code_bytes) => (1, code_bytes.len() as u64),
@@ -1503,12 +1503,16 @@ where
             )
             .map_err(TransferError::OutOfGas)?;
             let storage = dest_account
-                .storage(tc_ctx.host)
+                .storage(tc_ctx.rk.host())
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
                 .map_err(TransferError::OutOfGas)?;
-            let exec_ctx =
-                ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
+            let exec_ctx = ExecCtx::create(
+                tc_ctx.rk.host_mut(),
+                sender_account,
+                &dest_account,
+                amount,
+            )?;
 
             let delegated_storage_cost_before = operation_ctx.delegated_storage_cost;
             let (internal_operations, new_storage, address_registry_diff): (
@@ -1582,7 +1586,7 @@ where
                     )
                 } else {
                     let (prev_info, info_bytes_read) = dest_account
-                        .read_info_with_len(tc_ctx.host)
+                        .read_info_with_len(tc_ctx.rk.host())
                         .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
                     let (new_info, space) = prev_info.with_storage_size(
                         new_storage.len() as u64,
@@ -1631,7 +1635,7 @@ where
             // their gas has been charged (no-op for enshrined contracts).
             if let Some(info) = &info_to_write {
                 dest_account
-                    .write_storage_and_info(tc_ctx.host, &new_storage, info)
+                    .write_storage_and_info(tc_ctx.rk.host_mut(), &new_storage, info)
                     .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             }
             let StorageSpace {
@@ -1844,8 +1848,8 @@ pub fn get_enshrined_contract_views(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+fn transfer_external<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -1954,8 +1958,8 @@ impl From<TransferError> for CracTransferError {
 /// (e.g. Michelson `FAILWITH`).
 // TODO: L2-888 replace the low level revert mechanism by more general one
 #[allow(clippy::too_many_arguments)]
-pub fn cross_runtime_transfer<'a, Host>(
-    tc_ctx: &mut TcCtx<'a, Host>,
+pub fn cross_runtime_transfer<'a, Host, KS>(
+    tc_ctx: &mut TcCtx<'a, Host, KS>,
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
@@ -1978,7 +1982,7 @@ where
         tezos_smart_rollup_host::path::OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
     let checkpoint_index = journal
         .michelson
-        .checkpoint(tc_ctx.host, &world_state)
+        .checkpoint(tc_ctx.rk.host_mut(), &world_state)
         .map_err(|e| CracTransferError::from(gw(e)))?;
 
     let mut internal_receipts = Vec::new();
@@ -2014,7 +2018,7 @@ where
                 // promote: discard the snapshot, keep changes
                 journal
                     .michelson
-                    .checkpoint_commit(tc_ctx.host, checkpoint_index)
+                    .checkpoint_commit(tc_ctx.rk.host_mut(), checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
 
                 let target: TransferTarget = success.into();
@@ -2037,7 +2041,7 @@ where
                 // revert: restore the snapshot
                 journal
                     .michelson
-                    .checkpoint_revert(tc_ctx.host, checkpoint_index)
+                    .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
                 internal_receipts
                     .iter_mut()
@@ -2076,7 +2080,7 @@ where
         Err(e) => {
             journal
                 .michelson
-                .checkpoint_revert(tc_ctx.host, checkpoint_index)
+                .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
                 .map_err(|e| CracTransferError::from(gw(e)))?;
             internal_receipts
                 .iter_mut()
@@ -2127,8 +2131,8 @@ fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-pub fn typecheck_code_and_storage<'a, Host: StorageV1>(
-    ctx: &mut TcCtx<'a, Host>,
+pub fn typecheck_code_and_storage<'a, Host: StorageV1, KS>(
+    ctx: &mut TcCtx<'a, Host, KS>,
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
@@ -2192,8 +2196,8 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1>(
 /// storage with the other occurrences, so taking it by value would deep-copy
 /// it — unmetered, and before either the walk or the unparser charges
 /// anything (L2-1836).
-fn handle_storage_with_big_maps<'a, Host: StorageV1>(
-    ctx: &mut TcCtx<'a, Host>,
+fn handle_storage_with_big_maps<'a, Host: StorageV1, KS>(
+    ctx: &mut TcCtx<'a, Host, KS>,
     storage: Rc<TypedValue<'a>>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
@@ -2232,8 +2236,8 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1>(
 /// success body that the post-execution burn pass will charge. User-
 /// issued and internal MIR originations pass [`Origin::Native`]; the
 /// alias-forwarder materialization path passes [`Origin::Alias`].
-pub fn originate_contract<'a, Host>(
-    ctx: &mut TcCtx<'a, Host>,
+pub fn originate_contract<'a, Host, KS>(
+    ctx: &mut TcCtx<'a, Host, KS>,
     contract: ContractKt1Hash,
     sender_account: &impl TezosAccount,
     initial_balance: &Narith,
@@ -2297,7 +2301,12 @@ where
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
-        .init(ctx.host, script_code, &new_storage, lazy_storage_size_diff)
+        .init(
+            ctx.rk.host_mut(),
+            script_code,
+            &new_storage,
+            lazy_storage_size_diff,
+        )
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -2328,7 +2337,7 @@ where
 
     // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
-        ctx.host,
+        ctx.rk.host_mut(),
         sender_account,
         &smart_contract,
         &initial_balance.0,
@@ -2339,7 +2348,7 @@ where
     // writer of the origin path for a freshly created KT1, so write it
     // unconditionally.
     smart_contract
-        .set_origin(ctx.host, origin)
+        .set_origin(ctx.rk.host_mut(), origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -2544,8 +2553,8 @@ pub fn get_required_da_fees(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_and_apply_operation<Host>(
-    host: &mut Host,
+pub fn validate_and_apply_operation<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     operation: Operation,
@@ -2575,17 +2584,14 @@ where
         None
     };
 
-    let mut safe_host = SafeStorage {
-        host,
-        world_states: safe_roots.to_vec(),
-    };
+    let mut safe_rk = rk.to_safe_host(safe_roots.to_vec());
 
-    safe_host.start()?;
+    safe_rk.host_mut().start()?;
 
     log!(Debug, "Verifying that the batch is valid");
 
     let validation_info = match validate::execute_validation(
-        &mut safe_host,
+        safe_rk.host_mut(),
         operation,
         skip_signature_check,
         required_fees,
@@ -2593,23 +2599,23 @@ where
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(Debug, "Reverting the changes because the batch is invalid.");
-            safe_host.revert()?;
+            safe_rk.host_mut().revert()?;
             return Err(OperationError::Validation(validity_err));
         }
     };
 
     log!(Debug, "Batch is valid!");
 
-    safe_host.promote()?;
+    safe_rk.host_mut().promote()?;
     // Skip trace promotion (and its store_has probe) when the tracer is off:
     // no trace data was written, so there is nothing to move out of /tmp.
     if block_ctx.tracing_enabled {
-        safe_host.promote_trace()?;
+        safe_rk.host_mut().promote_trace()?;
     }
     if block_ctx.http_trace_enabled {
-        safe_host.promote_http_trace()?;
+        safe_rk.host_mut().promote_http_trace()?;
     }
-    safe_host.start()?;
+    safe_rk.host_mut().start()?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
@@ -2623,7 +2629,7 @@ where
     // We use `mut` here because apply_batch does not handle fee refund,
     // so we append the refund balance updates to processed_ops afterwards.
     let (mut processed_ops, applied) = apply_batch(
-        &mut safe_host,
+        &mut safe_rk,
         registry,
         journal,
         validation_info,
@@ -2637,12 +2643,12 @@ where
             Debug,
             "Committing the changes because the batch was successfully applied."
         );
-        safe_host.promote()?;
+        safe_rk.host_mut().promote()?;
         if block_ctx.tracing_enabled {
-            safe_host.promote_trace()?;
+            safe_rk.host_mut().promote_trace()?;
         }
         if block_ctx.http_trace_enabled {
-            safe_host.promote_http_trace()?;
+            safe_rk.host_mut().promote_http_trace()?;
         }
     } else {
         log!(
@@ -2650,9 +2656,9 @@ where
             "Reverting the changes because some operation failed."
         );
         log!(Debug, "Processed operations: {processed_ops:#?}");
-        safe_host.revert()?;
-        // Clear the in-memory EVM journal: safe_host.revert() only rolls
-        // back Tezos durable storage but cannot affect the in-memory REVM
+        safe_rk.host_mut().revert()?;
+        // Clear the in-memory EVM journal: safe_rk.host_mut().revert() only
+        // rolls back Tezos durable storage but cannot affect the in-memory REVM
         // JournalInner. Without this, commit_evm_journal_from_external()
         // would persist EVM state changes from a backtracked operation.
         journal.evm.clear();
@@ -2670,11 +2676,16 @@ where
     // Apply fee refund after all transactional work is done.
     // This runs outside the SafeStorage transaction (after promote/revert)
     // so that the refund applies in both cases: applied and failed operations.
-    // Uses safe_host.host directly since the transactional phase is complete.
+    // Uses the live host under the mirror directly, the transactional phase
+    // being complete.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
-        apply_fee_refund(safe_host.host, &mut processed_ops, fee_refund)
-            .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
+        apply_fee_refund(
+            &mut *safe_rk.host_mut().host,
+            &mut processed_ops,
+            fee_refund,
+        )
+        .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
 
     Ok(processed_ops)
@@ -2736,8 +2747,8 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_batch<Host>(
-    host: &mut Host,
+fn apply_batch<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     validation_info: validate::ValidatedBatch,
@@ -2776,7 +2787,7 @@ where
             }
         } else {
             apply_operation(
-                host,
+                rk,
                 registry,
                 journal,
                 &source_account,
@@ -2798,7 +2809,7 @@ where
     }
 
     // Clear all the temporaries big_map after the application of the batch
-    let cleared = clear_temporary_big_maps(host, &mut next_temporary_id);
+    let cleared = clear_temporary_big_maps(rk.host_mut(), &mut next_temporary_id);
 
     if let Err(lazy_storage_err) = cleared {
         log!(
@@ -2831,8 +2842,8 @@ fn log_on_operation_failure<T, E: std::fmt::Debug>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_operation<Host>(
-    host: &mut Host,
+fn apply_operation<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     source_account: &TezosImplicitAccount,
@@ -2848,7 +2859,7 @@ where
     let mut internal_operations_receipts: Vec<TaggedInternalOp> = Vec::new();
     let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
-        host,
+        rk,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
@@ -2868,7 +2879,7 @@ where
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
             OperationResultSum::Reveal(finalize_and_burn::<_, RevealContent, _>(
-                tc_ctx.host,
+                tc_ctx.rk.host_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -2955,7 +2966,7 @@ where
                 }
             };
             OperationResultSum::Transfer(finalize_and_burn::<_, TransferContent, _>(
-                tc_ctx.host,
+                tc_ctx.rk.host_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -2995,7 +3006,7 @@ where
             log_on_operation_failure("Origination", &origination_result);
             OperationResultSum::Origination(
                 finalize_and_burn::<_, OriginationContent, _>(
-                    tc_ctx.host,
+                    tc_ctx.rk.host_mut(),
                     source_account,
                     storage_limit,
                     balance_updates,
@@ -3056,7 +3067,7 @@ mod tests {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::{Narith, Zarith};
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -3226,7 +3237,7 @@ mod tests {
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let parser = mir::parser::Parser::new();
 
         // Seed the shared implementation with a real Michelson script.
@@ -3236,7 +3247,7 @@ mod tests {
             .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
-        write_alias_implementation(&mut host, &code).unwrap();
+        write_alias_implementation(rk.host_mut(), &code).unwrap();
 
         // A code-less KT1 classified as an alias.
         let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
@@ -3247,12 +3258,16 @@ mod tests {
         });
         let mut buf = vec![];
         origin.bin_write(&mut buf).unwrap();
-        host.store_write_all(&origin_path(&account).unwrap(), &buf)
+        rk.host_mut()
+            .store_write_all(&origin_path(&account).unwrap(), &buf)
             .unwrap();
 
-        let entrypoints =
-            get_contract_entrypoint(&host, &AddressHash::Kt1(kt1), &mut Gas::default())
-                .expect("alias entrypoints resolve to the shared implementation");
+        let entrypoints = get_contract_entrypoint(
+            rk.host(),
+            &AddressHash::Kt1(kt1),
+            &mut Gas::default(),
+        )
+        .expect("alias entrypoints resolve to the shared implementation");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
     }
 
@@ -3278,49 +3293,50 @@ mod tests {
 
     #[test]
     fn upgrade_accepts_entrypoint_superset() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let superset = encode_script(UPGRADE_SUPERSET_SCRIPT);
-        upgrade_alias_implementation(&mut host, &superset, &mut Gas::default())
+        upgrade_alias_implementation(rk.host_mut(), &superset, &mut Gas::default())
             .expect("adding an entrypoint while keeping `default` must be accepted");
         assert_eq!(
-            account_storage::read_alias_implementation(&host).unwrap(),
+            account_storage::read_alias_implementation(rk.host()).unwrap(),
             Some(superset)
         );
     }
 
     #[test]
     fn upgrade_rejects_dropped_entrypoint() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Start from the superset (default + foo)...
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
 
         // ...then try to drop `foo` by going back to the bare default script.
         let dropped = encode_script(UPGRADE_BASE_SCRIPT);
-        let err = upgrade_alias_implementation(&mut host, &dropped, &mut Gas::default())
-            .expect_err("dropping an exposed entrypoint must be rejected");
+        let err =
+            upgrade_alias_implementation(rk.host_mut(), &dropped, &mut Gas::default())
+                .expect_err("dropping an exposed entrypoint must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointRemoved(_)));
         // The slot is left untouched.
         assert_eq!(
-            account_storage::read_alias_implementation(&host).unwrap(),
+            account_storage::read_alias_implementation(rk.host()).unwrap(),
             Some(encode_script(UPGRADE_SUPERSET_SCRIPT))
         );
     }
 
     #[test]
     fn upgrade_rejects_entrypoint_type_change() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -3329,17 +3345,18 @@ mod tests {
         let retyped = encode_script(
             "parameter string; storage unit; code { CDR; NIL operation; PAIR }",
         );
-        let err = upgrade_alias_implementation(&mut host, &retyped, &mut Gas::default())
-            .expect_err("changing an entrypoint's type must be rejected");
+        let err =
+            upgrade_alias_implementation(rk.host_mut(), &retyped, &mut Gas::default())
+                .expect_err("changing an entrypoint's type must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointTypeChanged(_)));
     }
 
     #[test]
     fn upgrade_rejects_storage_type_change() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Base storage is `string` (like the forwarder).
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
@@ -3351,7 +3368,7 @@ mod tests {
              NIL operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &retyped_storage,
             &mut Gas::default(),
         )
@@ -3366,9 +3383,9 @@ mod tests {
         // implicit `default` entrypoint's type (it becomes the whole `or`), so
         // the upgrade is correctly rejected. The safe path is to annotate
         // `(unit %default)` — exercised by `upgrade_accepts_entrypoint_superset`.
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -3378,7 +3395,7 @@ mod tests {
              operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &widened_no_default,
             &mut Gas::default(),
         )
@@ -3388,15 +3405,15 @@ mod tests {
 
     #[test]
     fn upgrade_rejects_invalid_script() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         account_storage::write_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let err = upgrade_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             b"not a michelson script",
             &mut Gas::default(),
         )
@@ -3404,7 +3421,7 @@ mod tests {
         assert!(matches!(err, AliasUpgradeError::InvalidScript));
         // The core safety property: the slot is left untouched on rejection.
         assert_eq!(
-            account_storage::read_alias_implementation(&host).unwrap(),
+            account_storage::read_alias_implementation(rk.host()).unwrap(),
             Some(encode_script(UPGRADE_BASE_SCRIPT))
         );
     }
@@ -3412,11 +3429,11 @@ mod tests {
     #[test]
     fn upgrade_rejects_corrupt_current_implementation() {
         // A non-typeable slot means the current implementation is corrupt.
-        let mut host = MockKernelHost::default();
-        account_storage::write_alias_implementation(&mut host, b"garbage").unwrap();
+        let mut rk = RuntimeKeyspaces::default();
+        account_storage::write_alias_implementation(rk.host_mut(), b"garbage").unwrap();
 
         let err = upgrade_alias_implementation(
-            &mut host,
+            rk.host_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
             &mut Gas::default(),
         )
@@ -3430,12 +3447,12 @@ mod tests {
     #[test]
     fn upgrade_into_empty_slot_is_accepted() {
         // No current implementation: nothing to preserve.
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let code = encode_script(UPGRADE_BASE_SCRIPT);
-        upgrade_alias_implementation(&mut host, &code, &mut Gas::default())
+        upgrade_alias_implementation(rk.host_mut(), &code, &mut Gas::default())
             .expect("seeding an empty slot has no monotonicity constraint");
         assert_eq!(
-            account_storage::read_alias_implementation(&host).unwrap(),
+            account_storage::read_alias_implementation(rk.host()).unwrap(),
             Some(code)
         );
     }
@@ -3720,7 +3737,7 @@ mod tests {
     // This should fail as an EmptyImplicitContract
     #[test]
     fn apply_operation_empty_account() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
@@ -3728,12 +3745,12 @@ mod tests {
         // to avoid getting an error when initializing the safe_storage
         let other = bootstrap2();
 
-        let src_account = init_account(&mut host, &other.pkh, 50);
+        let src_account = init_account(rk.host_mut(), &other.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source);
 
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -3748,7 +3765,7 @@ mod tests {
             OperationError::Validation(ValidityError::EmptyImplicitContract);
 
         assert_eq!(
-            src_account.counter(&host).unwrap(),
+            src_account.counter(rk.host()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -3759,17 +3776,17 @@ mod tests {
     // Test that increasing the fees makes the operation fails
     #[test]
     fn apply_operation_cant_pay_fees() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
-        let src_account = init_account(&mut host, &source.pkh, 50);
+        let src_account = init_account(rk.host_mut(), &source.pkh, 50);
 
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 1000, 5, source);
 
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -3784,7 +3801,7 @@ mod tests {
             OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
 
         assert_eq!(
-            src_account.counter(&host).unwrap(),
+            src_account.counter(rk.host()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -3795,17 +3812,17 @@ mod tests {
     // Test that a wrong counter should make the operation fails
     #[test]
     fn apply_operation_invalid_counter() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
-        let src_account = init_account(&mut host, &source.pkh, 50);
+        let src_account = init_account(rk.host_mut(), &source.pkh, 50);
 
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 1000, 5, source);
 
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -3823,7 +3840,7 @@ mod tests {
             }));
 
         assert_eq!(
-            src_account.counter(&host).unwrap(),
+            src_account.counter(rk.host()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -3835,11 +3852,11 @@ mod tests {
     // Test a reveal operation on an already revealed account
     #[test]
     fn apply_reveal_operation_on_already_revealed_account() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
-        let account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(rk.host_mut(), &source.pkh, 50);
 
         // Setting the manager key of this account to its public_key, this account
         // will be considered as revealed and the reveal operation should fail
@@ -3849,13 +3866,13 @@ mod tests {
         .expect("Public key creation should have succeed");
 
         account
-            .set_manager_public_key(&mut host, &pk)
+            .set_manager_public_key(rk.host_mut(), &pk)
             .expect("Setting manager field should have succeed");
 
         // Applying the operation
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -3894,7 +3911,7 @@ mod tests {
         }];
 
         assert_eq!(
-            account.counter(&host).unwrap(),
+            account.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -3912,11 +3929,11 @@ mod tests {
     // the live account) rather than the standalone-only failure path.
     #[test]
     fn reveal_manager_is_always_consistent_on_live_account() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
-        let account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(rk.host_mut(), &source.pkh, 50);
 
         // Attempting to plant an inconsistent manager pkh is a no-op on the
         // live account: the manager stays `NotRevealed(source.pkh)`.
@@ -3925,11 +3942,11 @@ mod tests {
                 .expect("PublicKeyHash b58 conversion should have succeed");
 
         account
-            .force_set_manager_public_key_hash(&mut host, &inconsistent_pkh)
+            .force_set_manager_public_key_hash(rk.host_mut(), &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
         assert_eq!(
-            account.manager(&host).unwrap(),
+            account.manager(rk.host()).unwrap(),
             Manager::NotRevealed(source.pkh.clone()),
             "live account manager is derived from its own pkh, stays consistent"
         );
@@ -3937,7 +3954,7 @@ mod tests {
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -3976,12 +3993,12 @@ mod tests {
 
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
-            account.manager(&host).unwrap(),
+            account.manager(rk.host()).unwrap(),
             Manager::Revealed(source.pk),
             "reveal records the source's public key as the manager"
         );
         assert_eq!(
-            account.counter(&host).unwrap(),
+            account.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -3990,7 +4007,7 @@ mod tests {
     // Test an invalid operation where the provided public key is inconsistent for the source
     #[test]
     fn apply_reveal_operation_with_an_inconsistent_public_key() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // Wrong public key for source
         let pk = PublicKey::from_b58check(
@@ -4001,12 +4018,12 @@ mod tests {
         let source = Bootstrap { pk, ..bootstrap1() };
 
         // Even if we don't use it we need to init the account
-        let account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(rk.host_mut(), &source.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -4024,7 +4041,7 @@ mod tests {
         );
 
         assert_eq!(
-            account.counter(&host).unwrap(),
+            account.counter(rk.host()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -4039,12 +4056,12 @@ mod tests {
     // fee is debited or counter promoted.
     #[test]
     fn validate_reveal_with_attacker_key_does_not_charge_source() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let victim = bootstrap1();
         let attacker = bootstrap2();
 
-        let account = init_account(&mut host, &victim.pkh, 50);
+        let account = init_account(rk.host_mut(), &victim.pkh, 50);
 
         // source = victim, but the Reveal payload key is the attacker's, and the
         // whole batch is signed by the attacker (so the signature check against
@@ -4070,7 +4087,7 @@ mod tests {
         };
 
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -4091,12 +4108,12 @@ mod tests {
 
         // The victim's fee must not be charged and its counter must not move.
         assert_eq!(
-            account.balance(&host).unwrap(),
+            account.balance(rk.host()).unwrap(),
             50_u64.into(),
             "Victim balance must not be debited"
         );
         assert_eq!(
-            account.counter(&host).unwrap(),
+            account.counter(rk.host()).unwrap(),
             0.into(),
             "Victim counter must not be incremented"
         );
@@ -4105,14 +4122,14 @@ mod tests {
     // Test a valid reveal operation, the manager should go from NotRevealed to Revealed
     #[test]
     fn apply_reveal_operation() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
-        let account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(rk.host_mut(), &source.pkh, 50);
 
         let manager = account
-            .manager(&host)
+            .manager(rk.host())
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::NotRevealed(source.pkh.clone()));
@@ -4125,7 +4142,7 @@ mod tests {
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4165,13 +4182,13 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         let manager = account
-            .manager(&host)
+            .manager(rk.host())
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::Revealed(pk));
 
         assert_eq!(
-            account.counter(&host).unwrap(),
+            account.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4180,17 +4197,17 @@ mod tests {
     // Test an invalid transfer operation, source has not enough balance to fulfill the Transfer
     #[test]
     fn apply_transfer_with_not_enough_balance() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let source = bootstrap1();
 
         let dest = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance
-        let source_account = init_account(&mut host, &source.pkh, 50);
-        reveal_account(&mut host, &source);
+        let source_account = init_account(rk.host_mut(), &source.pkh, 50);
+        reveal_account(rk.host_mut(), &source);
 
-        let destination_account = init_account(&mut host, &dest.pkh, 50);
+        let destination_account = init_account(rk.host_mut(), &dest.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -4204,7 +4221,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4250,11 +4267,14 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source only paid the fees and the destination balance is unchanged
-        assert_eq!(source_account.balance(&host).unwrap(), 35.into());
-        assert_eq!(destination_account.balance(&host).unwrap(), 50_u64.into());
+        assert_eq!(source_account.balance(rk.host()).unwrap(), 35.into());
+        assert_eq!(
+            destination_account.balance(rk.host()).unwrap(),
+            50_u64.into()
+        );
 
         assert_eq!(
-            source_account.counter(&host).unwrap(),
+            source_account.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4263,17 +4283,17 @@ mod tests {
     // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
     #[test]
     fn apply_successful_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
         let dst = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance and reveal the source
-        let source = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
-        let destination = init_account(&mut host, &dst.pkh, 50);
+        let destination = init_account(rk.host_mut(), &dst.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -4287,7 +4307,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4348,12 +4368,12 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
-        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
+        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
 
         // Verify that the source's counter has been incremented
         assert_eq!(
-            source.counter(&host).unwrap(),
+            source.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4362,15 +4382,15 @@ mod tests {
     // Bootstrap 1 successfully transfers 30 mutez to itself
     #[test]
     fn apply_successful_self_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
         let dest = src.clone();
 
         // Setup account with 50 mutez in its balance
-        let source = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -4384,7 +4404,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4444,13 +4464,13 @@ mod tests {
         }];
 
         // Verify that balance was only debited for fees
-        assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
+        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
 
         // Verify that the source's counter has been incremented
         assert_eq!(
-            source.counter(&host).unwrap(),
+            source.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4458,15 +4478,15 @@ mod tests {
 
     #[test]
     fn apply_transfer_to_originated_faucet_with_success_receipt() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
         let src = bootstrap1();
         let desthash =
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
         // Setup accounts with 50 mutez in their balance
-        let requester = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let requester = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
         let (code, storage) = (
             r#"
                         parameter (mutez %fund);
@@ -4488,7 +4508,7 @@ mod tests {
             "#,
             &Micheline::from(()),
         );
-        let faucet = init_contract(&mut host, &desthash, code, storage, &1000.into());
+        let faucet = init_contract(rk.host_mut(), &desthash, code, storage, &1000.into());
         let requested_amount = 100;
         let operation = make_transfer_operation(
             fees,
@@ -4508,7 +4528,7 @@ mod tests {
             },
         );
         let res = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4610,16 +4630,16 @@ mod tests {
             }
         );
         assert_eq!(
-            faucet.balance(&host).unwrap(),
+            faucet.balance(rk.host()).unwrap(),
             (faucet_balance - requested_amount).into()
         );
         assert_eq!(
-            requester.balance(&host).unwrap(),
+            requester.balance(rk.host()).unwrap(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
 
         assert_eq!(
-            requester.counter(&host).unwrap(),
+            requester.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4636,7 +4656,7 @@ mod tests {
     /// any unknown KT1 would be a user-controllable block-abort handle.
     #[test]
     fn apply_transfer_to_nonexistent_originated_contract() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         // Never-originated KT1: no `init_contract` call, no code blob, no
         // balance entry exists at this path.
@@ -4644,8 +4664,8 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
 
-        let requester = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let requester = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -4659,7 +4679,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4700,15 +4720,15 @@ mod tests {
         let balance_path = context::contracts::balance_path(&dest_account)
             .expect("balance_path should have succeeded");
         assert_eq!(
-            host.store_has(&balance_path).unwrap(),
+            rk.host_mut().store_has(&balance_path).unwrap(),
             None,
             "no balance entry should exist for a never-originated KT1"
         );
 
         // Source paid the manager fee but not the transfer amount.
-        assert_eq!(requester.balance(&host).unwrap(), (50_u64 - 15).into());
+        assert_eq!(requester.balance(rk.host()).unwrap(), (50_u64 - 15).into());
         assert_eq!(
-            requester.counter(&host).unwrap(),
+            requester.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4716,7 +4736,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_execution() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
@@ -4727,10 +4747,15 @@ mod tests {
 
         // Source funded with 54 mutez: 15 fee + 30 transfer + 4
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
-        let source = init_account(&mut host, &src.pkh, 54);
-        reveal_account(&mut host, &src);
-        let destination =
-            init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
+        let source = init_account(rk.host_mut(), &src.pkh, 54);
+        reveal_account(rk.host_mut(), &src);
+        let destination = init_contract(
+            rk.host_mut(),
+            &dest,
+            SCRIPT,
+            &initial_storage,
+            &50_u64.into(),
+        );
 
         let storage_value = Micheline::from("Hello world")
             .encode(&mut Gas::default())
@@ -4751,7 +4776,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -4831,19 +4856,19 @@ mod tests {
 
         // Verify that source and destination balances changed:
         // 54 - 15 fee - 30 transfer - 4 burn (4 × COST_PER_BYTES) = 5.
-        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
+        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
 
         assert_eq!(receipt, expected_receipt);
 
         assert_eq!(
-            source.counter(&host).unwrap(),
+            source.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
 
         assert_eq!(
-            destination.storage(&host).unwrap(),
+            destination.storage(rk.host()).unwrap(),
             storage_value,
             "Storage has not been updated"
         )
@@ -4855,7 +4880,7 @@ mod tests {
     /// `set_storage` during execution.
     #[test]
     fn apply_transfer_bumps_paid_bytes_after_storage_growth() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
         let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -4864,10 +4889,15 @@ mod tests {
         let initial_storage = Micheline::from("initial");
         // Source funded with 1050 mutez: 15 fee + 30 transfer + 1000
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
-        init_account(&mut host, &src.pkh, 1050);
-        reveal_account(&mut host, &src);
-        let destination =
-            init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
+        init_account(rk.host_mut(), &src.pkh, 1050);
+        reveal_account(rk.host_mut(), &src);
+        let destination = init_contract(
+            rk.host_mut(),
+            &dest,
+            SCRIPT,
+            &initial_storage,
+            &50_u64.into(),
+        );
 
         let storage_value = Micheline::from("Hello world")
             .encode(&mut Gas::default())
@@ -4889,7 +4919,7 @@ mod tests {
         );
 
         let _ = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -4907,16 +4937,16 @@ mod tests {
         // is `code_size + |encoded("Hello world")|`. Read `code_size`
         // from durable storage — the invariant under test is exactly
         // `used == code_size + storage_size`.
-        let code_size = destination.code_size(&host).unwrap();
+        let code_size = destination.code_size(rk.host()).unwrap();
         let expected_used = Zarith(code_size.0 + new_storage_size);
 
-        assert_eq!(destination.used_bytes(&host).unwrap(), expected_used);
-        assert_eq!(destination.paid_bytes(&host).unwrap(), expected_used);
+        assert_eq!(destination.used_bytes(rk.host()).unwrap(), expected_used);
+        assert_eq!(destination.paid_bytes(rk.host()).unwrap(), expected_used);
     }
 
     #[test]
     fn apply_transfer_burn_failure_backtracks_with_error() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
@@ -4925,10 +4955,10 @@ mod tests {
         // Fund the source with 48 mutez: 15 fee + 30 transfer + 3
         // left.  The storage burn (4 × COST_PER_BYTES = 4 mutez)
         // does not fit; the operation must Backtrack.
-        let source = init_account(&mut host, &src.pkh, 48);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 48);
+        reveal_account(rk.host_mut(), &src);
         let destination = init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest,
             SCRIPT,
             &initial_storage.clone(),
@@ -4954,7 +4984,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -5028,9 +5058,9 @@ mod tests {
 
         // SafeStorage rollback: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
-        assert_eq!(source.balance(&host).unwrap(), (48_u64 - 15).into());
+        assert_eq!(source.balance(rk.host()).unwrap(), (48_u64 - 15).into());
         assert_eq!(
-            destination.storage(&host).unwrap(),
+            destination.storage(rk.host()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -5041,13 +5071,13 @@ mod tests {
 
     #[test]
     fn apply_transfer_to_unallocated_implicit_burns_slot() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let dest = bootstrap2();
         // Source funded for: 15 fee + 30 transfer + 257 slot burn
         // (ORIGINATION_SIZE × COST_PER_BYTES) + 5 mutez change.
-        let source = init_account(&mut host, &src.pkh, 307);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 307);
+        reveal_account(rk.host_mut(), &src);
         // Note: dest is NOT pre-allocated (no init_account call).
 
         let operation = make_transfer_operation(
@@ -5063,7 +5093,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation.clone(),
@@ -5142,20 +5172,20 @@ mod tests {
 
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
-        assert_eq!(dest_account.balance(&host).unwrap(), 30_u64.into());
+        assert_eq!(dest_account.balance(rk.host()).unwrap(), 30_u64.into());
         // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
-        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
+        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
     }
 
     #[test]
     fn apply_transfer_to_unallocated_implicit_cannot_pay_slot() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let dest = bootstrap2();
         // 50 mutez covers fee (15) + transfer (30) but NOT the slot
         // burn (257).
-        let source = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5170,7 +5200,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation.clone(),
@@ -5247,18 +5277,18 @@ mod tests {
 
         // SafeStorage rolled back the allocation: the destination
         // account is gone again, and the source paid only the fee.
-        assert_eq!(source.balance(&host).unwrap(), (50_u64 - 15).into());
+        assert_eq!(source.balance(rk.host()).unwrap(), (50_u64 - 15).into());
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert!(
-            !dest_account.allocated(&host).unwrap(),
+            !dest_account.allocated(rk.host()).unwrap(),
             "implicit allocation must be rolled back"
         );
     }
 
     #[test]
     fn apply_transfer_with_failed_execution() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
@@ -5267,11 +5297,11 @@ mod tests {
 
         let initial_storage = Micheline::from(());
 
-        let source = init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        let source = init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let destination = init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest,
             FAILING_SCRIPT,
             &initial_storage,
@@ -5296,7 +5326,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -5337,19 +5367,19 @@ mod tests {
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
-        assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
-        assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
+        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
+        assert_eq!(destination.balance(rk.host()).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
 
         assert_eq!(
-            source.counter(&host).unwrap(),
+            source.counter(rk.host()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
 
         assert_eq!(
-            destination.storage(&host).unwrap(),
+            destination.storage(rk.host()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -5360,14 +5390,14 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_argument_to_implicit_fails() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
         let dest = bootstrap2();
 
-        init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5387,7 +5417,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -5432,14 +5462,14 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_non_default_entrypoint_to_implicit_fails() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
         let dest = bootstrap2();
 
-        init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5460,7 +5490,7 @@ mod tests {
         );
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -5505,14 +5535,14 @@ mod tests {
 
     #[test]
     fn apply_three_valid_operations() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(&mut host, &src.pkh, 50);
-        let dest_acc = init_account(&mut host, &dest.pkh, 50);
+        let src_acc = init_account(rk.host_mut(), &src.pkh, 50);
+        let dest_acc = init_account(rk.host_mut(), &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -5520,7 +5550,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(&host).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
 
         // op‑2: transfer 10ꜩ to dest
         let transfer_content_1 = OperationContent::Transfer(TransferContent {
@@ -5547,7 +5577,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 batch.clone(),
@@ -5683,18 +5713,18 @@ mod tests {
         // counter updated, balances moved
         // initial_balance: 50 tez, fee amount: (3*5)tez, transfer amount: (10 + 20)tez
         assert_eq!(
-            src_acc.balance(&host).unwrap(),
+            src_acc.balance(rk.host()).unwrap(),
             5u64.into(),
             "Source account should have 5ꜩ left after fees and transfers."
         );
         assert_eq!(
-            dest_acc.balance(&host).unwrap(),
+            dest_acc.balance(rk.host()).unwrap(),
             80u64.into(),
             "Destination account should have 80ꜩ after transfers."
         );
 
         assert_eq!(
-            src_acc.counter(&host).unwrap(),
+            src_acc.counter(rk.host()).unwrap(),
             3.into(),
             "Counter should have been incremented three times."
         );
@@ -5702,14 +5732,14 @@ mod tests {
 
     #[test]
     fn apply_valid_then_invalid_operation_is_atomic() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(&mut host, &src.pkh, 50);
-        let _dst_acc = init_account(&mut host, &dest.pkh, 50);
+        let src_acc = init_account(rk.host_mut(), &src.pkh, 50);
+        let _dst_acc = init_account(rk.host_mut(), &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -5734,7 +5764,7 @@ mod tests {
         );
 
         let receipts = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             batch,
@@ -5753,7 +5783,7 @@ mod tests {
         assert_eq!(
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .balance(&host)
+                .balance(rk.host())
                 .unwrap(),
             50u64.into()
         );
@@ -5761,13 +5791,13 @@ mod tests {
         assert_eq!(
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .manager(&host)
+                .manager(rk.host())
                 .unwrap(),
             Manager::NotRevealed(src.pkh.clone())
         );
 
         assert_eq!(
-            src_acc.counter(&host).unwrap(),
+            src_acc.counter(rk.host()).unwrap(),
             0.into(),
             "Counter should not have been incremented."
         );
@@ -5775,27 +5805,27 @@ mod tests {
 
     #[test]
     fn apply_smart_contract_failure_reverts_batch() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
         // Funded for: 3 fees of 10 (= 30) + 2 transfer amounts of 1
         // (= 2) + storage burn for the second op (4 × COST_PER_BYTES = 1000) +
         // 18 mutez change. The batch reverts via FAILWITH; only the
         // fees survive, so final balance is 1050 - 30 = 1020.
-        let src_acc = init_account(&mut host, &src.pkh, 1050);
+        let src_acc = init_account(rk.host_mut(), &src.pkh, 1050);
 
         let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
 
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &fail_dest,
             FAILING_SCRIPT,
             &Micheline::from(()),
             &0_u64.into(),
         );
         let succ_account = init_contract(
-            &mut host,
+            rk.host_mut(),
             &succ_dest,
             SCRIPT,
             &Micheline::from("initial"),
@@ -5842,7 +5872,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 batch,
@@ -5892,7 +5922,7 @@ mod tests {
 
         // Storage must have reverted
         assert!(
-            succ_account.storage(&host).unwrap()
+            succ_account.storage(rk.host()).unwrap()
                 == Micheline::from("initial")
                     .encode(&mut Gas::default())
                     .unwrap()
@@ -5900,7 +5930,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_acc.counter(&host).unwrap(),
+            src_acc.counter(rk.host()).unwrap(),
             3.into(),
             "Counter should have been incremented three times."
         );
@@ -5908,7 +5938,7 @@ mod tests {
         // Initial balance: 1050 tez, paid in fees: (3*10) tez,
         // transfer + storage burn reverted via SafeStorage.
         assert_eq!(
-            src_acc.balance(&host).unwrap(),
+            src_acc.balance(rk.host()).unwrap(),
             1020.into(),
             "Fees should have been paid for failed operation"
         );
@@ -5916,18 +5946,18 @@ mod tests {
 
     #[test]
     fn origination_of_a_smart_contract() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1000000_u64);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1000000_u64);
+        reveal_account(rk.host_mut(), &src);
 
         let src_account = context::implicit_from_public_key_hash(&src.pkh)
             .expect("Should have succeeded to create an account");
 
         // Retrieve initial balance for the end of the test
         let initial_balance = src_account
-            .balance(&host)
+            .balance(rk.host())
             .expect("Should have found a balance");
 
         let fee = 15u64;
@@ -5962,7 +5992,7 @@ mod tests {
             ((code.len() as u64) + (storage.len() as u64)) * COST_PER_BYTES;
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation.clone(),
@@ -6057,7 +6087,7 @@ mod tests {
 
         // Balance of the source
         let current_balance = src_account
-            .balance(&host)
+            .balance(rk.host())
             .expect("Should have found a balance for the source");
 
         let expected_balance = initial_balance
@@ -6082,7 +6112,7 @@ mod tests {
 
         // Balance of the smart contract
         let current_kt1_balance = smart_contract_account
-            .balance(&host)
+            .balance(rk.host())
             .expect("Should have found a balance for the smart contract");
 
         assert_eq!(
@@ -6093,7 +6123,7 @@ mod tests {
 
         // Verify code and storage
         let smart_contract_code = smart_contract_account
-            .code(&host)
+            .code(rk.host())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_code,
@@ -6101,7 +6131,7 @@ mod tests {
             "Current code for smart contract is not the same as the one originated"
         );
         let smart_contract_storage = smart_contract_account
-            .storage(&host)
+            .storage(rk.host())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_storage, storage,
@@ -6141,16 +6171,16 @@ mod tests {
     /// top-level operation backtracks and the write is rolled back.
     #[test]
     fn test_internal_op_raise_after_applied_sibling_backtracks_top_level() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         // Fans out a single transfer to the contract below.
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -6160,7 +6190,7 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeed");
         let initial_storage = Micheline::Bytes(vec![]);
         let raising_account = init_contract(
-            &mut host,
+            rk.host_mut(),
             &raising_hash,
             EMIT_THEN_SET_DELEGATE_SCRIPT,
             &initial_storage,
@@ -6192,7 +6222,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -6251,7 +6281,7 @@ mod tests {
         // The state effect the `Applied` status used to commit: the callee's
         // storage write is rolled back with the rest of the operation.
         assert_eq!(
-            raising_account.storage(&host).unwrap(),
+            raising_account.storage(rk.host()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -6266,11 +6296,11 @@ mod tests {
     // its own nonce at 0 and collide.
     #[test]
     fn test_native_origination_claims_from_journal_nonce() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50000);
+        reveal_account(rk.host_mut(), &src);
 
         let code =
             hex::decode("02000000170500036805010368050202000000080316053d036d0342")
@@ -6292,7 +6322,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut journal,
                 operation,
@@ -6330,17 +6360,17 @@ mod tests {
 
     #[test]
     fn test_internal_receipts_failure_backtrack_all() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
 
         // Initialize accounts with higher balances for the test
-        init_account(&mut host, &src.pkh, 100);
+        init_account(rk.host_mut(), &src.pkh, 100);
 
         // Create a script that emits internal operations to multiple targets
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_chapo_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -6351,7 +6381,7 @@ mod tests {
         let internal_fail_contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &internal_fail_contract_hash,
             FAILING_SCRIPT,
             &Micheline::from(()),
@@ -6363,7 +6393,7 @@ mod tests {
             ContractKt1Hash::from_base58_check(CONTRACT_3)
                 .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &internal_success_contract_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -6409,7 +6439,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -6575,15 +6605,15 @@ mod tests {
         std::thread::Builder::new()
             .stack_size(1024 * 1024)
             .spawn(|| {
-                let mut host = MockKernelHost::default();
+                let mut rk = RuntimeKeyspaces::default();
                 let src = bootstrap1();
-                init_account(&mut host, &src.pkh, 1_000_000);
-                reveal_account(&mut host, &src);
+                init_account(rk.host_mut(), &src.pkh, 1_000_000);
+                reveal_account(rk.host_mut(), &src);
 
                 let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
                     .expect("ContractKt1Hash b58 conversion should have succeed");
                 init_contract(
-                    &mut host,
+                    rk.host_mut(),
                     &contract_hash,
                     SELF_RECURSIVE_TRANSFER_SCRIPT,
                     &Micheline::from(()),
@@ -6608,7 +6638,7 @@ mod tests {
                 );
                 let receipts = ProcessedOperation::into_receipts(
                     validate_and_apply_operation(
-                        &mut host,
+                        &mut rk,
                         &NotWiredRegistry,
                         &mut TezosXJournal::mock(RuntimeId::Ethereum),
                         operation,
@@ -6672,15 +6702,15 @@ mod tests {
     fn test_deep_internal_transfer_recursion_bounded_by_gas() {
         const DEPTH: usize = 200;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_hash,
             SELF_RECURSIVE_TRANSFER_SCRIPT,
             &Micheline::from(()),
@@ -6706,7 +6736,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -6833,16 +6863,16 @@ mod tests {
     /// pending parent from a raise rather than from a drained subtree.
     #[test]
     fn test_internal_op_error_fails_the_emitting_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         // Fans out to [set-delegate emitter, benign contract].
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -6851,7 +6881,7 @@ mod tests {
         let set_delegate_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &set_delegate_hash,
             SET_DELEGATE_SCRIPT,
             &Micheline::from(()),
@@ -6860,7 +6890,7 @@ mod tests {
         let sibling_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &sibling_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -6897,7 +6927,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -6991,15 +7021,15 @@ mod tests {
         // top-level operation.
         const CHAIN: usize = 5;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -7008,7 +7038,7 @@ mod tests {
         let recursive_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &recursive_hash,
             SELF_RECURSIVE_FAILING_SCRIPT,
             &Micheline::from(()),
@@ -7019,7 +7049,7 @@ mod tests {
         let starter_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &starter_hash,
             CHAIN_STARTER_SCRIPT,
             &Micheline::Bytes(
@@ -7058,7 +7088,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -7147,10 +7177,10 @@ mod tests {
     /// ticket-carrying transfer) would run twice while L1 backtracks.
     #[test]
     fn test_internal_transfer_replay_is_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100000);
+        reveal_account(rk.host_mut(), &src);
 
         // Parent: build one internal transfer, DUP the resulting
         // `operation`, and emit both copies in the returned list.
@@ -7176,7 +7206,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &parent_hash,
             DUP_TRANSFER_SCRIPT,
             &Micheline::from(()),
@@ -7186,7 +7216,7 @@ mod tests {
         let receiver_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &receiver_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -7215,7 +7245,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -7285,10 +7315,10 @@ mod tests {
     /// same contract twice.
     #[test]
     fn test_internal_origination_replay_is_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100000);
+        reveal_account(rk.host_mut(), &src);
 
         // Parent: one internal origination, DUP the `operation`, emit
         // both copies; store the (single) child address.
@@ -7312,7 +7342,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &parent_hash,
             DUP_ORIGINATION_SCRIPT,
             &Micheline::prim0(mir::lexer::Prim::None, &mut Gas::default()).unwrap(),
@@ -7338,7 +7368,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -7404,10 +7434,10 @@ mod tests {
     /// the same event twice — exercising the `Emit` arm's replay path.
     #[test]
     fn test_internal_emit_replay_is_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100000);
+        reveal_account(rk.host_mut(), &src);
 
         // Parent: build one internal EMIT operation, DUP the resulting
         // `operation`, and return both copies in the operation list.
@@ -7430,7 +7460,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &parent_hash,
             DUP_EMIT_SCRIPT,
             &Micheline::from(()),
@@ -7456,7 +7486,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -7532,10 +7562,10 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7543,7 +7573,7 @@ mod tests {
         let initial_amount = 0;
         let transfer_amount = 30;
         let src_contract = init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_hash,
             SCRIPT,
             &Micheline::from(initial_amount),
@@ -7568,7 +7598,7 @@ mod tests {
         );
 
         let _processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
@@ -7583,7 +7613,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(&host).unwrap(),
+            src_contract.storage(rk.host()).unwrap(),
             Micheline::from(i128::from(transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -7605,12 +7635,12 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         // Fund source for fee + transfer + storage burn for
         // recording the contract balance into its storage.
-        init_account(&mut host, &src.pkh, 5_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 5_000);
+        reveal_account(rk.host_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7618,7 +7648,7 @@ mod tests {
         let transfer_amount = 30;
         let initial_balance = 200;
         let src_contract = init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_hash,
             SCRIPT,
             &Micheline::from(0),
@@ -7642,7 +7672,7 @@ mod tests {
         );
 
         let _processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
@@ -7657,7 +7687,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(&host).unwrap(),
+            src_contract.storage(rk.host()).unwrap(),
             Micheline::from(i128::from(initial_balance + transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -7679,10 +7709,10 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50);
+        reveal_account(rk.host_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7693,7 +7723,7 @@ mod tests {
                 .unwrap(),
         );
         let src_contract = init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_hash,
             SCRIPT_ADDR,
             &micheline_address,
@@ -7718,7 +7748,7 @@ mod tests {
         );
 
         let _processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut journal_with_operation_hash(operation.hash().unwrap()),
             operation,
@@ -7733,7 +7763,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(&host).unwrap(),
+            src_contract.storage(rk.host()).unwrap(),
             micheline_address
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -7756,15 +7786,15 @@ mod tests {
 
     #[test]
     fn test_apply_origination_slot_burn_failure_backtracks() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
 
         // 283 = 15 fee + 30 initial balance + 38 variable burn
         // (code 28 bytes + storage 10 bytes = 38 bytes × COST_PER_BYTES)
         // + 200 leftover, insufficient for the 257 slot burn that follows.
         let funded = 283_u64;
-        init_account(&mut host, &src.pkh, funded);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, funded);
+        reveal_account(rk.host_mut(), &src);
 
         let fee = 15u64;
         let smart_contract_balance = 30u64;
@@ -7793,7 +7823,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation.clone(),
@@ -7875,20 +7905,23 @@ mod tests {
         // pre-burn smart-contract setup.
         let src_account =
             context::implicit_from_public_key_hash(&src.pkh).expect("source account");
-        assert_eq!(src_account.balance(&host).unwrap(), (funded - fee).into());
+        assert_eq!(
+            src_account.balance(rk.host()).unwrap(),
+            (funded - fee).into()
+        );
 
         // SafeStorage rolled back the origination: the smart contract is
         // nowhere to be found in durable storage.
         let originated_account = context::originated_from_kt1(&expected_kt1)
             .expect("originated account handle");
         assert!(
-            !originated_account.exists(&host).unwrap(),
+            !originated_account.exists(rk.host()).unwrap(),
             "originated contract must be rolled back"
         );
 
         // Initial-balance transfer rolled back too.
         assert_eq!(
-            originated_account.balance(&host).unwrap(),
+            originated_account.balance(rk.host()).unwrap(),
             0_u64.into(),
             "originated contract balance must be 0 (initial transfer rolled back)"
         );
@@ -7896,13 +7929,13 @@ mod tests {
 
     #[test]
     fn test_internal_origination_of_a_smart_contract() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
         let init_src_balance = 100000;
         let expected_init_contract_balance = 1000000;
-        init_account(&mut host, &src.pkh, 100000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100000);
+        reveal_account(rk.host_mut(), &src);
         let mut gas = Gas::default();
 
         let originated_code = "CDR;
@@ -7919,7 +7952,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -7946,7 +7979,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation.clone(),
@@ -8075,17 +8108,17 @@ mod tests {
                  // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
-            src_account.balance(&host).unwrap(),
+            src_account.balance(rk.host()).unwrap(),
             expected_src_balance.into(),
             "Source balance should be correct"
         );
         assert_eq!(
-            init_contract_account.balance(&host).unwrap(),
+            init_contract_account.balance(rk.host()).unwrap(),
             expected_init_contract_balance.into(),
             "Init contract balance should be correct"
         );
         assert_eq!(
-            originated_account.balance(&host).unwrap(),
+            originated_account.balance(rk.host()).unwrap(),
             1000u64.into(),
             "Originated contract balance should be correct"
         );
@@ -8099,10 +8132,10 @@ mod tests {
         // internal op would allocate nonce 65535 fails IN ISOLATION (the block
         // is not aborted), like L1 backtracking the offending operation.
         let run = |base: u128| {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let src = bootstrap1();
-            init_account(&mut host, &src.pkh, 100000);
-            reveal_account(&mut host, &src);
+            init_account(rk.host_mut(), &src.pkh, 100000);
+            reveal_account(rk.host_mut(), &src);
             let mut gas = Gas::default();
             let originated_script =
                 make_create_contract_block("unit", "unit", "CDR; NIL operation; PAIR;");
@@ -8110,7 +8143,7 @@ mod tests {
                 make_script_emitting_internal_origination(&originated_script);
             let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
             init_contract(
-                &mut host,
+                rk.host_mut(),
                 &contract_hash,
                 &init_script,
                 &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8135,7 +8168,7 @@ mod tests {
                 })],
             );
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -8182,10 +8215,10 @@ mod tests {
     /// internal op, so this also pins the post-renumber value.
     #[test]
     fn test_create_contract_kt1_uses_l1_canonical_index_zero() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100000);
+        reveal_account(rk.host_mut(), &src);
         let mut gas = Gas::default();
 
         // A contract whose code performs exactly one CREATE_CONTRACT.
@@ -8197,7 +8230,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8227,7 +8260,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut journal_with_operation_hash(op_hash.clone()),
                 operation,
@@ -8296,7 +8329,7 @@ mod tests {
         let originated_account = context::originated_from_kt1(&l1_canonical)
             .expect("originated account handle");
         assert!(
-            originated_account.exists(&host).unwrap(),
+            originated_account.exists(rk.host()).unwrap(),
             "Contract must be stored at the L1-canonical KT1"
         );
     }
@@ -8308,12 +8341,12 @@ mod tests {
     /// up.
     #[test]
     fn test_internal_originations_generated_addresses() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut gas = Gas::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1000000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1000000);
+        reveal_account(rk.host_mut(), &src);
 
         let originated_code = "CDR;
                         NIL operation;
@@ -8340,7 +8373,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8367,7 +8400,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation.clone(),
@@ -8542,13 +8575,13 @@ mod tests {
 
     #[test]
     fn test_try_apply_three_origination_batch() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
 
         // src & dest each credited with 400000ꜩ
-        let src_acc = init_account(&mut host, &src.pkh, 400000);
+        let src_acc = init_account(rk.host_mut(), &src.pkh, 400000);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -8556,7 +8589,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(&host).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
 
         // op‑2 orgination: create a contract with 15ꜩ balance successfully
         let origination_content_1 = OperationContent::Origination(OriginationContent {
@@ -8636,7 +8669,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 batch.clone(),
@@ -8864,14 +8897,14 @@ mod tests {
         );
         // Check the balances
         assert_eq!(
-            src_acc.balance(&host).unwrap(),
+            src_acc.balance(rk.host()).unwrap(),
             399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
 
         // Check the counters
         assert_eq!(
-            src_acc.counter(&host).unwrap(),
+            src_acc.counter(rk.host()).unwrap(),
             5.into(),
             "Source account counter should be 4 after the operations"
         );
@@ -8884,7 +8917,7 @@ mod tests {
             ))
             .unwrap();
             assert!(
-                account.code(&host).is_err(),
+                account.code(rk.host()).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
             );
         }
@@ -8892,12 +8925,12 @@ mod tests {
 
     #[test]
     fn test_origination_contract_typecheck_storage() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
-        init_account(&mut host, &src.pkh, 50000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50000);
+        reveal_account(rk.host_mut(), &src);
 
         let balance = 10.into();
 
@@ -8926,7 +8959,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -8960,12 +8993,12 @@ mod tests {
     // `ScriptTooLarge`. The gate runs before decoding, so raw bytes suffice.
     #[test]
     fn test_origination_script_too_large() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
-        init_account(&mut host, &src.pkh, 50000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50000);
+        reveal_account(rk.host_mut(), &src);
 
         let code = vec![1u8; crate::MICHELSON_MAXIMUM_SCRIPT_SIZE + 1];
         let storage = vec![];
@@ -8984,7 +9017,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9023,12 +9056,12 @@ mod tests {
     // rejected with `MirTypecheckingError` (`TypeTooLarge`) instead of OOM.
     #[test]
     fn test_origination_deeply_nested_or_parameter_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
-        init_account(&mut host, &src.pkh, 50000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 50000);
+        reveal_account(rk.host_mut(), &src);
 
         // 1001 `or` levels => 2003 type nodes > 2001 cap, but only ~8 kB.
         let mut param = String::from("unit");
@@ -9067,7 +9100,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9102,15 +9135,15 @@ mod tests {
     // fail, and empty transfers (external or internal) to smart contracts
     // succeed.
     fn test_empty_transfers() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let dst = bootstrap2();
         let kt1_addr =
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
         // Setup accounts with 50 mutez in their balance
-        init_account(&mut host, &src.pkh, 1000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1000);
+        reveal_account(rk.host_mut(), &src);
         let (code, storage) = (
             r#"
                         parameter (or (unit %default) (address %call));
@@ -9131,7 +9164,7 @@ mod tests {
             "#,
             &Micheline::from(()),
         );
-        init_contract(&mut host, &kt1_addr, code, storage, &0.into());
+        init_contract(rk.host_mut(), &kt1_addr, code, storage, &0.into());
 
         // An empty external transfer to an implicit account fails.
         let operation = make_transfer_operation(
@@ -9146,7 +9179,7 @@ mod tests {
         );
         let receipts1 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9195,7 +9228,7 @@ mod tests {
         );
         let receipts2 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9245,7 +9278,7 @@ mod tests {
         );
         let receipts3 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9303,7 +9336,7 @@ mod tests {
         );
         let receipts4 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9338,7 +9371,7 @@ mod tests {
 
     #[test]
     fn test_view_instruction() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut gas = Gas::default();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
@@ -9347,8 +9380,8 @@ mod tests {
 
         let arena = Arena::new();
 
-        init_account(&mut host, &src.pkh, 1000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1000);
+        reveal_account(rk.host_mut(), &src);
         let (code_view, storage_view) = (
             r#"
                 parameter unit ;
@@ -9358,7 +9391,13 @@ mod tests {
             "#,
             &Micheline::from(5),
         );
-        init_contract(&mut host, &view_addr, code_view, storage_view, &0.into());
+        init_contract(
+            rk.host_mut(),
+            &view_addr,
+            code_view,
+            storage_view,
+            &0.into(),
+        );
 
         let mich_addr = TypedValue::Address(Address {
             hash: mir::ast::AddressHash::Kt1(view_addr),
@@ -9382,7 +9421,7 @@ mod tests {
         );
 
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &caller_addr,
             code_caller,
             storage_caller,
@@ -9402,7 +9441,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9435,7 +9474,7 @@ mod tests {
 
     #[test]
     fn test_view_balance() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut gas = Gas::default();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
@@ -9444,13 +9483,13 @@ mod tests {
 
         let arena = Arena::new();
 
-        init_account(&mut host, &src.pkh, 1000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1000);
+        reveal_account(rk.host_mut(), &src);
 
         // Contract with a view that returns its BALANCE
         let view_balance = 500;
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &view_addr,
             r#"
                 parameter unit ;
@@ -9471,7 +9510,7 @@ mod tests {
 
         // Caller invokes the view and asserts the result equals 500
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &caller_addr,
             r#"
                 parameter unit ;
@@ -9500,7 +9539,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9538,7 +9577,10 @@ mod tests {
             .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
     }
 
-    fn big_map_was_removed<Host: StorageV1>(ctx: &mut TcCtx<'_, Host>, id: BigMapId) {
+    fn big_map_was_removed<Host: StorageV1, KS>(
+        ctx: &mut TcCtx<'_, Host, KS>,
+        id: BigMapId,
+    ) {
         let types = ctx
             .big_map_get_type(&id)
             .expect("Get big_map type should not panic");
@@ -9551,8 +9593,8 @@ mod tests {
         receipts: Vec<OperationWithMetadata>,
     }
 
-    fn transfer_big_map<Host>(
-        ctx: &mut TcCtx<'_, Host>,
+    fn transfer_big_map<Host, KS>(
+        ctx: &mut TcCtx<'_, Host, KS>,
         tz1: &Bootstrap,
         script_sender: &str,
         init_sender: &str,
@@ -9566,13 +9608,13 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
-        init_account(ctx.host, &tz1.pkh, 10_000_000);
-        reveal_account(ctx.host, tz1);
+        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.host_mut(), tz1);
 
         let parser = Parser::new();
 
         let sender_contract = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &sender_addr,
             script_sender,
             &parser
@@ -9582,7 +9624,7 @@ mod tests {
         );
 
         let receiver_contract = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &receiver_addr,
             script_receiver,
             &parser
@@ -9610,7 +9652,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                ctx.host,
+                &mut *ctx.rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9640,8 +9682,8 @@ mod tests {
         expected_sender_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
         expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
     ) {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
 
         let result = transfer_big_map(
@@ -9664,7 +9706,7 @@ mod tests {
         let receiver_contract = result.receiver;
 
         if let Some(expected_sender_big_map) = expected_sender_big_map {
-            let storage = sender_contract.storage(ctx.host).unwrap();
+            let storage = sender_contract.storage(ctx.rk.host()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -9690,7 +9732,7 @@ mod tests {
         }
 
         if let Some(expected_receiver_big_map) = expected_receiver_big_map {
-            let storage = receiver_contract.storage(ctx.host).unwrap();
+            let storage = receiver_contract.storage(ctx.rk.host()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -9883,8 +9925,8 @@ mod tests {
 
     #[test]
     fn big_map_transfer_with_creation() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
 
         let originator_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -9892,12 +9934,12 @@ mod tests {
 
         let script_originator = read_script("originator.tz");
 
-        init_account(ctx.host, &tz1.pkh, 100_000_000);
-        reveal_account(ctx.host, &tz1);
+        init_account(ctx.rk.host_mut(), &tz1.pkh, 100_000_000);
+        reveal_account(ctx.rk.host_mut(), &tz1);
         let parser = Parser::new();
 
         let originator_contract = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &originator_addr,
             &script_originator,
             &parser
@@ -9919,7 +9961,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                ctx.host,
+                &mut *ctx.rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -9983,7 +10025,7 @@ mod tests {
             .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Failed to fetch storage for originator");
         let mich_storage_originator = Micheline::decode_raw(
             &parser.arena,
@@ -10017,7 +10059,7 @@ mod tests {
         println!("Originator OK");
 
         let storage_0 = created_acount_0
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Failed to fetch storage for created account #0");
         let mich_storage_0 =
             Micheline::decode_raw(&parser.arena, &storage_0, &mut Gas::default())
@@ -10048,7 +10090,7 @@ mod tests {
         println!("Created_0 OK");
 
         let storage_1 = created_acount_1
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Failed to fetch storage for created account #1");
         let mich_storage_1 =
             Micheline::decode_raw(&parser.arena, &storage_1, &mut Gas::default())
@@ -10079,7 +10121,7 @@ mod tests {
         println!("Created_1 OK");
 
         let storage_2 = created_acount_2
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Failed to fetch storage for created account #2");
         let mich_storage_2 =
             Micheline::decode_raw(&parser.arena, &storage_2, &mut Gas::default())
@@ -10124,12 +10166,12 @@ mod tests {
     fn forged_big_map_id_in_external_parameter_is_rejected() {
         use mir::ast::big_map::LazyStorage;
 
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
 
         let tz1 = bootstrap1();
-        init_account(ctx.host, &tz1.pkh, 10_000_000);
-        reveal_account(ctx.host, &tz1);
+        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.host_mut(), &tz1);
 
         // Victim: a contract owning a `big_map nat string` initialised with
         // `0 -> "genesis-42"`. We allocate the big_map directly in the lazy
@@ -10148,7 +10190,7 @@ mod tests {
         let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _victim = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &victim_addr,
             "parameter unit ; storage (big_map nat string) ; \
              code { CDR ; NIL operation ; PAIR }",
@@ -10162,7 +10204,7 @@ mod tests {
         let writer_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _writer = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &writer_addr,
             "parameter (big_map nat string) ; storage (big_map nat string) ; \
              code { CAR ; PUSH string \"Hacked-by-mi\" ; SOME ; PUSH nat 0 ; \
@@ -10189,7 +10231,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                ctx.host,
+                &mut *ctx.rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -10236,12 +10278,12 @@ mod tests {
     fn forged_big_map_id_in_origination_storage_is_rejected() {
         use mir::ast::big_map::LazyStorage;
 
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
 
         let tz1 = bootstrap1();
-        init_account(ctx.host, &tz1.pkh, 10_000_000);
-        reveal_account(ctx.host, &tz1);
+        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.host_mut(), &tz1);
 
         // Victim big_map { 0 -> "genesis-42" } owned by an existing contract.
         let victim_id = ctx
@@ -10256,7 +10298,7 @@ mod tests {
         let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _victim = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &victim_addr,
             "parameter unit ; storage (big_map nat string) ; \
              code { CDR ; NIL operation ; PAIR }",
@@ -10294,7 +10336,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                ctx.host,
+                &mut *ctx.rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -10341,8 +10383,8 @@ mod tests {
 
     #[test]
     fn verify_temp_big_map_content_is_cleaned() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
         let parser = Parser::new();
 
@@ -10376,7 +10418,7 @@ mod tests {
 
         // Checks that the storage of the receiver is true
         let storage = receiver
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -10396,7 +10438,7 @@ mod tests {
             ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
 
         let _ = init_contract(
-            ctx.host,
+            ctx.rk.host_mut(),
             &second_sender_contract,
             &script_sender,
             &parser
@@ -10426,7 +10468,7 @@ mod tests {
         // as the big_map passed in argument doesn't have the key "d"
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                ctx.host,
+                &mut *ctx.rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -10447,7 +10489,7 @@ mod tests {
 
         // Checks that the storage of the receiver contract is 'False'
         let storage = receiver
-            .storage(ctx.host)
+            .storage(ctx.rk.host())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -10483,7 +10525,7 @@ mod tests {
     /// This tests the happy path: source has enough balance, gateway executes, bridge succeeds.
     #[test]
     fn apply_transfer_to_gateway_happy_path() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
 
@@ -10493,8 +10535,8 @@ mod tests {
                 .expect("Gateway KT1 address should be valid");
 
         // Set up source with enough balance (100 mutez: 15 for fees + 50 for transfer + some extra)
-        let source_account = init_account(&mut host, &src.pkh, 100);
-        reveal_account(&mut host, &src);
+        let source_account = init_account(rk.host_mut(), &src.pkh, 100);
+        reveal_account(rk.host_mut(), &src);
 
         // Create Micheline parameters for the generic %call entrypoint:
         // a POST to the destination Ethereum address with an empty body.
@@ -10527,7 +10569,7 @@ mod tests {
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &registry,
             &mut journal,
             operation,
@@ -10559,7 +10601,7 @@ mod tests {
         // Verify that source balance decreased by fee (15) + transfer amount (50)
         // Initial: 100, Final: 100 - 15 - 50 = 35
         assert_eq!(
-            source_account.balance(&host).unwrap(),
+            source_account.balance(rk.host()).unwrap(),
             35_u64.into(),
             "Source balance should have decreased by fee + transfer amount"
         );
@@ -10572,7 +10614,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(&host).unwrap(),
+            gateway_account.balance(rk.host()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after successful serve call"
         );
@@ -10582,12 +10624,12 @@ mod tests {
     // DA fee check entirely, so zero-fee operations are accepted.
     #[test]
     fn da_fee_delayed_inbox_zero_fees_accepted() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let _src_account = init_account(&mut host, &source.pkh, 1_000_000);
-        let _dst_account = init_account(&mut host, &dest.pkh, 0);
-        reveal_account(&mut host, &source);
+        let _src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
+        let _dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
+        reveal_account(rk.host_mut(), &source);
 
         // Transfer with fee = 0 mutez.
         let operation = make_transfer_operation(
@@ -10603,7 +10645,7 @@ mod tests {
 
         // None = delayed inbox: DA fee check is skipped.
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -10623,11 +10665,11 @@ mod tests {
     // DA fee enforcement: batch with reveal + transfer whose combined fee covers DA cost.
     #[test]
     fn da_fee_batch_sufficient_fees_accepted() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let src_account = init_account(&mut host, &source.pkh, 1_000_000);
-        let dst_account = init_account(&mut host, &dest.pkh, 0);
+        let src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
+        let dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
 
         let reveal_content = OperationContent::Reveal(RevealContent {
             pk: source.pk.clone(),
@@ -10655,7 +10697,7 @@ mod tests {
         let required_da_fees =
             get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             batch,
@@ -10670,12 +10712,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000 per op × 2 ops = 20_000, transfer: 10
         assert_eq!(
-            src_account.balance(&host).unwrap(),
+            src_account.balance(rk.host()).unwrap(),
             979_990_u64.into(),
             "Source balance should be 1_000_000 - 20_000 (fees) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(&host).unwrap(),
+            dst_account.balance(rk.host()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -10684,12 +10726,12 @@ mod tests {
     // DA fee enforcement: operation with sufficient fees is accepted.
     #[test]
     fn da_fee_sufficient_fees_accepted() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let src_account = init_account(&mut host, &source.pkh, 1_000_000);
-        let dst_account = init_account(&mut host, &dest.pkh, 0);
-        reveal_account(&mut host, &source);
+        let src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
+        let dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
+        reveal_account(rk.host_mut(), &source);
 
         // Transfer with fee = 10_000 mutez, well above DA cost for any reasonable op size.
         let operation = make_transfer_operation(
@@ -10708,7 +10750,7 @@ mod tests {
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -10726,12 +10768,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000, transfer: 10
         assert_eq!(
-            src_account.balance(&host).unwrap(),
+            src_account.balance(rk.host()).unwrap(),
             989_990_u64.into(),
             "Source balance should be 1_000_000 - 10_000 (fee) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(&host).unwrap(),
+            dst_account.balance(rk.host()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -10740,10 +10782,10 @@ mod tests {
     // DA fee enforcement: operation fees below DA cost are rejected.
     #[test]
     fn da_fee_insufficient_fees_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let source = bootstrap1();
-        let _src_account = init_account(&mut host, &source.pkh, 1_000_000);
-        reveal_account(&mut host, &source);
+        let _src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &source);
 
         // Transfer with fee = 1 mutez, well below DA cost.
         let operation = make_transfer_operation(
@@ -10762,7 +10804,7 @@ mod tests {
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -10787,13 +10829,13 @@ mod tests {
     /// encode this as absent storage rather than Some([]).
     #[test]
     fn gateway_tez_transfer_receipt_storage_is_none() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(&mut host, &src.pkh, 100);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100);
+        reveal_account(rk.host_mut(), &src);
 
         let arena = Arena::new();
         let operation = make_transfer_operation(
@@ -10824,7 +10866,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &registry,
                 &mut journal,
                 operation,
@@ -10857,14 +10899,14 @@ mod tests {
     /// value) produces an Applied receipt whose storage field is None.
     #[test]
     fn gateway_contract_call_receipt_storage_is_none() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut gas = Gas::default();
         let src = bootstrap1();
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(&mut host, &src.pkh, 100);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100);
+        reveal_account(rk.host_mut(), &src);
 
         // Encode Pair(dest, Pair(method_sig, abi_params)) for the call entrypoint
         let arena = Arena::new();
@@ -10913,7 +10955,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &registry,
                 &mut journal,
                 operation,
@@ -10947,13 +10989,13 @@ mod tests {
     /// produce an Applied result with a spurious storage field.
     #[test]
     fn gateway_evm_revert_yields_failed_receipt() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(&mut host, &src.pkh, 100);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100);
+        reveal_account(rk.host_mut(), &src);
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_revert")
             .with_serve_response(400, b"reverted".to_vec());
@@ -10980,7 +11022,7 @@ mod tests {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &registry,
                 &mut journal,
                 operation,
@@ -11014,7 +11056,7 @@ mod tests {
     /// which routes funds cross-runtime via registry.serve().
     #[test]
     fn tezos_alias_forwarder_forwards_on_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
@@ -11056,7 +11098,7 @@ mod tests {
 
         let storage_micheline = Micheline::String(evm_address.to_string());
         let _alias_account = init_contract(
-            &mut host,
+            rk.host_mut(),
             &alias_kt1,
             forwarder_script,
             &storage_micheline,
@@ -11067,8 +11109,8 @@ mod tests {
 
         // Set up a source account with funds
         let src = bootstrap1();
-        let _src_account = init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        let _src_account = init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         // Transfer 50 mutez to the alias KT1
         let transfer_amount = 50_u64;
@@ -11086,7 +11128,7 @@ mod tests {
         // Use MockRegistry that tracks serve calls
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &registry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -11138,7 +11180,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(&host).unwrap(),
+            gateway_account.balance(rk.host()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after forwarding"
         );
@@ -11162,15 +11204,15 @@ mod tests {
     /// 5. **Skipped**: batch where first op fails → second op Skipped, 0 gas
     #[test]
     fn gas_tracking_with_internal_operations() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 100_000);
+        reveal_account(rk.host_mut(), &src);
 
         // Chapo contract: emits internal transfers to each address in param
         let chapo = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &chapo,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -11180,7 +11222,7 @@ mod tests {
         // OK target: accepts unit, does nothing
         let ok_target = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &ok_target,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -11190,7 +11232,7 @@ mod tests {
         // Fail target: always FAILWITHs
         let fail_target = ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &fail_target,
             FAILING_SCRIPT,
             &Micheline::from(()),
@@ -11212,13 +11254,13 @@ mod tests {
         // and gas limit. Reads the counter from durable storage each time
         // so it stays in sync even if an operation is rejected during
         // validation.
-        let run = |host: &mut MockKernelHost,
+        let run = |rk: &mut MockRuntimeKeyspaces,
                    content: Vec<OperationContent>,
                    gas_limit: u64|
          -> Vec<ProcessedOperation> {
             let counter = context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .counter(host)
+                .counter(rk.host())
                 .unwrap()
                 .0
                 .to_u64()
@@ -11226,7 +11268,7 @@ mod tests {
                 + 1;
             let op = make_operation(5, counter, gas_limit, 0, src.clone(), content);
             validate_and_apply_operation(
-                host,
+                rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 op,
@@ -11272,7 +11314,7 @@ mod tests {
 
         // ── Scenario 1: Success ──────────────────────────────────────
         let addrs_ok = vec![ok_addr.clone(), ok_addr.clone(), ok_addr.clone()];
-        let success = run(&mut host, chapo_transfer(&addrs_ok), AMPLE_GAS);
+        let success = run(&mut rk, chapo_transfer(&addrs_ok), AMPLE_GAS);
         assert_eq!(success.len(), 1);
         assert!(
             matches!(
@@ -11293,7 +11335,7 @@ mod tests {
 
         // ── Scenario 2: FAILWITH (middle internal target) ────────────
         let addrs_fail = vec![ok_addr.clone(), fail_addr.clone(), ok_addr.clone()];
-        let failed = run(&mut host, chapo_transfer(&addrs_fail), AMPLE_GAS);
+        let failed = run(&mut rk, chapo_transfer(&addrs_fail), AMPLE_GAS);
         assert_eq!(failed.len(), 1);
         assert!(
             matches!(
@@ -11323,7 +11365,7 @@ mod tests {
         // leaving ~35k milligas — not enough to interpret the
         // chapo script.
         let oog_gas_limit: u64 = 200;
-        let oog = run(&mut host, chapo_transfer(&addrs_ok), oog_gas_limit);
+        let oog = run(&mut rk, chapo_transfer(&addrs_ok), oog_gas_limit);
         assert_eq!(oog.len(), 1);
         assert!(
             matches!(
@@ -11353,7 +11395,7 @@ mod tests {
         // Direct transfer to a contract that FAILWITHs immediately.
         // Unlike scenario 3, the script fails before exhausting gas,
         // so consumed gas is strictly less than the limit.
-        let fail_direct = run(&mut host, vec![direct_transfer(&fail_target)], AMPLE_GAS);
+        let fail_direct = run(&mut rk, vec![direct_transfer(&fail_target)], AMPLE_GAS);
         assert_eq!(fail_direct.len(), 1);
         assert!(
             matches!(
@@ -11382,7 +11424,7 @@ mod tests {
         // Batch of two operations: first fails (FAILWITH), second is
         // skipped. Skipped operations consume 0 gas.
         let skipped = run(
-            &mut host,
+            &mut rk,
             vec![
                 direct_transfer(&fail_target), // Op 1 → Failed
                 direct_transfer(&ok_target),   // Op 2 → Skipped
@@ -11445,16 +11487,16 @@ mod tests {
         n: usize,
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // Sender: an implicit account (tz1).
         let src = bootstrap1();
-        let sender_account = init_account(&mut host, &src.pkh, 100_000);
+        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
 
         // Destination: a KT1 contract with `PUSH string; FAILWITH`.
         let dest_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest_kt1,
             &push_failwith_script(n),
             &Micheline::from(()),
@@ -11474,7 +11516,7 @@ mod tests {
         let mut operation_gas = TezlinkOperationGas::start_milligas(milligas_limit)
             .expect("milligas within limit");
         let mut tc_ctx = TcCtx {
-            host: &mut host,
+            rk: &mut rk,
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
@@ -11665,17 +11707,17 @@ mod tests {
         n: usize,
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         // Sender: implicit account.
         let src = bootstrap1();
-        let sender_account = init_account(&mut host, &src.pkh, 100_000);
+        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
 
         // Outer contract: issues TRANSFER_TOKENS to a list of addresses.
         // Balance 100 mutez so it can forward 10 mutez per internal op.
         let outer_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &outer_kt1,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -11685,7 +11727,7 @@ mod tests {
         // Inner contract: FAILWITHs with `n` bytes.
         let inner_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &inner_kt1,
             &push_failwith_script(n),
             &Micheline::from(()),
@@ -11713,7 +11755,7 @@ mod tests {
         let mut operation_gas = TezlinkOperationGas::start_milligas(milligas_limit)
             .expect("milligas within limit");
         let mut tc_ctx = TcCtx {
-            host: &mut host,
+            rk: &mut rk,
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
@@ -11917,7 +11959,7 @@ mod tests {
 
     /// Result of a fee refund test setup.
     struct RefundTestCtx {
-        host: MockKernelHost,
+        rk: MockRuntimeKeyspaces,
         src: Bootstrap,
         source: TezosImplicitAccount,
         destination: TezosImplicitAccount,
@@ -11956,14 +11998,14 @@ mod tests {
         initial_src_balance: u64,
         da_fees: Option<u64>,
     ) -> RefundTestCtx {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
 
         let src = bootstrap1();
         let dst = bootstrap2();
 
-        let source = init_account(&mut host, &src.pkh, initial_src_balance);
-        reveal_account(&mut host, &src);
-        let destination = init_account(&mut host, &dst.pkh, 50);
+        let source = init_account(rk.host_mut(), &src.pkh, initial_src_balance);
+        reveal_account(rk.host_mut(), &src);
+        let destination = init_account(rk.host_mut(), &dst.pkh, 50);
 
         let operation = make_transfer_operation(
             fee,
@@ -11983,7 +12025,7 @@ mod tests {
         });
 
         let processed = validate_and_apply_operation(
-            &mut host,
+            &mut rk,
             &NotWiredRegistry,
             &mut TezosXJournal::mock(RuntimeId::Ethereum),
             operation,
@@ -12000,7 +12042,7 @@ mod tests {
         let receipt = ProcessedOperation::into_receipts(processed);
 
         RefundTestCtx {
-            host,
+            rk,
             src,
             source,
             destination,
@@ -12038,12 +12080,12 @@ mod tests {
 
         // Verify final balances.
         assert_eq!(
-            ctx.source.balance(&ctx.host).unwrap(),
+            ctx.source.balance(ctx.rk.host()).unwrap(),
             (initial_balance - fee + expected_refund - amount).into(),
             "Source balance should reflect fee, refund, and transfer"
         );
         assert_eq!(
-            ctx.destination.balance(&ctx.host).unwrap(),
+            ctx.destination.balance(ctx.rk.host()).unwrap(),
             (50 + amount).into(),
             "Destination balance should increase by transfer amount"
         );
@@ -12066,7 +12108,7 @@ mod tests {
 
         // Source balance = initial - fee - amount (no refund).
         assert_eq!(
-            ctx.source.balance(&ctx.host).unwrap(),
+            ctx.source.balance(ctx.rk.host()).unwrap(),
             (100 - fee - amount).into(),
         );
     }
@@ -12085,7 +12127,7 @@ mod tests {
 
         // Source balance = initial - fee - amount.
         assert_eq!(
-            ctx.source.balance(&ctx.host).unwrap(),
+            ctx.source.balance(ctx.rk.host()).unwrap(),
             (2000 - fee - amount).into(),
         );
     }
@@ -12143,13 +12185,13 @@ mod tests {
 
         // Source paid fees but got refund; transfer was reverted so amount not deducted.
         assert_eq!(
-            ctx.source.balance(&ctx.host).unwrap(),
+            ctx.source.balance(ctx.rk.host()).unwrap(),
             (initial_balance - fee + expected_refund).into(),
             "Source should pay fee minus refund, transfer amount reverted"
         );
         // Destination unchanged: transfer was reverted.
         assert_eq!(
-            ctx.destination.balance(&ctx.host).unwrap(),
+            ctx.destination.balance(ctx.rk.host()).unwrap(),
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
@@ -12165,16 +12207,16 @@ mod tests {
         const DEST: &str = CONTRACT_1;
         const A: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         let account = init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -12184,7 +12226,7 @@ mod tests {
         let a_hash = mir::ast::AddressHash::from_base58_check(A).unwrap();
         let a_entry = address_registry::entry_path(&a_hash).unwrap();
         let baseline_a: Option<Narith> =
-            read_optional_nom_value(&host, &a_entry).unwrap();
+            read_optional_nom_value(rk.host(), &a_entry).unwrap();
         assert_eq!(baseline_a, None, "A must start unregistered");
 
         let encode_address = |address: &str| {
@@ -12211,7 +12253,7 @@ mod tests {
         );
         let first_receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 first_operation,
@@ -12225,14 +12267,14 @@ mod tests {
         );
 
         let first_index: Option<Narith> =
-            read_optional_nom_value(&host, &a_entry).unwrap();
+            read_optional_nom_value(rk.host(), &a_entry).unwrap();
         let first_index = first_index.expect("first INDEX_ADDRESS must register A");
         let first_storage = Micheline::from(first_index.0.clone())
             .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
         assert_eq!(
-            account.storage(&host).unwrap(),
+            account.storage(rk.host()).unwrap(),
             first_storage,
             "contract storage must record the registered address index"
         );
@@ -12280,7 +12322,7 @@ mod tests {
         );
         let second_receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 second_operation,
@@ -12294,7 +12336,7 @@ mod tests {
         );
 
         let second_index: Option<Narith> =
-            read_optional_nom_value(&host, &a_entry).unwrap();
+            read_optional_nom_value(rk.host(), &a_entry).unwrap();
         assert_eq!(
             second_index,
             Some(first_index),
@@ -12366,16 +12408,16 @@ mod tests {
         const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
         const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &child,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -12383,7 +12425,7 @@ mod tests {
         );
         let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &parent,
             INDEX_THEN_CALL_CHILD_SCRIPT,
             &Micheline::from(999i128),
@@ -12411,7 +12453,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -12428,7 +12470,7 @@ mod tests {
             use mir::ast::ByteReprTrait;
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
             let entry = address_registry::entry_path(&hash).unwrap();
-            let index: Narith = read_optional_nom_value(&host, &entry)
+            let index: Narith = read_optional_nom_value(rk.host(), &entry)
                 .unwrap()
                 .expect("address must be registered");
             Zarith(index.0.into())
@@ -12499,16 +12541,16 @@ mod tests {
         const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
         const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &child,
             r#"
                 parameter address;
@@ -12525,7 +12567,7 @@ mod tests {
         );
         let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &parent,
             INDEX_THEN_CALL_CHILD_SCRIPT,
             &Micheline::from(999i128),
@@ -12553,7 +12595,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -12614,7 +12656,7 @@ mod tests {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
             let entry = address_registry::entry_path(&hash).unwrap();
             assert_eq!(
-                read_optional_nom_value::<Narith>(&host, &entry).unwrap(),
+                read_optional_nom_value::<Narith>(rk.host(), &entry).unwrap(),
                 None,
                 "registry write for {address} must be rolled back"
             );
@@ -12640,18 +12682,18 @@ mod tests {
         const B: &str = "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
         const C: &str = CONTRACT_2;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         let parser = mir::parser::Parser::new();
         let empty_list = parser.parse("{}").unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest,
             r#"
                 parameter (list address);
@@ -12666,7 +12708,7 @@ mod tests {
             &0_u64.into(),
         );
 
-        let call = |host: &mut MockKernelHost, counter: u64, arg: &str| {
+        let call = |rk: &mut MockRuntimeKeyspaces, counter: u64, arg: &str| {
             let value = mir::parser::Parser::new()
                 .parse(arg)
                 .unwrap()
@@ -12688,7 +12730,7 @@ mod tests {
             );
             ProcessedOperation::into_receipts(
                 validate_and_apply_operation(
-                    host,
+                    rk,
                     &NotWiredRegistry,
                     &mut TezosXJournal::mock(RuntimeId::Ethereum),
                     operation,
@@ -12704,11 +12746,11 @@ mod tests {
 
         // Index 0 is reserved for the pre-registered null address (as on L1),
         // so the first call registers X at index 1.
-        let _ = call(&mut host, 1, &format!("{{ \"{X}\" }}"));
+        let _ = call(&mut rk, 1, &format!("{{ \"{X}\" }}"));
 
         // Second call: X is already registered; A, B, C are fresh.
         let receipts = call(
-            &mut host,
+            &mut rk,
             2,
             &format!("{{ \"{X}\"; \"{A}\"; \"{B}\"; \"{C}\" }}"),
         );
@@ -12742,7 +12784,7 @@ mod tests {
         for (address, index) in [(X, 1u32), (A, 2), (B, 3), (C, 4)] {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
             let entry = address_registry::entry_path(&hash).unwrap();
-            let stored: Narith = read_optional_nom_value(&host, &entry)
+            let stored: Narith = read_optional_nom_value(rk.host(), &entry)
                 .unwrap()
                 .expect("address must be registered");
             assert_eq!(stored.0, BigUint::from(index));
@@ -12762,16 +12804,16 @@ mod tests {
         const DEST: &str = CONTRACT_1;
         const SR1: &str = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(&mut host).unwrap();
+        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 1_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         init_contract(
-            &mut host,
+            rk.host_mut(),
             &dest,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -12799,7 +12841,7 @@ mod tests {
         );
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -12816,12 +12858,12 @@ mod tests {
         // assigned index 1 and the counter advances to 2.
         let sr1_hash = mir::ast::Address::from_base58_check(SR1).unwrap().hash;
         let entry = address_registry::entry_path(&sr1_hash).unwrap();
-        let stored: Narith = read_optional_nom_value(&host, &entry)
+        let stored: Narith = read_optional_nom_value(rk.host(), &entry)
             .unwrap()
             .expect("sr1 address must be registered");
         assert_eq!(stored.0, BigUint::from(1u32));
         let counter_path = address_registry::counter_path().unwrap();
-        let counter: Narith = read_optional_nom_value(&host, &counter_path)
+        let counter: Narith = read_optional_nom_value(rk.host(), &counter_path)
             .unwrap()
             .expect("counter must be initialised");
         assert_eq!(counter.0, BigUint::from(2u32));
@@ -12862,10 +12904,10 @@ mod tests {
     /// present in the initial storage.
     #[test]
     fn test_origination_bills_initial_big_map() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 10_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 10_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let parser = mir::parser::Parser::new();
         let code = parser
@@ -12896,7 +12938,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation,
@@ -12919,10 +12961,10 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let mut host2 = MockKernelHost::default();
+        let mut rk2 = RuntimeKeyspaces::default();
         let src2 = bootstrap2();
-        init_account(&mut host2, &src2.pkh, 10_000_000);
-        reveal_account(&mut host2, &src2);
+        init_account(rk2.host_mut(), &src2.pkh, 10_000_000);
+        reveal_account(rk2.host_mut(), &src2);
 
         let operation2 = make_origination_operation(
             15,
@@ -12939,7 +12981,7 @@ mod tests {
 
         let receipts2 = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host2,
+                &mut rk2,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 operation2,
@@ -12969,10 +13011,10 @@ mod tests {
     /// be drained between them, not shared.
     #[test]
     fn test_origination_anti_contamination() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 20_000_000);
-        reveal_account(&mut host, &src);
+        init_account(rk.host_mut(), &src.pkh, 20_000_000);
+        reveal_account(rk.host_mut(), &src);
 
         let parser = mir::parser::Parser::new();
         let code = parser
@@ -13022,7 +13064,7 @@ mod tests {
 
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
-                &mut host,
+                &mut rk,
                 &NotWiredRegistry,
                 &mut TezosXJournal::mock(RuntimeId::Ethereum),
                 batch,
@@ -13057,9 +13099,9 @@ mod tests {
     /// surfaced — no half-applied storage-fees entry survives.
     #[test]
     fn burn_pass_internal_overshoot_returns_quota_exceeded() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(&mut host, &pkh, 10_000_000);
+        let payer = init_account(rk.host_mut(), &pkh, 10_000_000);
         let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -13080,7 +13122,7 @@ mod tests {
             }));
         let mut storage_limit_remaining = num_bigint::BigUint::from(8_u64);
         let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            &mut host,
+            rk.host_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -13111,9 +13153,9 @@ mod tests {
     /// survives on any internal.
     #[test]
     fn burn_pass_two_internals_share_budget_with_rollback() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(&mut host, &pkh, 10_000_000);
+        let payer = init_account(rk.host_mut(), &pkh, 10_000_000);
         let make_internal = || {
             TaggedInternalOp::own(
                 InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -13142,7 +13184,7 @@ mod tests {
         let mut storage_limit_remaining =
             num_bigint::BigUint::from(2 * ORIGINATION_SIZE - 1);
         let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            &mut host,
+            rk.host_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -13178,9 +13220,9 @@ mod tests {
     /// as usual. The vec order is preserved.
     #[test]
     fn burn_pass_skips_crac_tagged_entries() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(&mut host, &pkh, 100_000);
+        let payer = init_account(rk.host_mut(), &pkh, 100_000);
 
         let own_op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
@@ -13222,7 +13264,7 @@ mod tests {
         // Crac internal (7 bytes) would overshoot and return an error.
         let mut storage_limit_remaining = num_bigint::BigUint::from(4_u64);
         let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            &mut host,
+            rk.host_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -13233,7 +13275,10 @@ mod tests {
         // (a) The Own internal got its `Debited / Credited(StorageFees)`
         // pair, charging 4 × COST_PER_BYTES against the payer's balance.
         let own_burn = 4 * COST_PER_BYTES;
-        assert_eq!(payer.balance(&host).unwrap(), (100_000 - own_burn).into());
+        assert_eq!(
+            payer.balance(rk.host()).unwrap(),
+            (100_000 - own_burn).into()
+        );
 
         assert_eq!(internals.len(), 2);
 
