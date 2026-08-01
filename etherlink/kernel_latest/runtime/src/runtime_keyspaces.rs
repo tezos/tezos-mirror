@@ -89,6 +89,12 @@ where
     }
 }
 
+/// The `/base` keyspace a [`MockKernelHost`] mints, for the tests.
+pub type MockKeySpace = <MockKernelHost as KeySpaceLoader>::KeySpace;
+
+/// The handle a [`MockKernelHost`] mints, for the tests.
+pub type MockRuntimeKeyspaces = RuntimeKeyspaces<MockKernelHost, MockKeySpace>;
+
 /// Handle over a fresh mock host, for the tests.
 impl Default
     for RuntimeKeyspaces<MockKernelHost, <MockKernelHost as KeySpaceLoader>::KeySpace>
