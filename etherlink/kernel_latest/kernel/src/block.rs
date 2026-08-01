@@ -300,8 +300,7 @@ where
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
                 if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
-                    let (host, base) = rk.parts_mut();
-                    upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?;
+                    upgrade::upgrade(rk, kernel_upgrade.preimage_hash)?;
                     // We abort the call, as there is no blueprint to execute,
                     // the kernel will reboot.
                     return Ok(BlueprintParsing::Postponed);
@@ -591,8 +590,7 @@ where
             // This runs on the live host, before the failsafe mirror is
             // started: `start()` has not copied the world state into `/tmp`
             // yet, so a read through the mirror would come back empty.
-            let (host, base) = rk.parts_mut();
-            upgrade::possible_sequencer_upgrade(host, base)?;
+            upgrade::possible_sequencer_upgrade(rk)?;
 
             log!(Debug, "Creating BIP from Blueprint.");
             // Execute at most one of the stored blueprints
@@ -698,8 +696,7 @@ where
             }
             // The mirror is promoted, so its `/tmp` copy is gone: the
             // sequencer key change runs on the live host.
-            let (host, base) = rk.parts_mut();
-            upgrade::possible_sequencer_key_change(host, base, timestamp)?;
+            upgrade::possible_sequencer_key_change(rk, timestamp)?;
 
             if config.common.evm_node_flag {
                 Ok(ComputationResult::Finished)

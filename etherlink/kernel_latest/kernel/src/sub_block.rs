@@ -377,8 +377,7 @@ where
     )?;
     // The mirror is promoted, so its `/tmp` copy is gone: the sequencer key
     // change runs on the live host.
-    let (host, base) = rk.parts_mut();
-    upgrade::possible_sequencer_key_change(host, base, timestamp)?;
+    upgrade::possible_sequencer_key_change(rk, timestamp)?;
 
     Ok(())
 }
