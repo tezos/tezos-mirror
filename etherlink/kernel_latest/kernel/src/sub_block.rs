@@ -279,7 +279,7 @@ where
     block_in_progress.repush_tx(input_data.tx);
 
     let result = compute(
-        safe_rk.host_mut(),
+        &mut safe_rk,
         &registry,
         &config,
         &outbox_queue,
@@ -361,7 +361,7 @@ where
     )?;
     let number = block_in_progress.number;
     let block = block_in_progress.finalize_and_store(
-        safe_rk.host_mut(),
+        &mut safe_rk,
         &block_constants,
         config.is_tezos_runtime_enabled(number),
     )?;

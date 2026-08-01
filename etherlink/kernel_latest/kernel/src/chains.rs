@@ -614,10 +614,10 @@ impl TezosXChainConfig {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn apply_transaction<Host>(
+    pub fn apply_transaction<Host, KS>(
         &self,
         block_in_progress: &BlockInProgress,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &TezosXBlockConstants,
@@ -651,7 +651,7 @@ impl TezosXChainConfig {
 
                         return self.apply_tezos_operation(
                             block_in_progress,
-                            host,
+                            rk,
                             registry,
                             outbox_queue,
                             operation,
@@ -672,7 +672,7 @@ impl TezosXChainConfig {
                     &block_in_progress.cumulative_tezos_operation_receipts.list,
                 );
                 crate::apply::apply_transaction(
-                    host,
+                    rk.host_mut(),
                     registry,
                     outbox_queue,
                     &block_constants.evm_runtime_block_constants,
@@ -689,7 +689,7 @@ impl TezosXChainConfig {
             }
             TezosXTransaction::Tezos(operation) => self.apply_tezos_operation(
                 block_in_progress,
-                host,
+                rk,
                 registry,
                 outbox_queue,
                 operation,
@@ -705,9 +705,9 @@ impl TezosXChainConfig {
         }
     }
 
-    pub fn finalize_and_store<Host>(
+    pub fn finalize_and_store<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         block_in_progress: BlockInProgress,
         block_constants: &TezosXBlockConstants,
         _chain_header: EVMBlockHeader,
@@ -717,7 +717,7 @@ impl TezosXChainConfig {
     {
         let current_level = block_in_progress.number;
         block_in_progress.finalize_and_store(
-            host,
+            rk,
             block_constants,
             self.is_tezos_runtime_enabled(current_level),
         )
@@ -763,10 +763,10 @@ impl TezosXChainConfig {
 
 impl TezosXChainConfig {
     #[allow(clippy::too_many_arguments)]
-    fn apply_tezos_operation<Host>(
+    fn apply_tezos_operation<Host, KS>(
         &self,
         block_in_progress: &BlockInProgress,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         operation: TezlinkOperation,
@@ -831,7 +831,7 @@ impl TezosXChainConfig {
         let result = apply_tezos_operation(
             &self.michelson_chain_id,
             block_in_progress,
-            host,
+            rk,
             registry,
             &block_constants.michelson_runtime_block_constants,
             operation,
@@ -861,7 +861,7 @@ impl TezosXChainConfig {
         // traces under each generated Ethereum fake hash once the
         // mapping is available here.
         crate::storage::maybe_store_http_traces_for_tx(
-            host,
+            rk.host_mut(),
             http_trace_enabled,
             &tx_hash,
             &journal,
@@ -881,17 +881,17 @@ impl TezosXChainConfig {
                     ),
                     matches!(result, ExecutionResult::Success { .. }),
                 );
-                close_tezosx_journal(host, journal, Some(&result))?;
+                close_tezosx_journal(rk.host_mut(), journal, Some(&result))?;
                 Ok(crate::apply::ExecutionResult::Valid(
                     RuntimeExecutionInfo::Tezos(res),
                 ))
             }
             Ok(crate::apply::ExecutionResult::Invalid) => {
-                close_tezosx_journal(host, journal, None)?;
+                close_tezosx_journal(rk.host_mut(), journal, None)?;
                 Ok(crate::apply::ExecutionResult::Invalid)
             }
             Err(err) => {
-                close_tezosx_journal(host, journal, None)?;
+                close_tezosx_journal(rk.host_mut(), journal, None)?;
                 Err(err)
             }
         }
@@ -1122,10 +1122,10 @@ fn get_fees_data(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn apply_tezos_operation<Host>(
+pub fn apply_tezos_operation<Host, KS>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &TezlinkBlockConstants,
     operation: TezlinkOperation,
@@ -1195,7 +1195,7 @@ where
             let signature = operation.signature.clone();
 
             // The branch must be a recent block of this instance (see is_valid_tez_branch); reject otherwise.
-            if !skip_branch_check && !is_valid_tez_branch(host, &H256(*branch))? {
+            if !skip_branch_check && !is_valid_tez_branch(rk.host(), &H256(*branch))? {
                 log!(
                     Error,
                     "Dropping Tezos operation {}: branch {} is not a recent block of this instance",
@@ -1213,7 +1213,7 @@ where
             let safe_roots =
                 operation_safe_roots(&operation, &block_constants.safe_roots);
             let processed_operations = match tezos_execution::validate_and_apply_operation(
-                host,
+                rk.host_mut(),
                 registry,
                 journal,
                 operation,
@@ -1252,7 +1252,7 @@ where
                 ),
             };
 
-            credit_da_fees.apply(host)?;
+            credit_da_fees.apply(rk.host_mut())?;
 
             // Extract cross-runtime side effects accumulated
             // during the Michelson execution (e.g. CRAC into EVM)
@@ -1270,12 +1270,16 @@ where
                 (outbox_queue, evm_block_constants)
             {
                 let etherlink_withdrawals = commit_evm_journal_from_external(
-                    host,
+                    rk.host_mut(),
                     registry,
                     evm_block_constants,
                     journal,
                 )?;
-                push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
+                push_withdrawals_to_outbox(
+                    rk.host_mut(),
+                    outbox_queue,
+                    etherlink_withdrawals,
+                )?;
             }
 
             Ok(crate::apply::ExecutionResult::Valid(TezosExecutionInfo {
@@ -1287,7 +1291,7 @@ where
         TezlinkContent::Deposit(deposit) => {
             log!(Debug, "Execute Tezlink deposit: {deposit:?}");
 
-            let deposit_result = execute_tezlink_deposit(host, &deposit)?;
+            let deposit_result = execute_tezlink_deposit(rk.host_mut(), &deposit)?;
 
             let source = PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 

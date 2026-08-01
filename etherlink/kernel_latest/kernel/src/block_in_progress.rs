@@ -39,6 +39,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
@@ -411,10 +412,10 @@ impl BlockInProgress {
     }
 
     #[instrument(skip_all)]
-    pub fn register_valid_transaction<Host>(
+    pub fn register_valid_transaction<Host, KS>(
         &mut self,
         execution_info: RuntimeExecutionInfo,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         michelson_to_evm_gas_multiplier: u64,
     ) -> Result<(), anyhow::Error>
     where
@@ -428,7 +429,7 @@ impl BlockInProgress {
             }) => {
                 let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
                 // account for gas
-                host.add_execution_gas(execution_gas_used);
+                rk.host_mut().add_execution_gas(execution_gas_used);
                 self.add_gas(receipt_info.overall_gas_used)?;
                 // keep track of execution gas used
                 self.cumulative_execution_gas += execution_gas_used.into();
@@ -463,7 +464,7 @@ impl BlockInProgress {
                         consumed_milligas,
                         michelson_to_evm_gas_multiplier,
                     );
-                host.add_execution_gas(cumulative_execution_gas);
+                rk.host_mut().add_execution_gas(cumulative_execution_gas);
                 self.cumulative_execution_gas += U256::from(cumulative_execution_gas);
                 self.cumulative_tezos_operation_receipts
                     .list
@@ -509,9 +510,9 @@ impl BlockInProgress {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    pub fn finalize_and_store<Host>(
+    pub fn finalize_and_store<Host, KS>(
         self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error>
@@ -527,21 +528,22 @@ impl BlockInProgress {
             &michelson_commitment,
             self.timestamp,
         );
-        let state_root = crate::state_hash::evm_state_hash(host, &blueprint_hash);
+        let state_root =
+            crate::state_hash::evm_state_hash(rk.host_mut(), &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
-            host,
+            rk.host_mut(),
             &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
             &self.cumulative_receipts,
         )?;
         let transactions_root = self.transactions_root();
         block_storage::store_current_transactions_objects(
-            host,
+            rk.host_mut(),
             &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
             &self.cumulative_tx_objects,
         )?;
         let base_fee_per_gas = base_fee_per_gas(
-            host,
+            rk.host(),
             self.timestamp,
             block_constants
                 .evm_runtime_block_constants
@@ -550,7 +552,7 @@ impl BlockInProgress {
         );
 
         if enable_tezos_runtime {
-            let protocol = match read_current_tez_block_header(host) {
+            let protocol = match read_current_tez_block_header(rk.host()) {
                 Ok(previous_header) => previous_header.next_protocol,
                 Err(_) => TARGET_TEZOS_PROTOCOL,
             };
@@ -560,10 +562,12 @@ impl BlockInProgress {
                     "failed to assign block-wide internal-operation nonces: {e}"
                 )
             })?;
-            let tez_state_root =
-                crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
-                    .try_into()
-                    .expect("tez_accounts_state_hash must be 32 bytes");
+            let tez_state_root = crate::state_hash::tez_accounts_state_hash(
+                rk.host_mut(),
+                &blueprint_hash,
+            )
+            .try_into()
+            .expect("tez_accounts_state_hash must be 32 bytes");
             let tez_block = TezBlock::new(
                 protocol,
                 TARGET_TEZOS_PROTOCOL,
@@ -580,13 +584,13 @@ impl BlockInProgress {
             let tez_block = L2Block::Tezlink(tez_block);
             // Maintain the live_blocks set for the Michelson runtime (branch validation).
             block_storage::store_current(
-                host,
+                rk.host_mut(),
                 &TEZ_SAFE_STORAGE_ROOT_PATH,
                 &tez_block,
                 true, // maintain_live_blocks
             )
             .context("Failed to store the Tezos block")?;
-            store_current_tez_block_header(host, &new_header)
+            store_current_tez_block_header(rk.host_mut(), &new_header)
                 .context("Failed to store the current TezBlockHeader")?;
         }
 
@@ -605,7 +609,7 @@ impl BlockInProgress {
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
         block_storage::store_current(
-            host,
+            rk.host_mut(),
             &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
             &new_block,
             false, // maintain_live_blocks
