@@ -293,9 +293,8 @@ where
     KS: KeySpace,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
-    let (host, base) = rk.parts_mut();
     let (blueprint, size) =
-        read_blueprint(host, base, config, next_bip_number, timestamp, chain_header)?;
+        read_blueprint(rk, config, next_bip_number, timestamp, chain_header)?;
     log!(Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -435,10 +434,8 @@ where
             let (number, previous_timestamp, ref previous_chain_header) =
                 get_next_bip_info(rk.base());
 
-            let (host, base) = rk.parts_mut();
             match read_blueprint(
-                host,
-                base,
+                rk,
                 config,
                 number,
                 previous_timestamp,
