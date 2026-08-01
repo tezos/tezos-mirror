@@ -367,10 +367,8 @@ where
     )?;
 
     let timestamp = block.timestamp();
-    let (safe_host, base) = safe_rk.parts_mut();
     promote_block(
-        safe_host,
-        base,
+        &mut safe_rk,
         &outbox_queue,
         &BlockInProgressProvenance::Storage,
         block.header(),
