@@ -12,12 +12,15 @@ use mir::ast::BinWriter;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
-    ast::{big_map::BigMapId, IntoMicheline, Micheline},
+    ast::{big_map::BigMapId, BorrowedUnparseError, IntoMicheline, Micheline},
     context::CtxTrait,
     gas::{Gas, OutOfGas},
-    interpreter::compute_contract_address,
+    interpreter::{compute_contract_address, ContractInterpretError},
     parser::Parser,
-    typechecker::{type_props::TypeProperty, AllowForgedLazyStorageId, TypecheckViews},
+    serializer::DecodeError,
+    typechecker::{
+        type_props::TypeProperty, AllowForgedLazyStorageId, TcError, TypecheckViews,
+    },
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
@@ -1523,15 +1526,16 @@ where
                 };
                 let (internal_operations, new_storage) = match code {
                     Code::Code(code_bytes) => {
-                        let (iter, new_storage) = execute_smart_contract_originated(
-                            code_bytes,
-                            storage,
+                        let (iter, new_storage) = interpret_encoded_script(
+                            &code_bytes,
+                            &storage,
                             entrypoint,
                             param,
                             parser,
                             &mut ctx,
                             allow_forged_lazy_storage_id,
-                        )?;
+                        )
+                        .map_err(TransferError::from)?;
                         (iter.collect::<Vec<_>>(), new_storage)
                     }
                     Code::Enshrined(contract) => {
@@ -2419,29 +2423,83 @@ where
     Ok(())
 }
 
-/// Executes the entrypoint logic of an originated smart contract and returns the new storage.
-fn execute_smart_contract_originated<'a>(
-    code: Vec<u8>,
-    storage: Vec<u8>,
+/// Why [interpret_encoded_script] failed, with the MIR error kept
+/// structural so callers can classify it (durable-storage fault vs script
+/// failure) before rendering.
+///
+/// TODO: https://gitlab.com/tezos/tezos/-/issues/8003
+/// migrate [TransferError]'s remaining stringly sinks onto this type.
+#[derive(Debug, thiserror::Error)]
+enum ScriptError<'a> {
+    /// Gas ran out outside interpretation and unparsing, which report
+    /// their own exhaustion through [ScriptError::Interpret] and the
+    /// unparse fold in [interpret_encoded_script].
+    #[error("gas exhausted")]
+    OutOfGas(#[from] OutOfGas),
+    /// The script or storage bytes are not valid Micheline.
+    #[error("script or storage bytes are not valid Micheline")]
+    Decode(#[from] DecodeError),
+    /// No `parameter`/`storage`/`code` toplevel, or ill-typed.
+    #[error("script does not typecheck")]
+    Typecheck(#[from] TcError),
+    /// Execution failed: `FAILWITH`, an ill-typed parameter or storage,
+    /// gas, or a lazy-storage fault.
+    #[error("script execution failed")]
+    Interpret(ContractInterpretError<'a>),
+    /// The resulting storage cannot be unparsed.
+    #[error("resulting storage cannot be unparsed")]
+    Unparse(BorrowedUnparseError),
+    /// The resulting storage cannot be re-encoded.
+    #[error("resulting storage cannot be re-encoded")]
+    Encode(#[from] tezos_data_encoding::enc::BinError),
+}
+
+/// Hand-written: `#[from]` refuses a non-`'static` source
+/// ([Error::source] must be `dyn Error + 'static`).
+impl<'a> From<ContractInterpretError<'a>> for ScriptError<'a> {
+    fn from(e: ContractInterpretError<'a>) -> Self {
+        Self::Interpret(e)
+    }
+}
+
+impl From<ScriptError<'_>> for TransferError {
+    fn from(err: ScriptError) -> Self {
+        match err {
+            ScriptError::OutOfGas(e) => Self::OutOfGas(e),
+            ScriptError::Decode(e) => e.into(),
+            ScriptError::Typecheck(e) => e.into(),
+            ScriptError::Interpret(e) => e.into(),
+            ScriptError::Unparse(e) => e.into(),
+            ScriptError::Encode(e) => Self::MichelineSerializationError(e.to_string()),
+        }
+    }
+}
+
+/// Decode, typecheck and interpret a binary Michelson script against a
+/// binary storage; return the emitted operations and the re-encoded
+/// resulting storage.
+fn interpret_encoded_script<'a>(
+    code: &[u8],
+    storage: &[u8],
     entrypoint: &Entrypoint,
-    value: Micheline<'a>,
+    parameter: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut impl CtxTrait<'a>,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
-) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError<'a>> {
     // Parse and typecheck the contract
-    let contract_micheline = Micheline::decode_raw(&parser.arena, &code, ctx.gas())??;
+    let contract_micheline = Micheline::decode_raw(&parser.arena, code, ctx.gas())??;
     let contract_typechecked =
         contract_micheline
             .split_script()?
             .typecheck_script(ctx.gas(), true, false)?;
-    let storage_micheline = Micheline::decode_raw(&parser.arena, &storage, ctx.gas())??;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, storage, ctx.gas())??;
 
     // Execute the contract
     let (internal_operations, new_storage) = contract_typechecked.interpret(
         ctx,
         &parser.arena,
-        value,
+        parameter,
         entrypoint,
         &storage_micheline,
         allow_forged_lazy_storage_id,
@@ -2460,9 +2518,12 @@ fn execute_smart_contract_originated<'a>(
             &parser.arena,
             ctx.gas(),
             Some(TypeProperty::Storable),
-        )?
-        .encode(ctx.gas())?
-        .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
+        )
+        .map_err(|e| match e {
+            BorrowedUnparseError::OutOfGas => ScriptError::OutOfGas(OutOfGas),
+            e => ScriptError::Unparse(e),
+        })?
+        .encode(ctx.gas())??;
 
     Ok((internal_operations, new_storage))
 }
