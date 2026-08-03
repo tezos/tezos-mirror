@@ -1617,18 +1617,7 @@ module Scripts = struct
       in
       entrypoint_type ctxt arg_type entrypoint entrypoints
     in
-    let script_view_type ctxt contract expr view =
-      let ctxt = Gas.set_unlimited ctxt in
-      let open Script_ir_translator in
-      let* {views; _}, _ = parse_toplevel ctxt expr in
-      let*? view_name = Script_string.of_string view in
-      match Script_map.get view_name views with
-      | None ->
-          Environment.Error_monad.tzfail
-            (View_helpers.View_not_found (contract, view))
-      | Some Script_typed_ir.{input_ty; output_ty; _} ->
-          return (input_ty, output_ty)
-    in
+    let script_view_type = View_helpers.script_view_type in
     let native_view_type ctxt contract kind view =
       let*? (Ex_kind_and_types (kind, _)) =
         Script_native_types.get_typed_kind_and_types kind
