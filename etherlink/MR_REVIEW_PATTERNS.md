@@ -293,14 +293,24 @@ When a known limitation is left, file a Linear issue (`L2-XXXX`) and reference i
 
 Don't leave bare TODOs. Reviewers will file the issue themselves and ask the author to reference it.
 
-### 5.3 Update `CHANGES_TEZOSX.md` / `CHANGES_KERNEL.md` for user-facing changes
+### 5.3 Document user-facing changes in the changelog
 **Severity:** important | **Kind:** process + convention | **Frequency:** ~15
 
-Each user-facing change needs a changelog entry with the MR number and a concise user-impact-focused description. Tezlink terminology is forbidden in the Tezos X changelog. Entries go in `etherlink/CHANGES_TEZOSX.md` or `etherlink/CHANGES_KERNEL.md`. Sections: Internals, Native atomic composability, EVM Runtime, Michelson runtime.
+Each user-facing change needs a changelog entry with the MR number and a concise user-impact-focused description. Tezlink terminology is forbidden in the Tezos X changelog. Sections: Internals, Native Atomic Composability, EVM Runtime, Michelson Runtime, Storage versions.
 
-After a rebase, **recheck where your changelog lines landed.** Releases are cut on `master` between the time an MR is opened and the time it merges, so a new "Version X.Y" header may now sit above the lines you added. The rebase will not move them down for you, and the result is an entry that documents a release it was never part of. Mechanical check before pushing the rebased branch:
+**Tezos X** entries are *not* written in `etherlink/CHANGES_TEZOSX.md` — that file must never be edited by hand. They are fragment files, one per MR:
 
-1. Open `etherlink/CHANGES_TEZOSX.md` / `etherlink/CHANGES_KERNEL.md`.
+```
+etherlink/.changes/tezosx/<section>/<mr-number>.md
+```
+
+The file holds the markdown bullet(s) to insert under that section, without the `(!<mr-number>)` reference: that reference is appended to every bullet when the release is assembled, and a fragment spelling out its own reference is rejected. An MR that needs no entry says so with an empty `.changes/tezosx/no_changelog/<mr-number>.md`, which is explicit in the diff and reviewable.
+
+Since no two MRs write to the same file, there are no rebase conflicts and no entry can end up stranded above a release header cut on `master` while the MR was open. `etherlink.check_tezosx_changelog` fails the pipeline when the MR declares nothing, when a fragment would be silently dropped at release time, and when an entry appears in the changelog itself. See [`.changes/tezosx/README.md`](./.changes/tezosx/README.md).
+
+**Kernel** entries still go directly in `etherlink/CHANGES_KERNEL.md`, so the rebase hazard remains there. After a rebase, **recheck where your changelog lines landed:**
+
+1. Open `etherlink/CHANGES_KERNEL.md`.
 2. Confirm the first header above your new lines is the *Unreleased* section, not a versioned release.
 3. If a release section was inserted above your entry, move the entry back under *Unreleased*.
 
