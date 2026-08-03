@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+Entries for the next release live as one file per merge request under
+[`.changes/tezosx/`](.changes/tezosx/), to avoid rebase conflicts and entries
+stranded above a freshly cut release header. See
+[`.changes/tezosx/README.md`](.changes/tezosx/README.md).
+
 ## Version 0.8 (92258d046043a2ceed7a6400687a1bfa28893096)
 
 ### EVM Runtime
