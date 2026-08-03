@@ -3421,6 +3421,97 @@ mod tests {
         OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT)
     }
 
+    /// Pins [`run_code`](crate::run_code)'s step-constant semantics where
+    /// they differ from the applied path — a drift there is invisible
+    /// until an RPC consumer notices the wrong answer.
+    mod run_code {
+        use crate::gas::TezlinkOperationGas;
+        use crate::{run_code, RunCodeError, RunCodeParams};
+        use mir::ast::{Entrypoint, Micheline};
+        use mir::gas::Gas;
+        use mir::parser::Parser;
+        use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
+        use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+        use tezos_smart_rollup::types::Timestamp;
+        use tezos_tezlink::enc_wrappers::BlockNumber;
+        use tezosx_interfaces::testing::NotWiredRegistry;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
+
+        fn encode(micheline: Micheline<'_>) -> Vec<u8> {
+            micheline
+                .encode(&mut Gas::default())
+                .expect("encoding fits the default gas budget")
+                .expect("the value is encodable")
+        }
+
+        /// `balance` is given explicitly so the run does not depend on any
+        /// account existing in the mock host.
+        fn params(
+            script: Vec<u8>,
+            storage: Vec<u8>,
+            input: Vec<u8>,
+            payer: Option<mir::ast::PublicKeyHash>,
+        ) -> RunCodeParams {
+            RunCodeParams {
+                script,
+                storage,
+                input,
+                entrypoint: Entrypoint::default(),
+                self_address: ContractKt1Hash::from_b58check(KT1).expect("valid KT1"),
+                sender: None,
+                payer,
+                amount: 0,
+                balance: Some(0),
+                milligas: TezlinkOperationGas::MAX_LIMIT,
+                chain_id: ChainId::from([0u8; 4]),
+                level: BlockNumber { block_number: 1 },
+                now: Timestamp::from(0i64),
+            }
+        }
+
+        fn run(params: &RunCodeParams) -> Result<Vec<u8>, RunCodeError> {
+            let mut rk = MockRuntimeKeyspaces::default();
+            run_code(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                params,
+            )
+            .map(|output| output.storage)
+        }
+
+        /// An unoriginated `storage + 1` script with storage `41` and a
+        /// `Unit` parameter, encoded.
+        fn incr_fixture<'a>(parser: &'a Parser<'a>) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+            let script = encode(
+                parser
+                    .parse_top_level(
+                        "parameter unit; storage nat; \
+                         code { CDR; PUSH nat 1; ADD; NIL operation; PAIR }",
+                    )
+                    .expect("the script parses"),
+            );
+            let storage = encode(parser.parse("41").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+            (script, storage, input)
+        }
+
+        /// The baseline: a script that was never originated runs against
+        /// caller-supplied storage, and the storage it returns comes back.
+        #[test]
+        fn returns_the_resulting_storage() {
+            let parser = Parser::new();
+            let (script, storage, input) = incr_fixture(&parser);
+
+            let result = run(&params(script, storage, input, None)).expect("it runs");
+
+            assert_eq!(result, encode(parser.parse("42").expect("parses")));
+        }
+    }
+
     /// Test-only SafeStorage roots matching [`test_root`], so the inner
     /// SafeStorage wrap inside `validate_and_apply_operation` covers the
     /// test account subtree.
