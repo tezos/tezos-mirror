@@ -621,7 +621,6 @@ struct RunCodeInput {
 /// unknown tag fails the node's decoder outright, never a misclassified
 /// script failure.
 #[derive(BinWriter)]
-#[cfg_attr(test, derive(Debug, PartialEq, NomReader))]
 enum RunCodeResult {
     /// The resulting storage, Micheline-encoded (optimized-legacy).
     Success(RunCodeStorage),
@@ -635,7 +634,6 @@ enum RunCodeResult {
 /// tuple variant the derive accepts the attribute but ignores it, and
 /// the length prefix the node expects disappears.
 #[derive(BinWriter)]
-#[cfg_attr(test, derive(Debug, PartialEq, NomReader))]
 struct RunCodeStorage {
     #[encoding(dynamic, bytes)]
     storage: Vec<u8>,
@@ -1028,6 +1026,242 @@ fn encode_entrypoints_result(
 mod tests {
     use mir::ast::{Entrypoint, Micheline, Type};
     use mir::gas::Gas;
+
+    /// The pinned vectors freeze the wire format shared with the node's
+    /// `Run_code` module (`tezos_backend.ml`), which pins the same ones
+    /// in `etherlink/bin_node/test/test_run_code_codec.ml` — keep the
+    /// two in step, that is what makes them an oracle rather than a
+    /// snapshot of this file's own derives.
+    mod run_code_codec {
+        use super::super::{
+            run_code_params, RunCodeInput, RunCodeResult, RunCodeStorage,
+        };
+        use tezos_data_encoding::enc::BinWriter;
+        use tezos_data_encoding::nom::NomReader;
+        use tezos_execution::TezlinkOperationGas;
+        use tezos_protocol::contract::Contract;
+
+        const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
+        const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
+        const TZ1: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+
+        // Field by field: dynamic bytes (4-byte length prefix) for
+        // script / storage / input, dynamic string for the entrypoint,
+        // 4 raw bytes of chain id, 22 bytes of contract (`01` + KT1
+        // hash + padding), int64 amount, then the six options (`00`
+        // absent, `ff` + payload present).
+        const FULL_INPUT: &str =
+            "000000010200000001030000000200070000000764656661756c74f3d48b2a\
+             011f2d825fdd9da219235510335e558520235f4f54000000000000000007\
+             ff0183e44ba40860b4042688621bd56fbed9fa12e9c500\
+             ff002422090f872dfd3a39471bb23f180e6dfed030f3\
+             ff0000000000000063ff00000000000004d2ff0000000000000005ff0000002a";
+
+        const BARE_INPUT: &str =
+            "000000010200000001030000000200070000000764656661756c74f3d48b2a\
+             011f2d825fdd9da219235510335e558520235f4f54000000000000000007\
+             000000000000";
+
+        // Variant tag, then the payload: dynamic bytes for the storage,
+        // dynamic string for an error message.
+        const SUCCESS_RESULT: &str = "0000000002000c";
+
+        const EXECUTION_ERROR_RESULT: &str = "0100000010696c6c2d747970656420736372697074";
+
+        const HOST_ERROR_RESULT: &str = "020000001273746f7261676520756e7265616461626c65";
+
+        fn contract(b58: &str) -> Contract {
+            Contract::from_b58check(b58).expect("valid address")
+        }
+
+        fn pkh(b58: &str) -> tezos_crypto_rs::public_key_hash::PublicKeyHash {
+            tezos_crypto_rs::public_key_hash::PublicKeyHash::from_b58check(b58)
+                .expect("valid pkh")
+        }
+
+        fn full_input() -> RunCodeInput {
+            RunCodeInput {
+                script: vec![0x02],
+                storage: vec![0x03],
+                // Micheline `int 7`.
+                input: vec![0x00, 0x07],
+                entrypoint: "default".to_string(),
+                chain_id: tezos_crypto_rs::hash::ChainId::from([0xf3, 0xd4, 0x8b, 0x2a]),
+                self_address: contract(KT1),
+                amount: 7,
+                sender: Some(contract(KT1_SENDER)),
+                payer: Some(pkh(TZ1)),
+                balance: Some(99),
+                gas: Some(1234),
+                now: Some(5),
+                level: Some(42),
+            }
+        }
+
+        fn bare_input() -> RunCodeInput {
+            RunCodeInput {
+                sender: None,
+                payer: None,
+                balance: None,
+                gas: None,
+                now: None,
+                level: None,
+                ..full_input()
+            }
+        }
+
+        fn encode(input: &RunCodeInput) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            input.bin_write(&mut bytes).expect("the input encodes");
+            bytes
+        }
+
+        #[test]
+        fn input_wire_format_is_pinned() {
+            for (input, pinned) in
+                [(full_input(), FULL_INPUT), (bare_input(), BARE_INPUT)]
+            {
+                assert_eq!(hex::encode(encode(&input)), pinned);
+                // Against the literal, not against `encode`'s output:
+                // decoding is the direction the kernel actually runs.
+                let decoded = RunCodeInput::nom_read_exact(
+                    &hex::decode(pinned).expect("valid hex"),
+                )
+                .expect("the pinned input decodes");
+                assert_eq!(decoded, input);
+            }
+        }
+
+        #[test]
+        fn truncated_input_does_not_decode() {
+            let bytes = encode(&full_input());
+            RunCodeInput::nom_read_exact(&bytes[..bytes.len() / 2])
+                .expect_err("a truncated input must not decode");
+        }
+
+        /// Every input the wire can carry but the runtime cannot honour,
+        /// with the reason it is refused here rather than deeper in.
+        #[test]
+        fn rejects_out_of_range_inputs() {
+            let cases: [(&str, RunCodeInput, &str); 5] = [
+                (
+                    "an implicit `self`",
+                    RunCodeInput {
+                        self_address: contract(TZ1),
+                        ..full_input()
+                    },
+                    "must be a KT1",
+                ),
+                (
+                    // Narrower than L1, which accepts pre-epoch
+                    // timestamps: `now` is rendered into
+                    // `X-Tezos-Timestamp`, which the EVM side reads as a
+                    // u64.
+                    "a negative `now`",
+                    RunCodeInput {
+                        now: Some(-5),
+                        ..full_input()
+                    },
+                    "must not be negative",
+                ),
+                (
+                    "a negative `amount`",
+                    RunCodeInput {
+                        amount: -1,
+                        ..full_input()
+                    },
+                    "must not be negative",
+                ),
+                (
+                    "a negative `balance`",
+                    RunCodeInput {
+                        balance: Some(-1),
+                        ..full_input()
+                    },
+                    "must not be negative",
+                ),
+                (
+                    "a negative `gas`",
+                    RunCodeInput {
+                        gas: Some(-1),
+                        ..full_input()
+                    },
+                    "must not be negative",
+                ),
+            ];
+            for (label, input, expected) in cases {
+                let err = match run_code_params(input, 0, 0) {
+                    Ok(_) => panic!("{label} must not validate"),
+                    Err(err) => err,
+                };
+                assert!(
+                    err.contains(expected),
+                    "{label}: expected an error mentioning {expected:?}, got {err:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn clamps_gas_to_the_operation_cap() {
+            let params = |gas| {
+                run_code_params(
+                    RunCodeInput {
+                        gas,
+                        ..full_input()
+                    },
+                    0,
+                    0,
+                )
+                .expect("validates")
+            };
+            assert_eq!(params(None).milligas, TezlinkOperationGas::MAX_LIMIT);
+            assert_eq!(
+                params(Some(i64::MAX)).milligas,
+                TezlinkOperationGas::MAX_LIMIT
+            );
+            assert_eq!(params(Some(1234)).milligas, 1_234_000);
+        }
+
+        /// Absent options must fall back, not zero out — a `0` would
+        /// silently run at the epoch / level 0.
+        #[test]
+        fn absent_options_fall_back_to_the_block() {
+            let params = run_code_params(bare_input(), 1234, 42).expect("validates");
+            assert_eq!(params.now.as_u64(), 1234);
+            assert_eq!(params.level.block_number, 42);
+            assert!(params.sender.is_none());
+            assert!(params.payer.is_none());
+            assert_eq!(params.balance, None);
+        }
+
+        #[test]
+        fn result_wire_format_is_pinned() {
+            let encode = |result: &RunCodeResult| {
+                let mut bytes = Vec::new();
+                result.bin_write(&mut bytes).expect("the result encodes");
+                hex::encode(bytes)
+            };
+            let pinned = [
+                (
+                    RunCodeResult::Success(RunCodeStorage {
+                        storage: vec![0x00, 0x0c],
+                    }),
+                    SUCCESS_RESULT,
+                ),
+                (
+                    RunCodeResult::ExecutionError("ill-typed script".to_string()),
+                    EXECUTION_ERROR_RESULT,
+                ),
+                (
+                    RunCodeResult::HostError("storage unreadable".to_string()),
+                    HOST_ERROR_RESULT,
+                ),
+            ];
+            for (result, expected) in pinned {
+                assert_eq!(encode(&result), expected);
+            }
+        }
+    }
     use mir::parser::Parser;
     use std::collections::HashMap;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
