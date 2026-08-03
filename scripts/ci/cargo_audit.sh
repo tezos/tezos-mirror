@@ -179,23 +179,53 @@ else
   merge_base=$(./scripts/ci/git_merge_base.sh \
     "${TEZOS_CI_MR_TARGET}" "${TEZOS_CI_MR_HEAD}")
 
-  # A changed Cargo.lock means the dependency graph moved; a changed
-  # .cargo/audit.toml means the ignore list moved. Both must re-audit the
-  # affected workspace, so consider both. Map a matched path to its
-  # workspace directory: <dir>/Cargo.lock -> <dir>, and
-  # <dir>/.cargo/audit.toml -> <dir>.
-  echo "Auditing directories with a changed Cargo.lock or .cargo/audit.toml."
+  # Walk up from a directory to the nearest ancestor holding a Cargo.lock,
+  # i.e. the workspace that owns a given manifest. Nearest and not
+  # outermost, because some workspaces nest (src/rust_deps contains
+  # wasmer-3.3.0, rust_tezos_context and rust_igd_next, each with its own
+  # lock and its own .cargo/audit.toml). Prints nothing when the manifest
+  # belongs to no workspace, which leaves nothing to audit for it.
+  workspace_of() {
+    d=$1
+    while :; do
+      if [ -f "${d}/Cargo.lock" ]; then
+        echo "$d"
+        return
+      fi
+      case "$d" in
+      . | /) return ;;
+      esac
+      d=$(dirname "$d")
+    done
+  }
+
+  # A changed Cargo.lock means the dependency graph moved. A changed
+  # Cargo.toml can move it on the next resolution even when the lock stays
+  # byte-identical, because the lock records resolved versions and not the
+  # requirements that produced them: loosening a version bound leaves the
+  # lock untouched. A changed .cargo/audit.toml means the ignore list moved.
+  # All three must re-audit the affected workspace.
+  #
+  # Map a matched path to its workspace directory:
+  #   <dir>/Cargo.lock        -> <dir>
+  #   <dir>/.cargo/audit.toml -> <dir>
+  #   <dir>/Cargo.toml        -> nearest ancestor of <dir> holding a
+  #                              Cargo.lock, since most manifests sit in a
+  #                              workspace member rather than at its root
+  #                              (268 manifests for 29 workspaces).
+  echo "Auditing directories with a changed Cargo.lock, Cargo.toml or .cargo/audit.toml."
   dirs=$(git diff --name-only "${merge_base}" "${TEZOS_CI_MR_HEAD}" \
-    -- '**/Cargo.lock' '**/.cargo/audit.toml' |
+    -- '**/Cargo.lock' '**/Cargo.toml' '**/.cargo/audit.toml' |
     while IFS= read -r f; do
       case "$f" in
       */.cargo/audit.toml) echo "${f%/.cargo/audit.toml}" ;;
+      */Cargo.toml | Cargo.toml) workspace_of "$(dirname "$f")" ;;
       *) dirname "$f" ;;
       esac
     done | sort -u)
 
   if [ -z "$dirs" ]; then
-    echo "No Cargo.lock or .cargo/audit.toml changes detected. Nothing to audit."
+    echo "No Cargo.lock, Cargo.toml or .cargo/audit.toml changes detected. Nothing to audit."
     exit 0
   fi
 fi
