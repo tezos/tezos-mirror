@@ -1849,16 +1849,14 @@ release_site.build_tezt:
     when: on_success
 
 release_site.tezt:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - release_site.build
   - release_site.build_tezt
   dependencies:
-  - oc.docker:ci:amd64
   - release_site.build
   - release_site.build_tezt
   timeout: 40 minutes
@@ -2086,18 +2084,16 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 tezt:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
@@ -2150,18 +2146,16 @@ tezt:
   parallel: 34
 
 tezt-extra:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
@@ -2213,18 +2207,16 @@ tezt-extra:
   retry: 2
 
 tezt-flaky:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
@@ -2278,18 +2270,16 @@ tezt-flaky:
   parallel: 2
 
 tezt-riscv-slow:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
@@ -2341,18 +2331,16 @@ tezt-riscv-slow:
   retry: 2
 
 tezt-slow:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
@@ -2405,18 +2393,16 @@ tezt-slow:
   parallel: 12
 
 tezt-static-binaries:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-x86_64-linux-experimental-binaries
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-x86_64-linux-experimental-binaries
   - oc.build_x86_64-extra-dev
@@ -2469,18 +2455,16 @@ tezt-static-binaries:
     when: always
 
 tezt-time-sensitive:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev

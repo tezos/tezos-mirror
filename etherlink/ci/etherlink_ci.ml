@@ -188,7 +188,7 @@ let job_lint_solidity_artifacts =
     ~__POS__
     ~stage:Test
     ~description:"Check committed bytecode are up to date."
-    ~image:Images.CI.e2etest
+    ~image:Images.Base_images.alpine_e2etest
     ~only_if_changed:
       [
         "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";

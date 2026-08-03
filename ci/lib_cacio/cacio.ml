@@ -1377,7 +1377,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ~cpu
       ?storage
       ?tag
-      ~image:Tezos_ci.Images.CI.e2etest
+      ~image:Tezos_ci.Images.Base_images.alpine_e2etest
       ?only_if_changed
       ~needs
       ?parallel:
