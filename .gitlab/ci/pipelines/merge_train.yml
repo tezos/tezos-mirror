@@ -3239,6 +3239,8 @@ oc.docker:amd64:
     - docker-bake.hcl
     - scripts/ci/docker_release.sh
     - scripts/create_docker_image.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     when: on_success
   needs: []
   dependencies: []
@@ -3283,6 +3285,8 @@ oc.docker:arm64:
     - docker-bake.hcl
     - scripts/ci/docker_release.sh
     - scripts/create_docker_image.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     when: on_success
   needs: []
   dependencies: []

@@ -39,6 +39,8 @@ COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
+# Used by [make build-deps] below (install_build_deps.sh calls its .rust.sh).
+COPY --chown=tezos:nogroup scripts/install_build_deps.sh scripts/install_build_deps.rust.sh tezos/scripts/
 
 # Group 2: script inputs (change rarely)
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
@@ -91,6 +93,12 @@ ARG CARGO_INCREMENTAL="0"
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
+# The [build-deps] target reconciles the opam dependencies with this commit's
+# lockfiles on top of the deps baked into the alpine-build base image, so the
+# build never links stale dependencies. It is a near no-op on a fresh base
+# and installs only the delta when the base has drifted. Kept in the [release]
+# RUN rather than a separate one: with no layer cache a separate layer would
+# buy nothing.
 # hadolint ignore=DL3059
 RUN --network=host \
     if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
@@ -103,7 +111,7 @@ RUN --network=host \
     else \
       echo "### sccache disabled (no bucket configured)"; \
     fi && \
-    opam exec -- make -C tezos release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin && \
+    opam exec -- make -C tezos build-deps release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin && \
     if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
       echo "### sccache stats:"; \
       sccache --show-stats || true; \

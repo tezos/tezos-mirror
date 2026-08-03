@@ -4217,6 +4217,8 @@ oc.docker:amd64:
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/version.sh
     when: on_success
   needs:
@@ -4273,6 +4275,8 @@ oc.docker:arm64:
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/version.sh
     when: on_success
   needs:

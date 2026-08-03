@@ -50,6 +50,9 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
         (* The job runs this script, which in turn calls create_docker_image.sh. *)
         "scripts/ci/docker_release.sh";
         "scripts/create_docker_image.sh";
+        (* build.Dockerfile COPYs and runs these via [make build-deps]. *)
+        "scripts/install_build_deps.sh";
+        "scripts/install_build_deps.rust.sh";
       ]
     ~allow_failure:No
     ~retry:Tezos_ci.dind_retry
