@@ -1,78 +1,71 @@
 # Changelog
 
-## Unreleased
+## Version 0.8 (92258d046043a2ceed7a6400687a1bfa28893096)
 
 ### EVM Runtime
 
-- Sequencer key changes via the `change_sequencer_key` precompile are now
-  replay-protected: the signature covers the new key bound to the chain id and a
-  monotonic change counter, so captured calldata is single-use and cannot be
-  replayed to indefinitely postpone a pending change's activation. The counter
-  advances by exactly one per change — at scheduling time for a precompile
-  change, at activation time for a governance change — and is exposed to the
-  next signer. (!22504)
-- The `change_sequencer_key` precompile no longer treats a signature check
-  returning `Ok(false)` as success, so a syntactically valid but incorrect
-  signature can no longer authorize a key rotation. (!22510)
-- Fixed sequencer key storage corruption: writing a shorter sequencer key left
-  trailing bytes of the previous, longer key in storage. The stored key is now
-  fully overwritten and truncated to its exact length. (!22510)
 - Changing the sequencer key, via the `change_sequencer_key` precompile or a
   governance sequencer upgrade, rejects public keys that are not valid curve
   points. (!22502)
-- Fixed a blueprint chunk DoS: a blueprint chunk whose RLP `number` field was
-  longer than 32 bytes panicked the kernel during RLP decode, before the
-  signature was checked. Any L1 account could send such a chunk with no
-  sequencer key and no valid signature, trapping the rollup node. Oversized
-  U256 fields are now rejected with a clean decode error. (!22510)
+- Supported tracers (`structLogger` and `callTracer`) are now compatible with
+  ingoing and outgoing cross-runtime calls. (!22508 !22509 !22511 !22516 !22518
+  !22519 !22520 !22523 !22545 !22539 !22551 !22552 !22553 !22567 !22568 !22595
+  !22588 !22560 !22581 !22609)
+- Removed the `CrossRuntimeCallIdEvent` event that was injected as the first
+  event of any EVM transaction incoming or outgoing cross-runtine calls. It was
+  redundant with the `CrossRuntimeCallSent` and `CrossRuntimeCallReceived`
+  events. (!22620)
+- Fixed attribution inconsistencies for logs emitted by our custom precompiles.
+  (!22562)
 
 ### Michelson Runtime
 
-- **Security fix:** big-map keys and values are no longer deep-cloned when
-  a big map is persisted or freed — applying its deferred updates, dumping
-  it to durable storage, or dropping it (an OOM-crash vector); entries are
-  now held behind their shared pointers. (!22642)
-- **Security fix:** the returned storage is no longer deep-cloned during
+- Enable the Michelson runtime for all network migrating from a pre-existing
+  kernel. (!22637)
+- Big-map keys and values are no longer deep-cloned when a big map is persisted
+  or freed — applying its deferred updates, dumping it to durable storage, or
+  dropping it (an OOM-crash vector); entries are now held behind their shared
+  pointers. (!22642)
+- The returned storage is no longer deep-cloned during
   end-of-execution finalization when it is `DUP`-shared with an outgoing
   operation (an OOM-crash vector); it is now handed on behind its shared
   pointer. (!22636)
-- **Security fix:** `SLICE` no longer under-charges for the buffer it
-  allocates on a large `string`/`bytes` (an OOM-crash vector); its gas
-  cost is now floored by the allocation cost. (!22640)
-- **Security fix:** the two-operand overloads of `CONCAT` (string and
-  bytes) no longer deep-clone a `DUP`-shared operand (an OOM-crash
-  vector); the operands are now read borrowed. (!22594)
-- **Security fix:** `UPDATE n` no longer deep-clones the new field value
-  when it is `DUP`-shared (an OOM-crash vector); the value is now stored
-  in the field behind its shared pointer. (!22590)
-- **Security fix:** the instructions that only forward a value without
-  reading it no longer deep-clone that value when it is `DUP`-shared
-  (an OOM-crash vector); it is now forwarded behind its shared
-  pointer. (!22585)
-- **Bug fix:** an operation whose internal-operation subtree failed is no longer
-  reported `applied` because the last internal receipt happens to be applied. An
+- `SLICE` no longer under-charges for the buffer it allocates on a large
+  `string`/`bytes` (an OOM-crash vector); its gas cost is now floored by the
+  allocation cost. (!22640)
+- The two-operand overloads of `CONCAT` (string and bytes) no longer deep-clone
+  a `DUP`-shared operand (an OOM-crash vector); the operands are now read
+  borrowed. (!22594)
+- `UPDATE n` no longer deep-clones the new field value when it is `DUP`-shared
+  (an OOM-crash vector); the value is now stored in the field behind its shared
+  pointer. (!22590)
+- The instructions that only forward a value without reading it no longer
+  deep-clone that value when it is `DUP`-shared (an OOM-crash vector); it is
+  now forwarded behind its shared pointer. (!22585)
+- An operation whose internal-operation subtree failed is no longer reported
+  `applied` because the last internal receipt happens to be applied. An
   internal operation that raises — an unsupported `SET_DELEGATE`, or an
   out-of-gas on the per-operation cost — produces no receipt of its own, so a
   contract emitting `[EMIT ; SET_DELEGATE]` used to have its state committed
   under a failed receipt, with the storage its callee wrote left uncharged.
   (!22608)
-- **Bug fix:** inter-contract internal-operation processing is now iterative (an
-  explicit heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call
-  chain is bounded by gas rather than by the kernel stack, so a contract
-  emitting a deep self-referential transfer chain no longer overflows the fast
-  executor's stack and diverges from the reference PVM. (!22608)
-- **Security fix:** the instructions that only read a bytes operand no
-  longer deep-clone it when it is `DUP`-shared (an OOM-crash vector);
-  the operand is now read borrowed. (!22580)
+- Inter-contract internal-operation processing is now iterative (an explicit
+  heap worklist) instead of recursive. A deep `TRANSFER_TOKENS` call chain is
+  bounded by gas rather than by the kernel stack, so a contract emitting a deep
+  self-referential transfer chain no longer overflows the fast executor's stack
+  and diverges from the reference PVM. (!22608)
+- The instructions that only read a bytes operand no longer deep-clone it when
+  it is `DUP`-shared (an OOM-crash vector); the operand is now read borrowed.
+  (!22580)
 - The EVM node's Michelson runtime now embeds Tezos protocol U025 (Ushuai)
   instead of T024 (Tallinn, now frozen) as its current protocol, and decodes
   and serves U025-tagged blocks. ML-DSA (Mldsa44) keys, added by the protocol
   environment bump, are rejected during operation validation as they are not
   supported by the kernel. (!22598)
-- **Bug fix:** `EXEC` of a lambda with a deeply nested body no longer
-  overflows the native stack, and no longer costs `O(D²)` work for `O(D)` gas.
-  The runtime body is walked borrowed from a keep-alive arena instead of
-  deep-cloning each opened sub-block. (!22444)
+- `EXEC` of a lambda with a deeply nested body no longer overflows the native
+  stack, and no longer costs `O(D²)` work for `O(D)` gas. The runtime body is
+  walked borrowed from a keep-alive arena instead of deep-cloning each opened
+  sub-block. (!22444)
 - Elaboration now collapses singleton sequences (`{ x }` elaborates as `x`),
   mirroring L1's `script_ir_translator`. A body wrapped in a chain of singleton
   braces `{{{…x…}}}` therefore no longer survives typechecking as an `O(depth)`
@@ -87,33 +80,26 @@
 - The Michelson runtime charges substantially more gas to typecheck `key` and
   `signature` literals, reflecting the actual decode and curve point-validation
   cost (benchmarked on the MIR interpreter). (!22503)
-- **Bug fix:** `PACK` no longer deep-copies the value it serializes. The value
-  is only read to produce its serialization, so it is now read through the
-  shared `Rc` it already lives behind on the stack; a large shared value (e.g.
-  duplicated with `DUP`) could otherwise be copied into a second full allocation
-  and trap the kernel on the 4 GiB wasm heap. The copy is now gas-charged, so an
-  oversized value runs out of gas first. (!22587)
-- **Bug fix:** `FAILWITH` no longer deep-copies its failure value. The value is
-  only carried in the error for reporting, so it is now held behind the shared
-  `Rc` it already lives behind on the stack; a large shared value (e.g.
-  duplicated with `DUP`) could otherwise be copied into a second full allocation
-  and push the interpreter past the 4 GiB wasm heap, trapping the kernel before
-  it runs out of gas. (!22582)
-- Expose the address registry through a read-only RPC, `GET
-  .../context/destination/<address>/index`, mirroring L1's
-  `Destination_services.index` (same URL shape and `N`/`null` response). It
-  returns the index assigned to the address by the `INDEX_ADDRESS` opcode, or
-  `null` when the address was never indexed. Destinations cover implicit
-  accounts, originated contracts and smart rollups. (!22621)
-
-### Native Atomic Composability
-
-### Storage versions
+- `PACK` no longer deep-copies the value it serializes. The value is only read
+  to produce its serialization, so it is now read through the shared `Rc` it
+  already lives behind on the stack; a large shared value (e.g. duplicated with
+  `DUP`) could otherwise be copied into a second full allocation and trap the
+  kernel on the 4 GiB wasm heap. The copy is now gas-charged, so an oversized
+  value runs out of gas first. (!22587)
+- `FAILWITH` no longer deep-copies its failure value. The value is only carried
+  in the error for reporting, so it is now held behind the shared `Rc` it
+  already lives behind on the stack; a large shared value (e.g. duplicated with
+  `DUP`) could otherwise be copied into a second full allocation and push the
+  interpreter past the 4 GiB wasm heap, trapping the kernel before it runs out
+  of gas. (!22582)
+- Smart contract addresses are now generated from the same seed whether they
+  are originated from a pure Michelson transaction or from a cross-runtime
+  call, matching the Tezos L1 semantics. (!22619)
 
 ### Internals
 
-- The kernel is now instrumented to panic when reaching a call stack depth of
-  2,000. (!22447)
+- The kernel is now instrumented to model its stack usage, and panic when it
+  allocates too much. (!22447 !22628)
 
 ## Version 0.7 (22592cfa94eb19a2c8b114190533828791956ae5)
 
