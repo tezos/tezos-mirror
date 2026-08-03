@@ -199,7 +199,7 @@ pub struct BlockCtx<'block> {
     pub http_trace_enabled: bool,
 }
 
-fn address_from_contract(contract: Contract) -> AddressHash {
+pub fn address_from_contract(contract: Contract) -> AddressHash {
     match contract {
         Contract::Originated(kt1) => AddressHash::Kt1(kt1),
         Contract::Implicit(hash) => AddressHash::Implicit(hash),
