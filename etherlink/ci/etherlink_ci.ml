@@ -351,7 +351,7 @@ let job_mir_tzt =
     "mir_tzt"
     ~__POS__
     ~description:"Run MIR's tzt_runner on the tzt reference test suite."
-    ~image:Images.CI.test
+    ~image:Images.Base_images.alpine_test
     ~stage:Test
     ~only_if_changed:Files.(mir @ tzt)
     ~cargo_cache:true

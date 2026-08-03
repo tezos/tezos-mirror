@@ -1421,6 +1421,8 @@ module Base_images = struct
   let alpine_prebuild = mk_alpine_ci_img "prebuild"
 
   let alpine_build = mk_alpine_ci_img "build"
+
+  let alpine_test = mk_alpine_ci_img "test"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []

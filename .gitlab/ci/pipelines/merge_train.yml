@@ -364,7 +364,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:arm64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp_arm64
@@ -372,10 +372,8 @@ de.unit:arm64:
   - changes:
     - data-encoding/**
     when: on_success
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -390,7 +388,7 @@ de.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:x86_64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -398,10 +396,8 @@ de.unit:x86_64:
   - changes:
     - data-encoding/**
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -441,7 +437,7 @@ docker:hadolint:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.build_all:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -466,12 +462,10 @@ documentation.build_all:
     - vendors/**/*.ml*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
   - documentation.odoc
   - documentation.manuals
   - documentation.docgen
   dependencies:
-  - oc.docker:ci:amd64
   - documentation.odoc
   - documentation.manuals
   - documentation.docgen
@@ -496,7 +490,7 @@ documentation.build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation.docgen:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -520,10 +514,8 @@ documentation.docgen:
     - tezt/**/*.ml*
     - vendors/**/*.ml*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -591,7 +583,7 @@ documentation.install_python_trixie:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.manuals:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -616,11 +608,9 @@ documentation.manuals:
     - vendors/**/*.ml*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   timeout: 60 minutes
@@ -645,7 +635,7 @@ documentation.manuals:
     - docs/user/node-config.json
 
 documentation.odoc:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -669,10 +659,8 @@ documentation.odoc:
     - tezt/**/*.ml*
     - vendors/**/*.ml*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -710,7 +698,7 @@ documentation.odoc:
     when: always
 
 documentation.rst-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -986,7 +974,7 @@ etherlink.mir_no_tickets:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_tzt:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -998,10 +986,8 @@ etherlink.mir_tzt:
     - etherlink/kernel_latest/mir/**/Cargo.lock
     - tzt_reference_test_suite/**/*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -3331,39 +3317,6 @@ oc.docker:ci:amd64:
     - script_failure
     - runner_system_failure
 
-oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp_arm64
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: arm64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
 oc.install_bin_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-73a6a3d6
   stage: publishing_tests
@@ -3565,7 +3518,7 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.misc_checks:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -3643,7 +3596,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 oc.python_check:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -3653,10 +3606,8 @@ oc.python_check:
     - poetry.lock
     - pyproject.toml
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -3673,7 +3624,7 @@ oc.python_check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script:b58_prefix:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -3682,10 +3633,8 @@ oc.script:b58_prefix:
     - scripts/b58_prefix/b58_prefix.py
     - scripts/b58_prefix/test_b58_prefix.py
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -3945,7 +3894,7 @@ oc.test_keyring_debian:
       - trixie
 
 oc.unit:non-proto-arm64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp_arm64
@@ -3974,10 +3923,8 @@ oc.unit:non-proto-arm64:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:arm64
   - oc.build_kernels
   dependencies:
-  - oc.docker:ci:arm64
   - oc.build_kernels
   timeout: 20 minutes
   cache:
@@ -4023,7 +3970,7 @@ oc.unit:non-proto-arm64:
   parallel: 2
 
 oc.unit:non-proto-x86_64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4052,10 +3999,8 @@ oc.unit:non-proto-x86_64:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_kernels
   timeout: 60 minutes
   cache:
@@ -4332,7 +4277,7 @@ oc.unit:protocol_compiles:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.unit:webassembly-x86_64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4360,10 +4305,8 @@ oc.unit:webassembly-x86_64:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 20 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -4647,7 +4590,7 @@ release_site.tezt:
     when: always
 
 resto.unit:arm64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp_arm64
@@ -4655,10 +4598,8 @@ resto.unit:arm64:
   - changes:
     - resto/**
     when: on_success
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 10 minutes
   interruptible: true
   before_script:
@@ -4673,7 +4614,7 @@ resto.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 resto.unit:x86_64:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4681,10 +4622,8 @@ resto.unit:x86_64:
   - changes:
     - resto/**
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 10 minutes
   interruptible: true
   before_script:

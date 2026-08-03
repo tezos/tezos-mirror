@@ -282,14 +282,12 @@ etherlink.mir_no_tickets:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_tzt:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG

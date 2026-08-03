@@ -502,6 +502,8 @@ module Images : sig
     val alpine_prebuild : Image.t
 
     val alpine_build : Image.t
+
+    val alpine_test : Image.t
   end
 end
 

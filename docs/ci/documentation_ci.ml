@@ -52,7 +52,7 @@ let job_rst_check =
   CI.job
     "rst-check"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test_master
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~description:"Check ReStructured Text files."
     ~only_if_changed:Files.rst
@@ -99,7 +99,7 @@ let job_odoc =
   CI.job
     "odoc"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Build
     ~description:
       ("Build the documentation of our OCaml libraries (make -C docs " ^ target
@@ -121,7 +121,7 @@ let job_manuals =
   CI.job
     "manuals"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Build
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
@@ -149,7 +149,7 @@ let job_docgen =
   CI.job
     "docgen"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Build
     ~description:
       "Build various generated reference material. This includes the RPC, P2P \
@@ -176,7 +176,7 @@ let job_build_all =
   CI.job
     "build_all"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Build
     ~description:"Build the RSTs. Include material from previous build jobs."
     ~only_if_changed:Files.odoc
@@ -206,7 +206,7 @@ let job_linkcheck =
   CI.job
     "linkcheck"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~description:"Check links in the documentation."
     ~only_if_changed:Files.odoc
@@ -231,7 +231,7 @@ let job_publish =
   CI.job
     "publish"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Publish
     ~description:"Publish the documentation to octez.com/docs."
     ~needs:[(Artifacts, job_build_all `full)]

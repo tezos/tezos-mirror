@@ -47,7 +47,7 @@ let job_python_check =
     ~description:
       "Run Python checks (environment in sync. with the image, lint, \
        typecheck)."
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~only_if_changed:["poetry.lock"; "pyproject.toml"; "**/*.py"]
     ~script:
       [
@@ -125,7 +125,7 @@ let job_script_b58_prefix =
     ~__POS__
     ~stage:Test
     ~description:""
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~only_if_changed:
       [
         "scripts/b58_prefix/b58_prefix.py";
@@ -207,7 +207,7 @@ let job_resto_unit =
     ~description:"Run unit tests for resto."
     ~arch
     ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~timeout:(Minutes 10)
     ~only_if_changed:["resto/**"]
@@ -222,7 +222,7 @@ let job_de_unit =
     ~description:"Run unit tests for data-encoding."
     ~arch
     ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~only_if_changed:["data-encoding/**"]
     ~script:["eval $(opam env)"; "dune runtest data-encoding"]
@@ -254,7 +254,7 @@ let job_oc_unit_webassembly_x86_64 =
     ~__POS__
     ~description:"Run the tests for WASM."
     ~arch:Amd64 (* The wasm tests are written in Python *)
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~cargo_cache:true
     ~stage:Test
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
@@ -287,7 +287,7 @@ let job_oc_unit_non_proto_x86_64 =
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Amd64
     ~needs:[(Cacio.Artifacts, Kernels.job_build_kernels)]
@@ -314,7 +314,7 @@ let job_oc_unit_non_proto_arm64 =
     ~retry:Tezos_ci.retry_twice
     ~parallel:(Vector 2)
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Tezos_ci.Images.Base_images.alpine_test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Arm64
     ~storage:Ramfs

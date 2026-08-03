@@ -100,7 +100,7 @@ let job_oc_misc_checks =
       "Perform miscellaneous checks: lint, check WASM PVM regressions, check \
        EVM store migrations, check rollup node SQL migrations, check DAL store \
        migrations, check licences."
-    ~image:Tezos_ci.Images.CI.test_master
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~only_if_changed:
       [
