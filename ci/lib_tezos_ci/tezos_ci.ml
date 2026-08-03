@@ -1416,6 +1416,8 @@ module Base_images = struct
 
   let alpine_runtime = mk_alpine_ci_img "runtime"
 
+  let alpine_monitoring = mk_alpine_ci_img "monitoring"
+
   let alpine_build = mk_alpine_ci_img "build"
 end
 

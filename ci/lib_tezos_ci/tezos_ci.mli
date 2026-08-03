@@ -497,6 +497,8 @@ module Images : sig
 
     val alpine_runtime : Image.t
 
+    val alpine_monitoring : Image.t
+
     val alpine_build : Image.t
   end
 end
