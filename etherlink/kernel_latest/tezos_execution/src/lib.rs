@@ -3410,7 +3410,7 @@ mod tests {
     mod run_code {
         use crate::gas::TezlinkOperationGas;
         use crate::{run_code, RunCodeError, RunCodeParams};
-        use mir::ast::{Entrypoint, Micheline};
+        use mir::ast::{AddressHash, Entrypoint, Micheline};
         use mir::gas::Gas;
         use mir::parser::Parser;
         use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
@@ -3422,6 +3422,10 @@ mod tests {
         use tezosx_journal::TezosXJournal;
 
         const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
+        const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
+        const TZ1: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+        /// L1's `Implicit_account_repr.zero`, the default `SOURCE`.
+        const TZ1_NULL: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
 
         fn encode(micheline: Micheline<'_>) -> Vec<u8> {
             micheline
@@ -3436,6 +3440,7 @@ mod tests {
             script: Vec<u8>,
             storage: Vec<u8>,
             input: Vec<u8>,
+            sender: Option<AddressHash>,
             payer: Option<mir::ast::PublicKeyHash>,
         ) -> RunCodeParams {
             RunCodeParams {
@@ -3444,7 +3449,7 @@ mod tests {
                 input,
                 entrypoint: Entrypoint::default(),
                 self_address: ContractKt1Hash::from_b58check(KT1).expect("valid KT1"),
-                sender: None,
+                sender,
                 payer,
                 amount: 0,
                 balance: Some(0),
@@ -3489,9 +3494,73 @@ mod tests {
             let parser = Parser::new();
             let (script, storage, input) = incr_fixture(&parser);
 
-            let result = run(&params(script, storage, input, None)).expect("it runs");
+            let result =
+                run(&params(script, storage, input, None, None)).expect("it runs");
 
             assert_eq!(result, encode(parser.parse("42").expect("parses")));
+        }
+
+        /// L1 resolves `sender` and `payer` together: a `payer` given
+        /// without a `sender` is the sender too, and `SENDER` falls back to
+        /// `self` only when neither is given. Defaulting it to `self`
+        /// unconditionally — as this entrypoint first did — stores `False`.
+        #[test]
+        fn sender_falls_back_to_payer() {
+            let parser = Parser::new();
+            // `parse_top_level` borrows the source for as long as the
+            // parser, so a `format!` temporary would not live long enough.
+            let source = format!(
+                "parameter unit; storage bool; \
+                 code {{ DROP; SENDER; PUSH address \"{TZ1}\"; \
+                 COMPARE; EQ; NIL operation; PAIR }}"
+            );
+            let script =
+                encode(parser.parse_top_level(&source).expect("the script parses"));
+            let storage = encode(parser.parse("False").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let payer = match AddressHash::try_from(TZ1).expect("valid tz1") {
+                AddressHash::Implicit(pkh) => pkh,
+                other => panic!("expected an implicit account, got {other:?}"),
+            };
+
+            let result =
+                run(&params(script, storage, input, None, Some(payer))).expect("it runs");
+
+            assert_eq!(
+                result,
+                encode(parser.parse("True").expect("parses")),
+                "`SENDER` should be the payer, not `self`"
+            );
+        }
+
+        /// The other half of the pair: a `sender` given without a `payer`
+        /// is used verbatim and leaves `SOURCE` on its own default.
+        #[test]
+        fn sender_without_payer_keeps_the_null_source() {
+            let parser = Parser::new();
+            let source = format!(
+                "parameter unit; storage bool; \
+                 code {{ DROP; \
+                 SENDER; PUSH address \"{KT1_SENDER}\"; COMPARE; EQ; \
+                 SOURCE; PUSH address \"{TZ1_NULL}\"; COMPARE; EQ; \
+                 AND; NIL operation; PAIR }}"
+            );
+            let script =
+                encode(parser.parse_top_level(&source).expect("the script parses"));
+            let storage = encode(parser.parse("False").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let sender = AddressHash::try_from(KT1_SENDER).expect("valid KT1");
+
+            let result = run(&params(script, storage, input, Some(sender), None))
+                .expect("it runs");
+
+            assert_eq!(
+                result,
+                encode(parser.parse("True").expect("parses")),
+                "`SENDER` should be the given address and `SOURCE` the null tz1"
+            );
         }
     }
 
