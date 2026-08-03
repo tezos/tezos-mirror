@@ -3562,6 +3562,36 @@ mod tests {
                 "`SENDER` should be the given address and `SOURCE` the null tz1"
             );
         }
+
+        /// A `FAILWITH` is the caller's script failing, not the host
+        /// failing. The node keys on that distinction: the host kind is a
+        /// transient error clients may retry, this one is permanent.
+        #[test]
+        fn failwith_is_an_execution_error() {
+            let parser = Parser::new();
+            let script = encode(
+                parser
+                    .parse_top_level(
+                        "parameter unit; storage unit; \
+                         code { DROP; PUSH string \"boom\"; FAILWITH }",
+                    )
+                    .expect("the script parses"),
+            );
+            let storage = encode(parser.parse("Unit").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let err = run(&params(script, storage, input, None, None))
+                .expect_err("the script fails");
+
+            assert!(
+                matches!(err, RunCodeError::Execution(_)),
+                "a FAILWITH is not a host failure: {err:?}"
+            );
+            assert!(
+                err.to_string().contains("boom"),
+                "the failure value should survive into the message: {err}"
+            );
+        }
     }
 
     /// Test-only SafeStorage roots matching [`test_root`], so the inner
