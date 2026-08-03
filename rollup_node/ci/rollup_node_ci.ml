@@ -69,7 +69,7 @@ let job_build_static_binaries =
     ~arch
     ?cpu:(if arch = Amd64 then Some Very_high else None)
     ?storage:(if arch = Arm64 then Some Ramfs else None)
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~variables:
       [
         ("ARCH", arch_string);

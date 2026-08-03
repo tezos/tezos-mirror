@@ -20,7 +20,7 @@ let job_check_lift_limits_patch =
     ~stage:Test
     ~description:
       "Check that src/bin_tps_evaluation/lift_limits.patch still applies."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~only_if_changed:
       [
         "src/bin_tps_evaluation/lift_limits.patch";
@@ -63,7 +63,7 @@ let job_integration_compiler_rejections =
     ~__POS__
     ~stage:Test
     ~description:"Run the tests defined under dune alias @runtest_rejections."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -80,7 +80,7 @@ let job_script_test_gen_genesis =
     ~__POS__
     ~stage:Test
     ~description:"Check that scripts/gen-genesis/gen_genesis.exe still builds."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cargo_cache:true
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     ~script:
@@ -96,7 +96,7 @@ let job_script_snapshot_alpha_and_link =
     ~stage:Test
     ~description:
       "Test that Alpha can be snapshotted using snapshot_alpha_and_link.sh."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
     ~only_if_changed:
@@ -146,7 +146,7 @@ let job_test_liquidity_baking_scripts =
     ~__POS__
     ~stage:Test
     ~description:"Test the liquidity baking scripts."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~needs:
       [
         (Artifacts, Build.job_build_released Amd64);
@@ -172,7 +172,7 @@ let job_oc_script_test_release_versions =
     ~__POS__
     ~stage:Test
     ~description:"Test how src/lib_version parses Git tags."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~only_if_changed:
       ["scripts/test_octez_release_version.sh"; "src/lib_version/**/*"]
     ~script:
@@ -236,7 +236,7 @@ let job_oc_unit_protocol_compiles =
        octez-protocol-compiler."
     ~arch:Amd64
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~cargo_cache:true
@@ -353,7 +353,7 @@ let job_oc_unit_proto_x86_64 =
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~arch:Amd64
     ~cpu:Very_high
     ~variables:[("DUNE_ARGS", "-j 12")]
@@ -373,7 +373,7 @@ let job_oc_unit_other_x86_64 =
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~arch:Amd64
     ~cpu:High
     ~variables:[("DUNE_ARGS", "-j 12")]
@@ -390,7 +390,7 @@ let job_ocaml_check =
     ~__POS__
     ~description:"Typecheck all OCaml code with 'dune build @check'."
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
     ~only_if_changed:
       ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"]

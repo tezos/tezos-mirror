@@ -130,7 +130,7 @@ let job_build_evm_node_static =
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
@@ -170,7 +170,7 @@ let job_lint_wasm_runtime =
     ~__POS__
     ~stage:Test
     ~description:"Run the linter on lib_wasm_runtime."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~only_if_changed:Files.lib_wasm_runtime_rust
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -271,7 +271,7 @@ let job_unit_tests =
     ~__POS__
     ~stage:Test
     ~description:"Etherlink unit tests."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~cpu:Runner.CPU.Very_high
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
@@ -397,7 +397,7 @@ let job_build_tezt =
     ~__POS__
     ~stage:Build
     ~description:"Build the Etherlink Tezt executable."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"etherlink_tezt_exe"

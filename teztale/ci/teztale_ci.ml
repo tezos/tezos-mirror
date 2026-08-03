@@ -20,7 +20,7 @@ let job_build =
     ~__POS__
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:(match mode with `test -> Test | `release -> Build)
     ~description:"Build Teztale."
     ~artifacts:

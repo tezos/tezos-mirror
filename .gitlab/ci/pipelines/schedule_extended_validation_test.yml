@@ -84,14 +84,12 @@ oc.build_kernels:
     when: on_success
 
 oc.build_x86_64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -149,14 +147,12 @@ oc.build_x86_64-exp:
     when: on_success
 
 oc.build_x86_64-extra-dev:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -215,14 +211,12 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG

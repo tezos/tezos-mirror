@@ -53,14 +53,12 @@ audit_riscv_deps:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 build-layer1-profiling:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -115,14 +113,12 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 build_octez_source:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -405,14 +401,12 @@ npm_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build:static-arm64-linux-experimental-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -452,14 +446,12 @@ oc.build:static-arm64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -498,14 +490,12 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-experimental-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -545,14 +535,12 @@ oc.build:static-x86_64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -591,14 +579,12 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_arm64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -647,14 +633,12 @@ oc.build_arm64-exp:
     when: on_success
 
 oc.build_arm64-extra-dev:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -703,14 +687,12 @@ oc.build_arm64-extra-dev:
     when: on_success
 
 oc.build_arm64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -816,14 +798,12 @@ oc.build_kernels:
     when: on_success
 
 oc.build_x86_64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -881,14 +861,12 @@ oc.build_x86_64-exp:
     when: on_success
 
 oc.build_x86_64-extra-dev:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -947,14 +925,12 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1006,14 +982,12 @@ oc.build_x86_64-released:
     when: on_success
 
 oc.check_lift_limits_patch:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1217,14 +1191,12 @@ oc.docker:ci:arm64:
     - runner_system_failure
 
 oc.integration:compiler-rejections:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1284,7 +1256,7 @@ oc.misc_checks:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.ocaml_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/build:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -1367,14 +1339,12 @@ oc.script:b58_prefix:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script:snapshot_alpha_and_link:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1409,14 +1379,12 @@ oc.script:snapshot_alpha_and_link:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:test-gen-genesis:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1440,14 +1408,12 @@ oc.script:test-gen-genesis:
     CARGO_NET_OFFLINE: "false"
 
 oc.script:test_octez_release_versions:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -1485,17 +1451,15 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.test-liquidity-baking-scripts:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
@@ -1629,14 +1593,12 @@ oc.unit:non-proto-x86_64:
   retry: 2
 
 oc.unit:other-x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1688,14 +1650,12 @@ oc.unit:other-x86_64:
   retry: 2
 
 oc.unit:proto-x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1747,14 +1707,12 @@ oc.unit:proto-x86_64:
   retry: 2
 
 oc.unit:protocol_compiles:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1838,14 +1796,12 @@ oc:scripts:release_script_values:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 ocaml-check:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: test
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: dune_cache-$CI_JOB_NAME_SLUG
@@ -2044,7 +2000,7 @@ resto.unit:x86_64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sanity_ci:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/build:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: sanity
   tags:
   - gcp
