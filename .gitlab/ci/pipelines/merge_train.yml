@@ -3,7 +3,6 @@
 
 stages:
 - start
-- images
 - sanity
 - build
 - test
@@ -3280,39 +3279,6 @@ oc.docker:arm64:
     - script_failure
     - runner_system_failure
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
 oc.install_bin_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-73a6a3d6
   stage: publishing_tests
@@ -4448,7 +4414,7 @@ ocaml-check:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 release_site.build:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -4456,10 +4422,8 @@ release_site.build:
   - changes:
     - release_site/**/*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -4481,7 +4445,7 @@ release_site.build:
     when: on_success
 
 release_site.build_tezt:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -4489,10 +4453,8 @@ release_site.build_tezt:
   - changes:
     - release_site/**/*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:

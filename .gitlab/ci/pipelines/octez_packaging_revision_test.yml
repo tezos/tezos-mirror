@@ -3,7 +3,6 @@
 
 stages:
 - start
-- images
 - build
 - publish
 
@@ -507,39 +506,6 @@ oc.docker:arm64:
     - script_failure
     - runner_system_failure
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
 oc.docker:promote_revision_to_version:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
   stage: publish
@@ -572,7 +538,7 @@ oc.docker:promote_revision_to_version:
   retry: 0
 
 release_page.deploy-assets-packaging-revision:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp
@@ -580,11 +546,9 @@ release_page.deploy-assets-packaging-revision:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
@@ -608,15 +572,13 @@ release_page.deploy-assets-packaging-revision:
   retry: 0
 
 release_page.publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - release_page.deploy-assets-packaging-revision
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:

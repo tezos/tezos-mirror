@@ -195,7 +195,7 @@ let job_deploy_release_page_assets =
   CI.job
     "release_page.deploy-assets"
     ~__POS__
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
@@ -219,7 +219,7 @@ let job_deploy_release_page_assets_packaging_revision =
   CI.job
     "release_page.deploy-assets-packaging-revision"
     ~__POS__
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
@@ -248,7 +248,7 @@ let job_release_page =
   CI.job
     "release_page.publish"
     ~__POS__
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:

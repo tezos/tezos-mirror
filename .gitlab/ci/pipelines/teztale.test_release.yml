@@ -3,7 +3,6 @@
 
 stages:
 - start
-- images
 - build
 - publish
 
@@ -28,39 +27,6 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
 
 teztale.build-arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
@@ -183,7 +149,7 @@ teztale.gitlab_release:
   retry: 0
 
 teztale.release-page-deploy-assets:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -191,11 +157,9 @@ teztale.release-page-deploy-assets:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   dependencies:
-  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   timeout: 60 minutes
@@ -219,15 +183,13 @@ teztale.release-page-deploy-assets:
   retry: 0
 
 teztale.release-page-publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - teztale.release-page-deploy-assets
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
