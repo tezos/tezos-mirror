@@ -272,7 +272,7 @@ let job_dispatch_call =
   CI.job
     "dispatch-call"
     ~__POS__
-    ~image:Images.CI.prebuild
+    ~image:Images.Base_images.alpine_prebuild
     ~stage:Publish
     ~description:
       "A job release that triggers pipelines from other repositories after a \

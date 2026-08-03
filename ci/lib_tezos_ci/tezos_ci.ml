@@ -1418,6 +1418,8 @@ module Base_images = struct
 
   let alpine_monitoring = mk_alpine_ci_img "monitoring"
 
+  let alpine_prebuild = mk_alpine_ci_img "prebuild"
+
   let alpine_build = mk_alpine_ci_img "build"
 end
 

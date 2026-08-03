@@ -1595,7 +1595,7 @@ let () =
          "select_tezts"
          ~__POS__
          ~description:"Run Manifezt to select the set of Tezt tests to run."
-         ~image:Tezos_ci.Images.CI.prebuild
+         ~image:Tezos_ci.Images.Base_images.alpine_prebuild
          ~stage:Build
          ~artifacts:
            (Gitlab_ci.Util.artifacts

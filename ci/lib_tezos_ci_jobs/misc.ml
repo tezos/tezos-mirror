@@ -189,7 +189,7 @@ let job_test_release_versions =
     ~__POS__
     ~description:
       "Test the values defined in scripts/ci/octez-packages-version.sh."
-    ~image:Tezos_ci.Images.CI.prebuild
+    ~image:Tezos_ci.Images.Base_images.alpine_prebuild
     ~stage:Test
     ~only_if_changed:
       [

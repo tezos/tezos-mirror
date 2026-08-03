@@ -324,7 +324,7 @@ check_rust_fmt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 commit_titles:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/prebuild:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-73a6a3d6
   stage: sanity
   tags:
   - gcp
@@ -4478,7 +4478,7 @@ oc.upgrade_bin_debian_systemd:
       - trixie
 
 oc:scripts:release_script_values:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-73a6a3d6
   stage: test
   tags:
   - gcp
@@ -4488,10 +4488,8 @@ oc:scripts:release_script_values:
     - scripts/ci/test_release_values.sh
     - scripts/releases/octez-release.sh
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -4816,7 +4814,7 @@ sdk_bindings.test:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 select_tezts:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-73a6a3d6
   stage: build
   tags:
   - gcp
@@ -4844,10 +4842,8 @@ select_tezts:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   allow_failure:
     exit_codes: 17
   timeout: 60 minutes

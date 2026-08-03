@@ -100,16 +100,14 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 dispatch-call:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - gitlab:release
   - release_page.publish
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:

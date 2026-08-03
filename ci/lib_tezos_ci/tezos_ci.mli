@@ -499,6 +499,8 @@ module Images : sig
 
     val alpine_monitoring : Image.t
 
+    val alpine_prebuild : Image.t
+
     val alpine_build : Image.t
   end
 end

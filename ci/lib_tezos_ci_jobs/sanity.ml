@@ -194,7 +194,7 @@ let job_commit_titles =
     "commit_titles"
     ~__POS__
     ~description:"Check that commit titles match the developer guidelines."
-    ~image:Tezos_ci.Images.CI.prebuild_master
+    ~image:Tezos_ci.Images.Base_images.alpine_prebuild
     ~stage:Test
     ~force:true
     ~allow_failure:
