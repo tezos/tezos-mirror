@@ -31,7 +31,9 @@ use primitive_types::{H160, H256, U256};
 use rlp::{Rlp, RlpStream};
 use std::collections::HashMap;
 use tezos_crypto_rs::hash::OperationHash;
+use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::{
     rlp_helpers::{
         append_option_canonical, decode_field, decode_field_bool, decode_tx_hash, next,
@@ -42,6 +44,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -61,6 +64,11 @@ pub(crate) const TEZOSX_ENTRYPOINTS_INPUT_KEY: Key =
     Key::from_static(b"/tezosx_entrypoints/input");
 pub(crate) const TEZOSX_ENTRYPOINTS_RESULT_KEY: Key =
     Key::from_static(b"/tezosx_entrypoints/result");
+
+pub(crate) const TEZOSX_RUN_CODE_INPUT_KEY: Key =
+    Key::from_static(b"/tezosx_run_code/input");
+pub(crate) const TEZOSX_RUN_CODE_RESULT_KEY: Key =
+    Key::from_static(b"/tezosx_run_code/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -569,6 +577,295 @@ pub fn tezosx_michelson_entrypoints_fn<Host, R, KS>(
         }
     };
     handle_query_entrypoints_to(rk, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn tezosx_run_code() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    tezosx_run_code_fn(&mut sdk_host);
+}
+
+/// Input of the `tezosx_run_code` entrypoint. Mirrors the node's
+/// `Run_code.input_encoding` (`tezos_backend.ml`) field for field; the
+/// unit tests below pin the wire bytes. See
+/// [`tezos_execution::RunCodeParams`] for the fields' semantics.
+#[derive(NomReader)]
+#[cfg_attr(test, derive(Debug, PartialEq, BinWriter))]
+struct RunCodeInput {
+    #[encoding(dynamic, bytes)]
+    script: Vec<u8>,
+    #[encoding(dynamic, bytes)]
+    storage: Vec<u8>,
+    #[encoding(dynamic, bytes)]
+    input: Vec<u8>,
+    entrypoint: String,
+    chain_id: tezos_crypto_rs::hash::ChainId,
+    /// Must be a KT1.
+    self_address: Contract,
+    /// Mutez; must be non-negative.
+    amount: i64,
+    sender: Option<Contract>,
+    payer: Option<PublicKeyHash>,
+    /// Mutez; must be non-negative.
+    balance: Option<i64>,
+    /// Gas limit in *gas units* (as on L1), not milligas; must be
+    /// non-negative.
+    gas: Option<i64>,
+    now: Option<i64>,
+    level: Option<u32>,
+}
+
+/// Result of `tezosx_run_code`, decoded by the node's
+/// `Run_code.result_encoding`. The variant order is the union tag; an
+/// unknown tag fails the node's decoder outright, never a misclassified
+/// script failure.
+#[derive(BinWriter)]
+#[cfg_attr(test, derive(Debug, PartialEq, NomReader))]
+enum RunCodeResult {
+    /// The resulting storage, Micheline-encoded (optimized-legacy).
+    Success(RunCodeStorage),
+    /// Ill-typed input or failed execution. Deterministic: do not retry.
+    ExecutionError(String),
+    /// Durable-storage / host failure. Transient: may retry.
+    HostError(String),
+}
+
+/// A named field so it can take `#[encoding(dynamic, bytes)]`: on a
+/// tuple variant the derive accepts the attribute but ignores it, and
+/// the length prefix the node expects disappears.
+#[derive(BinWriter)]
+#[cfg_attr(test, derive(Debug, PartialEq, NomReader))]
+struct RunCodeStorage {
+    #[encoding(dynamic, bytes)]
+    storage: Vec<u8>,
+}
+
+impl From<Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>>
+    for RunCodeResult
+{
+    fn from(
+        result: Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>,
+    ) -> Self {
+        use tezos_execution::RunCodeError;
+        match result {
+            Ok(output) => Self::Success(RunCodeStorage {
+                storage: output.storage,
+            }),
+            Err(RunCodeError::Execution(msg)) => Self::ExecutionError(msg),
+            Err(RunCodeError::Host(msg)) => Self::HostError(msg),
+        }
+    }
+}
+
+/// Run an arbitrary Michelson script against the current state without
+/// originating it — the primitive behind the node's `run_script_view`.
+///
+/// [`tezos_execution::run_code`] writes as it interprets; the run is
+/// wrapped in a [`SafeStorage`](tezos_evm_runtime::safe_storage::SafeStorage)
+/// transaction that is always reverted, so
+/// the entrypoint leaves the state it was given untouched. The result is
+/// written afterwards, through the unwrapped host.
+#[allow(dead_code)]
+pub fn tezosx_run_code_fn<Host>(host: &mut Host)
+where
+    Host: StorageV1 + CoreStorage,
+{
+    let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
+        match RuntimeKeyspaces::init(host) {
+            Ok(rk) => rk,
+            Err(err) => {
+                log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+                return;
+            }
+        };
+    let result = match rk.base().get(&TEZOSX_RUN_CODE_INPUT_KEY) {
+        // Reported through the error channel rather than leaving the node
+        // to fail on an absent result key. `Host`, not `Execution`: the
+        // caller's script is not what is wrong.
+        None => RunCodeResult::HostError("run_code input not found".to_string()),
+        Some(payload) => run_code_from_input(&mut rk, &payload).into(),
+    };
+    let mut bytes = Vec::new();
+    if let Err(err) = result.bin_write(&mut bytes) {
+        log!(
+            Error,
+            "Error encoding the Tezos X run_code result: {:?}",
+            err
+        );
+        return;
+    }
+    if let Err(err) = rk.base_mut().set(&TEZOSX_RUN_CODE_RESULT_KEY, bytes) {
+        log!(
+            Error,
+            "Error writing the Tezos X run_code result: {:?}",
+            err
+        );
+    }
+}
+
+/// Validate a decoded input against the runtime's ranges, and inject the
+/// block's own `now` and `level` where the caller named none. Pure, so
+/// the boundary semantics are unit-testable without a host.
+fn run_code_params(
+    input: RunCodeInput,
+    default_now: i64,
+    default_level: u32,
+) -> Result<tezos_execution::RunCodeParams, String> {
+    use tezos_execution::TezlinkOperationGas;
+
+    let self_address = match input.self_address {
+        Contract::Originated(kt1) => kt1,
+        Contract::Implicit(pkh) => {
+            return Err(format!("`self` must be a KT1, got {pkh}"))
+        }
+    };
+    let amount: u64 = input
+        .amount
+        .try_into()
+        .map_err(|_| "`amount` must not be negative".to_string())?;
+    let sender = input.sender.map(tezos_execution::address_from_contract);
+    let balance = input
+        .balance
+        .map(|balance| {
+            balance
+                .try_into()
+                .map_err(|_| "`balance` must not be negative".to_string())
+        })
+        .transpose()?;
+    let milligas = match input.gas {
+        None => TezlinkOperationGas::MAX_LIMIT,
+        Some(gas) => u64::try_from(gas)
+            .map_err(|_| "`gas` must not be negative".to_string())?
+            .saturating_mul(1000)
+            .min(TezlinkOperationGas::MAX_LIMIT),
+    };
+    // Narrower than L1, which accepts pre-epoch timestamps: the
+    // enshrined-view path renders `now` into `X-Tezos-Timestamp`, which
+    // the EVM side parses as a u64. Refuse it here, with a clear reason,
+    // rather than deep inside a view.
+    if let Some(now) = input.now {
+        if now < 0 {
+            return Err(format!("`now` must not be negative, got {now}"));
+        }
+    }
+    let entrypoint = Entrypoint::try_from(input.entrypoint.as_str())
+        .map_err(|e| format!("invalid `entrypoint`: {e:?}"))?;
+
+    Ok(tezos_execution::RunCodeParams {
+        script: input.script,
+        storage: input.storage,
+        input: input.input,
+        entrypoint,
+        self_address,
+        sender,
+        payer: input.payer,
+        amount,
+        balance,
+        milligas,
+        chain_id: input.chain_id,
+        level: tezos_tezlink::enc_wrappers::BlockNumber {
+            block_number: input.level.unwrap_or(default_level),
+        },
+        now: tezos_smart_rollup::types::Timestamp::from(input.now.unwrap_or(default_now)),
+    })
+}
+
+/// Decode and validate the input, build the block environment, and run
+/// the script.
+fn run_code_from_input<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
+    payload: &[u8],
+) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
+where
+    Host: StorageV1,
+    KS: KeySpace,
+{
+    use tezos_execution::RunCodeError;
+
+    let input = RunCodeInput::nom_read_exact(payload).map_err(|e| {
+        RunCodeError::Execution(format!("cannot decode the input: {e:?}"))
+    })?;
+
+    let chain_config = fetch_tezosx_configuration(rk);
+    // Reading the block header is durable-storage work: a failure here is
+    // infrastructure, not the caller's script being wrong.
+    let blueprint_header = read_current_blueprint_header(rk.base()).map_err(|err| {
+        RunCodeError::Host(format!("cannot read the blueprint header: {err:?}"))
+    })?;
+
+    let params = run_code_params(
+        input,
+        blueprint_header.timestamp.as_u64() as i64,
+        blueprint_header.number.low_u32(),
+    )
+    .map_err(RunCodeError::Execution)?;
+
+    let registry = chain_config.init_registry();
+    let block_in_progress = bip_from_blueprint(
+        rk.host(),
+        &chain_config,
+        blueprint_header.number,
+        H256::zero(),
+        H256::zero(),
+        Blueprint {
+            transactions: vec![],
+            timestamp: blueprint_header.timestamp,
+        },
+    );
+    let mut block_constants = chain_config
+        .constants(
+            rk.host_mut(),
+            &block_in_progress,
+            U256::zero(),
+            H160::zero(),
+        )
+        .map_err(|err| {
+            RunCodeError::Host(format!("cannot build block constants: {err:?}"))
+        })?;
+    // A CRAC into the EVM reads its block from the journal's
+    // `outer_block`, so `block.number` / `block.timestamp` must answer
+    // with the same pair Michelson sees in `LEVEL` / `NOW`. Only these
+    // two: the rest stays gated on the real blueprint level.
+    block_constants.evm_runtime_block_constants.number =
+        U256::from(params.level.block_number);
+    block_constants.evm_runtime_block_constants.timestamp =
+        U256::from(params.now.as_u64());
+    let crac_id = tezosx_journal::CracId::new(0, 0);
+    // There is no operation to seed the identities from, and the run is
+    // always reverted: no origination address it derives outlives the call.
+    let mut journal = tezosx_journal::TezosXJournal::new(
+        crac_id,
+        TezosXHashes::zero(),
+        block_constants.evm_runtime_block_constants.clone(),
+    );
+
+    // The roots an applied Michelson operation snapshots, unnarrowed:
+    // nothing here proves the run touches accounts only.
+    let mut safe_rk = rk.to_safe_host(
+        block_constants
+            .michelson_runtime_block_constants
+            .safe_roots
+            .clone(),
+    );
+    safe_rk.host_mut().start().map_err(|err| {
+        RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
+    })?;
+
+    let result =
+        tezos_execution::run_code(&mut safe_rk, &registry, &mut journal, &params);
+
+    match (result, safe_rk.host_mut().revert()) {
+        (result, Ok(())) => result,
+        (Ok(_), Err(err)) => Err(RunCodeError::Host(format!(
+            "cannot revert the simulation: {err:?}"
+        ))),
+        // The run's own error is the one the caller asked about.
+        (Err(run_err), Err(err)) => {
+            log!(Error, "Reverting the run_code simulation failed: {:?}", err);
+            Err(run_err)
+        }
+    }
 }
 
 /// Query the entrypoints and synthetic views of a contract and write

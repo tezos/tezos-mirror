@@ -1992,7 +1992,8 @@ impl From<ScriptError<'_>> for RunCodeError {
 /// script writes through to durable storage — big-map contents and
 /// metadata, the global big-map id counter, the address registry — and a
 /// caller-supplied storage that drops an existing big-map id makes
-/// `interpret` *delete* that big map. Nothing in this crate enforces this.
+/// `interpret` *delete* that big map. Nothing in this crate enforces
+/// this; `tezosx_run_code_fn` does, with a reverted `SafeStorage`.
 pub fn run_code<
     Host: StorageV1,
     KS,
