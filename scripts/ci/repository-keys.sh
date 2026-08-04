@@ -494,13 +494,35 @@ else
 
   export GPG_TTY=/dev/console
 
-  GPG_KEY_ID="24EA481996EB8138"
-  GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
-  GPG_PUBLIC_KEY=$(cat "./scripts/packaging/package-signing-key.asc")
+  # The two test signing keys are two signing SUBKEYS of a SINGLE primary key,
+  # mirroring the production key-rotation topology. This is what exercises the
+  # dual-signing path in create_debian_repo.sh: a single "gpg -u A -u B" run
+  # would deduplicate two subkeys of the same primary down to one signature, so
+  # the fixture guards against that regression. GPG_KEY_ID / GPG_KEY_ID_BIS are
+  # the two subkey IDs; both share the primary's single passphrase.
+  GPG_KEY_ID="06AB528E88F8A2B2"
+  GPG_PASSPHRASE="test-dual-sign-2026"
 
-  # Import test key into GPG keyring
-  base64 -d < ./scripts/packaging/test_repo_private.key | gpg --batch --import -- 2> /dev/null
+  # Import the test key (primary + both signing subkeys) into the GPG keyring.
+  base64 -d < ./scripts/packaging/test_repo_private_key.key | gpg --batch --import -- 2> /dev/null
   echo "Test key imported into GPG keyring." >&2
+
+  # Second signing subkey of the same primary, enabling dual-signing. This
+  # import merges the second signing subkey into the already-imported primary.
+  GPG_KEY_ID_BIS="53951CC410942EB8"
+  GPG_PASSPHRASE_BIS="$GPG_PASSPHRASE"
+  base64 -d < ./scripts/packaging/test_repo_private_key_2.key | gpg --batch --import -- 2> /dev/null
+  echo "Test key 2 imported into GPG keyring (dual-signing enabled)." >&2
+  GPG_DUAL_SIGNING="true"
+
+  # Export individual public keys for the keyring build, and merge for octez.asc.
+  # package-signing-key.asc holds the primary + first (old) subkey, and
+  # package-signing-key-2.asc adds the second (new) subkey, mimicking two
+  # published generations of the public key across a rotation.
+  GPG_PUBLIC_KEY_1=$(cat "./scripts/packaging/package-signing-key.asc")
+  GPG_PUBLIC_KEY_2=$(cat "./scripts/packaging/package-signing-key-2.asc")
+  GPG_PUBLIC_KEY="${GPG_PUBLIC_KEY_1}
+${GPG_PUBLIC_KEY_2}"
 fi
 
 ##############################################
