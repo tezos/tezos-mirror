@@ -2,28 +2,10 @@
 
 ## Unreleased
 
-### Breaking changes
-
-### Configuration changes
-
-### RPCs changes
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config PATH` to assert your configuration file is still valid*
+Entries for the next release live as one file per merge request under
+[`.changes/node/`](.changes/node/), to avoid rebase conflicts and entries
+stranded above a freshly cut release header. See
+[`.changes/README.md`](.changes/README.md).
 
 ## Version 0.64 (2026-07-30)
 

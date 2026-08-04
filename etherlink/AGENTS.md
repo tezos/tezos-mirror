@@ -62,7 +62,7 @@ Best practices to follow when writing or modifying code under `etherlink/`. Thes
 
 - **One concern per commit**: separate migrations, refactors, and feature work into their own commits.
 - **Every TODO references a Linear issue** (`L2-XXXX`); no bare TODOs.
-- **Never edit `CHANGES_TEZOSX.md`**: document user-facing Tezos X changes in `etherlink/.changes/tezosx/<section>/<mr-number>.md`, holding the markdown bullet(s) without the `(!<mr-number>)` reference, and say "Michelson runtime", never "Tezlink". If no entry is needed, say so with an empty `.changes/tezosx/no_changelog/<mr-number>.md`. CI enforces both; see [`.changes/tezosx/README.md`](./.changes/tezosx/README.md).
+- **Never edit `CHANGES_TEZOSX.md` or `CHANGES_NODE.md`**: document user-facing changes in `etherlink/.changes/<tezosx|node>/<section>/<mr-number>.md`, holding the markdown bullet(s) without the `(!<mr-number>)` reference, and say "Michelson runtime", never "Tezlink". If no entry is needed, say so with an empty `.changes/<changelog>/no_changelog/<mr-number>.md`. A merge request that changes both the kernel and the node declares an entry in both. CI enforces it; see [`.changes/README.md`](./.changes/README.md).
 - **Update `CHANGES_KERNEL.md`** directly for user-facing kernel changes; after rebasing, recheck that your entries are still under *Unreleased* and not stranded above a freshly added release header.
 - **Update the RFC / spec** when behavior diverges (or fix the code if the RFC is right).
 - **Formatting must pass**: run `make -f etherlink.mk check` from the repo root before submitting.
