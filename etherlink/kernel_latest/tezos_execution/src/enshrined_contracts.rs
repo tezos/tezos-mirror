@@ -1269,7 +1269,7 @@ where
 /// info, and `Native` (or a Tezos target) to Tezos (this runtime).
 fn tezosx_resolve_source_alias_readonly(
     ctx: &impl HasOriginLookup,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     source: &AddressHash,
     target_runtime: RuntimeId,
 ) -> Result<(String, RuntimeId), TransferError> {
@@ -1546,7 +1546,7 @@ fn classify_origin_for_view<'a, Host, R>(
 ) -> Result<Classification, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    R: tezosx_interfaces::Registry,
+    R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Convert available milligas to source_runtime's native unit and pass as budget.
     let remaining_milligas = operation_gas
@@ -1593,7 +1593,7 @@ fn derive_alias_for_view<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    R: tezosx_interfaces::Registry,
+    R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     operation_gas
         .cast_and_consume_milligas(DERIVE_ALIAS_MILLIGAS)
@@ -1652,7 +1652,7 @@ pub fn dispatch_origin_of_get<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    R: tezosx_interfaces::Registry,
+    R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // ── Runtime ID validation ────────────────────────────────────────────
     let source_runtime = runtime_id_from_nat(source_runtime_nat)?;
@@ -1688,7 +1688,7 @@ pub fn dispatch_resolve_address_get<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    R: tezosx_interfaces::Registry,
+    R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Reusing `EnshrinedViewDispatchError::AliasResolution` for all three
     // registry call sites (source read, compute, destination read). A more
@@ -1938,7 +1938,7 @@ pub fn dispatch_staticcall_evm_get<'a, Host, R>(
 ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    R: Registry,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias
     // resolution path: needs only an immutable host, no operation gas / no

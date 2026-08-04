@@ -3553,6 +3553,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezosx-types",
  "thiserror 1.0.69",
 ]
 
@@ -3753,7 +3754,6 @@ dependencies = [
  "nom",
  "primitive-types",
  "tezos-smart-rollup-host",
- "tezos-storage-latest",
  "tezos_data_encoding",
  "tezosx-constants",
  "thiserror 1.0.69",

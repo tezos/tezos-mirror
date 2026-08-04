@@ -280,7 +280,7 @@ fn send_outbox_methods<'j, CTX, Host, R>(
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
@@ -468,7 +468,7 @@ pub(crate) fn send_outbox_message_precompile<'j, CTX, Host, R>(
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let mut gas = Gas::new(inputs.gas_limit);

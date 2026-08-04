@@ -39,7 +39,7 @@ pub(crate) fn global_counter_precompile<'j, CTX, Host, R>(
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
-    R: Registry + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     let mut gas = Gas::new(inputs.gas_limit);

@@ -122,7 +122,8 @@ macro_rules! abort_on_error {
     };
 }
 
-impl<Host, R: Registry> EtherlinkVMDB<'_, Host, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {
@@ -266,7 +267,8 @@ where
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host, R: Registry> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {
@@ -373,8 +375,8 @@ where
         }
     }
 }
-impl<Host, R: Registry> DatabaseCommitPrecompileStateChanges
-    for EtherlinkVMDB<'_, Host, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {
@@ -466,7 +468,8 @@ where
     }
 }
 
-impl<Host, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>> DatabaseCommit
+    for EtherlinkVMDB<'_, Host, R>
 where
     Host: StorageV1,
 {

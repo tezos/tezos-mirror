@@ -481,7 +481,7 @@ fn build_deposit_event(
 #[trace_kernel]
 pub fn apply_tezosx_xtz_deposit<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],

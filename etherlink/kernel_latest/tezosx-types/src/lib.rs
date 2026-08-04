@@ -79,12 +79,6 @@ pub struct CrossRuntimeContext {
 #[error("{0}")]
 pub struct KernelStorageError(pub String);
 
-impl From<tezos_storage::error::Error> for KernelStorageError {
-    fn from(e: tezos_storage::error::Error) -> Self {
-        KernelStorageError(e.to_string())
-    }
-}
-
 // TODO: L2-971
 // cleanup this, and remove use of Custom for more specific errors
 #[derive(Eq, PartialEq, Debug, Error)]
@@ -123,17 +117,6 @@ pub enum TezosXRuntimeError {
 impl From<KernelStorageError> for TezosXRuntimeError {
     fn from(e: KernelStorageError) -> Self {
         TezosXRuntimeError::Storage(e)
-    }
-}
-
-/// Preserve existing `?`-ergonomics on the Tezos side: the many call
-/// sites that propagate `tezos_storage::error::Error` with `?` do not
-/// need to be touched.  `?` performs exactly one `From` hop, so without
-/// this direct impl every Tezos-side `?` would need an explicit
-/// `.map_err(Into::into)`.
-impl From<tezos_storage::error::Error> for TezosXRuntimeError {
-    fn from(e: tezos_storage::error::Error) -> Self {
-        TezosXRuntimeError::Storage(KernelStorageError(e.to_string()))
     }
 }
 

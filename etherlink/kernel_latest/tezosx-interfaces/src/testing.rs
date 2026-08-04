@@ -24,6 +24,8 @@ use crate::{
 pub struct UnimplementedRegistry;
 
 impl Registry for UnimplementedRegistry {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
         _host: &mut Host,
@@ -89,6 +91,8 @@ impl Registry for UnimplementedRegistry {
 pub struct NotWiredRegistry;
 
 impl Registry for NotWiredRegistry {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
         _host: &mut Host,
@@ -213,6 +217,8 @@ impl MockRegistry {
 }
 
 impl Registry for MockRegistry {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
         _host: &mut Host,
@@ -354,6 +360,8 @@ impl StubRegistry {
 }
 
 impl Registry for StubRegistry {
+    type Journal = TezosXJournal;
+
     fn ensure_alias<Host>(
         &self,
         host: &mut Host,

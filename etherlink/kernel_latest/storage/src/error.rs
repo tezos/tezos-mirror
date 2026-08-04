@@ -10,6 +10,7 @@ use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::Error as HostError;
 use tezos_smart_rollup_keyspace::KeySpaceWriteError;
+use tezosx_types::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -74,6 +75,18 @@ impl From<BinError> for Error {
     fn from(value: BinError) -> Self {
         let msg = format!("{value}");
         Self::BinWriteError(msg)
+    }
+}
+
+impl From<Error> for KernelStorageError {
+    fn from(e: Error) -> Self {
+        KernelStorageError(e.to_string())
+    }
+}
+
+impl From<Error> for TezosXRuntimeError {
+    fn from(e: Error) -> Self {
+        TezosXRuntimeError::Storage(KernelStorageError(e.to_string()))
     }
 }
 

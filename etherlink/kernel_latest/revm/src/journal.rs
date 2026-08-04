@@ -52,7 +52,11 @@ use tezosx_interfaces::{
 /// On each additional call, the depth of the journaled state is increased (`depth`) and a new journal is added.
 ///
 /// The journal contains every state change that happens within that call, making it possible to revert changes made in a specific call.
-pub struct Journal<'a, Host: StorageV1, R: Registry> {
+pub struct Journal<
+    'a,
+    Host: StorageV1,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+> {
     /// Database
     pub database: EtherlinkVMDB<'a, Host, R>,
 
@@ -65,7 +69,9 @@ pub struct Journal<'a, Host: StorageV1, R: Registry> {
     deferred_error: Option<RuntimeError>,
 }
 
-impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
+impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    Journal<'a, Host, R>
+{
     pub fn new_with_inner(
         database: EtherlinkVMDB<'a, Host, R>,
         journal: &'a mut TezosXJournal,
@@ -85,7 +91,9 @@ impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
 
 /// Expose the journal-owned tracer to the `TracerInspector` filling the
 /// `Evm` inspector slot (see `evm_inspectors::TracerInspector`).
-impl<'a, Host: StorageV1, R: Registry> TracerContainer for Journal<'a, Host, R> {
+impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    TracerContainer for Journal<'a, Host, R>
+{
     fn take_tracer(&mut self) -> Option<Box<Tracer>> {
         self.journal.evm.take_tracer()
     }
@@ -97,7 +105,9 @@ impl<'a, Host: StorageV1, R: Registry> TracerContainer for Journal<'a, Host, R> 
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
+impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalTr
+    for Journal<'a, Host, R>
+{
     type Database = EtherlinkVMDB<'a, Host, R>;
     type State = EvmState;
     type JournaledAccount<'b>
@@ -501,7 +511,9 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
     }
 }
 
-impl<Host: StorageV1, R: Registry> JournalExt for Journal<'_, Host, R> {
+impl<Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalExt
+    for Journal<'_, Host, R>
+{
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
         &self.journal.evm.inner.journal
@@ -518,7 +530,9 @@ impl<Host: StorageV1, R: Registry> JournalExt for Journal<'_, Host, R> {
     }
 }
 
-impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
+impl<Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    Journal<'_, Host, R>
+{
     pub fn get_and_increment_global_counter(
         &mut self,
     ) -> Result<U256, LayeredStateError> {
@@ -732,7 +746,8 @@ pub trait CrossRuntimeCall {
     fn cross_runtime_originator(&self) -> Option<Address>;
 }
 
-impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
+impl<'a, Host, R: Registry<Journal = TezosXJournal>> CrossRuntimeCall
+    for Journal<'a, Host, R>
 where
     Host: StorageV1,
 {
@@ -943,7 +958,7 @@ where
 
 pub fn commit_evm_journal_from_external<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     journal: &mut TezosXJournal,
 ) -> Result<Vec<Withdrawal>, EvmRunError>

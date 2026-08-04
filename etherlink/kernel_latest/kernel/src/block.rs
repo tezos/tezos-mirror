@@ -108,7 +108,7 @@ pub fn can_fit_in_reboot(
 #[allow(clippy::too_many_arguments)]
 pub fn compute<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut BlockInProgress,
@@ -329,7 +329,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub fn compute_bip<Host>(
     host: &mut Host,
-    registry: &impl Registry,
+    registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,

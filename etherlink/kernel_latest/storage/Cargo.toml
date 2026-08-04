@@ -28,3 +28,4 @@ tezos-smart-rollup-storage.workspace = true
 tezos-smart-rollup-keyspace.workspace = true
 tezos_data_encoding.workspace = true
 nom.workspace = true
+tezosx-types.workspace = true
