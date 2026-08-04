@@ -7,6 +7,11 @@
 .PHONY: all
 all: build test check
 
+# Members that target wasm32: all of them but evm-evaluation and
+# revm-evaluation, isolated components of the EVM workspace, and mir, a
+# host-only crate (native binaries and BLS). Shared by 'build' and 'check'.
+WASM_MEMBERS := --workspace --exclude evm-evaluation --exclude revm-evaluation --exclude mir
+
 .PHONY: build
 build:
 ifdef EVM_KERNEL_FEATURES
@@ -15,10 +20,7 @@ endif
 ifdef EXCLUDE_MEMBER
 	$(eval EXCLUDE := --workspace --exclude ${EXCLUDE_MEMBER})
 else
-# By default evm-evaluation and revm-evaluation are excluded as they're
-# isolated components of the EVM workspace, and mir as it is a host-only
-# crate (native binaries and BLS) that does not target wasm32.
-	$(eval EXCLUDE := --workspace --exclude evm-evaluation --exclude revm-evaluation --exclude mir)
+	$(eval EXCLUDE := ${WASM_MEMBERS})
 endif
 ifndef EVM_KERNEL_SKIP_BYTECODE
 	@make -C revm/contracts/predeployed bytecode
@@ -81,6 +83,14 @@ test:
 check:
 	@cargo update --workspace --locked
 	@cargo clippy --all-targets --features testing -- --deny warnings
+# Clippy sees one target at a time, so the wasm32-only entry points are cfg'd
+# out of the host run above. Lint them too.
+#
+# This cannot be folded into the run above by passing it a second --target:
+# cargo applies the other flags to every target at once, and 'testing' pulls
+# proptest, whose own dependencies (getrandom, wait-timeout) have no wasm32
+# implementation. Hence one clippy per set of flags.
+	@cargo clippy --target wasm32-unknown-unknown ${WASM_MEMBERS} -- --deny warnings
 
 .PHONY: check-all
 check-all: check
