@@ -1,6 +1,6 @@
 { parameter
     (or (key_hash %claim_voting_rights)
-        (pair %propose_voting_key address bool (option (set address)))) ;
+        (pair %propose_voting_key address (pair bool (option (set address))))) ;
   storage
     (pair (big_map %voting_delegations address (map key_hash (pair bool (option (set address)))))
           (big_map %proposals (pair address key_hash) (pair bool (option (set address))))) ;
@@ -13,7 +13,8 @@
              AMOUNT ;
              COMPARE ;
              EQ ;
-             IF { DROP ; UNIT } { FAILWITH } } ;
+             IF { DROP } { FAILWITH } ;
+             UNIT } ;
          SWAP ;
          UNPAIR ;
          IF_LEFT
@@ -38,8 +39,8 @@
              SWAP ;
              DIG 4 ;
              UPDATE ;
-             DUP 4 ;
-             DIG 4 ;
+             SWAP ;
+             DIG 3 ;
              CAR ;
              PUSH nat 0 ;
              DUP 4 ;
@@ -48,11 +49,9 @@
              EQ ;
              IF { DIG 2 ; DROP ; NONE (map key_hash (pair bool (option (set address)))) }
                 { DIG 2 ; SOME } ;
-             DIG 4 ;
+             DIG 3 ;
              UPDATE ;
-             UPDATE 1 ;
-             SWAP ;
-             UPDATE 2 }
+             PAIR }
            { UNPAIR 3 ;
              UNIT ;
              DIG 5 ;
@@ -103,7 +102,7 @@
              IF_NONE
                { DUP 3 ;
                  IF { DIG 3 ; DIG 3 ; PAIR ; SOME }
-                    { DIG 2 ; DIG 3 ; DROP 2 ; NONE (pair bool (option (set address))) } }
+                    { DIG 2 ; DROP ; DIG 2 ; DROP ; NONE (pair bool (option (set address))) } }
                { DROP ; DIG 3 ; DIG 3 ; PAIR ; SOME } ;
              DUP 4 ;
              CAR ;
@@ -128,6 +127,8 @@
                  SOME ;
                  DIG 3 ;
                  UPDATE } ;
+             PAIR ;
+             UNPAIR ;
              DIG 2 ;
              SWAP ;
              UPDATE 1 ;
@@ -136,7 +137,7 @@
          NIL operation ;
          PAIR } ;
   view "is_voting_key_of"
-       (pair address key_hash (option address))
+       (pair address (pair key_hash (option address)))
        bool
        { UNPAIR ;
          UNPAIR 3 ;

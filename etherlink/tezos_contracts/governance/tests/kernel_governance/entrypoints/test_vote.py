@@ -362,6 +362,38 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         assert storage['voting_context']['period']['promotion']['yea_voting_power'] == DEFAULT_VOTING_POWER
         assert storage['voting_context']['period']['promotion']['total_voting_power'] == DEFAULT_TOTAL_VOTING_POWER
     
+    def test_self_delegated_voter_voting_power_not_doubled(self) -> None:
+        proposer = self.bootstrap_baker()
+        baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
+        governance_started_at_level = self.get_current_level() + 1
+        governance = self.deploy_kernel_governance(custom_config={
+            'started_at_level': governance_started_at_level,
+            'period_length': 5,
+            'proposal_quorum': 20,
+            'delegation_contract': delegation.address
+        })
+
+        whitelist = {governance.address}
+        delegation.using(baker).propose_voting_key(pkh(baker), True, whitelist).send()
+        self.bake_block()
+        delegation.using(baker).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+
+        assert delegation.list_voters(pkh(baker), governance.address) == [pkh(baker)]
+
+        kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
+        governance.using(proposer).new_proposal(kernel_root_hash).send()
+        self.bake_blocks(4)
+
+        assert governance.get_voting_state()['period_type'] == PROMOTION_PERIOD
+
+        governance.using(baker).vote(YEA_VOTE).send()
+        self.bake_block()
+
+        storage = governance.contract.storage()
+        assert storage['voting_context']['period']['promotion']['yea_voting_power'] == DEFAULT_VOTING_POWER
+
     def test_delegate_vote_should_only_apply_for_non_voted_baker(self) -> None:
         proposer = self.bootstrap_baker()
         baker1 = self.bootstrap_baker()

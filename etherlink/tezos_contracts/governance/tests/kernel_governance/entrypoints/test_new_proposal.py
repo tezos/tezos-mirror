@@ -263,6 +263,34 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == kernel_hash2
     
+    def test_self_delegated_proposer_voting_power_not_doubled(self) -> None:
+        baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
+        governance_started_at_level = self.get_current_level() + 1
+        governance = self.deploy_kernel_governance(custom_config={
+            'started_at_level': governance_started_at_level,
+            'period_length': 5,
+            'upvoting_limit': 2,
+            'delegation_contract': delegation.address
+        })
+
+        whitelist = {governance.address}
+        delegation.using(baker).propose_voting_key(pkh(baker), True, whitelist).send()
+        self.bake_block()
+        delegation.using(baker).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+
+        # Precondition: list_voters returns [baker], so without the fix get_voters
+        # would produce [baker, baker] and count the power twice
+        assert delegation.list_voters(pkh(baker), governance.address) == [pkh(baker)]
+
+        kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
+        governance.using(baker).new_proposal(kernel_root_hash).send()
+        self.bake_block()
+
+        storage = governance.contract.storage()
+        assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER
+
     def test_delegate_can_propose_multiple_payloads_for_different_bakers(self) -> None:
         delegate = self.bootstrap_no_baker()
         baker1 = self.bootstrap_baker()

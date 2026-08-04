@@ -15,11 +15,17 @@ let new_proposal
     let { voting_context; finished_voting; last_winner } = Voting.get_voting_state storage in
     let proposal_period = Voting.get_proposal_period voting_context in
     let potential_proposers = Voting.get_voters storage.config.delegation_contract in
-    let (proposers, total_voting_power, real_voting_power) =
+    let (proposers, total_voting_power) =
        Voting.filter_proposers potential_proposers proposal_period storage.config in
     let _ = Validation.assert_voting_power_positive total_voting_power in
-    let _ = Assert.Error.assert (Set.size proposers > 0n) Errors.upvoting_limit_exceeded in
-    let updated_period = Voting.add_new_proposal_and_upvote payload proposers real_voting_power proposal_period in
+    let _ = Assert.Error.assert (Map.size proposers > 0n) Errors.upvoting_limit_exceeded in
+    let (proposers_set, real_voting_power) =
+       Map.fold
+          (fun (((proposers_set, sum), (proposer_key_hash, voting_power)) : (key_hash set * nat) * (key_hash * nat)) ->
+             (Set.add proposer_key_hash proposers_set, sum + voting_power))
+          proposers
+          (Set.empty, 0n) in
+    let updated_period = Voting.add_new_proposal_and_upvote payload proposers_set real_voting_power proposal_period in
     let operations = match finished_voting with
         | Some event_payload -> [Events.create_voting_finished_event_operation event_payload]
         | None -> [] in

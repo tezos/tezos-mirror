@@ -1,7 +1,7 @@
-LIGO_COMPILER = docker run --rm -v "${PWD}":"${PWD}" -w "${PWD}" ligolang/ligo:1.9.2
+LIGO_COMPILER = docker run --rm -v "${PWD}":"${PWD}" -w "${PWD}" ligolang/ligo:1.14.2
 
 compile:
-	rm -r -f ./build 
+	rm -r -f ./build
 	mkdir ./build
 	${LIGO_COMPILER} compile contract contracts/kernel_governance.mligo -o build/kernel_governance.tz
 	${LIGO_COMPILER} compile contract contracts/sequencer_governance.mligo -o build/sequencer_governance.tz
