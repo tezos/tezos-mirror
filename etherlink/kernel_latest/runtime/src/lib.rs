@@ -4,6 +4,7 @@
 
 pub mod extensions;
 pub mod runtime;
+pub mod runtime_keyspaces;
 pub mod safe_storage;
 // TODO: This will be soon removed whenever the first transition will be made for
 // a given keyspace root.

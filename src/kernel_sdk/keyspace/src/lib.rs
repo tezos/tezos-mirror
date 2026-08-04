@@ -288,6 +288,68 @@ pub trait KeySpace {
     fn hash(&self) -> Vec<u8>;
 }
 
+/// A mutable borrow of a [`KeySpace`] is itself a [`KeySpace`], forwarding to
+/// the borrowed handle. A caller holding a key space can therefore lend it to a
+/// structure that takes one by value, and keep it once that structure dies.
+impl<KS: KeySpace> KeySpace for &mut KS {
+    fn name(&self) -> &Name {
+        (**self).name()
+    }
+
+    fn get(&self, key: &Key) -> Option<Vec<u8>> {
+        (**self).get(key)
+    }
+
+    fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize> {
+        (**self).read(key, offset, buffer)
+    }
+
+    fn set(
+        &mut self,
+        key: &Key,
+        value: impl AsRef<[u8]>,
+    ) -> Result<(), KeySpaceWriteError> {
+        (**self).set(key, value)
+    }
+
+    fn write(
+        &mut self,
+        key: &Key,
+        offset: usize,
+        data: impl AsRef<[u8]>,
+    ) -> Result<usize, KeySpaceWriteError> {
+        (**self).write(key, offset, data)
+    }
+
+    fn value_length(&self, key: &Key) -> Option<usize> {
+        (**self).value_length(key)
+    }
+
+    fn contains(&self, key: &Key) -> bool {
+        (**self).contains(key)
+    }
+
+    fn delete(&mut self, key: &Key) -> bool {
+        (**self).delete(key)
+    }
+
+    fn clear(&mut self) {
+        (**self).clear()
+    }
+
+    fn copy_from(&mut self, other: &Self) {
+        (**self).copy_from(other)
+    }
+
+    fn move_from(&mut self, other: &mut Self) {
+        (**self).move_from(other)
+    }
+
+    fn hash(&self) -> Vec<u8> {
+        (**self).hash()
+    }
+}
+
 /// Error returned by [`KeySpaceLoader::load_or_create`].
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeySpaceLoaderError {
@@ -333,4 +395,137 @@ pub trait KeySpaceLoader {
         &mut self,
         name: Name,
     ) -> Result<Self::KeySpace, KeySpaceLoaderError>;
+}
+
+/// Tests for [`KeySpace`] served through a mutable borrow. Keep the helpers
+/// generic: called on a `&mut KS` value directly, the `&mut self` methods
+/// resolve to `KS`'s own impl and skip the forwarder.
+#[cfg(all(test, feature = "irmin-compat"))]
+mod tests {
+    use super::*;
+    use crate::irmin_ds::{IrminKeySpaceRegistry, StorageV1KeySpaceCompat};
+    use tezos_smart_rollup_mock::{InMemoryStore, MockHost};
+
+    type MockKeySpace = StorageV1KeySpaceCompat<InMemoryStore>;
+
+    fn key(s: &[u8]) -> Key {
+        Key::from_bytes(s).unwrap()
+    }
+
+    /// Load `name` over `host`. Key spaces minted over one `host` share its
+    /// durable tree; the registry only keeps their names from overlapping.
+    fn load(
+        registry: &mut IrminKeySpaceRegistry,
+        host: &mut MockHost,
+        name: &str,
+    ) -> MockKeySpace {
+        // SAFETY: this registry is the only one minting key spaces over `host`,
+        // and it rejects overlapping names.
+        unsafe { registry.load_or_create(host, name.parse().unwrap()) }
+            .expect("name does not overlap a loaded one")
+    }
+
+    fn lent_reads_and_writes<KS: KeySpace>(mut base: KS) {
+        assert_eq!(base.name(), &"/lent".parse().unwrap());
+        assert_eq!(base.get(&key(b"/kept")), Some(b"before".to_vec()));
+        assert_eq!(base.value_length(&key(b"/kept")), Some(6));
+        assert!(base.contains(&key(b"/kept")));
+        assert!(!base.contains(&key(b"/absent")));
+
+        let mut buffer = [0u8; 3];
+        assert_eq!(base.read(&key(b"/kept"), 3, &mut buffer), Some(3));
+        assert_eq!(&buffer, b"ore");
+
+        base.set(&key(b"/added"), b"hello").unwrap();
+        assert_eq!(base.write(&key(b"/added"), 0, b"HELL").unwrap(), 4);
+        assert!(base.delete(&key(b"/kept")));
+        assert!(!base.delete(&key(b"/kept")));
+    }
+
+    fn lent_clear<KS: KeySpace>(mut base: KS) {
+        base.clear()
+    }
+
+    fn lent_hash<KS: KeySpace>(base: KS) -> Vec<u8> {
+        base.hash()
+    }
+
+    /// At `KS = &mut MockKeySpace`, `other: &KS` is a `&&mut MockKeySpace`,
+    /// hence `&&mut src` at the call site (`&mut &mut src` for `move_from`).
+    fn lent_copy_from<KS: KeySpace>(mut base: KS, other: &KS) {
+        base.copy_from(other)
+    }
+
+    fn lent_move_from<KS: KeySpace>(mut base: KS, other: &mut KS) {
+        base.move_from(other)
+    }
+
+    #[test]
+    fn borrowed_key_space_forwards_reads_and_writes() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/lent");
+        ks.set(&key(b"/kept"), b"before").unwrap();
+        let hash_before = ks.hash();
+
+        // The caller lends its key space, and keeps it.
+        lent_reads_and_writes(&mut ks);
+        assert_eq!(lent_hash(&mut ks), ks.hash());
+
+        // Every mutation made through the borrow is visible on the key space,
+        // and it is writable again now that the borrow is over.
+        assert_eq!(ks.get(&key(b"/added")), Some(b"HELLo".to_vec()));
+        assert!(!ks.contains(&key(b"/kept")));
+        assert_ne!(ks.hash(), hash_before);
+        ks.set(&key(b"/after"), b"again").unwrap();
+        assert!(ks.contains(&key(b"/after")));
+    }
+
+    #[test]
+    fn borrowed_key_space_forwards_clear() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/lent");
+        ks.set(&key(b"/a"), b"1").unwrap();
+        ks.set(&key(b"/b"), b"2").unwrap();
+
+        lent_clear(&mut ks);
+
+        assert!(!ks.contains(&key(b"/a")));
+        assert!(!ks.contains(&key(b"/b")));
+    }
+
+    #[test]
+    fn borrowed_key_space_forwards_copy_from() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut dst = load(&mut registry, &mut host, "/dst");
+        let mut src = load(&mut registry, &mut host, "/src");
+        dst.set(&key(b"/old"), b"dst").unwrap();
+        src.set(&key(b"/new"), b"src").unwrap();
+
+        lent_copy_from(&mut dst, &&mut src);
+
+        // `dst` holds `src`'s associations and only them, `src` holds its own.
+        assert_eq!(dst.get(&key(b"/new")), Some(b"src".to_vec()));
+        assert!(!dst.contains(&key(b"/old")));
+        assert_eq!(src.get(&key(b"/new")), Some(b"src".to_vec()));
+    }
+
+    #[test]
+    fn borrowed_key_space_forwards_move_from() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut dst = load(&mut registry, &mut host, "/dst");
+        let mut src = load(&mut registry, &mut host, "/src");
+        dst.set(&key(b"/old"), b"dst").unwrap();
+        src.set(&key(b"/new"), b"src").unwrap();
+
+        lent_move_from(&mut dst, &mut &mut src);
+
+        // `dst` holds `src`'s associations, and `src` is left empty.
+        assert_eq!(dst.get(&key(b"/new")), Some(b"src".to_vec()));
+        assert!(!dst.contains(&key(b"/old")));
+        assert!(!src.contains(&key(b"/new")));
+    }
 }

@@ -30,7 +30,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader, Name};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 use tezos_storage::{
     keyspace, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
     store_bin, store_read_slice, write_u256_le, write_u64_le,
@@ -86,9 +86,8 @@ impl StorageVersion {
 
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::V63;
 
-/// Name of the `/base` keyspace, holding kernel configuration and
-/// node-interaction values that do not belong to any world state.
-pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
+// The name of the `/base` keyspace now lives next to the handle that loads it.
+use tezos_evm_runtime::runtime_keyspaces::BASE_KEYSPACE_NAME;
 
 /// Load the `/base` keyspace and apply the log verbosity it records.
 ///
