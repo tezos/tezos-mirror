@@ -1,0 +1,40 @@
+# L2-1767: the Micheline binary decoder must not overflow the native stack on
+# deeply-nested input reached through UNPACK.
+# https://linear.app/tezos/issue/L2-1767  (fix: tezos/tezos!22367)
+#
+# `input` and `code` below are the issue's attached repro (unpack_stack_overflow.tzt)
+# verbatim. The DUP;CONCAT loop doubles `0x0500` k=24 times, giving 2^24 copies of
+# `05 00`; with the PACK tag `0x05` and an `Int 0` leaf (`00 00`) that is the packed
+# form of a 2^24 = 16,777,216-deep chain of single-argument primitives. The payload
+# is built at runtime, so this file stays tiny and the 32 KB operation-size limit
+# is irrelevant -- that is the point of the shape.
+#
+#   WITHOUT the decode-depth bound: the decoder recurses ~16.7M levels and the
+#   process dies with `Fatal error: exception Stack overflow`.
+#   WITH the bound: the decode is rejected, and the post-decode `unpack_failed`
+#   penalty then exhausts the operation gas -- hence `output Gas_exhaustion`.
+#
+# NB the issue's repro has `output { }`: it was written to be run against an
+# UNBOUNDED decoder, where the process aborts and no output is produced. Against
+# the bounded decoder the run terminates in Gas_exhaustion, so the expectation is
+# adjusted here; everything else is unchanged.
+#
+# k=24 is chosen because the crash window is bounded on both sides and slides with
+# the stack size (see the issue):
+#   - k=25 (67 MB) exhausts gas on UNPACK's saturating 20*len gate BEFORE decoding;
+#   - k<=23 decodes successfully below the stack threshold on a 12.5 MB stack and
+#     dies in the unpack_failed penalty instead;
+#   - a stack of ~20 MB or more survives k=24 entirely (the issue's operational
+#     stopgap), so on such a machine this test passes even against an unbounded
+#     decoder. If the CI stack size changes, re-verify against an unfixed build.
+#
+# NB this test is excluded from the file list handed to MIR's tzt_runner (see
+# etherlink/ci/etherlink_ci.ml): MIR still decodes Micheline recursively and
+# does not meter decoding gas, so it aborts on this input rather than reporting
+# a result. Only the octez-client TZT runner exercises it here.
+input { Stack_elt int 24 };
+output Gas_exhaustion;
+code { PUSH bytes 0x0500 ; SWAP ; PUSH bool True ;
+       LOOP { DIG 1 ; DUP ; CONCAT ; DUG 1 ; PUSH int -1 ; ADD ; DUP ; GT };
+       DROP ; PUSH bytes 0x0000 ; SWAP ; CONCAT ; PUSH bytes 0x05 ; CONCAT ;
+       UNPACK nat ; DROP ; } ;

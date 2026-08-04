@@ -3377,7 +3377,8 @@ etherlink.mir_tzt:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
+  - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner $(ls tzt_reference_test_suite/*.tzt
+    | grep -vFx tzt_reference_test_suite/unpack_deep_00.tzt)
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
