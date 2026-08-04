@@ -962,6 +962,9 @@ let register ~__FILE__ ~protocols =
     ~prover:false
     test_baker_registers_profiles
     protocols ;
+  (* Only U025+ bakers have the DAL attestable-slots worker this test syncs on
+     ([consumed_backfill_stream.v0]) and the health-check-off-consensus-path fix
+     it asserts; T024 has neither, so restrict to those protocols. *)
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["attestation"; "liveness"]
@@ -970,7 +973,7 @@ let register ~__FILE__ ~protocols =
     ~operator_profiles:[0]
     "chain progresses when dal node is unresponsive"
     test_baker_liveness_on_unresponsive_dal_health
-    protocols ;
+    (List.filter (fun protocol -> Protocol.number protocol >= 025) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["bootstrap"]

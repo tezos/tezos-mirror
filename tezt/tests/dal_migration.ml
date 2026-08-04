@@ -1589,6 +1589,30 @@ let test_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to
      practice. *)
   let migration_level = dal_parameters.attestation_lag + 2 in
 
+  (* This run bakes up to level [head_max = migration_level + max offset 0 + 4].
+     Once the head reaches level [2 * blocks_per_cycle] (the last block of cycle
+     1), applying that block prunes cycle 0's random seed, and the DAL node
+     crashes when its attester-attribution accounting fetches a committee for a
+     cycle-0 level (it looks back [attestation_lag] levels and resolves
+     committees against the current head). So the run is safe iff
+     [2 * blocks_per_cycle > migration_level + max offset 0 + 4].
+
+     The tight case is [offset = 2], i.e. [head_max = migration_level + 6]. This
+     holds with the default [blocks_per_cycle = 8] from U on (dynamic-lag
+     [attestation_lag = 5], head_max = 13 < 16) but not for T (static
+     [attestation_lag = 8], head_max = 16 = 2 * 8), which is why migrations from
+     T (and earlier) are not registered, see
+     [tests_start_dal_node_around_migration]. The assertion below guards the
+     pairs that do run; if it ever trips (new protocol lag, larger offset, or
+     smaller default cycle), raise [blocks_per_cycle] for that migration or skip
+     it. This cannot occur in practice, where [blocks_per_cycle] is far larger
+     than [attestation_lag]. *)
+  let* constants =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  assert (2 * blocks_per_cycle > migration_level + max offset 0 + 4) ;
+
   Log.info "Set user-activated-upgrade at level %d" migration_level ;
   let* () = Node.terminate node in
   let patch_config =
@@ -1642,19 +1666,22 @@ let test_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to
   unit
 
 let tests_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to =
-  let offsets = [-2; -1; 0; 1; 2] in
-  let tests ~migrate_from ~migrate_to ~check_rpc =
-    List.iter
-      (fun offset ->
-        test_start_dal_node_around_migration
-          ~__FILE__
-          ~migrate_from
-          ~migrate_to
-          ~offset
-          ~check_rpc)
-      offsets
-  in
-  tests ~migrate_from ~migrate_to ~check_rpc:true
+  (* Not registered when migrating from T (and earlier);
+     see [test_start_dal_node_around_migration] for why. *)
+  if Protocol.number migrate_from >= 025 then
+    let offsets = [-2; -1; 0; 1; 2] in
+    let tests ~migrate_from ~migrate_to ~check_rpc =
+      List.iter
+        (fun offset ->
+          test_start_dal_node_around_migration
+            ~__FILE__
+            ~migrate_from
+            ~migrate_to
+            ~offset
+            ~check_rpc)
+        offsets
+    in
+    tests ~migrate_from ~migrate_to ~check_rpc:true
 
 let test_dal_node_snapshot_over_migration ~operators ~migration_level
     ~migrate_to parameters node client dal_node =
