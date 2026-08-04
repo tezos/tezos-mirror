@@ -29,7 +29,7 @@ Closes L2-
 - [ ] Document any change to the user interface, including configuration parameters (see [node configuration](https://tezos.gitlab.io/user/node-configuration.html))
 - [ ] Provide automatic testing (see the [testing guide](https://tezos.gitlab.io/developer/testing.html)).
 - [ ] For new features and bug fixes, add an item in the appropriate changelog (`docs/protocols/alpha.rst` for the protocol and the environment, `CHANGES.rst` at the root of the repository for everything else).
-- [ ] For user-facing Tezos X changes, add a changelog fragment `etherlink/.changes/tezosx/<section>/<this MR number>.md` — or an empty `etherlink/.changes/tezosx/no_changelog/<this MR number>.md` if no entry is needed (see [`.changes/tezosx/README.md`](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/.changes/tezosx/README.md)).
+- [ ] For user-facing Tezos X changes, add a changelog fragment `etherlink/.changes/tezosx/<section>/<this MR number>.md` — or an empty `etherlink/.changes/tezosx/no_changelog/<this MR number>.md` if no entry is needed (see [`.changes/README.md`](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/.changes/README.md)).
 - [ ] Select suitable reviewers using the `Reviewers` field below.
 - [ ] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
 

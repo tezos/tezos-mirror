@@ -835,7 +835,7 @@ etherlink.check_tezosx_changelog:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - etherlink/scripts/tezosx_changelog.sh check
+  - etherlink/scripts/changelog.sh check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

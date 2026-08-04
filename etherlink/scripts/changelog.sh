@@ -12,7 +12,7 @@
 # etherlink/.changes/tezosx/<section>/. Those fragments are assembled into
 # CHANGES_TEZOSX.md once, when a release is cut.
 #
-# See etherlink/.changes/tezosx/README.md.
+# See etherlink/.changes/README.md.
 
 set -eu
 
@@ -46,7 +46,7 @@ unreleased_block() {
 Entries for the next release live as one file per merge request under
 [`.changes/tezosx/`](.changes/tezosx/), to avoid rebase conflicts and entries
 stranded above a freshly cut release header. See
-[`.changes/tezosx/README.md`](.changes/tezosx/README.md).
+[`.changes/README.md`](.changes/README.md).
 EOF
 }
 
@@ -275,7 +275,7 @@ instance:
   - The kernel no longer accepts blueprints signed by a rotated sequencer key.
 
 Do not write the '(!$1)' reference: it is appended when the release is
-assembled. See etherlink/.changes/tezosx/README.md.
+assembled. See etherlink/.changes/README.md.
 
 If this merge request needs no changelog entry, say so with an empty file:
 

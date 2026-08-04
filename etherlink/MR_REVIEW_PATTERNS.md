@@ -306,7 +306,7 @@ etherlink/.changes/tezosx/<section>/<mr-number>.md
 
 The file holds the markdown bullet(s) to insert under that section, without the `(!<mr-number>)` reference: that reference is appended to every bullet when the release is assembled, and a fragment spelling out its own reference is rejected. An MR that needs no entry says so with an empty `.changes/tezosx/no_changelog/<mr-number>.md`, which is explicit in the diff and reviewable.
 
-Since no two MRs write to the same file, there are no rebase conflicts and no entry can end up stranded above a release header cut on `master` while the MR was open. `etherlink.check_tezosx_changelog` fails the pipeline when the MR declares nothing, when a fragment would be silently dropped at release time, and when an entry appears in the changelog itself. See [`.changes/tezosx/README.md`](./.changes/tezosx/README.md).
+Since no two MRs write to the same file, there are no rebase conflicts and no entry can end up stranded above a release header cut on `master` while the MR was open. `etherlink.check_tezosx_changelog` fails the pipeline when the MR declares nothing, when a fragment would be silently dropped at release time, and when an entry appears in the changelog itself. See [`.changes/README.md`](./.changes/README.md).
 
 **Kernel** entries still go directly in `etherlink/CHANGES_KERNEL.md`, so the rebase hazard remains there. After a rebase, **recheck where your changelog lines landed:**
 

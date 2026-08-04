@@ -55,7 +55,7 @@ module Files = struct
   let tezosx = ["etherlink/kernel_latest/**/*"]
 
   (* The Tezos X changelog and the fragments it is assembled from (see
-     [etherlink/.changes/tezosx/README.md]). *)
+     [etherlink/.changes/README.md]). *)
   let tezosx_changelog =
     ["etherlink/.changes/tezosx/**/*"; "etherlink/CHANGES_TEZOSX.md"]
 
@@ -204,7 +204,7 @@ let job_lint_solidity_artifacts =
    an entry or, with an empty file, that it needs none. Registered as
    [Immediate] so that it lands in the sanity stage: it is a cheap check that
    should not wait for anything, hence also an image that the pipeline does not
-   have to build. See [etherlink/.changes/tezosx/README.md]. *)
+   have to build. See [etherlink/.changes/README.md]. *)
 let job_check_tezosx_changelog =
   CI.job
     "check_tezosx_changelog"
@@ -214,7 +214,7 @@ let job_check_tezosx_changelog =
       "Check that the merge request declares its Tezos X changelog entry."
     ~image:Images.Base_images.debian_trixie
     ~only_if_changed:Files.(tezosx @ tezosx_changelog)
-    ~script:["etherlink/scripts/tezosx_changelog.sh check"]
+    ~script:["etherlink/scripts/changelog.sh check"]
 
 (* Manual counterpart of [job_check_tezosx_changelog], for release merge
    requests: shows the changelog section that the fragments currently in the
@@ -228,8 +228,8 @@ let job_preview_tezosx_changelog =
       "Print the Tezos X changelog section assembled from the fragments."
     ~image:Images.Base_images.debian_trixie
     ~only_if_changed:
-      (Files.tezosx_changelog @ ["etherlink/scripts/tezosx_changelog.sh"])
-    ~script:["etherlink/scripts/tezosx_changelog.sh preview"]
+      (Files.tezosx_changelog @ ["etherlink/scripts/changelog.sh"])
+    ~script:["etherlink/scripts/changelog.sh preview"]
 
 let job_unit_tests =
   CI.job
