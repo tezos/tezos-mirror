@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.build_all:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: build
   tags:
   - gcp
@@ -62,7 +62,7 @@ documentation.build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation.docgen:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -107,7 +107,7 @@ documentation.docgen:
     - docs/shell/p2p_api.rst
 
 documentation.install_python_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -126,7 +126,7 @@ documentation.install_python_22_04:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -145,7 +145,7 @@ documentation.install_python_24_04:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -164,7 +164,7 @@ documentation.install_python_trixie:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.linkcheck:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -194,7 +194,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.manuals:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: build
   tags:
   - gcp
@@ -226,7 +226,7 @@ documentation.manuals:
     - docs/user/node-config.json
 
 documentation.odoc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -269,7 +269,7 @@ documentation.odoc:
     when: always
 
 documentation.rst-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -289,7 +289,7 @@ documentation.rst-check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build_x86_64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -353,7 +353,7 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu

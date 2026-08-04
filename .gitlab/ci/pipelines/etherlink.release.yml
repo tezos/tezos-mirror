@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.build_evm_node_static_arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -77,7 +77,7 @@ etherlink.build_evm_node_static_arm64:
     when: on_success
 
 etherlink.build_evm_node_static_x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -125,7 +125,7 @@ etherlink.build_evm_node_static_x86_64:
     when: on_success
 
 etherlink.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -139,8 +139,8 @@ etherlink.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-e92d4ade
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -162,7 +162,7 @@ etherlink.docker:amd64:
     - runner_system_failure
 
 etherlink.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -176,8 +176,8 @@ etherlink.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-e92d4ade
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -199,7 +199,7 @@ etherlink.docker:arm64:
     - runner_system_failure
 
 etherlink.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -230,7 +230,7 @@ etherlink.docker:merge_manifests:
   retry: 0
 
 etherlink.docker:promote_to_latest:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -260,7 +260,7 @@ etherlink.docker:promote_to_latest:
   retry: 0
 
 etherlink.gitlab:octez-evm-node-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-e92d4ade
   stage: publish
   tags:
   - gcp_not_interruptible
