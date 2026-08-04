@@ -168,17 +168,9 @@ end
 
 (** A facility for registering images for [image:] keywords.
 
-    Images can be registered in two manners:
-     - {i External} images are built outside the [tezos/tezos] CI and are
-       registered with their path (e.g. [alpine:3.18]).
-
-     - {i Internal} images are built in the pipeline they are
-       used. They are registered an [image_path] and an
-       [image_builder]. The [script:] of an [image_builder]
-       must build the image and push it to [image_path].
-
-    Pipelines with jobs using internal images automatically include
-    corresponding image builder jobs with appropriate dependencies. *)
+    Images are built outside the pipelines that use them -- by the
+    [base_images] pipelines, or outside the [tezos/tezos] CI altogether --
+    and are registered with their path (e.g. [alpine:3.18]). *)
 module Image : sig
   (** A registered Docker image in which a job can execute. *)
   type t
@@ -270,20 +262,9 @@ type git_strategy =
     - Translates each {!dependency} to [needs:] and [dependencies:]
       keywords as detailed in the documentation of {!dependency}.
 
-    - [image_dependencies] is a list of internal !{Image.t}s that this
-      job uses indirectly, i.e. not in it's [image:] field. For
-      instance, this can be used by a job that builds a Docker image
-      with an internal image as input.  A run-time error will be thrown
-      if this list includes an external image.
-
     - If both a [template] and an [image] are provided, then a
       run-time error is raised to prevent overriding the image defined
       in the GitLab template.
-
-    - If the [image] used is {!Internal} and [tag] is set to
-      {!Dynamic} then a run-time error is generated as the required
-      architecture for the internal image cannot be statically
-      deduced.
 
     This function accepts the following arguments to specify requirements
     on the runners that are to run the job.
@@ -326,7 +307,6 @@ val job :
   ?id_tokens:Gitlab_ci.Types.id_tokens ->
   ?interruptible:bool ->
   ?dependencies:dependencies ->
-  ?image_dependencies:Image.t list ->
   ?services:Gitlab_ci.Types.service list ->
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->
@@ -367,8 +347,6 @@ val dind_retry : Gitlab_ci.Types.retry
 
 module Stages : sig
   val start : Stage.t
-
-  val images : Stage.t
 
   val sanity : Stage.t
 
