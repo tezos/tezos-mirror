@@ -59,6 +59,13 @@ module Files = struct
   let tezosx_changelog =
     ["etherlink/.changes/tezosx/**/*"; "etherlink/CHANGES_TEZOSX.md"]
 
+  (* Code whose user-facing changes are documented in
+     [etherlink/CHANGES_NODE.md], and that changelog with its fragments. *)
+  let evm_node = ["etherlink/bin_node/**/*"]
+
+  let node_changelog =
+    ["etherlink/.changes/node/**/*"; "etherlink/CHANGES_NODE.md"]
+
   (* [evm_compatibility] and [revm_compatibility] are already included
      in [node @ kernel] *)
   let all =
@@ -198,38 +205,66 @@ let job_lint_solidity_artifacts =
         "git diff-index --quiet HEAD --";
       ]
 
-(* The Tezos X changelog is not edited directly: each merge request adds a
-   fragment named after its own number, so that concurrent merge requests never
-   touch the same lines. This job checks that the merge request declares either
-   an entry or, with an empty file, that it needs none. Registered as
-   [Immediate] so that it lands in the sanity stage: it is a cheap check that
-   should not wait for anything, hence also an image that the pipeline does not
-   have to build. See [etherlink/.changes/README.md]. *)
-let job_check_tezosx_changelog =
-  CI.job
-    "check_tezosx_changelog"
-    ~__POS__
-    ~stage:Test
-    ~description:
-      "Check that the merge request declares its Tezos X changelog entry."
-    ~image:Images.Base_images.debian_trixie
-    ~only_if_changed:Files.(tezosx @ tezosx_changelog)
-    ~script:["etherlink/scripts/changelog.sh check"]
+(* The changelogs that are assembled from fragments rather than edited directly
+   (see [etherlink/.changes/README.md]). *)
+type changelog = Tezosx | Node
 
-(* Manual counterpart of [job_check_tezosx_changelog], for release merge
-   requests: shows the changelog section that the fragments currently in the
-   repository would produce. *)
-let job_preview_tezosx_changelog =
+let changelog_id = function Tezosx -> "tezosx" | Node -> "node"
+
+let changelog_label = function Tezosx -> "Tezos X" | Node -> "EVM node"
+
+let changelog_script = "etherlink/scripts/changelog.sh"
+
+(* Code documented by a changelog, plus the changelog, its fragments and the
+   script itself: a merge request touching any of them has to declare what it
+   changes — or that it changes nothing. The script is included so that changing
+   it reruns the checks that it implements. *)
+let changelog_paths changelog =
+  (match changelog with
+  | Tezosx -> Files.(tezosx @ tezosx_changelog)
+  | Node -> Files.(evm_node @ node_changelog))
+  @ [changelog_script]
+
+(* A changelog is not edited directly: each merge request adds a fragment named
+   after its own number, so that concurrent merge requests never touch the same
+   lines. This job checks that the merge request declares either an entry or,
+   with an empty file, that it needs none. Registered as [Immediate] so that it
+   lands in the sanity stage: it is a cheap check that should not wait for
+   anything, hence also an image that the pipeline does not have to build. *)
+let job_check_changelog =
+  Cacio.parameterize @@ fun changelog ->
   CI.job
-    "preview_tezosx_changelog"
+    ("check_" ^ changelog_id changelog ^ "_changelog")
     ~__POS__
     ~stage:Test
     ~description:
-      "Print the Tezos X changelog section assembled from the fragments."
+      (sf
+         "Check that the merge request declares its %s changelog entry."
+         (changelog_label changelog))
+    ~image:Images.Base_images.debian_trixie
+    ~only_if_changed:(changelog_paths changelog)
+    ~script:[sf "%s %s check" changelog_script (changelog_id changelog)]
+
+(* Manual counterpart of [job_check_changelog], for release merge requests:
+   shows the changelog section that the fragments currently in the repository
+   would produce. *)
+let job_preview_changelog =
+  Cacio.parameterize @@ fun changelog ->
+  CI.job
+    ("preview_" ^ changelog_id changelog ^ "_changelog")
+    ~__POS__
+    ~stage:Test
+    ~description:
+      (sf
+         "Print the %s changelog section assembled from the fragments."
+         (changelog_label changelog))
     ~image:Images.Base_images.debian_trixie
     ~only_if_changed:
-      (Files.tezosx_changelog @ ["etherlink/scripts/changelog.sh"])
-    ~script:["etherlink/scripts/changelog.sh preview"]
+      ((match changelog with
+       | Tezosx -> Files.tezosx_changelog
+       | Node -> Files.node_changelog)
+      @ [changelog_script])
+    ~script:[sf "%s %s preview" changelog_script (changelog_id changelog)]
 
 let job_unit_tests =
   CI.job
@@ -549,7 +584,8 @@ let register () =
   let open Runner.Arch in
   Cacio.register_merge_request_jobs
     [
-      (Immediate, job_check_tezosx_changelog);
+      (Immediate, job_check_changelog Tezosx);
+      (Immediate, job_check_changelog Node);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
@@ -561,7 +597,8 @@ let register () =
       (Auto, job_mir_tzt);
       (Auto, job_mir_no_tickets);
       (Auto, job_tezt `merge_request);
-      (Manual, job_preview_tezosx_changelog);
+      (Manual, job_preview_changelog Tezosx);
+      (Manual, job_preview_changelog Node);
       (Manual, job_build_evm_node_static Amd64 Test);
       (Manual, job_build_evm_node_static Arm64 Test);
       (Manual, job_tezt_slow `merge_request);

@@ -815,16 +815,17 @@ etherlink.build_tezt:
     - _build/default/etherlink/tezt/tests/main.exe
     when: on_success
 
-etherlink.check_tezosx_changelog:
+etherlink.check_node_changelog:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
   stage: sanity
   tags:
   - gcp
   rules:
   - changes:
-    - etherlink/.changes/tezosx/**/*
-    - etherlink/CHANGES_TEZOSX.md
-    - etherlink/kernel_latest/**/*
+    - etherlink/.changes/node/**/*
+    - etherlink/CHANGES_NODE.md
+    - etherlink/bin_node/**/*
+    - etherlink/scripts/changelog.sh
     when: on_success
   needs: []
   dependencies: []
@@ -835,7 +836,33 @@ etherlink.check_tezosx_changelog:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - etherlink/scripts/changelog.sh check
+  - etherlink/scripts/changelog.sh node check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+etherlink.check_tezosx_changelog:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - etherlink/.changes/tezosx/**/*
+    - etherlink/CHANGES_TEZOSX.md
+    - etherlink/kernel_latest/**/*
+    - etherlink/scripts/changelog.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - etherlink/scripts/changelog.sh tezosx check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
