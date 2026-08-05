@@ -612,9 +612,20 @@ where
                 EtherlinkHandler::default()
             }
             .with_call_depth(call_depth);
-        let result = handler.inspect_run(&mut evm_context)?;
+        let result = match handler.inspect_run(&mut evm_context) {
+            Ok(r) => r,
+            Err(e) => {
+                if let Some(cp) = credit_checkpoint {
+                    evm_context.ctx.journaled_state.checkpoint_revert(cp);
+                }
+                return Err(e.into());
+            }
+        };
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            if let Some(cp) = credit_checkpoint {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
             return Err(EvmKernelError::Runtime(err).into());
         }
 
@@ -668,15 +679,26 @@ where
         };
 
         let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
-        let result = execute_transaction(
+        let result = match execute_transaction(
             &mut evm_context,
             &tx,
             transaction_hash,
             is_static_top_frame,
             call_depth,
-        )?;
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                if let Some(cp) = credit_checkpoint {
+                    evm_context.ctx.journaled_state.checkpoint_revert(cp);
+                }
+                return Err(e.into());
+            }
+        };
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            if let Some(cp) = credit_checkpoint {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
             return Err(EvmKernelError::Runtime(err).into());
         }
 

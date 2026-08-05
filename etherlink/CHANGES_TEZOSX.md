@@ -137,6 +137,10 @@
   for every cross-runtime-originated receipt. (!22049)
 - Add a precompile contract leading the kernel to panic—requires a feature flag
   to be available, as to avoid leaving an DoS path. (!22412)
+- Fix a bug where an inbound cross-runtime EVM sub-execution failing before it
+  entered the interpreter (a transaction validation error) drained the journal
+  it shares with the outer EVM transaction, reverting state the outer frames
+  had already written, and left the inbound value credit applied. (!22693)
 
 ### Michelson Runtime
 

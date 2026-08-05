@@ -413,7 +413,13 @@ impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
 
     #[inline]
     fn discard_tx(&mut self) {
-        self.journal.evm.inner.discard_tx();
+        // Noop: an inbound CRAC/NAC sub-execution shares the outer tx's
+        // JournalInner; revm's tx-global discard_tx would drain the outer
+        // frame's entries. Sub-execution cleanup is done by the parent CALL
+        // frame's checkpoint_revert. Top-level failures don't need it either:
+        // the journal is fresh per tx (apply.rs) and only committed on Ok
+        // on `run_transaction`, so a failed tx's journal is dropped — revm allows
+        // "cleared by discard_tx OR dropped".
     }
 
     /// Clear current journal resetting it to initial state and return changes state.
