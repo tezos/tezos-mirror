@@ -831,6 +831,79 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
   Log.info "Slot sucessfully attested" ;
   unit
 
+(* Regression test for the DAL-node health check freezing the baker. At every
+   level where [current_level mod 50 = 1] the baker queries its DAL node health
+   on the AWAITED attestation-building path ([may_get_dal_content] ->
+   [only_if_dal_feature_enabled] -> [dal_checks_and_warnings]). That request has
+   no timeout, so against an unresponsive DAL node it blocks the automaton loop
+   and halts both proposing and attesting for every delegate on this baker.
+
+   We freeze the DAL node with SIGSTOP before the level-51 boundary: the process
+   stops answering but keeps its connection open (no TCP close), reproducing an
+   unresponsive node. A plain kill would instead close the socket cleanly and not
+   exhibit the freeze. We then assert the chain keeps advancing past that level.
+   This asserts the DESIRED liveness and therefore FAILS against a baker that
+   awaits the health check; it passes once the health check is moved off the
+   awaited path and/or bounded by a timeout. *)
+let test_baker_liveness_on_unresponsive_dal_health _protocol _parameters
+    _cryptobox node client dal_node =
+  let event_timeout = 120. in
+  let baker =
+    Agnostic_baker.create
+      ~dal_node_rpc_endpoint:(Dal_node.as_rpc_endpoint dal_node)
+      node
+      client
+  in
+  let wait_initial_backfill =
+    Agnostic_baker.wait_for
+      ~timeout:event_timeout
+      baker
+      "consumed_backfill_stream.v0"
+      (fun _ -> Some ())
+  in
+  let* () = Agnostic_baker.run baker in
+  let* () = wait_initial_backfill in
+
+  Log.info "Baseline: the chain advances while the baker attests" ;
+  let* (_ : int) = Node.wait_for_level node 5 in
+
+  Log.info
+    "Freeze the DAL node (SIGSTOP: stops answering, keeps the connection open) \
+     before the level-51 health-check boundary" ;
+  let* () = Dal_node.stop dal_node in
+
+  (* The next level with [level mod 50 = 1] is 51; there the baker issues the
+     un-timed health request on the awaited attestation path. A healthy baker
+     keeps advancing; a frozen one halts around level 51. *)
+  let target_level = 55 in
+  let progress_timeout = 90. in
+  Log.info
+    "Assert the chain reaches level %d within %g s"
+    target_level
+    progress_timeout ;
+  let* reached =
+    Lwt.pick
+      [
+        (let* (_ : int) = Node.wait_for_level node target_level in
+         Lwt.return_true);
+        (let* () = Lwt_unix.sleep progress_timeout in
+         Lwt.return_false);
+      ]
+  in
+  (* Kill the frozen DAL node (SIGKILL works on a SIGSTOP'd process): this also
+     unblocks any hung baker RPC via a connection reset, so both daemons tear
+     down cleanly regardless of the assertion outcome. *)
+  let* () = Dal_node.kill dal_node in
+  let* () = Agnostic_baker.terminate baker in
+  Check.(
+    (reached = true)
+      bool
+      ~error_msg:
+        "chain did not reach the target level (reached = %L): the baker's \
+         automaton is frozen on an un-timed DAL node health check at the \
+         level-51 boundary, halting proposing and attesting for all delegates.") ;
+  unit
+
 let register ~__FILE__ ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
@@ -889,6 +962,18 @@ let register ~__FILE__ ~protocols =
     ~prover:false
     test_baker_registers_profiles
     protocols ;
+  (* Only U025+ bakers have the DAL attestable-slots worker this test syncs on
+     ([consumed_backfill_stream.v0]) and the health-check-off-consensus-path fix
+     it asserts; T024 has neither, so restrict to those protocols. *)
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["attestation"; "liveness"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~activation_timestamp:Now
+    ~operator_profiles:[0]
+    "chain progresses when dal node is unresponsive"
+    test_baker_liveness_on_unresponsive_dal_health
+    (List.filter (fun protocol -> Protocol.number protocol >= 025) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["bootstrap"]

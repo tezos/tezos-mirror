@@ -440,3 +440,22 @@ module P2P : sig
     val get_message_cache : t -> (int64 * (Types.Topic.t * int) list) list
   end
 end
+
+module Internal_for_tests : sig
+  (** Opaque handle for the in-flight committee fetch table. *)
+  type fetch_in_flight
+
+  (** [create_fetch_in_flight ()] creates a fresh in-flight deduplication
+      table with the standard capacity. *)
+  val create_fetch_in_flight : unit -> fetch_in_flight
+
+  (** [apply_fetch_dedup ~in_flight ~fetch_fn level] returns an existing
+      in-flight promise for [level] if one is present, or calls [fetch_fn
+      level] and registers the resulting promise so that concurrent callers
+      share it.  The entry is removed when the promise settles. *)
+  val apply_fetch_dedup :
+    in_flight:fetch_in_flight ->
+    fetch_fn:(int32 -> Committee_cache.committee tzresult Lwt.t) ->
+    int32 ->
+    Committee_cache.committee tzresult Lwt.t
+end

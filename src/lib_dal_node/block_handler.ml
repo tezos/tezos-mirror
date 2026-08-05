@@ -313,6 +313,26 @@ let fetch_and_store_skip_list_cells ctxt cctxt proto_params ~attested_level
   in
   store_skip_list_cells ctxt ~attested_level skip_list_cells
 
+(* [tb_slot_to_shards ~attestation_level_committee ~assignment_level_committee]
+   associates a Tenderbake attestation/consensus slot to an attester and its DAL
+   shards. The consensus slot is taken from [attestation_level_committee] (the
+   committee of the level actually attested by the operations, since consensus
+   slots are shuffled at every level), while the assigned shards are taken from
+   [assignment_level_committee] (the shard assignment committee for the published
+   level, i.e. the committee at [published_level + attestation_lag - 1]).
+   Attesters that hold no shards for the published level (absent from
+   [assignment_level_committee]) are dropped. *)
+let tb_slot_to_shards ~attestation_level_committee ~assignment_level_committee =
+  Signature.Public_key_hash.Map.fold
+    (fun pkh (_dal_shards, tb_slot) l ->
+      match
+        Signature.Public_key_hash.Map.find pkh assignment_level_committee
+      with
+      | None -> l
+      | Some (dal_shards, _tb_slot) -> (tb_slot, (pkh, dal_shards)) :: l)
+    attestation_level_committee
+    []
+
 (* This function counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     ~lag_index =
@@ -361,10 +381,16 @@ let decoded_attests_slot (decoded : Dal_plugin.unfolded_lag_attestation list)
    all attestation lags up to [block_level]. Returns an array of size
    [number_of_slots]. *)
 let compute_total_attested_shards_per_slot cctxt node_ctxt parameters
-    slot_to_committee ~published_level ~block_level
-    (module Plugin : Dal_plugin.T) =
+    ~published_level ~block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let number_of_slots = parameters.Types.number_of_slots in
+  (* Shards for slots published at [published_level] are assigned by the shard
+     assignment committee, whose level is [published_level + attestation_lag - 1
+     = block_level - 1], independently of the (dynamic) lag at which the
+     attestation is actually included. *)
+  let* assignment_level_committee =
+    Node_context.fetch_committees node_ctxt ~level:(Int32.pred block_level)
+  in
   let* attestations_per_lag =
     List.mapi_es
       (fun lag_index lag ->
@@ -377,14 +403,29 @@ let compute_total_attested_shards_per_slot cctxt node_ctxt parameters
               parameters
               ~attested_level
           in
-          return_some (lag_index, cached_ops)
+          (* Tenderbake consensus slots are shuffled at each level, so the
+             operations included at [attested_level] (which attest
+             [attested_level - 1]) are attributed to their delegate using the
+             committee of that level, while shards are weighted with
+             [assignment_level_committee]. *)
+          let* attestation_level_committee =
+            Node_context.fetch_committees
+              node_ctxt
+              ~level:(Int32.pred attested_level)
+          in
+          let slot_to_committee =
+            tb_slot_to_shards
+              ~attestation_level_committee
+              ~assignment_level_committee
+          in
+          return_some (lag_index, slot_to_committee, cached_ops)
         else return_none)
       parameters.Types.attestation_lags
   in
   let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
   let total_attested_shards = Array.make number_of_slots 0 in
   List.iter
-    (fun (lag_index, cached_ops) ->
+    (fun (lag_index, slot_to_committee, cached_ops) ->
       let shards =
         attested_shards_per_slot
           cached_ops
@@ -398,7 +439,7 @@ let compute_total_attested_shards_per_slot cctxt node_ctxt parameters
     attestations_per_lag ;
   return total_attested_shards
 
-let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
+let check_attesters_attested cctxt node_ctxt parameters ~block_level
     ~total_attested_shards (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let tracked_attesters =
@@ -422,6 +463,13 @@ let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
       let are_slots_protocol_attested =
         Array.map (fun n -> n >= threshold) total_attested_shards
       in
+      (* The shard assignment committee for slots published at [published_level]
+         is the committee at [published_level + attestation_lag - 1 =
+         block_level - 1]. Membership in it means the attester was assigned
+         shards for this published level, i.e. is expected to attest. *)
+      let* assignment_level_committee =
+        Node_context.fetch_committees node_ctxt ~level:(Int32.pred block_level)
+      in
       (* Rebuild attestations_per_lag for per-attester checks below.
          All ops are already cached by [compute_total_attested_shards_per_slot]. *)
       let* attestations_per_lag =
@@ -436,7 +484,21 @@ let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
                   parameters
                   ~attested_level
               in
-              return_some (lag_index, lag, attested_level, cached_ops)
+              (* Tenderbake consensus slots are shuffled at each level, so the
+                 operations included at [attested_level] (which attest
+                 [attested_level - 1]) must be attributed to their delegate
+                 using the committee of that level rather than a single one. *)
+              let* attestation_level_committee =
+                Node_context.fetch_committees
+                  node_ctxt
+                  ~level:(Int32.pred attested_level)
+              in
+              return_some
+                ( lag_index,
+                  lag,
+                  attested_level,
+                  attestation_level_committee,
+                  cached_ops )
             else return_none)
           parameters.Types.attestation_lags
       in
@@ -460,18 +522,32 @@ let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
                  index = slot_index
                  && Signature.Public_key_hash.equal delegate pkh)
       in
-      let check_attester attester proto_tb_slot =
-        (* Find the attester's attestation operations across all lag levels *)
+      let check_attester attester =
+        (* Find the attester's attestation operations across all lag levels.
+           The attester's consensus slot differs at each level, so it is
+           resolved with the committee of the corresponding attested level. *)
         let attestation_ops_per_lag =
           List.filter_map
-            (fun (lag_index, _lag, attested_level, cached_ops) ->
+            (fun ( lag_index,
+                   _lag,
+                   attested_level,
+                   attestation_level_committee,
+                   cached_ops )
+               ->
               match
-                List.find_opt
-                  (fun (tb_int, _fn_opt) -> tb_int = proto_tb_slot)
-                  cached_ops
+                Signature.Public_key_hash.Map.find
+                  attester
+                  attestation_level_committee
               with
               | None -> None
-              | Some entry -> Some (lag_index, attested_level, entry))
+              | Some (_dal_shards, proto_tb_slot) -> (
+                  match
+                    List.find_opt
+                      (fun (tb_int, _fn_opt) -> tb_int = proto_tb_slot)
+                      cached_ops
+                  with
+                  | None -> None
+                  | Some entry -> Some (lag_index, attested_level, entry)))
             attestations_per_lag
         in
         if attestation_ops_per_lag = [] then (
@@ -555,9 +631,15 @@ let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
       let*! () =
         Signature.Public_key_hash.Set.iter_s
           (fun attester ->
-            match Signature.Public_key_hash.Map.find attester committee with
-            | None -> Lwt.return_unit
-            | Some (_dal_slots, tb_slot) -> check_attester attester tb_slot)
+            (* Only attesters assigned DAL shards for [published_level] (i.e.
+               present in [assignment_level_committee]) are expected to attest;
+               the others must not trigger a "no attestation" warning. *)
+            if
+              Signature.Public_key_hash.Map.mem
+                attester
+                assignment_level_committee
+            then check_attester attester
+            else Lwt.return_unit)
           tracked_attesters
       in
       return_unit
@@ -681,11 +763,13 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     let committee_level = Int32.pred block_level in
     Node_context.fetch_committees ctxt ~level:committee_level
   in
-  (* [slot_to_committee] associates a Tenderbake attestation slot index to an
-     attester public key hash and its list of DAL shards indices. *)
+  (* [slot_to_committee] associates a Tenderbake attestation slot to an
+     attester public key hash and its list of DAL shards indices. It is built
+     from the committee of [block_level - 1] and is only consistent with the
+     attestations included at [block_level] (used below by the accuser). *)
   let slot_to_committee =
     Signature.Public_key_hash.Map.fold
-      (fun pkh (dal_slots, tb_slot) l -> (tb_slot, (pkh, dal_slots)) :: l)
+      (fun pkh (dal_shards, tb_slot) l -> (tb_slot, (pkh, dal_shards)) :: l)
       committees
       []
   in
@@ -702,7 +786,6 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
           cctxt
           ctxt
           proto_parameters
-          slot_to_committee
           ~published_level
           ~block_level
           (module Plugin)
@@ -720,7 +803,6 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
         (check_attesters_attested
            cctxt
            ctxt
-           committees
            proto_parameters
            ~block_level
            ~total_attested_shards
@@ -941,6 +1023,9 @@ let new_finalized_head ctxt cctxt l1_crawler finalized_block_hash ~launch_time
         ~committee_level ;
       return_unit
   in
+  (* Per-level liveness signal on every open monitoring stream, so that a
+         baker can detect a dead stream even during quiet periods. *)
+  Attestable_slots.notify_heartbeat ctxt ;
   let*? cryptobox, _ =
     Node_context.get_cryptobox_and_precomputations ~level ctxt
   in

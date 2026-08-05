@@ -949,6 +949,32 @@ open struct
       ~level:Info
       ("query_id", Data_encoding.int31)
 
+  let amplification_queue_full =
+    declare_3
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplification_queue_full"
+      ~msg:
+        "amplification queue is full ({queue_length} reconstructions in \
+         flight): dropping the reconstruction of slot index {slot_index} at \
+         level {level}."
+      ~level:Warning
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("queue_length", Data_encoding.int31)
+
+  let amplification_already_in_flight =
+    declare_2
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplification_already_in_flight"
+      ~msg:
+        "a reconstruction for slot index {slot_index} at level {level} is \
+         already in flight: skipping the duplicate amplification request."
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+
   let get_attestable_slots_ok_notice =
     declare_3
       ~section
@@ -1336,6 +1362,29 @@ open struct
       ("shard_index", Data_encoding.int31)
       ("sender", Types.Peer.encoding)
       ~pp4:Types.Peer.pp
+
+  let shard_committee_level_out_of_window =
+    declare_2
+      ~section:["dal_shards"; "reception"]
+      ~name:"shard_committee_level_out_of_window"
+      ~msg:
+        "Skipping committee fetch: committee level {committee_level} exceeds \
+         the fetch window (head level {head_level}); shard dropped."
+      ~level:Notice
+      ("committee_level", Data_encoding.int32)
+      ("head_level", Data_encoding.int32)
+
+  let committee_fetch_failed =
+    declare_2
+      ~section:["dal_shards"; "reception"]
+      ~name:"committee_fetch_failed"
+      ~msg:
+        "Committee fetch for level {level} failed; shard reception metric \
+         skipped. Failure: {trace}"
+      ~level:Warning
+      ~pp2:Error_monad.pp_print_trace
+      ("level", Data_encoding.int32)
+      ("trace", Error_monad.trace_encoding)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
   let skip_attesting_shards =
@@ -1763,6 +1812,12 @@ let emit_main_process_received_reply_error ~query_id ~msg =
 let emit_main_process_enqueue_query ~query_id =
   emit main_process_enqueue_query query_id
 
+let emit_amplification_queue_full ~level ~slot_index ~queue_length =
+  emit amplification_queue_full (level, slot_index, queue_length)
+
+let emit_amplification_already_in_flight ~level ~slot_index =
+  emit amplification_already_in_flight (level, slot_index)
+
 let emit_get_attestable_slots_ok_notice ~attester ~published_level
     ~slots_indices =
   emit get_attestable_slots_ok_notice (attester, published_level, slots_indices)
@@ -1872,6 +1927,12 @@ let emit_validation_of_shard_update ~level ~slot_index ~slot_metrics =
 
 let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
   emit reception_of_shard_detailed (level, slot_index, shard_index, sender)
+
+let emit_shard_committee_level_out_of_window ~committee_level ~head_level =
+  emit shard_committee_level_out_of_window (committee_level, head_level)
+
+let emit_dont_wait__committee_fetch_failed ~level ~trace =
+  emit__dont_wait__use_with_care committee_fetch_failed (level, trace)
 
 let emit_skip_attesting_shards ~level = emit skip_attesting_shards level
 

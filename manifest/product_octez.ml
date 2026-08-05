@@ -5802,7 +5802,7 @@ let octez_dal_node_lib =
 
 let _octez_dal_node_lib_test =
   tezt
-    ["test_storage"; "test_skip_shards"]
+    ["test_storage"; "test_skip_shards"; "test_committee_fetch"]
     ~path:"src/lib_dal_node/test/"
     ~opam:"tezos-dal-node-lib"
     ~preprocess:(ppses [ppx_hash])

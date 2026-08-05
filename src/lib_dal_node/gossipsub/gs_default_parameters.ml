@@ -89,6 +89,10 @@ end
 module Limits = struct
   let max_recv_ihave_per_heartbeat = 10
 
+  (** Max message-ids in a single IHave (outbound) or IWant (outbound and
+      inbound) message.  Also used as the [~max_length] bound for
+      [message_ids] lists in the wire encoding; see
+      [Transport_layer_interface.P2p_message_V1.p2p_message_app_encoding]. *)
   let max_sent_iwant_per_heartbeat = 5000
 
   let max_gossip_retransmission = 3
@@ -101,6 +105,10 @@ module Limits = struct
 
   let do_px = true
 
+  (** Max peer-exchange entries in an outbound Prune, and the max accepted on
+      receipt.  Also used as the [~max_length] bound for the [px] list in the
+      wire encoding; see
+      [Transport_layer_interface.P2p_message_V1.p2p_message_app_encoding]. *)
   let peers_to_px = 16
 
   let accept_px_threshold = 0.
@@ -163,6 +171,11 @@ module Limits = struct
   let opportunistic_graft_threshold = 1.
 
   let seen_history_length = 120
+
+  (* A DAL P2P peer is allowed at most this many distinct topics in its
+     subscription set.  The DAL topic space is currently at most ~160 slots ×
+     ~200 active delegates ≈ 32,000. *)
+  let max_topics_per_peer = 65536
 end
 
 module Peer_filter = struct

@@ -3419,6 +3419,135 @@ let test_default_rpc_addr_is_loopback ~__FILE__ () =
       ~error_msg:"Expected --rpc-addr help to advertise default port 10732") ;
   unit
 
+(* Testing
+   -------
+   Component:    DAL node / baker interaction — attestable-slots stream watchdog
+   Invocation:   dune exec tezt/tests/main.exe -- --file dal_node_tests.ml \
+                   "DAL attestable-slots stream watchdog recovers from a frozen DAL node"
+   Subject:      A baker keeps a long-lived [monitor/attestable_slots] stream to
+                 its DAL node. If the DAL node dies leaving a silent (reset or
+                 half-open) connection, the stream never delivers [None] and the
+                 baker would silently stop DAL-attesting. The per-level [Heartbeat]
+                 event plus the baker-side watchdog must (a) NOT fire while the DAL
+                 node is healthy but has nothing to report, and (b) force a
+                 reconnection once the DAL node stops sending anything, so that
+                 DAL-attestation recovers on its own. *)
+let test_dal_stream_watchdog protocol parameters _cryptobox node client dal_node
+    =
+  let client = Client.with_dal_node client ~dal_node in
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let attestation_lag = parameters.attestation_lag in
+  let slot_index = 0 in
+  let all_delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun k -> k.Account.alias)
+  in
+  let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+  let* baker =
+    Agnostic_baker.init
+      ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
+      ~dal_node_rpc_endpoint
+      ~delegates:all_delegates
+      ~state_recorder:true
+      node
+      client
+  in
+  (* Publish a slot and check it ends up DAL-attested on chain (as seen by the
+     DAL node). The exact level at which the publication is included depends on
+     when the running baker bakes the operation in, so instead of predicting it
+     we scan the levels following the injection for an [Attested] status, and
+     poll a few extra levels to let the DAL node catch up (e.g. after a
+     restart). *)
+  let publish_and_check_attested () =
+    let* level_before = Node.get_level node in
+    let* _commitment =
+      Helpers.publish_and_store_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+        (Helpers.make_slot ~slot_size (generate_dummy_slot slot_size))
+    in
+    (* The publication lands a few levels after [level_before]; wait until the
+       attestation window has closed for any such level. *)
+    let last_candidate = level_before + 6 in
+    let* _ = Node.wait_for_level node (last_candidate + attestation_lag) in
+    let scan () =
+      let rec loop lvl =
+        if lvl > last_candidate then Lwt.return_false
+        else
+          let* status =
+            Dal_RPC.(
+              call dal_node @@ get_level_slot_status ~slot_level:lvl ~slot_index)
+          in
+          match status with
+          | Dal_RPC.Attested _ -> Lwt.return_true
+          | _ -> loop (lvl + 1)
+      in
+      loop (level_before + 1)
+    in
+    let rec attempt extra =
+      let* found = scan () in
+      if found then unit
+      else if extra <= 0 then
+        Test.fail
+          ~__LOC__
+          "published slot at index %d was not DAL-attested within the expected \
+           window (levels %d..%d)"
+          slot_index
+          (level_before + 1)
+          last_candidate
+      else
+        let* current = Node.get_level node in
+        let* _ = Node.wait_for_level node (current + 1) in
+        attempt (extra - 1)
+    in
+    attempt 4
+  in
+  (* Assert that no watchdog reconnection happens during [window] consecutive
+     levels. *)
+  let check_no_reconnection ~__LOC__ ~window () =
+    let* start_level = Node.get_level node in
+    let stale =
+      Agnostic_baker.wait_for baker "dal_stream_stale_reconnect.v0" (fun _ ->
+          Some ())
+    in
+    let* _ = Node.wait_for_level node (start_level + window) in
+    (match Lwt.state stale with
+    | Lwt.Return () ->
+        Test.fail
+          ~__LOC__
+          "the DAL stream watchdog wrongly forced a reconnection while the DAL \
+           node was healthy"
+    | Lwt.Fail exn -> raise exn
+    | Lwt.Sleep -> ()) ;
+    Lwt.cancel stale ;
+    unit
+  in
+  Log.info "Baseline: DAL attestation works end-to-end" ;
+  let* () = publish_and_check_attested () in
+  Log.info
+    "Phase 1: a healthy DAL node with nothing to report must not trigger the \
+     watchdog (heartbeats keep the stream alive)" ;
+  let* () = check_no_reconnection ~__LOC__ ~window:5 () in
+  Log.info "Phase 2: freezing the DAL node must trigger the watchdog" ;
+  let reconnected =
+    Agnostic_baker.wait_for baker "dal_stream_stale_reconnect.v0" (fun json ->
+        Some (JSON.as_string json))
+  in
+  (* SIGSTOP keeps the TCP connection open but stops all traffic, heartbeats
+     included: this reproduces the reset/half-open case where the stream never
+     delivers [None]. A plain kill would instead close the socket cleanly and be
+     recovered by the pre-existing end-of-stream path. *)
+  let* () = Dal_node.stop dal_node in
+  let* _delegate_id = reconnected in
+  Log.info
+    "Phase 3: resuming the DAL node; DAL-attestation must recover on its own" ;
+  let* () = Dal_node.continue dal_node in
+  let* () = publish_and_check_attested () in
+  let* () = Agnostic_baker.terminate baker in
+  unit
+
 let register ~__FILE__ ~protocols =
   test_dal_node_startup ~__FILE__ protocols ;
   test_dal_node_invalid_config ~__FILE__ () ;
@@ -3530,6 +3659,15 @@ let register ~__FILE__ ~protocols =
     ~consensus_threshold_size:171 (* 2/3 * 256 *)
     "No redundant DAL attestations with multi-lag"
     test_no_redundant_dal_attestations
+    (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~tags:["baker"; "attestation"; "watchdog"; "restart"]
+    ~operator_profiles:[0]
+    ~activation_timestamp:Now
+    "DAL attestable-slots stream watchdog recovers from a frozen DAL node"
+    test_dal_stream_watchdog
     (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__

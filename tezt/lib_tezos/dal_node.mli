@@ -156,6 +156,9 @@ val kill : t -> unit Lwt.t
 (** Send SIGSTOP to a daemon. Do not wait for the process to terminate. *)
 val stop : t -> unit Lwt.t
 
+(** Send SIGCONT to a daemon previously suspended with {!stop}. *)
+val continue : t -> unit Lwt.t
+
 (** Shows in stdout every events sent by the node *)
 val log_events : ?max_length:int -> t -> unit
 
@@ -326,6 +329,15 @@ val point_str : t -> string
     the crawler and stored in store/last_processed_level KVS file. The function
     returns [None] in case of error (e.g. file not found, file locked, ...). *)
 val load_last_finalized_processed_level : t -> int option Lwt.t
+
+(** [save_last_finalized_processed_level dal_node ~level] overwrites the last
+    finalized level processed by the crawler in the
+    [store/last_processed_level] KVS file of [dal_node]'s store, using the same
+    layout as the node. The node must be stopped. This is meant to simulate a
+    node killed after storing the data of a finalized block but before
+    recording the block as processed. Fails the test if the store cannot be
+    written. *)
+val save_last_finalized_processed_level : t -> level:int -> unit Lwt.t
 
 (** [debug_print_store_schemas ?path ?hooks ()] calls [path debug
     print store schemas] where:

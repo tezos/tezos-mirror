@@ -34,6 +34,15 @@ type t = {
   mutable query_pipe : query_msg Lwt_pipe.Unbounded.t;
   mutable query_id : int;
   query_store : (int, query) Query_store.t;
+  mutable in_flight_slots : Types.Slot_id.Set.t;
+      (* Set of slot ids whose reconstruction has been enqueued but whose
+         reconstructed shards have not yet been written back to the store. It is
+         used to avoid enqueuing duplicate reconstructions for a slot that is
+         already in the pipeline. The [ongoing_amplifications] lock (see
+         {!with_amplification_lock}) only guards the pre-enqueue phase (random
+         delay + recount) and is released as soon as the job is enqueued, so
+         without this set, shards received for the same slot during the
+         reconstruction would each enqueue a redundant job. *)
   amplification_random_delay_min : float;
   amplification_random_delay_max : float;
       (* When receiving shards from the network, the DAL node does not
@@ -364,7 +373,8 @@ let query_sender_job {query_pipe; process; _} =
 
 (* This job aims to read the responses (completed jobs) sent by the amplificator
    process. This function aims to be run by the main DAL node process. *)
-let reply_receiver_job {process; query_store; _} node_context =
+let reply_receiver_job ({process; query_store; _} as amplificator) node_context
+    =
   let open Lwt_result_syntax in
   let process_output = Process_worker.output_channel process in
   let gs_worker = Node_context.get_gs_worker node_context in
@@ -378,8 +388,14 @@ let reply_receiver_job {process; query_store; _} node_context =
            {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
       Query_store.find query_store query_id
     in
-    (* Messages queue is unbounded *)
     Query_store.remove query_store query_id ;
+    let clean_in_flight_slots () =
+      (* The reconstruction for this slot is done (whether it succeeds or fails
+        below); release its in-flight guard so future shards can re-trigger an
+        amplification if needed. *)
+      amplificator.in_flight_slots <-
+        Types.Slot_id.Set.remove slot_id amplificator.in_flight_slots
+    in
     let length = Query_store.length query_store in
     let () = Dal_metrics.update_amplification_queue_length length in
     (* The first message should be a OK | ERR *)
@@ -388,6 +404,7 @@ let reply_receiver_job {process; query_store; _} node_context =
     in
     match Bytes.to_string msg with
     | "ERR" ->
+        let () = clean_in_flight_slots () in
         let*! msg =
           Lwt_eio.run_eio (fun () -> Process_worker.read_message process_output)
         in
@@ -410,6 +427,7 @@ let reply_receiver_job {process; query_store; _} node_context =
           Store.Shards.write_all (Store.shards node_store) slot_id shards
           |> Errors.to_tzresult
         in
+        let () = clean_in_flight_slots () in
         let* () =
           Attestable_slots.may_notify_attestable_slot_or_trap
             node_context
@@ -544,6 +562,7 @@ let stop_process amplificator =
 let reset_query_state amplificator =
   amplificator.query_pipe <- Lwt_pipe.Unbounded.create () ;
   Query_store.clear amplificator.query_store ;
+  amplificator.in_flight_slots <- Types.Slot_id.Set.empty ;
   amplificator.query_id <- 0 ;
   Dal_metrics.update_amplification_queue_length 0
 
@@ -563,6 +582,7 @@ let start_amplificator node_ctxt =
       process;
       query_pipe;
       query_store;
+      in_flight_slots = Types.Slot_id.Set.empty;
       query_id = 0;
       amplification_random_delay_min;
       amplification_random_delay_max;
@@ -609,51 +629,81 @@ let make node_ctxt =
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
-    shards reconstruction_start_time =
+    shards reconstruction_start_time ~number_of_already_stored_shards
+    ~number_of_shards =
   let open Lwt_result_syntax in
-  let*! shards = Seq_s.fold_left (fun res it -> it :: res) [] shards in
-  let shards =
-    Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
-  in
-  (* This get/set is safe with the current cooperative Lwt execution model:
+  (* Bound the reconstruction queue. When too many
+     reconstructions are already in flight, drop this request instead of
+     enqueuing it: the node keeps receiving shards normally and other nodes can
+     still amplify the slot. This prevents a sustained shard flood from growing
+     [query_pipe] without bound and driving the node OOM. *)
+  let in_flight = Types.Slot_id.Set.cardinal amplificator.in_flight_slots in
+  if Types.Slot_id.Set.mem slot_id amplificator.in_flight_slots then
+    (* A reconstruction for this slot is already queued or being processed; skip
+       to avoid enqueuing a duplicate (see {!in_flight_slots}). *)
+    let*! () =
+      Event.emit_amplification_already_in_flight
+        ~level:slot_id.Types.Slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+    in
+    return_unit
+  else if in_flight >= Constants.amplification_queue_max_length then
+    let*! () =
+      Event.emit_amplification_queue_full
+        ~level:slot_id.Types.Slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~queue_length:in_flight
+    in
+    return_unit
+  else
+    let () = Dal_metrics.reconstruction_started () in
+    let*! () =
+      Event.emit_reconstruct_started
+        ~level:slot_id.slot_level
+        ~slot_index:slot_id.slot_index
+        ~number_of_received_shards:number_of_already_stored_shards
+        ~number_of_shards
+    in
+    let () =
+      amplificator.in_flight_slots <-
+        Types.Slot_id.Set.add slot_id amplificator.in_flight_slots
+    in
+    let*! shards = Seq_s.fold_left (fun res it -> it :: res) [] shards in
+    let shards =
+      Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
+    in
+    (* This get/set is safe with the current cooperative Lwt execution model:
      there is no yield point in this critical section.
      If this path becomes truly parallel in the future (e.g. multi-domain shared
      state), this code can race and should be replaced by serialized ownership
      of the state (or a proper synchronization strategy). *)
-  let query_id = amplificator.query_id in
-  amplificator.query_id <- amplificator.query_id + 1 ;
-  (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
+    let query_id = amplificator.query_id in
+    amplificator.query_id <- amplificator.query_id + 1 ;
+    (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
      so avoid the cost of serializing them *)
-  let () =
-    Query_store.add
-      amplificator.query_store
-      query_id
-      (Query {slot_id; commitment; proto_parameters; reconstruction_start_time})
-  in
-  let length = Query_store.length amplificator.query_store in
-  let slot_level = slot_id.slot_level in
-  let () = Dal_metrics.update_amplification_queue_length length in
-  let*! () = Event.emit_main_process_enqueue_query ~query_id in
-  let () =
-    Lwt_pipe.Unbounded.push
-      amplificator.query_pipe
-      (Query_msg {query_id; shards; slot_level})
-  in
-  return_unit
+    let () =
+      Query_store.add
+        amplificator.query_store
+        query_id
+        (Query
+           {slot_id; commitment; proto_parameters; reconstruction_start_time})
+    in
+    let length = Query_store.length amplificator.query_store in
+    let slot_level = slot_id.slot_level in
+    let () = Dal_metrics.update_amplification_queue_length length in
+    let*! () = Event.emit_main_process_enqueue_query ~query_id in
+    let () =
+      Lwt_pipe.Unbounded.push
+        amplificator.query_pipe
+        (Query_msg {query_id; shards; slot_level})
+    in
+    return_unit
 
 let amplify node_store commitment (slot_id : Types.slot_id)
     ~number_of_already_stored_shards ~number_of_shards ~number_of_needed_shards
     proto_parameters amplificator =
   let open Lwt_result_syntax in
   let reconstruction_start_time = Unix.gettimeofday () in
-  Dal_metrics.reconstruction_started () ;
-  let*! () =
-    Event.emit_reconstruct_started
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      ~number_of_received_shards:number_of_already_stored_shards
-      ~number_of_shards
-  in
   let* shards =
     let* seq =
       Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
@@ -679,6 +729,8 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       proto_parameters
       shards
       reconstruction_start_time
+      ~number_of_already_stored_shards
+      ~number_of_shards
   in
   return_unit
 
@@ -701,11 +753,12 @@ let try_amplification commitment slot_metrics slot_id amplificator =
   let* number_of_already_stored_shards =
     Store.Shards.count_values (Store.shards node_store) slot_id
   in
-  (* There are two situations where we don't want to reconstruct:
-     if we don't have enough shards or if we already have all the
-     shards. *)
+  (* There are three situations where we don't want to reconstruct:
+     if a reconstruction for this slot is already in flight, if we don't have
+     enough shards, or if we already have all the shards. *)
   if
-    number_of_already_stored_shards < number_of_needed_shards
+    Types.Slot_id.Set.mem slot_id amplificator.in_flight_slots
+    || number_of_already_stored_shards < number_of_needed_shards
     || number_of_already_stored_shards = number_of_shards
   then return_unit
   else

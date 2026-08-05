@@ -115,19 +115,30 @@ let disconnections_handler gs_worker peer_id =
   | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
 (** This handler forwards p2p messages received via Octez p2p to the Gossipsub
-    worker. *)
+    worker. The application callback is spawned asynchronously so that a slow
+    callback on one connection does not delay receiving messages from other
+    peers. *)
 let transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback =
   let open Lwt_syntax in
   let rec loop () =
     let* conn, p2p_message = P2p.recv_any p2p_layer in
     let from_peer = peer_of_connection p2p_layer conn in
-    let* _res =
-      match p2p_message with
-      | Message_with_header {message_id; _} ->
-          app_in_callback message_id from_peer
-      | _ -> return_ok_unit
-    in
-    Worker.(In_message {from_peer; p2p_message} |> p2p_input gs_worker) ;
+    (match p2p_message with
+    | Message_with_header {message_id; _} ->
+        Lwt.dont_wait
+          (fun () ->
+            let open Lwt_syntax in
+            let* res = app_in_callback message_id from_peer in
+            match res with
+            | Ok () -> return_unit
+            | Error trace ->
+                Events.(emit app_in_callback_failed (message_id, trace)))
+          (fun exn ->
+            Format.eprintf
+              "Warning: exception in DAL shard reception callback: %s@."
+              (Printexc.to_string exn))
+    | _ -> ()) ;
+    Worker.(In_message {from_peer; p2p_message} |> bounded_p2p_input gs_worker) ;
     loop ()
   in
   loop ()

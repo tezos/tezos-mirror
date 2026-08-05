@@ -504,10 +504,17 @@ let sign_unsigned_block_and_register_seed_nonce
 
 let dal_checks_and_warnings state =
   let open Lwt_syntax in
-  (* We print warning about DAL state only every 50 levels. *)
+  let open Constants in
+  let Parametric.{dal = {feature_enable; _}; _} =
+    state.global_state.constants.parametric
+  in
+  (* Best-effort DAL health warnings, emitted at most every 50 levels and only
+     when the feature is enabled. This must stay off the awaited consensus path:
+     it is run detached (see [update_to_level]) so an unresponsive DAL node
+     cannot stall the baker. *)
   let current_level = state.level_state.current_level in
-  let level_with_warning = Int32.rem current_level 50l = 1l in
-  if level_with_warning then
+  if (not feature_enable) || Int32.rem current_level 50l <> 1l then return_unit
+  else
     match state.global_state.dal_node_rpc_ctxt with
     | None -> Events.(emit no_dal_node_provided) ()
     | Some ctxt -> (
@@ -518,7 +525,6 @@ let dal_checks_and_warnings state =
             | Tezos_dal_node_services.Types.Health.Up -> return_unit
             | _ -> Events.(emit unhealthy_dal_node) (ctxt#base, health))
         | Error _ -> Events.(emit unreachable_dal_node) ctxt#base)
-  else return_unit
 
 let only_if_dal_feature_enabled state ~default_value f =
   let open Lwt_syntax in
@@ -527,7 +533,6 @@ let only_if_dal_feature_enabled state ~default_value f =
     state.global_state.constants.parametric
   in
   if feature_enable then
-    let* () = dal_checks_and_warnings state in
     Option.fold
       ~none:(return default_value)
       ~some:f
@@ -1373,6 +1378,11 @@ let update_to_level state level_update =
        ~next_level_delegate_infos
      [@profiler.record_s {verbosity = Debug} "compute new state"])
   in
+  (* Best-effort DAL health warnings; run detached so an unresponsive DAL node
+     cannot stall the automaton loop. Attestation building
+     ([may_get_dal_content]) is awaited by [perform_action], so a blocking DAL
+     RPC on that path would freeze proposing and attesting for every delegate. *)
+  Lwt.dont_wait (fun () -> dal_checks_and_warnings new_state) (fun _exn -> ()) ;
   let _promise =
     only_if_dal_feature_enabled
       new_state

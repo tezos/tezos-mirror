@@ -54,6 +54,11 @@ val notify_backfill_payload :
   backfill_payload:Attestable_event.backfill_payload ->
   unit
 
+(** [notify_heartbeat t pkh] pushes a [Heartbeat] liveness event to the stream
+    for [pkh], if present. Unlike slot events, heartbeats are never
+    deduplicated. *)
+val notify_heartbeat : t -> Signature.public_key_hash -> unit
+
 (** [remove t pkh] removes the watcher entry for [pkh] from [t] if present. *)
 val remove : t -> Signature.public_key_hash -> unit
 

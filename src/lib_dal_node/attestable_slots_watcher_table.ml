@@ -85,6 +85,11 @@ let notify_backfill_payload t pkh ~backfill_payload =
   | Some watcher ->
       Lwt_watcher.notify watcher.stream (Backfill {backfill_payload})
 
+let notify_heartbeat t pkh =
+  match Signature.Public_key_hash.Table.find t pkh with
+  | None -> ()
+  | Some watcher -> Lwt_watcher.notify watcher.stream Heartbeat
+
 let remove = Signature.Public_key_hash.Table.remove
 
 let elements = Signature.Public_key_hash.Table.to_seq_keys
