@@ -607,9 +607,8 @@ module Images : sig
     (** The prefix of the path of the base images. *)
     val path_prefix : string
 
-    val debian_version : string
-
-    val rpm_version : string
+    (** The version tag shared by all CI base images. *)
+    val base_images_tag : string
 
     val debian_bookworm : Image.t
 
