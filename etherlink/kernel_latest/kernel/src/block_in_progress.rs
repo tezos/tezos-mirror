@@ -715,7 +715,6 @@ impl BlockInProgress {
         // required by EIP-658 / the Yellow Paper. This matches the ordering in
         // `register_valid_transaction`.
         self.add_gas(gas_used)?;
-        self.cumulative_execution_gas += gas_used;
 
         let receipt = TransactionReceipt {
             hash: hash_bytes,
@@ -952,6 +951,11 @@ mod tests {
 
         // Pre-existing block gas (as if a prior transaction had run).
         bip.cumulative_gas = U256::from(100u64);
+        // Pre-existing execution gas, including the gas of the Michelson
+        // operation these CRACs belong to: the Michelson arm of
+        // `register_valid_transaction` accounts for it before dispatching the
+        // effects.
+        bip.cumulative_execution_gas = U256::from(50u64);
 
         bip.register_crac_evm_transaction(dummy_crac_effect(7))
             .expect("CRAC registration should succeed");
@@ -973,5 +977,15 @@ mod tests {
         );
 
         assert_eq!(bip.cumulative_gas, U256::from(120u64));
+
+        // The base-fee accumulator must be left untouched: the CRAC's gas is
+        // the Michelson operation's own gas, already accounted for by the
+        // caller. Re-adding it here would double-count it and inflate the
+        // chain-wide base fee (L2-1873).
+        assert_eq!(
+            bip.cumulative_execution_gas,
+            U256::from(50u64),
+            "CRAC registration must not add to cumulative_execution_gas"
+        );
     }
 }
