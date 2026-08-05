@@ -143,7 +143,7 @@ oc.build-rockylinux:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-rockylinux-data:
@@ -336,7 +336,7 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu_ramfs
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-fedora-data:

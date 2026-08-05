@@ -81,10 +81,6 @@ module Tag : sig
         (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
     | Gcp_very_high_cpu_dev
         (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
-    | Gcp_very_high_cpu_ramfs
-        (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
-    | Gcp_very_high_cpu_ramfs_dev
-        (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
     | Aws_specific
         (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
     | Dynamic

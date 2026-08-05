@@ -50,7 +50,6 @@ let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
          image_name)
     ~stage:Test
     ~cpu:Very_high
-    ~storage:Ramfs
     ~only_if_changed:["docs/introduction/compile-sources.sh"]
     ~image:
       (Tezos_ci.Image.mk_external
