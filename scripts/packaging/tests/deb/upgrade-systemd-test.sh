@@ -14,6 +14,11 @@ RELEASE=$2
 export DEBIAN_FRONTEND=noninteractive
 
 apt_get update
+# Bring distro packages current now so the octez upgrade transaction below
+# contains only octez packages: a pending libc6 upgrade re-execs systemd
+# (daemon-reexec) and the systemctl calls that follow the upgrade race that
+# window ("Failed to connect to system scope bus", #8380).
+apt_get upgrade -y
 apt_get install -y sudo gpg curl apt-utils debconf-utils procps jq
 
 # [preseed debconf]
