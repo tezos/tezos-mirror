@@ -1377,7 +1377,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ~cpu
       ?storage
       ?tag
-      ~image:Tezos_ci.Images.CI.e2etest
+      ~image:Tezos_ci.Images.Base_images.alpine_e2etest
       ?only_if_changed
       ~needs
       ?parallel:
@@ -1595,7 +1595,7 @@ let () =
          "select_tezts"
          ~__POS__
          ~description:"Run Manifezt to select the set of Tezt tests to run."
-         ~image:Tezos_ci.Images.CI.prebuild
+         ~image:Tezos_ci.Images.Base_images.alpine_prebuild
          ~stage:Build
          ~artifacts:
            (Gitlab_ci.Util.artifacts

@@ -107,7 +107,7 @@ let job_container_scanning_slack_notification =
     ~description:
       ("Report on Slack the results of the scan for [" ^ full_image_name ^ "]")
     ~stage:Test
-    ~image:Images.CI.monitoring
+    ~image:Images.Base_images.alpine_monitoring
     ~needs:[(Cacio.Artifacts, job_container_scanning image)]
     ~variables:[("REPORT", report)]
     ~script:
@@ -135,7 +135,7 @@ let job_container_scanning_merge_reports =
       "Merge container scanning reports in a single one fitted for Gitlab \
        Vulnerability report"
     ~stage:Test
-    ~image:Images.CI.monitoring
+    ~image:Images.Base_images.alpine_monitoring
     ~needs:(List.map (fun j -> (Cacio.Artifacts, j)) all_scanning_jobs)
     ~artifacts:
       (artifacts

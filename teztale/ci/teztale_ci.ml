@@ -20,7 +20,7 @@ let job_build =
     ~__POS__
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:(match mode with `test -> Test | `release -> Build)
     ~description:"Build Teztale."
     ~artifacts:
@@ -78,7 +78,7 @@ let job_deploy_release_page_assets =
   CI.job
     "release-page-deploy-assets"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.release_page
+    ~image:Tezos_ci.Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
@@ -104,7 +104,7 @@ let job_release_page =
   CI.job
     "release-page-publish"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.release_page
+    ~image:Tezos_ci.Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:

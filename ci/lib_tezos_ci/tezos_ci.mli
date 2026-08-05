@@ -497,7 +497,17 @@ module Images : sig
 
     val alpine_runtime : Image.t
 
+    val alpine_monitoring : Image.t
+
+    val alpine_prebuild : Image.t
+
     val alpine_build : Image.t
+
+    val alpine_release_page : Image.t
+
+    val alpine_test : Image.t
+
+    val alpine_e2etest : Image.t
   end
 end
 

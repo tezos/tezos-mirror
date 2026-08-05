@@ -1416,7 +1416,17 @@ module Base_images = struct
 
   let alpine_runtime = mk_alpine_ci_img "runtime"
 
+  let alpine_monitoring = mk_alpine_ci_img "monitoring"
+
+  let alpine_prebuild = mk_alpine_ci_img "prebuild"
+
   let alpine_build = mk_alpine_ci_img "build"
+
+  let alpine_release_page = mk_alpine_ci_img "release-page"
+
+  let alpine_test = mk_alpine_ci_img "test"
+
+  let alpine_e2etest = mk_alpine_ci_img "e2etest"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []

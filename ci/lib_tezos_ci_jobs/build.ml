@@ -21,7 +21,7 @@ let build_octez_source =
     ~description:"Check compilation of the Octez tarball."
     ~stage:Test
     ~force:true
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
     ~cargo_cache:true
@@ -51,7 +51,7 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = [])
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
     ?storage
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~variables:
       (("EXECUTABLE_FILES", executable_files)
@@ -159,7 +159,7 @@ let job_build_layer1_profiling =
       "Build some layer1 executables with the profiler PPX enabled, to check \
        that it can still be built."
     ~stage:Test
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~artifacts:
@@ -199,7 +199,7 @@ let job_build_static_linux_released_binaries =
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~variables:
       [
         ("ARCH", arch_string);
@@ -234,7 +234,7 @@ let job_build_static_linux_experimental_binaries =
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~variables:
       [
         ("ARCH", arch_string);

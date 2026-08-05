@@ -26,7 +26,7 @@ let job_build_released =
     ~description:"Build the Tezos X executables for amd64."
     ~stage:Build
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~variables:[("EXECUTABLE_FILES", "script-inputs/tezos-x-executables")]
     ~artifacts:
       (Gitlab_ci.Util.artifacts

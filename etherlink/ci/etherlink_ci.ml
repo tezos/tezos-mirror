@@ -130,7 +130,7 @@ let job_build_evm_node_static =
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
@@ -170,7 +170,7 @@ let job_lint_wasm_runtime =
     ~__POS__
     ~stage:Test
     ~description:"Run the linter on lib_wasm_runtime."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~only_if_changed:Files.lib_wasm_runtime_rust
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -188,7 +188,7 @@ let job_lint_solidity_artifacts =
     ~__POS__
     ~stage:Test
     ~description:"Check committed bytecode are up to date."
-    ~image:Images.CI.e2etest
+    ~image:Images.Base_images.alpine_e2etest
     ~only_if_changed:
       [
         "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";
@@ -271,7 +271,7 @@ let job_unit_tests =
     ~__POS__
     ~stage:Test
     ~description:"Etherlink unit tests."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~cpu:Runner.CPU.Very_high
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
@@ -351,7 +351,7 @@ let job_mir_tzt =
     "mir_tzt"
     ~__POS__
     ~description:"Run MIR's tzt_runner on the tzt reference test suite."
-    ~image:Images.CI.test
+    ~image:Images.Base_images.alpine_test
     ~stage:Test
     ~only_if_changed:Files.(mir @ tzt)
     ~cargo_cache:true
@@ -397,7 +397,7 @@ let job_build_tezt =
     ~__POS__
     ~stage:Build
     ~description:"Build the Etherlink Tezt executable."
-    ~image:Images.CI.build
+    ~image:Images.Base_images.alpine_build
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"etherlink_tezt_exe"

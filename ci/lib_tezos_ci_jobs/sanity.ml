@@ -22,7 +22,7 @@ let job_sanity_ci =
     ~__POS__
     ~description:
       "Check that generated dune, .opam and .yml files are up-to-date."
-    ~image:Tezos_ci.Images.CI.build_master
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
     ~only_if_changed:
       [
@@ -60,7 +60,7 @@ let job_oc_ocaml_fmt =
     ~description:
       "Check that .ocamlformat files are all the same, and check that OCaml \
        source files are correctly formatted using ocamlformat."
-    ~image:Tezos_ci.Images.CI.build_master
+    ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
     ~only_if_changed:["**/.ocamlformat"; "**/*.ml"; "**/*.mli"]
     ~dune_cache:true
@@ -100,7 +100,7 @@ let job_oc_misc_checks =
       "Perform miscellaneous checks: lint, check WASM PVM regressions, check \
        EVM store migrations, check rollup node SQL migrations, check DAL store \
        migrations, check licences."
-    ~image:Tezos_ci.Images.CI.test_master
+    ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~only_if_changed:
       [
@@ -194,7 +194,7 @@ let job_commit_titles =
     "commit_titles"
     ~__POS__
     ~description:"Check that commit titles match the developer guidelines."
-    ~image:Tezos_ci.Images.CI.prebuild_master
+    ~image:Tezos_ci.Images.Base_images.alpine_prebuild
     ~stage:Test
     ~force:true
     ~allow_failure:

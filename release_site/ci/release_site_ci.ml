@@ -19,7 +19,7 @@ let job_build =
     ~__POS__
     ~stage:Build
     ~description:"Build the Release-page executable."
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"release_page_exe"
@@ -37,7 +37,7 @@ let job_build_tezt =
     ~__POS__
     ~stage:Build
     ~description:"Build the Release-page Tezt executable."
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"release_page_tezt_exe"

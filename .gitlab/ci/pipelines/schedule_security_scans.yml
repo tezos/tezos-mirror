@@ -3,16 +3,14 @@
 
 stages:
 - start
-- images
 - test
 
 container_scanning_merge_reports:
-  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
@@ -22,7 +20,6 @@ container_scanning_merge_reports:
   - container_scanning_tezos-ubuntu-24.04-master-73a6a3d6
   - container_scanning_tezos-ubuntu-26.04-master-73a6a3d6
   dependencies:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
@@ -51,15 +48,13 @@ container_scanning_merge_reports:
       container_scanning: gl-container-scanning-report.json
 
 container_scanning_slack_notification_tezos-tezos-latest:
-  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   dependencies:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   timeout: 60 minutes
   interruptible: true
@@ -76,15 +71,13 @@ container_scanning_slack_notification_tezos-tezos-latest:
     REPORT: gl-container-scanning-report-tezos-tezos-latest.json
 
 container_scanning_slack_notification_tezos-tezos-master:
-  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-master
   dependencies:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-master
   timeout: 60 minutes
   interruptible: true
@@ -101,15 +94,13 @@ container_scanning_slack_notification_tezos-tezos-master:
     REPORT: gl-container-scanning-report-tezos-tezos-master.json
 
 container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
-  image: ${ci_image_name}/monitoring:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-73a6a3d6
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-octez-evm-node-latest
   dependencies:
-  - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-octez-evm-node-latest
   timeout: 60 minutes
   interruptible: true
@@ -410,36 +401,3 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure

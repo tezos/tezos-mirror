@@ -3,7 +3,6 @@
 
 stages:
 - start
-- images
 - build
 - publish
 
@@ -220,7 +219,7 @@ grafazos.build:
     when: on_success
 
 grafazos.release-page-deploy-assets:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -228,10 +227,8 @@ grafazos.release-page-deploy-assets:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - grafazos.build
   dependencies:
-  - oc.docker:ci:amd64
   - grafazos.build
   timeout: 60 minutes
   interruptible: false
@@ -254,15 +251,13 @@ grafazos.release-page-deploy-assets:
   retry: 0
 
 grafazos.release-page-publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - grafazos.release-page-deploy-assets
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -431,14 +426,12 @@ oc.build-ubuntu:
       - gcp_arm64
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   allow_failure: false
   timeout: 60 minutes
   cache:
@@ -479,14 +472,12 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   allow_failure: false
   timeout: 60 minutes
   cache:
@@ -619,81 +610,13 @@ oc.docker:arm64:
     - script_failure
     - runner_system_failure
 
-oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: amd64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
-oc.docker:ci:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
-  stage: images
-  tags:
-  - gcp_arm64
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    ARCH: arm64
-    CI_DOCKER_HUB: "false"
-    DOCKER_VERSION: 28.5.1
-    GCLOUD_VERSION: 543.0.0
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
 octez-smart-rollup-node.build:static-arm64-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -733,14 +656,12 @@ octez-smart-rollup-node.build:static-arm64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.build:static-x86_64-binaries:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -866,7 +787,7 @@ octez-smart-rollup-node.docker:merge_manifests:
   retry: 0
 
 octez-smart-rollup-node.release-page-deploy-assets:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -874,11 +795,9 @@ octez-smart-rollup-node.release-page-deploy-assets:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - octez-smart-rollup-node.build:static-x86_64-binaries
   - octez-smart-rollup-node.build:static-arm64-binaries
   dependencies:
-  - oc.docker:ci:amd64
   - octez-smart-rollup-node.build:static-x86_64-binaries
   - octez-smart-rollup-node.build:static-arm64-binaries
   timeout: 60 minutes
@@ -902,15 +821,13 @@ octez-smart-rollup-node.release-page-deploy-assets:
   retry: 0
 
 octez-smart-rollup-node.release-page-publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - octez-smart-rollup-node.release-page-deploy-assets
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -937,7 +854,7 @@ octez-smart-rollup-node.release-page-publish:
   retry: 0
 
 release_page.deploy-assets:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -945,11 +862,9 @@ release_page.deploy-assets:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   dependencies:
-  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
@@ -973,15 +888,13 @@ release_page.deploy-assets:
   retry: 0
 
 release_page.publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - release_page.deploy-assets
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -1010,17 +923,15 @@ release_page.publish:
   retry: 0
 
 teztale.build-arm64:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1063,17 +974,15 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   stage: build
   tags:
   - gcp_very_high_cpu
   rules:
   - when: manual
     allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1116,7 +1025,7 @@ teztale.build-x86_64:
     when: on_success
 
 teztale.release-page-deploy-assets:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -1124,11 +1033,9 @@ teztale.release-page-deploy-assets:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   dependencies:
-  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   timeout: 60 minutes
@@ -1152,15 +1059,13 @@ teztale.release-page-deploy-assets:
   retry: 0
 
 teztale.release-page-publish:
-  image: ${ci_image_name}/release-page:${ci_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:ci:amd64
   - teztale.release-page-deploy-assets
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
