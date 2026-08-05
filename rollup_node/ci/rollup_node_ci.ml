@@ -25,7 +25,6 @@ let job_docker_build =
   let arch_string = Runner.Arch.show_uniform arch in
   CI.job
     ("docker:" ^ arch_string)
-    ~image_dependencies:[Images.CI.runtime]
     ~__POS__
     ~stage:Build
     ~image:Images.Base_images.alpine_docker_ci

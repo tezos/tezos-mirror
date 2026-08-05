@@ -1351,7 +1351,8 @@ end
 
    Use this module to register images that are built in the base
    image pipelines of [tezos/tezos] and pushed to the protected
-   registry. *)
+   registry (the build jobs push to [${GCP_REGISTRY}], which resolves to the
+   protected registry on protected refs). *)
 module Base_images = struct
   let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
@@ -1401,6 +1402,21 @@ module Base_images = struct
   (* [ci-release] is built on top of the internal [debian] base image (so it
      inherits jq, gcloud, datadog, ...). Since !22370. *)
   let ci_release = make_img "ci-release:trixie"
+
+  (* [alpine-*] CI images, built and pushed by the [images.alpine-ci-all] jobs.
+     Unlike the other base images they have no [<release>] segment (e.g.
+     [debian:bookworm]), so [make_img] -- which appends [-<tag>] to a
+     [<distro>:<release>] name -- would mangle the tag separator. Reference them
+     as [alpine-<component>:<base_images_tag>] instead.
+     TODO (#8378): give them a release version so they follow the standard
+     scheme and can reuse [make_img]. *)
+  let mk_alpine_ci_img name =
+    Image.mk_external
+      ~image_path:(sf "%s/alpine-%s:%s" path_prefix name base_images_tag)
+
+  let alpine_runtime = mk_alpine_ci_img "runtime"
+
+  let alpine_build = mk_alpine_ci_img "build"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []

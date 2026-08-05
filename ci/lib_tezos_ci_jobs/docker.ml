@@ -12,13 +12,15 @@ module CI = Cacio.Shared
    During the migration to Cacio however, those other instances will continue to exist. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
-(* The CI image tags are resolved at runtime by the job's shell from the
-   [Images.CI.runtime] dependency dotenv, exactly as the jobs' [image:] fields
-   already reference them. *)
+(* The references are the alpine CI images, built by the [images.alpine-ci-all]
+   jobs (see [base_images.ml]) in a previously-run base-images pipeline. *)
 let docker_release_script =
-  "./scripts/ci/docker_release.sh --runtime-image \
-   ${ci_image_name}/runtime:${ci_image_tag} --build-deps-image \
-   ${ci_image_name}/build:${ci_image_tag}"
+  Format.asprintf
+    "./scripts/ci/docker_release.sh --runtime-image %a --build-deps-image %a"
+    Tezos_ci.Image.pp
+    Tezos_ci.Images.Base_images.alpine_runtime
+    Tezos_ci.Image.pp
+    Tezos_ci.Images.Base_images.alpine_build
 
 (* [docker_release_script] extended for with-EVM builds with the L2 builder
    image: the [debian-rust:trixie] base image, used directly. Builds without
@@ -48,15 +50,14 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
         (* The job runs this script, which in turn calls create_docker_image.sh. *)
         "scripts/ci/docker_release.sh";
         "scripts/create_docker_image.sh";
+        (* build.Dockerfile COPYs and runs these via [make build-deps]. *)
+        "scripts/install_build_deps.sh";
+        "scripts/install_build_deps.rust.sh";
       ]
     ~allow_failure:No
     ~retry:Tezos_ci.dind_retry
     ~arch
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
-      (* The L2 builder image (used for with-EVM builds) is the
-         [debian-rust:trixie] base image, pulled directly by the build, so it is
-         not a job dependency. *)
-    ~image_dependencies:[Tezos_ci.Images.CI.runtime]
     ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
     ~variables:
       [

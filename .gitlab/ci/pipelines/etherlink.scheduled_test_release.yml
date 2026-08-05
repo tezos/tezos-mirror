@@ -134,10 +134,8 @@ etherlink.docker:amd64:
   stage: build
   tags:
   - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -146,8 +144,8 @@ etherlink.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -170,10 +168,8 @@ etherlink.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -182,8 +178,8 @@ etherlink.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

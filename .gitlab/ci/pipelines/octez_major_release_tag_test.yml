@@ -584,10 +584,8 @@ oc.docker:amd64:
   stage: build
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   allow_failure: false
   timeout: 60 minutes
   interruptible: true
@@ -597,8 +595,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -621,10 +619,8 @@ oc.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   allow_failure: false
   timeout: 60 minutes
   interruptible: true
@@ -634,8 +630,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -818,10 +814,8 @@ octez-smart-rollup-node.docker:amd64:
   stage: build
   tags:
   - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -830,8 +824,8 @@ octez-smart-rollup-node.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -849,10 +843,8 @@ octez-smart-rollup-node.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -861,8 +853,8 @@ octez-smart-rollup-node.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${ci_image_name}/runtime:${ci_image_tag}
-    --build-deps-image ${ci_image_name}/build:${ci_image_tag}
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

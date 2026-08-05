@@ -494,6 +494,10 @@ module Images : sig
     val alpine_docker_ci : Image.t
 
     val ci_release : Image.t
+
+    val alpine_runtime : Image.t
+
+    val alpine_build : Image.t
   end
 end
 
