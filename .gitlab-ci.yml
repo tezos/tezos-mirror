@@ -190,6 +190,12 @@ workflow:
     variables:
       PIPELINE_TYPE: homebrew.daily
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "base_images.refresh"
+    variables:
+      PIPELINE_TYPE: base_images.refresh
+      CI_COMMIT_REF_SLUG: master
+      DOCKER_FORCE_BUILD: "true"
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "base_images.daily"
     variables:
       PIPELINE_TYPE: base_images.daily
@@ -452,6 +458,10 @@ include:
 - local: .gitlab/ci/pipelines/homebrew.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "homebrew.daily"
+    when: always
+- local: .gitlab/ci/pipelines/base_images.refresh.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "base_images.refresh"
     when: always
 - local: .gitlab/ci/pipelines/base_images.daily.yml
   rules:

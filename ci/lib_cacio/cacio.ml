@@ -855,6 +855,7 @@ type global_pipeline =
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
   | Base_images_daily
+  | Base_images_refresh
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -917,7 +918,7 @@ let get_jobs pipeline =
   | Master -> convert_jobs ~interruptible_publish:true jobs
   | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
   | Schedule_extended_test | Custom_extended_test | Base_images_daily
-  | Homebrew_daily | Scheduled_docker_master_snapshot ->
+  | Base_images_refresh | Homebrew_daily | Scheduled_docker_master_snapshot ->
       (* Scheduled pipelines. *)
       convert_jobs ~interruptible_pipeline:false jobs
   | _ -> convert_jobs jobs

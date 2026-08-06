@@ -456,6 +456,10 @@ type global_pipeline =
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
   | Base_images_daily
+  (* Same jobs as [Base_images_daily] for now, but the pipeline should only run
+     on refresh branches (e.g. [master-ci-images] branch).
+     The two pipelines should diverge after #8367. *)
+  | Base_images_refresh
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit

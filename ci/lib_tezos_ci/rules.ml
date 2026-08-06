@@ -61,6 +61,12 @@ let homebrew_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "homebrew.daily"
 let base_images_daily =
   scheduled && var "TZ_SCHEDULE_KIND" == str "base_images.daily"
 
+(* The refresh pipeline rebuilds the base images from scratch. It has its own
+   schedule kind ([base_images.refresh]) and should only run on refresh branches
+   such as e.g. [master-ci-images] branch. *)
+let base_images_refresh =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "base_images.refresh"
+
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 

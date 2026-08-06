@@ -372,6 +372,23 @@ let () =
     ~jobs:(Cacio.get_jobs Cacio.Homebrew_daily)
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
+  (* Rebuilds the base images on the [master-ci-images] branch.
+     [DOCKER_FORCE_BUILD] disables the Docker layer cache, so the images are
+     rebuilt fresh. This periodic refresh is necessary to avoid image deletion
+     due to the registry retention policy.
+     [CI_COMMIT_REF_SLUG] is overridden to [master] so the rebuilt images are
+     tagged [master-<sha>] rather than [master-ci-images-<sha>].
+     TODO (#8374): drop the [CI_COMMIT_REF_SLUG] override once base-image tags
+     no longer embed the ref slug. *)
+  register
+    "base_images.refresh"
+    base_images_refresh
+    ~jobs:(Cacio.get_jobs Base_images_refresh)
+    ~variables:
+      [("CI_COMMIT_REF_SLUG", "master"); ("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Refresh pipeline: rebuild the base images from scratch on the \
+       [master-ci-images] branch (same jobs as [base_images.daily])." ;
   register
     "base_images.daily"
     base_images_daily

@@ -616,4 +616,7 @@ let () =
     ]
   in
   Cacio.register_merge_request_jobs jobs ;
-  Cacio.register_jobs Cacio.Base_images_daily jobs
+  Cacio.register_jobs Cacio.Base_images_daily jobs ;
+  (* Same jobs as the daily pipeline; the [base_images.refresh] pipeline only
+     runs on the [master-ci-images] branch (see [Rules.base_images_refresh]). *)
+  Cacio.register_jobs Cacio.Base_images_refresh jobs
