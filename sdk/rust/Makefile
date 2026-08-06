@@ -20,18 +20,15 @@ check-fmt:
 
 .PHONY: check-native
 check-native:
-	cargo check --all-targets
-	cargo clippy --all-targets
+	cargo clippy --all-targets -- --deny warnings
 
 .PHONY: check-wasm
 check-wasm:
-	cargo check --target wasm32-unknown-unknown --no-default-features --features bls
-	cargo clippy --target wasm32-unknown-unknown --no-default-features --features bls
+	cargo clippy --target wasm32-unknown-unknown --no-default-features --features bls -- --deny warnings
 
 .PHONY: check-riscv
 check-riscv:
-	cargo +${RISCV_RUSTC_VERSION} check --target riscv64gc-unknown-linux-musl --no-default-features
-	cargo +${RISCV_RUSTC_VERSION} clippy --target riscv64gc-unknown-linux-musl --no-default-features
+	cargo +${RISCV_RUSTC_VERSION} clippy --target riscv64gc-unknown-linux-musl --no-default-features -- --deny warnings
 
 .PHONY: check
 check: check-fmt check-native check-wasm check-riscv
