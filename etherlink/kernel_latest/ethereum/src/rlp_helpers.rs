@@ -153,6 +153,13 @@ pub fn decode_compressed_h256(decoder: &Rlp<'_>) -> Result<H256, DecoderError> {
     // shorter-than-32 payloads are the canonical form of a scalar whose high
     // bytes were zero, and are zero-extended back below.
     if data[0] == 0 {
+        // Exception: `rlp_append_opt` writes a `None` signature's `r`/`s` as 32
+        // zero bytes, and those bytes are hashed into `transactions_root`, so
+        // they cannot be canonicalized away. Safe: `TxSignature::new` rejects a
+        // zero `r`/`s`, so no valid signature gains a second encoding.
+        if length == 32 && data.iter().all(|byte| *byte == 0) {
+            return Ok(H256::zero());
+        }
         return Err(DecoderError::RlpInvalidLength);
     }
     let mut full = [0u8; 32];
