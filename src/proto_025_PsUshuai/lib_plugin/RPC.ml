@@ -1318,6 +1318,41 @@ module Scripts = struct
         | _ -> return_unit)
       (Operation.to_list (Contents_list contents))
 
+  (* Reject any [`stake`] operation that would mint no staking pseudotoken (see
+     also {!Block_validation.stake_mints_no_pseudotoken}). *)
+  let check_stake_operations_mint_pseudotokens context
+      ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+    let open Lwt_result_syntax in
+    List.iter_es
+      (fun op ->
+        match op with
+        | Contents
+            (Manager_operation
+               {
+                 source;
+                 operation =
+                   Transaction
+                     {amount; destination = Implicit staker; entrypoint; _};
+                 _;
+               })
+          when Entrypoint.(entrypoint = stake)
+               && Signature.Public_key_hash.(source = staker) ->
+            let* mints_no_pseudotoken =
+              Block_validation.stake_mints_no_pseudotoken
+                context
+                ~staker
+                ~amount
+            in
+            let*? () =
+              if mints_no_pseudotoken then
+                Environment.Error_monad.Result_syntax.tzfail
+                  (Block_validation.Stake_amount_too_small amount)
+              else Result_syntax.return_unit
+            in
+            return_unit
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
+
   (** Validate and apply the operation but skip signature checks; do
       not support consensus operations.
 
@@ -1336,6 +1371,9 @@ module Scripts = struct
       | _ -> Result_syntax.return_unit
     in
     let*? () = check_increase_paid_storage packed_operation in
+    let* () =
+      check_stake_operations_mint_pseudotokens context packed_operation
+    in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
     let* _validate_operation_state =
