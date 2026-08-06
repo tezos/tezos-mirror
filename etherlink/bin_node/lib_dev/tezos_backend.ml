@@ -249,6 +249,30 @@ let make (ctxt : Evm_ro_context.t) =
          handled by the kernel-entrypoints fall-through in [get_script]. *)
       Durable_storage.read_contract_code c state
 
+    (* The stub script of a code-less originated contract (an enshrined
+       TezosX contract): unit storage and FAILWITH code, carrying the
+       entrypoints and synthetic views returned by the kernel. [None] if
+       the kernel does not know the contract either. *)
+    let enshrined_script c state =
+      let open Lwt_result_syntax in
+      let addr_bytes =
+        Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding c
+      in
+      let* bytes =
+        Evm_ro_context.execute_entrypoint
+          ctxt
+          state
+          ~input_path:Durable_storage_path.Tezosx_entrypoints.input
+          ~input:addr_bytes
+          ~output_path:Durable_storage_path.Tezosx_entrypoints.result
+          ~entrypoint:"tezosx_michelson_entrypoints"
+      in
+      let* result = decode_entrypoints_result bytes in
+      match result with
+      | None -> return_none
+      | Some (_, entries, views) ->
+          return_some (Tezlink_mock.script_of_metadata ~views entries)
+
     let get_script chain block c =
       let open Lwt_result_syntax in
       let* code = get_code chain block c in
@@ -264,31 +288,10 @@ let make (ctxt : Evm_ro_context.t) =
       | None -> (
           match c with
           | Implicit _ -> return_none
-          | Originated _ -> (
-              (* Enshrined TezosX contract — no code in durable storage.
-                 Derive the script from the entrypoints returned by the
-                 kernel, using a unit storage and FAILWITH code as stubs. *)
+          | Originated _ ->
               let* eth_block = shell_block_param_to_eth_block_param block in
-              let addr_bytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Tezos_types.Contract.encoding
-                  c
-              in
               let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
-              let* bytes =
-                Evm_ro_context.execute_entrypoint
-                  ctxt
-                  state
-                  ~input_path:Durable_storage_path.Tezosx_entrypoints.input
-                  ~input:addr_bytes
-                  ~output_path:Durable_storage_path.Tezosx_entrypoints.result
-                  ~entrypoint:"tezosx_michelson_entrypoints"
-              in
-              let* result = decode_entrypoints_result bytes in
-              match result with
-              | None -> return_none
-              | Some (_, entries, views) ->
-                  return_some (Tezlink_mock.script_of_metadata ~views entries)))
+              enshrined_script c state)
 
     let manager_key _chain block contract =
       let open Lwt_result_syntax in
