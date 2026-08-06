@@ -43,6 +43,27 @@ val find_future_dal_refute :
   Protocol.Alpha_context.packed_operation ->
   Protocol.Alpha_context.Raw_level.t option
 
+(** Raised when an external staker's [`stake`] amount is too small to mint any
+    staking pseudotoken at the delegate's current conversion rate (the
+    down-rounded credit would be zero), which would transfer the tez into the
+    delegate's frozen deposits with no pseudotoken minted in exchange. Exposed
+    so that the operation-simulation RPC can reject such operations with the
+    same error as block validation. *)
+type Environment.Error_monad.error +=
+  | Stake_amount_too_small of Protocol.Alpha_context.Tez.t
+
+(** [stake_mints_no_pseudotoken ctxt ~staker ~amount] returns [true] when a
+    [`stake`] of [amount] by [staker] would mint no staking pseudotoken given
+    the current [ctxt] (external staker whose amount rounds down to zero
+    pseudotokens). Returns [false] for cases that either mint a pseudotoken or
+    are rejected by the protocol on their own (self-stake, no delegate,
+    non-positive amount, uninitialized or fully-slashed pool). *)
+val stake_mints_no_pseudotoken :
+  Protocol.Alpha_context.t ->
+  staker:Protocol.Alpha_context.public_key_hash ->
+  amount:Protocol.Alpha_context.Tez.t ->
+  bool Environment.Error_monad.tzresult Lwt.t
+
 (** [check_execute_outbox_message context ~rollup ~output_proof] checks the
     validity of a given [output_proof] against the rollup. Returns an error if
     not the case. *)
