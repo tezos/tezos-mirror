@@ -411,6 +411,7 @@ let _octez_evm_node_tests =
       "test_bitset_nonce";
       "test_compact_receipt_encoding";
       "test_entrypoints_decoder";
+      "test_run_code_codec";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
