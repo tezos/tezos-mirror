@@ -485,4 +485,45 @@ mod test {
         };
         object_encoding_roundtrip(v2);
     }
+
+    /// A `None` signature — deposits, FA deposits, Tezos-delayed operations
+    /// and cross-runtime call envelopes all produce one — must survive a
+    /// round-trip. It did not once `decode_compressed_h256` started rejecting
+    /// non-canonical scalars, while `rlp_append_opt` still wrote `r`/`s` as a
+    /// 32-byte all-zero string.
+    #[test]
+    fn none_signature_transaction_object_should_roundtrip() {
+        let v = TransactionObject {
+            block_number: U256::from(532532),
+            from: address_of_str("3535353535353535353535353535353535353535"),
+            gas: U256::from(32523),
+            gas_price: U256::from(100432432),
+            hash: [5; TRANSACTION_HASH_SIZE],
+            input: vec![],
+            nonce: 8888,
+            to: Some(address_of_str("3635353535353535353535353535353535353536")),
+            index: 15u32,
+            value: U256::from(0),
+            signature: None,
+        };
+        object_encoding_roundtrip(v);
+    }
+
+    /// The bytes a `None` signature encodes to are consensus-critical: they are
+    /// hashed into the block's `transactions_root`, because
+    /// `TransactionObject::encode_2718` is its `rlp_bytes`. Canonicalizing
+    /// `r`/`s` to the empty scalar — the tempting "fix" for the round-trip above
+    /// — would move the hash of every block carrying a deposit or a
+    /// cross-runtime call. Pin the encoding so that cannot happen silently.
+    #[test]
+    fn none_signature_encoding_is_consensus_critical() {
+        let mut stream = RlpStream::new_list(3);
+        rlp_append_opt(&None, &mut stream);
+        let zero_scalar = format!("a0{}", "00".repeat(32));
+        assert_eq!(
+            hex::encode(stream.out()),
+            format!("f843{}{}{}", "80", zero_scalar, zero_scalar),
+            "the None-signature encoding feeds transactions_root and must not change"
+        );
+    }
 }
