@@ -16234,6 +16234,130 @@ let test_crac_roundtrip_tz1_via_evm_back_to_tezos () =
   in
   unit
 
+(** EVM target of the probe crossing below: an address holding no code, so
+ *  the cross-runtime leg itself is a trivially successful empty execution.
+ *  The only thing left that can fail is alias materialization. *)
+let codeless_evm_target = "0x00000000000000000000000000000000000c0de0"
+
+(** A tz1 makes its very first crossing into the EVM runtime — a direct
+ *  top-level gateway [%call_evm] — while its derivable EVM alias already
+ *  holds [dust] wei put there by a third party.
+ *
+ *    Chain: bootstrap5 (tz1) → gateway/%call_evm → codeless EVM address
+ *
+ *  The first crossing is what materializes alias(tz1): [init_tezosx_alias]
+ *  only writes system state (native address, public key, initialized flag)
+ *  and never moves value, so materialization succeeds and installs the
+ *  forwarder delegation regardless of any balance already sitting at the
+ *  alias.
+ *
+ *  With [dust = None] the alias starts empty — the control.
+ *
+ *  With [dust = Some 1 wei] the alias already holds a sub-mutez balance.
+ *  That balance stays resident: it is below the forwarder's one-mutez
+ *  sweep threshold, so it is never forwarded, and the crossing applies
+ *  normally regardless. *)
+let register_first_crossing_with_alias_balance_test ~title ~tags ~dust =
+  register_crac_runner_test ~title ~tags:(["alias"; "l2_1931"] @ tags)
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "ALIAS-DUST" in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  Log.info "%s: tz1 = %s, derived alias = %s" prefix tz1 alias ;
+  (* Precondition: the tz1 has never crossed, so its alias carries no
+     forwarder delegation yet.  Without this the scenario would silently
+     stop exercising materialization. *)
+  let*@ code_before = Rpc.get_code ~address:alias sequencer in
+  Check.(
+    (code_before = "0x")
+      string
+      ~error_msg:
+        (prefix
+       ^ ": alias already holds code %L before the first crossing; the \
+          scenario no longer exercises materialization")) ;
+  (* Arm the branch: a plain EVM transfer to the alias address.  It holds no
+     code, so nothing runs — the value just rests there, which is exactly
+     the pre-materialization residue the sweep was built for. *)
+  let* () =
+    match dust with
+    | None -> unit
+    | Some value ->
+        let* _tx_hash = send_evm_transfer_no_block ~value ~address:alias () in
+        let*@ _block_number = Rpc.produce_block sequencer in
+        unit
+  in
+  let expected_residue = Option.value ~default:Wei.zero dust in
+  let*@ balance_before = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_before = expected_residue)
+      Wei.typ
+      ~error_msg:(prefix ^ ": alias balance before the crossing %L, expected %R")) ;
+  (* The first crossing of the tz1. *)
+  Log.debug ~prefix "Fire the tz1's first crossing (gateway %%call_evm)" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  (* Read the receipt of the block the crossing was just sealed into.  Going
+     through the protocol RPC at [head] rather than the by-level path: the
+     latter answers [deserialize_operation] on this operation shape. *)
+  let* all_passes =
+    RPC_core.call
+      (tezlink_foreign_endpoint sequencer)
+      (RPC.get_chain_block_operations ())
+  in
+  let manager_ops = JSON.(all_passes |=> 3 |> as_list) in
+  Check.(
+    (List.length manager_ops = 1)
+      int
+      ~error_msg:
+        (prefix ^ ": expected %R manager operation in the block, got %L")) ;
+  let result =
+    JSON.(
+      List.hd manager_ops |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result")
+  in
+  let status = JSON.(result |-> "status" |> as_string) in
+  Check.(
+    (status = "applied")
+      string
+      ~error_msg:(prefix ^ ": top-level crossing status %L, expected %R")) ;
+  let*@ code_after = Rpc.get_code ~address:alias sequencer in
+  let*@ balance_after = Rpc.get_balance ~address:alias sequencer in
+  (* Materialization succeeds either way: it only writes system state, so
+     the forwarder delegation is installed regardless of any dust sitting
+     at the alias. *)
+  Check.(
+    (code_after <> "0x")
+      string
+      ~error_msg:
+        (prefix
+       ^ ": expected a forwarder delegation at the alias after the first \
+          crossing, got %L")) ;
+  (* Any dust below the one-mutez sweep threshold is never forwarded: it
+     stays resident on the alias. *)
+  Check.(
+    (balance_after = expected_residue)
+      Wei.typ
+      ~error_msg:(prefix ^ ": alias balance after the crossing %L, expected %R")) ;
+  unit
+
+let test_first_crossing_without_alias_balance () =
+  register_first_crossing_with_alias_balance_test
+    ~title:"CRAC: tz1 first crossing succeeds with an empty alias"
+    ~tags:["materialization"]
+    ~dust:None
+
+let test_first_crossing_with_one_wei_alias_balance () =
+  register_first_crossing_with_alias_balance_test
+    ~title:"CRAC: tz1 first crossing succeeds with dust on its alias"
+    ~tags:["materialization"; "dust"]
+    ~dust:(Some Wei.one)
+
 (** Two-hop EVM→TEZ→EVM CRAC: the original EVM transaction signer is
  *  recovered as [tx.origin] at the return hop (originator axis), while
  *  [msg.sender] is the TEZ bridge's EVM alias (immediate-caller axis).
@@ -17884,6 +18008,8 @@ let () =
   test_crac_orig_two_cracs_one_tx () ;
   test_crac_evm_deep_recurse_then_michelson_oog [Alpha] ;
   test_crac_roundtrip_tz1_via_evm_back_to_tezos () ;
+  test_first_crossing_without_alias_balance () ;
+  test_first_crossing_with_one_wei_alias_balance () ;
   test_crac_roundtrip_evm_via_michelson_back_to_evm () ;
   test_crac_address_identity_path_independence () ;
   test_crac_legacy_fallback_blind_derivation () ;
