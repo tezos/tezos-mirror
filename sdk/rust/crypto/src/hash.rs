@@ -761,8 +761,8 @@ impl P256Signature {
         match p256::ecdsa::Signature::from_scalars(r, s) {
             Ok(sig) => {
                 let s = *sig.s();
-                // Low-S iff `n - s` is not strictly smaller than `s`.
-                !((-s).to_bytes() < s.to_bytes())
+                // Low-S iff `n - s` is greater than or equal to `s`.
+                (-s).to_bytes() >= s.to_bytes()
             }
             Err(_) => false,
         }
