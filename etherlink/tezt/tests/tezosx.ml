@@ -7141,6 +7141,88 @@ let test_run_script_view () =
 
   unit
 
+(** A CRAC out of a view must read the same clock the view does: the
+    caller's [now] / [level], not the blueprint's. The client has no
+    flag for either, so drive the RPC directly. *)
+let test_run_script_view_crac_step_constants () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view propagates now and level across a CRAC"
+    ~tags:["rpc"; "run_script_view"; "view"; "cross_runtime"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  (* Runtime (9B): <opcode> / PUSH1 0 / MSTORE / PUSH1 32 / PUSH1 0 /
+     RETURN, behind the 11-byte copy init the other CRAC tests use. *)
+  let deploy ~nonce ~opcode =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~nonce
+      ~init_code:(sf "600980600b6000396000f3%s60005260206000f3" opcode)
+      ()
+  in
+  (* TIMESTAMP and NUMBER. *)
+  let* timestamp_evm = deploy ~nonce:0 ~opcode:"42" in
+  let* number_evm = deploy ~nonce:1 ~opcode:"43" in
+  let originate_bridge ~alias evm_address =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["mini_scenarios"; "staticcall_evm_view"]
+      ~init_storage_data:(sf {|"%s"|} evm_address)
+      ~alias
+      sandbox
+  in
+  let* timestamp_kt1 = originate_bridge ~alias:"crac_now" timestamp_evm in
+  let* number_kt1 = originate_bridge ~alias:"crac_level" number_evm in
+
+  let endpoint = tezlink_foreign_endpoint sandbox in
+  let* chain_id = RPC_core.call endpoint @@ RPC.get_chain_chain_id () in
+  (* Distinctive values, far from any level or timestamp the sandbox
+     would produce on its own. *)
+  let now = 1_700_000_000 in
+  let level = 987_654 in
+  let read_evm kt1 =
+    let data =
+      RPC_core.Data
+        (`O
+           [
+             ("contract", `String kt1);
+             ("view", `String "read_evm");
+             ("input", `O [("prim", `String "Unit")]);
+             ("chain_id", `String chain_id);
+             ("unparsing_mode", `String "Readable");
+             ("now", `String (string_of_int now));
+             ("level", `String (string_of_int level));
+           ])
+    in
+    RPC_core.call endpoint
+    @@ RPC_core.make
+         ~data
+         POST
+         [
+           "chains";
+           "main";
+           "blocks";
+           "head";
+           "helpers";
+           "scripts";
+           "run_script_view";
+         ]
+         (fun json -> JSON.(json |-> "data" |-> "bytes" |> as_string))
+  in
+  let check ~what kt1 expected =
+    let* hex = read_evm kt1 in
+    Check.(
+      (Z.to_string (Z.of_string ("0x" ^ hex)) = string_of_int expected)
+        string
+        ~error_msg:(sf "%s: expected %%R but got %%L" what))
+    |> return
+  in
+  let* () = check ~what:"block.timestamp inside the CRAC" timestamp_kt1 now in
+  let* () = check ~what:"block.number inside the CRAC" number_kt1 level in
+  unit
+
 (** [run_script_view] rejects the two L1 fields the Michelson runtime
     cannot honour, rather than silently computing against a different
     state than the caller asked for. *)
@@ -7273,4 +7355,5 @@ let () =
   test_michelson_address_registry_view_lambda () ;
   test_tezosx_single_tx_execution_input () ;
   test_run_script_view () ;
+  test_run_script_view_crac_step_constants () ;
   test_run_script_view_unsupported_fields ()
