@@ -61,6 +61,24 @@ pub const MAX_CRAC_DEPTH: u32 = 32;
 pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
     "user-supplied X-Tezos-* headers are forbidden";
 
+/// Rejection message for a native atomic call (NAC) whose target runtime is
+/// the caller's own runtime.
+///
+/// A same-runtime NAC is not a real boundary crossing: the callee executes
+/// against the *same* journal state as the caller, so the inbound error path
+/// (`discard_tx` on a shared `JournalInner`) drains the whole journal and
+/// bumps its transaction id, desyncing the outer frames' checkpoints. A later
+/// `checkpoint_revert` then no-ops and state moved after the discard survives
+/// the revert.
+///
+/// Refusing it costs no expressiveness: a target on the caller's own runtime
+/// is already reachable natively — a plain EVM `CALL` on the EVM side, an
+/// internal operation on the Michelson side — with the ordinary rollback
+/// semantics of that runtime. Only the generic `call` / `%call` gateway
+/// entrypoints can express such a target; the typed entrypoints hardcode the
+/// other runtime's host and can never trip this.
+pub const ERR_SAME_RUNTIME_NAC: &str = "same-runtime native atomic call is not supported";
+
 /// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
 pub struct CrossRuntimeContext {
