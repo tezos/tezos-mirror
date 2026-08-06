@@ -2005,9 +2005,13 @@ module CracRunnerWrapper = struct
     val inject_crac_no_block : tez_runner -> unit Lwt.t
 
     (** Send a simple EVM transfer via [send_raw_transaction] without
-        producing a block.  Returns the tx hash. *)
+        producing a block.  Returns the tx hash. [gas] defaults to 21_000,
+        the flat intrinsic cost, fine for a codeless target; callers
+        targeting an address that runs code (e.g. the alias forwarder's
+        [receive()]/[fallback()], gateway sub-call included) must raise
+        it. *)
     val send_evm_transfer_no_block :
-      ?value:Wei.t -> address:string -> unit -> string Lwt.t
+      ?gas:int -> ?value:Wei.t -> address:string -> unit -> string Lwt.t
 
     module EvmStoreAndReturn : sig
       val deploy : unit -> evm_runner Lwt.t
@@ -2796,13 +2800,14 @@ module CracRunnerWrapper = struct
         in
         unit
 
-      let send_evm_transfer_no_block ?(value = Wei.zero) ~address () =
+      let send_evm_transfer_no_block ?(gas = 21_000) ?(value = Wei.zero)
+          ~address () =
         let* raw_tx =
           Cast.craft_tx
             ~source_private_key:sender.Eth_account.private_key
             ~chain_id:1337
             ~nonce:(evm_nonce ())
-            ~gas:21_000
+            ~gas
             ~gas_price:1_000_000_000
             ~value
             ~address
@@ -16358,6 +16363,877 @@ let test_first_crossing_with_one_wei_alias_balance () =
     ~tags:["materialization"; "dust"]
     ~dust:(Some Wei.one)
 
+(* ── Fixed-shape priming and full-balance sweep ─────────────────────────── *)
+
+(** One mutez expressed in wei, matching the forwarder's own sweep-gate
+    constant: amounts at or above this are swept, amounts below stay
+    resident. *)
+let one_mutez_wei = Wei.of_tez (Tez.of_mutez_int 1)
+
+(** A minimal Michelson contract whose sole entrypoint is [%default]: calling
+    it (via a bare [%default] call, no other entrypoint exists) makes it call
+    the CRAC gateway itself, so its own alias — not some intermediate
+    caller's — is the one materialized on first use. Contrasts with
+    {!TezCrossRuntimeRunnerEvm}, which exposes no [%default] at all. *)
+let inline_default_crossing_script ~evm_target =
+  sf
+    {|parameter (unit %%default) ;
+storage unit ;
+code
+  { DROP ;
+    PUSH @gateway address "%s" ;
+    CONTRACT %%call_evm (pair string (pair string (pair bytes (option (contract bytes))))) ;
+    ASSERT_SOME ;
+    NONE (contract bytes) ;
+    PUSH bytes 0x ;
+    PAIR ;
+    PUSH string "" ;
+    PAIR ;
+    PUSH string "%s" ;
+    PAIR ;
+    AMOUNT ;
+    SWAP ;
+    TRANSFER_TOKENS ;
+    NIL operation ;
+    SWAP ;
+    CONS ;
+    PUSH unit Unit ;
+    SWAP ;
+    PAIR }|}
+    gateway_address
+    evm_target
+
+(** topic0 of the forwarder's [Initialized] and [Forwarded] events, shared by
+    the priming-shape assertion below and the log-placement scenarios
+    further down. *)
+let initialized_event_topic = event_topic "Initialized(string,bytes,uint256)"
+
+let forwarded_event_topic = event_topic "Forwarded(string,uint256)"
+
+(** The number of logs among a callTracer frame's own [logs] carrying
+    [topic] as their topic0. *)
+let frame_log_count ~topic frame =
+  List.length
+    (List.filter
+       (fun l -> trace_log_topic0 l = Some topic)
+       (trace_frame_logs frame))
+
+(** Assert that materializing [alias] ran as a fixed-shape priming frame
+    targeting [alias] specifically (one [handler -> alias] frame, zero
+    subcalls, exactly one [Initialized] log and no [Forwarded] log) inside
+    the fake or native tx [tx_hash], and that [residue] — sitting on the
+    alias before materialization — is still there afterward untouched.
+    Filtering priming frames on [to = alias] matters because several
+    scenarios below prime more than one alias (e.g. both the originator's
+    and the bridge's) in the same trace; without the filter the assertions
+    could pass without the alias under test ever being primed. *)
+let assert_fixed_shape_priming_and_residue_stays ~prefix ~sequencer ~alias
+    ~residue ~tx_hash =
+  let* trace =
+    get_call_trace
+      ~prefix
+      ~tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  let alias_lc = String.lowercase_ascii alias in
+  let priming =
+    List.filter
+      (fun f -> trace_field_lc f "to" = alias_lc)
+      (priming_subcalls trace)
+  in
+  Check.(
+    (List.length priming = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": expected exactly one alias-priming frame targeting the alias under \
+          test, got %L")) ;
+  let priming_frame = List.hd priming in
+  Check.(
+    (List.length (trace_subcalls priming_frame) = 0)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": the priming frame must have a fixed shape with zero subcalls, got \
+          %L")) ;
+  Check.(
+    (frame_log_count ~topic:initialized_event_topic priming_frame = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": expected exactly one Initialized log in the priming frame, got %L")) ;
+  Check.(
+    (frame_log_count ~topic:forwarded_event_topic priming_frame = 0)
+      int
+      ~error_msg:
+        (prefix ^ ": expected no Forwarded log in the priming frame, got %L")) ;
+  let*@ balance_after = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after = residue)
+      Wei.typ
+      ~error_msg:(prefix ^ ": residue after materialization %L, expected %R")) ;
+  unit
+
+(** Native #1: a plain tz1 (bootstrap5) makes its first crossing directly
+    via the gateway, while its alias already holds [>= 1 mutez] worth of
+    residue. *)
+let test_first_crossing_tz1_with_residue_has_fixed_shape_priming () =
+  register_crac_runner_test
+    ~title:"CRAC: tz1 first crossing with residue has fixed-shape priming"
+    ~tags:["alias"; "l2_1931"; "residue"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "NATIVE-RESIDUE-TZ1" in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~value:one_mutez_wei ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  assert_fixed_shape_priming_and_residue_stays
+    ~prefix
+    ~sequencer
+    ~alias
+    ~residue:one_mutez_wei
+    ~tx_hash
+
+(** Native #2: a KT1 with no [%default] entrypoint at all
+    ({!TezCrossRuntimeRunnerEvm}) makes its own first crossing (its [%run]
+    is invoked directly, so it — not some caller wrapping it — is the CRAC
+    source), while its alias already holds residue. Materialization only
+    writes system state and never moves value to the native address, so it
+    succeeds regardless of whether the native could receive a bare-address
+    transfer. *)
+let test_first_crossing_kt1_without_default_with_residue_succeeds () =
+  register_crac_runner_test
+    ~title:"CRAC: KT1 without %default first crossing with residue succeeds"
+    ~tags:["alias"; "l2_1931"; "residue"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "NATIVE-RESIDUE-KT1-NO-DEFAULT" in
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  let (`Tez_runner (_, kt1)) = tez_bridge in
+  let alias = evm_alias_of_tezos_address kt1 in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~value:one_mutez_wei ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () = TezRunner.call_run tez_bridge in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_leaf in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  assert_fixed_shape_priming_and_residue_stays
+    ~prefix
+    ~sequencer
+    ~alias
+    ~residue:one_mutez_wei
+    ~tx_hash
+
+(** Native #3: a KT1 that DOES declare a [%default] entrypoint
+    ({!inline_default_crossing_script}), invoked via a bare [%default] call,
+    while its alias already holds residue. Materialization succeeds exactly
+    like the other two natives: it writes only system state, so the
+    native's own entrypoints play no role in it. *)
+let test_first_crossing_kt1_with_default_and_residue_succeeds () =
+  register_crac_runner_test
+    ~title:"CRAC: KT1 with %default first crossing with residue succeeds"
+    ~tags:["alias"; "l2_1931"; "residue"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "NATIVE-RESIDUE-KT1-DEFAULT" in
+  let* _hex, kt1 =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script:
+        (inline_default_crossing_script ~evm_target:codeless_evm_target)
+      ~init_storage_data:"Unit"
+      ()
+  in
+  let alias = evm_alias_of_tezos_address kt1 in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~value:one_mutez_wei ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    TezContract.call_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~dest:kt1
+      ~arg_data:"Unit"
+      ~gas_limit:200_000
+      ()
+  in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  assert_fixed_shape_priming_and_residue_stays
+    ~prefix
+    ~sequencer
+    ~alias
+    ~residue:one_mutez_wei
+    ~tx_hash
+
+(** A payment through a materialized alias sweeps the payment and any
+    resident residue together in one forward. *)
+let test_residue_sweep_with_payment () =
+  register_crac_runner_test
+    ~title:"CRAC: a payment through an alias sweeps payment plus residue"
+    ~tags:["alias"; "l2_1931"; "sweep"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "SWEEP-PAYMENT" in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  (* Dust BEFORE materialization: once the forwarder delegation is in place,
+     any value-carrying call — including a plain transfer — is itself an
+     incoming interaction that sweeps on the spot. Pre-materialization is
+     the only way to leave genuine residue resident (see the SELFDESTRUCT
+     scenario for the other way, which bypasses receive()/fallback()). *)
+  let residue =
+    Wei.of_string "2500000000000"
+    (* 2.5 mutez *)
+  in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  let*@ code_after_materialization = Rpc.get_code ~address:alias sequencer in
+  Check.(
+    (code_after_materialization <> "0x")
+      string
+      ~error_msg:
+        (prefix
+       ^ ": expected a forwarder delegation after materialization, got %L")) ;
+  let*@ balance_before_payment = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_before_payment = residue)
+      Wei.typ
+      ~error_msg:(prefix ^ ": alias residue before payment %L, expected %R")) ;
+  let* native_before = Client.get_balance_for ~account:tz1 client_tezlink in
+  let payment = Wei.of_tez (Tez.of_mutez_int 1) in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~gas:2_000_000 ~value:payment ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* native_after = Client.get_balance_for ~account:tz1 client_tezlink in
+  let*@ balance_after = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after = Wei.zero)
+      Wei.typ
+      ~error_msg:
+        (prefix ^ ": alias must be fully swept (residue included), got %L")) ;
+  let expected_mutez = Wei.truncate_to_mutez Wei.(residue + payment) in
+  let delta_mutez = Tez.to_mutez native_after - Tez.to_mutez native_before in
+  Check.(
+    (delta_mutez = expected_mutez)
+      int
+      ~error_msg:(prefix ^ ": native balance delta %L mutez, expected %R mutez")) ;
+  unit
+
+(** A zero-value poke to a materialized alias holding residue sweeps the
+    residue on its own — no payment attached. *)
+let test_residue_sweep_with_zero_value_poke () =
+  register_crac_runner_test
+    ~title:"CRAC: a zero-value poke sweeps an alias's resident residue"
+    ~tags:["alias"; "l2_1931"; "sweep"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "SWEEP-POKE" in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  (* Dust BEFORE materialization; see {!test_residue_sweep_with_payment}. *)
+  let residue = Wei.of_tez (Tez.of_mutez_int 4) in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  let* native_before = Client.get_balance_for ~account:tz1 client_tezlink in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~gas:2_000_000 ~value:Wei.zero ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* native_after = Client.get_balance_for ~account:tz1 client_tezlink in
+  let*@ balance_after = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after = Wei.zero)
+      Wei.typ
+      ~error_msg:(prefix ^ ": the poke must sweep the full residue, got %L")) ;
+  let expected_mutez = Wei.truncate_to_mutez residue in
+  let delta_mutez = Tez.to_mutez native_after - Tez.to_mutez native_before in
+  Check.(
+    (delta_mutez = expected_mutez)
+      int
+      ~error_msg:(prefix ^ ": native balance delta %L mutez, expected %R mutez")) ;
+  unit
+
+(** A contract SELFDESTRUCTs its balance onto a materialized alias: the
+    transfer bypasses the alias's receive()/fallback() entirely, so the
+    balance is stranded there until a later poke recovers it. *)
+let test_selfdestruct_residue_recovered_by_poke () =
+  register_crac_runner_test
+    ~title:"CRAC: a poke recovers residue stranded by SELFDESTRUCT"
+    ~tags:["alias"; "l2_1931"; "selfdestruct"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "SELFDESTRUCT-RECOVER" in
+  let evm_version = Kernel.select_evm_version Kernel.Latest in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  let* selfdestructor =
+    EvmContract.deploy_solidity_contract
+      ~evm_version
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~contract:Solidity_contracts.selfdestruct_to
+      ()
+  in
+  let strand = Wei.of_tez (Tez.of_mutez_int 3) in
+  let* _receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:strand
+      ~address:selfdestructor
+      ~abi_signature:"destructTo(address)"
+      ~arguments:[alias]
+      ()
+  in
+  let*@ balance_after_selfdestruct = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after_selfdestruct = strand)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": balance stranded by SELFDESTRUCT %L, expected %R (no forwarder \
+          sweep must have run)")) ;
+  let* native_before = Client.get_balance_for ~account:tz1 client_tezlink in
+  let* _tx_hash =
+    send_evm_transfer_no_block ~gas:2_000_000 ~value:Wei.zero ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* native_after = Client.get_balance_for ~account:tz1 client_tezlink in
+  let*@ balance_after_poke = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after_poke = Wei.zero)
+      Wei.typ
+      ~error_msg:
+        (prefix ^ ": the poke must recover the stranded balance, got %L")) ;
+  let expected_mutez = Wei.truncate_to_mutez strand in
+  let delta_mutez = Tez.to_mutez native_after - Tez.to_mutez native_before in
+  Check.(
+    (delta_mutez = expected_mutez)
+      int
+      ~error_msg:(prefix ^ ": native balance delta %L mutez, expected %R mutez")) ;
+  unit
+
+(** Michelson contract with two entrypoints: [%run] crosses into EVM (used
+    only to materialize its own alias), and [%default] FAILWITHs unless
+    called with exactly [price] mutez — used to receive a sweep and pin the
+    exact amount it observes. *)
+let amount_sensitive_default_script =
+  sf
+    {|parameter (or (unit %%run) (unit %%default)) ;
+storage mutez ;
+code
+  { UNPAIR ;
+    IF_LEFT
+      { DROP ;
+        PUSH @gateway address "%s" ;
+        CONTRACT %%call_evm (pair string (pair string (pair bytes (option (contract bytes))))) ;
+        ASSERT_SOME ;
+        NONE (contract bytes) ;
+        PUSH bytes 0x ;
+        PAIR ;
+        PUSH string "" ;
+        PAIR ;
+        PUSH string "%s" ;
+        PAIR ;
+        AMOUNT ;
+        SWAP ;
+        TRANSFER_TOKENS ;
+        NIL operation ;
+        SWAP ;
+        CONS ;
+        PAIR }
+      { DROP ;
+        DUP ;
+        AMOUNT ;
+        COMPARE ;
+        NEQ ;
+        IF { PUSH string "wrong amount" ; FAILWITH } {} ;
+        NIL operation ;
+        PAIR }
+  }|}
+    gateway_address
+    codeless_evm_target
+
+(** Dusting a KT1's alias shifts the exact amount its amount-sensitive
+    [%default] must observe to clear: a payment of the nominal [price]
+    now overshoots (price + residue), reverting loudly with nothing lost,
+    while a payment of [price - residue] lands exactly on [price] once the
+    residue is folded in. *)
+let test_amount_sensitive_default_dust_shifts_required_payment () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: dust on a KT1's alias shifts the exact payment its %default \
+       requires"
+    ~tags:["alias"; "l2_1931"; "amount_sensitive"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "AMOUNT-SENSITIVE-DEFAULT" in
+  let price_mutez = 5 in
+  let* _hex, kt1 =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script:amount_sensitive_default_script
+      ~init_storage_data:(string_of_int price_mutez)
+      ()
+  in
+  let alias = evm_alias_of_tezos_address kt1 in
+  (* Dust BEFORE materialization; see {!test_residue_sweep_with_payment}. *)
+  let residue = Wei.of_tez (Tez.of_mutez_int 2) in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  (* Materialize alias(kt1): invoke %run directly so kt1 itself is the CRAC
+     source. *)
+  let* () =
+    TezContract.call_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~dest:kt1
+      ~arg_data:"Unit"
+      ~entrypoint:"run"
+      ~gas_limit:200_000
+      ()
+  in
+  let*@ balance_after_materialization =
+    Rpc.get_balance ~address:alias sequencer
+  in
+  Check.(
+    (balance_after_materialization = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix ^ ": residue must stay resident through materialization, got %L")) ;
+  let price_wei =
+    Wei.of_string (string_of_int (price_mutez * 1_000_000_000_000))
+  in
+  (* A payment of the nominal price overshoots (price + residue): the
+     %default's amount check fails, and the whole payment tx reverts —
+     loudly, and nothing lost. *)
+  let* failing_tx_hash =
+    send_evm_transfer_no_block ~gas:2_000_000 ~value:price_wei ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ failed_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:failing_tx_hash sequencer
+  in
+  (match failed_receipt with
+  | Some r ->
+      Check.(
+        (r.status = false)
+          bool
+          ~error_msg:(prefix ^ ": expected the overshooting payment to revert"))
+  | None -> Test.fail "%s: missing receipt for the overshooting payment" prefix) ;
+  let*@ balance_after_failed_payment =
+    Rpc.get_balance ~address:alias sequencer
+  in
+  Check.(
+    (balance_after_failed_payment = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": a reverted payment must leave the alias's residue untouched, got %L"
+        )) ;
+  (* A payment of (price - residue) lands exactly on price once the residue
+     is folded in, and clears the %default check. *)
+  let* native_before = Client.get_balance_for ~account:kt1 client_tezlink in
+  let clearing_payment = Wei.(price_wei - residue) in
+  let* clearing_tx_hash =
+    send_evm_transfer_no_block
+      ~gas:2_000_000
+      ~value:clearing_payment
+      ~address:alias
+      ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ clearing_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:clearing_tx_hash sequencer
+  in
+  (match clearing_receipt with
+  | Some r ->
+      Check.(
+        (r.status = true)
+          bool
+          ~error_msg:(prefix ^ ": expected the clearing payment to succeed"))
+  | None -> Test.fail "%s: missing receipt for the clearing payment" prefix) ;
+  let* native_after = Client.get_balance_for ~account:kt1 client_tezlink in
+  let*@ balance_after_clearing_payment =
+    Rpc.get_balance ~address:alias sequencer
+  in
+  Check.(
+    (balance_after_clearing_payment = Wei.zero)
+      Wei.typ
+      ~error_msg:
+        (prefix ^ ": a cleared payment must fully sweep the alias, got %L")) ;
+  Check.(
+    (Tez.to_mutez native_after - Tez.to_mutez native_before = price_mutez)
+      int
+      ~error_msg:(prefix ^ ": native balance delta %L mutez, expected %R mutez")) ;
+  unit
+
+(** A zero-value poke of a residue-holding alias whose native side is bound
+    to a KT1 with {!amount_sensitive_default_script}, pinned to
+    [price = 0]: the sweep's AMOUNT is the non-zero residue, which always
+    misses a price of 0, so the RuntimeGateway call fails and the forwarder
+    must revert with its own [TransferFailed] rather than silently drop the
+    failure, leaving the residue resident on the alias. *)
+let test_zero_value_poke_reverts_when_native_default_failwiths () =
+  register_crac_runner_test
+    ~title:"CRAC: a poke reverts with TransferFailed when %default FAILWITHs"
+    ~tags:["alias"; "l2_1931"; "sweep"; "negative"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "SWEEP-POKE-FAILWITH" in
+  let* _hex, kt1 =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script:amount_sensitive_default_script
+      ~init_storage_data:"0"
+      ()
+  in
+  let alias = evm_alias_of_tezos_address kt1 in
+  (* Dust BEFORE materialization; see {!test_residue_sweep_with_payment}. *)
+  let residue = Wei.of_tez (Tez.of_mutez_int 3) in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  (* Materialize alias(kt1): invoke %run directly so kt1 itself is the CRAC
+     source. *)
+  let* () =
+    TezContract.call_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~dest:kt1
+      ~arg_data:"Unit"
+      ~entrypoint:"run"
+      ~gas_limit:200_000
+      ()
+  in
+  let*@ balance_after_materialization =
+    Rpc.get_balance ~address:alias sequencer
+  in
+  Check.(
+    (balance_after_materialization = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix ^ ": residue must stay resident through materialization, got %L")) ;
+  let* poke_tx_hash =
+    send_evm_transfer_no_block ~gas:2_000_000 ~value:Wei.zero ~address:alias ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ poke_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:poke_tx_hash sequencer
+  in
+  (match poke_receipt with
+  | Some r ->
+      Check.(
+        (r.status = false)
+          bool
+          ~error_msg:(prefix ^ ": expected the poke to revert"))
+  | None -> Test.fail "%s: missing receipt for the poke" prefix) ;
+  let* poke_trace = get_call_trace ~prefix ~tx_hash:poke_tx_hash sequencer in
+  let poke_output_has_transfer_failed_selector =
+    let transfer_failed_selector = solidity_selector "TransferFailed()" in
+    let out = trace_field_lc poke_trace "output" in
+    String.length out >= String.length transfer_failed_selector
+    && String.sub out 0 (String.length transfer_failed_selector)
+       = transfer_failed_selector
+  in
+  Check.(
+    (poke_output_has_transfer_failed_selector = true)
+      bool
+      ~error_msg:
+        (prefix
+       ^ ": expected the poke to revert with the forwarder's TransferFailed")) ;
+  let*@ balance_after_poke = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after_poke = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": a reverted poke must leave the alias's residue untouched, got %L")) ;
+  unit
+
+(** The priming frame's gas must be identical whether or not the alias
+    being materialized already holds residue — materialization no longer
+    inspects the balance at all. Compared at the priming frame's own
+    [gasUsed] (each callTracer frame carries its own), rather than the
+    whole transaction's: the frame-level cost isolates the residue
+    variable without needing a throwaway warm-up crossing to absorb
+    cross-transaction cold/warm-cache asymmetry. The durable, one-off cost
+    of warming up shared global state (e.g. the AliasForwarder
+    precompile's own code/account) is paid outside the priming frame
+    itself — in the frame that calls into it — so it never shows up in
+    the frame-level [gasUsed] being compared here, which is what makes
+    the comparison valid without a warm-up crossing. *)
+let test_priming_gas_identical_with_and_without_residue () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: first-crossing priming gas is identical with or without residue"
+    ~tags:["alias"; "l2_1931"; "gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "GAS-PARITY" in
+  let* evm_leaf_a = EvmMultiRunCaller.deploy_and_init () in
+  let* evm_leaf_b = EvmMultiRunCaller.deploy_and_init () in
+  let* bridge_no_residue = TezCrossRuntimeRunnerEvm.originate evm_leaf_a in
+  let* bridge_with_residue = TezCrossRuntimeRunnerEvm.originate evm_leaf_b in
+  let (`Tez_runner (_, kt1_no_residue)) = bridge_no_residue in
+  let alias_no_residue = evm_alias_of_tezos_address kt1_no_residue in
+  let (`Tez_runner (_, kt1_with_residue)) = bridge_with_residue in
+  let alias_with_residue = evm_alias_of_tezos_address kt1_with_residue in
+  let* _tx_hash =
+    send_evm_transfer_no_block
+      ~value:one_mutez_wei
+      ~address:alias_with_residue
+      ()
+  in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let priming_frame_gas_of_first_crossing ~alias runner =
+    let* () = TezRunner.call_run runner in
+    let*@ block = latest_block ~sequencer in
+    let tx_hash = first_tx_hash ~prefix block in
+    let* trace = get_call_trace ~prefix ~tx_hash sequencer in
+    let alias_lc = String.lowercase_ascii alias in
+    let priming =
+      List.filter
+        (fun f -> trace_field_lc f "to" = alias_lc)
+        (priming_subcalls trace)
+    in
+    match priming with
+    | [frame] -> return (trace_qty frame "gasUsed")
+    | frames ->
+        Test.fail
+          "%s: expected exactly one priming frame for %s, got %d"
+          prefix
+          alias
+          (List.length frames)
+  in
+  let* gas_without_residue =
+    priming_frame_gas_of_first_crossing
+      ~alias:alias_no_residue
+      bridge_no_residue
+  in
+  let* gas_with_residue =
+    priming_frame_gas_of_first_crossing
+      ~alias:alias_with_residue
+      bridge_with_residue
+  in
+  Check.(
+    (gas_with_residue = gas_without_residue)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": priming gas with residue (%L) must equal without residue (%R)")) ;
+  unit
+
+(** The [Initialized] logs among [logs] emitted by [alias]. *)
+let initialized_logs_at ~alias (logs : Transaction.tx_log list) =
+  List.filter
+    (fun (l : Transaction.tx_log) ->
+      String.lowercase_ascii l.address = String.lowercase_ascii alias
+      && List.exists
+           (fun t -> String.lowercase_ascii t = initialized_event_topic)
+           l.topics)
+    logs
+
+(** Decode the [residentBalance] field of a forwarder [Initialized] log:
+    [event Initialized(string nativeAddress, bytes nativePublicKey, uint256
+    residentBalance)]. None of the three fields is indexed, so all three are
+    ABI-encoded in [data] as a 3-slot head followed by the tail holding the
+    two dynamic fields' contents. [residentBalance] is the only static
+    field, so its value sits inlined in the head at slot index 2 — no
+    offset-chasing into the tail is needed to read it. *)
+let initialized_log_resident_balance ~prefix (log : Transaction.tx_log) =
+  let hex =
+    match log.data with
+    | s when String.length s >= 2 && String.sub s 0 2 = "0x" ->
+        String.sub s 2 (String.length s - 2)
+    | s -> s
+  in
+  if String.length hex < 192 then
+    Test.fail "%s: short Initialized data: %s" prefix log.data
+  else
+    let residual_balance_word = String.sub hex 128 64 in
+    Wei.of_string ("0x" ^ residual_balance_word)
+
+(** For a Michelson-originated crossing (a tz1's top-level gateway call),
+    the alias-priming [Initialized] log lands in the synthetic fake EVM
+    tx's own receipt, and its [residentBalance] field reports the residue
+    that was sitting on the alias before materialization. *)
+let test_initialized_log_in_fake_tx_receipt_for_michelson_originated () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: Initialized lands in the fake tx's own receipt \
+       (Michelson-originated)"
+    ~tags:["alias"; "l2_1931"; "initialized_log"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "INIT-LOG-MICHELSON" in
+  let tz1 = source.public_key_hash in
+  let alias = evm_alias_of_tezos_address tz1 in
+  let residue = Wei.of_tez (Tez.of_mutez_int 2) in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Gateway.call_evm
+      ~evm_target:(`Evm_runner codeless_evm_target)
+      ~method_sig:""
+      ~abi_params:""
+      ()
+  in
+  let*@ block = latest_block ~sequencer in
+  let tx_hash = first_tx_hash ~prefix block in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let logs =
+    match receipt with
+    | Some r -> r.logs
+    | None -> Test.fail "%s: missing receipt for the fake tx" prefix
+  in
+  let initialized = initialized_logs_at ~alias logs in
+  Check.(
+    (List.length initialized = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": expected exactly one Initialized log for the alias in the fake \
+          tx's own receipt, got %L")) ;
+  Check.(
+    (initialized_log_resident_balance ~prefix (List.hd initialized) = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": Initialized's residentBalance %L, expected the prefunded residue %R"
+        )) ;
+  (* The Initialized log's residentBalance field only reports what balance
+     was resident before materialization — it says nothing about whether
+     that balance stayed put or got forwarded to the native side. Checking
+     that the alias balance is unchanged afterward is what actually pins
+     the no-value-moved invariant. *)
+  let*@ balance_after = Rpc.get_balance ~address:alias sequencer in
+  Check.(
+    (balance_after = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": residue after materialization %L, expected it to stay resident %R")) ;
+  unit
+
+(** For an EVM-originated re-entrant crossing (EVM calls a TEZ bridge, which
+    calls back into EVM), the alias-priming [Initialized] log for the
+    intermediary's alias lands in the triggering EVM transaction's own
+    receipt — no extra synthetic tx is created for the re-entrant leg — and
+    its [residentBalance] field reports the residue that was sitting on the
+    alias before materialization. *)
+let test_initialized_log_in_triggering_tx_receipt_for_evm_originated () =
+  register_crac_runner_test
+    ~title:
+      "CRAC: Initialized lands in the triggering tx's own receipt \
+       (EVM-originated)"
+    ~tags:["alias"; "l2_1931"; "initialized_log"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "INIT-LOG-EVM" in
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let (`Tez_runner (_, tez_bridge_kt1)) = tez_bridge in
+  let alias = evm_alias_of_tezos_address tez_bridge_kt1 in
+  let residue = Wei.of_tez (Tez.of_mutez_int 3) in
+  let* _tx_hash = send_evm_transfer_no_block ~value:residue ~address:alias () in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let* _gas_used = EvmRunner.call_run evm_bridge in
+  let*@ block = latest_block ~sequencer in
+  Check.(
+    (List.length
+       (match block.Block.transactions with Block.Hash l -> l | _ -> [])
+    = 1)
+      int
+      ~error_msg:
+        (prefix ^ ": expected exactly one native EVM tx in the block, got %L")) ;
+  let tx_hash = first_tx_hash ~prefix block in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let logs =
+    match receipt with
+    | Some r -> r.logs
+    | None -> Test.fail "%s: missing receipt for the triggering tx" prefix
+  in
+  let initialized = initialized_logs_at ~alias logs in
+  Check.(
+    (List.length initialized = 1)
+      int
+      ~error_msg:
+        (prefix
+       ^ ": expected exactly one Initialized log in the triggering tx's own \
+          receipt, got %L")) ;
+  Check.(
+    (initialized_log_resident_balance ~prefix (List.hd initialized) = residue)
+      Wei.typ
+      ~error_msg:
+        (prefix
+       ^ ": Initialized's residentBalance %L, expected the prefunded residue %R"
+        )) ;
+  unit
+
 (** Two-hop EVM→TEZ→EVM CRAC: the original EVM transaction signer is
  *  recovered as [tx.origin] at the return hop (originator axis), while
  *  [msg.sender] is the TEZ bridge's EVM alias (immediate-caller axis).
@@ -18010,6 +18886,17 @@ let () =
   test_crac_roundtrip_tz1_via_evm_back_to_tezos () ;
   test_first_crossing_without_alias_balance () ;
   test_first_crossing_with_one_wei_alias_balance () ;
+  test_first_crossing_tz1_with_residue_has_fixed_shape_priming () ;
+  test_first_crossing_kt1_without_default_with_residue_succeeds () ;
+  test_first_crossing_kt1_with_default_and_residue_succeeds () ;
+  test_residue_sweep_with_payment () ;
+  test_residue_sweep_with_zero_value_poke () ;
+  test_selfdestruct_residue_recovered_by_poke () ;
+  test_amount_sensitive_default_dust_shifts_required_payment () ;
+  test_zero_value_poke_reverts_when_native_default_failwiths () ;
+  test_priming_gas_identical_with_and_without_residue () ;
+  test_initialized_log_in_fake_tx_receipt_for_michelson_originated () ;
+  test_initialized_log_in_triggering_tx_receipt_for_evm_originated () ;
   test_crac_roundtrip_evm_via_michelson_back_to_evm () ;
   test_crac_address_identity_path_independence () ;
   test_crac_legacy_fallback_blind_derivation () ;
