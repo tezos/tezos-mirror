@@ -1358,8 +1358,8 @@ module Base_images = struct
 
   (* Version tag shared by all base images below (built together by the
      [base_images.daily] pipeline). Current version created by
-     https://gitlab.com/tezos/tezos/-/pipelines/2690710152 (commit 73a6a3d6). *)
-  let base_images_tag = "master-73a6a3d6"
+     https://gitlab.com/tezos/tezos/-/pipelines/2729110598 (commit e92d4ade). *)
+  let base_images_tag = "master-e92d4ade"
 
   let make_img distro =
     Image.mk_external

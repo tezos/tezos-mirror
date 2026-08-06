@@ -8,7 +8,7 @@ stages:
 - test
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -52,7 +52,7 @@ audit_riscv_deps:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 build-layer1-profiling:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -112,7 +112,7 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 build_octez_source:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -159,7 +159,7 @@ build_octez_source:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 cargo_audit:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -180,7 +180,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -203,7 +203,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -244,7 +244,7 @@ check_riscv_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -285,7 +285,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp_arm64
@@ -305,7 +305,7 @@ de.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -396,7 +396,7 @@ npm_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build:static-arm64-linux-experimental-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -441,7 +441,7 @@ oc.build:static-arm64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -485,7 +485,7 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-experimental-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -530,7 +530,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -574,7 +574,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_arm64-exp:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -628,7 +628,7 @@ oc.build_arm64-exp:
     when: on_success
 
 oc.build_arm64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -682,7 +682,7 @@ oc.build_arm64-extra-dev:
     when: on_success
 
 oc.build_arm64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -739,7 +739,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -793,7 +793,7 @@ oc.build_kernels:
     when: on_success
 
 oc.build_x86_64-exp:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -856,7 +856,7 @@ oc.build_x86_64-exp:
     when: on_success
 
 oc.build_x86_64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -920,7 +920,7 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -977,7 +977,7 @@ oc.build_x86_64-released:
     when: on_success
 
 oc.check_lift_limits_patch:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1018,7 +1018,7 @@ oc.check_lift_limits_patch:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1048,7 +1048,7 @@ oc.compile_sources_doc_debian:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1069,7 +1069,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1090,7 +1090,7 @@ oc.compile_sources_doc_deps_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1120,7 +1120,7 @@ oc.compile_sources_doc_ubuntu:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.integration:compiler-rejections:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1158,7 +1158,7 @@ oc.integration:compiler-rejections:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.misc_checks:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -1185,7 +1185,7 @@ oc.misc_checks:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.ocaml_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -1219,7 +1219,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 oc.python_check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1241,7 +1241,7 @@ oc.python_check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script:b58_prefix:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1264,7 +1264,7 @@ oc.script:b58_prefix:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script:snapshot_alpha_and_link:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1304,7 +1304,7 @@ oc.script:snapshot_alpha_and_link:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:test-gen-genesis:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1333,7 +1333,7 @@ oc.script:test-gen-genesis:
     CARGO_NET_OFFLINE: "false"
 
 oc.script:test_octez_release_versions:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1376,7 +1376,7 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.test-liquidity-baking-scripts:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1403,7 +1403,7 @@ oc.test-liquidity-baking-scripts:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.unit:non-proto-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp_arm64
@@ -1455,7 +1455,7 @@ oc.unit:non-proto-arm64:
   parallel: 2
 
 oc.unit:non-proto-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1514,7 +1514,7 @@ oc.unit:non-proto-x86_64:
   retry: 2
 
 oc.unit:other-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_high_cpu
@@ -1571,7 +1571,7 @@ oc.unit:other-x86_64:
   retry: 2
 
 oc.unit:proto-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1628,7 +1628,7 @@ oc.unit:proto-x86_64:
   retry: 2
 
 oc.unit:protocol_compiles:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1666,7 +1666,7 @@ oc.unit:protocol_compiles:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.unit:webassembly-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1696,7 +1696,7 @@ oc.unit:webassembly-x86_64:
     CARGO_NET_OFFLINE: "false"
 
 oc:scripts:release_script_values:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1715,7 +1715,7 @@ oc:scripts:release_script_values:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 ocaml-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1749,7 +1749,7 @@ ocaml-check:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 release_site.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
   stage: build
   tags:
   - gcp
@@ -1776,7 +1776,7 @@ release_site.build:
     when: on_success
 
 release_site.build_tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
   stage: build
   tags:
   - gcp
@@ -1811,7 +1811,7 @@ release_site.build_tezt:
     when: on_success
 
 release_site.tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -1869,7 +1869,7 @@ release_site.tezt:
     when: always
 
 resto.unit:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp_arm64
@@ -1889,7 +1889,7 @@ resto.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 resto.unit:x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1909,7 +1909,7 @@ resto.unit:x86_64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sanity_ci:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: sanity
   tags:
   - gcp
@@ -1931,7 +1931,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sdk_bindings.test:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -1969,7 +1969,7 @@ sdk_bindings.test:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -2009,7 +2009,7 @@ test_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -2046,7 +2046,7 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -2108,7 +2108,7 @@ tezt:
   parallel: 34
 
 tezt-extra:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -2169,7 +2169,7 @@ tezt-extra:
   retry: 2
 
 tezt-flaky:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -2232,7 +2232,7 @@ tezt-flaky:
   parallel: 2
 
 tezt-riscv-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -2293,7 +2293,7 @@ tezt-riscv-slow:
   retry: 2
 
 tezt-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt
@@ -2355,7 +2355,7 @@ tezt-slow:
   parallel: 12
 
 tezt-static-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp
@@ -2417,7 +2417,7 @@ tezt-static-binaries:
     when: always
 
 tezt-time-sensitive:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-e92d4ade
   stage: test
   tags:
   - gcp_tezt

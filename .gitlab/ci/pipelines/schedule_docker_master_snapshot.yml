@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:snapshot:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -61,7 +61,7 @@ docker:merge_manifests:snapshot:
   retry: 0
 
 docker:promote_weekly:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -92,7 +92,7 @@ docker:promote_weekly:
   retry: 0
 
 oc.docker:snapshot:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: build
   tags:
   - gcp
@@ -108,9 +108,9 @@ oc.docker:snapshot:amd64:
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
-    --rust-toolchain-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-73a6a3d6
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-e92d4ade
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
+    --rust-toolchain-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -132,7 +132,7 @@ oc.docker:snapshot:amd64:
     - runner_system_failure
 
 oc.docker:snapshot:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-73a6a3d6
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
   stage: build
   tags:
   - gcp_arm64
@@ -148,8 +148,8 @@ oc.docker:snapshot:arm64:
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-73a6a3d6
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-73a6a3d6
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-e92d4ade
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
