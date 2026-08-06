@@ -3500,6 +3500,49 @@ mod tests {
             assert_eq!(result, encode(parser.parse("42").expect("parses")));
         }
 
+        /// `tezosx_run_code_fn` runs this inside a [`SafeStorage`]
+        /// transaction it always reverts: reads must resolve through the
+        /// snapshot, and the state must come back untouched.
+        #[test]
+        fn runs_and_reverts_inside_a_safe_storage_transaction() {
+            use tezos_evm_runtime::safe_storage::TMP_PATH;
+            use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+            use tezos_smart_rollup_host::storage::StorageV1;
+
+            let parser = Parser::new();
+            let (script, storage, input) = incr_fixture(&parser);
+
+            let mut host = MockKernelHost::default();
+            let probe = RefPath::assert_from(b"/tez/tez_accounts/probe");
+            host.store_write_all(&probe, b"before")
+                .expect("the probe is written");
+
+            let mut safe_host = tezos_evm_runtime::safe_storage::SafeStorage {
+                host: &mut host,
+                world_states: vec![OwnedPath::from(crate::context::TEZOS_ACCOUNTS_ROOT)],
+            };
+            safe_host.start().expect("the snapshot is taken");
+            run_code(
+                &mut safe_host,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &params(script, storage, input, None, None),
+            )
+            .expect("it runs");
+            safe_host.revert().expect("the snapshot is dropped");
+
+            assert_eq!(
+                host.store_read_all(&probe).expect("the probe survives"),
+                b"before"
+            );
+            assert!(
+                host.store_has(&TMP_PATH)
+                    .expect("/tmp is readable")
+                    .is_none(),
+                "the reverted snapshot should leave no `/tmp` behind"
+            );
+        }
+
         /// L1 resolves `sender` and `payer` together: a `payer` given
         /// without a `sender` is the sender too, and `SENDER` falls back to
         /// `self` only when neither is given. Defaulting it to `self`
