@@ -17266,6 +17266,25 @@ let test_crac_roundtrip_evm_via_michelson_back_to_evm () =
   let* () =
     EvmIdentityRecorder.check_last_sender ~expected_sender evm_recorder
   in
+  (* The two identity axes must stay distinct, and neither may be the frame
+     above the immediate caller. Laundering msg.sender — deriving it from the
+     originator or from the outer EVM bridge instead of forwarding the
+     immediate Michelson caller — would leave both assertions above holding
+     degenerately. *)
+  let norm a = String.lowercase_ascii (Test_helpers.remove_0x a) in
+  Check.(
+    (norm expected_sender <> norm expected_origin)
+      string
+      ~error_msg:
+        "msg.sender and tx.origin at the recorder collided (%L == %R); the \
+         identity assertions above are degenerate") ;
+  Check.(
+    (norm expected_sender <> norm evm_bridge_addr)
+      string
+      ~error_msg:
+        "msg.sender at the recorder is the outer EVM bridge (%L == %R); the \
+         gateway must forward the immediate Michelson caller, not the frame \
+         above it") ;
   (* Negative: a fresh EVM recorder that was never targeted holds the initial
      zero address (EvmIdentityRecorder initialises both slots to zero). *)
   let* other_recorder = EvmIdentityRecorder.deploy () in
