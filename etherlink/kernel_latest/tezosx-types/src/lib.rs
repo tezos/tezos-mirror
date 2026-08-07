@@ -72,9 +72,11 @@ pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
 /// the revert.
 ///
 /// Refusing it costs no expressiveness: a target on the caller's own runtime
-/// is already reachable natively — a plain EVM `CALL` on the EVM side, an
-/// internal operation on the Michelson side — with the ordinary rollback
-/// semantics of that runtime. Only the generic `call` / `%call` gateway
+/// is already reachable natively — for a POST, a plain EVM `CALL` on the EVM
+/// side or an internal operation on the Michelson side, with the ordinary
+/// rollback semantics of that runtime; for a GET, the `VIEW` instruction,
+/// which is the synchronous read an internal operation cannot express. Only
+/// the generic `call` / `%call` gateway
 /// entrypoints can express such a target; the typed entrypoints hardcode the
 /// other runtime's host and can never trip this.
 pub const ERR_SAME_RUNTIME_NAC: &str = "same-runtime native atomic call is not supported";

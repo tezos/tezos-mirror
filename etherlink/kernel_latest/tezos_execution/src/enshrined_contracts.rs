@@ -1070,7 +1070,8 @@ where
     // building, so the inbound error path's `discard_tx` desyncs our
     // checkpoints and a later revert silently no-ops. Callers wanting a
     // Michelson target already have internal operations, which backtrack
-    // properly. Checked before the sender-alias short-circuit below so no
+    // properly, and `VIEW` for the synchronous read a GET would have
+    // served. Checked before the sender-alias short-circuit below so no
     // alias gas is charged for a call that cannot proceed; `%call_evm`
     // hardcodes the `ethereum` host and can never reach this.
     if target_runtime == RuntimeId::Tezos {
