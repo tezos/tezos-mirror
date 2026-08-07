@@ -383,6 +383,41 @@ module TezContract = struct
            | Some _ | None -> None)
          internal_ops)
 
+  (** [get_internal_op_error_messages ~block ~entrypoint sequencer] queries
+   *  the tezlink RPC for [block]'s first manager operation and returns the
+   *  [error_message] of every entry in the [errors] list of each internal
+   *  operation targeting [entrypoint].  Used to check that a refused
+   *  gateway call names its reason on the receipt rather than failing
+   *  anonymously.
+   *
+   *  @param block Block identifier (default ["head"]). *)
+  let get_internal_op_error_messages ?(block = "head") ~entrypoint sequencer =
+    let path = sf "/tezlink/chains/main/blocks/%s/operations/3/0" block in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"tezlink_operation_receipt" res in
+    let internal_ops =
+      JSON.(
+        json |-> "contents" |=> 0 |-> "metadata"
+        |-> "internal_operation_results" |> as_list)
+    in
+    return
+      (List.concat_map
+         (fun op ->
+           if
+             JSON.(op |-> "parameters" |-> "entrypoint" |> as_string_opt)
+             = Some entrypoint
+           then
+             List.filter_map
+               (fun err -> JSON.(err |-> "error_message" |> as_string_opt))
+               JSON.(op |-> "result" |-> "errors" |> as_list)
+           else [])
+         internal_ops)
+
   (** Reads the decoded Micheline storage of the Michelson contract
    *  identified by [contract_address] (a b58check KT1 address) from the
    *  tezlink RPC of [sequencer]. *)
@@ -12980,7 +13015,25 @@ let test_crac_http_call_tez_to_tez_is_refused () =
     TezCrossRuntimeHttpCallTez.check_storage ~expected_counter:0 tez_caller
   in
   Log.debug ~prefix "Verify TEZ target was never entered (counter=0)" ;
-  TezMultiRunCaller.check_storage ~expected_counter:0 tez_target
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_target in
+  (* Both counters staying at 0 is what *any* failure of the manager
+     operation produces, so pin the reason too: the gateway's internal op
+     must carry the refusal message. *)
+  Log.debug ~prefix "Verify the receipt names the refusal as the reason" ;
+  let* errors =
+    TezContract.get_internal_op_error_messages ~entrypoint:"call" sequencer
+  in
+  Check.is_true
+    (List.exists
+       (fun msg ->
+         msg =~ rex "same-runtime native atomic call is not supported")
+       errors)
+    ~error_msg:
+      (sf
+         "Expected an internal %%call error naming the same-runtime refusal, \
+          got [%s]"
+         (String.concat "; " errors)) ;
+  unit
 
 (* L1 vs TezosX receipt comparison helpers *)
 
