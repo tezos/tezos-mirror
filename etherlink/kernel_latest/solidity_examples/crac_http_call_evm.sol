@@ -6,9 +6,8 @@ pragma solidity ^0.8.20;
 // same-runtime NAC, which the gateway refuses. Used to pin that refusal:
 // the gateway CALL returns false and the caller's try/catch observes it.
 //
-// run()         - calls run() on the EVM destination via the precompile
-//                 (POST). Reverts on failure.
-// runCatch()    - same call wrapped in try/catch, so the refusal (or a
+// runCatch()    - calls run() on the EVM destination via the precompile
+//                 (POST), wrapped in try/catch, so the refusal (or a
 //                 revert/OOG) can be observed by the EVM caller.
 // runCatchGet() - same, with method = GET. The gateway derives the target
 //                 runtime from the URL host before splitting on the
@@ -42,15 +41,6 @@ contract CracHttpCallEvm {
             body,
             method
         );
-    }
-
-    function run() external payable {
-        count++;
-        (bool ok, ) = GATEWAY.call{value: msg.value}(_buildCalldata(1));
-        if (!ok) {
-            revert("cross-runtime call reverted");
-        }
-        count++;
     }
 
     function _doCall() external payable {
