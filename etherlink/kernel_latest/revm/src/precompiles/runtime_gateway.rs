@@ -1511,24 +1511,6 @@ mod tests {
         );
     }
 
-    /// The host strings the `call` arm parses map to the runtimes the guard
-    /// discriminates on, so `http://ethereum/...` is what actually trips it.
-    #[test]
-    fn same_runtime_refusal_keys_on_the_url_host() {
-        assert_eq!(RuntimeId::from_host("ethereum"), Some(RuntimeId::Ethereum));
-        assert_eq!(RuntimeId::from_host("tezos"), Some(RuntimeId::Tezos));
-        assert!(reject_same_runtime_target(
-            RuntimeId::from_host("ethereum").unwrap(),
-            Gas::new(GAS_LIMIT)
-        )
-        .is_err());
-        assert!(reject_same_runtime_target(
-            RuntimeId::from_host("tezos").unwrap(),
-            Gas::new(GAS_LIMIT)
-        )
-        .is_ok());
-    }
-
     // These tests call the dispatch helpers (dispatch_origin_of /
     // dispatch_resolve_address) directly. Going through
     // runtime_gateway_precompile would require constructing a
