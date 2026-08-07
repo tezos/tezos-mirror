@@ -32,6 +32,7 @@ use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -545,8 +546,8 @@ fn log_transaction_type(to: Option<H160>, data: &[u8]) {
 #[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn revm_run_transaction<Host>(
-    host: &mut Host,
+pub fn revm_run_transaction<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     block_constants: &BlockConstants,
@@ -591,7 +592,7 @@ where
     let gas_data =
         GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
     revm_etherlink::run_transaction(
-        host,
+        rk,
         registry,
         journal,
         block_constants,
@@ -610,8 +611,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-fn apply_ethereum_transaction_common<Host>(
-    host: &mut Host,
+fn apply_ethereum_transaction_common<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
@@ -631,7 +632,7 @@ where
 {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
-        host,
+        rk.host_mut(),
         transaction,
         block_constants,
         effective_gas_price,
@@ -672,7 +673,7 @@ where
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
-        if let Err(e) = caller_account.sub_balance(host, u256_to_alloy(&cost)) {
+        if let Err(e) = caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&cost)) {
             return Err(anyhow::anyhow!(
                 "Failed to charge {caller} additional fees of {}: {}",
                 cost,
@@ -709,7 +710,7 @@ where
     );
 
     let run_result = revm_run_transaction(
-        host,
+        rk,
         registry,
         &mut journal,
         block_constants,
@@ -735,7 +736,7 @@ where
     // observable through the [http_trace*] RPCs. Matches the behavior of the
     // other two journal sites (Tezos / TezosDelayed).
     crate::storage::maybe_store_http_traces_for_tx(
-        host,
+        rk.host_mut(),
         http_trace_enabled,
         &transaction_hash,
         &journal,
@@ -744,7 +745,7 @@ where
     let execution_outcome = match run_result {
         Ok(outcome) => outcome,
         Err(err) => {
-            close_tezosx_journal(host, journal, None)?;
+            close_tezosx_journal(rk.host_mut(), journal, None)?;
             return Err(err.into());
         }
     };
@@ -753,7 +754,7 @@ where
     // this transaction so they can be included in the Michelson runtime block.
     let crac_receipts = drain_pending_crac_receipts(&mut journal);
 
-    close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
+    close_tezosx_journal(rk.host_mut(), journal, Some(&execution_outcome.result))?;
 
     let transaction_result =
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -786,8 +787,8 @@ impl From<&Deposit> for SolXTZDeposit {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn pure_xtz_deposit<Host>(
-    host: &mut Host,
+pub fn pure_xtz_deposit<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
@@ -815,7 +816,7 @@ where
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit
     // this top-level transaction needs.
-    caller_account.add_balance(host, u256_to_alloy(&value))?;
+    caller_account.add_balance(rk.host_mut(), u256_to_alloy(&value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
@@ -841,7 +842,7 @@ where
     );
 
     match revm_run_transaction(
-        host,
+        rk,
         registry,
         &mut journal,
         &block_constants,
@@ -865,16 +866,20 @@ where
             // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
             // uncredited.
             if !execution_outcome.result.is_success() {
-                caller_account.sub_balance(host, u256_to_alloy(&value))?;
+                caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&value))?;
             }
-            close_tezosx_journal(host, journal, Some(&execution_outcome.result))?;
+            close_tezosx_journal(
+                rk.host_mut(),
+                journal,
+                Some(&execution_outcome.result),
+            )?;
 
             Ok(execution_outcome)
         }
         Err(err) => {
-            close_tezosx_journal(host, journal, None)?;
+            close_tezosx_journal(rk.host_mut(), journal, None)?;
             // Something went wrong, we remove the added balance for the xtz deposit.
-            caller_account.sub_balance(host, u256_to_alloy(&value))?;
+            caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&value))?;
             Err(err)
         }
     }
@@ -934,8 +939,8 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
 
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn pure_fa_deposit<Host>(
-    host: &mut Host,
+pub fn pure_fa_deposit<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
@@ -990,7 +995,7 @@ where
     );
 
     let outcome = revm_run_transaction(
-        host,
+        rk,
         registry,
         &mut journal,
         &block_constants,
@@ -1011,19 +1016,19 @@ where
 
     match outcome {
         Ok(outcome) => {
-            close_tezosx_journal(host, journal, Some(&outcome.result))?;
+            close_tezosx_journal(rk.host_mut(), journal, Some(&outcome.result))?;
             Ok(outcome)
         }
         Err(err) => {
-            close_tezosx_journal(host, journal, None)?;
+            close_tezosx_journal(rk.host_mut(), journal, None)?;
             Err(err)
         }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_fa_deposit<Host>(
-    host: &mut Host,
+fn apply_fa_deposit<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
@@ -1035,7 +1040,7 @@ where
     Host: StorageV1,
 {
     let execution_outcome = pure_fa_deposit(
-        host,
+        rk,
         registry,
         fa_deposit,
         block_constants,
@@ -1184,8 +1189,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn handle_transaction_result<Host>(
-    host: &mut Host,
+pub fn handle_transaction_result<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,
@@ -1222,10 +1227,10 @@ where
             log!(Benchmarking, "reason: {:?}", execution_outcome.result);
 
             let withdrawals = std::mem::take(&mut execution_outcome.withdrawals);
-            push_withdrawals_to_outbox(host, outbox_queue, withdrawals)?;
+            push_withdrawals_to_outbox(rk.host_mut(), outbox_queue, withdrawals)?;
 
             if pay_fees {
-                fee_updates.apply(host, caller, sequencer_pool_address)?;
+                fee_updates.apply(rk.host_mut(), caller, sequencer_pool_address)?;
             }
 
             let tx_object = make_object(
@@ -1259,7 +1264,11 @@ where
             cross_runtime_effects,
             consumed_milligas,
         } => {
-            push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
+            push_withdrawals_to_outbox(
+                rk.host_mut(),
+                outbox_queue,
+                etherlink_withdrawals,
+            )?;
             Ok(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op,
                 cross_runtime_effects,
@@ -1271,8 +1280,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn apply_transaction<Host>(
-    host: &mut Host,
+pub fn apply_transaction<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
@@ -1293,7 +1302,7 @@ where
 {
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
-            host,
+            rk,
             registry,
             block_constants,
             tx,
@@ -1307,7 +1316,7 @@ where
             debug_features,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
-            host,
+            rk,
             registry,
             block_constants,
             tx,
@@ -1323,7 +1332,7 @@ where
         TransactionContent::Deposit(deposit) => {
             log!(Benchmarking, "Transaction type: DEPOSIT");
             apply_tezosx_xtz_deposit(
-                host,
+                rk,
                 registry,
                 deposit,
                 block_constants,
@@ -1335,7 +1344,7 @@ where
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(Benchmarking, "Transaction type: FA_DEPOSIT");
             apply_fa_deposit(
-                host,
+                rk,
                 registry,
                 fa_deposit,
                 block_constants,
@@ -1358,7 +1367,7 @@ where
     match apply_result {
         ExecutionResult::Valid(tx_result) => {
             let execution_result = handle_transaction_result(
-                host,
+                rk,
                 outbox_queue,
                 block_constants,
                 transaction,

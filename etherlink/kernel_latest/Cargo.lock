@@ -3690,6 +3690,7 @@ version = "0.1.0"
 dependencies = [
  "http",
  "primitive-types",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezosx-journal",
  "tezosx-types",

@@ -415,7 +415,7 @@ where
             chains::apply_tezos_operation(
                 chain_config.michelson_chain_id(),
                 &block_in_progress,
-                rk.host_mut(),
+                &mut rk,
                 &registry,
                 &block_constants.michelson_runtime_block_constants,
                 operation,
@@ -446,7 +446,7 @@ where
         }
         _ => chain_config.apply_transaction(
             &block_in_progress,
-            rk.host_mut(),
+            &mut rk,
             &registry,
             &outbox_queue,
             &block_constants,

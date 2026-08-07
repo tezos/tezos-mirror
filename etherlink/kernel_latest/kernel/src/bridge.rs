@@ -28,6 +28,7 @@ use tezos_ethereum::{
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
@@ -479,8 +480,8 @@ fn build_deposit_event(
 
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn apply_tezosx_xtz_deposit<Host>(
-    host: &mut Host,
+pub fn apply_tezosx_xtz_deposit<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
@@ -494,7 +495,7 @@ where
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {
             let execution_outcome = pure_xtz_deposit(
-                host,
+                rk,
                 registry,
                 deposit,
                 block_constants,
@@ -536,7 +537,7 @@ where
             let depositor = Contract::Implicit(source.clone());
 
             let (result, internal_operation_results) =
-                match TezosRuntime::add_balance(host, pkh, U256::from(amount)) {
+                match TezosRuntime::add_balance(rk.host_mut(), pkh, U256::from(amount)) {
                     Ok(()) => {
                         let event = build_deposit_event(
                             depositor.clone(),
@@ -692,7 +693,6 @@ mod tests {
         rlp_helpers::{append_option_explicit, append_u256_le},
         transaction::TRANSACTION_HASH_SIZE,
     };
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::{
         ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair,
@@ -708,6 +708,7 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::StorageAccount;
 
     use super::{apply_tezosx_xtz_deposit, Deposit};
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     mod xtz_events {
         alloy_sol_types::sol! {
@@ -942,15 +943,15 @@ mod tests {
 
     #[test]
     fn deposit_execution_outcome_contains_event() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = &RegistryImpl::default();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let deposit = dummy_deposit();
 
         let limits = EvmLimits::default();
         let execution_result = apply_tezosx_xtz_deposit(
-            &mut host,
+            &mut rk,
             registry,
             &deposit,
             &BlockConstants::first_block(
@@ -996,16 +997,16 @@ mod tests {
 
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = &RegistryImpl::default();
-        init_precompile_bytecodes(&mut host, true).unwrap();
+        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
 
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
         let limits = EvmLimits::default();
         let execution_result = apply_tezosx_xtz_deposit(
-            &mut host,
+            &mut rk,
             registry,
             &deposit,
             &BlockConstants::first_block(
@@ -1038,7 +1039,7 @@ mod tests {
         assert!(outcome.result.is_success());
 
         let execution_result = apply_tezosx_xtz_deposit(
-            &mut host,
+            &mut rk,
             registry,
             &deposit,
             &BlockConstants::first_block(
@@ -1076,7 +1077,7 @@ mod tests {
         // on the `Ok`-with-revert arm too, so no value is stranded on
         // FEED_DEPOSIT_ADDR.
         let feed_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
-        let feed_info = feed_account.info(&mut host).unwrap();
+        let feed_info = feed_account.info(rk.host_mut()).unwrap();
         assert_eq!(feed_info.balance, alloy_primitives::U256::ZERO);
     }
 

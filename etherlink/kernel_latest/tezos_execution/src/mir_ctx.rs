@@ -32,6 +32,7 @@ use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprH
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
@@ -104,8 +105,8 @@ impl Default for InterpretContext {
     }
 }
 
-pub struct TcCtx<'operation, Host: StorageV1> {
-    pub host: &'operation mut Host,
+pub struct TcCtx<'operation, Host: StorageV1, KS> {
+    pub rk: &'operation mut RuntimeKeyspaces<Host, KS>,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
@@ -170,8 +171,8 @@ pub struct ExecCtx {
     pub contract_account: TezosOriginatedAccount,
 }
 
-pub struct Ctx<'a, 'operation, Host: StorageV1, R: Registry> {
-    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
+pub struct Ctx<'a, 'operation, Host: StorageV1, KS, R: Registry> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host, KS>,
     pub exec_ctx: ExecCtx,
     pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub journal: &'a mut tezosx_journal::TezosXJournal,
@@ -243,7 +244,7 @@ impl ExecCtx {
     }
 }
 
-impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
+impl<'a, Host: StorageV1, KS> TypecheckingCtx<'a> for TcCtx<'a, Host, KS> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         &mut self.operation_gas.remaining
     }
@@ -252,7 +253,11 @@ impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         &mut self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(self.host, address, &mut self.operation_gas.remaining)
+        get_contract_entrypoint(
+            self.rk.host(),
+            address,
+            &mut self.operation_gas.remaining,
+        )
     }
 
     fn big_map_get_type(
@@ -263,7 +268,7 @@ impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         let key_type_path = key_type_path(id)?;
         let value_type_path = value_type_path(id)?;
 
-        let encoded_key_type = match self.host.store_read_all(&key_type_path) {
+        let encoded_key_type = match self.rk.host().store_read_all(&key_type_path) {
             Ok(key_type) => Ok(key_type),
             Err(RuntimeError::PathNotFound) => return Ok(None),
             Err(err) => Err(err),
@@ -276,7 +281,7 @@ impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         )??
         .parse_ty(self.gas())?;
 
-        let encoded_value_type = match self.host.store_read_all(&value_type_path) {
+        let encoded_value_type = match self.rk.host().store_read_all(&value_type_path) {
             Ok(key_type) => Ok(key_type),
             Err(RuntimeError::PathNotFound) => return Ok(None),
             Err(err) => Err(err),
@@ -292,7 +297,9 @@ impl<'a, Host: StorageV1> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     }
 }
 
-impl<'a, Host: StorageV1, R: Registry> TypecheckingCtx<'a> for Ctx<'_, '_, Host, R> {
+impl<'a, Host: StorageV1, KS, R: Registry> TypecheckingCtx<'a>
+    for Ctx<'_, '_, Host, KS, R>
+{
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -349,7 +356,7 @@ pub fn read_address_counter<Host: StorageV1>(
         .0)
 }
 
-impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
+impl<'a, Host: StorageV1, KS, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, KS, R> {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -448,7 +455,7 @@ impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
         //   `VIEW addr "name"; IF_NONE { ... }`
         // against a possibly-missing KT1.
         if !account
-            .exists(self.tc_ctx.host)
+            .exists(self.tc_ctx.rk.host())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?
         {
             return Ok(None);
@@ -458,7 +465,7 @@ impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
         // I/O on a known contract and must surface as an error rather
         // than impersonate "view not found".
         let serialized_script = account
-            .code(self.tc_ctx.host)
+            .code(self.tc_ctx.rk.host())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
@@ -482,10 +489,10 @@ impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
                     code: view.code.clone(),
                 };
                 let storage = account
-                    .storage(self.tc_ctx.host)
+                    .storage(self.tc_ctx.rk.host())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
                 let balance = account
-                    .balance(self.tc_ctx.host)
+                    .balance(self.tc_ctx.rk.host())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
                 let balance: i64 = balance
                     .0
@@ -595,13 +602,17 @@ impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
         )?;
 
         let entry = address_registry::entry_path(address).map_err(registry_error)?;
-        let counter = read_address_counter(self.tc_ctx.host)?;
+        let counter = read_address_counter(self.tc_ctx.rk.host_mut())?;
         let current = Narith(counter);
-        store_bin(&current, self.tc_ctx.host, &entry).map_err(registry_error)?;
+        store_bin(&current, self.tc_ctx.rk.host_mut(), &entry).map_err(registry_error)?;
 
         let counter_path = address_registry::counter_path().map_err(registry_error)?;
-        store_bin(&Narith(&current.0 + 1u32), self.tc_ctx.host, &counter_path)
-            .map_err(registry_error)?;
+        store_bin(
+            &Narith(&current.0 + 1u32),
+            self.tc_ctx.rk.host_mut(),
+            &counter_path,
+        )
+        .map_err(registry_error)?;
         // Emit the (address, index) pair on the frame's receipt, like L1's
         // address_registry_diff.
         // Sr1 addresses consume an index but are skipped here: the receipt's
@@ -625,9 +636,11 @@ impl<'a, Host: StorageV1, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, R> {
     ) -> Result<Option<BigUint>, AddressRegistryError> {
         let entry = address_registry::entry_path(address).map_err(registry_error)?;
         consume_storage_read_milligas(self.tc_ctx.operation_gas, 1, COUNTER_SIZE)?;
-        Ok(read_optional_nom_value::<Narith>(self.tc_ctx.host, &entry)
-            .map_err(registry_error)?
-            .map(|n| n.0))
+        Ok(
+            read_optional_nom_value::<Narith>(self.tc_ctx.rk.host(), &entry)
+                .map_err(registry_error)?
+                .map(|n| n.0),
+        )
     }
 }
 
@@ -681,7 +694,7 @@ pub fn enshrined_synthetic_views(
     }
 }
 
-impl<'a, Host: StorageV1, R: Registry> Ctx<'_, 'a, Host, R> {
+impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
     /// Body of the `originOf` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     ///
@@ -727,7 +740,7 @@ impl<'a, Host: StorageV1, R: Registry> Ctx<'_, 'a, Host, R> {
             _ => return Some(Ok(None)),
         };
         // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.host;
+        let host: &Host = self.tc_ctx.rk.host();
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_origin_of_get(
@@ -779,7 +792,7 @@ impl<'a, Host: StorageV1, R: Registry> Ctx<'_, 'a, Host, R> {
             _ => return Some(Ok(None)),
         };
         // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.host;
+        let host: &Host = self.tc_ctx.rk.host();
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_resolve_address_get(
@@ -838,15 +851,15 @@ impl<'a, Host: StorageV1, R: Registry> Ctx<'_, 'a, Host, R> {
         let crac_id_str = self.journal.crac_id().to_string();
         let timestamp_str = i64::from(*self.operation_ctx.now).to_string();
         let block_number_str = u32::from(*self.operation_ctx.level).to_string();
-        // Distinct-field split borrows on `self`: `tc_ctx.host`,
+        // Distinct-field split borrows on `self`: `tc_ctx.rk`,
         // `tc_ctx.operation_gas`, `journal`, `registry`. The dispatcher
         // consumes them for the call only.
-        let host: &mut Host = self.tc_ctx.host;
+        let rk: &mut RuntimeKeyspaces<Host, KS> = &mut *self.tc_ctx.rk;
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let crac_chain_depth = self.operation_ctx.crac_chain_depth;
         let result = crate::enshrined_contracts::dispatch_staticcall_evm_get(
-            host,
+            rk,
             operation_gas,
             self.registry,
             self.journal,
@@ -929,62 +942,62 @@ pub trait HasRegistry {
     fn registry(&self) -> &Self::R;
 }
 
-/// Atomically expose `host`, `journal`, and `registry` as a tuple
-/// of disjoint borrows on the same `ctx`. Required for the
-/// `registry.serve(host, journal, request)` and
-/// `registry.ensure_alias(host, journal, ...)` calls where the three
+/// Atomically expose the storage handle, `journal`, and `registry` as a
+/// tuple of disjoint borrows on the same `ctx`. Required for the
+/// `registry.serve(rk, journal, request)` and
+/// `registry.ensure_alias(rk, journal, ...)` calls where the three
 /// fields must be live simultaneously — sequential `host()`,
 /// `journal()`, `registry()` trait method calls would each hold
 /// `&mut self` exclusively and conflict. Implementers construct the
 /// tuple via direct field access so the borrow checker accepts the
 /// distinct-field split.
-pub trait HasCrossRuntime<Host: StorageV1>: HasJournal + HasRegistry {
+pub trait HasCrossRuntime<Host: StorageV1, KS>: HasJournal + HasRegistry {
     fn cross_runtime_split(
         &mut self,
     ) -> (
-        &mut Host,
+        &mut RuntimeKeyspaces<Host, KS>,
         &mut tezosx_journal::TezosXJournal,
         &<Self as HasRegistry>::R,
     );
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasContractAccount
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasContractAccount
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     fn contract_account(&self) -> &TezosOriginatedAccount {
         &self.exec_ctx.contract_account
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasHost<Host>
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasHost<Host>
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     fn host(&mut self) -> &mut Host {
-        self.tc_ctx.host
+        self.tc_ctx.rk.host_mut()
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasOriginLookup
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasOriginLookup
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     fn read_origin_for_address(
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(&*self.tc_ctx.host, address)
+        crate::context::read_origin_for_address(self.tc_ctx.rk.host(), address)
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasJournal
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasJournal
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
         self.journal
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasRegistry
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasRegistry
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     type R = R;
     fn registry(&self) -> &Self::R {
@@ -992,38 +1005,42 @@ impl<'a, 'operation, Host: StorageV1, R: Registry> HasRegistry
     }
 }
 
-impl<'a, 'operation, Host: StorageV1, R: Registry> HasCrossRuntime<Host>
-    for Ctx<'a, 'operation, Host, R>
+impl<'a, 'operation, Host: StorageV1, KS, R: Registry> HasCrossRuntime<Host, KS>
+    for Ctx<'a, 'operation, Host, KS, R>
 {
     fn cross_runtime_split(
         &mut self,
-    ) -> (&mut Host, &mut tezosx_journal::TezosXJournal, &R) {
-        (self.tc_ctx.host, self.journal, self.registry)
+    ) -> (
+        &mut RuntimeKeyspaces<Host, KS>,
+        &mut tezosx_journal::TezosXJournal,
+        &R,
+    ) {
+        (&mut *self.tc_ctx.rk, self.journal, self.registry)
     }
 }
 
-impl<'operation, Host: StorageV1> HasOriginLookup for TcCtx<'operation, Host> {
+impl<'operation, Host: StorageV1, KS> HasOriginLookup for TcCtx<'operation, Host, KS> {
     fn read_origin_for_address(
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(&*self.host, address)
+        crate::context::read_origin_for_address(self.rk.host(), address)
     }
 }
 
-impl<Host: StorageV1, R: Registry> HasOperationGas for Ctx<'_, '_, Host, R> {
+impl<Host: StorageV1, KS, R: Registry> HasOperationGas for Ctx<'_, '_, Host, KS, R> {
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
         self.tc_ctx.operation_gas
     }
 }
 
-impl<Host: StorageV1, R: Registry> HasSourcePublicKey for Ctx<'_, '_, Host, R> {
+impl<Host: StorageV1, KS, R: Registry> HasSourcePublicKey for Ctx<'_, '_, Host, KS, R> {
     fn source_public_key(&self) -> &[u8] {
         self.operation_ctx.source_public_key
     }
 }
 
-impl<Host: StorageV1, R: Registry> HasCracChainDepth for Ctx<'_, '_, Host, R> {
+impl<Host: StorageV1, KS, R: Registry> HasCracChainDepth for Ctx<'_, '_, Host, KS, R> {
     fn crac_chain_depth(&self) -> u32 {
         self.operation_ctx.crac_chain_depth
     }
@@ -1033,7 +1050,9 @@ impl<Host: StorageV1, R: Registry> HasCracChainDepth for Ctx<'_, '_, Host, R> {
     }
 }
 
-impl<Host: StorageV1, R: Registry> HasDelegatedStorageCost for Ctx<'_, '_, Host, R> {
+impl<Host: StorageV1, KS, R: Registry> HasDelegatedStorageCost
+    for Ctx<'_, '_, Host, KS, R>
+{
     fn delegated_storage_cost(&self) -> u64 {
         self.operation_ctx.delegated_storage_cost
     }
@@ -1046,7 +1065,7 @@ impl<Host: StorageV1, R: Registry> HasDelegatedStorageCost for Ctx<'_, '_, Host,
     }
 }
 
-impl<Host: StorageV1> TcCtx<'_, Host> {
+impl<Host: StorageV1, KS> TcCtx<'_, Host, KS> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -1103,8 +1122,8 @@ impl<Host: StorageV1> TcCtx<'_, Host> {
         } else {
             let next_id_path = next_id_path()?;
             let id: BigMapId =
-                read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
-            store_bin(&id.succ(), self.host, &next_id_path)
+                read_nom_value(self.rk.host(), &next_id_path).unwrap_or(0.into());
+            store_bin(&id.succ(), self.rk.host_mut(), &next_id_path)
                 .map_err(storage_error_to_lazy)?;
             Ok(id)
         }
@@ -1428,7 +1447,7 @@ fn set_total_bytes(
     Ok(())
 }
 
-impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
+impl<'a, Host: StorageV1, KS> LazyStorage<'a> for TcCtx<'a, Host, KS> {
     /// The kernel's metered implementation: this is the one that has to bite,
     /// since the end-of-execution walk runs here over an attacker-shaped value
     /// inside a 4 GiB heap and against the PVM's tick ceiling.
@@ -1445,7 +1464,7 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         let value_path = value_path(id, &hash_key(key.clone(), self.gas())?)?;
         let Some(encoded_value) =
-            read_big_map_value_metered(self.operation_gas, self.host, &value_path)?
+            read_big_map_value_metered(self.operation_gas, self.rk.host(), &value_path)?
         else {
             return Ok(None);
         };
@@ -1474,7 +1493,7 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
         let path = value_path(id, &key_hashed)?;
         // Mirrors L1's carbonated `Big_map.Contents.mem`.
         consume_storage_read_milligas(self.operation_gas, 1, 0)?;
-        Ok(self.host.store_has(&path)?.is_some())
+        Ok(self.rk.host().store_has(&path)?.is_some())
     }
 
     fn big_map_update_ref(
@@ -1498,9 +1517,9 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
         match value {
             None => {
                 consume_storage_write_milligas(self.operation_gas, 1, 0)?;
-                if self.host.store_has(&value_path)?.is_some() {
+                if self.rk.host().store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
-                        self.host.store_value_size(&value_path)?.into();
+                        self.rk.host().store_value_size(&value_path)?.into();
                     // Read total_bytes BEFORE mutating /keys. For a pre-counter
                     // big_map the counter is absent and total_bytes() rebuilds it
                     // by summing /keys (init_total_bytes_from_existing); reading
@@ -1508,15 +1527,15 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
                     // entry, so the `-(65 + prev)` subtraction below would drop it
                     // twice. (Once the counter exists this is a plain read, so the
                     // order only matters on the lazy-migration path.)
-                    let current = total_bytes(self.host, id)?;
-                    self.host.store_delete(&value_path)?;
-                    BigMapKeys::remove_key(self.host, id, &key_hashed)?;
+                    let current = total_bytes(self.rk.host_mut(), id)?;
+                    self.rk.host_mut().store_delete(&value_path)?;
+                    BigMapKeys::remove_key(self.rk.host_mut(), id, &key_hashed)?;
 
                     let lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
                     );
                     let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                    set_total_bytes(self.host, id, &new_total_bytes)?;
+                    set_total_bytes(self.rk.host_mut(), id, &new_total_bytes)?;
                     self.interpret_context
                         .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
                 }
@@ -1535,22 +1554,22 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
                     )?
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
-                let current = total_bytes(self.host, id)?;
-                let lazy_storage_size_diff = match self.host.store_value_size(&value_path)
-                {
-                    Err(RuntimeError::PathNotFound) => {
-                        // We should write the key in the list only if it's an add in the big_map not an update
-                        BigMapKeys::add_key(self.host, id, &key_hashed)?;
-                        Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
-                    }
-                    Ok(previous_value_size) => {
-                        let previous_value_size: BigInt = previous_value_size.into();
-                        Zarith(new_value_size - previous_value_size)
-                    }
-                    Err(err) => return Err(err.into()),
-                };
+                let current = total_bytes(self.rk.host_mut(), id)?;
+                let lazy_storage_size_diff =
+                    match self.rk.host().store_value_size(&value_path) {
+                        Err(RuntimeError::PathNotFound) => {
+                            // We should write the key in the list only if it's an add in the big_map not an update
+                            BigMapKeys::add_key(self.rk.host_mut(), id, &key_hashed)?;
+                            Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
+                        }
+                        Ok(previous_value_size) => {
+                            let previous_value_size: BigInt = previous_value_size.into();
+                            Zarith(new_value_size - previous_value_size)
+                        }
+                        Err(err) => return Err(err.into()),
+                    };
                 let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                set_total_bytes(self.host, id, &new_total_bytes)?;
+                set_total_bytes(self.rk.host_mut(), id, &new_total_bytes)?;
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
 
@@ -1560,7 +1579,7 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
                     1,
                     encoded.len() as u64,
                 )?;
-                self.host.store_write_all(&value_path, &encoded)?;
+                self.rk.host_mut().store_write_all(&value_path, &encoded)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -1590,9 +1609,11 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
         let value_type_encoded = value_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
-        self.host
+        self.rk
+            .host_mut()
             .store_write_all(&value_type_path, &value_type_encoded)?;
-        self.host
+        self.rk
+            .host_mut()
             .store_write_all(&key_type_path, &key_type_encoded)?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -1617,23 +1638,31 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
         let dest_key_type_path = key_type_path(&dest_id)?;
 
         // Copy the key type to the destination
-        let key_type = self.host.store_read_all(&src_key_type_path)?;
-        self.host.store_write_all(&dest_key_type_path, &key_type)?;
+        let key_type = self.rk.host().store_read_all(&src_key_type_path)?;
+        self.rk
+            .host_mut()
+            .store_write_all(&dest_key_type_path, &key_type)?;
 
         // Retrieve the path of the value_type
         let src_value_type_path = value_type_path(id)?;
         let dest_value_type_path = value_type_path(&dest_id)?;
 
         // Copy the value type to the destination
-        let value_type = self.host.store_read_all(&src_value_type_path)?;
-        self.host
+        let value_type = self.rk.host().store_read_all(&src_value_type_path)?;
+        self.rk
+            .host_mut()
             .store_write_all(&dest_value_type_path, &value_type)?;
 
         // Copy the content of the big_map
-        BigMapKeys::copy_keys_in_storage(self.host, self.operation_gas, id, &dest_id)?;
+        BigMapKeys::copy_keys_in_storage(
+            self.rk.host_mut(),
+            self.operation_gas,
+            id,
+            &dest_id,
+        )?;
 
-        let source_total_bytes = total_bytes(self.host, id)?;
-        set_total_bytes(self.host, &dest_id, &source_total_bytes)?;
+        let source_total_bytes = total_bytes(self.rk.host_mut(), id)?;
+        set_total_bytes(self.rk.host_mut(), &dest_id, &source_total_bytes)?;
         self.interpret_context.record_lazy_storage_size_diff(
             &dest_id,
             &Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY) + source_total_bytes.0),
@@ -1653,12 +1682,12 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let total = total_bytes(self.host, id)?;
+        let total = total_bytes(self.rk.host_mut(), id)?;
         self.interpret_context.record_lazy_storage_size_diff(
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
         );
-        remove_big_map(self.host, Some(self.operation_gas), id)?;
+        remove_big_map(self.rk.host_mut(), Some(self.operation_gas), id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
@@ -1701,7 +1730,6 @@ pub mod tests {
             .collect()
     }
     use std::collections::{BTreeMap, BTreeSet};
-    use tezos_evm_runtime::runtime::MockKernelHost;
 
     /// Take a big map back out of a dump root without moving out of the
     /// `Drop`-implementing [TypedValue] (which the compiler forbids): swap an
@@ -1717,8 +1745,8 @@ pub mod tests {
 
     /// Dump a single standalone big map through [dump_big_map_updates] by
     /// wrapping it in a value, then unwrap the mutated map back out.
-    fn dump_one<'a, Host: StorageV1>(
-        ctx: &mut TcCtx<'a, Host>,
+    fn dump_one<'a, Host: StorageV1, KS>(
+        ctx: &mut TcCtx<'a, Host, KS>,
         started: &[BigMapId],
         map: BigMap<'a>,
     ) -> BigMap<'a> {
@@ -1729,10 +1757,10 @@ pub mod tests {
 
     #[macro_export]
     macro_rules! make_default_ctx {
-        ($ctx:ident, $host: expr) => {
+        ($ctx:ident, $rk:ident) => {
             let mut operation_gas = TezlinkOperationGas::default();
             let mut $ctx = TcCtx {
-                host: $host,
+                rk: &mut $rk,
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: $crate::mir_ctx::InterpretContext::new(),
@@ -1751,8 +1779,8 @@ pub mod tests {
         };
     }
 
-    pub fn assert_big_map_eq<'a, Host: StorageV1>(
-        ctx: &mut TcCtx<'a, Host>,
+    pub fn assert_big_map_eq<'a, Host: StorageV1, KS>(
+        ctx: &mut TcCtx<'a, Host, KS>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -1768,7 +1796,7 @@ pub mod tests {
         assert_eq!(stored_value_type, value_type);
 
         let nb_passed_keys = content.len();
-        let nb_stored_keys = BigMapKeys::get(ctx.host, id).keys.len();
+        let nb_stored_keys = BigMapKeys::get(ctx.rk.host_mut(), id).keys.len();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
         assert_eq!(nb_passed_keys, nb_stored_keys);
 
@@ -1781,33 +1809,33 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: StorageV1>(
-        ctx: &TcCtx<'a, Host>,
+    fn assert_big_map_removed<'a, Host: StorageV1, KS>(
+        ctx: &TcCtx<'a, Host, KS>,
         id: &BigMapId,
         removed_keys: &BigMapKeys,
     ) {
         let key_type_path = key_type_path(id).unwrap();
         assert!(
-            ctx.host.store_has(&key_type_path).unwrap().is_none(),
+            ctx.rk.host().store_has(&key_type_path).unwrap().is_none(),
             "Key type should have been removed",
         );
 
         let value_type_path = value_type_path(id).unwrap();
         assert!(
-            ctx.host.store_has(&value_type_path).unwrap().is_none(),
+            ctx.rk.host().store_has(&value_type_path).unwrap().is_none(),
             "Value type should have been removed",
         );
 
         let keys_path = keys_of_big_map(id).unwrap();
         assert!(
-            ctx.host.store_has(&keys_path).unwrap().is_none(),
+            ctx.rk.host().store_has(&keys_path).unwrap().is_none(),
             "List of keys of the big_map should have been removed",
         );
 
         for key in &removed_keys.keys {
             let value_path = value_path(id, key).unwrap();
             assert!(
-                ctx.host.store_has(&value_path).unwrap().is_none(),
+                ctx.rk.host().store_has(&value_path).unwrap().is_none(),
                 "{key:?} should have been removed from the storage"
             );
         }
@@ -1815,8 +1843,8 @@ pub mod tests {
 
     #[test]
     fn test_map_from_memory() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -1843,8 +1871,8 @@ pub mod tests {
 
     #[test]
     fn test_map_updates_to_storage() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let map_id = storage
             .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
@@ -1870,7 +1898,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let big_map_keys_before = BigMapKeys::get(storage.host, &map_id);
+        let big_map_keys_before = BigMapKeys::get(storage.rk.host_mut(), &map_id);
         assert_eq!(
             big_map_keys_before.keys.len(),
             3usize,
@@ -1888,7 +1916,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let big_map_keys_after = BigMapKeys::get(storage.host, &map_id);
+        let big_map_keys_after = BigMapKeys::get(storage.rk.host_mut(), &map_id);
         assert_eq!(
             big_map_keys_after.keys.len(),
             2usize,
@@ -1920,8 +1948,8 @@ pub mod tests {
 
     #[test]
     fn test_copy() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -1967,8 +1995,8 @@ pub mod tests {
     /// before `/keys` is mutated.
     #[test]
     fn pre_counter_bigmap_delete_double_decrements_total_bytes() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
 
         // 1. Allocate a big_map with a single entry. The Some-branch of
         //    big_map_update writes the total_bytes counter alongside the key.
@@ -1983,7 +2011,7 @@ pub mod tests {
             )
             .unwrap();
 
-        let counter_after_insert = total_bytes(storage.host, &map_id).unwrap();
+        let counter_after_insert = total_bytes(storage.rk.host_mut(), &map_id).unwrap();
         assert!(
             counter_after_insert.0 > BigInt::from(0),
             "sanity: counter must be positive after one insert, got {counter_after_insert:?}"
@@ -1994,9 +2022,9 @@ pub mod tests {
         //    Contents. This is exactly the state a kernel predating the counter
         //    leaves behind.
         let tb_path = total_bytes_path(&map_id).unwrap();
-        storage.host.store_delete(&tb_path).unwrap();
+        storage.rk.host_mut().store_delete(&tb_path).unwrap();
         assert!(
-            storage.host.store_has(&tb_path).unwrap().is_none(),
+            storage.rk.host().store_has(&tb_path).unwrap().is_none(),
             "counter should be absent to model a pre-counter big_map"
         );
 
@@ -2007,7 +2035,7 @@ pub mod tests {
 
         // 4. The big_map is now empty, so its total_bytes counter MUST be 0.
         //    The buggy code persists -(65 + size("a")) instead.
-        let counter_after_delete = total_bytes(storage.host, &map_id).unwrap();
+        let counter_after_delete = total_bytes(storage.rk.host_mut(), &map_id).unwrap();
         assert_eq!(
             counter_after_delete.0,
             BigInt::from(0),
@@ -2019,8 +2047,8 @@ pub mod tests {
     #[test]
     fn test_remove_big_map() {
         // Setup the context and big_map for the test
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let key_type = Type::Int;
         let value_type = Type::Int;
         let map_id = storage.big_map_new(&key_type, &value_type, false).unwrap();
@@ -2051,8 +2079,8 @@ pub mod tests {
 
     #[test]
     fn test_remove_with_dump() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         // Arena must outlive `map1` so its `BigMap<'_>` destructor can still
         // borrow from the arena lifetime; values are dropped in reverse
         // declaration order.
@@ -2104,8 +2132,8 @@ pub mod tests {
     /// exists; the source is removed afterwards.
     #[test]
     fn dump_moves_persisted_big_map_into_operation() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let arena = Arena::new();
 
         // Seed the persisted parent big map S (id 0).
@@ -2195,8 +2223,8 @@ pub mod tests {
 
     #[test]
     fn dump_retained_then_moved_big_map_copies_pre_update_state() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
         let arena = Arena::new();
 
         let p = storage
@@ -2314,8 +2342,8 @@ pub mod tests {
     // gets its own copy, as on L1 (no cross-operation deduplication).
     #[test]
     fn operation_big_maps_sharing_a_source_are_copied_independently() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
 
         let p = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
@@ -2372,8 +2400,8 @@ pub mod tests {
     /// has copied the source.
     #[test]
     fn dump_copy_after_source_removed_errors() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(storage, rk);
 
         let s = storage
             .big_map_new(&Type::Int, &Type::String, false)
@@ -2522,8 +2550,8 @@ pub mod tests {
 
     #[test]
     fn lazy_storage_diff_updates_sorted_by_key_hash_descending() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         for k in 0i64..=5 {
             ctx.big_map_update(&id, TypedValue::int(k), Some(TypedValue::int(k * 10)))
@@ -2583,8 +2611,8 @@ pub mod tests {
         use mir::ast::michelson_address::AddressHash;
         use tezos_smart_rollup_host::path::RefPath;
 
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(tc_ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(tc_ctx, rk);
 
         // OperationCtx + ExecCtx are unread by `lookup_view_storage_balance`
         // but the type system requires a fully constructed `Ctx`. Use
@@ -2671,36 +2699,36 @@ pub mod tests {
 
     #[test]
     fn big_map_new_initializes_total_bytes_to_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
 
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0.into());
+        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0.into());
     }
 
     #[test]
     fn big_map_update_insert_adds_key_forfait_plus_value_size() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
-        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
             (old_total_bytes.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
 
     #[test]
     fn big_map_update_overwrite_grows_by_value_diff() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2708,7 +2736,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(small))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
 
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2717,15 +2745,15 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
             (old_total_bytes.0 + big_size - small_size).into()
         );
     }
 
     #[test]
     fn big_map_update_overwrite_shrinks_by_value_diff() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2733,7 +2761,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(big))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
 
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2742,15 +2770,15 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
             (old_total_bytes.0 + small_size - big_size).into()
         );
     }
 
     #[test]
     fn big_map_update_delete_existing_subtracts_key_forfait_plus_prev_size() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -2758,32 +2786,35 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
             (old_total_bytes.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
 
     #[test]
     fn big_map_update_delete_absent_is_noop() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
-        let old_total_bytes = total_bytes(ctx.host, &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(42), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), old_total_bytes);
+        assert_eq!(
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            old_total_bytes
+        );
     }
 
     #[test]
     fn big_map_copy_replicates_source_total_bytes() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &src,
@@ -2797,18 +2828,18 @@ pub mod tests {
             Some(TypedValue::String("bb".into())),
         )
         .unwrap();
-        let src_total = total_bytes(ctx.host, &src).unwrap();
+        let src_total = total_bytes(ctx.rk.host_mut(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &dest).unwrap(), src_total);
+        assert_eq!(total_bytes(ctx.rk.host_mut(), &dest).unwrap(), src_total);
     }
 
     #[test]
     fn big_map_copy_charges_gas_per_persisted_entry() {
         fn copy_gas(entries: usize, value: &str) -> u64 {
-            let mut host = MockKernelHost::default();
-            make_default_ctx!(ctx, &mut host);
+            let mut rk = RuntimeKeyspaces::default();
+            make_default_ctx!(ctx, rk);
             let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
             for i in 0..entries {
                 ctx.big_map_update(
@@ -2839,8 +2870,8 @@ pub mod tests {
     #[test]
     fn big_map_remove_charges_gas_per_persisted_entry() {
         fn remove_gas(entries: usize) -> u64 {
-            let mut host = MockKernelHost::default();
-            make_default_ctx!(ctx, &mut host);
+            let mut rk = RuntimeKeyspaces::default();
+            make_default_ctx!(ctx, rk);
             let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
             for i in 0..entries {
                 ctx.big_map_update(
@@ -2867,8 +2898,8 @@ pub mod tests {
 
     #[test]
     fn big_map_update_insert_then_delete_returns_to_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         ctx.big_map_update(
@@ -2879,13 +2910,13 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0u64.into());
+        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
     }
 
     #[test]
     fn big_map_update_multi_key_cumul_matches_sum() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         let values = [
@@ -2902,13 +2933,16 @@ pub mod tests {
             expected += BYTES_SIZE_FOR_BIG_MAP_KEY + size;
         }
 
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), Zarith(expected));
+        assert_eq!(
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            Zarith(expected)
+        );
     }
 
     #[test]
     fn big_map_copy_then_modify_source_leaves_dest_counter_unchanged() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &src,
@@ -2917,7 +2951,7 @@ pub mod tests {
         )
         .unwrap();
         let dest = ctx.big_map_copy(&src, false).unwrap();
-        let dest_total_after_copy = total_bytes(ctx.host, &dest).unwrap();
+        let dest_total_after_copy = total_bytes(ctx.rk.host_mut(), &dest).unwrap();
 
         ctx.big_map_update(
             &src,
@@ -2927,13 +2961,16 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&src, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &dest).unwrap(), dest_total_after_copy);
+        assert_eq!(
+            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
+            dest_total_after_copy
+        );
     }
 
     #[test]
     fn big_map_realistic_cross_hook_sequence_stays_consistent() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
 
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let inserts = [
@@ -2945,7 +2982,7 @@ pub mod tests {
             ctx.big_map_update(&src, TypedValue::int(*k), Some(v.clone()))
                 .unwrap();
         }
-        let src_total_after_inserts = total_bytes(ctx.host, &src).unwrap();
+        let src_total_after_inserts = total_bytes(ctx.rk.host_mut(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
@@ -2958,7 +2995,7 @@ pub mod tests {
         let extra = encoded_size(&TypedValue::String("xx".into()))
             - encoded_size(&TypedValue::String("x".into()));
         assert_eq!(
-            total_bytes(ctx.host, &src).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &src).unwrap(),
             Zarith(src_total_after_inserts.0.clone() + extra)
         );
 
@@ -2971,21 +3008,21 @@ pub mod tests {
         let added =
             BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(&TypedValue::String("wwww".into()));
         assert_eq!(
-            total_bytes(ctx.host, &dest).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
             Zarith(src_total_after_inserts.0 + added)
         );
 
         ctx.big_map_remove(&src).unwrap();
         let src_path = total_bytes_path(&src).unwrap();
-        assert!(ctx.host.store_has(&src_path).unwrap().is_none());
+        assert!(ctx.rk.host().store_has(&src_path).unwrap().is_none());
 
-        assert!(total_bytes(ctx.host, &dest).unwrap().0 > 0u64.into());
+        assert!(total_bytes(ctx.rk.host_mut(), &dest).unwrap().0 > 0u64.into());
     }
 
     #[test]
     fn big_map_update_shrink_then_delete_returns_to_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         ctx.big_map_update(
@@ -3002,13 +3039,13 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), 0u64.into());
+        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
     }
 
     #[test]
     fn big_map_remove_clears_total_bytes_path() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &id,
@@ -3017,17 +3054,17 @@ pub mod tests {
         )
         .unwrap();
         let path = total_bytes_path(&id).unwrap();
-        assert!(ctx.host.store_has(&path).unwrap().is_some());
+        assert!(ctx.rk.host().store_has(&path).unwrap().is_some());
 
         ctx.big_map_remove(&id).unwrap();
 
-        assert!(ctx.host.store_has(&path).unwrap().is_none());
+        assert!(ctx.rk.host().store_has(&path).unwrap().is_none());
     }
 
     #[test]
     fn total_bytes_lazily_migrates_pre_counter_big_map() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let entries = [
             TypedValue::String("a".into()),
@@ -3044,16 +3081,16 @@ pub mod tests {
         // Simulate a pre-counter big-map: drop the `total_bytes` path,
         // leaving the keys list and the values intact.
         let path = total_bytes_path(&id).unwrap();
-        ctx.host.store_delete(&path).unwrap();
-        assert!(ctx.host.store_has(&path).unwrap().is_none());
+        ctx.rk.host_mut().store_delete(&path).unwrap();
+        assert!(ctx.rk.host().store_has(&path).unwrap().is_none());
 
         // First read triggers the lazy migration.
-        let migrated = total_bytes(ctx.host, &id).unwrap();
+        let migrated = total_bytes(ctx.rk.host_mut(), &id).unwrap();
         assert_eq!(migrated, Zarith(expected_sum.into()));
 
         // Migration persisted the counter so subsequent reads are O(1).
-        assert!(ctx.host.store_has(&path).unwrap().is_some());
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), migrated);
+        assert!(ctx.rk.host().store_has(&path).unwrap().is_some());
+        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), migrated);
 
         // Maintenance hooks now operate from the correct baseline: an
         // overwrite produces the expected delta against the migrated value.
@@ -3063,15 +3100,15 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(0), Some(new_value))
             .unwrap();
         assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
+            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
             Zarith((expected_sum + new_size - old_size).into()),
         );
     }
 
     #[test]
     fn clear_temporary_big_maps_removes_total_bytes_paths() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let temp1 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let temp2 = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         ctx.big_map_update(
@@ -3088,13 +3125,13 @@ pub mod tests {
         .unwrap();
         let path1 = total_bytes_path(&temp1).unwrap();
         let path2 = total_bytes_path(&temp2).unwrap();
-        assert!(ctx.host.store_has(&path1).unwrap().is_some());
-        assert!(ctx.host.store_has(&path2).unwrap().is_some());
+        assert!(ctx.rk.host().store_has(&path1).unwrap().is_some());
+        assert!(ctx.rk.host().store_has(&path2).unwrap().is_some());
 
-        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.rk.host_mut(), ctx.next_temporary_id).unwrap();
 
-        assert!(ctx.host.store_has(&path1).unwrap().is_none());
-        assert!(ctx.host.store_has(&path2).unwrap().is_none());
+        assert!(ctx.rk.host().store_has(&path1).unwrap().is_none());
+        assert!(ctx.rk.host().store_has(&path2).unwrap().is_none());
     }
 
     /// The TezosX gateway exposes three synthetic views today:
@@ -3168,8 +3205,8 @@ pub mod tests {
         use tezos_crypto_rs::hash::HashTrait;
         use tezos_smart_rollup_host::path::RefPath;
 
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(tc_ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(tc_ctx, rk);
 
         // OperationCtx + ExecCtx fields are unread by the
         // `return_type = Unit` early-exit path. Use placeholder
@@ -3263,8 +3300,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_alloc_permanent_adds_33() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff,
@@ -3274,16 +3311,16 @@ pub mod tests {
 
     #[test]
     fn interpret_context_alloc_temporary_is_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         assert_eq!(ctx.interpret_context.lazy_storage_size_diff, 0.into());
     }
 
     #[test]
     fn interpret_context_insert_permanent_adds_65_plus_value_size() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3297,8 +3334,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_overwrite_permanent_adds_value_size_diff() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let small = TypedValue::String("hi".into());
         let big = TypedValue::String("hello, world".into());
@@ -3321,8 +3358,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_delete_permanent_subtracts_65_plus_prev_size() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3340,8 +3377,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_copy_permanent_adds_33_plus_source_total() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let v1 = TypedValue::String("a".into());
         let v2 = TypedValue::String("bb".into());
@@ -3362,8 +3399,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_copy_promotes_temp_to_perm_adds_33_plus_total() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         // Create a temporary big-map and fill it — no accumulator activity
         // for the alloc nor the updates (the id is in the temp range).
         let temp_src = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
@@ -3396,8 +3433,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_copy_temporary_is_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let src = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.interpret_context.lazy_storage_size_diff = 0.into();
         let _dest = ctx.big_map_copy(&src, true).unwrap();
@@ -3409,8 +3446,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_remove_permanent_subtracts_33_plus_total() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
@@ -3429,8 +3466,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_update_on_temporary_skipped() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         ctx.big_map_update(
             &id,
@@ -3446,8 +3483,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_clear_temporaries_does_not_touch_accumulator() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let perm = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         ctx.big_map_update(
             &perm,
@@ -3457,7 +3494,7 @@ pub mod tests {
         .unwrap();
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let before_clear = ctx.interpret_context.lazy_storage_size_diff.clone();
-        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.rk.host_mut(), ctx.next_temporary_id).unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff, before_clear,
             "clear_temporary_big_maps must not touch the accumulator",
@@ -3466,8 +3503,8 @@ pub mod tests {
 
     #[test]
     fn interpret_context_take_resets_to_zero() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(ctx, &mut host);
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
         let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let first = ctx.interpret_context.take_lazy_storage_size_diff();
         assert!(first.0 > BigInt::from(0));
@@ -3487,26 +3524,29 @@ pub mod tests {
         const COUNTER_PATH: RefPath =
             RefPath::assert_from(b"/tez/tez_accounts/address_registry/counter");
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         // An unseeded registry has no counter: the read errors rather than
         // seeding on demand.
-        assert!(super::read_address_counter(&mut host).is_err());
+        assert!(super::read_address_counter(rk.host_mut()).is_err());
 
         // Seeding installs null@0 and the next-free counter at 1.
-        super::init_address_registry(&mut host).unwrap();
-        assert_eq!(host.store_read_all(&NULL_ENTRY_PATH).unwrap(), [0x00]);
-        assert_eq!(host.store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
+        super::init_address_registry(rk.host_mut()).unwrap();
         assert_eq!(
-            super::read_address_counter(&mut host).unwrap(),
+            rk.host_mut().store_read_all(&NULL_ENTRY_PATH).unwrap(),
+            [0x00]
+        );
+        assert_eq!(rk.host_mut().store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
+        assert_eq!(
+            super::read_address_counter(rk.host_mut()).unwrap(),
             BigUint::from(1u32)
         );
 
         // Seeding is one-shot: a second call errors instead of overwriting.
         assert_eq!(
-            super::init_address_registry(&mut host),
+            super::init_address_registry(rk.host_mut()),
             Err(AddressRegistryError::AlreadySeeded(BigUint::from(1u32)))
         );
-        assert_eq!(host.store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
+        assert_eq!(rk.host_mut().store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
     }
 
     #[test]
@@ -3516,7 +3556,7 @@ pub mod tests {
         use super::mock::MockCtx;
         use crate::test_utils::MockRegistry;
         use tezosx_journal::{CracId, TezosXJournal};
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
             OperationHash::default(),
@@ -3525,7 +3565,7 @@ pub mod tests {
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
         let sender: AddressHash =
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".try_into().unwrap();
-        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, sender, 0);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, sender, 0);
         let null = AddressHash::default();
         let addr: AddressHash =
             "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap();
@@ -3553,8 +3593,8 @@ pub(crate) mod mock {
     /// tests can construct `MockCtx` from a long-lived host and shorter-
     /// lived journal/registry locals without forcing the borrow checker
     /// to unify them under a single `'a`.
-    pub struct MockCtx<'h, 'j, 'r, Host: StorageV1, R: Registry> {
-        pub host: &'h mut Host,
+    pub struct MockCtx<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> {
+        pub rk: &'h mut RuntimeKeyspaces<Host, KS>,
         pub journal: &'j mut tezosx_journal::TezosXJournal,
         pub registry: &'r R,
         pub sender: AddressHash,
@@ -3572,16 +3612,16 @@ pub(crate) mod mock {
         pub address_registry: HashMap<AddressHash, BigUint>,
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> MockCtx<'h, 'j, 'r, Host, R> {
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> MockCtx<'h, 'j, 'r, Host, KS, R> {
         pub fn new(
-            host: &'h mut Host,
+            rk: &'h mut RuntimeKeyspaces<Host, KS>,
             journal: &'j mut tezosx_journal::TezosXJournal,
             registry: &'r R,
             sender: AddressHash,
             amount: i64,
         ) -> Self {
             Self {
-                host,
+                rk,
                 journal,
                 registry,
                 sender,
@@ -3607,8 +3647,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasCracChainDepth
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasCracChainDepth
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn crac_chain_depth(&self) -> u32 {
             self.crac_chain_depth
@@ -3619,8 +3659,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasDelegatedStorageCost
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasDelegatedStorageCost
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn delegated_storage_cost(&self) -> u64 {
             self.delegated_storage_cost
@@ -3631,16 +3671,16 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasJournal
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasJournal
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
             self.journal
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasRegistry
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasRegistry
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         type R = R;
         fn registry(&self) -> &Self::R {
@@ -3648,62 +3688,66 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasCrossRuntime<Host>
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasCrossRuntime<Host, KS>
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn cross_runtime_split(
             &mut self,
-        ) -> (&mut Host, &mut tezosx_journal::TezosXJournal, &R) {
-            (self.host, self.journal, self.registry)
+        ) -> (
+            &mut RuntimeKeyspaces<Host, KS>,
+            &mut tezosx_journal::TezosXJournal,
+            &R,
+        ) {
+            (&mut *self.rk, self.journal, self.registry)
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasOriginLookup
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasOriginLookup
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn read_origin_for_address(
             &self,
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            crate::context::read_origin_for_address(&*self.host, address)
+            crate::context::read_origin_for_address(self.rk.host(), address)
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasHost<Host>
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasHost<Host>
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn host(&mut self) -> &mut Host {
-            self.host
+            self.rk.host_mut()
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasContractAccount
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasContractAccount
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn contract_account(&self) -> &TezosOriginatedAccount {
             &self.contract_account
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasOperationGas
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasOperationGas
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
             &mut self.operation_gas
         }
     }
 
-    impl<'h, 'j, 'r, Host: StorageV1, R: Registry> HasSourcePublicKey
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'h, 'j, 'r, Host: StorageV1, KS, R: Registry> HasSourcePublicKey
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn source_public_key(&self) -> &[u8] {
             &[]
         }
     }
 
-    impl<'a, 'h, 'j, 'r, Host: StorageV1, R: Registry> TypecheckingCtx<'a>
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'a, 'h, 'j, 'r, Host: StorageV1, KS, R: Registry> TypecheckingCtx<'a>
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn gas(&mut self) -> &mut mir::gas::Gas {
             &mut self.operation_gas.remaining
@@ -3724,8 +3768,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, 'h, 'j, 'r, Host: StorageV1, R: Registry> CtxTrait<'a>
-        for MockCtx<'h, 'j, 'r, Host, R>
+    impl<'a, 'h, 'j, 'r, Host: StorageV1, KS, R: Registry> CtxTrait<'a>
+        for MockCtx<'h, 'j, 'r, Host, KS, R>
     {
         fn sender(&self) -> AddressHash {
             self.sender.clone()

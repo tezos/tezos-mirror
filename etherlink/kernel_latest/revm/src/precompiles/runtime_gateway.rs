@@ -527,14 +527,18 @@ fn dispatch_resolve_address<
 ///
 /// Called after each CRAC that may have left truncation residue on the
 /// precompile's balance.
-fn burn_gateway_residual<'j, CTX, Host, R>(
+fn burn_gateway_residual<'j, CTX, Host, KS, R>(
     context: &mut CTX,
     gas: &mut Gas,
 ) -> Result<(), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let snapshot = *gas;
     let is_zero = {
@@ -573,7 +577,7 @@ where
 /// meaning of each field stay identical across surfaces. `target_address`
 /// is always the bare target *contract* — callers strip any
 /// entrypoint/view segment before passing it (L2-1456).
-fn emit_crac_sent<'j, CTX, Host, R>(
+fn emit_crac_sent<'j, CTX, Host, KS, R>(
     context: &mut CTX,
     crac_id: String,
     target_runtime: &str,
@@ -581,8 +585,12 @@ fn emit_crac_sent<'j, CTX, Host, R>(
     amount: U256,
 ) where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -612,15 +620,19 @@ fn emit_crac_sent<'j, CTX, Host, R>(
 ///   originated there and crossed into EVM), its native address is
 ///   resolved from `source_addr` once, here — the only durable read, and
 ///   it lands solely on the genuinely cross-runtime path.
-fn build_original_source<'j, CTX, Host, R>(
+fn build_original_source<'j, CTX, Host, KS, R>(
     context: &CTX,
     source_addr: Address,
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let runtime = context.journal().crac_origin_runtime();
     let original_address = if runtime == RuntimeId::Ethereum {
@@ -676,14 +688,18 @@ fn original_source_evm_address<R: Registry<Journal = tezosx_journal::TezosXJourn
 /// Michelson → EVM CRAC frame would forward the immediate sender alias as
 /// `X-Tezos-Source` while `ORIGIN` reported the real transitive source.
 /// `X-Tezos-Sender` stays on the immediate caller.
-fn capture_original_source<'j, CTX, Host, R>(
+fn capture_original_source<'j, CTX, Host, KS, R>(
     context: &CTX,
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let source_addr = context
         .journal()
@@ -699,14 +715,18 @@ where
 /// that re-entered the EVM). The read-only entries persist through here
 /// too, so a nested Michelson `staticcall_evm` view sees the same
 /// originator on the shared journal.
-fn resolve_original_source<'j, CTX, Host, R>(
+fn resolve_original_source<'j, CTX, Host, KS, R>(
     context: &mut CTX,
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     if let Some(src) = context.journal().original_source() {
         return Ok(src.clone());
@@ -724,7 +744,7 @@ where
 /// common case), the resolution is performed once and the resulting
 /// alias is reused for both slots — a single `ALIAS_LOOKUP_COST` is
 /// billed instead of two.
-fn resolve_aliases<'j, CTX, Host, R>(
+fn resolve_aliases<'j, CTX, Host, KS, R>(
     context: &mut CTX,
     gas: &mut Gas,
     target_runtime: RuntimeId,
@@ -733,8 +753,12 @@ fn resolve_aliases<'j, CTX, Host, R>(
 ) -> Result<(String, String), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     // --- sender alias ---
     charge(gas, ALIAS_LOOKUP_COST)?;
@@ -832,7 +856,7 @@ fn inject_tezos_headers(
 /// `headers`. `crac_depth` is `inbound + 1`: counts CRAC hops only, never
 /// REVM CALL frames.
 #[allow(clippy::too_many_arguments)]
-fn inject_tezos_headers_from_context<'j, CTX, Host, R>(
+fn inject_tezos_headers_from_context<'j, CTX, Host, KS, R>(
     context: &CTX,
     headers: &mut HeaderMap,
     sender_alias: &str,
@@ -844,8 +868,12 @@ fn inject_tezos_headers_from_context<'j, CTX, Host, R>(
 ) -> Result<(), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let timestamp = context.block().timestamp();
     let block_number = context.block().number();
@@ -866,15 +894,19 @@ where
     )
 }
 
-pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, R>(
+pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, KS, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     // Reject DELEGATECALL and CALLCODE gateway-wide. Under those
     // opcodes the precompile code runs in the caller's context, which
@@ -1293,7 +1325,7 @@ where
                 None
             };
             let output = dispatch_origin_of(
-                context.db().host,
+                context.db().rk.host(),
                 context.db().registry,
                 call.addr,
                 source_runtime,
@@ -1351,7 +1383,7 @@ where
                 None
             };
             let output = dispatch_resolve_address(
-                context.db().host,
+                context.db().rk.host(),
                 context.db().registry,
                 call.addr,
                 source_runtime,

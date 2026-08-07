@@ -107,8 +107,8 @@ pub fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute<Host>(
-    host: &mut Host,
+pub fn compute<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -138,7 +138,7 @@ where
         log!(Benchmarking, "Transaction data size: {}", data_size);
 
         if !chain_config.can_fit_in_reboot(
-            host.executed_gas().into(),
+            rk.host().executed_gas().into(),
             &transaction,
             block_constants,
         )? {
@@ -160,7 +160,7 @@ where
             "apply_transaction",
             chain_config.apply_transaction(
                 block_in_progress,
-                host,
+                rk,
                 registry,
                 outbox_queue,
                 block_constants,
@@ -214,7 +214,7 @@ where
                     chain_config.michelson_to_evm_gas_multiplier(block_constants);
                 block_in_progress.register_valid_transaction(
                     execution_info,
-                    host,
+                    rk,
                     multiplier,
                 )?;
             }
@@ -328,8 +328,8 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_bip<Host>(
-    host: &mut Host,
+pub fn compute_bip<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -344,10 +344,14 @@ pub fn compute_bip<Host>(
 where
     Host: StorageV1 + WithGas,
 {
-    let constants =
-        chain_config.constants(host, &block_in_progress, da_fee_per_byte, coinbase)?;
+    let constants = chain_config.constants(
+        rk.host_mut(),
+        &block_in_progress,
+        da_fee_per_byte,
+        coinbase,
+    )?;
     let result = compute(
-        host,
+        rk,
         registry,
         chain_config,
         outbox_queue,
@@ -360,20 +364,20 @@ where
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
             log!(Info, "Ask for reboot.");
-            storage::store_block_in_progress(host, &block_in_progress)?;
+            storage::store_block_in_progress(rk.host_mut(), &block_in_progress)?;
             Ok(BlockComputationResult::RebootNeeded)
         }
         BlockInProgressComputationResult::Finished {
             included_delayed_transactions,
         } => {
             crate::gas_price::register_block(
-                host,
+                rk.host_mut(),
                 block_in_progress.cumulative_execution_gas,
                 block_in_progress.timestamp,
                 block_in_progress.queue_length(),
             )?;
             let new_block = chain_config
-                .finalize_and_store(host, block_in_progress, &constants, chain_header)
+                .finalize_and_store(rk, block_in_progress, &constants, chain_header)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -633,7 +637,7 @@ where
 
     let processed_blueprint = block_in_progress.number;
     let computation_result = compute_bip(
-        safe_rk.host_mut(),
+        &mut safe_rk,
         &registry,
         chain_config,
         &outbox_queue,
@@ -2039,7 +2043,7 @@ mod tests {
             let result = chain_config
                 .apply_transaction(
                     &block_in_progress,
-                    rk.host_mut(),
+                    &mut rk,
                     &registry,
                     &outbox_queue,
                     &block_constants,
@@ -2465,7 +2469,7 @@ mod tests {
 
         // act
         let result = compute(
-            rk.host_mut(),
+            &mut rk,
             &registry,
             &chain_config,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
@@ -2607,7 +2611,7 @@ mod tests {
         rk.host_mut().add_execution_gas(cumulative_gas_in_run);
 
         let result = compute(
-            rk.host_mut(),
+            &mut rk,
             &registry,
             &chain_config,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
@@ -3311,7 +3315,7 @@ mod tests {
         let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut rk);
 
         let result = compute(
-            rk.host_mut(),
+            &mut rk,
             &registry,
             &chain_config,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),

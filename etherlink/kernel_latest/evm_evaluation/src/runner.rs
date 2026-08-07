@@ -15,6 +15,7 @@ use revm_etherlink::{
 };
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
+use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
 use tezosx_journal::{RuntimeId, TezosXJournal};
 use thiserror::Error;
 
@@ -88,9 +89,9 @@ fn read_testsuite(path: &Path) -> Result<TestSuite, TestError> {
     serde_json::from_reader(&*json_reader).map_err(TestError::from)
 }
 
-fn prepare_host() -> MockKernelHost {
+fn prepare_rk() -> MockRuntimeKeyspaces {
     tezos_evm_logging::DEBUG_LOG.with_borrow_mut(|log| log.truncate(0));
-    MockKernelHost::default()
+    MockRuntimeKeyspaces::default()
 }
 
 fn prepare_filler_source(
@@ -206,8 +207,8 @@ fn u256_to_u128(value: U256) -> u128 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_transaction(
-    host: &mut MockKernelHost,
+fn execute_transaction<KS>(
+    rk: &mut RuntimeKeyspaces<MockKernelHost, KS>,
     unit: &TestUnit,
     env: &mut Env,
     spec_id: SpecId,
@@ -258,7 +259,7 @@ fn execute_transaction(
     let registry = kernel::registry_impl::RegistryImpl::default();
     let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
     run_transaction(
-        host,
+        rk,
         &registry,
         &mut journal,
         &block_constants,
@@ -338,7 +339,7 @@ pub fn run_test(
     skip_data: &SkipData,
 ) -> Result<(), TestError> {
     let suit = read_testsuite(path)?;
-    let mut host;
+    let mut rk;
 
     for (name, unit) in suit.0.into_iter() {
         if output.log {
@@ -380,8 +381,8 @@ pub fn run_test(
                     }
                     continue;
                 }
-                host = prepare_host();
-                initialize_accounts(&mut host, &unit);
+                rk = prepare_rk();
+                initialize_accounts(rk.host_mut(), &unit);
                 let data_label = info.labels.get(&data);
                 if let Some(data_label) = data_label {
                     if output.log {
@@ -406,7 +407,7 @@ pub fn run_test(
                 }
 
                 let exec_result = execute_transaction(
-                    &mut host,
+                    &mut rk,
                     &unit,
                     &mut env,
                     spec_id,
@@ -424,7 +425,7 @@ pub fn run_test(
                 match filler_source.clone() {
                     Some(filler_source) => {
                         let result = process(
-                            &mut host,
+                            rk.host_mut(),
                             filler_source,
                             spec_name,
                             report_map,

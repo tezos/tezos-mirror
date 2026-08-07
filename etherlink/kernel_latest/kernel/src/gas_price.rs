@@ -167,7 +167,7 @@ mod test {
     use revm::primitives::hardfork::SpecId;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_host::storage::StorageV1;
 
     proptest! {
@@ -198,9 +198,9 @@ mod test {
 
     #[test]
     fn gas_price_responds_to_load() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let timestamp = 0_i64;
-        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
+        let block_fees = crate::retrieve_block_fees(rk.host_mut()).unwrap();
         let dummy_block_constants = TezosXBlockConstants {
             evm_runtime_block_constants: BlockConstants::first_block(
                 timestamp.into(),
@@ -230,20 +230,20 @@ mod test {
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
 
         register_block(
-            &mut host,
+            rk.host_mut(),
             bip.cumulative_execution_gas,
             bip.timestamp,
             bip.queue_length(),
         )
         .unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
+        bip.finalize_and_store(&mut rk, &dummy_block_constants, false)
             .unwrap();
 
         // At tolerance, gas price should be min.
-        let (min, gas_price) = load_gas_price(&mut host);
+        let (min, gas_price) = load_gas_price(rk.host_mut());
         assert_eq!(min, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         assert_eq!(gas_price, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
-        let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
+        let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
         assert_eq!(gas_price, gas_price_now);
 
         // register more blocks - now double tolerance
@@ -258,22 +258,23 @@ mod test {
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
         bip.number = 1.into();
         register_block(
-            &mut host,
+            rk.host_mut(),
             bip.cumulative_execution_gas,
             bip.timestamp,
             bip.queue_length(),
         )
         .unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
+        bip.finalize_and_store(&mut rk, &dummy_block_constants, false)
             .unwrap();
-        let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
+        let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
 
-        let (min, gas_price) = load_gas_price(&mut host);
+        let (min, gas_price) = load_gas_price(rk.host_mut());
         assert!(gas_price > min);
         assert_eq!(gas_price, gas_price_now);
 
         // after 10 seconds, reduces back to tolerance
-        let gas_price_after_10 = base_fee_per_gas(&host, (timestamp + 10).into(), min);
+        let gas_price_after_10 =
+            base_fee_per_gas(rk.host(), (timestamp + 10).into(), min);
         assert_eq!(
             gas_price_after_10,
             crate::fees::MINIMUM_BASE_FEE_PER_GAS.into()

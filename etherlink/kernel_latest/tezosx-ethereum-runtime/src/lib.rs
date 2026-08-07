@@ -26,6 +26,7 @@ use revm_etherlink::{
     EvmRunError, ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::block::BlockConstants;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
@@ -77,10 +78,10 @@ impl EthereumRuntime {
     /// run init to set forwarder storage and forward any prior balance.
     /// The delegation and classification are staged by the caller.
     #[allow(clippy::too_many_arguments)]
-    fn materialize_alias<Host>(
+    fn materialize_alias<Host, KS>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         alias: Address,
         native_address: &str,
@@ -95,11 +96,11 @@ impl EthereumRuntime {
         // (it should be initialized at kernel startup, but verify it exists)
         let precompile_account =
             StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS)?;
-        let precompile_info = precompile_account.info(host)?;
+        let precompile_info = precompile_account.info(rk.host_mut())?;
         if precompile_info.code_hash != ALIAS_FORWARDER_SOL_CONTRACT.code_hash {
             // Initialize the precompile if not already done
             CodeStorage::add(
-                host,
+                rk.host_mut(),
                 ALIAS_FORWARDER_SOL_CONTRACT.code,
                 Some(ALIAS_FORWARDER_SOL_CONTRACT.code_hash),
             )
@@ -119,7 +120,7 @@ impl EthereumRuntime {
         .abi_encode();
 
         // Set up block constants for EVM execution
-        let block_constants = self.create_block_constants(host, journal, context);
+        let block_constants = self.create_block_constants(rk.host(), journal, context);
 
         // Use the caller's remaining gas so it controls the budget. The
         // `effective_gas_price` is 0, so REVM's pre-flight balance check on the
@@ -137,7 +138,7 @@ impl EthereumRuntime {
 
         // Run the EVM transaction to call init_tezosx_alias
         let outcome = run_transaction(
-            host,
+            rk,
             registry,
             journal,
             &block_constants,
@@ -304,10 +305,10 @@ sol! {
 /// - else  → catchable `405`.
 ///
 /// `serve` then only handles the result-to-HTTP-status mapping.
-fn execute_request<Host>(
+fn execute_request<Host, KS>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
@@ -315,9 +316,9 @@ where
     Host: StorageV1,
 {
     match *request.method() {
-        http::Method::POST => execute_call(runtime, registry, host, journal, request),
+        http::Method::POST => execute_call(runtime, registry, rk, journal, request),
         http::Method::GET => {
-            execute_static_call(runtime, registry, host, journal, request)
+            execute_static_call(runtime, registry, rk, journal, request)
         }
         ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
             "HTTP method {other} not allowed (use POST for entrypoint calls or GET for static calls)"
@@ -375,10 +376,10 @@ fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
 /// sender, and runs the EVM transaction with state changes preserved
 /// (the journal is not committed here — the outer block builder handles
 /// that for the whole CRAC).
-fn execute_call<Host>(
+fn execute_call<Host, KS>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
@@ -419,7 +420,7 @@ where
         block_number: hdrs.block_number,
     };
 
-    let block_constants = runtime.create_block_constants(host, journal, &context);
+    let block_constants = runtime.create_block_constants(rk.host(), journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -467,7 +468,7 @@ where
     let saved_cross_runtime_originator = journal.evm.cross_runtime_originator();
     journal.evm.set_cross_runtime_originator(hdrs.source);
     let outcome = run_transaction(
-        host,
+        rk,
         registry,
         journal,
         &block_constants,
@@ -514,10 +515,10 @@ where
 ///   so the top-level frame has `is_static = true` and any state
 ///   mutation halts with `StateChangeDuringStaticCall` (surfaced as
 ///   `400`).
-fn execute_static_call<Host>(
+fn execute_static_call<Host, KS>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
@@ -559,7 +560,7 @@ where
         block_number: hdrs.block_number,
     };
 
-    let block_constants = runtime.create_block_constants(host, journal, &context);
+    let block_constants = runtime.create_block_constants(rk.host(), journal, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
     // Intentionally no `CrossRuntimeCallReceived` log on the static path.
@@ -573,7 +574,7 @@ where
     let saved_cross_runtime_originator = journal.evm.cross_runtime_originator();
     journal.evm.set_cross_runtime_originator(hdrs.source);
     let outcome = run_transaction(
-        host,
+        rk,
         registry,
         journal,
         &block_constants,
@@ -607,10 +608,10 @@ where
 impl RuntimeInterface for EthereumRuntime {
     type Journal = TezosXJournal;
 
-    fn ensure_alias<Host>(
+    fn ensure_alias<Host, KS>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -657,7 +658,7 @@ impl RuntimeInterface for EthereumRuntime {
         }
         // One info read serves both the classification and the
         // Branch 2 forwarder detection (the code hash).
-        let storage_info = alias_account.info(host)?;
+        let storage_info = alias_account.info(rk.host_mut())?;
         match storage_info.origin {
             AccountOrigin::Alias(_) => {
                 return Ok((alias.to_string(), AliasResolution::build(gas_remaining)));
@@ -691,7 +692,7 @@ impl RuntimeInterface for EthereumRuntime {
 
         let (alias_str, remaining_after) = self.materialize_alias(
             registry,
-            host,
+            rk,
             journal,
             alias,
             native_address,
@@ -710,17 +711,17 @@ impl RuntimeInterface for EthereumRuntime {
         Ok(alias.to_string())
     }
 
-    fn serve<Host>(
+    fn serve<Host, KS>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1,
     {
-        build_response(execute_request(self, registry, host, journal, request))
+        build_response(execute_request(self, registry, rk, journal, request))
     }
 
     fn host(&self) -> &'static str {
@@ -822,6 +823,7 @@ mod tests {
     };
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezosx_interfaces::testing::UnimplementedRegistry;
     use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{RuntimeInterface, TezosXRuntimeError};
@@ -872,7 +874,7 @@ mod tests {
 
     #[test]
     fn test_serve_simple_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -892,10 +894,10 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -904,13 +906,13 @@ mod tests {
 
         // Verify destination received the transfer (5 TEZ in wei)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(&mut host).unwrap();
+        let info = destination_account.info(rk.host_mut()).unwrap();
         assert_eq!(info.balance, five_tez_wei);
     }
 
     #[test]
     fn test_serve_executes_contract_bytecode() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -929,7 +931,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -939,7 +941,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
@@ -949,10 +951,10 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -961,7 +963,7 @@ mod tests {
 
         // Verify the contract wrote 0x42 to storage slot 1
         let slot_value = contract_account
-            .get_storage(&host, &revm::primitives::U256::from(1))
+            .get_storage(rk.host(), &revm::primitives::U256::from(1))
             .unwrap();
         assert_eq!(slot_value, revm::primitives::U256::from(0x42));
     }
@@ -970,7 +972,7 @@ mod tests {
     /// X-Tezos-Amount. The contract reads CALLVALUE and stores it.
     #[test]
     fn test_serve_with_value_sets_correct_msg_value() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let block_constants = BlockConstants::test_block_with_no_fees();
@@ -990,7 +992,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -1000,7 +1002,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
@@ -1010,10 +1012,10 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -1025,7 +1027,7 @@ mod tests {
         let forty_two_tez_wei =
             revm::primitives::U256::from(42_000_000_000_000_000_000u128);
         let stored_value = contract_account
-            .get_storage(&host, &revm::primitives::U256::ZERO)
+            .get_storage(rk.host(), &revm::primitives::U256::ZERO)
             .unwrap();
         assert_eq!(
             stored_value, forty_two_tez_wei,
@@ -1033,7 +1035,7 @@ mod tests {
         );
 
         // Contract received the transfer
-        let contract_info = contract_account.info(&mut host).unwrap();
+        let contract_info = contract_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             contract_info.balance, forty_two_tez_wei,
             "Contract should hold the transferred value"
@@ -1041,7 +1043,7 @@ mod tests {
 
         // Sender balance should be 0 after sending 42
         let sender_account = StorageAccount::from_address(&sender).unwrap();
-        let sender_info = sender_account.info(&mut host).unwrap();
+        let sender_info = sender_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             sender_info.balance,
             revm::primitives::U256::ZERO,
@@ -1091,7 +1093,7 @@ mod tests {
 
     #[test]
     fn test_serve_post_restores_crac_chain_depth() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1106,7 +1108,7 @@ mod tests {
             &destination,
             INBOUND_DEPTH,
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         // Without the save/restore the outer frame would keep the inner
@@ -1120,7 +1122,7 @@ mod tests {
 
     #[test]
     fn test_serve_get_restores_crac_chain_depth() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1135,7 +1137,7 @@ mod tests {
             &destination,
             INBOUND_DEPTH,
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         assert_eq!(
@@ -1153,7 +1155,7 @@ mod tests {
     /// `TxEnv.caller`, flipping `tx.origin` mid-frame.
     #[test]
     fn test_serve_post_restores_cross_runtime_originator() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1171,7 +1173,7 @@ mod tests {
             &destination,
             INBOUND_DEPTH,
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         assert_eq!(
@@ -1183,7 +1185,7 @@ mod tests {
 
     #[test]
     fn test_serve_get_restores_cross_runtime_originator() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1201,7 +1203,7 @@ mod tests {
             &destination,
             INBOUND_DEPTH,
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         assert_eq!(
@@ -1219,7 +1221,7 @@ mod tests {
         // CRAC. This is the bracketed counter `crac_chain_depth` is now
         // aligned with; the assertion holds regardless of the
         // crac_chain_depth fix.
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
         let sender = Address::from_slice(&[0x11; 20]);
@@ -1234,7 +1236,7 @@ mod tests {
             &destination,
             INBOUND_DEPTH,
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         assert_eq!(journal.evm.revm_call_depth(), Some(7));
@@ -1549,7 +1551,7 @@ mod tests {
     /// Test that serve() handles zero-amount transfers correctly.
     #[test]
     fn test_serve_zero_amount_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -1565,10 +1567,10 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -1577,14 +1579,14 @@ mod tests {
 
         // Destination should have 0 balance (no transfer)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(&mut host).unwrap();
+        let info = destination_account.info(rk.host_mut()).unwrap();
         assert_eq!(info.balance, revm::primitives::U256::ZERO);
     }
 
     /// Test that serve() correctly handles fractional TEZ amounts.
     #[test]
     fn test_serve_fractional_amount_transfer() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -1603,10 +1605,10 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -1614,13 +1616,13 @@ mod tests {
         .unwrap();
 
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(&mut host).unwrap();
+        let info = destination_account.info(rk.host_mut()).unwrap();
         assert_eq!(info.balance, half_tez_wei);
     }
 
     #[test]
     fn test_serve_calls_contract() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -1643,7 +1645,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -1653,7 +1655,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         // The cross-runtime call path uses gas_price = 0 and amount = 0,
         // so REVM's pre-flight balance requirement on the caller is 0 — no
@@ -1679,7 +1681,7 @@ mod tests {
             .unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 
@@ -1733,7 +1735,7 @@ mod tests {
     /// the slot-0 assertion.
     #[test]
     fn inbound_crac_origin_is_source_sender_is_caller() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -1742,7 +1744,7 @@ mod tests {
         let source = Address::from_slice(&[0x22; 20]); // true originator (an EOA alias)
         let contract = Address::from_slice(&[0x33; 20]);
         deploy_at(
-            &mut host,
+            rk.host_mut(),
             &contract,
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
@@ -1750,19 +1752,20 @@ mod tests {
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
         )
         .unwrap();
 
-        let stored_origin = read_slot(&mut host, &contract, revm::primitives::U256::ZERO);
+        let stored_origin =
+            read_slot(rk.host_mut(), &contract, revm::primitives::U256::ZERO);
         let stored_caller =
-            read_slot(&mut host, &contract, revm::primitives::U256::from(1));
+            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1));
         assert_eq!(
             stored_origin,
             revm::primitives::U256::from_be_slice(source.as_slice()),
@@ -1786,7 +1789,7 @@ mod tests {
     fn cracreceived_source_runtime_follows_header() {
         use alloy_sol_types::SolEvent;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -1824,7 +1827,7 @@ mod tests {
             .unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         // A plain transfer to a code-less account emits no contract logs,
@@ -1852,7 +1855,7 @@ mod tests {
     fn cracreceived_source_runtime_defaults_to_tezos_when_absent() {
         use alloy_sol_types::SolEvent;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -1864,7 +1867,7 @@ mod tests {
         let request =
             build_serve_request_with_source(&sender, &source, &destination, "0", vec![]);
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         let crac_log = journal
@@ -1884,7 +1887,7 @@ mod tests {
     /// behavior is preserved.
     #[test]
     fn inbound_crac_origin_equals_caller_when_source_is_sender() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -1892,26 +1895,27 @@ mod tests {
         let eoa = Address::from_slice(&[0x44; 20]);
         let contract = Address::from_slice(&[0x55; 20]);
         deploy_at(
-            &mut host,
+            rk.host_mut(),
             &contract,
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_source(&eoa, &eoa, &contract, "0", vec![]);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
         )
         .unwrap();
 
-        let stored_origin = read_slot(&mut host, &contract, revm::primitives::U256::ZERO);
+        let stored_origin =
+            read_slot(rk.host_mut(), &contract, revm::primitives::U256::ZERO);
         let stored_caller =
-            read_slot(&mut host, &contract, revm::primitives::U256::from(1));
+            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1));
         let eoa_word = revm::primitives::U256::from_be_slice(eoa.as_slice());
         assert_eq!(stored_origin, eoa_word);
         assert_eq!(stored_caller, eoa_word);
@@ -1929,19 +1933,23 @@ mod tests {
     /// the H-0094 bypass: before L2-1363 it returned 200 (`passed=1`).
     #[test]
     fn inbound_crac_eoa_only_guard_blocks_contract_caller() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let source = Address::from_slice(&[0x22; 20]);
         let guard = Address::from_slice(&[0x33; 20]);
-        deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
+        deploy_at(
+            rk.host_mut(),
+            &guard,
+            Bytes::from_hex(EOA_ONLY_GUARD).unwrap(),
+        );
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &guard, "0", vec![]);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(
             resp.status(),
             http::StatusCode::BAD_REQUEST,
@@ -1953,17 +1961,21 @@ mod tests {
     /// (`source == sender` → `tx.origin == msg.sender`).
     #[test]
     fn inbound_crac_eoa_only_guard_allows_eoa() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
         let eoa = Address::from_slice(&[0x44; 20]);
         let guard = Address::from_slice(&[0x55; 20]);
-        deploy_at(&mut host, &guard, Bytes::from_hex(EOA_ONLY_GUARD).unwrap());
+        deploy_at(
+            rk.host_mut(),
+            &guard,
+            Bytes::from_hex(EOA_ONLY_GUARD).unwrap(),
+        );
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_source(&eoa, &eoa, &guard, "0", vec![]);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 
@@ -1978,7 +1990,7 @@ mod tests {
     /// `TxEnv.caller` would make this test read `1` instead.
     #[test]
     fn inbound_crac_does_not_leak_origin_nonce_bump() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -1988,15 +2000,15 @@ mod tests {
         let source = Address::from_slice(&[0x22; 20]);
         let contract = Address::from_slice(&[0x33; 20]);
         // Target with a single STOP — trivial inner call.
-        deploy_at(&mut host, &contract, Bytes::from_hex("00").unwrap());
+        deploy_at(rk.host_mut(), &contract, Bytes::from_hex("00").unwrap());
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
             build_serve_request_with_source(&sender, &source, &contract, "0", vec![]);
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -2004,7 +2016,7 @@ mod tests {
         .unwrap();
 
         let source_account = StorageAccount::from_address(&source).unwrap();
-        let info = source_account.info(&mut host).unwrap();
+        let info = source_account.info(rk.host_mut()).unwrap();
         assert_eq!(
             info.nonce, 0,
             "inbound CRAC must not leak its pre-execution nonce bump onto the originator"
@@ -2017,7 +2029,7 @@ mod tests {
         use revm_etherlink::precompiles::runtime_gateway::RuntimeGateway;
         use tezosx_interfaces::testing::MockRegistry;
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
 
         // A = true originator (X-Tezos-Source), B = immediate caller (X-Tezos-Sender).
@@ -2032,7 +2044,7 @@ mod tests {
         // PUSH1 0 PUSH1 0 CALLDATASIZE PUSH1 0         -- retLen retOff argsLen argsOff
         // PUSH1 0 PUSH20 <gw> GAS CALL POP STOP        -- value to gas call
         deploy_at(
-            &mut host,
+            rk.host_mut(),
             &contract,
             Bytes::from_hex(
                 "36600060003760006000366000600073\
@@ -2102,7 +2114,7 @@ mod tests {
                 .body(calldata)
                 .unwrap()
         };
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(
             resp.status(),
             http::StatusCode::OK,
@@ -2210,7 +2222,7 @@ mod tests {
     /// asserted 200 into a 500.
     #[test]
     fn test_serve_accepts_code_bearing_caller() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
@@ -2221,10 +2233,14 @@ mod tests {
         // Give the caller non-empty, non-EIP-7702 bytecode: this is what
         // EIP-3607 rejects, and what a same-runtime EVM-to-EVM caller now
         // carries.
-        deploy_at(&mut host, &sender, Bytes::from_hex("6001").unwrap());
+        deploy_at(rk.host_mut(), &sender, Bytes::from_hex("6001").unwrap());
 
         // Target stores 0x42 at slot 1 (PUSH1 0x42 PUSH1 0x01 SSTORE).
-        deploy_at(&mut host, &contract, Bytes::from_hex("6042600155").unwrap());
+        deploy_at(
+            rk.host_mut(),
+            &contract,
+            Bytes::from_hex("6042600155").unwrap(),
+        );
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
@@ -2234,14 +2250,14 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(
             resp.status(),
             http::StatusCode::OK,
             "a code-bearing CRAC caller must not be rejected by EIP-3607"
         );
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -2251,14 +2267,14 @@ mod tests {
         // The target actually executed (proves the call was not rejected
         // before reaching the EVM frame).
         assert_eq!(
-            read_slot(&mut host, &contract, revm::primitives::U256::from(1)),
+            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1)),
             revm::primitives::U256::from(0x42)
         );
     }
 
     #[test]
     fn test_serve_unsupported_method_returns_405() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -2280,7 +2296,7 @@ mod tests {
                 "0",
                 vec![],
             );
-            let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+            let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
             assert_eq!(
                 resp.status(),
                 http::StatusCode::METHOD_NOT_ALLOWED,
@@ -2291,7 +2307,7 @@ mod tests {
 
     #[test]
     fn test_static_call_with_nonzero_amount_is_rejected() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -2306,7 +2322,7 @@ mod tests {
             "1",
             vec![],
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
     }
 
@@ -2323,13 +2339,13 @@ mod tests {
         //   RETURN         (0xF3)
         let bytecode_raw = Bytes::from_hex("604260005260206000F3").unwrap();
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x33; 20]);
-        deploy_at(&mut host, &destination, bytecode_raw);
+        deploy_at(rk.host_mut(), &destination, bytecode_raw);
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
@@ -2339,7 +2355,7 @@ mod tests {
             "0",
             vec![],
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         // Body is 32 bytes ending in 0x42.
         let body = resp.body();
@@ -2370,18 +2386,18 @@ mod tests {
         //   RETURN         (0xF3)
         let bytecode_raw = Bytes::from_hex("60016000556000600060F3").unwrap();
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x44; 20]);
-        deploy_at(&mut host, &destination, bytecode_raw);
+        deploy_at(rk.host_mut(), &destination, bytecode_raw);
 
         // Pre-condition: slot 0 starts at zero.
         assert_eq!(
-            read_slot(&mut host, &destination, revm::primitives::U256::ZERO),
+            read_slot(rk.host_mut(), &destination, revm::primitives::U256::ZERO),
             revm::primitives::U256::ZERO,
         );
 
@@ -2393,7 +2409,7 @@ mod tests {
             "0",
             vec![],
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         // The SSTORE attempt halts the EVM; we surface it as 400.
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
 
@@ -2401,7 +2417,7 @@ mod tests {
         // Since REVM aborted the call on the SSTORE attempt, slot 0
         // stays at zero.
         commit_evm_journal_from_external(
-            &mut host,
+            &mut rk,
             &registry,
             &block_constants,
             &mut journal,
@@ -2409,7 +2425,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            read_slot(&mut host, &destination, revm::primitives::U256::ZERO),
+            read_slot(rk.host_mut(), &destination, revm::primitives::U256::ZERO),
             revm::primitives::U256::ZERO,
         );
     }
@@ -2425,13 +2441,13 @@ mod tests {
         //   REVERT         (0xFD)
         let bytecode_raw = Bytes::from_hex("604260005260206000FD").unwrap();
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x55; 20]);
-        deploy_at(&mut host, &destination, bytecode_raw);
+        deploy_at(rk.host_mut(), &destination, bytecode_raw);
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
@@ -2441,7 +2457,7 @@ mod tests {
             "0",
             vec![],
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
     }
 
@@ -2487,15 +2503,15 @@ mod tests {
         //     SET_CODE delegations. A single read is charged.
         #[test]
         fn backstop_fires_on_account_with_code() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (addr, addr_str) = evm_addr(0xbb);
 
-            set_account_with_code(&mut host, &addr);
+            set_account_with_code(rk.host_mut(), &addr);
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2505,14 +2521,14 @@ mod tests {
         //     on its own — only code presence promotes to Native.
         #[test]
         fn backstop_with_empty_code_returns_unknown() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (addr, addr_str) = evm_addr(0xcc);
 
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         nonce: 5,
                         ..AccountInfo::default()
@@ -2522,7 +2538,7 @@ mod tests {
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2530,13 +2546,13 @@ mod tests {
         // (c) Account does not exist → Unknown, single read charged.
         #[test]
         fn no_account_returns_unknown() {
-            let host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0xdd);
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2544,14 +2560,14 @@ mod tests {
         // (d) Native classification in the account record → Native.
         #[test]
         fn recorded_native_origin_returns_native() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (addr, addr_str) = evm_addr(0xee);
 
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         origin: AccountOrigin::Native,
                         ..AccountInfo::default()
@@ -2561,7 +2577,7 @@ mod tests {
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2570,7 +2586,7 @@ mod tests {
         //     its payload, from the same single read.
         #[test]
         fn recorded_alias_origin_returns_alias_payload() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (addr, addr_str) = evm_addr(0xff);
 
@@ -2581,7 +2597,7 @@ mod tests {
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    &mut host,
+                    rk.host_mut(),
                     AccountInfo {
                         origin: AccountOrigin::Alias(alias_info.clone()),
                         ..AccountInfo::default()
@@ -2591,7 +2607,7 @@ mod tests {
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Alias(alias_info));
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2599,12 +2615,12 @@ mod tests {
         // (f) Malformed hex address → Unknown, no charge
         #[test]
         fn malformed_address_returns_unknown_no_charge() {
-            let host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
 
             let budget = 100_000;
             let (class, consumed) =
-                runtime.read_origin(&host, "not-hex", budget).unwrap();
+                runtime.read_origin(rk.host(), "not-hex", budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, 0); // malformed → no charge
         }
@@ -2612,12 +2628,12 @@ mod tests {
         // (g) Wrong-length hex address → Unknown, no charge
         #[test]
         fn wrong_length_hex_returns_unknown_no_charge() {
-            let host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
 
             let budget = 100_000;
             let (class, consumed) = runtime
-                .read_origin(&host, "0x00112233445566778899aabbccddeeff0011", budget)
+                .read_origin(rk.host(), "0x00112233445566778899aabbccddeeff0011", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, 0); // malformed → no charge
@@ -2626,26 +2642,28 @@ mod tests {
         // (h) Insufficient budget for the read → OutOfGas
         #[test]
         fn insufficient_budget_returns_out_of_gas() {
-            let host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0x11);
 
             // Budget below ALIAS_LOOKUP_COST: fails at the read
             let budget = ALIAS_LOOKUP_COST - 1;
-            let err = runtime.read_origin(&host, &addr_str, budget).unwrap_err();
+            let err = runtime
+                .read_origin(rk.host(), &addr_str, budget)
+                .unwrap_err();
             assert_eq!(err, tezosx_interfaces::TezosXRuntimeError::OutOfGas);
         }
 
         // (i) Budget exactly ALIAS_LOOKUP_COST → succeeds, consumed == budget
         #[test]
         fn exact_budget_succeeds() {
-            let host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0x22);
 
             let budget = ALIAS_LOOKUP_COST;
             let (class, consumed) =
-                runtime.read_origin(&host, &addr_str, budget).unwrap();
+                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, budget);
         }
@@ -2689,7 +2707,7 @@ mod tests {
         // materialization instead of blessing an uninitialized forwarder.
         #[test]
         fn failed_init_defers_and_does_not_brick_alias() {
-            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
             let registry = UnimplementedRegistry;
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -2711,7 +2729,7 @@ mod tests {
             // before it can run.
             let failed = runtime.ensure_alias(
                 &registry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 info.clone(),
                 Some(pubkey.as_slice()),
@@ -2730,12 +2748,12 @@ mod tests {
             // no delegation code_hash and no Origin record.
             let alias_account = StorageAccount::from_address(&alias).unwrap();
             assert_ne!(
-                alias_account.info(&mut host).unwrap().code_hash,
+                alias_account.info(rk.host_mut()).unwrap().code_hash,
                 delegation_code_hash,
                 "no delegation code_hash may be written when init fails"
             );
             let classification = alias_account
-                .info_without_migration(&host)
+                .info_without_migration(rk.host())
                 .unwrap()
                 .map(|info| info.origin)
                 .unwrap_or_default();
@@ -2761,7 +2779,7 @@ mod tests {
             // classification.
             let retried = runtime.ensure_alias(
                 &registry,
-                &mut host,
+                &mut rk,
                 &mut journal,
                 info,
                 Some(pubkey.as_slice()),
@@ -2798,7 +2816,7 @@ mod tests {
     fn test_serve_block_observables_reflect_outer_block() {
         use tezos_ethereum::block::{BlockConstants, BlockFees};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let runtime = EthereumRuntime::default();
         let registry = UnimplementedRegistry;
 
@@ -2819,7 +2837,7 @@ mod tests {
 
         let sender = Address::from_slice(&[0x11; 20]);
         let contract = Address::from_slice(&[0xBB; 20]);
-        deploy_observables_probe(&mut host, &contract);
+        deploy_observables_probe(rk.host_mut(), &contract);
 
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(0, 0),
@@ -2836,7 +2854,7 @@ mod tests {
             vec![],
             journal.evm.outer_block(),
         );
-        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
         // A successful serve also proves the basefee preflight gate is
         // opened: the CRAC runs at `gas_price = 0`, which stock EIP-1559
         // validation would reject against the live basefee.
@@ -2848,32 +2866,27 @@ mod tests {
         );
 
         let commit_block = BlockConstants::test_block_with_no_fees();
-        commit_evm_journal_from_external(
-            &mut host,
-            &registry,
-            &commit_block,
-            &mut journal,
-        )
-        .unwrap();
+        commit_evm_journal_from_external(&mut rk, &registry, &commit_block, &mut journal)
+            .unwrap();
 
         let u256 = revm::primitives::U256::from;
         assert_eq!(
-            read_slot(&mut host, &contract, u256(0u64)),
+            read_slot(rk.host_mut(), &contract, u256(0u64)),
             u256(live_basefee),
             "BASEFEE must reflect the live block basefee"
         );
         assert_eq!(
-            read_slot(&mut host, &contract, u256(1u64)),
+            read_slot(rk.host_mut(), &contract, u256(1u64)),
             u256(block_gas_limit),
             "GASLIMIT must reflect the block gas limit, not the forwarded call gas"
         );
         assert_eq!(
-            read_slot(&mut host, &contract, u256(2u64)),
+            read_slot(rk.host_mut(), &contract, u256(2u64)),
             u256(live_basefee),
             "GASPRICE must reflect the live basefee, not the cross-runtime TxEnv's 0"
         );
         assert_eq!(
-            read_slot(&mut host, &contract, u256(3u64)),
+            read_slot(rk.host_mut(), &contract, u256(3u64)),
             u256(prevrandao),
             "PREVRANDAO must reflect the block's value, not the default 0"
         );

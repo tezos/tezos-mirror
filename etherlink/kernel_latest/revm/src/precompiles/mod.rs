@@ -9,11 +9,15 @@ use tezosx_interfaces::Registry;
 
 use crate::{database::EtherlinkVMDB, journal::Journal};
 
-pub fn log<'j, Host, R, CTX>(context: &mut CTX, log: Log)
+pub fn log<'j, Host, KS, R, CTX>(context: &mut CTX, log: Log)
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     if let Some(mut tracer) = context.journal_mut().take_tracer() {
         tracer.inject_log(log.clone());

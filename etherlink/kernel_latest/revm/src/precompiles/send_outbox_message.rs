@@ -274,14 +274,18 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<'j, CTX, Host, R>(
+fn send_outbox_methods<'j, CTX, Host, KS, R>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
@@ -461,15 +465,19 @@ where
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<'j, CTX, Host, R>(
+pub(crate) fn send_outbox_message_precompile<'j, CTX, Host, KS, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
+    KS: 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
-    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, Host, KS, R>,
+        Journal = Journal<'j, Host, KS, R>,
+    >,
 {
     let mut gas = Gas::new(inputs.gas_limit);
     guard(

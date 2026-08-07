@@ -4,7 +4,7 @@
 
 use crate::{
     fixture::{Account, Env, Fixtures, NamedFixture, PostEntry, TestCase},
-    helpers::{extract_brackets, prepare_host, pretty, u256_to_u128},
+    helpers::{extract_brackets, prepare_rk, pretty, u256_to_u128},
 };
 use revm::{
     context::{result::ExecutionResult, transaction::AccessList},
@@ -369,7 +369,7 @@ pub fn main() {
         )
     };
 
-    let mut host;
+    let mut rk;
     let registry = kernel::registry_impl::RegistryImpl::default();
 
     for NamedFixture { path, fixtures } in fixtures {
@@ -402,8 +402,8 @@ pub fn main() {
 
             for (spec_name, post_entrys) in post {
                 for PostEntry { state, indexes, .. } in post_entrys {
-                    host = prepare_host();
-                    fill_state(&mut host, pre.clone());
+                    rk = prepare_rk();
+                    fill_state(rk.host_mut(), pre.clone());
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
                     let block_constants =
@@ -423,7 +423,7 @@ pub fn main() {
 
                     let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
                     let execution_result = run_transaction(
-                        &mut host,
+                        &mut rk,
                         &registry,
                         &mut journal,
                         &block_constants,
@@ -452,7 +452,7 @@ pub fn main() {
                             .unwrap();
 
                     let final_result = check_result(
-                        &mut host,
+                        rk.host_mut(),
                         state,
                         &mut output_file,
                         total_gas_refunded,

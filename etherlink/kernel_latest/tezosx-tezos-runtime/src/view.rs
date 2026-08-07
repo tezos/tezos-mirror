@@ -17,6 +17,7 @@
 //! at typechecking time.
 
 use std::collections::BTreeMap;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
 use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, BorrowedUnparseError, Micheline, Type, TypedValue};
@@ -175,10 +176,10 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
 /// The returned [`ExecuteRequestOutcome`] carries the gas consumed during
 /// typechecking and interpretation, and [`RequestFailure`] does the same
 /// on failure, so the caller can report it to the gateway.
-pub(crate) fn execute_view_call<Host>(
+pub(crate) fn execute_view_call<Host, KS>(
     chain_id: &tezos_crypto_rs::hash::ChainId,
     registry: &impl tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
@@ -211,7 +212,7 @@ where
     // balance. `lookup_view_storage_balance` below re-reads balance
     // internally; the extra storage read is the price of keeping this
     // ctx initialized in one shot rather than patching a placeholder.
-    let balance_narith = dest_account.balance(host).map_err(|e| {
+    let balance_narith = dest_account.balance(rk.host()).map_err(|e| {
         TezosXRuntimeError::Custom(format!("failed to read destination balance: {e:?}"))
     })?;
     let balance: i64 = balance_narith.0.try_into().map_err(|_| {
@@ -237,7 +238,7 @@ where
         value: Zarith(0.into()),
     };
     let mut tc_ctx = TcCtx {
-        host,
+        rk,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),

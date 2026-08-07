@@ -11,7 +11,7 @@ use revm::{
     context_interface::{
         context::{SStoreResult, SelfDestructResult, StateLoad},
         journaled_state::{AccountLoad, JournalCheckpoint, JournalTr, TransferError},
-        Database,
+        Database as RevmDatabase,
     },
     inspector::JournalExt,
     interpreter::Gas,
@@ -40,6 +40,7 @@ use evm_types::{
 };
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
@@ -55,10 +56,11 @@ use tezosx_interfaces::{
 pub struct Journal<
     'a,
     Host: StorageV1,
+    KS,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 > {
     /// Database
-    pub database: EtherlinkVMDB<'a, Host, R>,
+    pub database: EtherlinkVMDB<'a, Host, KS, R>,
 
     /// TezosX journal combining EVM and Michelson journal state.
     pub journal: &'a mut TezosXJournal,
@@ -69,11 +71,11 @@ pub struct Journal<
     deferred_error: Option<RuntimeError>,
 }
 
-impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    Journal<'a, Host, R>
+impl<'a, Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    Journal<'a, Host, KS, R>
 {
     pub fn new_with_inner(
-        database: EtherlinkVMDB<'a, Host, R>,
+        database: EtherlinkVMDB<'a, Host, KS, R>,
         journal: &'a mut TezosXJournal,
     ) -> Self {
         Self {
@@ -91,8 +93,8 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
 
 /// Expose the journal-owned tracer to the `TracerInspector` filling the
 /// `Evm` inspector slot (see `evm_inspectors::TracerInspector`).
-impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    TracerContainer for Journal<'a, Host, R>
+impl<'a, Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    TracerContainer for Journal<'a, Host, KS, R>
 {
     fn take_tracer(&mut self) -> Option<Box<Tracer>> {
         self.journal.evm.take_tracer()
@@ -105,18 +107,18 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalTr
-    for Journal<'a, Host, R>
+impl<'a, Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    JournalTr for Journal<'a, Host, KS, R>
 {
-    type Database = EtherlinkVMDB<'a, Host, R>;
+    type Database = EtherlinkVMDB<'a, Host, KS, R>;
     type State = EvmState;
     type JournaledAccount<'b>
-        = JournaledAccount<'b, EtherlinkVMDB<'a, Host, R>>
+        = JournaledAccount<'b, EtherlinkVMDB<'a, Host, KS, R>>
     where
-        EtherlinkVMDB<'a, Host, R>: 'b,
+        EtherlinkVMDB<'a, Host, KS, R>: 'b,
         'a: 'b;
 
-    fn new(_database: EtherlinkVMDB<'a, Host, R>) -> Journal<'a, Host, R> {
+    fn new(_database: EtherlinkVMDB<'a, Host, KS, R>) -> Journal<'a, Host, KS, R> {
         unimplemented!("Use Journal::new_with_inner instead")
     }
 
@@ -132,7 +134,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         &mut self,
         address: Address,
         key: StorageKey,
-    ) -> Result<StateLoad<StorageValue>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<StorageValue>, <Self::Database as RevmDatabase>::Error> {
         self.sload_skip_cold_load(address, key, false)
             .map_err(JournalLoadError::unwrap_db_error)
     }
@@ -145,7 +147,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         skip_cold_load: bool,
     ) -> Result<
         StateLoad<StorageValue>,
-        JournalLoadError<<Self::Database as Database>::Error>,
+        JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
         self.journal
             .evm
@@ -158,7 +160,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         address: Address,
         key: StorageKey,
         value: StorageValue,
-    ) -> Result<StateLoad<SStoreResult>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<SStoreResult>, <Self::Database as RevmDatabase>::Error> {
         self.sstore_skip_cold_load(address, key, value, false)
             .map_err(JournalLoadError::unwrap_db_error)
     }
@@ -172,7 +174,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         skip_cold_load: bool,
     ) -> Result<
         StateLoad<SStoreResult>,
-        JournalLoadError<<Self::Database as Database>::Error>,
+        JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
         self.journal.evm.inner.sstore(
             &mut self.database,
@@ -202,7 +204,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         skip_cold_load: bool,
     ) -> Result<
         StateLoad<SelfDestructResult>,
-        JournalLoadError<<Self::Database as Database>::Error>,
+        JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
         self.journal.evm.inner.selfdestruct(
             &mut self.database,
@@ -252,7 +254,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         from: Address,
         to: Address,
         balance: U256,
-    ) -> Result<Option<TransferError>, <Self::Database as Database>::Error> {
+    ) -> Result<Option<TransferError>, <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -295,7 +297,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         &mut self,
         address: Address,
         balance: U256,
-    ) -> Result<(), <Self::Database as Database>::Error> {
+    ) -> Result<(), <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -313,7 +315,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     fn load_account(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<&Account>, <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -324,7 +326,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     fn load_account_code(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<&Account>, <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -335,7 +337,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     fn load_account_delegated(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<AccountLoad>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<AccountLoad>, <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -351,7 +353,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     #[inline]
     fn checkpoint_commit(&mut self) {
         self.journal.evm.inner.checkpoint_commit();
-        if let Err(e) = self.journal.global_commit(self.database.host) {
+        if let Err(e) = self.journal.global_commit(self.database.rk.host_mut()) {
             self.deferred_error.get_or_insert(e);
         }
     }
@@ -363,7 +365,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         // Michelson side recovers each snapshot's revert target from the
         // snapshot itself (see `MichelsonJournal`), so no path is supplied
         // — CRACs may snapshot subtrees other than `/evm/world_state`.
-        if let Err(e) = self.journal.global_revert(self.database.host) {
+        if let Err(e) = self.journal.global_revert(self.database.rk.host_mut()) {
             self.deferred_error.get_or_insert(e);
         }
     }
@@ -441,8 +443,10 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         address: Address,
         load_code: bool,
         skip_cold_load: bool,
-    ) -> Result<AccountInfoLoad<'_>, JournalLoadError<<Self::Database as Database>::Error>>
-    {
+    ) -> Result<
+        AccountInfoLoad<'_>,
+        JournalLoadError<<Self::Database as RevmDatabase>::Error>,
+    > {
         let spec = self.journal.evm.inner.cfg.spec;
         self.journal
             .evm
@@ -475,7 +479,7 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     fn load_account_with_code(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+    ) -> Result<StateLoad<&Account>, <Self::Database as RevmDatabase>::Error> {
         self.journal
             .evm
             .inner
@@ -487,8 +491,10 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         &mut self,
         address: Address,
         skip_cold_load: bool,
-    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
-    {
+    ) -> Result<
+        StateLoad<Self::JournaledAccount<'_>>,
+        <Self::Database as RevmDatabase>::Error,
+    > {
         self.journal
             .evm
             .inner
@@ -501,8 +507,10 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
         &mut self,
         address: Address,
         load_code: bool,
-    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
-    {
+    ) -> Result<
+        StateLoad<Self::JournaledAccount<'_>>,
+        <Self::Database as RevmDatabase>::Error,
+    > {
         self.journal
             .evm
             .inner
@@ -511,8 +519,8 @@ impl<'a, Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     }
 }
 
-impl<Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalExt
-    for Journal<'_, Host, R>
+impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalExt
+    for Journal<'_, Host, KS, R>
 {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
@@ -530,8 +538,8 @@ impl<Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>> Jour
     }
 }
 
-impl<Host: StorageV1, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    Journal<'_, Host, R>
+impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    Journal<'_, Host, KS, R>
 {
     pub fn get_and_increment_global_counter(
         &mut self,
@@ -746,8 +754,8 @@ pub trait CrossRuntimeCall {
     fn cross_runtime_originator(&self) -> Option<Address>;
 }
 
-impl<'a, Host, R: Registry<Journal = TezosXJournal>> CrossRuntimeCall
-    for Journal<'a, Host, R>
+impl<'a, Host, KS, R: Registry<Journal = TezosXJournal>> CrossRuntimeCall
+    for Journal<'a, Host, KS, R>
 where
     Host: StorageV1,
 {
@@ -782,7 +790,7 @@ where
             None => StorageAccount::from_address(&source)
                 .map_err(EvmDbError::from)
                 .and_then(|a| {
-                    Ok(a.info_without_migration(self.database.host)?
+                    Ok(a.info_without_migration(self.database.rk.host())?
                         .map(|info| info.origin)
                         .unwrap_or_default()
                         .into())
@@ -834,7 +842,7 @@ where
             .database
             .registry
             .ensure_alias(
-                self.database.host,
+                self.database.rk,
                 self.journal,
                 alias_info,
                 None,
@@ -878,7 +886,7 @@ where
             None => StorageAccount::from_address(&source)
                 .map_err(EvmDbError::from)
                 .and_then(|a| {
-                    Ok(a.info_without_migration(self.database.host)?
+                    Ok(a.info_without_migration(self.database.rk.host())?
                         .map(|info| info.origin)
                         .unwrap_or_default()
                         .into())
@@ -922,7 +930,7 @@ where
         let response =
             self.database
                 .registry
-                .serve(self.database.host, self.journal, http_request);
+                .serve(self.database.rk, self.journal, http_request);
         self.journal.evm.set_revm_call_depth(saved);
         response
     }
@@ -956,8 +964,8 @@ where
     }
 }
 
-pub fn commit_evm_journal_from_external<Host>(
-    host: &mut Host,
+pub fn commit_evm_journal_from_external<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     journal: &mut TezosXJournal,
@@ -967,7 +975,7 @@ where
 {
     // Cross-runtime callers are classified through their staged alias,
     // never as Native: no caller to classify here.
-    let db = EtherlinkVMDB::new(host, registry, block_constants, None)?;
+    let db = EtherlinkVMDB::new(rk, registry, block_constants, None)?;
     let mut journal = Journal::new_with_inner(db, journal);
     let state = journal.finalize();
     DatabaseCommit::commit(journal.db_mut(), state);
