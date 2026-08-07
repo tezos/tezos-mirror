@@ -1065,6 +1065,7 @@ etherlink.test_kernel:
   - changes:
     - etherlink.mk
     - etherlink/**/*.rs
+    - etherlink/kernel_latest/Makefile
     - etherlink/kernel_latest/mir/**/*.lalrpop
     - etherlink/kernel_latest/mir/**/*.rs
     - etherlink/kernel_latest/mir/**/*.toml

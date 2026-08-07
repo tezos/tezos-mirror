@@ -16,7 +16,8 @@ module Files = struct
 
   let node = ["etherlink/**/*"]
 
-  let kernel = ["etherlink.mk"; "etherlink/**/*.rs"]
+  let kernel =
+    ["etherlink.mk"; "etherlink/**/*.rs"; "etherlink/kernel_latest/Makefile"]
 
   let kernel_test_data =
     [
