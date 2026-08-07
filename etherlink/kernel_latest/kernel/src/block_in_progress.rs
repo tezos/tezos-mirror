@@ -974,4 +974,34 @@ mod tests {
 
         assert_eq!(bip.cumulative_gas, U256::from(120u64));
     }
+
+    /// A BiP holding a `None`-signature transaction object must round-trip, or
+    /// a mid-block reboot in a block carrying a deposit or a cross-runtime call
+    /// can never be resumed: the BiP is deleted only on the `Finished` path, so
+    /// a decode failure on reload repeats on every run and wedges the rollup.
+    ///
+    /// The object is produced through the real CRAC path rather than built by
+    /// hand, so the test stays honest if that path changes. Note that the
+    /// existing `test_encode_bip_*` cases all leave `cumulative_tx_objects`
+    /// empty, which is why they never caught this.
+    #[test]
+    fn bip_with_none_signature_object_should_reload() {
+        let mut bip =
+            BlockInProgress::new(U256::from(1), Default::default(), U256::one());
+
+        bip.register_crac_evm_transaction(dummy_crac_effect(7))
+            .expect("CRAC registration should succeed");
+
+        assert!(
+            bip.cumulative_tx_objects
+                .iter()
+                .any(|obj| obj.signature.is_none()),
+            "the CRAC envelope should have produced a None-signature object"
+        );
+
+        let encoded = bip.rlp_bytes();
+        let decoded = BlockInProgress::decode(&Rlp::new(&encoded))
+            .expect("BiP with a None-signature tx object should be decodable");
+        assert_eq!(decoded, bip);
+    }
 }
