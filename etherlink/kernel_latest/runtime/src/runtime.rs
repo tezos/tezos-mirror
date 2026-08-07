@@ -13,7 +13,6 @@ use std::{
 use crate::extensions::WithGas;
 use tezos_evm_logging::{tracing::instrument, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
     input::Message,
@@ -324,18 +323,6 @@ impl Default for MockKernelHost {
     fn default() -> Self {
         Self {
             host: MockHost::default(),
-            execution_gas_used: 0,
-            _pd: PhantomData,
-            registry: IrminKeySpaceRegistry::new(),
-        }
-    }
-}
-
-impl MockKernelHost {
-    pub fn with_address(address: SmartRollupAddress) -> Self {
-        let host = MockHost::with_address(&address);
-        KernelHost {
-            host,
             execution_gas_used: 0,
             _pd: PhantomData,
             registry: IrminKeySpaceRegistry::new(),

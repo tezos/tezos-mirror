@@ -50,6 +50,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
 };
@@ -164,10 +165,14 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &impl StorageV1, base: &impl KeySpace) -> Self {
+    pub fn read_from_storage<Host, KS>(rk: &RuntimeKeyspaces<Host, KS>) -> Self
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
         let (enable_michelson_gas_refund, tezos_runtime_enabled) = (
-            crate::storage::enable_michelson_gas_refund(base),
-            crate::storage::enable_tezos_runtime(base),
+            crate::storage::enable_michelson_gas_refund(rk.base()),
+            crate::storage::enable_tezos_runtime(rk.base()),
         );
 
         let enabled_michelson_target_sunrise_level = if tezos_runtime_enabled {
@@ -175,7 +180,7 @@ impl ExperimentalFeatures {
             // current deployment where only enable_tezos_runtime is set to still
             // activate the Michelson runtime.
             Some(
-                crate::storage::read_michelson_runtime_target_sunrise_level(host)
+                crate::storage::read_michelson_runtime_target_sunrise_level(rk.host())
                     .unwrap_or(U256::zero()),
             )
         } else {
@@ -564,18 +569,19 @@ impl TezosXChainConfig {
         }
     }
 
-    pub fn fetch_hashes_from_delayed_inbox(
-        host: &impl StorageV1,
-        base: &impl KeySpace,
+    pub fn fetch_hashes_from_delayed_inbox<Host, KS>(
+        rk: &RuntimeKeyspaces<Host, KS>,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &DelayedInbox,
         current_blueprint_size: usize,
         block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
-            host,
-            base,
+            rk,
             delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
@@ -717,16 +723,16 @@ impl TezosXChainConfig {
         )
     }
 
-    pub fn start_simulation_mode<Host>(
+    pub fn start_simulation_mode<Host, KS>(
         &self,
-        host: &mut Host,
-        base: &mut impl KeySpace,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + WasmHost,
+        KS: KeySpace,
     {
-        start_simulation_mode(host, base, registry, &self.spec_id)
+        start_simulation_mode(rk, registry, &self.spec_id)
     }
 
     /// The durable roots the failsafe mirror shadows: the world-state roots

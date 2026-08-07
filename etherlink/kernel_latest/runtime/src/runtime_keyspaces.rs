@@ -13,8 +13,9 @@ use std::borrow::{Borrow, BorrowMut};
 use tezos_evm_logging::set_global_verbosity;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
+use tezos_smart_rollup_mock::MockHost;
 
-use crate::runtime::{read_logs_verbosity, KernelHost};
+use crate::runtime::{read_logs_verbosity, KernelHost, MockKernelHost};
 use crate::safe_storage::SafeStorage;
 
 /// Name of the `/base` keyspace, holding kernel configuration and
@@ -51,8 +52,10 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
     /// Wrap the host in the failsafe mirror shadowing `world_states`, and
     /// lend the same `/base` to the handle it returns.
     ///
-    /// `world_states` must not overlap: no path may be a prefix of another.
-    /// On a handle whose host is already a mirror, this stacks a second one.
+    /// `world_states` must not overlap: no path may be a prefix of another,
+    /// and an already-mirrored host gets a second mirror stacked on top.
+    /// `/base` is never shadowed, so `promote` and `revert` on the host half
+    /// leave whatever was written through `base_mut` in place.
     pub fn to_safe_host(
         &mut self,
         world_states: Vec<OwnedPath>,
@@ -83,5 +86,14 @@ where
         let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
         set_global_verbosity(read_logs_verbosity(&base));
         Ok(Self { host, base })
+    }
+}
+
+/// Handle over a fresh mock host, for the tests.
+impl Default
+    for RuntimeKeyspaces<MockKernelHost, <MockKernelHost as KeySpaceLoader>::KeySpace>
+{
+    fn default() -> Self {
+        Self::init(MockHost::default()).expect("failed to init the runtime keyspaces")
     }
 }

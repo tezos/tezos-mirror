@@ -26,6 +26,7 @@ use tezos_crypto_rs::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::evm_node_flag;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
@@ -169,25 +170,26 @@ impl TezosContracts {
 
 // The `/evm` contracts are read through the raw host; the `/base` ones go
 // through the keyspace handle.
-fn fetch_tezos_contracts(
-    host: &mut impl StorageV1,
-    base: &impl KeySpace,
-) -> TezosContracts {
+fn fetch_tezos_contracts<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> TezosContracts
+where
+    Host: StorageV1,
+    KS: KeySpace,
+{
     // 1. Fetch the kernel's ticketer, returns `None` if it is badly
     //    encoded or absent.
-    let ticketer = read_ticketer(host);
+    let ticketer = read_ticketer(rk.host());
     // 2. Fetch the kernel's administrator, returns `None` if it is badly
     //    encoded or absent.
-    let admin = read_admin(base);
+    let admin = read_admin(rk.base());
     // 3. Fetch the sequencer governance, returns `None` if it is badly
     //    encoded or absent.
-    let sequencer_governance = read_sequencer_governance(host);
+    let sequencer_governance = read_sequencer_governance(rk.host_mut());
     // 4. Fetch the kernel_governance contract, returns `None` if it is badly
     //    encoded or absent.
-    let kernel_governance = read_kernel_governance(base);
+    let kernel_governance = read_kernel_governance(rk.base());
     // 5. Fetch the kernel_security_governance contract, returns `None` if it is badly
     //    encoded or absent.
-    let kernel_security_governance = read_kernel_security_governance(base);
+    let kernel_security_governance = read_kernel_security_governance(rk.base());
 
     TezosContracts {
         ticketer,
@@ -280,22 +282,23 @@ fn fetch_michelson_runtime_chain_id(
     }
 }
 
-pub fn fetch_tezosx_configuration<Host>(
-    host: &mut Host,
-    base: &impl KeySpace,
+pub fn fetch_tezosx_configuration<Host, KS>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> TezosXChainConfig
 where
     Host: StorageV1,
+    KS: KeySpace,
 {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
-    let evm_chain_id = fetch_evm_chain_id(host);
-    let limits = fetch_evm_limits(host);
-    let spec_id = read_evm_version(host).into();
-    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
-    let debug_features = DebugFeatures::read_from_storage(base);
-    let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
+    let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+    let limits = fetch_evm_limits(rk.host_mut());
+    let spec_id = read_evm_version(rk.host_mut()).into();
+    let experimental_features = ExperimentalFeatures::read_from_storage(rk);
+    let debug_features = DebugFeatures::read_from_storage(rk.base());
+    let michelson_chain_id =
+        fetch_michelson_runtime_chain_id(rk.host_mut(), evm_chain_id);
     TezosXChainConfig::create_config(
         evm_chain_id,
         limits,
@@ -306,15 +309,16 @@ where
     )
 }
 
-pub fn fetch_common_config<Host>(host: &mut Host, base: &impl KeySpace) -> CommonConfig
+pub fn fetch_common_config<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> CommonConfig
 where
     Host: StorageV1,
+    KS: KeySpace,
 {
-    let tezos_contracts = fetch_tezos_contracts(host, base);
+    let tezos_contracts = fetch_tezos_contracts(rk);
     let maximum_allowed_ticks =
-        read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
-    let enable_fa_bridge = is_enable_fa_bridge(base);
-    let evm_node_flag = evm_node_flag(host, base);
+        read_maximum_allowed_ticks(rk.base()).unwrap_or(MAX_ALLOWED_TICKS);
+    let enable_fa_bridge = is_enable_fa_bridge(rk.base());
+    let evm_node_flag = evm_node_flag(rk.host(), rk.base());
     CommonConfig {
         tezos_contracts,
         maximum_allowed_ticks,
@@ -323,17 +327,18 @@ where
     }
 }
 
-pub fn fetch_configuration<Host>(host: &mut Host, base: &impl KeySpace) -> Configuration
+pub fn fetch_configuration<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> Configuration
 where
     Host: StorageV1,
+    KS: KeySpace,
 {
-    let sequencer = sequencer(host).unwrap_or_default();
-    let common = fetch_common_config(host, base);
+    let sequencer = sequencer(rk.host()).unwrap_or_default();
+    let common = fetch_common_config(rk);
     let dal: Option<DalConfiguration> =
-        fetch_dal_configuration(base, common.evm_node_flag);
+        fetch_dal_configuration(rk.base(), common.evm_node_flag);
     match sequencer {
         Some(sequencer) => {
-            let delayed_bridge = read_delayed_transaction_bridge(base)
+            let delayed_bridge = read_delayed_transaction_bridge(rk.base())
                 // The sequencer must declare a delayed transaction bridge. This
                 // default value is only to facilitate the testing.
                 .unwrap_or_else(|| {
@@ -344,9 +349,9 @@ where
                 });
             // Default to 5 minutes.
             let max_blueprint_lookahead_in_seconds =
-                max_blueprint_lookahead_in_seconds(base)
+                max_blueprint_lookahead_in_seconds(rk.base())
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
-            match DelayedInbox::from_base(base) {
+            match DelayedInbox::from_base(rk.base()) {
                 Ok(delayed_inbox) => Configuration {
                     common,
                     mode: ConfigurationMode::Sequencer(SequencerConfig {
