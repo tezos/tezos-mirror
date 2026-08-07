@@ -907,9 +907,9 @@ end
 
 (** Michelson contract that calls another Michelson contract via the
  *  gateway's [%call] (HTTP) entrypoint, pointing at
- *  [http://tezos/<destination>/run].  Exercises the same-runtime CRAC
- *  path: the gateway dispatches the request back to the Michelson
- *  runtime instead of crossing to the EVM runtime. *)
+ *  [http://tezos/<destination>/run].  That is a same-runtime NAC, which
+ *  the gateway refuses.  Used to pin that refusal: Michelson cannot
+ *  catch it, so the whole manager operation backtracks. *)
 module TezCrossRuntimeHttpCallTez = struct
   open TezContract
   include TezRunner

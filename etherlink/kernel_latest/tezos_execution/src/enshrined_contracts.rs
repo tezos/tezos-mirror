@@ -1467,9 +1467,10 @@ fn build_ethereum_request(
 ///
 /// `serve` is invoked synchronously from inside the gateway entrypoint,
 /// which is what makes a CRAC sub-tree execute depth-first within the
-/// caller's frame — equivalent to a same-runtime synchronous call (EVM
-/// `CALL`) or a same-runtime DFS-expanded `TRANSFER_TOKENS` (Michelson
-/// since Florence).
+/// caller's frame — matching the shape of an intra-runtime synchronous
+/// call (EVM `CALL`) or a DFS-expanded `TRANSFER_TOKENS` (Michelson since
+/// Florence). The target is always the *other* runtime: a NAC back into
+/// the caller's own runtime is refused (see `ERR_SAME_RUNTIME_NAC`).
 fn dispatch_crac_call<'a, Host, KS>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
