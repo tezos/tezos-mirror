@@ -140,12 +140,12 @@ The *list* of protocol constants can be found in the OCaml APIs:
 
 The *values* of protocol constants in any given protocol can be found using specific RPC calls:
 
-- one RPC for :ref:`all constants
-  <GET_..--block_id--context--constants>` (fixed and parametric and
+- one RPC for `all constants
+  <./rpc.html#get-block-id-context-constants>`__ (fixed and parametric and
   derived), as shown in :ref:`this example <get_protocol_constants>`
 
-- one RPC for :ref:`the parametric constants
-  <GET_..--block_id--context--constants--parametric>` specifically
+- one RPC for `the parametric constants
+  <./rpc.html#get-block-id-context-constants-parametric>`__ specifically
 
 Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:
