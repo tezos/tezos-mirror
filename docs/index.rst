@@ -151,7 +151,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
     </div></details><br/>
 
-You may also access this whole documentation as a single `text file <https://octez.tezos.com/docs/octezdoc.txt>`__.
+You may also access this whole documentation (for the stable release) as a single `text file <https://octez.tezos.com/docs/octezdoc.txt>`__.
 
 .. toctree::
    :maxdepth: 2
