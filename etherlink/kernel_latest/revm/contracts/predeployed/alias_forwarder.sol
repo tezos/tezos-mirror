@@ -24,6 +24,10 @@ contract AliasForwarder {
     /// @notice Precompile address for Tezos signature verification
     address constant VERIFY_TEZOS_SIG = 0xfF0000000000000000000000000000000000000a;
 
+    /// @notice One mutez expressed in wei (10^12), the smallest amount the
+    ///         Tezos runtime can represent.
+    uint256 constant ONE_MUTEZ_IN_WEI = 10 ** 12;
+
     /// @notice The native Tezos address this alias forwards to (stored at slot 0)
     string public nativeAddress;
 
@@ -108,21 +112,39 @@ contract AliasForwarder {
     /// @notice Receive function to accept plain tez transfers
     /// @dev Sweeps the alias's full balance (not just msg.value), so a
     ///      zero-value call is a free, permissionless sweep trigger for any
-    ///      residue left resident from before materialization.
+    ///      residue left resident from before materialization or from a
+    ///      prior sub-mutez transfer.
     receive() external payable {
-        _forwardBalance(address(this).balance);
+        _forwardBalance();
     }
 
     /// @notice Fallback function to accept any calls with tez
     /// @dev Same full-balance sweep as receive(), see above.
     fallback() external payable {
-        _forwardBalance(address(this).balance);
+        _forwardBalance();
     }
 
-    /// @notice Internal function to forward balance to the native address
-    /// @param amount The amount to forward
-    function _forwardBalance(uint256 amount) internal {
-        if (amount == 0) {
+    /// @notice Internal function to forward the alias's full balance
+    ///         (read directly, `msg.value` included) to the native address
+    /// @dev Amounts below one mutez are left resident instead of being
+    ///      forwarded: they would truncate to 0 mutez at the gateway, and a
+    ///      0-mutez transfer is not harmless there. The Michelson runtime
+    ///      rejects a 0-mutez transfer to an implicit account, and for an
+    ///      originated account it would still run `%default` with
+    ///      AMOUNT = 0.
+    ///      Above the gate, the full amount is forwarded as-is, including
+    ///      any sub-mutez remainder: the gateway floors the wei value to
+    ///      mutez on conversion, and the truncated remainder is burned
+    ///      there rather than kept resident, so the alias ends at exactly
+    ///      zero after a successful forward. This is asymmetric with the
+    ///      below-gate case, where the whole amount stays resident instead:
+    ///      forwarding only the whole-mutez part and leaving the sub-mutez
+    ///      remainder resident was considered and rejected, in favor of the
+    ///      simpler all-or-nothing rule that matches the gateway's existing
+    ///      conversion semantics elsewhere.
+    function _forwardBalance() internal {
+        uint256 amount = address(this).balance;
+        if (amount < ONE_MUTEZ_IN_WEI) {
             return;
         }
 
