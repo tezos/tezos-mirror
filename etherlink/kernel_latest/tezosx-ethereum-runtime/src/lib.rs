@@ -480,12 +480,16 @@ where
         None,
         // Disable EIP-3607 (via `is_simulation = true`): an inbound CRAC
         // caller is not a user-signed EVM transaction but a trusted,
-        // gateway-supplied address. A same-runtime EVM-to-EVM round-trip
-        // forwards the real calling contract as `msg.sender`, whose
-        // bytecode is neither empty nor an EIP-7702 delegation; EIP-3607
-        // would otherwise reject it (RejectCallerWithCode), turning a
-        // catchable revert into a 500 that aborts the whole CRAC block.
-        // The static GET path disables it for the same reason.
+        // gateway-supplied address, and it can carry code. An
+        // `EVM -> Michelson -> EVM` round-trip resolves the forwarded
+        // sender alias back through `RoutingDecision::RoundTrip` to the
+        // real calling EVM contract, whose bytecode is neither empty nor
+        // an EIP-7702 delegation; EIP-3607 would otherwise reject it
+        // (RejectCallerWithCode), turning a catchable revert into a 500
+        // that aborts the whole CRAC block. The static GET path disables
+        // it for the same reason. (Same-runtime EVM-to-EVM NACs, the
+        // original motivation here, are refused outright — see
+        // `ERR_SAME_RUNTIME_NAC` — but the round-trip keeps this needed.)
         true,
         TransactionOrigin::CrossRuntime {
             credit: Some((hdrs.sender, hdrs.amount)),
@@ -2198,10 +2202,11 @@ mod tests {
     }
 
     /// Regression (L2-1370): an inbound CRAC whose caller is a real
-    /// code-bearing contract must not be rejected by EIP-3607. Since the
-    /// same-runtime EVM-to-EVM round-trip forwards the calling contract
-    /// verbatim as `msg.sender` (rather than a re-aliased,
-    /// EIP-3607-exempt address), the `execute_call` path must disable
+    /// code-bearing contract must not be rejected by EIP-3607. An
+    /// `EVM -> Michelson -> EVM` round-trip forwards the original calling
+    /// contract as `msg.sender` (the sender alias resolves back to it
+    /// through `RoutingDecision::RoundTrip`, rather than to a re-aliased,
+    /// EIP-3607-exempt address), so the `execute_call` path must disable
     /// EIP-3607; otherwise the caller's bytecode triggers
     /// `RejectCallerWithCode`, surfaced as a 500 that aborts the whole
     /// CRAC block. Reverting the fix (`is_simulation = false`) turns the

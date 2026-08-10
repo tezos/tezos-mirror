@@ -31,9 +31,10 @@ use tezosx_interfaces::{
     headers::{format_tez_from_mutez, parse_u64_opt},
     resolve_routing, translate_original_source, AliasInfo, Classification,
     CrossRuntimeContext, Registry, RoutingDecision, RuntimeId, ALIAS_LOOKUP_MILLIGAS,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID,
-    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
-    X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST,
+    X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -1059,6 +1060,18 @@ where
                 "http_call: unknown or missing target runtime in URL host".into(),
             )
         })?;
+    // A NAC back into this runtime is refused, for both methods. The
+    // callee would run against the very journal state this operation is
+    // building, so the inbound error path's `discard_tx` desyncs our
+    // checkpoints and a later revert silently no-ops. Callers wanting a
+    // Michelson target already have internal operations, which backtrack
+    // properly, and `VIEW` for the synchronous read a GET would have
+    // served. Checked before the sender-alias short-circuit below so no
+    // alias gas is charged for a call that cannot proceed; `%call_evm`
+    // hardcodes the `ethereum` host and can never reach this.
+    if target_runtime == RuntimeId::Tezos {
+        return Err(TransferError::GatewayError(ERR_SAME_RUNTIME_NAC.into()));
+    }
     let source_public_key = ctx.source_public_key().to_vec();
     let sender = ctx.sender();
     // Propagate the originator end-to-end so `tx.origin` stays invariant
@@ -1450,9 +1463,10 @@ fn build_ethereum_request(
 ///
 /// `serve` is invoked synchronously from inside the gateway entrypoint,
 /// which is what makes a CRAC sub-tree execute depth-first within the
-/// caller's frame — equivalent to a same-runtime synchronous call (EVM
-/// `CALL`) or a same-runtime DFS-expanded `TRANSFER_TOKENS` (Michelson
-/// since Florence).
+/// caller's frame — matching the shape of an intra-runtime synchronous
+/// call (EVM `CALL`) or a DFS-expanded `TRANSFER_TOKENS` (Michelson since
+/// Florence). The target is always the *other* runtime: a NAC back into
+/// the caller's own runtime is refused (see `ERR_SAME_RUNTIME_NAC`).
 fn dispatch_crac_call<'a, Host>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
@@ -3049,6 +3063,66 @@ pub(crate) mod tests {
             internal_ops.is_empty(),
             "gateway should not emit internal ops"
         );
+    }
+
+    /// Same-runtime NAC via %call: a `http://tezos/...` target is refused
+    /// before the call is dispatched. Michelson has no way to catch this, so
+    /// the refusal backtracks the whole manager operation.
+    ///
+    /// Driven for both methods — GET (view) and POST (entrypoint) — because
+    /// the guard sits ahead of the method split and must not let either
+    /// through. This is the end-to-end coverage for the GET arm: the tezt
+    /// counterpart only drives POST, since the Michelson bridge script
+    /// hardcodes the method.
+    #[test]
+    fn test_same_runtime_nac_via_call_entrypoint_is_refused() {
+        for method in [0i64, 1i64] {
+            let mut host = MockKernelHost::default();
+            let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+            let source = AddressHash::from_bytes(&[
+                0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24,
+                0x42, 0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+            ])
+            .unwrap();
+            let dest = "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
+
+            let mut journal = TezosXJournal::new(
+                CracId::new(1, 0),
+                tezos_crypto_rs::hash::OperationHash::default(),
+                tezos_ethereum::block::BlockConstants::dummy(),
+            );
+            let mut ctx =
+                MockCtx::new(&mut host, &mut journal, &registry, source, 100_000_000);
+
+            let entrypoint = Entrypoint::try_from("call").unwrap();
+            let arena = typed_arena::Arena::new();
+            let value = build_http_call_micheline(
+                &arena,
+                &format!("http://tezos/{dest}/run"),
+                &[],
+                &[],
+                method,
+            );
+
+            let result = execute_enshrined_contract(
+                EnshrinedContracts::TezosXGateway,
+                &entrypoint,
+                value,
+                &mut ctx,
+            );
+            let err = match result {
+                Ok(ops) => panic!(
+                    "method {method}: a Michelson target must be refused, \
+                     but the call was dispatched and returned {ops:?}"
+                ),
+                Err(err) => err,
+            };
+            assert!(
+                err.to_string().contains(ERR_SAME_RUNTIME_NAC),
+                "method {method}: error should be the same-runtime refusal: {err}"
+            );
+        }
     }
 
     /// The legacy %default (simple transfer) entrypoint was removed:
