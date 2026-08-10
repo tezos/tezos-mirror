@@ -19074,11 +19074,34 @@ let test_crac_nested_frames_temporary_big_map_ids () =
          ~evm_target:evm_bridge_addr)
       "Unit"
   in
-  (* TODO: call the top-level contract [outer_kt1] that will trigger the whole
+  (* Call the top-level contract [outer_kt1] that will trigger the whole
      execution: creating a temporary big map, calling [inner_kt1] through a CRAC
      and [evm_bridge], and making big maps persistent with [sink_outer] and
      [sink_inner]. Check that the permanent IDs of the big maps of the latter two
      contracts are different. *)
+  Log.debug ~prefix "Call the outer frame" ;
+  let* () =
+    TezRunner.call_run
+      ~gas_limit:500_000
+      ~storage_limit:10_000
+      ~fee:100_000
+      (`Tez_runner (outer_hex, outer_kt1))
+  in
+  let big_map_id_of sink =
+    let* storage = TezContract.get_storage ~sequencer sink in
+    return JSON.(storage |-> "int" |> as_string)
+  in
+  let* outer_big_map_id = big_map_id_of sink_outer in
+  let* inner_big_map_id = big_map_id_of sink_inner in
+  Log.info
+    "%s: sink_outer holds big map %s, sink_inner holds big map %s"
+    prefix
+    outer_big_map_id
+    inner_big_map_id ;
+  Check.(
+    (outer_big_map_id <> inner_big_map_id)
+      string
+      ~error_msg:"The two sinks must hold distinct big maps, both got %L") ;
   (* TODO: check the keys: the big map in [sink_outer] should only hold 0 and the
      big map in [sink_inner] should only hold 1. *)
   unit
