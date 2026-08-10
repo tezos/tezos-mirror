@@ -204,6 +204,14 @@ impl<T> Stack<T> {
         )
     }
 
+    /// Like [`Stack::split_off`], but returns `Err(StackOob)` instead of
+    /// panicking, as `drop_top` and `drain_top` do. Prefer it where the length
+    /// is a runtime invariant: a panic in WASM traps the kernel.
+    pub fn split_off_checked(&mut self, size: usize) -> Result<Stack<T>, StackOob> {
+        let split_at = self.len().checked_sub(size).ok_or(StackOob)?;
+        Ok(Self::stack_from_vec(self.0.split_off(split_at)))
+    }
+
     /// Move elements from `other` to the top of the stack. New stack top is the
     /// top of `other`. Note that elements are moved out of `other`.
     pub fn append(&mut self, other: &mut Stack<T>) {
@@ -551,4 +559,5 @@ mod tests {
     fn default() {
         assert_eq!(Stack::<()>::default(), stk![]);
     }
+
 }

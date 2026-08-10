@@ -1419,7 +1419,10 @@ fn interpret_step<'a, 'b>(
         I::Dip(opt_height, body) => {
             ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
-            let protected = stack.split_off(protected_height as usize);
+            // Cannot fail on a well-typed script (the typechecker's `DIP` case
+            // calls `ensure_stack_len`), but the interpreter does not re-check
+            // it and a panic here would trap the kernel.
+            let protected = stack.split_off_checked(protected_height as usize)?;
             Ok(StepResult::OpenDip {
                 body,
                 protected,
