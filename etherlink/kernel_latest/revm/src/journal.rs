@@ -697,9 +697,11 @@ pub trait CrossRuntimeCall {
     ///
     /// `serve` is invoked synchronously from inside the gateway
     /// precompile, which is what makes a CRAC sub-tree execute
-    /// depth-first within the caller's frame — equivalent to a
-    /// same-runtime synchronous call (EVM `CALL`) or a same-runtime
-    /// DFS-expanded `TRANSFER_TOKENS` (Michelson since Florence).
+    /// depth-first within the caller's frame — matching the shape of an
+    /// intra-runtime synchronous call (EVM `CALL`) or a DFS-expanded
+    /// `TRANSFER_TOKENS` (Michelson since Florence). The target is always
+    /// the *other* runtime: a NAC back into the caller's own runtime is
+    /// refused by the gateway (see `ERR_SAME_RUNTIME_NAC`).
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
@@ -745,6 +747,13 @@ where
         if target_runtime == RuntimeId::Ethereum {
             // Short-circuit for Ethereum: the alias is the EVM address itself,
             // and no generation cost is incurred even on cache miss.
+            //
+            // Kept defensively: no live caller reaches it now that
+            // same-runtime NACs are refused in the gateway (see
+            // `ERR_SAME_RUNTIME_NAC`) — every remaining caller passes a
+            // non-Ethereum target. It stays so the function remains total
+            // over `RuntimeId` rather than silently producing a wrong alias
+            // if a future caller does pass Ethereum.
             return Ok((
                 source.to_string(),
                 ResolvedAliasCost {
@@ -851,7 +860,10 @@ where
     ) -> Result<String, CustomPrecompileError> {
         if target_runtime == RuntimeId::Ethereum {
             // Short-circuit for Ethereum: the alias is the EVM address itself,
-            // and no generation cost is incurred even on cache miss.
+            // and no generation cost is incurred even on cache miss. Kept
+            // defensively for the same reason as in
+            // `tezosx_resolve_source_alias` above: callers now always pass a
+            // non-Ethereum target.
             return Ok(source.to_string());
         }
         let remaining = Gas::new(remaining_evm_gas);

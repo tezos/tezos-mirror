@@ -3,9 +3,9 @@ storage (pair (nat %count) (string %destination)) ;
 # Michelson-to-Michelson bridge using the gateway's %call (HTTP) entrypoint.
 #
 # Functionally analogous to cross_runtime_http_call_evm.tz, but the URL
-# host is http://tezos/<destination>/run, exercising the same-runtime
-# CRAC path: the gateway dispatches the HTTP request back to the
-# Michelson runtime instead of crossing to the EVM runtime.
+# host is http://tezos/<destination>/run, i.e. a same-runtime NAC — which
+# the gateway refuses. Used to pin that refusal: Michelson cannot catch
+# it, so the whole manager operation backtracks and %count stays at 0.
 #
 # %run builds:
 #   url     = "http://tezos/" ++ destination ++ "/run"

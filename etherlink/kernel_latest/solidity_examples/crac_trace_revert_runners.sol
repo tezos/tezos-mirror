@@ -7,8 +7,7 @@ pragma solidity ^0.8.20;
 // Minimal runners used by the `crac_trace_revert` tezt suite
 // (see cross_runtime.ml). Each runner exposes a parameterless `run()`
 // so it can be invoked by the cross-runtime bridge
-// `cross_runtime_run_evm.tz` or reached over the same-runtime gateway
-// path (`crac_http_call_evm.sol`, which calls `run()` on its target).
+// `cross_runtime_run_evm.tz`.
 
 /// @notice Child of `CracReverter` that emits a log and returns
 ///         successfully. It runs (and closes, recording its log) BEFORE

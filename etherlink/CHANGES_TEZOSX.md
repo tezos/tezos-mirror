@@ -618,6 +618,22 @@
 
 ### Native Atomic Composability
 
+- **Breaking change:** a cross-runtime call whose target runtime is the
+  caller's own runtime is now refused. Only the generic `call` (EVM) and
+  `%call` (Michelson) gateway entrypoints could express such a target — via a
+  `http://ethereum/...` URL from the EVM runtime or a `http://tezos/...` URL
+  from the Michelson runtime — for both the POST and GET methods; the typed
+  entrypoints (`callMichelson`, `callMichelsonView`, `%call_evm`,
+  `staticcallEvm`) always target the other runtime and are unaffected. Such a
+  call was not a real boundary crossing: the callee executed against the
+  caller's own journal state, so the inbound error path drained the shared
+  journal and desynced the outer frames' checkpoints, after which a revert
+  could silently fail to unwind state. It also granted no capability — a
+  target on the caller's own runtime is reachable natively: a POST by a plain
+  EVM `CALL` or a Michelson internal operation, with that runtime's ordinary
+  rollback semantics, and a GET by the `VIEW` instruction. On the EVM side the
+  refusal is a catchable revert of the gateway `CALL`; on the Michelson side,
+  which has no catch, it backtracks the manager operation. (!22688)
 - **Breaking change for integrators:** the user-facing names of a
   cross-runtime call were renamed; internal kernel symbols are unchanged.
   - HTTP context headers `X-Tezos-CRAC-ID` and `X-Tezos-CRAC-Depth` are now
