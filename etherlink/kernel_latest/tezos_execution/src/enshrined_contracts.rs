@@ -768,23 +768,27 @@ pub(crate) fn drain_reentrant_crac_ops(
 ) -> Vec<InternalOperationSum> {
     use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
     let mut receipts: Vec<(u64, AppliedOperation)> = Vec::new();
+    // Clamp: a watermark outlives its list once the EVM frame stack is
+    // unbalanced (`run_transaction` leaks a checkpoint, !22693), and draining
+    // past the end traps the kernel.
+    let michelson = &mut journal.michelson;
+    let len = michelson.pending_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .pending_crac_receipts
-            .drain(pending_watermark..),
+            .drain(pending_watermark.min(len)..),
     );
+    let len = michelson.failed_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .failed_crac_receipts
-            .drain(failed_watermark..),
+            .drain(failed_watermark.min(len)..),
     );
+    let len = michelson.backtracked_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .backtracked_crac_receipts
-            .drain(backtracked_watermark..),
+            .drain(backtracked_watermark.min(len)..),
     );
     receipts.sort_by_key(|(seq, _)| *seq);
 
@@ -6112,4 +6116,5 @@ pub(crate) mod tests {
             "expected OutOfGas on budget exhaustion, got: {result:?}"
         );
     }
+
 }

@@ -267,6 +267,13 @@ impl MichelsonJournal {
         seq
     }
 
+    /// Number of EVM frames still open. Non-zero at the end of an operation
+    /// means a frame leaked its checkpoint, which mis-points the CRAC receipt
+    /// watermarks. Reported by `close_tezosx_journal`.
+    pub fn open_frame_count(&self) -> usize {
+        self.external_checkpoints.len()
+    }
+
     /// Push a successful CRAC receipt, tagging it with the next
     /// execution-order sequence number.  The invariant that the
     /// `pending` list holds only Applied top-level receipts (and
@@ -521,8 +528,10 @@ impl MichelsonJournal {
         // replay identity (L2-1676).
         let _ = checkpoint.internal_operation_counter;
         let _ = checkpoint.alias_internals_count;
+        // Clamp both branches. The `+ 1` overshoots on purpose: the snapshot
+        // at the watermark is left for the parent.
         let drain_from = if self.external_checkpoints.is_empty() {
-            checkpoint.snapshot_watermark
+            checkpoint.snapshot_watermark.min(self.snapshots.len())
         } else {
             (checkpoint.snapshot_watermark + 1).min(self.snapshots.len())
         };
@@ -583,10 +592,12 @@ impl MichelsonJournal {
         // `failed_crac_receipts`, the backtracked list is NOT subject
         // to further revert: once migrated, a subsequent inner revert
         // does not re-delete the entry.
-        let drained: Vec<(u64, AppliedOperation)> = self
-            .pending_crac_receipts
-            .drain(checkpoint.receipt_count..)
-            .collect();
+        // Clamped like `commit_frame`: `receipt_count` can outlive the list.
+        let drain_from = checkpoint
+            .receipt_count
+            .min(self.pending_crac_receipts.len());
+        let drained: Vec<(u64, AppliedOperation)> =
+            self.pending_crac_receipts.drain(drain_from..).collect();
         for (seq, mut receipt) in drained {
             backtrack_receipt(&mut receipt);
             self.backtracked_crac_receipts.push((seq, receipt));
@@ -1931,4 +1942,5 @@ mod tests {
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
     }
+
 }
