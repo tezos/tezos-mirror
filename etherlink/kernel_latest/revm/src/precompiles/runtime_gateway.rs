@@ -983,6 +983,7 @@ where
                         )
                     })?;
             let crac_id = context.journal().crac_id();
+            emit_crac_sent(context, crac_id, "tezos", destination, amount);
             inject_tezos_headers_from_context(
                 context,
                 request.headers_mut(),
@@ -1001,8 +1002,6 @@ where
                 &mut gas,
                 context.block().basefee(),
             )?;
-
-            emit_crac_sent(context, crac_id, "tezos", destination, amount);
         }
         RuntimeGatewayCalls::callMichelsonView(call) => {
             charge_gateway_request(&mut gas, calldata.len(), call.input.len())?;
@@ -1243,6 +1242,11 @@ where
                 .unwrap_or("")
                 .to_string();
 
+            // POST-only state effects: emit the CrossRuntimeCallSent event.
+            if !is_get {
+                emit_crac_sent(context, crac_id, &target_rt, target_addr, amount);
+            }
+
             let response = context.journal_mut().tezosx_call_http(request);
             let output = charge_and_encode_crac_response(
                 response,
@@ -1252,13 +1256,9 @@ where
             )?;
 
             // POST-only state effects: burn any residual precompile
-            // balance from a bridged value, and emit the CrossRuntimeCallSent
-            // event. Both are incompatible with STATICCALL and
-            // intentionally skipped on GET — for which the entry is
-            // read-only end-to-end.
+            // balance from a bridged value
             if !is_get {
                 burn_gateway_residual(context, &mut gas)?;
-                emit_crac_sent(context, crac_id, &target_rt, target_addr, amount);
             }
 
             return Ok(InterpreterResult {
