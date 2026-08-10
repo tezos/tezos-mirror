@@ -300,6 +300,9 @@ pub enum LazyStorageError {
     /// A big_map entry carried a value that cannot be unparsed for storage.
     #[error("big_map entry value is not storable")]
     NonStorableValue,
+    /// A big_map is lacking a total_bytes field, should not happen with recent kernels.
+    #[error("big_map ID {0} s missing total bytes counter")]
+    MissingTotalBytes(BigMapId),
 }
 
 impl From<BorrowedUnparseError> for LazyStorageError {
