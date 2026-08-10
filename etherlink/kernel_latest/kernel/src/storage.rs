@@ -69,6 +69,7 @@ pub enum StorageVersion {
     V61,
     V62,
     V63,
+    V64,
 }
 
 impl From<StorageVersion> for u64 {
@@ -83,7 +84,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V63;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V64;
 
 pub const PRIVATE_FLAG_KEY: Key = Key::from_static(b"/remove_whitelist");
 
