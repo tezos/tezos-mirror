@@ -18941,6 +18941,54 @@ let test_michelson_runtime_rejects_invalid_key () =
     (status = "failed") string ~error_msg:"tz4 key: expected status %R, got %L") ;
   unit
 
+(** Michelson sink: replaces its own storage with the [big_map nat nat] it
+    receives in order to test temporary big map IDs. *)
+let bigmap_sink_script =
+  {|parameter (big_map nat nat); storage (big_map nat nat);
+    code { CAR; NIL operation; PAIR }|}
+
+(** Michelson contract that builds a fresh [big_map nat nat]
+    holding the single binding [key -> key] and hands it to the [sink] contract.
+*)
+let bigmap_maker_script ~key ~sink =
+  Printf.sprintf
+    {|parameter (unit %%run); storage unit;
+      code { CAR;
+             PUSH address "%s"; CONTRACT (big_map nat nat); ASSERT_SOME;
+             PUSH mutez 0;
+             EMPTY_BIG_MAP nat nat; PUSH nat %d; SOME; PUSH nat %d; UPDATE;
+             TRANSFER_TOKENS;
+             NIL operation; SWAP; CONS; PAIR }|}
+    sink
+    key
+    key
+
+(** Like {!bigmap_maker_script}, plus a trailing [%call_evm] gateway call to
+    [evm_target]'s [run()].. *)
+let bigmap_maker_then_crac_script ~key ~sink ~evm_target =
+  Printf.sprintf
+    {|parameter (unit %%run); storage unit;
+      code { CAR;
+             PUSH address "%s"; CONTRACT (big_map nat nat); ASSERT_SOME;
+             PUSH mutez 0;
+             EMPTY_BIG_MAP nat nat; PUSH nat %d; SOME; PUSH nat %d; UPDATE;
+             TRANSFER_TOKENS;
+             PUSH address "%s";
+             CONTRACT %%call_evm
+               (pair string (pair string (pair bytes (option (contract bytes)))));
+             ASSERT_SOME;
+             PUSH mutez 0;
+             NONE (contract bytes); PUSH bytes 0x; PAIR;
+             PUSH string "run()"; PAIR;
+             PUSH string "%s"; PAIR;
+             TRANSFER_TOKENS;
+             NIL operation; SWAP; CONS; SWAP; CONS; PAIR }|}
+    sink
+    key
+    key
+    gateway_address
+    evm_target
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
