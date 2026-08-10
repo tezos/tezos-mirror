@@ -12,6 +12,10 @@ type error +=
   | Run_script_view_decode_error of string
   | Run_script_view_failed of string
   | Run_script_view_host_error of string
+  | Kernel_entrypoint_unavailable of {
+      entrypoint : string;
+      storage_version : int;
+    }
 
 let () =
   register_error_kind
@@ -61,7 +65,27 @@ let () =
         msg)
     Data_encoding.(obj1 (req "msg" string))
     (function Run_script_view_host_error msg -> Some msg | _ -> None)
-    (fun msg -> Run_script_view_host_error msg)
+    (fun msg -> Run_script_view_host_error msg) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.kernel_entrypoint_unavailable"
+    ~title:"Kernel entrypoint unavailable"
+    ~description:
+      "The kernel running at the requested block does not expose the \
+       entrypoint this RPC is served through."
+    ~pp:(fun ppf (entrypoint, storage_version) ->
+      Format.fprintf
+        ppf
+        "The kernel at storage version %d does not expose the %s entrypoint"
+        storage_version
+        entrypoint)
+    Data_encoding.(obj2 (req "entrypoint" string) (req "storage_version" int31))
+    (function
+      | Kernel_entrypoint_unavailable {entrypoint; storage_version} ->
+          Some (entrypoint, storage_version)
+      | _ -> None)
+    (fun (entrypoint, storage_version) ->
+      Kernel_entrypoint_unavailable {entrypoint; storage_version})
 
 (* Decode the entrypoints + synthetic-views result written by the
    kernel's tezosx_michelson_entrypoints entrypoint.
@@ -351,6 +375,25 @@ let make (ctxt : Evm_ro_context.t) =
       | `Level of int32
       | `Hash of Ethereum_types.block_hash * int32 ]
 
+    (* Same as [Evm_ro_context.execute_entrypoint], but refuses upfront when
+       the kernel that produced [state] is too old to export [entrypoint]:
+       the call would otherwise leave the IPC result path empty and be
+       reported as an opaque failure. *)
+    let execute_kernel_entrypoint state ~available ~input_path ~input
+        ~output_path ~entrypoint =
+      let open Lwt_result_syntax in
+      let* storage_version = Durable_storage.storage_version state in
+      if not (available ~storage_version) then
+        tzfail (Kernel_entrypoint_unavailable {entrypoint; storage_version})
+      else
+        Evm_ro_context.execute_entrypoint
+          ctxt
+          state
+          ~input_path
+          ~input
+          ~output_path
+          ~entrypoint
+
     let shell_block_param_to_block_number =
       let open Lwt_result_syntax in
       let compute_offset (Ethereum_types.Qty block_number) offset =
@@ -495,9 +538,9 @@ let make (ctxt : Evm_ro_context.t) =
         Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding c
       in
       let* bytes =
-        Evm_ro_context.execute_entrypoint
-          ctxt
+        execute_kernel_entrypoint
           state
+          ~available:Storage_version.tezosx_michelson_entrypoints
           ~input_path:Durable_storage_path.Tezosx_entrypoints.input
           ~input:addr_bytes
           ~output_path:Durable_storage_path.Tezosx_entrypoints.result
@@ -727,9 +770,9 @@ let make (ctxt : Evm_ro_context.t) =
           in
           let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
           let* bytes =
-            Evm_ro_context.execute_entrypoint
-              ctxt
+            execute_kernel_entrypoint
               state
+              ~available:Storage_version.tezosx_michelson_entrypoints
               ~input_path:Durable_storage_path.Tezosx_entrypoints.input
               ~input:(Bytes.of_string addr_bytes)
               ~output_path:Durable_storage_path.Tezosx_entrypoints.result
@@ -850,9 +893,9 @@ let make (ctxt : Evm_ro_context.t) =
           ~level
       in
       let* bytes =
-        Evm_ro_context.execute_entrypoint
-          ctxt
+        execute_kernel_entrypoint
           state
+          ~available:Storage_version.tezosx_run_code
           ~input_path:Durable_storage_path.Tezosx_run_code.input
           ~input:input_bytes
           ~output_path:Durable_storage_path.Tezosx_run_code.result
