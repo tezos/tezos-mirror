@@ -19,13 +19,13 @@ All combinations below are provided for both **amd64** and **arm64**.
 
 **Debian**
 
-+-----------+----------+
-| Release   | Codename |
-+===========+==========+
-| Debian 12 | bookworm |
-+-----------+----------+
-| Debian 13 | trixie   |
-+-----------+----------+
++-----------+----------+-------------------------+
+| Release   | Codename | Upstream end of support |
++===========+==========+=========================+
+| Debian 12 | bookworm | June 2026 (ended)       |
++-----------+----------+-------------------------+
+| Debian 13 | trixie   | August 2028             |
++-----------+----------+-------------------------+
 
 **Ubuntu** (LTS releases only)
 
@@ -44,31 +44,34 @@ See :ref:`installing_deb` for installation instructions.
 Support policy
 --------------
 
-- **LTS only.** For Ubuntu, we support only Long-Term Support releases.
+- **Ubuntu LTS only.** For Ubuntu, we support only Long-Term Support releases.
   Interim (non-LTS) releases are not supported.
-- **Two Debian stables.** For Debian, we support the current stable release and
-  the previous one (oldstable). Testing and unstable branches are not supported.
+- **Debian stable only.** For Debian, we support releases still under regular
+  security support: the current stable, plus the previous one for about a year
+  after a new stable ships. Debian LTS, testing and unstable are not supported.
 - **Both architectures.** Every supported release is built for ``amd64`` and
   ``arm64``.
 - **Dropped at end of life.** A release is dropped once its vendor ends regular
   (non-extended) security support.
-- **Added after validation.** A new LTS release is added once it passes our
+- **Added after validation.** A new release is added once it passes our
   build and test pipelines -- typically within one Octez release cycle of its
   upstream release.
 
 Planned end of support
 ----------------------
 
-New LTS releases are added within one Octez release cycle of their upstream
+New releases are added within one Octez release cycle of their upstream
 release; see the policy above. The following currently supported releases have
 a known end of support:
 
 +----------------------+---------------------------+--------------------------+
 | Release              | Upstream end of support   | Dropped from Octez       |
 +======================+===========================+==========================+
-| Debian 12 (bookworm) | ~June 2026 (security)     | When Debian 14 (forky)   |
-|                      |                           | is released (trixie      |
-|                      |                           | becomes oldstable)       |
+| Debian 12 (bookworm) | June 2026 (LTS until      | Octez release v26        |
+|                      | June 2028, not covered)   |                          |
++----------------------+---------------------------+--------------------------+
+| Debian 13 (trixie)   | August 2028               | First Octez release      |
+|                      |                           | after August 2028        |
 +----------------------+---------------------------+--------------------------+
 | Ubuntu 22.04 LTS     | April 2027                | First Octez release      |
 |                      |                           | after April 2027         |
