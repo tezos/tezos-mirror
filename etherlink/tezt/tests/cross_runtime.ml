@@ -19030,7 +19030,7 @@ let test_crac_nested_frames_temporary_big_map_ids () =
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let prefix = "BIGMAP-NEST" in
-  (* TODO: originate all Michelson contracts:
+  (* Originate all Michelson contracts:
      * two contracts used to make big maps persistent: [sink_outer] and
        [sink_inner];
      * two contracts that create big maps (being given temporary IDs) with
@@ -19039,6 +19039,41 @@ let test_crac_nested_frames_temporary_big_map_ids () =
        to [sink_outer]);
      * an EVM contract used to make a CRAC between calling the Michelson
        contracts above: [evm_bridge]. *)
+  let originate_inline inline_script init_storage_data =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script
+      ~init_storage_data
+      Michelson_contracts.tezlink_protocol
+  in
+  Log.debug ~prefix "Originate the two big map sinks" ;
+  let* _, sink_outer = originate_inline bigmap_sink_script "{}" in
+  let* _, sink_inner = originate_inline bigmap_sink_script "{}" in
+  Log.debug ~prefix "Originate the inner (CRAC-reached) Michelson frame" ;
+  (* The big map in [inner_kt1] only has one binding: 1->1. *)
+  let* inner_hex, inner_kt1 =
+    originate_inline (bigmap_maker_script ~key:1 ~sink:sink_inner) "Unit"
+  in
+  Log.debug ~prefix "Deploy the EVM bridge calling the inner frame" ;
+  let* evm_bridge =
+    EvmCrossRuntimeRunnerTez.deploy_and_init
+      (`Tez_runner (inner_hex, inner_kt1))
+  in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  Log.debug ~prefix "Originate the outer Michelson frame" ;
+  (* The big map in [outer_kt1] only has one binding: 0->0. *)
+  let* outer_hex, outer_kt1 =
+    originate_inline
+      (bigmap_maker_then_crac_script
+         ~key:0
+         ~sink:sink_outer
+         ~evm_target:evm_bridge_addr)
+      "Unit"
+  in
   (* TODO: call the top-level contract [outer_kt1] that will trigger the whole
      execution: creating a temporary big map, calling [inner_kt1] through a CRAC
      and [evm_bridge], and making big maps persistent with [sink_outer] and
