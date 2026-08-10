@@ -19017,6 +19017,37 @@ let bigmap_maker_then_crac_script ~key ~sink ~evm_target =
     gateway_address
     evm_target
 
+(** A test where two Michelson contracts create big maps that are each assigned
+    a temporary big map ID, in a single transaction, and one inside a CRAC.
+    The test shows that the IDs are not conflicting: temporary big maps IDs are
+    global to the transaction, not local to a call frame. It does so by
+    inspecting the big map contents and checking the they include the expected
+    bindings. *)
+let test_crac_nested_frames_temporary_big_map_ids () =
+  register_crac_runner_test
+    ~title:"CRAC: nested frames must not share temporary big map IDs"
+    ~tags:["big_map"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "BIGMAP-NEST" in
+  (* TODO: originate all Michelson contracts:
+     * two contracts used to make big maps persistent: [sink_outer] and
+       [sink_inner];
+     * two contracts that create big maps (being given temporary IDs) with
+       different bindings so that we can differentiate them: [inner_kt1] with
+       1->1 (transferred to [sink_inner]), and [outer_kt1] with 0->0 (transferred
+       to [sink_outer]);
+     * an EVM contract used to make a CRAC between calling the Michelson
+       contracts above: [evm_bridge]. *)
+  (* TODO: call the top-level contract [outer_kt1] that will trigger the whole
+     execution: creating a temporary big map, calling [inner_kt1] through a CRAC
+     and [evm_bridge], and making big maps persistent with [sink_outer] and
+     [sink_inner]. Check that the permanent IDs of the big maps of the latter two
+     contracts are different. *)
+  (* TODO: check the keys: the big map in [sink_outer] should only hold 0 and the
+     big map in [sink_inner] should only hold 1. *)
+  unit
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
@@ -19192,4 +19223,5 @@ let () =
   test_crac_legacy_fallback_blind_derivation () ;
   test_crac_origin_repair_none_to_alias () ;
   test_crac_journal_revert_drops_origin () ;
-  test_michelson_runtime_rejects_invalid_key ()
+  test_michelson_runtime_rejects_invalid_key () ;
+  test_crac_nested_frames_temporary_big_map_ids ()
