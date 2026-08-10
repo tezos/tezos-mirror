@@ -653,6 +653,14 @@ let gas_burner_large =
     ~label:"gas_burner_large"
     ~contract:"GasBurnerLarge"
 
+(** The info for the "selfdestruct_to.sol" contract: strands its balance at
+    an arbitrary target address via SELFDESTRUCT. *)
+let selfdestruct_to =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/selfdestruct_to.sol")
+    ~label:"selfdestruct_to"
+    ~contract:"SelfdestructTo"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
