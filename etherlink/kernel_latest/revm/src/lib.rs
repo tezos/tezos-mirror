@@ -5927,4 +5927,185 @@ mod test {
             "a no-op poke must not emit any event"
         );
     }
+
+    /// A sub-mutez resident balance is left untouched by an incoming
+    /// zero-value call: the amount would truncate to 0 mutez at the
+    /// gateway, so the forwarder leaves it resident instead of forwarding.
+    #[test]
+    fn test_alias_forwarder_leaves_sub_mutez_balance_resident_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1DustPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let dust = U256::from(1u64); // 1 wei, far below one mutez
+        set_balance(&mut host, alias, dust);
+
+        let sender = Address::from(&[0xEE; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success (no-op, not a revert), got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            dust,
+            "sub-mutez dust must stay resident on the alias"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero()
+        );
+        assert!(
+            outcome.result.logs().is_empty(),
+            "a sub-mutez no-op must not emit any event"
+        );
+    }
+
+    /// A resident balance of exactly one mutez (in wei) is forwarded by a
+    /// zero-value poke: the gate is `< ONE_MUTEZ_WEI`, so the boundary value
+    /// itself must sweep. Derived from `ONE_MUTEZ_WEI` so this test fails if
+    /// the Rust-side constant and the Solidity gate it mirrors drift apart.
+    #[test]
+    fn test_alias_forwarder_sweeps_balance_at_exactly_one_mutez_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1ExactMutezPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let balance = U256::from(ONE_MUTEZ_WEI);
+        set_balance(&mut host, alias, balance);
+
+        let sender = Address::from(&[0xFA; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success, got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            U256::ZERO,
+            "a balance of exactly one mutez must be fully swept"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::from(1u64),
+            "the swept mutez lands on the native side"
+        );
+        assert!(
+            has_forwarded_event(&outcome),
+            "expected a Forwarded event for the swept mutez"
+        );
+    }
+
+    /// A resident balance of one wei below one mutez is left untouched by a
+    /// zero-value poke: the gate is `< ONE_MUTEZ_WEI`, so the boundary value
+    /// minus one wei must stay resident. Derived from `ONE_MUTEZ_WEI` so this
+    /// test fails if the Rust-side constant and the Solidity gate it mirrors
+    /// drift apart.
+    #[test]
+    fn test_alias_forwarder_leaves_balance_below_one_mutez_resident_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1BelowMutezPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let balance = U256::from(ONE_MUTEZ_WEI - 1);
+        set_balance(&mut host, alias, balance);
+
+        let sender = Address::from(&[0xFB; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success (no-op, not a revert), got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            balance,
+            "a balance one wei below one mutez must stay resident"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero()
+        );
+        assert!(
+            outcome.result.logs().is_empty(),
+            "a below-mutez no-op must not emit any event"
+        );
+    }
 }
