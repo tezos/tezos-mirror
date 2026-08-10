@@ -19074,8 +19074,50 @@ let test_crac_nested_frames_temporary_big_map_ids () =
     (outer_big_map_id <> inner_big_map_id)
       string
       ~error_msg:"The two sinks must hold distinct big maps, both got %L") ;
-  (* TODO: check the keys: the big map in [sink_outer] should only hold 0 and the
+  (* Check the keys: the big map in [sink_outer] should only hold 0 and the
      big map in [sink_inner] should only hold 1. *)
+  let has_key ~id ~data =
+    let* hash_result = Client.hash_data ~data ~typ:"nat" client in
+    let* response =
+      RPC_core.call_raw
+        (tezlink_foreign_endpoint sequencer)
+        (RPC.get_chain_block_context_big_map
+           ~id
+           ~key_hash:hash_result.script_expr_hash
+           ())
+    in
+    match response.code with
+    | 200 -> return true
+    | 404 -> return false
+    | code ->
+        Test.fail
+          ~__LOC__
+          "Unexpected HTTP code %d while looking up key %s in big map %s: %s"
+          code
+          data
+          id
+          response.body
+  in
+  let check_binding contract id key ~expected =
+    let* has_key = has_key ~id ~data:key in
+    Check.(
+      (has_key = expected)
+        bool
+        ~error_msg:
+          (contract ^ "'s big map must"
+          ^ (if expected then "" else "n't")
+          ^ " hold a binding to " ^ key ^ " (presence: %L)")) ;
+    unit
+  in
+  (* The big map in [sink_outer] still only holds the 0 key. *)
+  let* () = check_binding "sink_outer" outer_big_map_id "0" ~expected:true in
+  let* () = check_binding "sink_outer" outer_big_map_id "1" ~expected:false in
+  (* TODO L2-1937: [sink_inner] has a binding to 0 because its temporary big map
+     ID collided with that of [sink_outer]: the test succeeeds with
+     [~expected = true], i.e. 0 has a binding, while it should be false because 0
+     is not part of this big map. *)
+  let* () = check_binding "sink_inner" inner_big_map_id "0" ~expected:true in
+  let* () = check_binding "sink_inner" inner_big_map_id "1" ~expected:true in
   unit
 
 let () =
