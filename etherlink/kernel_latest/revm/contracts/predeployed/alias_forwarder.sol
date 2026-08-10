@@ -8,6 +8,12 @@ pragma solidity ^0.8.24;
 /// @notice Contract deployed at alias addresses to forward tez to native Tezos addresses
 /// @dev This contract is deployed as a precompile and alias addresses use EIP-7702
 ///      delegation to point to it. Each alias stores its native address in storage.
+///      It is only ever entered through that delegation, so `address(this)` and
+///      storage slots resolve to the alias account. It must not be reached via
+///      DELEGATECALL from an arbitrary contract: receive() and fallback() read
+///      `address(this).balance` and slot 0, which under a foreign delegatecall
+///      would resolve to the caller's balance and storage instead of the
+///      alias's.
 contract AliasForwarder {
     /// @notice The RuntimeGateway precompile address for cross-runtime transfers
     address constant RUNTIME_GATEWAY = 0xfF00000000000000000000000000000000000007;
@@ -31,7 +37,7 @@ contract AliasForwarder {
     event Forwarded(string indexed nativeAddress, uint256 amount);
 
     /// @notice Emitted when the alias is initialized
-    event Initialized(string nativeAddress, bytes nativePublicKey, uint256 forwardedBalance);
+    event Initialized(string nativeAddress, bytes nativePublicKey, uint256 residentBalance);
 
     error AlreadyInitialized();
     error NotAuthorized();
@@ -60,11 +66,11 @@ contract AliasForwarder {
         nativePublicKey = _nativePublicKey;
         initialized = true;
 
-        // Forward any pre-existing balance (sent before alias was created)
+        // Materialization only writes system state: no value moves and no
+        // gateway call happens here, regardless of any balance sent to this
+        // address before the alias existed. That balance stays resident on
+        // the alias and is swept on the next incoming interaction.
         uint256 balance = address(this).balance;
-        if (balance > 0) {
-            _forwardBalance(balance);
-        }
 
         emit Initialized(_nativeAddress, _nativePublicKey, balance);
     }
@@ -100,13 +106,17 @@ contract AliasForwarder {
     }
 
     /// @notice Receive function to accept plain tez transfers
+    /// @dev Sweeps the alias's full balance (not just msg.value), so a
+    ///      zero-value call is a free, permissionless sweep trigger for any
+    ///      residue left resident from before materialization.
     receive() external payable {
-        _forwardBalance(msg.value);
+        _forwardBalance(address(this).balance);
     }
 
     /// @notice Fallback function to accept any calls with tez
+    /// @dev Same full-balance sweep as receive(), see above.
     fallback() external payable {
-        _forwardBalance(msg.value);
+        _forwardBalance(address(this).balance);
     }
 
     /// @notice Internal function to forward balance to the native address
