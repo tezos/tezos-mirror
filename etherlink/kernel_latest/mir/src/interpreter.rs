@@ -4958,6 +4958,26 @@ mod interpreter_tests {
         assert_eq!(stack, expected_stack);
     }
 
+    /// Regression: a `DIP n` whose `n` exceeds the stack height must return
+    /// `StackOob`, not panic.
+    ///
+    /// The typechecker rejects such a program (`ensure_stack_len` in its `DIP`
+    /// case), so this state is not reachable through a well-typed contract. It
+    /// is reachable here because the test drives the interpreter directly. The
+    /// guard matters because `Stack::split_off` panics on underflow, and in WASM
+    /// a panic is an uncatchable trap: the rollup would re-execute the same
+    /// inbox level and trap again, wedging until a kernel upgrade.
+    #[test]
+    fn dip_deeper_than_the_stack_is_an_error_not_a_panic() {
+        let mut stack = stk![V::nat(10)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            interpret(&[Dip(Some(5), vec![Drop(None)])], &mut ctx, &mut stack),
+            Err(InterpretError::StackOob(crate::stack::StackOob)),
+            "DIP past the stack bottom must surface as StackOob"
+        );
+    }
+
     #[test]
     fn test_drop() {
         let mut stack = stk![V::nat(20), V::nat(5), V::nat(10)];

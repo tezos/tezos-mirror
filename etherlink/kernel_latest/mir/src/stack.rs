@@ -560,4 +560,23 @@ mod tests {
         assert_eq!(Stack::<()>::default(), stk![]);
     }
 
+    #[test]
+    fn split_off_checked() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        let stk2 = stk.split_off_checked(3);
+        assert_eq!(stk2, Ok(stk![3, 4, 5]));
+        assert_eq!(stk, stk![1, 2]);
+        // The boundary `size == len` splits off the whole stack.
+        let mut whole: IntStack = stk![1, 2];
+        assert_eq!(whole.split_off_checked(2), Ok(stk![1, 2]));
+        assert_eq!(whole, stk![]);
+    }
+
+    #[test]
+    fn split_off_checked_out_of_bounds() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        assert_eq!(stk.split_off_checked(42), Err(StackOob));
+        // The stack is left untouched on the error path.
+        assert_eq!(stk, stk![1, 2, 3, 4, 5]);
+    }
 }
