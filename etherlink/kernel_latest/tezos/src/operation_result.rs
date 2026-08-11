@@ -14,6 +14,7 @@ use mir::gas;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
+use primitive_types::U256;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
@@ -468,6 +469,18 @@ pub trait HasConsumedMilligas {
     fn consumed_milligas(&self) -> &Narith;
 }
 
+/// Saturating conversion of a milligas amount into a [U256]. Milligas counters
+/// are bounded by the operation gas limit, orders of magnitude below
+/// [U256::MAX], so the saturation is unreachable in practice.
+fn milligas_to_u256(milligas: &Narith) -> U256 {
+    let bytes = milligas.0.to_bytes_be();
+    if bytes.len() <= 32 {
+        U256::from_big_endian(&bytes)
+    } else {
+        U256::MAX
+    }
+}
+
 pub trait OperationKind {
     type Success: PartialEq
         + Eq
@@ -709,6 +722,21 @@ pub struct BacktrackedResult<M: OperationKind> {
 }
 
 impl<M: OperationKind> ContentResult<M> {
+    /// Milligas consumed by this content result. `Failed` and `Skipped`
+    /// consumed nothing; a `BackTracked` one keeps the gas burnt before the
+    /// revert, as L1 does.
+    pub fn consumed_milligas(&self) -> U256 {
+        match self {
+            ContentResult::Applied(success) => {
+                milligas_to_u256(success.consumed_milligas())
+            }
+            ContentResult::BackTracked(backtracked) => {
+                milligas_to_u256(backtracked.result.consumed_milligas())
+            }
+            ContentResult::Failed(_) | ContentResult::Skipped => U256::zero(),
+        }
+    }
+
     pub fn backtrack_if_applied(&mut self) {
         if let ContentResult::Applied(_) = self {
             // Lowkey optimisation: takes the ownership of the content result by replacing
@@ -780,6 +808,18 @@ pub struct OperationResult<M: OperationKind> {
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
 
+impl<M: OperationKind> OperationResult<M> {
+    /// Milligas consumed by the operation itself plus every internal
+    /// operation it triggered.
+    pub fn consumed_milligas(&self) -> U256 {
+        self.internal_operation_results
+            .iter()
+            .fold(self.result.consumed_milligas(), |acc, internal| {
+                acc.saturating_add(internal.consumed_milligas())
+            })
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
@@ -847,6 +887,17 @@ impl BalanceUpdate {
 }
 
 impl InternalOperationSum {
+    /// Milligas consumed by this internal operation.
+    pub fn consumed_milligas(&self) -> U256 {
+        match self {
+            InternalOperationSum::Transfer(op_res) => op_res.result.consumed_milligas(),
+            InternalOperationSum::Origination(op_res) => {
+                op_res.result.consumed_milligas()
+            }
+            InternalOperationSum::Event(op_res) => op_res.result.consumed_milligas(),
+        }
+    }
+
     pub fn transform_result_backtrack(&mut self) {
         match self {
             InternalOperationSum::Transfer(op_res) => {
@@ -890,6 +941,15 @@ pub enum OperationResultSum {
 }
 
 impl OperationResultSum {
+    /// Milligas consumed by the operation, internal operations included.
+    pub fn consumed_milligas(&self) -> U256 {
+        match self {
+            OperationResultSum::Reveal(op_res) => op_res.consumed_milligas(),
+            OperationResultSum::Transfer(op_res) => op_res.consumed_milligas(),
+            OperationResultSum::Origination(op_res) => op_res.consumed_milligas(),
+        }
+    }
+
     pub fn is_applied(&self) -> bool {
         match self {
             OperationResultSum::Reveal(op_res) => {
@@ -1009,6 +1069,17 @@ fn produce_skipped_result<M: OperationKind>(
 #[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum OperationDataAndMetadata {
     OperationWithMetadata(OperationBatchWithMetadata),
+}
+
+impl OperationDataAndMetadata {
+    /// Milligas consumed by every operation of the batch, internal operations
+    /// included.
+    pub fn consumed_milligas(&self) -> U256 {
+        let Self::OperationWithMetadata(batch) = self;
+        batch.operations.iter().fold(U256::zero(), |acc, op| {
+            acc.saturating_add(op.receipt.consumed_milligas())
+        })
+    }
 }
 
 #[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
