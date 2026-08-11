@@ -1,5 +1,4 @@
-.. TODO #2170:
-   search shifted protocol name/number & adapt
+.. TODO #2170: search shifted protocol name/number & adapt
 
 .. _octez:
 

@@ -1,5 +1,3 @@
-.. _howtouse:
-
 Getting started with Octez
 ==========================
 

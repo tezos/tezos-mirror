@@ -47,7 +47,7 @@ Their OpenAPI specification can be found at:
 - `rpc-openapi <../_static/rpc-openapi.html>`__ (version 25.1)
 - `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
-.. TODO tezos/tezos#2170: add/remove section(s)
+.. TODO #2170: remove sections for the deactivated protocol, and the linked files
 
 Ushuaia RPCs
 ------------
@@ -83,7 +83,7 @@ protocol in use. Their specification is given in the sections below.
 (The exact versions of the rollup node for which these files are produced can be
 seen in the field ``.info.version`` within each file.)
 
-.. TODO tezos/tezos#2170: add/remove section(s)
+.. TODO #2170: add/remove section(s)
 
 Ushuaia RPCs
 ------------
