@@ -434,7 +434,7 @@ fn build_failed_crac_receipt(
     destination: &Contract,
     parameters: &Parameters,
     error: TransferError,
-    pre_transfer_internals: Vec<InternalOperationSum>,
+    mut pre_transfer_internals: Vec<InternalOperationSum>,
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: &str,
     base_nonce: u16,
@@ -444,9 +444,14 @@ fn build_failed_crac_receipt(
     // Since the downstream transfer failed, the event is backtracked
     // (matching Tezos protocol semantics where all applied internal ops
     // preceding a failure are backtracked).
-    // `pre_transfer_internals` (alias-forwarder originations) keep
-    // their applied status — those materializations happened before
-    // the CRAC body ran and their storage effects are persistent.
+    // `pre_transfer_internals` (alias-forwarder originations) are
+    // backtracked for the same reason: the forwarder KT1 is written to
+    // Michelson durable storage inside the enclosing EVM frame, so it
+    // does NOT survive that frame's revert nor the enclosing batch's
+    // SafeStorage revert.
+    pre_transfer_internals
+        .iter_mut()
+        .for_each(InternalOperationSum::transform_result_backtrack);
     let mut all_internal = Vec::new();
     let mut next_nonce = base_nonce;
 
@@ -2675,6 +2680,79 @@ mod tests {
             occurrences, 1,
             "error payload must appear exactly once (alias→target internal op only); \
              charge_persisted_error prices 1× on this"
+        );
+    }
+
+    /// `pre_transfer_internals` — the alias-forwarder originations from
+    /// `ensure_alias` branch 3 — are handed to `build_failed_crac_receipt`
+    /// as `Applied`, but the forwarder write does not survive the failing
+    /// frame's revert, so the receipt must report them as backtracked.
+    #[test]
+    fn build_failed_crac_receipt_backtracks_alias_origination() {
+        use tezos_tezlink::operation_result::{
+            OperationDataAndMetadata, OperationResultSum,
+        };
+
+        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
+        let kt1 =
+            |s: &str| Contract::Originated(ContractKt1Hash::from_b58check(s).unwrap());
+
+        let alias_origination = build_alias_origination_internal(
+            &null_pkh,
+            Script {
+                code: vec![],
+                storage: vec![],
+            },
+            OriginationSuccess {
+                balance_updates: vec![],
+                originated_contracts: vec![],
+                consumed_milligas: Narith(0u64.into()),
+                storage_size: Zarith(0.into()),
+                paid_storage_size_diff: Zarith(0.into()),
+                lazy_storage_diff: None,
+            },
+        );
+        assert!(
+            alias_origination.is_applied(),
+            "fixture must start Applied, otherwise the test is vacuous"
+        );
+
+        let applied = build_failed_crac_receipt(
+            &null_pkh,
+            &kt1("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"),
+            &kt1("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2"),
+            &Narith(0u64.into()),
+            &kt1("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"),
+            &Parameters::default(),
+            TransferError::FailedToExecuteInternalOperation("test failure".into()),
+            vec![alias_origination],
+            vec![],
+            "1-0",
+            0,
+            false,
+        )
+        .expect("build_failed_crac_receipt should succeed");
+
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            &applied.op_and_receipt;
+        let OperationResultSum::Transfer(ref result) = batch.operations[0].receipt else {
+            panic!("expected Transfer receipt");
+        };
+
+        // Layout: [begin_event, alias_origination, alias→target, end_event]
+        let InternalOperationSum::Origination(ref origination) =
+            result.internal_operation_results[1]
+        else {
+            panic!(
+                "expected Origination at index 1, got {:?}",
+                result.internal_operation_results[1]
+            );
+        };
+        assert!(
+            matches!(origination.result, ContentResult::BackTracked(_)),
+            "alias-forwarder origination must be BackTracked when the CRAC fails; \
+             got: {:?}",
+            origination.result
         );
     }
 
