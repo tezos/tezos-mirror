@@ -5463,49 +5463,66 @@ mod test {
         );
     }
 
-    /// Test that pre-existing balance at the alias address is forwarded to the
-    /// native Tezos address when the alias is created.
-    #[test]
-    fn test_alias_forwarder_transfers_preexisting_balance() {
-        let mut host = MockKernelHost::default();
-        let mut block_constants = BlockConstants::test_block_with_no_fees();
-        block_constants.tezos_experimental_features = true;
+    // One mutez expressed in wei (10^12), mirroring the forwarder's own
+    // `ONE_MUTEZ_IN_WEI` gate. Amounts below this are left resident instead
+    // of being forwarded.
+    const ONE_MUTEZ_WEI: u128 = 1_000_000_000_000;
 
-        // Initialize all precompiles (including AliasForwarder)
-        init_precompile_bytecodes(&mut host, true).unwrap();
+    /// Compute the deterministic Ethereum alias address for `native_address`,
+    /// mirroring `ensure_alias`'s `keccak256(native_address)[0..20]` scheme.
+    fn alias_address_for(native_address: &str) -> Address {
+        let hash = bytes_hash(native_address.as_bytes());
+        Address::from_slice(&hash.0[0..20])
+    }
 
-        // Native Tezos address that should receive the funds
-        let native_address = "tz1PreexistingBal";
+    /// Directly set an account's EVM balance, simulating value that landed
+    /// on the address (e.g. before the alias existed, or via a prior
+    /// sub-mutez transfer) without going through a transaction.
+    fn set_balance(host: &mut MockKernelHost, address: Address, balance: U256) {
+        let mut account = StorageAccount::from_address(&address).unwrap();
+        let mut info = account.info(host).unwrap();
+        info.balance = balance;
+        account.set_info_without_code(host, info).unwrap();
+    }
 
-        // First, we need to compute the alias address to set pre-existing balance
-        // We use the same algorithm as ensure_alias: keccak256(native_address)[0..20]
-        let alias = {
-            let hash = bytes_hash(native_address.as_bytes());
-            Address::from_slice(&hash.0[0..20])
-        };
+    /// Read an account's EVM balance.
+    fn get_balance(host: &mut MockKernelHost, address: Address) -> U256 {
+        StorageAccount::from_address(&address)
+            .unwrap()
+            .info(host)
+            .unwrap()
+            .balance
+    }
 
-        // Set pre-existing balance at the alias address BEFORE creating the alias
-        let preexisting_balance = U256::from(5_000_000_000_000_000_000u128); // 5 ETH
-        let mut alias_account = StorageAccount::from_address(&alias).unwrap();
-        let mut alias_info = alias_account.info(&mut host).unwrap();
-        alias_info.balance = preexisting_balance;
-        alias_account
-            .set_info_without_code(&mut host, alias_info)
-            .unwrap();
+    /// Read the mock Tezos balance recorded for `native_address`.
+    fn tezos_balance(
+        host: &mut MockKernelHost,
+        registry: &Registry,
+        native_address: &str,
+    ) -> primitive_types::U256 {
+        registry
+            .get_balance(
+                host,
+                native_address.as_bytes(),
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
+            .unwrap_or(primitive_types::U256::zero())
+    }
 
-        // Verify pre-existing balance is set
-        let alias_info_before = alias_account.info(&mut host).unwrap();
-        assert_eq!(
-            alias_info_before.balance, preexisting_balance,
-            "Pre-existing balance should be set"
-        );
-
-        // Create the Ethereum alias - this should forward the pre-existing balance
+    /// Materialize the Ethereum alias for `native_address` and flush the EVM
+    /// journal, mirroring what the kernel does on a successful parent
+    /// operation: materialization is staged in the journal and only becomes
+    /// durable at commit.
+    fn materialize_alias(
+        host: &mut MockKernelHost,
+        block_constants: &BlockConstants,
+        native_address: &str,
+    ) -> (Address, Registry, TezosXJournal) {
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let alias_bytes = registry
+        let (alias_bytes, _) = registry
             .ensure_alias(
-                &mut host,
+                host,
                 &mut journal,
                 AliasInfo {
                     runtime: tezosx_interfaces::RuntimeId::Tezos,
@@ -5517,30 +5534,84 @@ mod test {
                 1_000_000,
             )
             .expect("Failed to generate alias");
-        let alias_bytes = alias_bytes.0;
+        let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
+        let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 
-        // Verify the alias was created at the expected address
-        // (case-insensitive: ensure_alias returns lowercase, Address::to_string uses EIP-55 checksum)
+        crate::journal::commit_evm_journal_from_external(
+            host,
+            &registry,
+            block_constants,
+            &mut journal,
+        )
+        .expect("flush evm journal");
+
+        (alias, registry, journal)
+    }
+
+    // The `AliasForwarder` events, declared inline since the contract has no
+    // generated ABI binding in this crate. `nativeAddress` is indexed, so
+    // the generated `Forwarded` type carries its topic hash rather than the
+    // original string — irrelevant here, only `amount` is asserted.
+    sol! {
+        event Forwarded(string indexed nativeAddress, uint256 amount);
+    }
+
+    /// Whether `outcome` contains a `Forwarded` log.
+    fn has_forwarded_event(outcome: &ExecutionOutcome) -> bool {
+        outcome
+            .result
+            .logs()
+            .iter()
+            .any(|log| log.topics().first() == Some(&Forwarded::SIGNATURE_HASH))
+    }
+
+    /// Test that materializing an alias with a pre-existing balance writes
+    /// only system state: no value moves, and the residue stays resident on
+    /// the alias instead of being forwarded.
+    #[test]
+    fn test_alias_materialization_leaves_preexisting_balance_resident() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        // Native Tezos address that should NOT receive the funds
+        let native_address = "tz1PreexistingBal";
+        let alias = alias_address_for(native_address);
+
+        // Set pre-existing balance at the alias address BEFORE creating the alias
+        let preexisting_balance = U256::from(5_000_000_000_000_000_000u128); // 5 ETH
+        set_balance(&mut host, alias, preexisting_balance);
+
+        // Create the Ethereum alias
+        let (created_alias, registry, _journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
         assert_eq!(
-            alias_bytes.to_lowercase(),
-            alias.to_string().to_lowercase(),
+            created_alias, alias,
             "Alias should be at the computed address"
         );
 
-        // Check that the pre-existing balance was forwarded to the Tezos address
-        let native_addr_str = native_address.to_string();
-        let tezos_balance = registry
-            .get_balance(
-                &mut host,
-                native_addr_str.as_bytes(),
-                tezosx_interfaces::RuntimeId::Tezos,
-            )
-            .unwrap_or(primitive_types::U256::zero());
-
-        // The pre-existing balance should have been forwarded
+        // Materialization must not have triggered a gateway subcall: the
+        // mock Tezos runtime never recorded an incoming CRAC.
         assert!(
-            tezos_balance > primitive_types::U256::zero(),
-            "Pre-existing balance should have been forwarded to Tezos. Balance: {tezos_balance:?}"
+            utilities::last_recorded_source(&host).is_none(),
+            "materialization must not forward any balance to the gateway"
+        );
+
+        // The native Tezos side never received anything.
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero(),
+            "materialization must not move value to the native address"
+        );
+
+        // The residue stays resident on the alias.
+        assert_eq!(
+            get_balance(&mut host, alias),
+            preexisting_balance,
+            "the pre-existing balance must stay resident on the alias"
         );
     }
 
@@ -5597,6 +5668,13 @@ mod test {
             alias_info.code_hash,
             revm::primitives::KECCAK_EMPTY,
             "Alias should have delegation bytecode"
+        );
+
+        // Materializing with a zero balance must not trigger a gateway
+        // subcall either.
+        assert!(
+            utilities::last_recorded_source(&host).is_none(),
+            "materialization with zero balance must not forward anything"
         );
 
         // Set up a sender with balance
@@ -5661,5 +5739,373 @@ mod test {
                 panic!("Transaction halted: {reason:?}");
             }
         }
+    }
+
+    /// A payment to a materialized alias that still holds resident residue
+    /// sweeps payment and residue together in the same forward.
+    #[test]
+    fn test_alias_forwarder_sweeps_payment_plus_resident_balance() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1ResidueThenPayment";
+        let alias = alias_address_for(native_address);
+
+        // Residue sent before the alias existed, left resident by
+        // materialization (see the previous test).
+        let residue = U256::from(2_000_000_000_000_000_001u128); // 2 ETH + 1 wei dust
+        set_balance(&mut host, alias, residue);
+
+        let (_, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+        assert_eq!(get_balance(&mut host, alias), residue);
+
+        let sender = Address::from(&[0xBB; 20]);
+        utilities::fund(&mut host, sender);
+
+        let payment = U256::from(1_000_000_000_000_000_000u128); // 1 ETH
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(), // empty calldata triggers receive()
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            payment,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success, got {:?}",
+            outcome.result
+        );
+
+        // The full resident balance (residue + payment) is swept out of the
+        // alias in one go; the mutez-precision remainder is burned at the
+        // gateway rather than left resident.
+        assert_eq!(
+            get_balance(&mut host, alias),
+            U256::ZERO,
+            "the alias must be fully swept, remainder included"
+        );
+
+        let swept = residue + payment;
+        let expected_mutez =
+            crate::helpers::legacy::alloy_to_u256(&(swept / U256::from(ONE_MUTEZ_WEI)));
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            expected_mutez,
+            "the native side receives the swept amount floored to mutez"
+        );
+
+        assert!(
+            has_forwarded_event(&outcome),
+            "expected a Forwarded event for the sweep"
+        );
+    }
+
+    /// A zero-value call ("poke") to a materialized alias holding resident
+    /// residue sweeps the residue on its own, with no payment attached.
+    #[test]
+    fn test_alias_forwarder_zero_value_poke_sweeps_resident_balance() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1ResidueZeroPoke";
+        let alias = alias_address_for(native_address);
+
+        let residue = U256::from(3_000_000_000_000u128); // 3 mutez, no dust
+        set_balance(&mut host, alias, residue);
+
+        let (_, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+        assert_eq!(get_balance(&mut host, alias), residue);
+
+        let sender = Address::from(&[0xCC; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(), // empty calldata, zero value: triggers receive()
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success, got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            U256::ZERO,
+            "the poke must sweep the full resident residue"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::from(3u64),
+            "the residue lands on the native side, in mutez"
+        );
+        assert!(
+            has_forwarded_event(&outcome),
+            "expected a Forwarded event for the swept residue"
+        );
+    }
+
+    /// A zero-value call to a materialized alias with no resident balance
+    /// is a no-op: no forward, no event, no failure.
+    #[test]
+    fn test_alias_forwarder_zero_value_poke_on_empty_alias_is_noop() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1EmptyPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+        assert_eq!(get_balance(&mut host, alias), U256::ZERO);
+
+        let sender = Address::from(&[0xDD; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success, got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(get_balance(&mut host, alias), U256::ZERO);
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero()
+        );
+        assert!(
+            outcome.result.logs().is_empty(),
+            "a no-op poke must not emit any event"
+        );
+    }
+
+    /// A sub-mutez resident balance is left untouched by an incoming
+    /// zero-value call: the amount would truncate to 0 mutez at the
+    /// gateway, so the forwarder leaves it resident instead of forwarding.
+    #[test]
+    fn test_alias_forwarder_leaves_sub_mutez_balance_resident_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1DustPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let dust = U256::from(1u64); // 1 wei, far below one mutez
+        set_balance(&mut host, alias, dust);
+
+        let sender = Address::from(&[0xEE; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success (no-op, not a revert), got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            dust,
+            "sub-mutez dust must stay resident on the alias"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero()
+        );
+        assert!(
+            outcome.result.logs().is_empty(),
+            "a sub-mutez no-op must not emit any event"
+        );
+    }
+
+    /// A resident balance of exactly one mutez (in wei) is forwarded by a
+    /// zero-value poke: the gate is `< ONE_MUTEZ_WEI`, so the boundary value
+    /// itself must sweep. Derived from `ONE_MUTEZ_WEI` so this test fails if
+    /// the Rust-side constant and the Solidity gate it mirrors drift apart.
+    #[test]
+    fn test_alias_forwarder_sweeps_balance_at_exactly_one_mutez_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1ExactMutezPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let balance = U256::from(ONE_MUTEZ_WEI);
+        set_balance(&mut host, alias, balance);
+
+        let sender = Address::from(&[0xFA; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success, got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            U256::ZERO,
+            "a balance of exactly one mutez must be fully swept"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::from(1u64),
+            "the swept mutez lands on the native side"
+        );
+        assert!(
+            has_forwarded_event(&outcome),
+            "expected a Forwarded event for the swept mutez"
+        );
+    }
+
+    /// A resident balance of one wei below one mutez is left untouched by a
+    /// zero-value poke: the gate is `< ONE_MUTEZ_WEI`, so the boundary value
+    /// minus one wei must stay resident. Derived from `ONE_MUTEZ_WEI` so this
+    /// test fails if the Rust-side constant and the Solidity gate it mirrors
+    /// drift apart.
+    #[test]
+    fn test_alias_forwarder_leaves_balance_below_one_mutez_resident_on_poke() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+        init_precompile_bytecodes(&mut host, true).unwrap();
+
+        let native_address = "tz1BelowMutezPoke";
+        let (alias, registry, mut journal) =
+            materialize_alias(&mut host, &block_constants, native_address);
+
+        let balance = U256::from(ONE_MUTEZ_WEI - 1);
+        set_balance(&mut host, alias, balance);
+
+        let sender = Address::from(&[0xFB; 20]);
+        utilities::fund(&mut host, sender);
+
+        let outcome = run_transaction(
+            &mut host,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .expect("transaction should not fail");
+        assert!(
+            outcome.result.is_success(),
+            "expected success (no-op, not a revert), got {:?}",
+            outcome.result
+        );
+
+        assert_eq!(
+            get_balance(&mut host, alias),
+            balance,
+            "a balance one wei below one mutez must stay resident"
+        );
+        assert_eq!(
+            tezos_balance(&mut host, &registry, native_address),
+            primitive_types::U256::zero()
+        );
+        assert!(
+            outcome.result.logs().is_empty(),
+            "a below-mutez no-op must not emit any event"
+        );
     }
 }

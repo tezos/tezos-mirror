@@ -8,6 +8,12 @@ pragma solidity ^0.8.24;
 /// @notice Contract deployed at alias addresses to forward tez to native Tezos addresses
 /// @dev This contract is deployed as a precompile and alias addresses use EIP-7702
 ///      delegation to point to it. Each alias stores its native address in storage.
+///      It is only ever entered through that delegation, so `address(this)` and
+///      storage slots resolve to the alias account. It must not be reached via
+///      DELEGATECALL from an arbitrary contract: receive() and fallback() read
+///      `address(this).balance` and slot 0, which under a foreign delegatecall
+///      would resolve to the caller's balance and storage instead of the
+///      alias's.
 contract AliasForwarder {
     /// @notice The RuntimeGateway precompile address for cross-runtime transfers
     address constant RUNTIME_GATEWAY = 0xfF00000000000000000000000000000000000007;
@@ -17,6 +23,10 @@ contract AliasForwarder {
 
     /// @notice Precompile address for Tezos signature verification
     address constant VERIFY_TEZOS_SIG = 0xfF0000000000000000000000000000000000000a;
+
+    /// @notice One mutez expressed in wei (10^12), the smallest amount the
+    ///         Tezos runtime can represent.
+    uint256 constant ONE_MUTEZ_IN_WEI = 10 ** 12;
 
     /// @notice The native Tezos address this alias forwards to (stored at slot 0)
     string public nativeAddress;
@@ -31,7 +41,7 @@ contract AliasForwarder {
     event Forwarded(string indexed nativeAddress, uint256 amount);
 
     /// @notice Emitted when the alias is initialized
-    event Initialized(string nativeAddress, bytes nativePublicKey, uint256 forwardedBalance);
+    event Initialized(string nativeAddress, bytes nativePublicKey, uint256 residentBalance);
 
     error AlreadyInitialized();
     error NotAuthorized();
@@ -60,11 +70,11 @@ contract AliasForwarder {
         nativePublicKey = _nativePublicKey;
         initialized = true;
 
-        // Forward any pre-existing balance (sent before alias was created)
+        // Materialization only writes system state: no value moves and no
+        // gateway call happens here, regardless of any balance sent to this
+        // address before the alias existed. That balance stays resident on
+        // the alias and is swept on the next incoming interaction.
         uint256 balance = address(this).balance;
-        if (balance > 0) {
-            _forwardBalance(balance);
-        }
 
         emit Initialized(_nativeAddress, _nativePublicKey, balance);
     }
@@ -100,19 +110,41 @@ contract AliasForwarder {
     }
 
     /// @notice Receive function to accept plain tez transfers
+    /// @dev Sweeps the alias's full balance (not just msg.value), so a
+    ///      zero-value call is a free, permissionless sweep trigger for any
+    ///      residue left resident from before materialization or from a
+    ///      prior sub-mutez transfer.
     receive() external payable {
-        _forwardBalance(msg.value);
+        _forwardBalance();
     }
 
     /// @notice Fallback function to accept any calls with tez
+    /// @dev Same full-balance sweep as receive(), see above.
     fallback() external payable {
-        _forwardBalance(msg.value);
+        _forwardBalance();
     }
 
-    /// @notice Internal function to forward balance to the native address
-    /// @param amount The amount to forward
-    function _forwardBalance(uint256 amount) internal {
-        if (amount == 0) {
+    /// @notice Internal function to forward the alias's full balance
+    ///         (read directly, `msg.value` included) to the native address
+    /// @dev Amounts below one mutez are left resident instead of being
+    ///      forwarded: they would truncate to 0 mutez at the gateway, and a
+    ///      0-mutez transfer is not harmless there. The Michelson runtime
+    ///      rejects a 0-mutez transfer to an implicit account, and for an
+    ///      originated account it would still run `%default` with
+    ///      AMOUNT = 0.
+    ///      Above the gate, the full amount is forwarded as-is, including
+    ///      any sub-mutez remainder: the gateway floors the wei value to
+    ///      mutez on conversion, and the truncated remainder is burned
+    ///      there rather than kept resident, so the alias ends at exactly
+    ///      zero after a successful forward. This is asymmetric with the
+    ///      below-gate case, where the whole amount stays resident instead:
+    ///      forwarding only the whole-mutez part and leaving the sub-mutez
+    ///      remainder resident was considered and rejected, in favor of the
+    ///      simpler all-or-nothing rule that matches the gateway's existing
+    ///      conversion semantics elsewhere.
+    function _forwardBalance() internal {
+        uint256 amount = address(this).balance;
+        if (amount < ONE_MUTEZ_IN_WEI) {
             return;
         }
 

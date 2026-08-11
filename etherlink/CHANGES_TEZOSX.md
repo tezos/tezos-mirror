@@ -622,6 +622,13 @@
 
 ### Native Atomic Composability
 
+- Alias materialization no longer forwards a pre-existing alias balance to
+  the native account: it only installs the forwarder delegation and its
+  storage. The alias forwarder now sweeps its full balance (payment plus
+  any residue) on any incoming interaction, retains sub-mutez amounts
+  instead of reverting, and treats a zero-value call to a materialized
+  alias as a sweep trigger. Dust on a not-yet-materialized alias no longer
+  makes the native account's first crossing fail. (!22704)
 - **Breaking change:** a cross-runtime call whose target runtime is the
   caller's own runtime is now refused. Only the generic `call` (EVM) and
   `%call` (Michelson) gateway entrypoints could express such a target — via a
