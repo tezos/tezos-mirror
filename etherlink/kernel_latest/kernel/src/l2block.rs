@@ -37,10 +37,22 @@ impl L2Block {
         }
     }
 
-    pub fn gas_used(&self) -> U256 {
+    pub fn gas_used_report(&self) -> String {
         match self {
-            Self::Etherlink(block) => block.gas_used,
-            Self::Tezlink(_) => U256::zero(),
+            Self::Etherlink(block) => {
+                format!("{} gas used", U256::to_string(&block.gas_used))
+            }
+            Self::Tezlink(block) => {
+                format!(
+                    "{} milligas used",
+                    U256::to_string(&block.operations.list.iter().fold(
+                        U256::zero(),
+                        |acc, op| {
+                            acc.saturating_add(op.op_and_receipt.consumed_milligas())
+                        }
+                    ))
+                )
+            }
         }
     }
 
