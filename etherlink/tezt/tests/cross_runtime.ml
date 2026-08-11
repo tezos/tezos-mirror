@@ -11071,9 +11071,14 @@ let test_crac_receipt_evm_to_tez_revert () =
   in
   (* 6 internal ops: CRAC begin event + alias materializations
      (sender + source) + alias→reverter call + reverter's
-     internal _revert call + CRAC end event. The aliases were
-     materialized successfully in storage BEFORE the body failed;
-     their receipt status is "applied" because they did succeed. The
+     internal _revert call + CRAC end event. The alias
+     materializations are "backtracked": each forwarder write sits on a
+     snapshot of the Michelson world state taken when the alias was
+     materialized, and that snapshot is restored as soon as the EVM
+     frame carrying the failing CRAC reverts, whether or not an
+     ancestor frame catches the failure (see
+     test_crac_evm_to_tez_revert_drops_alias for the uncaught case and
+     test_crac_receipt_failed_frame_markers for the caught one). The
      alias→reverter (%run) call is "backtracked": it is the
      directly-called target and succeeds, but a deeper internal op
      fails, so the error is carried once on that descendant (%_revert,
@@ -11094,14 +11099,14 @@ let test_crac_receipt_evm_to_tez_revert () =
     ~prefix
     ~expected_nonce:1
     ~expected_alias_kt1:evm_bridge_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 1) ;
   (* ── Internal #2: origination of alias(EOA = sender) ───────── *)
   check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:2
     ~expected_alias_kt1:sender_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 2) ;
   (* ── Internal #3: alias(E_bridge) → tez_reverter (%run) — backtracked
      The directly-called target succeeds; it is backtracked because a
@@ -11227,14 +11232,14 @@ let test_crac_receipt_two_failed_independent () =
     ~prefix
     ~expected_nonce:1
     ~expected_alias_kt1:bridge_1_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 1) ;
   (* ── Internal #2: origination alias(EOA = sender) ────────── *)
   check_crac_internal_alias_origination
     ~prefix
     ~expected_nonce:2
     ~expected_alias_kt1:sender_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 2) ;
   (* ── Internal #3: alias(bridge_1) → tez_reverter_1 (%run) — backtracked
      (target succeeds; deeper #4 %_revert fails and carries the error) *)
@@ -11277,7 +11282,7 @@ let test_crac_receipt_two_failed_independent () =
     ~prefix
     ~expected_nonce:7
     ~expected_alias_kt1:bridge_2_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 7) ;
   (* ── Internal #8: origination alias(EOA = sender), re-materialized ──
      CRAC #1 reverted, dropping its alias(sender) materialization, so
@@ -11286,7 +11291,7 @@ let test_crac_receipt_two_failed_independent () =
     ~prefix
     ~expected_nonce:8
     ~expected_alias_kt1:sender_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 8) ;
   (* ── Internal #9: alias(bridge_2) → tez_reverter_2 (%run) — backtracked
      (target succeeds; deeper #10 %_revert fails and carries the error) *)
@@ -11465,7 +11470,9 @@ let test_crac_receipt_interleaved_failed_pending () =
   let event_key = sf "event/%s/applied" handler_address in
   (* Failing CRAC markers are backtracked (the frame failed). *)
   let event_bt_key = sf "event/%s/backtracked" handler_address in
-  let orig_key alias = sf "origination/%s/applied/[%s]" handler_address alias in
+  let orig_key ~status alias =
+    sf "origination/%s/%s/[%s]" handler_address status alias
+  in
   let tx_key ~src ~dst ~ep ~status =
     sf "transaction/%s->%s/%s/%s" src dst ep status
   in
@@ -11501,12 +11508,17 @@ let test_crac_receipt_interleaved_failed_pending () =
      [n_pairs-1] × (S: begin, run, incr, end;  F: begin, orig bridge_fail, run, revert, end)
      Each begin/end for S is applied; for F it is backtracked. *)
   let s1_frame =
-    [event_key; orig_key bridge_ok_alias; orig_key sender_alias]
+    [
+      event_key;
+      orig_key ~status:"applied" bridge_ok_alias;
+      orig_key ~status:"applied" sender_alias;
+    ]
     @ s_pair_txs @ [event_key]
   in
   let s_frame = [event_key] @ s_pair_txs @ [event_key] in
   let f_frame =
-    [event_bt_key; orig_key bridge_fail_alias] @ f_pair_txs @ [event_bt_key]
+    [event_bt_key; orig_key ~status:"backtracked" bridge_fail_alias]
+    @ f_pair_txs @ [event_bt_key]
   in
   let expected =
     s1_frame @ f_frame
@@ -18402,6 +18414,16 @@ let test_crac_receipt_failed_frame_markers () =
   let*@ sender_alias =
     Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
   in
+  (* Snapshot the Michelson contracts index before the call: the two
+     alias originations above are reported [backtracked], so no new
+     forwarder KT1 may show up here afterwards. *)
+  let contracts () =
+    let*@! contracts =
+      Rpc.state_subkeys sequencer TezContract.tezosx_michelson_contracts_index
+    in
+    return contracts
+  in
+  let* before = contracts () in
   (* EVM tx succeeds; Michelson callee FAILWITHed but EVM caught it. *)
   let* _ = EvmRunner.call_run evm_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
@@ -18447,13 +18469,13 @@ let test_crac_receipt_failed_frame_markers () =
     ~prefix:(prefix ^ "#1")
     ~expected_nonce:1
     ~expected_alias_kt1:bridge_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 1) ;
   check_crac_internal_alias_origination
     ~prefix:(prefix ^ "#2")
     ~expected_nonce:2
     ~expected_alias_kt1:sender_alias
-    ~expected_status:"applied"
+    ~expected_status:"backtracked"
     (List.nth internals 2) ;
   (* alias→target is backtracked: the reverter's %run body completed
      (it built the op list), but the emitted %_revert internal op
@@ -18483,6 +18505,19 @@ let test_crac_receipt_failed_frame_markers () =
     (List.nth internals 5) ;
   (* Bracket walk succeeds without status filtering. *)
   check_crac_brackets ~prefix internals ;
+  (* The receipt claims both alias originations are backtracked: the chain
+     must agree, no forwarder KT1 survives the failed frame. *)
+  let* after = contracts () in
+  (match List.filter (fun c -> not (List.mem c before)) after with
+  | [] -> ()
+  | created ->
+      Test.fail
+        "%s: the CRAC frame failed, so alias(%s) and alias(%s) must not be \
+         materialized, but %d forwarder KT1(s) survived"
+        prefix
+        bridge_alias
+        sender_alias
+        (List.length created)) ;
   unit
 
 (** A CRAC whose target itself succeeds but one of its internal
