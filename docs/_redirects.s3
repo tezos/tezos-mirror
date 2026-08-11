@@ -4,6 +4,8 @@
 # redirect pages for the old protocol to the active protocol.
 # Update this one at each MAJOR release of Octez:
 /releases/latest.html /releases/version-25.html 302
+# Other new redirections:
+/llms-full.txt /octezdoc.txt 301
 # These are inherited from the past, don't change:
 /whitedoc/micheline.html /shell/micheline.html 301
 /whitedoc/michelson.html /active/michelson.html 301

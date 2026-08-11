@@ -14,6 +14,9 @@ if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then
   aws configure set max_attempts 5
   aws configure set s3.max_concurrent_requests 50
   aws s3 sync docs/_build/ s3://site-prod.octez.tezos.com/docs --delete --only-show-errors
+  aws s3 cp docs/_build/_static/llms.txt s3://site-prod.octez.tezos.com/llms.txt --only-show-errors
+  aws s3 cp docs/_build/_static/llms.txt s3://site-prod.octez.tezos.com/docs/llms.txt --only-show-errors
+  aws s3 cp docs/_build/octezdoc.txt s3://site-prod.octez.tezos.com/llms-full.txt --only-show-errors
   aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
 
   # we publish to gitlab.io only file _redirects:
