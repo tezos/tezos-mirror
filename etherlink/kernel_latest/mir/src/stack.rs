@@ -204,6 +204,14 @@ impl<T> Stack<T> {
         )
     }
 
+    /// Like [`Stack::split_off`], but returns `Err(StackOob)` instead of
+    /// panicking, as `drop_top` and `drain_top` do. Prefer it where the length
+    /// is a runtime invariant: a panic in WASM traps the kernel.
+    pub fn split_off_checked(&mut self, size: usize) -> Result<Stack<T>, StackOob> {
+        let split_at = self.len().checked_sub(size).ok_or(StackOob)?;
+        Ok(Self::stack_from_vec(self.0.split_off(split_at)))
+    }
+
     /// Move elements from `other` to the top of the stack. New stack top is the
     /// top of `other`. Note that elements are moved out of `other`.
     pub fn append(&mut self, other: &mut Stack<T>) {
@@ -550,5 +558,25 @@ mod tests {
     #[test]
     fn default() {
         assert_eq!(Stack::<()>::default(), stk![]);
+    }
+
+    #[test]
+    fn split_off_checked() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        let stk2 = stk.split_off_checked(3);
+        assert_eq!(stk2, Ok(stk![3, 4, 5]));
+        assert_eq!(stk, stk![1, 2]);
+        // The boundary `size == len` splits off the whole stack.
+        let mut whole: IntStack = stk![1, 2];
+        assert_eq!(whole.split_off_checked(2), Ok(stk![1, 2]));
+        assert_eq!(whole, stk![]);
+    }
+
+    #[test]
+    fn split_off_checked_out_of_bounds() {
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
+        assert_eq!(stk.split_off_checked(42), Err(StackOob));
+        // The stack is left untouched on the error path.
+        assert_eq!(stk, stk![1, 2, 3, 4, 5]);
     }
 }

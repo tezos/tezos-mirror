@@ -10,7 +10,10 @@ use revm::primitives::{Address, B256};
 use revm_etherlink::EvmRunError;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, Level::Debug};
+use tezos_evm_logging::{
+    log,
+    Level::{Debug, Fatal},
+};
 use tezos_smart_rollup::host::StorageV1;
 use tezos_tezlink::operation::ManagerOperationField;
 use tezosx_interfaces::{canonicalize_native_address, AliasInfo, Registry, RuntimeId};
@@ -74,6 +77,10 @@ pub fn prepare_tezosx_journal(
 /// the attached tracer, if any. Must be called on every code path (error
 /// paths pass `result: None`) so extending the close logic cannot miss
 /// one; taking the journal by value prevents use after close.
+///
+/// Also reports a leaked EVM frame checkpoint, which mis-points the CRAC receipt
+/// watermarks. A log and not an assertion: `run_transaction` leaks one until
+/// !22693 lands.
 pub fn close_tezosx_journal<Host>(
     host: &mut Host,
     mut journal: TezosXJournal,
@@ -82,6 +89,16 @@ pub fn close_tezosx_journal<Host>(
 where
     Host: StorageV1,
 {
+    let open_frames = journal.michelson.open_frame_count();
+    if open_frames > 0 {
+        log!(
+            Fatal,
+            "closing the journal with {} EVM frame checkpoint(s) still open: a \
+             frame was neither committed nor reverted, so the cross-runtime call \
+             receipt watermarks no longer match the receipts they index.",
+            open_frames
+        );
+    }
     if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
         Ok(tracer.finalize(host, result)?)
     } else {

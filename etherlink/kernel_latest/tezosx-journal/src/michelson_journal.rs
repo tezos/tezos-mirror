@@ -267,6 +267,13 @@ impl MichelsonJournal {
         seq
     }
 
+    /// Number of EVM frames still open. Non-zero at the end of an operation
+    /// means a frame leaked its checkpoint, which mis-points the CRAC receipt
+    /// watermarks. Reported by `close_tezosx_journal`.
+    pub fn open_frame_count(&self) -> usize {
+        self.external_checkpoints.len()
+    }
+
     /// Push a successful CRAC receipt, tagging it with the next
     /// execution-order sequence number.  The invariant that the
     /// `pending` list holds only Applied top-level receipts (and
@@ -521,8 +528,10 @@ impl MichelsonJournal {
         // replay identity (L2-1676).
         let _ = checkpoint.internal_operation_counter;
         let _ = checkpoint.alias_internals_count;
+        // Clamp both branches. The `+ 1` overshoots on purpose: the snapshot
+        // at the watermark is left for the parent.
         let drain_from = if self.external_checkpoints.is_empty() {
-            checkpoint.snapshot_watermark
+            checkpoint.snapshot_watermark.min(self.snapshots.len())
         } else {
             (checkpoint.snapshot_watermark + 1).min(self.snapshots.len())
         };
@@ -583,10 +592,12 @@ impl MichelsonJournal {
         // `failed_crac_receipts`, the backtracked list is NOT subject
         // to further revert: once migrated, a subsequent inner revert
         // does not re-delete the entry.
-        let drained: Vec<(u64, AppliedOperation)> = self
-            .pending_crac_receipts
-            .drain(checkpoint.receipt_count..)
-            .collect();
+        // Clamped like `commit_frame`: `receipt_count` can outlive the list.
+        let drain_from = checkpoint
+            .receipt_count
+            .min(self.pending_crac_receipts.len());
+        let drained: Vec<(u64, AppliedOperation)> =
+            self.pending_crac_receipts.drain(drain_from..).collect();
         for (seq, mut receipt) in drained {
             backtrack_receipt(&mut receipt);
             self.backtracked_crac_receipts.push((seq, receipt));
@@ -1930,5 +1941,71 @@ mod tests {
         journal.revert_frame(&mut host).unwrap();
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
+    }
+
+    /// Regression: a checkpoint whose `receipt_count` outlives the list it
+    /// indexes must not trap the kernel.
+    ///
+    /// `push_external_checkpoint` records the pending list's length, and the
+    /// list is shared with the Tezos runtime, whose
+    /// `drain_reentrant_crac_ops` takes receipts back out of it. Should the
+    /// frame stack ever be unbalanced, `receipt_count` outlives what it
+    /// indexes, and `Vec::drain(start..)` panics when `start > len` — in WASM
+    /// an uncatchable trap, re-fired on every replay of the same immutable
+    /// inbox level, i.e. a permanent wedge.
+    ///
+    /// Twin of the kernel-side
+    /// `drain_reentrant_crac_ops_survives_a_watermark_past_the_end`: that one
+    /// guards the derived drain, this one the drain at the source.
+    #[test]
+    fn revert_frame_with_a_receipt_count_past_the_end_does_not_trap() {
+        let mut host = MockHost::default();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        journal.push_pending_crac_receipt(dummy_receipt(0));
+        journal.push_pending_crac_receipt(dummy_receipt(1));
+        // The checkpoint records `receipt_count = 2`.
+        journal.push_external_checkpoint();
+        // The re-entrant drain empties the list before the frame closes, so
+        // the recorded count now points past the end.
+        journal.pending_crac_receipts.clear();
+
+        journal.revert_frame(&mut host).unwrap();
+
+        assert!(
+            journal.pending_crac_receipts.is_empty(),
+            "there was nothing left to drain"
+        );
+        assert!(
+            journal.backtracked_crac_receipts.is_empty(),
+            "a stale receipt_count must migrate nothing, not trap"
+        );
+    }
+
+    /// `commit_frame`'s outermost-frame branch used to pass its watermark raw,
+    /// so it trapped on the same imbalance the other branch already guarded.
+    ///
+    /// Sequence: a snapshot is taken, a frame opens over it (watermark = 1), the
+    /// snapshot is consumed by a revert (length back to 0), then the frame
+    /// commits with an empty checkpoint stack — `drain(1..)` over no snapshots.
+    #[test]
+    fn commit_frame_with_a_snapshot_watermark_past_the_end_does_not_trap() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut host, &world, b"v0");
+        let idx = journal.checkpoint(&mut host, &world).unwrap();
+        journal.push_external_checkpoint(); // snapshot_watermark = 1
+        journal.checkpoint_revert(&mut host, idx).unwrap(); // snapshots back to 0
+
+        journal.commit_frame(&mut host).unwrap();
+
+        assert_eq!(
+            journal.open_frame_count(),
+            0,
+            "the frame was popped; reaching this line at all is the point, the \
+             unclamped drain panicked here"
+        );
     }
 }

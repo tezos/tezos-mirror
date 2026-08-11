@@ -1419,7 +1419,10 @@ fn interpret_step<'a, 'b>(
         I::Dip(opt_height, body) => {
             ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
-            let protected = stack.split_off(protected_height as usize);
+            // Cannot fail on a well-typed script (the typechecker's `DIP` case
+            // calls `ensure_stack_len`), but the interpreter does not re-check
+            // it and a panic here would trap the kernel.
+            let protected = stack.split_off_checked(protected_height as usize)?;
             Ok(StepResult::OpenDip {
                 body,
                 protected,
@@ -4953,6 +4956,26 @@ mod interpreter_tests {
             interpret(&[Dip(Some(2), vec![Drop(None)])], &mut ctx, &mut stack).is_ok()
         );
         assert_eq!(stack, expected_stack);
+    }
+
+    /// Regression: a `DIP n` whose `n` exceeds the stack height must return
+    /// `StackOob`, not panic.
+    ///
+    /// The typechecker rejects such a program (`ensure_stack_len` in its `DIP`
+    /// case), so this state is not reachable through a well-typed contract. It
+    /// is reachable here because the test drives the interpreter directly. The
+    /// guard matters because `Stack::split_off` panics on underflow, and in WASM
+    /// a panic is an uncatchable trap: the rollup would re-execute the same
+    /// inbox level and trap again, wedging until a kernel upgrade.
+    #[test]
+    fn dip_deeper_than_the_stack_is_an_error_not_a_panic() {
+        let mut stack = stk![V::nat(10)];
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            interpret(&[Dip(Some(5), vec![Drop(None)])], &mut ctx, &mut stack),
+            Err(InterpretError::StackOob(crate::stack::StackOob)),
+            "DIP past the stack bottom must surface as StackOob"
+        );
     }
 
     #[test]

@@ -768,23 +768,27 @@ pub(crate) fn drain_reentrant_crac_ops(
 ) -> Vec<InternalOperationSum> {
     use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
     let mut receipts: Vec<(u64, AppliedOperation)> = Vec::new();
+    // Clamp: a watermark outlives its list once the EVM frame stack is
+    // unbalanced (`run_transaction` leaks a checkpoint, !22693), and draining
+    // past the end traps the kernel.
+    let michelson = &mut journal.michelson;
+    let len = michelson.pending_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .pending_crac_receipts
-            .drain(pending_watermark..),
+            .drain(pending_watermark.min(len)..),
     );
+    let len = michelson.failed_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .failed_crac_receipts
-            .drain(failed_watermark..),
+            .drain(failed_watermark.min(len)..),
     );
+    let len = michelson.backtracked_crac_receipts.len();
     receipts.extend(
-        journal
-            .michelson
+        michelson
             .backtracked_crac_receipts
-            .drain(backtracked_watermark..),
+            .drain(backtracked_watermark.min(len)..),
     );
     receipts.sort_by_key(|(seq, _)| *seq);
 
@@ -6110,6 +6114,104 @@ pub(crate) mod tests {
                 CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas))
             ),
             "expected OutOfGas on budget exhaustion, got: {result:?}"
+        );
+    }
+
+    /// Regression: a CRAC watermark that outlives the list it indexes must not
+    /// trap the kernel.
+    ///
+    /// `execute_internal_operations` captures the watermark before an internal
+    /// operation runs; `MichelsonJournal::revert_frame` can shorten the same
+    /// lists from the EVM side, and on an empty checkpoint stack truncates them
+    /// to zero. Before the clamp, `drain(watermark..)` panicked with
+    /// `slice index starts at 1 but ends at 0` — in WASM an uncatchable trap,
+    /// re-triggered on every replay of the same (immutable) inbox level, i.e. a
+    /// permanent wedge.
+    ///
+    /// The frame stack is unbalanced today — `run_transaction` leaks a
+    /// checkpoint on its credit path — so this is a guard against a reachable
+    /// state, not only against a future REVM upgrade or a new hook missing its
+    /// `global_checkpoint` (which has happened once already, in
+    /// `create_account_checkpoint`).
+    #[test]
+    fn drain_reentrant_crac_ops_survives_a_watermark_past_the_end() {
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        assert!(
+            journal.michelson.pending_crac_receipts.is_empty(),
+            "harness: the lists start empty"
+        );
+
+        // Watermark 1 over empty lists: the pre-clamp panic case.
+        let ops = drain_reentrant_crac_ops(&mut journal, 1, 1, 1);
+        assert!(
+            ops.is_empty(),
+            "a stale watermark must yield no ops, not a trap"
+        );
+    }
+
+    /// A CRAC receipt with no operation in its batch. Enough to occupy a slot
+    /// in a list, which is all these tests observe.
+    fn empty_receipt() -> AppliedOperation {
+        use tezos_crypto_rs::hash::{BlockHash, OperationHash, UnknownSignature};
+        use tezos_tezlink::operation_result::{
+            OperationBatchWithMetadata, OperationDataAndMetadata,
+        };
+        AppliedOperation {
+            hash: OperationHash::default(),
+            branch: BlockHash::default(),
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations: vec![],
+                    signature: UnknownSignature::try_from([0u8; 64].as_slice()).unwrap(),
+                },
+            ),
+        }
+    }
+
+    fn journal_with_two_pending_receipts() -> TezosXJournal {
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            tezos_crypto_rs::hash::OperationHash::default(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal
+            .michelson
+            .pending_crac_receipts
+            .push((0, empty_receipt()));
+        journal
+            .michelson
+            .pending_crac_receipts
+            .push((1, empty_receipt()));
+        journal
+    }
+
+    /// What the clamp costs, on a list that is NOT empty: the receipts past it
+    /// stay in the journal instead of being drained into their parent's subtree.
+    ///
+    /// The sibling test above pins the absence of a trap, but with empty lists
+    /// `drain(0..)` has nothing to skip. The control is what makes this
+    /// discriminating: the same journal, drained from a watermark in range,
+    /// empties. So the receipts left behind below are the clamp's doing.
+    #[test]
+    fn drain_reentrant_crac_ops_clamped_watermark_leaves_receipts_behind() {
+        let mut control = journal_with_two_pending_receipts();
+        drain_reentrant_crac_ops(&mut control, 0, 0, 0);
+        assert!(
+            control.michelson.pending_crac_receipts.is_empty(),
+            "control: a watermark in range drains both receipts out"
+        );
+
+        let mut clamped = journal_with_two_pending_receipts();
+        drain_reentrant_crac_ops(&mut clamped, 5, 0, 0);
+        assert_eq!(
+            clamped.michelson.pending_crac_receipts.len(),
+            2,
+            "a watermark past the end is clamped to the length, so the drain \
+             takes nothing and the receipts stay: the cost the clamp accepts"
         );
     }
 }
