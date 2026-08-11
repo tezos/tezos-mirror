@@ -67,6 +67,13 @@ mod path {
     }
 }
 
+fn runtime_of_block(block: &L2Block) -> &'static str {
+    match block {
+        L2Block::Etherlink(_) => "EVM",
+        L2Block::Tezlink(_) => "Michelson",
+    }
+}
+
 pub fn store_current<Host>(
     host: &mut Host,
     root: &impl Path,
@@ -82,11 +89,12 @@ where
     host.store_write_all(&path::current_block(root)?, &block.to_bytes())?;
     log!(
         Info,
-        "Storing block {} at {} containing {} transaction(s) for {} gas used.",
+        "Storing {} block {} at {} containing {} transaction(s) for {} gas used.",
+        runtime_of_block(block),
         block.number(),
         block.timestamp(),
         block.number_of_transactions(),
-        U256::to_string(&block.gas_used())
+        &block.gas_used_report()
     );
     Ok(())
 }
