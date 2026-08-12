@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{cell::Cell, rc::Rc};
+
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
@@ -213,6 +215,48 @@ pub struct MichelsonJournal {
     /// [`set_internal_operation_counter`](Self::set_internal_operation_counter),
     /// rolled back on `revert_frame`, kept on `commit_frame`.
     internal_operation_counter: u128,
+    /// Temporary big map IDs of this manager operation, shared by every
+    /// one of its Michelson frames.
+    ///
+    /// Deliberately *not* captured in [`ExternalCheckpoint`]: the
+    /// counter only ever moves forward, even when a frame reverts.
+    temporary_big_map_id_allocator: TemporaryBigMapIdAllocator,
+}
+
+/// Counter value while a manager operation has been handed out no
+/// temporary big map ID. Temporary IDs are negative and progress away
+/// from 0: the opposite of permanent IDs.
+const NO_TEMPORARY_BIG_MAP_ID: i64 = 0;
+
+/// Handle on a manager operation's temporary big map ID counter, cloned
+/// into every context that allocates temporary big maps for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TemporaryBigMapIdAllocator(Rc<Cell<i64>>);
+
+impl TemporaryBigMapIdAllocator {
+    /// A fresh counter, no ID handed out yet.
+    pub fn new() -> Self {
+        Self(Rc::new(Cell::new(NO_TEMPORARY_BIG_MAP_ID)))
+    }
+
+    /// Hand out the next temporary big map ID.
+    pub fn allocate(&self) -> i64 {
+        let id = self.0.get() - 1;
+        self.0.set(id);
+        id
+    }
+
+    /// The last ID handed out, [`NO_TEMPORARY_BIG_MAP_ID`] — which is
+    /// not a temporary ID — while there is none.
+    pub fn last_allocated(&self) -> i64 {
+        self.0.get()
+    }
+}
+
+impl Default for TemporaryBigMapIdAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Default for MichelsonJournal {
@@ -250,6 +294,7 @@ impl MichelsonJournal {
             operation_hash,
             origination_index: 0,
             internal_operation_counter: 0,
+            temporary_big_map_id_allocator: TemporaryBigMapIdAllocator::new(),
         }
     }
 
@@ -392,6 +437,14 @@ impl MichelsonJournal {
     /// from 0 (L2-1676).
     pub fn set_internal_operation_counter(&mut self, counter: u128) {
         self.internal_operation_counter = counter;
+    }
+
+    /// Handle on the operation-wide temporary big map ID counter, to be
+    /// cloned into every `TcCtx` built for this manager operation, so
+    /// all its frames — native and inbound CRAC alike — allocate from
+    /// one sequence.
+    pub fn temporary_big_map_id_allocator(&self) -> TemporaryBigMapIdAllocator {
+        self.temporary_big_map_id_allocator.clone()
     }
 }
 

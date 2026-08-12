@@ -8,17 +8,18 @@ use enshrined_contracts::charge_internal_receipt_bodies;
 use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
 use enshrined_contracts::CracError;
+use mir::ast::big_map::LazyStorageError;
 use mir::ast::BinWriter;
+use mir::ast::BorrowedUnparseError;
+use mir::ast::IntoMicheline;
+use mir::ast::Micheline;
 use mir::ast::{
     AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens, TypedValue,
 };
+use mir::context::CtxTrait;
+use mir::context::LookupViewError;
 use mir::context::TypecheckingCtx;
 use mir::{
-    ast::{
-        big_map::{BigMapId, LazyStorageError},
-        BorrowedUnparseError, IntoMicheline, Micheline,
-    },
-    context::{CtxTrait, LookupViewError},
     gas::{Gas, OutOfGas},
     interpreter::{compute_contract_address, ContractInterpretError, InterpretError},
     parser::Parser,
@@ -27,6 +28,7 @@ use mir::{
         type_props::TypeProperty, AllowForgedLazyStorageId, TcError, TypecheckViews,
     },
 };
+use mir_ctx::clear_temporary_big_maps;
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
 use num_traits::{ToPrimitive, Zero};
@@ -64,6 +66,7 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{Origin, Registry};
+use tezosx_journal::TemporaryBigMapIdAllocator;
 use tezosx_journal::TezosXJournal;
 
 use crate::account_storage::{
@@ -73,8 +76,7 @@ use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
-    InterpretContext, OperationCtx, TcCtx,
+    convert_big_map_diff, BlockCtx, Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -2059,7 +2061,6 @@ pub fn run_code<
         kt1: account.kt1().clone(),
     };
 
-    let mut next_temporary_id = BigMapId { value: (-1).into() };
     let mut counter = 0u128;
 
     let mut tc_ctx = TcCtx {
@@ -2067,7 +2068,7 @@ pub fn run_code<
         operation_gas: &mut operation_gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
-        next_temporary_id: &mut next_temporary_id,
+        temporary_big_map_id_allocator: TemporaryBigMapIdAllocator::new(),
     };
     let mut operation_ctx = OperationCtx {
         source: &payer_account,
@@ -2129,9 +2130,10 @@ pub fn run_code<
     // Clear the temporary range so a second run against the same state
     // does not restart allocation at -1 and collide. It does *not* make
     // the run clean — see the precondition.
-    if let Err(err) =
-        clear_temporary_big_maps(tc_ctx.rk.host_mut(), tc_ctx.next_temporary_id)
-    {
+    if let Err(err) = clear_temporary_big_maps(
+        tc_ctx.rk.host_mut(),
+        &tc_ctx.temporary_big_map_id_allocator,
+    ) {
         log!(
             Error,
             "Cleaning the temporary big_map in the storage failed: {err}"
@@ -3060,7 +3062,6 @@ where
     } = validation_info;
     let mut first_failure: Option<usize> = None;
     let mut processed_ops = Vec::with_capacity(validated_operations.len());
-    let mut next_temporary_id = BigMapId { value: (-1).into() };
     for (index, validated_operation) in validated_operations.into_iter().enumerate() {
         log!(
             Debug,
@@ -3088,7 +3089,6 @@ where
                 &source_account,
                 &source_public_key,
                 validated_operation,
-                &mut next_temporary_id,
                 block_ctx,
                 nonce_counter,
             )?
@@ -3101,16 +3101,6 @@ where
         }
 
         processed_ops.push(processed);
-    }
-
-    // Clear all the temporaries big_map after the application of the batch
-    let cleared = clear_temporary_big_maps(rk.host_mut(), &mut next_temporary_id);
-
-    if let Err(lazy_storage_err) = cleared {
-        log!(
-            Error,
-            "Cleaning the temporary big_map in the storage failed: {lazy_storage_err}"
-        )
     }
 
     if let Some(failure_idx) = first_failure {
@@ -3144,7 +3134,6 @@ fn apply_operation<Host, KS>(
     source_account: &TezosImplicitAccount,
     source_public_key: &[u8],
     validated_operation: validate::ValidatedOperation,
-    next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
 ) -> Result<ProcessedOperation, String>
@@ -3158,7 +3147,9 @@ where
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
-        next_temporary_id,
+        temporary_big_map_id_allocator: journal
+            .michelson
+            .temporary_big_map_id_allocator(),
     };
     let parser = Parser::new();
     // Block-cumulative internal-operation counter: the block's prior count
@@ -3346,7 +3337,7 @@ mod tests {
     use crate::context;
     use crate::{
         account_storage::TezosOriginatedAccount, address::OriginationNonce,
-        mir_ctx::BlockCtx,
+        mir_ctx::clear_temporary_big_maps, mir_ctx::BlockCtx,
     };
     use mir::ast::big_map::BigMapId;
     use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
@@ -10185,11 +10176,12 @@ mod tests {
             },
         );
 
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut *ctx.rk,
                 &NotWiredRegistry,
-                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &mut journal,
                 operation,
                 &block_ctx!(),
                 false,
@@ -10201,6 +10193,11 @@ mod tests {
                 "validate_and_apply_operation should not have failed with a kernel error",
             ),
         );
+        clear_temporary_big_maps(
+            ctx.rk.host_mut(),
+            &journal.michelson.temporary_big_map_id_allocator(),
+        )
+        .expect("clearing the temporary big maps should not have failed");
 
         BigMapTransfer {
             sender: sender_contract,
@@ -12055,7 +12052,8 @@ mod tests {
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
-            next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
+            temporary_big_map_id_allocator:
+                tezosx_journal::TemporaryBigMapIdAllocator::new(),
         };
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
@@ -12294,7 +12292,8 @@ mod tests {
             operation_gas: &mut operation_gas,
             big_map_diff: std::collections::BTreeMap::new(),
             interpret_context: crate::mir_ctx::InterpretContext::new(),
-            next_temporary_id: &mut mir::ast::big_map::BigMapId { value: (-1).into() },
+            temporary_big_map_id_allocator:
+                tezosx_journal::TemporaryBigMapIdAllocator::new(),
         };
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
