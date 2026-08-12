@@ -25,16 +25,12 @@ use crate::{parsable, parsing};
 
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
-use revm::{
-    context::result::ExecutionResult as VMResult,
-    primitives::{Address, B256},
-};
+use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy, EvmKernelError as RevmError, ExecutionOutcome,
     TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
@@ -531,10 +527,7 @@ impl Evaluation {
         // `revm_run_transaction` below and never appears in a receipt. A
         // simulation's tracer input carries no `tx_hash` filter, so
         // `get_tracer_configuration` honours it regardless of this value.
-        let operation_hashes = journal::TezosXHashes {
-            evm: B256::ZERO,
-            michelson: OperationHash::default(),
-        };
+        let operation_hashes = journal::TezosXHashes::zero();
         let mut journal = journal::prepare_tezosx_journal(
             CracId::mock(RuntimeId::Ethereum),
             &operation_hashes,

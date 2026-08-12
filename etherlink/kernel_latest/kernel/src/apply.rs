@@ -268,11 +268,11 @@ pub fn extract_cross_runtime_effects(
     let mut effects = Vec::new();
 
     if let Some(tx_info) = journal.evm.take_crac_data() {
-        let crac_id = journal.crac_id().to_string();
+        let tx_hash = journal.evm.tx_hash().0;
         let logs = std::mem::take(&mut journal.evm.inner.logs);
 
         effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
-            crac_id,
+            tx_hash,
             logs,
             source: H160(*tx_info.source.0),
             gas_used: U256::from(michelson_milligas_to_evm_gas(
@@ -687,17 +687,11 @@ where
     log_transaction_type(to, &call_data);
     let value = transaction.value;
     // An EVM-entered synthetic Michelson manager operation has no real
-    // Tezos operation hash, so the origination-nonce seed is derived; the
-    // tracer, however, must key off the Ethereum transaction hash this
-    // transaction's receipt reports.
-    let operation_hashes = journal::TezosXHashes {
-        evm: B256::from(transaction_hash),
-        michelson: TezosXJournal::synthetic_operation_hash(
-            &crac_id,
-            block_constants.chain_id.low_u64(),
-            block_constants.number.low_u64(),
-        ),
-    };
+    // Tezos operation hash, so the origination-nonce seed is derived from
+    // this transaction's hash; the tracer keys off that same hash, which
+    // is what the receipt reports.
+    let operation_hashes =
+        journal::TezosXHashes::from_evm_transaction(B256::from(transaction_hash));
 
     let mut journal = journal::prepare_tezosx_journal(
         crac_id,
@@ -822,15 +816,11 @@ where
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Both hashes are the deposit's own transaction hash: it is what the
-    // deposit's receipt reports, so the tracer keys off it, and reusing it
-    // as the origination-nonce seed keeps that seed deterministic and
-    // unique even though the kernel-managed XTZ bridge does not NAC into
-    // Michelson today.
-    let operation_hashes = journal::TezosXHashes {
-        evm: B256::from(transaction_hash),
-        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-    };
+    // The deposit's own transaction hash is what its receipt reports, so
+    // the tracer keys off it and the origination-nonce seed derives from
+    // it — same rule as any other EVM-entered operation, even though the
+    // kernel-managed XTZ bridge does not NAC into Michelson today.
+    let operation_hashes = journal::TezosXHashes::from_deposit(transaction_hash);
     let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
         &operation_hashes,
@@ -975,15 +965,8 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    // Both hashes are the deposit's own transaction hash, as in
-    // `pure_xtz_deposit`: it is what the deposit's receipt reports, so the
-    // tracer keys off it, and reusing it as the origination-nonce seed keeps
-    // that seed deterministic and unique even though the kernel-managed FA
-    // bridge does not NAC into Michelson today.
-    let operation_hashes = journal::TezosXHashes {
-        evm: B256::from(transaction_hash),
-        michelson: tezos_crypto_rs::hash::OperationHash::from(transaction_hash),
-    };
+    // As in `pure_xtz_deposit`.
+    let operation_hashes = journal::TezosXHashes::from_deposit(transaction_hash);
     let mut journal = journal::prepare_tezosx_journal(
         CracId::mock(RuntimeId::Ethereum),
         &operation_hashes,
@@ -1089,8 +1072,10 @@ pub enum CrossRuntimeEffect {
 /// in `logs` (the `CrossRuntimeCallReceived` events), not in the envelope — see
 /// L2-1408.
 pub struct EvmCracEffect {
-    /// CRAC-ID shared by all CRACs in this transaction.
-    pub crac_id: String,
+    /// Hash of the fake EVM transaction mirroring this operation,
+    /// derived once at journal preparation from the Michelson operation
+    /// hash and carried here so it is not recomputed at registration.
+    pub tx_hash: TransactionHash,
     /// Logs accumulated from all `serve()` calls.
     pub logs: Vec<revm::primitives::Log>,
     /// EVM address (alias) of the top-level originator (from
@@ -1403,6 +1388,7 @@ pub(crate) mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezosx_journal::TezosXHashes;
 
     const CHAIN_ID: u32 = 1337;
 
@@ -1930,7 +1916,7 @@ pub(crate) mod tests {
         use tezosx_journal::{CracId, TezosXJournal};
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal
@@ -1976,7 +1962,7 @@ pub(crate) mod tests {
         use tezosx_journal::{CracId, TezosXJournal};
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         // First-executed CRAC fails (top=Failed in the source receipt),
@@ -2004,7 +1990,7 @@ pub(crate) mod tests {
         use tezosx_journal::{CracId, TezosXJournal};
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let mut r1 = dummy_crac_receipt(vec![make_transfer(0, 100)]);
@@ -2033,7 +2019,7 @@ pub(crate) mod tests {
         use tezosx_journal::{CracId, TezosXJournal};
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         // Execution order: failed(100), pending(200), failed(300)

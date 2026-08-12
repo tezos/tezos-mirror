@@ -3044,6 +3044,8 @@ pub(crate) mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use tezosx_journal::TezosXHashes;
+
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
     use crate::context;
@@ -3113,7 +3115,7 @@ mod tests {
     fn journal_with_operation_hash(hash: OperationHash) -> TezosXJournal {
         TezosXJournal::new(
             tezosx_journal::CracId::mock(RuntimeId::Ethereum),
-            hash,
+            TezosXHashes::from_michelson_operation(hash),
             tezos_ethereum::block::BlockConstants::dummy(),
         )
     }
@@ -10565,7 +10567,7 @@ mod tests {
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let processed = validate_and_apply_operation(
@@ -10861,7 +10863,7 @@ mod tests {
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let receipts = ProcessedOperation::into_receipts(
@@ -10950,7 +10952,7 @@ mod tests {
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let receipts = ProcessedOperation::into_receipts(
