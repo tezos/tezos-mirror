@@ -1366,8 +1366,6 @@ module Base_images = struct
       ~image_path:(sf "%s/%s-%s" path_prefix distro base_images_tag)
 
   (* DEB packaging *)
-  let debian_bookworm = make_img "debian:bookworm"
-
   let debian_trixie = make_img "debian:trixie"
 
   let debian_build_trixie = make_img "debian-build:trixie"

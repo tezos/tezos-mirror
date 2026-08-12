@@ -2202,7 +2202,6 @@ images.debian:
   parallel:
     matrix:
     - RELEASE:
-      - bookworm
       - trixie
 
 images.debian-build:
@@ -2261,7 +2260,6 @@ images.debian-build:
   parallel:
     matrix:
     - RELEASE:
-      - bookworm
       - trixie
       TAGS:
       - gcp_very_high_cpu
@@ -2321,7 +2319,6 @@ images.debian-build.merge:
   parallel:
     matrix:
     - RELEASE:
-      - bookworm
       - trixie
 
 images.debian-homebrew:
@@ -2613,7 +2610,6 @@ images.debian-systemd:
   parallel:
     matrix:
     - RELEASE:
-      - bookworm
       - trixie
 
 images.ubuntu:

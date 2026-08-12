@@ -27,7 +27,6 @@ let full_name_for_humans distro =
 let image distro =
   let open Tezos_ci.Images.Base_images in
   match distro with
-  | {name = Debian; release = "bookworm"} -> debian_bookworm
   | {name = Debian; release = "trixie"} -> debian_trixie
   | {name = Ubuntu; release = "22.04"} -> ubuntu_22_04
   | {name = Ubuntu; release = "24.04"} -> ubuntu_24_04
@@ -44,5 +43,5 @@ let main_image = function
    the Full debian-repository test matrix (debian_repository.ml),
    and security scans (security_scans.ml). *)
 let supported_releases = function
-  | Debian -> ["bookworm"; "trixie"]
+  | Debian -> ["trixie"]
   | Ubuntu -> ["22.04"; "24.04"; "26.04"]

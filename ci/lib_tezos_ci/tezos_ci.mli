@@ -451,8 +451,6 @@ module Images : sig
     (** The version tag shared by all CI base images. *)
     val base_images_tag : string
 
-    val debian_bookworm : Image.t
-
     val debian_trixie : Image.t
 
     val debian_jsonnet_trixie : Image.t
