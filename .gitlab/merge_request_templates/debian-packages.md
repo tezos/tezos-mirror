@@ -74,7 +74,7 @@ Documentation](https://tezos.gitlab.io/introduction/howtoget.html#new-set-of-deb
 The CI creates an apt repository for each MR. Replace `$CI_COMMIT_REF_NAME`
 with the ref name related to this MR.
 
-For distributions other than `debian/bookworm`, run a scheduled pipeline to
+For distributions other than `debian/trixie`, run a scheduled pipeline to
 generate packages for this MR using:
 
 ```
@@ -86,19 +86,17 @@ variables as :
 
 ```
     export distribution=next/$CI_COMMIT_REF_NAME/debian
-    export release=bookworm
+    export release=trixie
 ```
 
 and the follow all the steps in the detailed section dedicated to the installation of the debian packages: https://tezos.gitlab.io/introduction/services.html
-
-We also have a dedicated page for the migration from the Serokell packages that should be considered : https://tezos.gitlab.io/introduction/serokell.html
 
 ## Test debian packages in isolation
 
 To test Debian packages in a clean environment using Docker, install Docker (Docker Installation Guide https://docs.docker.com/engine/install/#supported-platforms ) and use the following Dockerfile:
 
 ```
-FROM debian:bookworm
+FROM debian:trixie
 
 ARG CI_COMMIT_REF_NAME
 
@@ -106,7 +104,7 @@ RUN apt-get update && apt-get install -y gpg curl
 
 RUN curl https://tezos-linux-repo.storage.googleapis.com/next/debian/octez.asc | gpg --dearmor -o /etc/apt/keyrings/octez.gpg
 
-RUN echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://tezos-linux-repo.storage.googleapis.com/next/${CI_COMMIT_REF_NAME}/debian bookworm main" > /etc/apt/sources.list.d/octez.list
+RUN echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] https://tezos-linux-repo.storage.googleapis.com/next/${CI_COMMIT_REF_NAME}/debian trixie main" > /etc/apt/sources.list.d/octez.list
 
 RUN apt-get update
 RUN apt-get install -y octez-node
