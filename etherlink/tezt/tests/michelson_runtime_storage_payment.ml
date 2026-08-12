@@ -82,21 +82,28 @@ module Contract = struct
       Client.transfer ~arg ~receiver:address ~gas_limit
   end
 
-  module Failing_cross_runtime_http_call_tez_callback = struct
-    let prg =
-      contract_prg
-        ["mini_scenarios"; "failing_cross_runtime_http_call_tez_callback"]
+  (** Wrapper that emits [pre_incr, CRAC to EVM with callback, post_incr]
+      and whose [%on_result] always FAILWITHs, cascading every internal op
+      back to BackTracked. *)
+  module Failing_callback_run_evm = struct
+    let prg = contract_prg ["mini_scenarios"; "failing_callback_run_evm"]
 
     let originate ?(gas_limit = michelson_hard_gas_limit_per_operation)
-        ~destination =
-      let init = sf {|Pair 0 (Pair "%s" None)|} destination in
+        ~evm_target ~method_sig ~abi_params =
+      let init =
+        sf
+          {|Pair 0 (Pair "%s" (Pair "%s" (Pair 0x%s None)))|}
+          evm_target
+          method_sig
+          abi_params
+      in
       Client.originate_contract ~init ~prg ~gas_limit
 
     let run ?(gas_limit = michelson_hard_gas_limit_per_operation) ?storage_limit
-        ~body_hex address =
+        address =
       Client.transfer
         ?storage_limit
-        ~arg:body_hex
+        ~arg:"Unit"
         ~entrypoint:"run"
         ~receiver:address
         ~gas_limit
@@ -2092,239 +2099,6 @@ let test_evm_to_michelson_alias_origination_evm_oog () =
 
   unit
 
-(** Send a tz1 transfer to the Michelson-side gateway with the
-    [%call] entrypoint, dispatching a CRAC to a Michelson contract.
-    The URL is wired for in-runtime routing
-    ([http://tezos/<kt1>/<entrypoint>]); the body is the
-    Michelson-packed parameter (e.g. [encode_michelson_string]); the
-    callback is [None]. Used by SCENARIO 7. *)
-let tz1_to_michelson_via_gateway ~tez_client ~source ~kt1 ~entrypoint ~body_hex
-    ?(gas_limit = michelson_hard_gas_limit_per_operation) ?fee () =
-  let arg =
-    sf
-      {|Pair "http://tezos/%s/%s" (Pair {} (Pair %s (Pair 1 None)))|}
-      kt1
-      entrypoint
-      body_hex
-  in
-  Client.transfer
-    ?fee
-    ~amount:Tez.zero
-    ~giver:source
-    ~burn_cap:Tez.one
-    ~receiver:michelson_gateway_address
-    ~entrypoint:"call"
-    ~arg
-    ~gas_limit
-    tez_client
-
-(** Sends a CRAC from a top-level tz1 manager-op to a Michelson
-    contract that grows its storage, and checks that the storage
-    cost is burned on the top-level Michelson sender's balance. *)
-let test_michelson_to_michelson_storage_growth_michelson_pays () =
-  Setup.register_sandbox_test
-    ~uses_client:true
-    ~title:
-      "Michelson->Michelson CRAC: storage growth is paid by the top-level \
-       Michelson manager-op"
-    ~tags:["cross_runtime"; "delegated_storage"; "m_to_m"]
-    ~with_runtimes:[Tezos]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
-  @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint evm_node in
-  let* tez_client = tezlink_client evm_node in
-  let initial_storage = "x" in
-  let new_storage = "hello world this is now substantially larger" in
-  let* kt1 =
-    Contract.Store_input.originate
-      ~alias:"store_input"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~burn_cap:Tez.one
-      ~initial_storage
-      tez_client
-  in
-  let*@ _ = Rpc.produce_block evm_node in
-
-  (* Measure: tz1 → gateway → Store_input with storage growth. *)
-  let* new_storage_hex = encode_michelson_string ~tez_client new_storage in
-  let fee = Tez.one in
-  let* balance_before =
-    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
-  in
-  let* () =
-    tz1_to_michelson_via_gateway
-      ~tez_client
-      ~source:Constant.bootstrap1.alias
-      ~kt1
-      ~entrypoint:"default"
-      ~body_hex:new_storage_hex
-      ~fee
-      ()
-  in
-  let*@ _ = Rpc.produce_block evm_node in
-  let* content = get_first_manager_operations_content ~tez_endpoint in
-  let* balance_after =
-    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
-  in
-
-  (* Check the storage was updated *)
-  let* current_storage = Contract.Store_input.read_storage ~tez_client kt1 in
-  Check.(
-    (current_storage = new_storage)
-      string
-      ~error_msg:"Expected Michelson storage to be %R, got %L") ;
-
-  (* Check the top-level Michelson paid for the storage growth *)
-  let debited_mutez = Tez.(to_mutez (balance_before - balance_after)) in
-  let storage_burn = debited_mutez - Tez.to_mutez fee in
-  let growth_bytes =
-    String.length new_storage - String.length initial_storage
-  in
-  Check.(
-    (storage_burn = growth_bytes * cost_per_byte)
-      int
-      ~error_msg:
-        "Expected top-level Michelson storage burn = %R mutez (growth_bytes × \
-         cost_per_byte), got %L") ;
-
-  (* Check the storage-fees burn pair lands on the top-level operation_result, not on any
-     internal operation. *)
-  let top_bus =
-    Tezos_JSON.balance_updates_of_result
-      (Tezos_JSON.get_operation_result content)
-  in
-  Check.is_true
-    (BalanceUpdate.has_storage_fees_burn_pair
-       ~payer:Constant.bootstrap1.public_key_hash
-       ~burn:(growth_bytes * cost_per_byte)
-       top_bus)
-    ~error_msg:
-      (sf
-         "Expected a storage-fees burn pair of %d mutez on the top-level \
-          manager-op for payer %s"
-         (growth_bytes * cost_per_byte)
-         Constant.bootstrap1.public_key_hash) ;
-  let internal_bus = Tezos_JSON.internal_balance_updates content in
-  Check.is_false
-    (BalanceUpdate.any_storage_fees_burn internal_bus)
-    ~error_msg:"Expected no storage-fees burn on the internal operations" ;
-
-  unit
-
-(** SCENARIO: Michelson(1) -> Michelson(2) CRAC followed by a
-    FAILWITH in the same frame.  The wrapper contract (1) emits
-    a CRAC to (2) (which grows its storage) and a callback whose
-    [%on_result] always FAILWITHs.  The cascade then backtracks
-    every internal op and the top-level — but the inner CRAC's
-    state change in (2) was committed independently by the
-    gateway.  Used to verify that the burn debit on the payer's
-    balance and the rendered storage-fees pairs in the receipt
-    reconcile under failure. *)
-let test_michelson_to_michelson_storage_growth_michelson_failwith_backtracks ()
-    =
-  Setup.register_sandbox_test
-    ~uses_client:true
-    ~title:
-      "Michelson->Michelson CRAC: failing callback backtracks the outer \
-       manager-op"
-    ~tags:["cross_runtime"; "delegated_storage"; "m_to_m"; "failwith"]
-    ~with_runtimes:[Tezos]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
-  @@ fun evm_node ->
-  let tez_endpoint = tezlink_foreign_endpoint evm_node in
-  let* tez_client = tezlink_client evm_node in
-  let initial_storage = "x" in
-  let new_storage = "hello world this is now substantially larger" in
-  (* Originate (2) — the CRAC target whose storage grows. *)
-  let* kt1_target =
-    Contract.Store_input.originate
-      ~alias:"store_input"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~burn_cap:Tez.one
-      ~initial_storage
-      tez_client
-  in
-  let*@ _ = Rpc.produce_block evm_node in
-  (* Originate (1) — the wrapper that CRACs to (2) and FAILWITHs
-     in its callback. *)
-  let* kt1_wrapper =
-    Contract.Failing_cross_runtime_http_call_tez_callback.originate
-      ~alias:"failing_crac_wrapper"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~burn_cap:Tez.one
-      ~destination:kt1_target
-      tez_client
-  in
-  let*@ _ = Rpc.produce_block evm_node in
-
-  (* Trigger: tz1 -> (1).run(new_storage).  Internally emits the
-     CRAC to (2) — whose body field forwards [new_storage] so (2)
-     actually grows — plus a callback that FAILWITHs; the cascade
-     backtracks the whole manager-op. *)
-  let* new_storage_hex = encode_michelson_string ~tez_client new_storage in
-  let fee = Tez.one in
-  let* balance_before =
-    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
-  in
-  let* () =
-    Contract.Failing_cross_runtime_http_call_tez_callback.run
-      ~body_hex:new_storage_hex
-      ~amount:Tez.zero
-      ~fee
-      ~giver:Constant.bootstrap1.alias
-      ~burn_cap:Tez.one
-      ~storage_limit:1000
-      ~force:true
-      kt1_wrapper
-      tez_client
-  in
-  let*@ _ = Rpc.produce_block evm_node in
-  let* content = get_first_manager_operations_content ~tez_endpoint in
-  let* balance_after =
-    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
-  in
-
-  (* Check the top-level manager-op backtracked. *)
-  let operation_result = Tezos_JSON.get_operation_result content in
-  let status = Tezos_JSON.status_of_result operation_result in
-  Check.(
-    (status = "backtracked")
-      string
-      ~error_msg:"Expected main op status %R, got %L") ;
-
-  (* Check the CRAC target's storage was NOT updated. *)
-  let* current_storage =
-    Contract.Store_input.read_storage ~tez_client kt1_target
-  in
-  Check.(
-    (current_storage = initial_storage)
-      string
-      ~error_msg:
-        "Expected Michelson storage on the CRAC target to remain %R, got %L") ;
-
-  (* Check the payer was debited only the manager-op fee (no storage burn). *)
-  let debited_mutez = Tez.(to_mutez (balance_before - balance_after)) in
-  Check.(
-    (debited_mutez = Tez.to_mutez fee)
-      int
-      ~error_msg:
-        "Expected the payer to be debited only the manager-op fee (%R mutez), \
-         got %L") ;
-
-  (* Check no storage-fees burn appears anywhere in the receipt. *)
-  let top_bus = Tezos_JSON.balance_updates_of_result operation_result in
-  let internal_bus = Tezos_JSON.internal_balance_updates content in
-  Check.is_false
-    (BalanceUpdate.any_storage_fees_burn (top_bus @ internal_bus))
-    ~error_msg:
-      "Expected no storage-fees burn anywhere in the receipt (top-level + \
-       internal)" ;
-
-  unit
-
 (** [send_crac_to_evm ~tez_client ~source ~evm_address ~fn_sig ()] sends a CRAC from
     [source] to the EVM contract [evm_address]
     through the gateway's [call_evm] entrypoint. *)
@@ -2543,6 +2317,114 @@ let test_michelson_to_evm_to_michelson_storage_growth_evm_pays () =
 
   unit
 
+(** SCENARIO: a top-level Michelson manager op emits a CRAC to EVM plus a
+    callback whose [%on_result] always FAILWITHs.  The cascade backtracks
+    every internal op and the top-level.
+
+    Re-pins the receipt shape the deleted Michelson->Michelson variant
+    covered — top-level status [backtracked], the payer debited only the
+    manager fee, and no storage-fees burn rendered anywhere — on the
+    Michelson->EVM path, which is the one that survives now that a CRAC
+    cannot target the caller's own runtime. *)
+let test_michelson_to_evm_failing_callback_backtracks () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:
+      "Michelson->EVM CRAC: failing callback backtracks the outer manager-op"
+    ~tags:["cross_runtime"; "delegated_storage"; "m_to_evm"; "failwith"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun evm_node ->
+  let tez_endpoint = tezlink_foreign_endpoint evm_node in
+  let* tez_client = tezlink_client evm_node in
+  let deployer = Eth_account.bootstrap_accounts.(0) in
+
+  (* Deploy the EVM CRAC target: store(uint256) grows its EVM storage, so
+     the crossing has a state change to roll back. *)
+  let* contract = Solidity_contracts.store_and_return Evm_version.Cancun in
+  let* evm_target =
+    let bytecode = Tezt.Base.read_file contract.bin in
+    let* raw_tx =
+      Cast.craft_deploy_tx
+        ~source_private_key:deployer.Eth_account.private_key
+        ~chain_id:1337
+        ~nonce:0
+        ~gas:2_000_000
+        ~gas_price:1_000_000_000
+        ~data:("0x" ^ bytecode)
+        ()
+    in
+    let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
+    let*@ _ = Rpc.produce_block evm_node in
+    let*@ receipt = Rpc.get_transaction_receipt ~tx_hash evm_node in
+    match receipt with
+    | Some {contractAddress = Some addr; status = true; _} -> return addr
+    | _ -> Test.fail "Failed to deploy StoreAndReturn"
+  in
+
+  (* Originate the wrapper whose callback FAILWITHs. *)
+  let* kt1_wrapper =
+    Contract.Failing_callback_run_evm.originate
+      ~alias:"failing_callback_wrapper"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~burn_cap:Tez.one
+      ~evm_target
+      ~method_sig:"store(uint256)"
+      ~abi_params:(Printf.sprintf "%064x" 42)
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+
+  let fee = Tez.one in
+  let* balance_before =
+    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
+  in
+  let* () =
+    Contract.Failing_callback_run_evm.run
+      ~amount:Tez.zero
+      ~fee
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~storage_limit:1000
+      ~force:true
+      kt1_wrapper
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block evm_node in
+  let* content = get_first_manager_operations_content ~tez_endpoint in
+  let* balance_after =
+    Client.get_balance_for ~account:Constant.bootstrap1.alias tez_client
+  in
+
+  (* Check the top-level manager-op backtracked. *)
+  let operation_result = Tezos_JSON.get_operation_result content in
+  let status = Tezos_JSON.status_of_result operation_result in
+  Check.(
+    (status = "backtracked")
+      string
+      ~error_msg:"Expected main op status %R, got %L") ;
+
+  (* Check the payer was debited only the manager-op fee (no storage burn). *)
+  let debited_mutez = Tez.(to_mutez (balance_before - balance_after)) in
+  Check.(
+    (debited_mutez = Tez.to_mutez fee)
+      int
+      ~error_msg:
+        "Expected the payer to be debited only the manager-op fee (%R mutez), \
+         got %L") ;
+
+  (* Check no storage-fees burn appears anywhere in the receipt. *)
+  let top_bus = Tezos_JSON.balance_updates_of_result operation_result in
+  let internal_bus = Tezos_JSON.internal_balance_updates content in
+  Check.is_false
+    (BalanceUpdate.any_storage_fees_burn (top_bus @ internal_bus))
+    ~error_msg:
+      "Expected no storage-fees burn anywhere in the receipt (top-level + \
+       internal)" ;
+
+  unit
+
 let () =
   test_origination_receipt_exposes_storage_fields () ;
   test_transfer_with_growth_exposes_delta () ;
@@ -2562,6 +2444,5 @@ let () =
   test_evm_to_michelson_storage_growth_evm_reverts_after_g2 () ;
   test_evm_to_michelson_alias_origination_evm_pays () ;
   test_evm_to_michelson_alias_origination_evm_oog () ;
-  test_michelson_to_michelson_storage_growth_michelson_pays () ;
-  test_michelson_to_michelson_storage_growth_michelson_failwith_backtracks () ;
-  test_michelson_to_evm_to_michelson_storage_growth_evm_pays ()
+  test_michelson_to_evm_to_michelson_storage_growth_evm_pays () ;
+  test_michelson_to_evm_failing_callback_backtracks ()

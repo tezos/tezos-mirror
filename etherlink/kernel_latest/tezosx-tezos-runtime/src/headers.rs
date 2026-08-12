@@ -36,9 +36,12 @@ pub struct MichelsonHeaders {
     /// Block level.
     pub block_number: BlockNumber,
     /// Sender contract address for Michelson `SENDER` — either an
-    /// originated KT1 or an implicit (tz1/tz2/tz3) account. The latter
-    /// is reachable when an implicit account calls the gateway directly
-    /// and through the EVM gateway's same-runtime round-trip (cf. !21963).
+    /// originated KT1 or an implicit (tz1/tz2/tz3) account. The latter is
+    /// reachable through a `Michelson -> EVM -> Michelson` round-trip: the
+    /// EVM frame's caller is the alias of the originating implicit account,
+    /// which `RoutingDecision::RoundTrip` resolves back to the original
+    /// tz1/tz2/tz3 when the alias is translated for this runtime
+    /// (cf. !21963).
     pub sender: Contract,
     /// CRAC origin contract address parsed from `X-Tezos-Source`.
     /// May be an implicit `tz1`/`tz2`/`tz3` (native Michelson origin) or an

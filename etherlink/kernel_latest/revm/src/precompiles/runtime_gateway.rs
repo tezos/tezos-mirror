@@ -15,10 +15,10 @@ use tezosx_interfaces::{
     canonicalize_native_address, gas,
     headers::{format_tez_from_wei, parse_u64_opt},
     translate_original_source, AliasInfo, Classification, Origin, Registry, RuntimeId,
-    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST,
-    X_TEZOS_TIMESTAMP,
+    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
+    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -388,6 +388,20 @@ fn dispatch_origin_of<
         }
     };
     Ok(output)
+}
+
+/// Refuse a native atomic call whose target is the EVM runtime itself.
+fn reject_same_runtime_target(
+    target_runtime: RuntimeId,
+    gas: Gas,
+) -> Result<(), CustomPrecompileError> {
+    if target_runtime == RuntimeId::Ethereum {
+        return Err(CustomPrecompileError::Revert(
+            ERR_SAME_RUNTIME_NAC.into(),
+            gas,
+        ));
+    }
+    Ok(())
 }
 
 /// Core logic for the `resolveAddress` selector, extracted for unit-testability.
@@ -798,10 +812,10 @@ where
 /// - `X-Tezos-Sender`: The resolved alias of the immediate caller (UTF-8 string).
 /// - `X-Tezos-Source`: The resolved alias of the transaction originator (UTF-8 string).
 /// - `X-Tezos-Source-Runtime`: The native runtime of `X-Tezos-Source`,
-///   as the decimal `RuntimeId` tag. On a same-runtime `EVM -> EVM`
+///   as the decimal `RuntimeId` tag. This is the *originator's* native
+///   runtime, not the immediate caller's: on an `EVM -> Michelson -> EVM`
 ///   round-trip the source is an EVM origin, so the receiving frame
-///   reports `sourceRuntime = ethereum` rather than a
-///   hardcoded `tezos`.
+///   reports `sourceRuntime = ethereum` rather than a hardcoded `tezos`.
 /// - `X-Tezos-Amount`: The value attached to the call, as a TEZ decimal string.
 /// - `X-Tezos-Gas-Limit`: The gas limit forwarded to the call (decimal string).
 /// - `X-Tezos-Timestamp`: The current block timestamp in seconds (decimal string).
@@ -1159,6 +1173,8 @@ where
                     )
                 })?;
 
+            reject_same_runtime_target(target_runtime, gas)?;
+
             // GET requests target read-only handlers on the other
             // runtime (Michelson view / EVM STATICCALL), so this arm
             // mirrors the STATICCALL-compatibility contract of
@@ -1455,6 +1471,44 @@ mod tests {
             classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas, 1);
         assert!(matches!(result, Err(CustomPrecompileError::Revert(_, _))));
         assert_eq!(gas.remaining(), 0, "the op limit must drain the budget");
+    }
+
+    // ── same-runtime NAC refusal ────────────────────────────────────────────
+    //
+    // The guard sits in the generic `call` arm, right after the target
+    // runtime is derived from the URL host and before the GET/POST split, so
+    // `reject_same_runtime_target` is method-agnostic by construction and a
+    // single pair of rows covers both. The end-to-end EVM->EVM refusal is
+    // pinned by tezt (`cross_runtime.ml`, tag `same_runtime`).
+
+    /// An `http://ethereum/...` target reverts with the shared message,
+    /// leaving the caller's remaining gas intact for the revert to report.
+    #[test]
+    fn same_runtime_target_is_refused() {
+        let gas = Gas::new(GAS_LIMIT);
+        let err = reject_same_runtime_target(RuntimeId::Ethereum, gas)
+            .expect_err("an EVM target must be refused");
+        match err {
+            CustomPrecompileError::Revert(msg, reported) => {
+                assert_eq!(msg, ERR_SAME_RUNTIME_NAC);
+                assert_eq!(
+                    reported.remaining(),
+                    GAS_LIMIT,
+                    "the refusal must not consume the caller's budget itself"
+                );
+            }
+            other => panic!("expected a catchable revert, got {other:?}"),
+        }
+    }
+
+    /// A cross-runtime target stays accepted: the guard must not turn the
+    /// supported direction into a revert.
+    #[test]
+    fn cross_runtime_target_is_accepted() {
+        assert!(
+            reject_same_runtime_target(RuntimeId::Tezos, Gas::new(GAS_LIMIT)).is_ok(),
+            "a Michelson target must remain dispatchable"
+        );
     }
 
     // These tests call the dispatch helpers (dispatch_origin_of /
