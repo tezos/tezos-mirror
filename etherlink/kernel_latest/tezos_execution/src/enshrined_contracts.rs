@@ -2345,6 +2345,50 @@ pub(crate) mod tests {
     use crate::mir_ctx::mock::MockCtx;
     use crate::test_utils::MockRegistry;
 
+    // Regression (L2-1952): a permissionless `%call` on the enshrined gateway
+    // could wedge the kernel. The caller-supplied `HeaderMap` was filled through
+    // the *fallible* `Builder::header` path up to the `http` crate's usable
+    // capacity (¾ · MAX_SIZE = 24576); the kernel then injected its `X-Tezos-*`
+    // headers through the *panicking* `HeaderMap::insert`, overflowing it -> WASM
+    // trap. `dispatch_crac_call` now rejects header counts above
+    // `MAX_HTTP_CALL_HEADERS` as a 400 Bad Request, before that injection.
+    #[test]
+    fn crac_gateway_dispatch_rejects_too_many_headers_as_400() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut ctx = MockCtx::new(&mut host, &mut journal, &registry, source, 0);
+
+        // `build_http_request` accepts an over-cap header set (fallible fill);
+        // the count cap lives in `dispatch_crac_call`, before header injection.
+        let names: Vec<String> = (0..MAX_HTTP_CALL_HEADERS + 1)
+            .map(|i| format!("h{i}"))
+            .collect();
+        let headers: Vec<(String, String)> =
+            names.iter().map(|n| (n.clone(), "v".to_string())).collect();
+        let request =
+            build_http_request("http://ethereum/0x00", &headers, &[], 1u32.into())
+                .expect("build_http_request accepts the headers (no cap there)");
+
+        let err = dispatch_crac_call(&mut ctx, request)
+            .expect_err("too many headers must be rejected before injection");
+        let msg = err.to_string();
+        assert!(msg.contains("400"), "expected a 400 error, got: {msg}");
+        assert!(
+            msg.contains("too many headers"),
+            "expected 'too many headers', got: {msg}"
+        );
+    }
+
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
     const ERC20_WRAPPER_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb";
 
