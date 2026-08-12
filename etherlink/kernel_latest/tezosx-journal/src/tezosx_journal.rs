@@ -5,12 +5,17 @@
 use std::fmt;
 
 use crate::{EvmJournal, MichelsonJournal};
-use revm::primitives::Address;
+use revm::primitives::{keccak256, Address, B256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_types::{OriginalSource, RuntimeId};
+
+/// Domain tags for the synthetic hash derivations below. Each names the
+/// identifier being produced, not its source.
+const SYNTHETIC_MICHELSON_OP_TAG: &[u8] = b"michelson";
+const SYNTHETIC_EVM_TX_TAG: &[u8] = b"evm";
 
 /// Unique identifier for a cross-runtime call chain within a block.
 ///
@@ -185,6 +190,62 @@ impl HttpTrace {
     }
 }
 
+/// The two hashes a journal needs, which are NOT the same value.
+///
+/// [`michelson`] seeds the manager operation's single origination nonce, so
+/// a child KT1 is `digest_160(michelson[32] || index[4])`. [`evm`] is the
+/// Ethereum transaction hash appearing in this transaction's receipt; it is
+/// what `get_tracer_configuration` matches a `debug_trace*` request's target
+/// hash against, so a wrong value here silently traces nothing (or the wrong
+/// transaction).
+///
+/// Build one through a constructor rather than a struct literal: each names
+/// an entry direction and derives the missing half, so a real hash cannot be
+/// paired with the wrong counterpart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TezosXHashes {
+    pub evm: B256,
+    pub michelson: tezos_crypto_rs::hash::OperationHash,
+}
+
+impl TezosXHashes {
+    /// EVM-entered: real Ethereum transaction hash, derived Michelson
+    /// operation hash.
+    pub fn from_evm_transaction(evm: B256) -> Self {
+        Self {
+            michelson: TezosXJournal::synthetic_operation_hash(&evm),
+            evm,
+        }
+    }
+
+    /// Michelson-entered: real operation hash, derived fake Ethereum
+    /// transaction hash.
+    pub fn from_michelson_operation(
+        michelson: tezos_crypto_rs::hash::OperationHash,
+    ) -> Self {
+        Self {
+            evm: TezosXJournal::synthetic_evm_tx_hash(&michelson),
+            michelson,
+        }
+    }
+
+    /// Kernel-synthesized deposit: the deposit's own hash is what its receipt
+    /// reports, so it is the EVM identity directly; the Michelson seed derives
+    /// from it like any other EVM-entered operation.
+    pub fn from_deposit(transaction_hash: [u8; 32]) -> Self {
+        Self::from_evm_transaction(B256::from(transaction_hash))
+    }
+
+    /// Non-authoritative: simulation, and tests that do not exercise
+    /// origination.
+    pub fn zero() -> Self {
+        Self {
+            evm: B256::ZERO,
+            michelson: tezos_crypto_rs::hash::OperationHash::default(),
+        }
+    }
+}
+
 /// The journal tracks both EVM/Michelson state changes and HTTP traces.
 ///
 /// HTTP traces are recorded with proper nesting: when a cross-runtime call
@@ -212,14 +273,13 @@ pub struct TezosXJournal {
 
 impl TezosXJournal {
     /// Construct a fresh journal for one Michelson manager operation.
-    /// [`operation_hash`] is propagated to the Michelson journal, where
-    /// it seeds the operation's single origination nonce — the one every
-    /// `CREATE_CONTRACT` of the operation claims from, native or
-    /// CRAC-reached.  It MUST be deterministic and unique per operation.
-    /// For a Tezos-entered operation pass the real `Operation::hash()`,
-    /// as L1 does.  An EVM-entered *synthetic* Michelson manager
-    /// operation has no such hash, so derive one from `crac_id` and the
-    /// originating block with [`Self::synthetic_operation_hash`].
+    /// [`operation_hashes`] is split across the sub-journals: the
+    /// Michelson half seeds the operation's single origination nonce — the
+    /// one every `CREATE_CONTRACT` of the operation claims from, native or
+    /// CRAC-reached — and the EVM half becomes the EVM journal's transaction
+    /// identity. Both MUST be deterministic and unique per operation; build
+    /// the pair with a [`TezosXHashes`] constructor, which names the entry
+    /// direction and derives the half that has no real hash.
     /// [`outer_block`] is the originating runtime's L2 block environment.
     /// Outside a block-producing context (traces, unit tests) pass
     /// [`BlockConstants::dummy`]. The cross-runtime journal is the single
@@ -231,12 +291,12 @@ impl TezosXJournal {
     /// kernel reaching into a specific runtime's journal after the fact.
     pub fn new(
         crac_id: CracId,
-        operation_hash: tezos_crypto_rs::hash::OperationHash,
+        operation_hashes: TezosXHashes,
         outer_block: BlockConstants,
     ) -> Self {
         Self {
-            evm: EvmJournal::new(outer_block),
-            michelson: MichelsonJournal::new(operation_hash),
+            evm: EvmJournal::new(outer_block, operation_hashes.evm),
+            michelson: MichelsonJournal::new(operation_hashes.michelson),
             finalized_http_traces: Vec::new(),
             pending_http_traces: Vec::new(),
             crac_id,
@@ -273,7 +333,7 @@ impl TezosXJournal {
     pub fn mock(runtime: RuntimeId) -> Self {
         Self::new(
             CracId::mock(runtime),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             BlockConstants::dummy(),
         )
     }
@@ -323,29 +383,48 @@ impl TezosXJournal {
 
     /// Canonical derivation of an operation hash for an *EVM-entered*
     /// synthetic Michelson manager operation, which has no signed Tezos
-    /// operation to hash and so cannot obtain a real one.  Hashing
-    /// `cross-runtime-call:<chain_id>:<block_number>:<crac_id>` gives
-    /// each such operation a distinct seed across operations, blocks AND
-    /// chains.  This mirrors L1, where the operation hash is the hash of
-    /// the signed bytes whose signature is bound to the chain id via the
-    /// signing watermark — so identical operation bytes on two chains
-    /// yield different op hashes (and child KT1s).  Folding `chain_id`
-    /// in keeps the kernel safe if the same binary runs on multiple
-    /// chains (test scenarios, replays, forks).
+    /// operation to hash.  Seeded from the originating Ethereum
+    /// transaction hash, so uniqueness is inherited from the parent
+    /// (unique per chain via nonce + signature) rather than from the
+    /// positional `(block_number, crac_id)` pair used before — which
+    /// moved a child KT1 whenever the block was reordered.
+    ///
+    /// **Only ever pass a real, signed transaction hash.**  A zero or
+    /// placeholder would collapse every child KT1 onto one address
+    /// (L2-1366); simulation keeps its explicit zero seed instead.
     ///
     /// Tezos-entered operations do NOT use this: they pass their real
     /// `Operation::hash()` to [`Self::new`], matching L1's per-operation
     /// nonce semantics (L2-1440).  Tests that do not care about
     /// origination addresses may pass `OperationHash::default()`.
     pub fn synthetic_operation_hash(
-        crac_id: &CracId,
-        chain_id: u64,
-        block_number: u64,
+        evm_tx_hash: &B256,
     ) -> tezos_crypto_rs::hash::OperationHash {
-        let seed = format!("cross-runtime-call:{chain_id}:{block_number}:{crac_id}");
+        let mut preimage = [0u8; SYNTHETIC_MICHELSON_OP_TAG.len() + 32];
+        preimage[..SYNTHETIC_MICHELSON_OP_TAG.len()]
+            .copy_from_slice(SYNTHETIC_MICHELSON_OP_TAG);
+        preimage[SYNTHETIC_MICHELSON_OP_TAG.len()..]
+            .copy_from_slice(evm_tx_hash.as_slice());
         tezos_crypto_rs::hash::OperationHash::from(tezos_crypto_rs::blake2b::digest_256(
-            seed.as_bytes(),
+            &preimage,
         ))
+    }
+
+    /// Dual of [`Self::synthetic_operation_hash`]: the "fake" Ethereum
+    /// transaction hash mirroring a Michelson-entered operation that
+    /// crossed into the EVM runtime.  Seeded from the originating
+    /// Michelson operation hash, which is unique per chain (counter +
+    /// signature) — the uniqueness the EVM node's `transactions` PRIMARY
+    /// KEY requires, and which the earlier block-local derivation
+    /// violated with a `UNIQUE constraint failed` crash.
+    pub fn synthetic_evm_tx_hash(
+        michelson_op_hash: &tezos_crypto_rs::hash::OperationHash,
+    ) -> B256 {
+        let mut preimage = [0u8; SYNTHETIC_EVM_TX_TAG.len() + 32];
+        preimage[..SYNTHETIC_EVM_TX_TAG.len()].copy_from_slice(SYNTHETIC_EVM_TX_TAG);
+        preimage[SYNTHETIC_EVM_TX_TAG.len()..]
+            .copy_from_slice(michelson_op_hash.as_ref());
+        keccak256(preimage)
     }
 
     /// Record an HTTP request. The trace is pushed onto an internal stack;
@@ -456,7 +535,7 @@ mod tests {
     fn fresh_journal() -> TezosXJournal {
         TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             BlockConstants::dummy(),
         )
     }
@@ -511,25 +590,23 @@ mod tests {
         assert_eq!(journal.original_source(), Some(&next_eoa));
     }
 
-    // Golden vector for `synthetic_operation_hash`.
-    //
-    // Pins the digest of the seed `crac:1:2:3-4` so any drift in the
-    // format template, `CracId::Display`, or the digest function
-    // surfaces here rather than only via Tezt regressions watching
-    // KT1 churn.  Regenerate by running this test and copying the
-    // bytes printed in the failure message.
+    fn parent_hash_bytes() -> [u8; 32] {
+        std::array::from_fn(|i| (i + 1) as u8)
+    }
+
+    // Golden vector for `synthetic_operation_hash`: pins
+    // blake2b-256(b"michelson" || parent) so drift in the tag, the byte
+    // layout or the digest surfaces here rather than only via Tezt
+    // regressions watching KT1 churn.  Regenerate by running this test
+    // and copying the bytes printed in the failure message.
     #[test]
     fn test_synthetic_operation_hash_golden() {
-        let hash = TezosXJournal::synthetic_operation_hash(
-            &CracId::new(3, 4),
-            /* chain_id = */ 1,
-            /* block_number = */ 2,
-        );
-        // blake2b-256(b"cross-runtime-call:1:2:3-4")
+        let hash =
+            TezosXJournal::synthetic_operation_hash(&B256::from(parent_hash_bytes()));
         let expected = tezos_crypto_rs::hash::OperationHash::from([
-            0x6d, 0xfd, 0xd4, 0xf4, 0x11, 0x20, 0xf9, 0x8c, 0x2a, 0xfd, 0x88, 0x87, 0x40,
-            0x4d, 0x44, 0xd4, 0xa0, 0x28, 0x65, 0x3c, 0xba, 0x0f, 0xdf, 0xde, 0xb7, 0x4e,
-            0xfb, 0x3c, 0x20, 0x5e, 0x42, 0xbf,
+            0x95, 0x79, 0x34, 0x08, 0x4c, 0x41, 0x5f, 0xf8, 0xcc, 0xab, 0xf8, 0x6a, 0x2a,
+            0xf0, 0x7d, 0xb6, 0xcc, 0x55, 0x7c, 0xf7, 0x59, 0xe7, 0xaa, 0x50, 0xd1, 0x67,
+            0x3b, 0xf4, 0x8c, 0x39, 0xcc, 0xc5,
         ]);
         assert_eq!(
             hash,
@@ -539,11 +616,69 @@ mod tests {
         );
     }
 
+    // Same for the dual derivation, which was pinned only from OCaml
+    // (`cross_runtime.ml`) and so could drift without running Tezt.
+    #[test]
+    fn test_synthetic_evm_tx_hash_golden() {
+        let hash = TezosXJournal::synthetic_evm_tx_hash(
+            &tezos_crypto_rs::hash::OperationHash::from(parent_hash_bytes()),
+        );
+        let expected = B256::new([
+            0x5e, 0x02, 0x87, 0x13, 0x6d, 0xd2, 0xa9, 0x6e, 0x55, 0xaa, 0xd4, 0x95, 0xed,
+            0xcc, 0x32, 0x9a, 0xfc, 0x57, 0xdf, 0x76, 0xe8, 0x96, 0xe2, 0x9c, 0x42, 0xe1,
+            0xf8, 0x0d, 0x9d, 0xa7, 0xde, 0xb4,
+        ]);
+        assert_eq!(
+            hash, expected,
+            "synthetic_evm_tx_hash drifted from golden vector; got {hash:02x?}",
+        );
+    }
+
+    // Guards against one derivation's body being copy-pasted over the
+    // other's.
+    #[test]
+    fn test_synthetic_derivations_do_not_collide() {
+        let parent = parent_hash_bytes();
+        let michelson = TezosXJournal::synthetic_operation_hash(&B256::from(parent));
+        let evm = TezosXJournal::synthetic_evm_tx_hash(
+            &tezos_crypto_rs::hash::OperationHash::from(parent),
+        );
+        assert_ne!(michelson.as_ref(), evm.as_slice());
+    }
+
+    // The synthetic hash is a function of the originating operation
+    // alone: stable across derivations, distinct across parents.
+    #[test]
+    fn test_synthetic_hashes_depend_only_on_parent() {
+        let parent = B256::from(parent_hash_bytes());
+        assert_eq!(
+            TezosXJournal::synthetic_operation_hash(&parent),
+            TezosXJournal::synthetic_operation_hash(&parent),
+        );
+
+        let other = B256::from([0xffu8; 32]);
+        assert_ne!(
+            TezosXJournal::synthetic_operation_hash(&parent),
+            TezosXJournal::synthetic_operation_hash(&other),
+        );
+
+        let m_parent = tezos_crypto_rs::hash::OperationHash::from(parent_hash_bytes());
+        let m_other = tezos_crypto_rs::hash::OperationHash::from([0xffu8; 32]);
+        assert_eq!(
+            TezosXJournal::synthetic_evm_tx_hash(&m_parent),
+            TezosXJournal::synthetic_evm_tx_hash(&m_parent),
+        );
+        assert_ne!(
+            TezosXJournal::synthetic_evm_tx_hash(&m_parent),
+            TezosXJournal::synthetic_evm_tx_hash(&m_other),
+        );
+    }
+
     #[test]
     fn test_crac_id_available_from_creation() {
         let journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert_eq!(journal.crac_id().origin_runtime, 1);
@@ -555,7 +690,7 @@ mod tests {
     fn test_verify_crac_id_matching() {
         let journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert!(journal.verify_crac_id("1-42").is_ok());
@@ -565,7 +700,7 @@ mod tests {
     fn test_verify_crac_id_mismatch() {
         let journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert!(journal.verify_crac_id("0-99").is_err());
@@ -584,12 +719,12 @@ mod tests {
     fn test_crac_id_is_stable() {
         let j1 = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let j2 = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         assert_eq!(j1.crac_id(), j2.crac_id());
@@ -599,7 +734,7 @@ mod tests {
     fn test_record_request_and_response() {
         let mut journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.set_http_trace_enabled(true);
@@ -637,7 +772,7 @@ mod tests {
     fn test_nested_traces() {
         let mut journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.set_http_trace_enabled(true);
@@ -683,7 +818,7 @@ mod tests {
     fn test_record_skipped_when_http_trace_disabled() {
         let mut journal = TezosXJournal::new(
             test_crac_id(),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         // Left at the default (`false`): no `set_http_trace_enabled`.

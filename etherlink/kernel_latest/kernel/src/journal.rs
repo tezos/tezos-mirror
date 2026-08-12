@@ -6,9 +6,8 @@ use std::str::FromStr;
 
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use revm::context::result::ExecutionResult;
-use revm::primitives::{Address, B256};
+use revm::primitives::Address;
 use revm_etherlink::EvmRunError;
-use tezos_crypto_rs::hash::OperationHash;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{
     log,
@@ -23,18 +22,7 @@ use crate::chains::{
     tezos_op_evm_gas_limit, DebugFeatures, TezlinkContent, TezlinkOperation,
 };
 
-/// The two hashes a journal needs, which are NOT the same value.
-///
-/// [`michelson`] seeds the manager operation's single origination nonce, so
-/// a child KT1 is `digest_160(michelson[32] || index[4])`. [`evm`] is the
-/// Ethereum transaction hash appearing in this transaction's receipt; it is
-/// what `get_tracer_configuration` matches a `debug_trace*` request's target
-/// hash against, so a wrong value here silently traces nothing (or the wrong
-/// transaction).
-pub struct TezosXHashes {
-    pub evm: B256,
-    pub michelson: OperationHash,
-}
+pub use tezosx_journal::TezosXHashes;
 
 /// Build the [`TezosXJournal`] for one transaction application. Every
 /// journal built here must eventually reach [`close_tezosx_journal`].
@@ -48,11 +36,8 @@ pub fn prepare_tezosx_journal(
     internal_operations_base: u128,
     tracer_input: Option<TracerInput>,
 ) -> TezosXJournal {
-    let mut journal = TezosXJournal::new(
-        crac_id,
-        operation_hashes.michelson.clone(),
-        block_constants.clone(),
-    );
+    let mut journal =
+        TezosXJournal::new(crac_id, operation_hashes.clone(), block_constants.clone());
     // Fold the block's prior internal ops into this op's cap (anti-DoS).
     journal
         .michelson

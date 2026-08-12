@@ -299,6 +299,27 @@ module TezContract = struct
         json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
         |-> "consumed_milligas" |> as_int)
 
+  (** [get_michelson_op_hash ~block ~index sequencer] returns the base58
+   *  ["o..."] hash of [block]'s manager operation at [index]. This is the
+   *  hash the kernel derives the mirroring fake EVM transaction from, so
+   *  tests recompute that hash from here rather than from a block-local
+   *  index.
+   *
+   *  @param block Block identifier (default ["head"]).
+   *  @param index Manager-operation index in the block (default [0]). *)
+  let get_michelson_op_hash ?(block = "head") ?(index = 0) sequencer =
+    let path =
+      sf "/tezlink/chains/main/blocks/%s/operations/3/%d" block index
+    in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"tezlink_operation_hash" res in
+    return JSON.(json |-> "hash" |> as_string)
+
   (** [get_gateway_consumed_milligas ~block ~entrypoint sequencer] queries
    *  the tezlink RPC for [block]'s first manager operation and returns
    *  the [consumed_milligas] of the internal gateway operation matching
@@ -4166,21 +4187,16 @@ let crac_received_event_topic =
   event_topic
     "CrossRuntimeCallReceived(string,string,string,string,string,uint256)"
 
-(* OCaml re-derivation of the kernel's [compute_crac_fake_tx_hash]:
-   keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be32 || crac_id). Pins the
-   cross-runtime fake-tx hashing recipe independently of the kernel. *)
-let compute_crac_fake_tx_hash ~block_number ~crac_id =
-  let be32 = Bytes.make 32 '\000' in
-  let n = ref block_number in
-  for i = 31 downto 0 do
-    Bytes.set be32 i (Char.chr (!n land 0xff)) ;
-    n := !n lsr 8
-  done ;
-  let payload =
-    Bytes.concat
-      Bytes.empty
-      [Bytes.of_string "CROSS-RUNTIME-CALL-TX"; be32; Bytes.of_string crac_id]
+(* OCaml re-derivation of the kernel's [synthetic_evm_tx_hash]:
+   keccak256("evm" || michelson_op_hash). Pins the cross-runtime fake-tx
+   hashing recipe independently of the kernel. [michelson_op_hash] is the
+   base58 ["o..."] hash of the originating Michelson operation. *)
+let compute_crac_fake_tx_hash ~michelson_op_hash =
+  let parent =
+    Tezos_crypto.Hashed.Operation_hash.of_b58check_exn michelson_op_hash
+    |> Tezos_crypto.Hashed.Operation_hash.to_string |> Bytes.of_string
   in
+  let payload = Bytes.cat (Bytes.of_string "evm") parent in
   let digest = Tezos_crypto.Hacl.Hash.Keccak_256.digest payload in
   String.lowercase_ascii ("0x" ^ (Hex.of_bytes digest |> Hex.show))
 
@@ -4211,15 +4227,15 @@ let json_deep_equal a b =
   sort_ezjson (JSON.unannotate a) = sort_ezjson (JSON.unannotate b)
 
 (* [true] iff the block-trace entry [t]'s [txHash] is the synthetic CRAC
-   fake-tx hash recomputed from [block_number] and one of [crac_ids]
-   (["<origin_runtime>-<tx_index>"], e.g. "0-0" for the first Michelson
-   operation of a block) — i.e. [t] is an incoming Michelson-originated
-   fake-tx trace, not a plain EVM / deposit trace. *)
-let block_entry_is_crac_fake_tx ~block_number ~crac_ids t =
+   fake-tx hash recomputed from one of [michelson_op_hashes] — i.e. [t] is an
+   incoming Michelson-originated fake-tx trace, not a plain EVM / deposit
+   trace. *)
+let block_entry_is_crac_fake_tx ~michelson_op_hashes t =
   let tx_hash = String.lowercase_ascii JSON.(t |-> "txHash" |> as_string) in
   List.exists
-    (fun crac_id -> tx_hash = compute_crac_fake_tx_hash ~block_number ~crac_id)
-    crac_ids
+    (fun michelson_op_hash ->
+      tx_hash = compute_crac_fake_tx_hash ~michelson_op_hash)
+    michelson_op_hashes
 
 (* For every entry of a [debug_traceBlockByNumber] result, assert its [result]
    is JSON-deep-equal to [debug_traceTransaction(txHash)] traced with the SAME
@@ -4390,13 +4406,10 @@ let test_crac_debug_trace_transaction () =
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
   let crac_tx_hash = first_tx_hash ~prefix block in
-  (* Pin the fake-tx hashing recipe: the single CRAC op is tx index 0 of a
-     Tezos-originated (origin 0) crossing, so crac_id = "0-0". *)
-  let recomputed =
-    compute_crac_fake_tx_hash
-      ~block_number:(Int32.to_int block.number)
-      ~crac_id:"0-0"
-  in
+  (* Pin the fake-tx hashing recipe: it derives from the originating
+     Michelson operation's own hash. *)
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  let recomputed = compute_crac_fake_tx_hash ~michelson_op_hash in
   Check.(
     (String.lowercase_ascii crac_tx_hash = recomputed)
       string
@@ -4685,11 +4698,8 @@ let test_crac_call_tracer_incoming_backtrack_no_fake_tx () =
       ~error_msg:
         (prefix ^ ": a backtracked incoming NAC must emit no fake tx, got %L")) ;
   (* The recipe hash for the would-be crossing resolves to no transaction. *)
-  let fake_hash =
-    compute_crac_fake_tx_hash
-      ~block_number:(Int32.to_int block.number)
-      ~crac_id:"0-0"
-  in
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  let fake_hash = compute_crac_fake_tx_hash ~michelson_op_hash in
   let*@ obj =
     Rpc.get_transaction_by_hash ~transaction_hash:fake_hash sequencer
   in
@@ -5684,11 +5694,10 @@ let test_crac_debug_trace_block () =
      identify it by hash, then pin its envelope + children + sentinel log.
      This also proves block-mode tracing keeps exactly one trace per tx
      (the [List.combine] zip in the node never sees a mismatched arity). *)
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
   let crac_traces, _ =
     List.partition
-      (block_entry_is_crac_fake_tx
-         ~block_number:(Int32.to_int block.number)
-         ~crac_ids:["0-0"])
+      (block_entry_is_crac_fake_tx ~michelson_op_hashes:[michelson_op_hash])
       trace_results
   in
   Check.(
@@ -5775,12 +5784,8 @@ let test_crac_debug_trace_normal_tx_in_crac_block () =
       int
       ~error_msg:(prefix ^ ": a plain transfer must have no children, got %L")) ;
   (* And the CRAC fake tx still renders its own tree under a distinct hash. *)
-  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let crac_hash =
-    compute_crac_fake_tx_hash
-      ~block_number:(Int32.to_int block.number)
-      ~crac_id:"0-0"
-  in
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  let crac_hash = compute_crac_fake_tx_hash ~michelson_op_hash in
   Check.(
     (String.lowercase_ascii crac_hash <> String.lowercase_ascii normal_tx_hash)
       string
@@ -5861,14 +5866,14 @@ let test_crac_l2_1212_multi_michelson_block () =
       ~tracer_config:[("withLog", `Bool true)]
       trace_results
   in
-  (* Exactly two of the three entries are CRAC fake txs, identified by their
-     recomputed fake-tx recipe hashes (the two Michelson operations of the
-     block have CRAC-IDs "0-0" and "0-1"). *)
+  (* Exactly two of the three entries are CRAC fake txs, identified by the
+     recomputed fake-tx recipe hashes of the block's two Michelson
+     operations. *)
+  let* op_hash_0 = TezContract.get_michelson_op_hash ~index:0 sequencer in
+  let* op_hash_1 = TezContract.get_michelson_op_hash ~index:1 sequencer in
   let crac_entries, plain_entries =
     List.partition
-      (block_entry_is_crac_fake_tx
-         ~block_number:(Int32.to_int block.number)
-         ~crac_ids:["0-0"; "0-1"])
+      (block_entry_is_crac_fake_tx ~michelson_op_hashes:[op_hash_0; op_hash_1])
       trace_results
   in
   Check.(
@@ -5969,11 +5974,10 @@ let test_crac_debug_trace_block_consistency_mixed () =
       trace_results
   in
   (* Exactly one incoming (fake-tx hash) and one outgoing (plain root) entry. *)
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
   let incoming, outgoing =
     List.partition
-      (block_entry_is_crac_fake_tx
-         ~block_number:(Int32.to_int block.number)
-         ~crac_ids:["0-0"])
+      (block_entry_is_crac_fake_tx ~michelson_op_hashes:[michelson_op_hash])
       trace_results
   in
   Check.(
@@ -8169,28 +8173,15 @@ let check_evm_block_tx_count ~prefix ~expected_tx_count sequencer =
       ~error_msg:"Expected %R EVM transaction(s), got %L") ;
   return block
 
-(** Compute the expected fake CRAC transaction hash for a given [crac_id]
-    and [block_number], then verify it is present in the block's tx hashes.
-    The kernel computes: hash = keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be256 || crac_id). *)
-let check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
-  let block_number_be256 =
-    let buf = Bytes.make 32 '\000' in
-    Bytes.set_int64_be buf 24 (Int64.of_int32 block.number) ;
-    buf
-  in
-  let expected_hash_bytes =
-    Tezos_crypto.Hacl.Hash.Keccak_256.digest
-      (Bytes.cat
-         (Bytes.cat
-            (Bytes.of_string "CROSS-RUNTIME-CALL-TX")
-            block_number_be256)
-         (Bytes.of_string expected_crac_id))
-  in
-  let expected_hash = "0x" ^ (Hex.of_bytes expected_hash_bytes |> Hex.show) in
+(** Compute the expected fake CRAC transaction hash from the originating
+    Michelson operation's hash, then verify it is present in the block's tx
+    hashes. The kernel computes: keccak256("evm" || michelson_op_hash). *)
+let check_fake_crac_tx_hash ~prefix ~michelson_op_hash (block : Block.t) =
+  let expected_hash = compute_crac_fake_tx_hash ~michelson_op_hash in
   Log.info
-    "%s: expected fake tx hash for CRAC-ID %s = %s"
+    "%s: expected fake tx hash for Michelson op %s = %s"
     prefix
-    expected_crac_id
+    michelson_op_hash
     expected_hash ;
   let tx_hashes =
     match block.transactions with
@@ -8206,9 +8197,10 @@ let check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
     (List.mem expected_hash tx_hashes)
     ~error_msg:
       (sf
-         "%s: Expected fake CRAC tx hash (CRAC-ID %s) in EVM block tx hashes"
+         "%s: Expected fake CRAC tx hash (Michelson op %s) in EVM block tx \
+          hashes"
          prefix
-         expected_crac_id)
+         michelson_op_hash)
 
 (** Verify that [top] is a valid CRAC top-level content item per the RFC.
     Checks source = handler, destination = [expected_destination],
@@ -10466,7 +10458,8 @@ let test_crac_receipt_tez_evm_tez () =
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
   in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash block ;
   (* ── Michelson runtime side: EVM→TEZ return leg ────────────────────── *)
   (* Origin is TEZ (runtime_id=0), so re-entering TEZ should NOT
      produce a CRAC event — the event was already emitted on the
@@ -11649,10 +11642,11 @@ let test_crac_receipt_evm_not_first_tx () =
  * CRAC-ID = "0-1".
  *
  * The kernel computes the fake EVM transaction hash as:
- *   keccak256("CROSS-RUNTIME-CALL-TX" || block_number_be256 || crac_id_string)
+ *   keccak256("evm" || michelson_op_hash)
  * Since there is no "cross_runtime_call" event on the Michelson runtime side for TEZ-originated
- * CRACs (origin_runtime = 0), we verify the CRAC-ID by matching the
- * fake transaction hash in the EVM block.
+ * CRACs (origin_runtime = 0), we verify which operation was mirrored by
+ * matching the fake transaction hash in the EVM block against each
+ * Michelson operation's own hash.
  *
  *   TEZ[dummy transfer]   (Michelson tx_index 0)
  *   TEZ[tez_runner] |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]  (Michelson tx_index 1)
@@ -11711,9 +11705,35 @@ let test_crac_receipt_tez_not_first_tx () =
   (* Produce one block containing both Michelson transactions. *)
   let*@ _block_number = Rpc.produce_block sequencer in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
-  (* Verify the fake CRAC tx hash matches CRAC-ID "0-1". *)
+  (* The fake tx mirrors the CRAC operation — the SECOND Michelson op of the
+     block — and not the dummy transfer at index 0. Since the fake-tx hash
+     now derives from the originating operation's own hash rather than from
+     its index, pinning which of the two hashes it matches is what proves the
+     mirrored operation is the one at tx_index 1. *)
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-1" block ;
+  let* dummy_op_hash = TezContract.get_michelson_op_hash ~index:0 sequencer in
+  let* crac_op_hash = TezContract.get_michelson_op_hash ~index:1 sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash:crac_op_hash block ;
+  let dummy_derived =
+    compute_crac_fake_tx_hash ~michelson_op_hash:dummy_op_hash
+  in
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hs -> List.map String.lowercase_ascii hs
+    | Block.Full txs ->
+        List.map
+          (fun (tx : Transaction.transaction_object) ->
+            String.lowercase_ascii tx.hash)
+          txs
+    | Block.Empty -> []
+  in
+  Check.is_false
+    (List.mem dummy_derived tx_hashes)
+    ~error_msg:
+      (sf
+         "%s: the dummy Michelson transfer at index 0 must not be mirrored by \
+          a fake tx"
+         prefix) ;
   unit
 
 (* Mixed block: one EVM tx (tx_index 0) followed by one TezosDelayed
@@ -11789,7 +11809,8 @@ let test_crac_receipt_evm_then_tez_same_block () =
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:2 sequencer
   in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash block ;
   unit
 
 (* RFC Example 1: Michelson → EVM (simple success).
@@ -12087,7 +12108,8 @@ let test_crac_receipt_tez_evm_tez_evm () =
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
   in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash block ;
   unit
 
 (* 5-crossing chain receipt — EVM-originated CRAC chain with 5 hops.
@@ -12558,7 +12580,8 @@ let test_crac_receipt_tez_mixed_calls_with_crac () =
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
   in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash block ;
   unit
 
 (** Generic call() precompile: EVM calls TEZ via HTTP, succeeds.
@@ -15262,7 +15285,7 @@ let test_crac_evm_to_tez_high_gas () =
  * silently overwrote any previously-deployed child.
  *
  * The fix derives the operation hash from
- * `blake2b(crac:<block_number>:<crac_id>)` AND persists the
+ * `blake2b("michelson:" || evm_tx_hash)` AND persists the
  * origination index in the Michelson journal across the inbound-CRAC
  * handler invocations of a single synthetic Michelson manager
  * operation.  This guarantees three properties end-to-end:
@@ -15273,8 +15296,8 @@ let test_crac_evm_to_tez_high_gas () =
  *   3. intra-operation isolation (two inbound CRACs triggered by the
  *      same top-level EVM transaction, e.g. one EVM contract calling
  *      two distinct Michelson callees in turn — the case the
- *      block-number/crac-id seed alone could not catch because both
- *      CRACs share the same seed).
+ *      operation-hash seed alone cannot catch because both CRACs
+ *      share the same seed).
  *
  * The three tests below pin each property; a fourth pre-fix
  * verification asserts the children never collapse onto the legacy
@@ -18234,7 +18257,8 @@ let test_crac_receipt_tez_origin_reentry_trailing_op () =
   let* block =
     check_evm_block_tx_count ~prefix ~expected_tx_count:1 sequencer
   in
-  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
+  check_fake_crac_tx_hash ~prefix ~michelson_op_hash block ;
   (* ── Michelson side: root op un-bracketed, one frame inside ─── *)
   let* ops = fetch_recent_michelson_manager_ops sequencer in
   let op_list = JSON.(ops |> as_list) in
