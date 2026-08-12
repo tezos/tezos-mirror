@@ -903,6 +903,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -960,6 +961,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1021,6 +1023,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1576,6 +1579,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1614,6 +1618,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1761,6 +1766,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1910,6 +1916,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2004,6 +2011,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2250,6 +2258,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2410,6 +2419,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2858,6 +2868,7 @@ mod tests {
             &registry,
             &commit_block,
             &mut journal,
+            None,
         )
         .unwrap();
 

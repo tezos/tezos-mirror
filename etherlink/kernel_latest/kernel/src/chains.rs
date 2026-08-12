@@ -31,7 +31,7 @@ use primitive_types::{H160, H256, U256};
 use revm::{context::result::ExecutionResult, primitives::hardfork::SpecId};
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
+    storage::block::BLOCKS_STORED,
 };
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
@@ -935,31 +935,6 @@ pub struct TezlinkBlockConstants {
     pub safe_roots: Vec<OwnedPath>,
 }
 
-fn credit_da_fees<Host>(
-    host: &mut Host,
-    sequencer_pool_address: Option<H160>,
-    da_fees_mutez: u64,
-) -> Result<(), anyhow::Error>
-where
-    Host: StorageV1,
-{
-    if let Some(sequencer_pool_address) = sequencer_pool_address {
-        let da_fees_wei = eth_from_mutez(da_fees_mutez);
-        let mut account =
-            StorageAccount::from_address(&h160_to_alloy(&sequencer_pool_address))?;
-        if account
-            .add_balance(host, u256_to_alloy(&da_fees_wei))
-            .is_err()
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to compensate sequencer with da fees",
-            ));
-        }
-    };
-
-    Ok(())
-}
-
 enum CreditDaFees {
     Skip,
     Execute {
@@ -976,13 +951,20 @@ impl CreditDaFees {
         }
     }
 
-    fn apply<Host: StorageV1>(self, host: &mut Host) -> Result<(), anyhow::Error> {
+    /// The sequencer pool and what it is owed, for the commit to pay.
+    /// `None` when no pool is configured or nothing is owed.
+    fn to_credit(&self) -> Option<(revm::primitives::Address, revm::primitives::U256)> {
         match self {
-            CreditDaFees::Skip => Ok(()),
+            CreditDaFees::Skip => None,
             CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez,
-            } => credit_da_fees(host, sequencer_pool_address, da_fees_mutez),
+            } => sequencer_pool_address.map(|address| {
+                (
+                    h160_to_alloy(&address),
+                    u256_to_alloy(&eth_from_mutez(*da_fees_mutez)),
+                )
+            }),
         }
     }
 }
@@ -1231,8 +1213,6 @@ where
                 ),
             };
 
-            credit_da_fees.apply(host)?;
-
             // Extract cross-runtime side effects accumulated
             // during the Michelson execution (e.g. CRAC into EVM)
             // BEFORE the commit: `commit_evm_journal_from_external`
@@ -1253,6 +1233,7 @@ where
                     registry,
                     evm_block_constants,
                     journal,
+                    credit_da_fees.to_credit(),
                 )?;
                 push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             }
