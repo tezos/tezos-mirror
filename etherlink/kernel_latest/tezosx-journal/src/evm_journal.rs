@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use evm_inspectors::Tracer;
 use revm::{
     context::{transaction::AccessList, JournalInner},
-    primitives::Address,
+    primitives::{Address, B256},
     JournalEntry,
 };
 use tezos_ethereum::block::BlockConstants;
@@ -74,6 +74,13 @@ pub struct EvmJournal {
     /// block-invariant, so the value set at the top is correct for every
     /// re-entrant frame (L2-1417).
     outer_block: BlockConstants,
+    /// EVM-side identity of the operation this journal serves: the real
+    /// transaction hash when EVM-entered, the synthetic one from
+    /// [`crate::TezosXJournal::synthetic_evm_tx_hash`] when
+    /// Michelson-entered. Supplied at creation like `outer_block`, so the
+    /// fake transaction mirroring a crossing is derived once rather than
+    /// recomputed at a second site that has to agree with the first.
+    tx_hash: B256,
     /// Tracer of the transaction being executed, when tracing was
     /// requested. The journal owns it so it can follow the transaction
     /// across execution contexts (a cross-runtime call spawns a fresh EVM
@@ -111,7 +118,7 @@ impl EvmJournal {
     /// [`crate::TezosXJournal::new`] — rather than poked in afterwards, so
     /// the cross-runtime journal owns the single point that distributes
     /// block context to each runtime's sub-journal.
-    pub fn new(outer_block: BlockConstants) -> Self {
+    pub fn new(outer_block: BlockConstants, tx_hash: B256) -> Self {
         Self {
             layered_state: LayeredState::new(),
             inner: JournalInner::new(),
@@ -122,9 +129,15 @@ impl EvmJournal {
             revm_call_depth: None,
             cross_runtime_originator: None,
             outer_block,
+            tx_hash,
             pending_alias_delegation: None,
             tracer: TracerSlot(None),
         }
+    }
+
+    /// `B256::ZERO` outside a block-producing context (simulation, tests).
+    pub fn tx_hash(&self) -> B256 {
+        self.tx_hash
     }
 }
 
@@ -273,7 +286,7 @@ impl EvmJournal {
 
 impl Default for EvmJournal {
     fn default() -> Self {
-        Self::new(BlockConstants::dummy())
+        Self::new(BlockConstants::dummy(), B256::ZERO)
     }
 }
 
@@ -284,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_record_crac_crossing_keeps_first_source() {
-        let mut journal = EvmJournal::new(BlockConstants::dummy());
+        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         // The originator is invariant across crossings, so the first
         // one fixes `source` and later crossings never change it.
         journal.record_crac_crossing(Address::from([0x11; 20]), true);
@@ -295,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_take_crac_data_returns_none_when_no_crac() {
-        let mut journal = EvmJournal::new(BlockConstants::dummy());
+        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         assert!(journal.take_crac_data().is_none());
     }
 
@@ -303,7 +316,7 @@ mod tests {
     fn test_static_only_crossing_is_suppressed() {
         // A read-only `staticcall_evm` crossing leaves no EVM-observable
         // effect, so no fake tx is built even though a CRAC was serviced.
-        let mut journal = EvmJournal::new(BlockConstants::dummy());
+        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         journal.record_crac_crossing(Address::from([0x11; 20]), false);
         assert!(journal.has_crac_data());
         assert!(journal.take_crac_data().is_none());
@@ -314,7 +327,7 @@ mod tests {
     fn test_mutating_after_static_is_not_suppressed() {
         // L2-1408 regression: a leading static crossing must not latch
         // the slot and suppress a later mutating crossing.
-        let mut journal = EvmJournal::new(BlockConstants::dummy());
+        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         journal.record_crac_crossing(Address::from([0x11; 20]), false);
         journal.record_crac_crossing(Address::from([0x11; 20]), true);
         let info = journal.take_crac_data().unwrap();
@@ -324,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_take_crac_data_consumes() {
-        let mut journal = EvmJournal::new(BlockConstants::dummy());
+        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         journal.record_crac_crossing(Address::from([0x11; 20]), true);
 
         let _ = journal.take_crac_data().unwrap();

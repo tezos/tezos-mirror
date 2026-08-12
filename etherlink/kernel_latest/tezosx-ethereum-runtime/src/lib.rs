@@ -811,6 +811,8 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(all(test, feature = "testing"))]
 mod tests {
+    use tezosx_journal::TezosXHashes;
+
     use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
     use revm::primitives::Address;
     use revm::state::Bytecode;
@@ -2071,7 +2073,7 @@ mod tests {
                 u8::from(tezosx_interfaces::RuntimeId::Ethereum),
                 0,
             ),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             BlockConstants::dummy(),
         );
         // Inbound CRAC: source = A (originator), sender = B (caller).
@@ -2826,7 +2828,7 @@ mod tests {
 
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(0, 0),
-            Default::default(),
+            TezosXHashes::zero(),
             outer,
         );
 

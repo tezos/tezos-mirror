@@ -4,7 +4,7 @@
 
 use crate::{
     apply::{extract_cross_runtime_effects, RuntimeExecutionInfo, TezosExecutionInfo},
-    block_in_progress::{compute_crac_fake_tx_hash, BlockInProgress},
+    block_in_progress::BlockInProgress,
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     configuration::EVM_CHAIN_ID,
@@ -28,10 +28,7 @@ use evm_inspectors::TracerInput;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
-use revm::{
-    context::result::ExecutionResult,
-    primitives::{hardfork::SpecId, B256},
-};
+use revm::{context::result::ExecutionResult, primitives::hardfork::SpecId};
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     storage::{block::BLOCKS_STORED, world_state_handler::StorageAccount},
@@ -773,29 +770,22 @@ impl TezosXChainConfig {
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
-        let operation_hashes = TezosXHashes {
-            // The EVM-side identity of this operation is the fake transaction
-            // it registers in the EVM block, NOT its Tezos hash: that fake
-            // hash is what a `debug_trace*` request targets. Recompute it
-            // exactly as `register_crac_evm_transaction` does at block
-            // generation, or the tracer filter never matches and the trace
-            // silently comes back empty.
-            evm: B256::from(compute_crac_fake_tx_hash(
-                block_in_progress.number,
-                &crac_id.to_string(),
-            )),
-            // The journal holds the single origination nonce for the whole
-            // manager operation, seeded from the Tezos operation hash. Both
-            // arms seed it with the very hash the operation's receipt carries,
-            // so the KT1s a `CREATE_CONTRACT` derives and the hash observers
-            // see in the Tezos block cannot drift apart.
-            michelson: match &operation.content {
-                TezlinkContent::Tezos(operation) => operation.hash()?,
-                // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
-                // journal with the deposit's own `transaction_hash`
-                TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
-            },
+        // The journal holds the single origination nonce for the whole
+        // manager operation, seeded from the Tezos operation hash. Both
+        // arms seed it with the very hash the operation's receipt carries,
+        // so the KT1s a `CREATE_CONTRACT` derives and the hash observers
+        // see in the Tezos block cannot drift apart.
+        let michelson_op_hash = match &operation.content {
+            TezlinkContent::Tezos(operation) => operation.hash()?,
+            // Mirroring `pure_xtz_deposit` / `pure_fa_deposit` in apply.rs, which likewise seed the
+            // journal with the deposit's own `transaction_hash`
+            TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
         };
+        // The EVM-side identity of this operation is the fake transaction it
+        // registers in the EVM block, NOT its Tezos hash: that fake hash is
+        // what a `debug_trace*` request targets. It derives from the Michelson
+        // hash above, so it must be computed after it.
+        let operation_hashes = TezosXHashes::from_michelson_operation(michelson_op_hash);
         // Seed the journal with this block's EVM environment so any
         // inbound CRAC the Michelson operation dispatches to the EVM
         // runtime exposes the live block observables (BASEFEE,

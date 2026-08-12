@@ -1502,6 +1502,7 @@ impl TezosRuntime {
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_ethereum::block::BlockConstants;
+    use tezosx_journal::TezosXHashes;
 
     use super::*;
     use tezos_tezlink::operation_result::OperationKind;
@@ -3130,7 +3131,7 @@ mod tests {
             X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
             X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
         };
-        use tezos_crypto_rs::hash::OperationHash;
+
         use tezosx_journal::CracId;
 
         // alias(E_0): EVM tx originator alias — top-level CRAC source.
@@ -3149,11 +3150,8 @@ mod tests {
         // match the journal's id for `verify_crac_id` to pass.
         let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
         let crac_id_str = crac_id.to_string();
-        let mut journal = TezosXJournal::new(
-            crac_id,
-            OperationHash::default(),
-            BlockConstants::dummy(),
-        );
+        let mut journal =
+            TezosXJournal::new(crac_id, TezosXHashes::zero(), BlockConstants::dummy());
 
         // Non-empty body holding an encoded Unit: skips the empty-body
         // Unit fallback (which would itself draw on the tight gas) and
@@ -3253,7 +3251,7 @@ mod tests {
         };
         use mir::ast::micheline::Micheline;
         use tezos_crypto_rs::blake2b::digest_160;
-        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezosx_journal::CracId;
 
         // The frame's counter is resumed from this sentinel. A non-zero,
@@ -3337,11 +3335,8 @@ mod tests {
 
         let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
         let crac_id_str = crac_id.to_string();
-        let mut journal = TezosXJournal::new(
-            crac_id,
-            OperationHash::default(),
-            BlockConstants::dummy(),
-        );
+        let mut journal =
+            TezosXJournal::new(crac_id, TezosXHashes::zero(), BlockConstants::dummy());
 
         // Pre-seed the journal counter to model a prior reentrant frame
         // having already assigned identities up to SEEDED_COUNTER.
@@ -3411,7 +3406,7 @@ mod tests {
         use mir::ast::micheline::Micheline;
         use mir::interpreter::MAX_INTERNAL_OPERATIONS;
         use tezos_crypto_rs::blake2b::digest_160;
-        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezosx_journal::CracId;
 
         const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
@@ -3488,7 +3483,7 @@ mod tests {
             let crac_id_str = crac_id.to_string();
             let mut journal = TezosXJournal::new(
                 crac_id,
-                OperationHash::default(),
+                TezosXHashes::zero(),
                 BlockConstants::dummy(),
             );
             journal.michelson.set_internal_operation_counter(base);

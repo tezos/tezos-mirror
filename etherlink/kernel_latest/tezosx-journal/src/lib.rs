@@ -13,7 +13,7 @@ pub use error::LayeredStateError;
 pub use evm_journal::{CracTransactionInfo, EvmJournal};
 pub use layered_state::LayeredState;
 pub use michelson_journal::{DispatchSlotError, MichelsonJournal};
-pub use tezosx_journal::{CracId, HttpTrace, TezosXJournal};
+pub use tezosx_journal::{CracId, HttpTrace, TezosXHashes, TezosXJournal};
 // Re-exported for callers that reach the originator through the journal;
 // the type itself is runtime-agnostic and defined in `tezosx-types`.
 pub use tezosx_types::OriginalSource;

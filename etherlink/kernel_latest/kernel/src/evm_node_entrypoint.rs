@@ -20,6 +20,7 @@ use crate::{
     chains::{self, TezosXChainConfig},
     configuration::fetch_tezosx_configuration,
     delayed_inbox::DelayedInbox,
+    journal::{prepare_tezosx_journal, TezosXHashes},
     sub_block,
     transaction::Transaction,
 };
@@ -312,67 +313,59 @@ where
     // application.
     let skip_fees_check = skip_signature_check;
 
-    // For Tezos transactions, call apply_tezos_operation directly with an
-    // external journal so we can capture HTTP traces.  For Ethereum
-    // transactions, go through the normal apply_transaction path.
-    let trace_crac_id = tezosx_journal::CracId::new(0, 0);
-    // Seed the journal's origination nonce exactly as
-    // `TezosXChainConfig::apply_tezos_operation` does, so pre-applied KT1s
-    // match the ones application produces: a Michelson operation uses its
-    // real hash, a deposit its blueprint-supplied `tx_hash`.
-    // `apply_tezos_operation` also reads this back as the receipt's
-    // operation hash. An Ethereum transaction never reaches
-    // `apply_tezos_operation`, so its journal only needs a seed that is
-    // unique per simulation — hence the synthetic one.
-    let trace_operation_hash = match &transaction {
-        chains::TezosXTransaction::Tezos(operation) => match &operation.content {
-            chains::TezlinkContent::Tezos(inner) => match inner.hash() {
-                Ok(hash) => hash,
-                Err(err) => {
-                    log!(
-                        Error,
-                        "Tezos X simulation: failed to hash operation: {:?}",
-                        err
-                    );
-                    return;
-                }
-            },
-            chains::TezlinkContent::Deposit(_) => OperationHash::from(operation.tx_hash),
-        },
-        chains::TezosXTransaction::Ethereum(_) => {
-            tezosx_journal::TezosXJournal::synthetic_operation_hash(
-                &trace_crac_id,
-                chain_config.get_evm_chain_id().low_u64(),
-                block_in_progress.number.low_u64(),
-            )
-        }
-    };
-    // Seed the journal with the live simulation block (built above from
-    // `block_in_progress`), exactly as the applied path seeds the real
-    // block, so a CRAC dispatched during a simulated/pre-applied Michelson
-    // operation observes the live block environment (`BASEFEE`, `GASLIMIT`,
-    // `GASPRICE`, `PREVRANDAO`) instead of the placeholder
-    // `BlockConstants::dummy()`. This keeps simulation and pre-application
-    // consistent with execution; mirrors `Evaluation::run` for the
-    // `eth_call`/`estimateGas` path.
-    let mut trace_journal = tezosx_journal::TezosXJournal::new(
-        trace_crac_id,
-        trace_operation_hash,
-        block_constants.evm_runtime_block_constants.clone(),
-    );
-    // Capture HTTP traces only when the node requested them by writing the
-    // flag before an `http_traceCall` (read back via `into_http_traces`
-    // below). This entrypoint is shared with the non-trace Michelson
-    // simulate used by `eth_call` / `eth_estimateGas`, which leave the flag
-    // unset and pay no trace clone. Read on the base host, before any
-    // `SafeStorage` wrapping, exactly as the applied path does.
-    trace_journal.set_http_trace_enabled(crate::storage::is_http_trace_enabled(&host));
-    let execution_result = match transaction {
+    // Only the Michelson arm needs an externally-owned journal: it calls
+    // `apply_tezos_operation` directly so the HTTP traces of the crossings it
+    // dispatches can be captured. The Ethereum arm goes through
+    // `apply_transaction`, which builds and owns its own journal, so it has
+    // neither a journal to seed here nor traces to collect — hence the empty
+    // trace list it returns below.
+    let (execution_result, traces) = match transaction {
         chains::TezosXTransaction::Tezos(operation) => {
+            // Seed the journal's origination nonce exactly as
+            // `TezosXChainConfig::apply_tezos_operation` does, so pre-applied
+            // KT1s match the ones application produces: a Michelson operation
+            // uses its real hash, a deposit its blueprint-supplied `tx_hash`.
+            // `apply_tezos_operation` also reads this back as the receipt's
+            // operation hash.
+            let michelson = match &operation.content {
+                chains::TezlinkContent::Tezos(inner) => match inner.hash() {
+                    Ok(hash) => hash,
+                    Err(err) => {
+                        log!(
+                            Error,
+                            "Tezos X simulation: failed to hash operation: {:?}",
+                            err
+                        );
+                        return;
+                    }
+                },
+                chains::TezlinkContent::Deposit(_) => {
+                    OperationHash::from(operation.tx_hash)
+                }
+            };
+            // Built through `prepare_tezosx_journal` like every applied
+            // journal, so this path cannot drift from block production on the
+            // setup it shares. The live simulation block goes in, not
+            // `BlockConstants::dummy()`, so a CRAC dispatched here observes
+            // `BASEFEE`, `GASLIMIT`, ... as execution would. The HTTP-trace
+            // flag is read on the base host, before any `SafeStorage`
+            // wrapping, exactly as the applied path does. The simulation block
+            // carries no prior operation, hence an internal-operation base of
+            // 0, and no tracer: this entrypoint reports HTTP traces, not EVM
+            // call traces.
+            let mut trace_journal = prepare_tezosx_journal(
+                tezosx_journal::CracId::new(0, 0),
+                &TezosXHashes::from_michelson_operation(michelson),
+                &block_constants.evm_runtime_block_constants,
+                crate::storage::is_http_trace_enabled(&host),
+                &chain_config.debug_features,
+                0,
+                None,
+            );
             let enable_gas_refund = chain_config
                 .experimental_features
                 .is_michelson_gas_refund_enabled();
-            chains::apply_tezos_operation(
+            let execution_result = chains::apply_tezos_operation(
                 chain_config.michelson_chain_id(),
                 &block_in_progress,
                 &mut host,
@@ -402,25 +395,29 @@ where
                     ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(res))
                 }
                 ExecutionResult::Invalid => ExecutionResult::Invalid,
-            })
+            });
+            (execution_result, trace_journal.into_http_traces())
         }
-        _ => chain_config.apply_transaction(
-            &block_in_progress,
-            &mut host,
-            &registry,
-            &outbox_queue,
-            &block_constants,
-            transaction,
-            0,
-            None,
-            None,
-            skip_signature_check,
-            skip_fees_check,
-            // This is the [tezosx_simulate] entrypoint, not the replay path:
-            // simulation writes its own aggregate traces via
-            // [store_simulation_http_traces], so the per-tx [http_trace*]
-            // capture is not wanted here.
-            false,
+        _ => (
+            chain_config.apply_transaction(
+                &block_in_progress,
+                &mut host,
+                &registry,
+                &outbox_queue,
+                &block_constants,
+                transaction,
+                0,
+                None,
+                None,
+                skip_signature_check,
+                skip_fees_check,
+                // This is the [tezosx_simulate] entrypoint, not the replay
+                // path: simulation writes its own aggregate traces via
+                // [store_simulation_http_traces], so the per-tx [http_trace*]
+                // capture is not wanted here.
+                false,
+            ),
+            Vec::new(),
         ),
     };
 
@@ -437,7 +434,6 @@ where
     };
 
     // Store captured HTTP traces.
-    let traces = trace_journal.into_http_traces();
     if let Err(err) = crate::storage::store_simulation_http_traces(&mut host, &traces) {
         log!(
             Error,
