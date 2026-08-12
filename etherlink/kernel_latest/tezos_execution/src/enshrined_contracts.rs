@@ -423,6 +423,14 @@ const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 =
 /// `HeaderMap` insertion (hash + bucket insert + potential rehash).
 const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 10_000;
 
+/// Maximum number of caller-supplied headers accepted by the `%call`
+/// gateway entrypoint. A CRAC HTTP call only needs a handful of headers;
+/// this defensive cap sits far below the vendored `http` crate's
+/// `HeaderMap` usable capacity (¾ · MAX_SIZE = ¾ · (1<<15) = 24576), past
+/// which the crate's panicking `insert` traps the kernel. Rejecting early
+/// turns a would-be trap into a graceful failed operation.
+const MAX_HTTP_CALL_HEADERS: usize = 1024;
+
 /// Keccak256 selector computation in %call_evm.
 const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
 
@@ -1492,6 +1500,26 @@ where
     }
 
     let target_host = request.uri().host().map(str::to_string);
+
+    // Reject an over-large caller header set as a 400 Bad Request, routed
+    // through the same 4xx path as a target-returned client error (a catchable
+    // operation-level revert). This is done before `inject_context_headers`,
+    // whose panicking `HeaderMap::insert` would otherwise overflow the vendored
+    // `http` crate's capacity and trap the kernel.
+    if request.headers().len() > MAX_HTTP_CALL_HEADERS {
+        let response = http::Response::builder()
+            .status(http::StatusCode::BAD_REQUEST)
+            .body(
+                format!(
+                    "too many headers ({} > {MAX_HTTP_CALL_HEADERS})",
+                    request.headers().len()
+                )
+                .into_bytes(),
+            )
+            .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+        return classify_and_charge_crac_response(response, target_host.as_deref(), ctx);
+    }
+
     let request = inject_context_headers(request, ctx)?;
 
     let response = {
