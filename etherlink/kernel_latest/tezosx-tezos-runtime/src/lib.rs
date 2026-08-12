@@ -281,6 +281,12 @@ fn build_synthetic_crac_marker(
 ///
 /// Returns the `AppliedOperation` that the block builder will store
 /// in the Michelson runtime block.
+/// [`operation_hash`] becomes the receipt's `AppliedOperation::hash`: the
+/// journal's seed, which for an EVM-entered operation is derived from the
+/// originating Ethereum transaction. Taking it from the journal — as the
+/// Tezos-entered path does — keeps the hash unique per operation and stable
+/// across the merging and nonce renumbering the receipt still undergoes
+/// before it reaches the block.
 #[allow(clippy::too_many_arguments)]
 fn build_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -294,6 +300,7 @@ fn build_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: &str,
     base_nonce: u16,
+    operation_hash: &OperationHash,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Combine, in execution order:
     //   [CRAC begin event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
@@ -389,14 +396,8 @@ fn build_crac_receipt(
             signature,
         });
 
-    let mut serialized = Vec::new();
-    op_data.bin_write(&mut serialized).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
-    })?;
-    let hash = OperationHash::from(blake2b::digest_256(&serialized));
-
     Ok(AppliedOperation {
-        hash,
+        hash: operation_hash.clone(),
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
@@ -425,6 +426,13 @@ fn build_crac_receipt(
 ///   `BackTracked(None)`, matching native Tezos L1 semantics where
 ///   ancestor ops are backtracked and the error lives once on the
 ///   actually-failing descendant.
+///
+/// [`operation_hash`] becomes the receipt's `AppliedOperation::hash`: the
+/// journal's seed, which for an EVM-entered operation is derived from the
+/// originating Ethereum transaction. Taking it from the journal — as the
+/// Tezos-entered path does — keeps the hash unique per operation and stable
+/// across the merging and nonce renumbering the receipt still undergoes
+/// before it reaches the block.
 #[allow(clippy::too_many_arguments)]
 fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -439,6 +447,7 @@ fn build_failed_crac_receipt(
     crac_id: &str,
     base_nonce: u16,
     deep_failure: bool,
+    operation_hash: &OperationHash,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // The CRAC begin event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
@@ -549,14 +558,8 @@ fn build_failed_crac_receipt(
             signature,
         });
 
-    let mut serialized = Vec::new();
-    op_data.bin_write(&mut serialized).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
-    })?;
-    let hash = OperationHash::from(blake2b::digest_256(&serialized));
-
     Ok(AppliedOperation {
-        hash,
+        hash: operation_hash.clone(),
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
@@ -975,6 +978,7 @@ where
                         &crac_id_str,
                         base_nonce,
                         deep_failure,
+                        journal.michelson.operation_hash(),
                     ) {
                         Ok(receipt) => {
                             #[cfg(debug_assertions)]
@@ -1035,6 +1039,7 @@ where
             result.internal_receipts,
             &crac_id_str,
             base_nonce,
+            journal.michelson.operation_hash(),
         )?;
         #[cfg(debug_assertions)]
         assert_receipt_markers_balanced(&receipt);
@@ -2245,6 +2250,7 @@ mod tests {
             vec![],
             crac_id,
             0,
+            &OperationHash::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2405,6 +2411,7 @@ mod tests {
             vec![],
             "1-0",
             0,
+            &OperationHash::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2534,6 +2541,7 @@ mod tests {
             "1-0",
             0,
             false, // immediate failure: alias→target must be Failed
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2644,6 +2652,7 @@ mod tests {
             "1-0",
             0,
             false, // immediate failure: error lives on alias→target
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2731,6 +2740,7 @@ mod tests {
             "1-0",
             0,
             false,
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2838,6 +2848,7 @@ mod tests {
             "1-0",
             0,
             true, // deep failure: alias→target must be BackTracked
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
