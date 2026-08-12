@@ -390,6 +390,7 @@ val register_sandbox :
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?sequencer_pool_address:string ->
   tags:string list ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?websockets:bool ->

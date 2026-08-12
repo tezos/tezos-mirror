@@ -5056,6 +5056,7 @@ mod test {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .expect("flush evm journal");
 
@@ -5207,6 +5208,7 @@ mod test {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .expect("flush evm journal");
 
@@ -5348,6 +5350,7 @@ mod test {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .expect("flush evm journal");
 
@@ -5609,6 +5612,7 @@ mod test {
             &registry,
             block_constants,
             &mut journal,
+            None,
         )
         .expect("flush evm journal");
 
@@ -5725,6 +5729,7 @@ mod test {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .expect("flush evm journal");
 

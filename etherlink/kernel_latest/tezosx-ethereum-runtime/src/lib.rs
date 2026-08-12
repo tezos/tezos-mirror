@@ -906,6 +906,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -963,6 +964,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1024,6 +1026,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1579,6 +1582,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1617,6 +1621,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1764,6 +1769,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -1914,6 +1920,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2023,6 +2030,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2280,6 +2288,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2440,6 +2449,7 @@ mod tests {
             &registry,
             &block_constants,
             &mut journal,
+            None,
         )
         .unwrap();
 
@@ -2885,8 +2895,14 @@ mod tests {
         );
 
         let commit_block = BlockConstants::test_block_with_no_fees();
-        commit_evm_journal_from_external(&mut rk, &registry, &commit_block, &mut journal)
-            .unwrap();
+        commit_evm_journal_from_external(
+            &mut rk,
+            &registry,
+            &commit_block,
+            &mut journal,
+            None,
+        )
+        .unwrap();
 
         let u256 = revm::primitives::U256::from;
         assert_eq!(

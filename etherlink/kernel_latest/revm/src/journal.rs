@@ -987,6 +987,7 @@ pub fn commit_evm_journal_from_external<Host, KS>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     journal: &mut TezosXJournal,
+    sequencer_credit: Option<(Address, U256)>,
 ) -> Result<Vec<Withdrawal>, EvmRunError>
 where
     Host: StorageV1,
@@ -995,6 +996,10 @@ where
     // never as Native: no caller to classify here.
     let db = EtherlinkVMDB::new(rk, registry, block_constants, None)?;
     let mut journal = Journal::new_with_inner(db, journal);
+    // Credit the sequencer through the journal so the payment joins the state this commit writes.
+    if let Some((address, amount)) = sequencer_credit {
+        journal.balance_incr(address, amount)?;
+    }
     let state = journal.finalize();
     DatabaseCommit::commit(journal.db_mut(), state);
     Ok(journal.db_mut().take_withdrawals())

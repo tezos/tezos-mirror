@@ -784,10 +784,10 @@ let produce_block_and_wait_for ?timestamp ~sequencer n =
 
 let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
     ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id
-    ?enable_michelson_gas_refund ?enable_debug_precompiles ?time_between_blocks
-    body =
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?sequencer_pool_address ~tags
+    ?patch_config ?websockets ?sequencer_keys ?(regression = false)
+    ?with_runtimes ?chain_id ?enable_michelson_gas_refund
+    ?enable_debug_precompiles ?time_between_blocks body =
   let register =
     if regression then Regression.register ?file:None
     else Test.register ?seed:None
@@ -818,6 +818,7 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
+      ?sequencer_pool_address
       ?patch_config
       ?websockets
       ?sequencer_keys
