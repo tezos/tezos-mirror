@@ -42,6 +42,7 @@ use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
 use tezos_tezlink::operation_result::{AddressRegistry, TransferError};
+use tezosx_journal::TemporaryBigMapIdAllocator;
 use typed_arena::Arena;
 
 /// The cross-runtime [`tezosx_interfaces::Registry`] specialized to the
@@ -108,7 +109,11 @@ pub struct TcCtx<'operation, Host: StorageV1, KS> {
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
-    pub next_temporary_id: &'operation mut BigMapId,
+    /// Handle on the operation-wide temporary big map ID counter owned
+    /// by the Michelson journal. A shared handle rather than a borrow
+    /// because [`Ctx`] holds `&mut` on the journal for as long as it
+    /// holds this context, so the two cannot both borrow it.
+    pub temporary_big_map_id_allocator: TemporaryBigMapIdAllocator,
 }
 
 pub struct OperationCtx<'operation> {
@@ -1114,9 +1119,7 @@ impl<Host: StorageV1, KS> TcCtx<'_, Host, KS> {
 
     fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
         if temporary {
-            let new_id = self.next_temporary_id.clone();
-            self.next_temporary_id.incr();
-            Ok(new_id)
+            Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
             let next_id_path = next_id_path()?;
             let id: BigMapId =
@@ -1137,17 +1140,21 @@ fn remove_big_map<Host: StorageV1>(
     Ok(())
 }
 
-/// Function to clear temporary big_maps create for an operation
+/// Remove every temporary big map `allocator` handed out.
 ///
-/// This function also reset the next temporary id to minus one
+/// To be called once the last frame allowed to reach those big maps is over,
+/// otherwise a big map still in use further down the execution path gets
+/// cleared. Takes the allocator itself, so the range covered can only be the
+/// temporary IDs: they run from -1 down to the last one it handed out.
 pub fn clear_temporary_big_maps<Host: StorageV1>(
     host: &mut Host,
-    next_temp_id: &mut BigMapId,
+    allocator: &TemporaryBigMapIdAllocator,
 ) -> Result<(), LazyStorageError> {
-    while next_temp_id.dec() {
+    for id in (allocator.last_allocated()..0).rev() {
+        let id: BigMapId = id.into();
         // An ID can have no storage: the frame that allocated it may have
         // reverted, and the counter does not roll back with it.
-        match remove_big_map(host, next_temp_id) {
+        match remove_big_map(host, &id) {
             Ok(()) | Err(LazyStorageError::RuntimeError(RuntimeError::PathNotFound)) => {}
             Err(err) => return Err(err),
         }
@@ -1595,7 +1602,8 @@ pub mod tests {
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: $crate::mir_ctx::InterpretContext::new(),
-                next_temporary_id: &mut BigMapId { value: (-1).into() },
+                temporary_big_map_id_allocator:
+                    tezosx_journal::TemporaryBigMapIdAllocator::new(),
             };
         };
     }
@@ -2819,7 +2827,8 @@ pub mod tests {
         assert!(ctx.rk.host().store_has(&path1).unwrap().is_some());
         assert!(ctx.rk.host().store_has(&path2).unwrap().is_some());
 
-        clear_temporary_big_maps(ctx.rk.host_mut(), ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
+            .unwrap();
 
         assert!(ctx.rk.host().store_has(&path1).unwrap().is_none());
         assert!(ctx.rk.host().store_has(&path2).unwrap().is_none());
@@ -3185,7 +3194,8 @@ pub mod tests {
         .unwrap();
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let before_clear = ctx.interpret_context.lazy_storage_size_diff.clone();
-        clear_temporary_big_maps(ctx.rk.host_mut(), ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
+            .unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff, before_clear,
             "clear_temporary_big_maps must not touch the accumulator",

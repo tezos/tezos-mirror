@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use http::StatusCode;
-use mir::ast::{big_map::BigMapId, AddressHash, ByteReprTrait};
+use mir::ast::{AddressHash, ByteReprTrait};
 use mir::gas::{Gas, OutOfGas};
 use primitive_types::U256;
 use std::collections::BTreeMap;
@@ -14,16 +14,13 @@ use tezos_crypto_rs::{
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 // UnknownSignature has a private constructor; use try_from to build one.
 const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
-use tezos_data_encoding::{
-    enc::BinWriter,
-    types::{Narith, Zarith},
-};
+use tezos_data_encoding::{enc::BinWriter, types::Narith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
     account_storage::TezosAccount,
     context, cross_runtime_transfer,
     enshrined_contracts::CracError,
-    mir_ctx::{clear_temporary_big_maps, InterpretContext, OperationCtx, TcCtx},
+    mir_ctx::{InterpretContext, OperationCtx, TcCtx},
     originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
     TezlinkOperationGas,
 };
@@ -757,22 +754,14 @@ where
             TezosXRuntimeError::Custom(format!("Failed to fetch source account: {e:?}"))
         })?;
 
-    // Seed the per-operation temporary big-map id to -1 (negative =
-    // temporary, per `BigMapId::is_temporary`), matching the native
-    // batch path (`tezos_execution::apply_operations`) and the
-    // alias-origination path below. A non-negative seed (e.g. 0) is
-    // NOT recognized as temporary, so transient big-maps would be
-    // written to — and leak into — the durable `/big_map/<id>`
-    // namespace.
-    let mut next_temp_id = BigMapId {
-        value: Zarith((-1).into()),
-    };
     let mut tc_ctx = TcCtx {
         rk: &mut *rk,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
-        next_temporary_id: &mut next_temp_id,
+        temporary_big_map_id_allocator: journal
+            .michelson
+            .temporary_big_map_id_allocator(),
     };
     // Nothing to set up for the origination nonce: it lives on the
     // Michelson journal, which owns it for the whole manager operation,
@@ -1000,21 +989,6 @@ where
             });
         }
     };
-
-    // Clear the temporary big-maps allocated during this CRAC's
-    // Michelson execution, mirroring the native batch path
-    // (`tezos_execution::apply_operations`). Without this, the
-    // transient big-maps persist in durable storage after the
-    // operation. Only the success path needs it: every failure path in
-    // `cross_runtime_transfer` reverts the world-state checkpoint,
-    // which already removes any temp big-maps written during the
-    // reverted execution.
-    if let Err(e) = clear_temporary_big_maps(rk.host_mut(), &mut next_temp_id) {
-        log!(
-            Error,
-            "Failed to clear temporary big-maps after cross-runtime call: {e}"
-        );
-    }
 
     if is_crac {
         let source_contract = hdrs.crac_origin_contract.as_ref().ok_or_else(|| {
@@ -1296,15 +1270,14 @@ impl RuntimeInterface for TezosRuntime {
                 TezlinkOperationGas::start_milligas(remaining).map_err(|e| {
                     TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}"))
                 })?;
-            let mut next_temp_id = BigMapId {
-                value: Zarith((-1).into()),
-            };
             let mut tc_ctx = TcCtx {
                 rk: &mut *rk,
                 operation_gas: &mut gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: InterpretContext::new(),
-                next_temporary_id: &mut next_temp_id,
+                temporary_big_map_id_allocator: journal
+                    .michelson
+                    .temporary_big_map_id_allocator(),
             };
             let parser = mir::parser::Parser::new();
             let typed_storage = typecheck_code_and_storage(&mut tc_ctx, &parser, &script)
@@ -1509,6 +1482,7 @@ impl TezosRuntime {
 #[cfg(all(test, feature = "testing"))]
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
+    use tezos_data_encoding::types::Zarith;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
     use tezosx_journal::TezosXHashes;
