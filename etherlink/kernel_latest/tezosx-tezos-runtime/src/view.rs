@@ -18,7 +18,6 @@
 
 use std::collections::BTreeMap;
 
-use mir::ast::big_map::BigMapId;
 use mir::ast::{AddressHash, BorrowedUnparseError, Micheline, Type, TypedValue};
 use mir::context::{CtxTrait, TypecheckingCtx};
 use mir::gas::OutOfGas;
@@ -28,7 +27,7 @@ use mir::typechecker::type_props::TypeProperty;
 use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
-use tezos_data_encoding::types::{Narith, Zarith};
+use tezos_data_encoding::types::Narith;
 use tezos_execution::account_storage::TezosAccount;
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
@@ -233,15 +232,14 @@ where
     // `Display` impl.
     let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
         .map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))?;
-    let mut next_temp_id = BigMapId {
-        value: Zarith(0.into()),
-    };
     let mut tc_ctx = TcCtx {
         host,
         operation_gas: &mut gas,
         big_map_diff: BTreeMap::new(),
         interpret_context: InterpretContext::new(),
-        next_temporary_id: &mut next_temp_id,
+        temporary_big_map_id_allocator: journal
+            .michelson
+            .temporary_big_map_id_allocator(),
     };
     // Views have no notion of origination or of a running batch: no
     // internal operations are produced (typechecked away by `in_view`)
