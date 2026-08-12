@@ -622,6 +622,12 @@
 
 ### Native Atomic Composability
 
+- The synthetic Ethereum transaction mirroring a Michelson-originated crossing
+  now derives its hash from that operation's hash rather than from the block
+  number and the cross-runtime call id. That makes them predictable. (!22722)
+- The synthetic Tezos operation mirroring an EVM-originated crossing
+  now derives its hash from that transaction's hash rather than from the block
+  number and the cross-runtime call id. That makes them predictable. (!22722)
 - Alias materialization no longer forwards a pre-existing alias balance to
   the native account: it only installs the forwarder delegation and its
   storage. The alias forwarder now sweeps its full balance (payment plus

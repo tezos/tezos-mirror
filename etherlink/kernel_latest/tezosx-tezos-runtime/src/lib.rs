@@ -280,6 +280,12 @@ fn build_synthetic_crac_marker(
 ///
 /// Returns the `AppliedOperation` that the block builder will store
 /// in the Michelson runtime block.
+/// [`operation_hash`] becomes the receipt's `AppliedOperation::hash`: the
+/// journal's seed, which for an EVM-entered operation is derived from the
+/// originating Ethereum transaction. Taking it from the journal — as the
+/// Tezos-entered path does — keeps the hash unique per operation and stable
+/// across the merging and nonce renumbering the receipt still undergoes
+/// before it reaches the block.
 #[allow(clippy::too_many_arguments)]
 fn build_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -293,6 +299,7 @@ fn build_crac_receipt(
     internal_receipts: Vec<InternalOperationSum>,
     crac_id: &str,
     base_nonce: u16,
+    operation_hash: &OperationHash,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // Combine, in execution order:
     //   [CRAC begin event, ...pre_transfer_internals, alias(E_1)→target, ...further internal ops]
@@ -388,14 +395,8 @@ fn build_crac_receipt(
             signature,
         });
 
-    let mut serialized = Vec::new();
-    op_data.bin_write(&mut serialized).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
-    })?;
-    let hash = OperationHash::from(blake2b::digest_256(&serialized));
-
     Ok(AppliedOperation {
-        hash,
+        hash: operation_hash.clone(),
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
@@ -424,6 +425,13 @@ fn build_crac_receipt(
 ///   `BackTracked(None)`, matching native Tezos L1 semantics where
 ///   ancestor ops are backtracked and the error lives once on the
 ///   actually-failing descendant.
+///
+/// [`operation_hash`] becomes the receipt's `AppliedOperation::hash`: the
+/// journal's seed, which for an EVM-entered operation is derived from the
+/// originating Ethereum transaction. Taking it from the journal — as the
+/// Tezos-entered path does — keeps the hash unique per operation and stable
+/// across the merging and nonce renumbering the receipt still undergoes
+/// before it reaches the block.
 #[allow(clippy::too_many_arguments)]
 fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
@@ -438,6 +446,7 @@ fn build_failed_crac_receipt(
     crac_id: &str,
     base_nonce: u16,
     deep_failure: bool,
+    operation_hash: &OperationHash,
 ) -> Result<AppliedOperation, TezosXRuntimeError> {
     // The CRAC begin event is always first, even on failure.
     // Since the downstream transfer failed, the event is backtracked
@@ -548,14 +557,8 @@ fn build_failed_crac_receipt(
             signature,
         });
 
-    let mut serialized = Vec::new();
-    op_data.bin_write(&mut serialized).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
-    })?;
-    let hash = OperationHash::from(blake2b::digest_256(&serialized));
-
     Ok(AppliedOperation {
-        hash,
+        hash: operation_hash.clone(),
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
@@ -974,6 +977,7 @@ where
                         &crac_id_str,
                         base_nonce,
                         deep_failure,
+                        journal.michelson.operation_hash(),
                     ) {
                         Ok(receipt) => {
                             #[cfg(debug_assertions)]
@@ -1034,6 +1038,7 @@ where
             result.internal_receipts,
             &crac_id_str,
             base_nonce,
+            journal.michelson.operation_hash(),
         )?;
         #[cfg(debug_assertions)]
         assert_receipt_markers_balanced(&receipt);
@@ -1502,6 +1507,7 @@ impl TezosRuntime {
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_ethereum::block::BlockConstants;
+    use tezosx_journal::TezosXHashes;
 
     use super::*;
     use tezos_tezlink::operation_result::OperationKind;
@@ -2241,6 +2247,7 @@ mod tests {
             vec![],
             crac_id,
             0,
+            &OperationHash::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2401,6 +2408,7 @@ mod tests {
             vec![],
             "1-0",
             0,
+            &OperationHash::default(),
         )
         .expect("build_crac_receipt should succeed");
 
@@ -2530,6 +2538,7 @@ mod tests {
             "1-0",
             0,
             false, // immediate failure: alias→target must be Failed
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2640,6 +2649,7 @@ mod tests {
             "1-0",
             0,
             false, // immediate failure: error lives on alias→target
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2727,6 +2737,7 @@ mod tests {
             "1-0",
             0,
             false,
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -2834,6 +2845,7 @@ mod tests {
             "1-0",
             0,
             true, // deep failure: alias→target must be BackTracked
+            &OperationHash::default(),
         )
         .expect("build_failed_crac_receipt should succeed");
 
@@ -3130,7 +3142,7 @@ mod tests {
             X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
             X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
         };
-        use tezos_crypto_rs::hash::OperationHash;
+
         use tezosx_journal::CracId;
 
         // alias(E_0): EVM tx originator alias — top-level CRAC source.
@@ -3149,11 +3161,8 @@ mod tests {
         // match the journal's id for `verify_crac_id` to pass.
         let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
         let crac_id_str = crac_id.to_string();
-        let mut journal = TezosXJournal::new(
-            crac_id,
-            OperationHash::default(),
-            BlockConstants::dummy(),
-        );
+        let mut journal =
+            TezosXJournal::new(crac_id, TezosXHashes::zero(), BlockConstants::dummy());
 
         // Non-empty body holding an encoded Unit: skips the empty-body
         // Unit fallback (which would itself draw on the tight gas) and
@@ -3253,7 +3262,7 @@ mod tests {
         };
         use mir::ast::micheline::Micheline;
         use tezos_crypto_rs::blake2b::digest_160;
-        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezosx_journal::CracId;
 
         // The frame's counter is resumed from this sentinel. A non-zero,
@@ -3337,11 +3346,8 @@ mod tests {
 
         let crac_id = CracId::new(u8::from(RuntimeId::Ethereum), 0);
         let crac_id_str = crac_id.to_string();
-        let mut journal = TezosXJournal::new(
-            crac_id,
-            OperationHash::default(),
-            BlockConstants::dummy(),
-        );
+        let mut journal =
+            TezosXJournal::new(crac_id, TezosXHashes::zero(), BlockConstants::dummy());
 
         // Pre-seed the journal counter to model a prior reentrant frame
         // having already assigned identities up to SEEDED_COUNTER.
@@ -3411,7 +3417,7 @@ mod tests {
         use mir::ast::micheline::Micheline;
         use mir::interpreter::MAX_INTERNAL_OPERATIONS;
         use tezos_crypto_rs::blake2b::digest_160;
-        use tezos_crypto_rs::hash::{ContractKt1Hash, OperationHash};
+        use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezosx_journal::CracId;
 
         const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
@@ -3488,7 +3494,7 @@ mod tests {
             let crac_id_str = crac_id.to_string();
             let mut journal = TezosXJournal::new(
                 crac_id,
-                OperationHash::default(),
+                TezosXHashes::zero(),
                 BlockConstants::dummy(),
             );
             journal.michelson.set_internal_operation_counter(base);

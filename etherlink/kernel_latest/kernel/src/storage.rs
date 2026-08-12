@@ -1210,6 +1210,7 @@ pub fn read_delayed_transaction_bridge(host: &impl StorageV1) -> Option<Contract
 mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_journal::TezosXHashes;
     use tezosx_journal::{CracId, TezosXJournal};
 
     #[test]
@@ -1252,7 +1253,7 @@ mod tests {
         let tx_hash = [7u8; 32];
         let journal = TezosXJournal::new(
             CracId::new(0, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
@@ -1270,7 +1271,7 @@ mod tests {
         let tx_hash = [42u8; 32];
         let journal = TezosXJournal::new(
             CracId::new(0, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
@@ -1288,7 +1289,7 @@ mod tests {
 
         let mut journal = TezosXJournal::new(
             CracId::new(0, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.set_http_trace_enabled(true);
@@ -1342,7 +1343,7 @@ mod tests {
 
         let mut journal = TezosXJournal::new(
             CracId::new(0, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         journal.set_http_trace_enabled(true);

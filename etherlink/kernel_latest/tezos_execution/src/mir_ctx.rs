@@ -1671,6 +1671,8 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
 
 #[cfg(test)]
 pub mod tests {
+    use tezosx_journal::TezosXHashes;
+
     use super::*;
     use crate::gas::TezlinkOperationGas;
     use mir::ast::big_map::{
@@ -2629,7 +2631,7 @@ pub mod tests {
         // just placeholders that satisfy the type system.
         let mut journal = tezosx_journal::TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = tezosx_interfaces::testing::UnimplementedRegistry;
@@ -3211,7 +3213,7 @@ pub mod tests {
 
         let mut journal = tezosx_journal::TezosXJournal::new(
             tezosx_journal::CracId::new(1, 0),
-            tezos_crypto_rs::hash::OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         // The synthetic-view dispatcher under test short-circuits on
@@ -3517,7 +3519,7 @@ pub mod tests {
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::new(
             CracId::new(1, 0),
-            OperationHash::default(),
+            TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
