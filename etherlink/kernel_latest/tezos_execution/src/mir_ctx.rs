@@ -29,8 +29,6 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
-use tezos_data_encoding::enc::BinWriter;
-use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
@@ -43,6 +41,7 @@ use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
 use tezos_tezlink::operation_result::{AddressRegistry, TransferError};
+use tezosx_journal::TemporaryBigMapIdAllocator;
 use typed_arena::Arena;
 
 pub struct InterpretContext {
@@ -95,7 +94,11 @@ pub struct TcCtx<'operation, Host: StorageV1> {
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
-    pub next_temporary_id: &'operation mut BigMapId,
+    /// Handle on the operation-wide temporary big map ID counter owned
+    /// by the Michelson journal. A shared handle rather than a borrow
+    /// because [`Ctx`] holds `&mut` on the journal for as long as it
+    /// holds this context, so the two cannot both borrow it.
+    pub temporary_big_map_id_allocator: TemporaryBigMapIdAllocator,
 }
 
 pub struct OperationCtx<'operation> {
@@ -1095,9 +1098,7 @@ impl<Host: StorageV1> TcCtx<'_, Host> {
 
     fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
         if temporary {
-            let new_id = self.next_temporary_id.clone();
-            self.next_temporary_id.incr();
-            Ok(new_id)
+            Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
             let next_id_path = next_id_path()?;
             let id: BigMapId =
@@ -1111,35 +1112,31 @@ impl<Host: StorageV1> TcCtx<'_, Host> {
 
 fn remove_big_map<Host: StorageV1>(
     host: &mut Host,
-    operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
-    // Remove the key type of the big_map
-    let key_type_path = key_type_path(id)?;
-    host.store_delete(&key_type_path)?;
-
-    // Remove the value type of the big_map
-    let value_type_path = value_type_path(id)?;
-    host.store_delete(&value_type_path)?;
-
-    // Removing the content of the big_map
-    BigMapKeys::remove_keys_in_storage(host, operation_gas, id)?;
-
-    let total_bytes_path = total_bytes_path(id)?;
-    host.store_delete_value(&total_bytes_path)?;
+    host.store_delete(&big_map_path(id)?)?;
 
     Ok(())
 }
 
-/// Function to clear temporary big_maps create for an operation
+/// Remove every temporary big map `allocator` handed out.
 ///
-/// This function also reset the next temporary id to minus one
+/// To be called once the last frame allowed to reach those big maps is over,
+/// otherwise a big map still in use further down the execution path gets
+/// cleared. Takes the allocator itself, so the range covered can only be the
+/// temporary IDs: they run from -1 down to the last one it handed out.
 pub fn clear_temporary_big_maps<Host: StorageV1>(
     host: &mut Host,
-    next_temp_id: &mut BigMapId,
+    allocator: &TemporaryBigMapIdAllocator,
 ) -> Result<(), LazyStorageError> {
-    while next_temp_id.dec() {
-        remove_big_map(host, None, next_temp_id)?;
+    for id in (allocator.last_allocated()..0).rev() {
+        let id: BigMapId = id.into();
+        // An ID can have no storage: the frame that allocated it may have
+        // reverted, and the counter does not roll back with it.
+        match remove_big_map(host, &id) {
+            Ok(()) | Err(LazyStorageError::RuntimeError(RuntimeError::PathNotFound)) => {}
+            Err(err) => return Err(err),
+        }
     }
     Ok(())
 }
@@ -1259,113 +1256,6 @@ pub fn convert_big_map_diff(
     Some(LazyStorageDiffList { diff })
 }
 
-#[derive(Debug, BinWriter, NomReader)]
-struct BigMapKeys {
-    #[encoding(list)]
-    keys: Vec<ScriptExprHash>,
-}
-
-impl BigMapKeys {
-    #[cfg(test)]
-    fn get(host: &mut impl StorageV1, id: &BigMapId) -> Self {
-        let path = keys_of_big_map(id).unwrap();
-        read_nom_value(host, &path).unwrap_or(BigMapKeys { keys: vec![] })
-    }
-
-    fn add_key(
-        host: &mut impl StorageV1,
-        id: &BigMapId,
-        key: &ScriptExprHash,
-    ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(id)?;
-        let size = host.store_value_size(&path).unwrap_or(0usize);
-        host.store_write(&path, key.as_ref(), size)?;
-        Ok(())
-    }
-
-    fn remove_key(
-        host: &mut impl StorageV1,
-        id: &BigMapId,
-        key: &ScriptExprHash,
-    ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(id)?;
-        let mut big_map_keys: Self = read_nom_value(host, &path)
-            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        big_map_keys.keys.retain(|elt| elt != key);
-        store_bin(&big_map_keys, host, &path).map_err(storage_error_to_lazy)?;
-        Ok(())
-    }
-
-    fn remove_keys_in_storage(
-        host: &mut impl StorageV1,
-        mut operation_gas: Option<&mut crate::gas::TezlinkOperationGas>,
-        id: &BigMapId,
-    ) -> Result<(), LazyStorageError> {
-        let path = keys_of_big_map(id)?;
-        let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &path)
-            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        let big_map_keys = match big_map_keys_opt {
-            Some(big_map_keys) => big_map_keys,
-            None => {
-                // If the big_map keys doesn't exist, no need to remove
-                // anything
-                return Ok(());
-            }
-        };
-        for key in big_map_keys.keys {
-            let value_path = value_path(id, &key)?;
-            // Each entry value is L1's carbonated `Big_map.Contents`; charge
-            // its removal as one durable write. The `0` is the payload byte
-            // count: a delete writes no new bytes, so only the per-write base
-            // is charged (same pattern as `big_map_update`'s delete branch).
-            if let Some(operation_gas) = operation_gas.as_deref_mut() {
-                consume_storage_write_milligas(operation_gas, 1, 0)?;
-            }
-            host.store_delete(&value_path)?;
-        }
-
-        // Remove keys for the big_map
-        host.store_delete(&path)?;
-
-        Ok(())
-    }
-
-    fn copy_keys_in_storage(
-        host: &mut impl StorageV1,
-        operation_gas: &mut crate::gas::TezlinkOperationGas,
-        source: &BigMapId,
-        dest: &BigMapId,
-    ) -> Result<(), LazyStorageError> {
-        let source_path = keys_of_big_map(source)?;
-        let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &source_path)
-            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        let big_map_keys = match big_map_keys_opt {
-            Some(big_map_keys) => big_map_keys,
-            None => {
-                // If the big_map keys doesn't exist, no need to try
-                // the copy we can just return instantly
-                return Ok(());
-            }
-        };
-
-        for key in &big_map_keys.keys {
-            let source_value_path = value_path(source, key)?;
-            let dest_value_path = value_path(dest, key)?;
-
-            let size = host.store_value_size(&source_value_path)? as u64;
-            consume_storage_read_milligas(operation_gas, 1, size)?;
-            let value = host.store_read_all(&source_value_path)?;
-            consume_storage_write_milligas(operation_gas, 1, size)?;
-            host.store_write_all(&dest_value_path, &value)?;
-        }
-
-        let dest_path = keys_of_big_map(dest)?;
-        store_bin(&big_map_keys, host, &dest_path).map_err(storage_error_to_lazy)?;
-
-        Ok(())
-    }
-}
-
 /// Flat per-entry forfait L1 charges to cover the on-disk cost of
 /// indexing a big-map entry.
 ///
@@ -1378,31 +1268,7 @@ const BYTES_SIZE_FOR_BIG_MAP_KEY: u64 = 65;
 /// Value from `src/proto_023_PtSeouLo/lib_protocol/lazy_storage_diff.ml`.
 const BYTES_SIZE_FOR_EMPTY: u64 = 33;
 
-/// Reconstruct the `total_bytes` counter for a big-map allocated
-/// before the counter existed. Walks the persisted keys list and
-/// sums `BYTES_SIZE_FOR_BIG_MAP_KEY` plus each value's stored size,
-/// then persists the result so subsequent reads are O(1).
-fn init_total_bytes_from_existing(
-    host: &mut impl StorageV1,
-    id: &BigMapId,
-) -> Result<Zarith, LazyStorageError> {
-    let keys_path = keys_of_big_map(id)?;
-    let keys: BigMapKeys = read_optional_nom_value(host, &keys_path)
-        .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?
-        .unwrap_or(BigMapKeys { keys: vec![] });
-    let mut total: u64 = 0;
-    for key_hash in &keys.keys {
-        let vp = value_path(id, key_hash)?;
-        let size = host.store_value_size(&vp)? as u64;
-        total = total.saturating_add(BYTES_SIZE_FOR_BIG_MAP_KEY + size);
-    }
-    let migrated = Zarith(total.into());
-    set_total_bytes(host, id, &migrated)?;
-    Ok(migrated)
-}
-
-/// Read the `total_bytes` counter persisted for a big-map. Lazily
-/// migrates pre-counter big-maps via `init_total_bytes_from_existing`.
+/// Read the `total_bytes` counter persisted for a big-map.
 fn total_bytes(
     host: &mut impl StorageV1,
     id: &BigMapId,
@@ -1410,7 +1276,7 @@ fn total_bytes(
     let path = total_bytes_path(id)?;
     match read_optional_nom_value::<Zarith>(host, &path) {
         Ok(Some(total)) => Ok(total),
-        Ok(None) => init_total_bytes_from_existing(host, id),
+        Ok(None) => Err(LazyStorageError::MissingTotalBytes(id.clone())),
         Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
     }
 }
@@ -1499,16 +1365,8 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
                 if self.host.store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.host.store_value_size(&value_path)?.into();
-                    // Read total_bytes BEFORE mutating /keys. For a pre-counter
-                    // big_map the counter is absent and total_bytes() rebuilds it
-                    // by summing /keys (init_total_bytes_from_existing); reading
-                    // after remove_key would sum a /keys already missing this
-                    // entry, so the `-(65 + prev)` subtraction below would drop it
-                    // twice. (Once the counter exists this is a plain read, so the
-                    // order only matters on the lazy-migration path.)
                     let current = total_bytes(self.host, id)?;
                     self.host.store_delete(&value_path)?;
-                    BigMapKeys::remove_key(self.host, id, &key_hashed)?;
 
                     let lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
@@ -1537,8 +1395,6 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
                 let lazy_storage_size_diff = match self.host.store_value_size(&value_path)
                 {
                     Err(RuntimeError::PathNotFound) => {
-                        // We should write the key in the list only if it's an add in the big_map not an update
-                        BigMapKeys::add_key(self.host, id, &key_hashed)?;
                         Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
                     }
                     Ok(previous_value_size) => {
@@ -1592,6 +1448,7 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host
             .store_write_all(&key_type_path, &key_type_encoded)?;
+        set_total_bytes(self.host, &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
             &id,
@@ -1610,28 +1467,15 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
     ) -> Result<BigMapId, LazyStorageError> {
         let dest_id = self.generate_id(temporary)?;
 
-        // Retrieve the path of the key_type
-        let src_key_type_path = key_type_path(id)?;
-        let dest_key_type_path = key_type_path(&dest_id)?;
+        let src_path = big_map_path(id)?;
+        let dest_path = big_map_path(&dest_id)?;
 
-        // Copy the key type to the destination
-        let key_type = self.host.store_read_all(&src_key_type_path)?;
-        self.host.store_write_all(&dest_key_type_path, &key_type)?;
-
-        // Retrieve the path of the value_type
-        let src_value_type_path = value_type_path(id)?;
-        let dest_value_type_path = value_type_path(&dest_id)?;
-
-        // Copy the value type to the destination
-        let value_type = self.host.store_read_all(&src_value_type_path)?;
-        self.host
-            .store_write_all(&dest_value_type_path, &value_type)?;
-
-        // Copy the content of the big_map
-        BigMapKeys::copy_keys_in_storage(self.host, self.operation_gas, id, &dest_id)?;
-
+        // The copy is paid for in *storage burn*, via the `total_bytes(src) + bytes_size_for_empty`
+        // returned by `apply_init`
         let source_total_bytes = total_bytes(self.host, id)?;
-        set_total_bytes(self.host, &dest_id, &source_total_bytes)?;
+
+        self.host.store_copy(&src_path, &dest_path)?;
+
         self.interpret_context.record_lazy_storage_size_diff(
             &dest_id,
             &Zarith(BigInt::from(BYTES_SIZE_FOR_EMPTY) + source_total_bytes.0),
@@ -1656,7 +1500,7 @@ impl<'a, Host: StorageV1> LazyStorage<'a> for TcCtx<'a, Host> {
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
         );
-        remove_big_map(self.host, Some(self.operation_gas), id)?;
+        remove_big_map(self.host, id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
@@ -1729,14 +1573,22 @@ pub mod tests {
 
     #[macro_export]
     macro_rules! make_default_ctx {
-        ($ctx:ident, $host: expr) => {
+        ($ctx:ident, $host:expr) => {
+            $crate::make_default_ctx!(
+                $ctx,
+                $host,
+                tezosx_journal::TemporaryBigMapIdAllocator::new()
+            );
+        };
+        // Third form for the frames of one operation, which share its allocator.
+        ($ctx:ident, $host:expr, $temporary_big_map_id_allocator:expr) => {
             let mut operation_gas = TezlinkOperationGas::default();
             let mut $ctx = TcCtx {
                 host: $host,
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: $crate::mir_ctx::InterpretContext::new(),
-                next_temporary_id: &mut BigMapId { value: (-1).into() },
+                temporary_big_map_id_allocator: $temporary_big_map_id_allocator,
             };
         };
     }
@@ -1767,11 +1619,6 @@ pub mod tests {
         assert_eq!(stored_key_type, key_type);
         assert_eq!(stored_value_type, value_type);
 
-        let nb_passed_keys = content.len();
-        let nb_stored_keys = BigMapKeys::get(ctx.host, id).keys.len();
-        // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
-        assert_eq!(nb_passed_keys, nb_stored_keys);
-
         for (key, value) in &content {
             let stored_value = ctx
                 .big_map_get(arena, id, key, &value_type)
@@ -1781,11 +1628,7 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: StorageV1>(
-        ctx: &TcCtx<'a, Host>,
-        id: &BigMapId,
-        removed_keys: &BigMapKeys,
-    ) {
+    fn assert_big_map_removed<'a, Host: StorageV1>(ctx: &TcCtx<'a, Host>, id: &BigMapId) {
         let key_type_path = key_type_path(id).unwrap();
         assert!(
             ctx.host.store_has(&key_type_path).unwrap().is_none(),
@@ -1797,20 +1640,6 @@ pub mod tests {
             ctx.host.store_has(&value_type_path).unwrap().is_none(),
             "Value type should have been removed",
         );
-
-        let keys_path = keys_of_big_map(id).unwrap();
-        assert!(
-            ctx.host.store_has(&keys_path).unwrap().is_none(),
-            "List of keys of the big_map should have been removed",
-        );
-
-        for key in &removed_keys.keys {
-            let value_path = value_path(id, key).unwrap();
-            assert!(
-                ctx.host.store_has(&value_path).unwrap().is_none(),
-                "{key:?} should have been removed from the storage"
-            );
-        }
     }
 
     #[test]
@@ -1870,13 +1699,6 @@ pub mod tests {
             )
             .unwrap();
 
-        let big_map_keys_before = BigMapKeys::get(storage.host, &map_id);
-        assert_eq!(
-            big_map_keys_before.keys.len(),
-            3usize,
-            "{big_map_keys_before:?}"
-        );
-
         storage
             .big_map_update(&map_id, TypedValue::int(2), None)
             .unwrap();
@@ -1887,21 +1709,6 @@ pub mod tests {
                 Some(TypedValue::String("gamma".into())),
             )
             .unwrap();
-
-        let big_map_keys_after = BigMapKeys::get(storage.host, &map_id);
-        assert_eq!(
-            big_map_keys_after.keys.len(),
-            2usize,
-            "{big_map_keys_after:?}"
-        );
-        assert_eq!(
-            big_map_keys_before.keys.first(),
-            big_map_keys_after.keys.first(),
-        );
-        assert_eq!(
-            big_map_keys_before.keys.get(2),
-            big_map_keys_after.keys.get(1),
-        );
 
         let expected_content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("a".into())),
@@ -1952,70 +1759,6 @@ pub mod tests {
         );
     }
 
-    /// Regression for the `total_bytes` double-decrement bug (audit M2).
-    ///
-    /// On a big_map allocated before the `total_bytes` counter existed (counter
-    /// absent from storage, i.e. the migration target), the first key removal in
-    /// `big_map_update` reads `total_bytes()` AFTER `remove_key` has already
-    /// shrunk the `/keys` list. The lazy reconstruction
-    /// (`init_total_bytes_from_existing`) therefore already excludes the removed
-    /// entry, and the subsequent `-(65 + previous_value_size)` subtracts it a
-    /// second time. The persisted counter ends up too small (negative for the
-    /// last-key case).
-    ///
-    /// This test FAILS on the buggy code and passes once `total_bytes()` is read
-    /// before `/keys` is mutated.
-    #[test]
-    fn pre_counter_bigmap_delete_double_decrements_total_bytes() {
-        let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host);
-
-        // 1. Allocate a big_map with a single entry. The Some-branch of
-        //    big_map_update writes the total_bytes counter alongside the key.
-        let map_id = storage
-            .big_map_new(&Type::Int, &Type::String, false)
-            .unwrap();
-        storage
-            .big_map_update(
-                &map_id,
-                TypedValue::int(1),
-                Some(TypedValue::String("a".into())),
-            )
-            .unwrap();
-
-        let counter_after_insert = total_bytes(storage.host, &map_id).unwrap();
-        assert!(
-            counter_after_insert.0 > BigInt::from(0),
-            "sanity: counter must be positive after one insert, got {counter_after_insert:?}"
-        );
-
-        // 2. Model a PRE-COUNTER big_map (the migration target): drop the
-        //    total_bytes counter while keeping the key in /keys and the value in
-        //    Contents. This is exactly the state a kernel predating the counter
-        //    leaves behind.
-        let tb_path = total_bytes_path(&map_id).unwrap();
-        storage.host.store_delete(&tb_path).unwrap();
-        assert!(
-            storage.host.store_has(&tb_path).unwrap().is_none(),
-            "counter should be absent to model a pre-counter big_map"
-        );
-
-        // 3. Remove the only key.
-        storage
-            .big_map_update(&map_id, TypedValue::int(1), None)
-            .unwrap();
-
-        // 4. The big_map is now empty, so its total_bytes counter MUST be 0.
-        //    The buggy code persists -(65 + size("a")) instead.
-        let counter_after_delete = total_bytes(storage.host, &map_id).unwrap();
-        assert_eq!(
-            counter_after_delete.0,
-            BigInt::from(0),
-            "total_bytes must be 0 after removing the last key of a pre-counter \
-             big_map; a negative value reveals the double-decrement (audit M2)"
-        );
-    }
-
     #[test]
     fn test_remove_big_map() {
         // Setup the context and big_map for the test
@@ -2039,11 +1782,7 @@ pub mod tests {
         // Remove the big_map
         storage.big_map_remove(&map_id).unwrap();
 
-        // Ensure that the big_map has been removed
-        let removed_keys = BigMapKeys {
-            keys: vec![hash_key(key, storage.gas()).unwrap()],
-        };
-        assert_big_map_removed(&storage, &map_id, &removed_keys);
+        assert_big_map_removed(&storage, &map_id);
 
         // Verify that the big_map_mem function returns the expected result
         assert!(!storage.big_map_mem(&map_id, &TypedValue::int(0)).unwrap());
@@ -2804,8 +2543,11 @@ pub mod tests {
         assert_eq!(total_bytes(ctx.host, &dest).unwrap(), src_total);
     }
 
+    /// `big_map_copy` duplicates the whole subtree with one `store_copy`
+    /// instead of reading and rewriting each entry, so its gas does not
+    /// scale with the entry count.
     #[test]
-    fn big_map_copy_charges_gas_per_persisted_entry() {
+    fn big_map_copy_gas_is_independent_of_entry_count() {
         fn copy_gas(entries: usize, value: &str) -> u64 {
             let mut host = MockKernelHost::default();
             make_default_ctx!(ctx, &mut host);
@@ -2824,20 +2566,14 @@ pub mod tests {
         }
 
         let value = "a fixed-size value";
-        let value_size = encoded_size(&TypedValue::String(value.into()));
-        let per_entry = crate::storage_read_cost_milligas(1, value_size)
-            + crate::storage_write_cost_milligas(1, value_size);
 
-        let small = copy_gas(2, value);
-        let large = copy_gas(20, value);
-
-        assert_eq!(small, 2 * per_entry);
-        assert_eq!(large, 20 * per_entry);
-        assert_eq!(large - small, 18 * per_entry);
+        assert_eq!(copy_gas(2, value), copy_gas(20, value));
     }
 
+    /// `big_map_remove` deletes the whole subtree in one `store_delete`, so
+    /// its gas does not scale with the entry count.
     #[test]
-    fn big_map_remove_charges_gas_per_persisted_entry() {
+    fn big_map_remove_gas_is_independent_of_entry_count() {
         fn remove_gas(entries: usize) -> u64 {
             let mut host = MockKernelHost::default();
             make_default_ctx!(ctx, &mut host);
@@ -2855,14 +2591,7 @@ pub mod tests {
             (ctx.operation_gas.total_milligas_consumed() - before) as u64
         }
 
-        let per_entry = crate::storage_write_cost_milligas(1, 0);
-
-        let small = remove_gas(2);
-        let large = remove_gas(20);
-
-        assert_eq!(small, 2 * per_entry);
-        assert_eq!(large, 20 * per_entry);
-        assert_eq!(large - small, 18 * per_entry);
+        assert_eq!(remove_gas(2), remove_gas(20));
     }
 
     #[test]
@@ -3025,46 +2754,26 @@ pub mod tests {
     }
 
     #[test]
-    fn total_bytes_lazily_migrates_pre_counter_big_map() {
+    fn total_bytes_on_missing_counter_is_an_error() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(ctx, &mut host);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
-        let entries = [
-            TypedValue::String("a".into()),
-            TypedValue::String("bb".into()),
-            TypedValue::String("ccc".into()),
-        ];
-        let mut expected_sum: u64 = 0;
-        for (i, v) in entries.iter().enumerate() {
-            ctx.big_map_update(&id, TypedValue::int(i as i64), Some(v.clone()))
-                .unwrap();
-            expected_sum += BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(v);
-        }
+        ctx.big_map_update(
+            &id,
+            TypedValue::int(0),
+            Some(TypedValue::String("a".into())),
+        )
+        .unwrap();
 
-        // Simulate a pre-counter big-map: drop the `total_bytes` path,
-        // leaving the keys list and the values intact.
         let path = total_bytes_path(&id).unwrap();
-        ctx.host.store_delete(&path).unwrap();
-        assert!(ctx.host.store_has(&path).unwrap().is_none());
+        host.store_delete(&path).unwrap();
 
-        // First read triggers the lazy migration.
-        let migrated = total_bytes(ctx.host, &id).unwrap();
-        assert_eq!(migrated, Zarith(expected_sum.into()));
-
-        // Migration persisted the counter so subsequent reads are O(1).
-        assert!(ctx.host.store_has(&path).unwrap().is_some());
-        assert_eq!(total_bytes(ctx.host, &id).unwrap(), migrated);
-
-        // Maintenance hooks now operate from the correct baseline: an
-        // overwrite produces the expected delta against the migrated value.
-        let new_value = TypedValue::String("dddd".into());
-        let new_size = encoded_size(&new_value);
-        let old_size = encoded_size(&entries[0]);
-        ctx.big_map_update(&id, TypedValue::int(0), Some(new_value))
-            .unwrap();
-        assert_eq!(
-            total_bytes(ctx.host, &id).unwrap(),
-            Zarith((expected_sum + new_size - old_size).into()),
+        assert!(
+            matches!(
+                total_bytes(&mut host, &id),
+                Err(LazyStorageError::MissingTotalBytes(_))
+            ),
+            "an absent counter must surface as MissingTotalBytes"
         );
     }
 
@@ -3091,10 +2800,94 @@ pub mod tests {
         assert!(ctx.host.store_has(&path1).unwrap().is_some());
         assert!(ctx.host.store_has(&path2).unwrap().is_some());
 
-        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.host, &ctx.temporary_big_map_id_allocator).unwrap();
 
         assert!(ctx.host.store_has(&path1).unwrap().is_none());
         assert!(ctx.host.store_has(&path2).unwrap().is_none());
+    }
+
+    /// The frames of one operation share its allocator, so a second frame must
+    /// continue the sequence instead of restarting it (L2-1937), and one clear
+    /// must cover what all of them allocated.
+    #[test]
+    fn temporary_big_map_ids_are_shared_across_frames() {
+        let mut host = MockKernelHost::default();
+        let allocator = tezosx_journal::TemporaryBigMapIdAllocator::new();
+        let outer = {
+            make_default_ctx!(ctx, &mut host, allocator.clone());
+            ctx.big_map_new(&Type::Int, &Type::String, true).unwrap()
+        };
+        let inner = {
+            make_default_ctx!(ctx, &mut host, allocator.clone());
+            ctx.big_map_new(&Type::Int, &Type::String, true).unwrap()
+        };
+        assert!(outer.is_temporary() && inner.is_temporary());
+        assert_ne!(outer, inner, "the second frame restarted the sequence");
+
+        clear_temporary_big_maps(&mut host, &allocator).unwrap();
+
+        for id in [&outer, &inner] {
+            assert!(
+                host.store_has(&big_map_path(id).unwrap())
+                    .unwrap()
+                    .is_none(),
+                "clear must remove {id}"
+            );
+        }
+    }
+
+    /// Clearing walks the IDs handed out down to the first one. It must stop
+    /// there: permanent IDs sit on the other side of 0 and progress the other
+    /// way, so walking one ID too far would delete a live big map.
+    #[test]
+    fn clear_temporary_big_maps_spares_permanent_big_maps() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(ctx, &mut host);
+        // Two permanent maps, so one of them has a non-zero ID to walk onto.
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let permanent = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let permanent_path = big_map_path(&permanent).unwrap();
+
+        // Nothing handed out yet: nothing to clear.
+        clear_temporary_big_maps(ctx.host, &TemporaryBigMapIdAllocator::new()).unwrap();
+        assert!(ctx.host.store_has(&permanent_path).unwrap().is_some());
+
+        let temporary = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        clear_temporary_big_maps(ctx.host, &ctx.temporary_big_map_id_allocator).unwrap();
+
+        assert!(ctx
+            .host
+            .store_has(&big_map_path(&temporary).unwrap())
+            .unwrap()
+            .is_none());
+        assert!(
+            ctx.host.store_has(&permanent_path).unwrap().is_some(),
+            "clearing the temporary IDs must spare {permanent}"
+        );
+    }
+
+    /// A frame that reverts keeps its IDs handed out but takes its big maps
+    /// with it, so clearing walks over IDs with nothing in the store.
+    #[test]
+    fn clear_temporary_big_maps_tolerates_absent_big_maps() {
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(ctx, &mut host);
+        // Cleared last, after the reverted one, so an abort would spare it.
+        let live = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        let reverted = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        ctx.host
+            .store_delete(&big_map_path(&reverted).unwrap())
+            .unwrap();
+
+        clear_temporary_big_maps(ctx.host, &ctx.temporary_big_map_id_allocator).unwrap();
+
+        assert!(
+            ctx.host
+                .store_has(&big_map_path(&live).unwrap())
+                .unwrap()
+                .is_none(),
+            "the absent {reverted} aborted the clearing before {live}"
+        );
     }
 
     /// The TezosX gateway exposes three synthetic views today:
@@ -3457,7 +3250,7 @@ pub mod tests {
         .unwrap();
         let _ = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
         let before_clear = ctx.interpret_context.lazy_storage_size_diff.clone();
-        clear_temporary_big_maps(ctx.host, ctx.next_temporary_id).unwrap();
+        clear_temporary_big_maps(ctx.host, &ctx.temporary_big_map_id_allocator).unwrap();
         assert_eq!(
             ctx.interpret_context.lazy_storage_size_diff, before_clear,
             "clear_temporary_big_maps must not touch the accumulator",

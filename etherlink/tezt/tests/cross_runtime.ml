@@ -18941,6 +18941,182 @@ let test_michelson_runtime_rejects_invalid_key () =
     (status = "failed") string ~error_msg:"tz4 key: expected status %R, got %L") ;
   unit
 
+(** Michelson sink: replaces its own storage with the [big_map nat nat] it
+    receives in order to test temporary big map IDs. *)
+let bigmap_sink_script =
+  {|parameter (big_map nat nat); storage (big_map nat nat);
+    code { CAR; NIL operation; PAIR }|}
+
+(** Michelson contract that builds a fresh [big_map nat nat]
+    holding the single binding [key -> key] and hands it to the [sink] contract.
+*)
+let bigmap_maker_script ~key ~sink =
+  Printf.sprintf
+    {|parameter (unit %%run); storage unit;
+      code { CAR;
+             PUSH address "%s"; CONTRACT (big_map nat nat); ASSERT_SOME;
+             PUSH mutez 0;
+             EMPTY_BIG_MAP nat nat; PUSH nat %d; SOME; PUSH nat %d; UPDATE;
+             TRANSFER_TOKENS;
+             NIL operation; SWAP; CONS; PAIR }|}
+    sink
+    key
+    key
+
+(** Like {!bigmap_maker_script}, plus a trailing [%call_evm] gateway call to
+    [evm_target]'s [run()].. *)
+let bigmap_maker_then_crac_script ~key ~sink ~evm_target =
+  Printf.sprintf
+    {|parameter (unit %%run); storage unit;
+      code { CAR;
+             PUSH address "%s"; CONTRACT (big_map nat nat); ASSERT_SOME;
+             PUSH mutez 0;
+             EMPTY_BIG_MAP nat nat; PUSH nat %d; SOME; PUSH nat %d; UPDATE;
+             TRANSFER_TOKENS;
+             PUSH address "%s";
+             CONTRACT %%call_evm
+               (pair string (pair string (pair bytes (option (contract bytes)))));
+             ASSERT_SOME;
+             PUSH mutez 0;
+             NONE (contract bytes); PUSH bytes 0x; PAIR;
+             PUSH string "run()"; PAIR;
+             PUSH string "%s"; PAIR;
+             TRANSFER_TOKENS;
+             NIL operation; SWAP; CONS; SWAP; CONS; PAIR }|}
+    sink
+    key
+    key
+    gateway_address
+    evm_target
+
+(** A test where two Michelson contracts create big maps that are each assigned
+    a temporary big map ID, in a single transaction, and one inside a CRAC.
+    The test shows that the IDs are not conflicting: temporary big maps IDs are
+    global to the transaction, not local to a call frame. It does so by
+    inspecting the big map contents and checking the they include the expected
+    bindings. *)
+let test_crac_nested_frames_temporary_big_map_ids () =
+  register_crac_runner_test
+    ~title:"CRAC: nested frames must not share temporary big map IDs"
+    ~tags:["big_map"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "BIGMAP-NEST" in
+  (* Originate all Michelson contracts:
+     * two contracts used to make big maps persistent: [sink_outer] and
+       [sink_inner];
+     * two contracts that create big maps (being given temporary IDs) with
+       different bindings so that we can differentiate them: [inner_kt1] with
+       1->1 (transferred to [sink_inner]), and [outer_kt1] with 0->0 (transferred
+       to [sink_outer]);
+     * an EVM contract used to make a CRAC between calling the Michelson
+       contracts above: [evm_bridge]. *)
+  let originate_inline inline_script init_storage_data =
+    TezContract.originate_inline_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~inline_script
+      ~init_storage_data
+      Michelson_contracts.tezlink_protocol
+  in
+  Log.debug ~prefix "Originate the two big map sinks" ;
+  let* _, sink_outer = originate_inline bigmap_sink_script "{}" in
+  let* _, sink_inner = originate_inline bigmap_sink_script "{}" in
+  Log.debug ~prefix "Originate the inner (CRAC-reached) Michelson frame" ;
+  (* The big map in [inner_kt1] only has one binding: 1->1. *)
+  let* inner_hex, inner_kt1 =
+    originate_inline (bigmap_maker_script ~key:1 ~sink:sink_inner) "Unit"
+  in
+  Log.debug ~prefix "Deploy the EVM bridge calling the inner frame" ;
+  let* evm_bridge =
+    EvmCrossRuntimeRunnerTez.deploy_and_init
+      (`Tez_runner (inner_hex, inner_kt1))
+  in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  Log.debug ~prefix "Originate the outer Michelson frame" ;
+  (* The big map in [outer_kt1] only has one binding: 0->0. *)
+  let* outer_hex, outer_kt1 =
+    originate_inline
+      (bigmap_maker_then_crac_script
+         ~key:0
+         ~sink:sink_outer
+         ~evm_target:evm_bridge_addr)
+      "Unit"
+  in
+  (* Call the top-level contract [outer_kt1] that will trigger the whole
+     execution: creating a temporary big map, calling [inner_kt1] through a CRAC
+     and [evm_bridge], and making big maps persistent with [sink_outer] and
+     [sink_inner]. Check that the permanent IDs of the big maps of the latter two
+     contracts are different. *)
+  Log.debug ~prefix "Call the outer frame" ;
+  let* () =
+    TezRunner.call_run
+      ~gas_limit:500_000
+      ~storage_limit:10_000
+      ~fee:100_000
+      (`Tez_runner (outer_hex, outer_kt1))
+  in
+  let big_map_id_of sink =
+    let* storage = TezContract.get_storage ~sequencer sink in
+    return JSON.(storage |-> "int" |> as_string)
+  in
+  let* outer_big_map_id = big_map_id_of sink_outer in
+  let* inner_big_map_id = big_map_id_of sink_inner in
+  Log.info
+    "%s: sink_outer holds big map %s, sink_inner holds big map %s"
+    prefix
+    outer_big_map_id
+    inner_big_map_id ;
+  Check.(
+    (outer_big_map_id <> inner_big_map_id)
+      string
+      ~error_msg:"The two sinks must hold distinct big maps, both got %L") ;
+  (* Check the keys: the big map in [sink_outer] should only hold 0 and the
+     big map in [sink_inner] should only hold 1. *)
+  let has_key ~id ~data =
+    let* hash_result = Client.hash_data ~data ~typ:"nat" client in
+    let* response =
+      RPC_core.call_raw
+        (tezlink_foreign_endpoint sequencer)
+        (RPC.get_chain_block_context_big_map
+           ~id
+           ~key_hash:hash_result.script_expr_hash
+           ())
+    in
+    match response.code with
+    | 200 -> return true
+    | 404 -> return false
+    | code ->
+        Test.fail
+          ~__LOC__
+          "Unexpected HTTP code %d while looking up key %s in big map %s: %s"
+          code
+          data
+          id
+          response.body
+  in
+  let check_binding contract id key ~expected =
+    let* has_key = has_key ~id ~data:key in
+    Check.(
+      (has_key = expected)
+        bool
+        ~error_msg:
+          (contract ^ "'s big map must"
+          ^ (if expected then "" else "n't")
+          ^ " hold a binding to " ^ key ^ " (presence: %L)")) ;
+    unit
+  in
+  (* The big map in [sink_outer] still only holds the 0 key. *)
+  let* () = check_binding "sink_outer" outer_big_map_id "0" ~expected:true in
+  let* () = check_binding "sink_outer" outer_big_map_id "1" ~expected:false in
+  (* The big map in [sink_inner] still only holds the 1 key. *)
+  let* () = check_binding "sink_inner" inner_big_map_id "0" ~expected:false in
+  let* () = check_binding "sink_inner" inner_big_map_id "1" ~expected:true in
+  unit
+
 let () =
   test_crac_evm_to_tez () ;
   test_crac_evm_multiple_independent_crossings () ;
@@ -19113,4 +19289,5 @@ let () =
   test_crac_legacy_fallback_blind_derivation () ;
   test_crac_origin_repair_none_to_alias () ;
   test_crac_journal_revert_drops_origin () ;
-  test_michelson_runtime_rejects_invalid_key ()
+  test_michelson_runtime_rejects_invalid_key () ;
+  test_crac_nested_frames_temporary_big_map_ids ()

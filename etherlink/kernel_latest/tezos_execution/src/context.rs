@@ -152,8 +152,6 @@ pub mod big_maps {
 
     const NEXT_ID_PATH: RefPath = RefPath::assert_from(b"/next_id");
 
-    const KEYS: RefPath = RefPath::assert_from(b"/keys");
-
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
 
     fn root() -> Result<OwnedPath, PathError> {
@@ -170,10 +168,6 @@ pub mod big_maps {
 
     pub fn key_type_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
         concat(&big_map_path(id)?, &KEY_TYPE_PATH)
-    }
-
-    pub fn keys_of_big_map(id: &BigMapId) -> Result<OwnedPath, PathError> {
-        concat(&big_map_path(id)?, &KEYS)
     }
 
     pub fn value_type_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
