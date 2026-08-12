@@ -9,13 +9,18 @@ use enshrined_contracts::charge_persisted_error;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
 use enshrined_contracts::CracError;
 use mir::ast::BinWriter;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
+use mir::ast::{
+    AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens, TypedValue,
+};
 use mir::context::TypecheckingCtx;
 use mir::{
-    ast::{big_map::BigMapId, BorrowedUnparseError, IntoMicheline, Micheline},
-    context::CtxTrait,
+    ast::{
+        big_map::{BigMapId, LazyStorageError},
+        BorrowedUnparseError, IntoMicheline, Micheline,
+    },
+    context::{CtxTrait, LookupViewError},
     gas::{Gas, OutOfGas},
-    interpreter::{compute_contract_address, ContractInterpretError},
+    interpreter::{compute_contract_address, ContractInterpretError, InterpretError},
     parser::Parser,
     serializer::DecodeError,
     typechecker::{
@@ -28,7 +33,10 @@ use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
-use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
+use tezos_crypto_rs::{
+    hash::{ContractKt1Hash, ContractTz1Hash},
+    PublicKeyWithHash,
+};
 use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
@@ -63,6 +71,7 @@ use crate::account_storage::{
 };
 use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
+pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
     InterpretContext, OperationCtx, TcCtx,
@@ -1846,6 +1855,292 @@ pub fn get_enshrined_contract_views(
     }
 }
 
+/// Debug-render a MIR error (or value) under the runtime's byte cap: a
+/// `DUP; PAIR` DAG built for `O(K)` gas renders as `2^K` nodes (see
+/// [`mir::bounded_fmt`]), and this backs a free, unauthenticated RPC, so
+/// an uncapped render is an OOM vector.
+fn bounded_render<T: std::fmt::Debug + ?Sized>(value: &T) -> String {
+    mir::bounded_fmt::debug_bounded(
+        value,
+        mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
+    )
+}
+
+/// Inputs of [`run_code`]: run an arbitrary Michelson script against the
+/// current state, without originating it. Can be used by the node
+/// to implement RPCs such as `run_script_view`, `run_code`,
+/// `trace_code` and TZIP-4 `run_view`.
+#[derive(Debug)]
+pub struct RunCodeParams {
+    /// Micheline-encoded toplevel script (`parameter` / `storage` / `code`).
+    pub script: Vec<u8>,
+    /// Micheline-encoded initial storage.
+    pub storage: Vec<u8>,
+    /// Micheline-encoded parameter.
+    pub input: Vec<u8>,
+    /// Entrypoint to call.
+    pub entrypoint: Entrypoint,
+    /// Value of `SELF_ADDRESS`, and the account whose balance backs
+    /// `BALANCE` when [`balance`](Self::balance) is absent. Mandatory,
+    /// unlike L1's `opt "self"`: L1 answers an absent `self` by
+    /// originating a 4,000,000-ꜩ dummy in its in-memory simulation
+    /// context, which here would mean minting into durable storage.
+    // TODO: https://linear.app/tezos/issue/L2-1875
+    // The `run_code` RPC lets the caller omit `self`; synthesise the KT1
+    // node-side rather than teaching the kernel to mint.
+    pub self_address: ContractKt1Hash,
+    /// Value of `SENDER`. Defaults to [`payer`](Self::payer) when that is
+    /// given, and to `self_address` otherwise — L1 resolves the pair
+    /// together, see `sender_and_payer` in `proto_alpha/lib_plugin/RPC.ml`.
+    pub sender: Option<AddressHash>,
+    /// Value of `SOURCE`. Defaults to the null implicit account (the
+    /// all-zero `tz1`, L1's `Implicit_account_repr.zero`).
+    pub payer: Option<PublicKeyHash>,
+    /// Value of `AMOUNT`, in mutez.
+    pub amount: u64,
+    /// Value of `BALANCE`, in mutez. Defaults to `self_address`'s own
+    /// balance, which is zero if that account does not exist.
+    pub balance: Option<u64>,
+    /// Gas budget, in milligas.
+    pub milligas: u64,
+    /// Value of `CHAIN_ID`.
+    pub chain_id: tezos_crypto_rs::hash::ChainId,
+    /// Value of `LEVEL`.
+    pub level: tezos_tezlink::enc_wrappers::BlockNumber,
+    /// Value of `NOW`.
+    pub now: tezos_smart_rollup::types::Timestamp,
+}
+
+/// Output of [`run_code`].
+pub struct RunCodeOutput {
+    /// The resulting storage, Micheline-encoded in the optimized-legacy
+    /// representation.
+    pub storage: Vec<u8>,
+}
+
+/// Why a [`run_code`] call did not produce a result.
+#[derive(Debug, thiserror::Error)]
+pub enum RunCodeError {
+    /// The script, storage or parameter is ill-typed, or execution
+    /// failed (`FAILWITH`, out of gas, ...). A user-level error.
+    #[error("{0}")]
+    Execution(String),
+    /// Durable-storage failure. Infrastructure, not a script failure.
+    #[error("{0}")]
+    Host(String),
+}
+
+const GAS_EXHAUSTED: &str = "Gas exhausted";
+
+/// A durable-storage fault is infrastructure, not the caller's script
+/// being wrong. The other `LazyStorageError` variants are the caller's:
+/// gas, a forged id that does not resolve, an ill-typed stored value.
+fn is_host_fault(err: &LazyStorageError) -> bool {
+    matches!(
+        err,
+        LazyStorageError::PathError(_)
+            | LazyStorageError::RuntimeError(_)
+            | LazyStorageError::NomReadError(_)
+            | LazyStorageError::BinWriteError(_)
+    )
+}
+
+impl From<ScriptError<'_>> for RunCodeError {
+    fn from(err: ScriptError) -> Self {
+        match err {
+            ScriptError::OutOfGas(_) => Self::Execution(GAS_EXHAUSTED.to_string()),
+            // Host faults surface from big-map finalization directly, or
+            // nested in `InterpretError`: big-map access and `VIEW` lookup
+            // mid-interpretation.
+            ScriptError::Interpret(e) => match &e {
+                ContractInterpretError::LazyStorageError(err)
+                | ContractInterpretError::InterpretError(
+                    InterpretError::LazyStorageError(err),
+                ) if is_host_fault(err) => Self::Host(bounded_render(&e)),
+                ContractInterpretError::InterpretError(
+                    InterpretError::ViewLookupError(LookupViewError::HostError(_)),
+                ) => Self::Host(bounded_render(&e)),
+                _ => Self::Execution(bounded_render(&e)),
+            },
+            ScriptError::Decode(e) => Self::Execution(bounded_render(&e)),
+            ScriptError::Typecheck(e) => Self::Execution(bounded_render(&e)),
+            ScriptError::Unparse(e) => Self::Execution(match e {
+                // Folded into [ScriptError::OutOfGas] upstream; kept for
+                // exhaustiveness.
+                BorrowedUnparseError::OutOfGas => GAS_EXHAUSTED.to_string(),
+                BorrowedUnparseError::UnsupportedUnparsing => {
+                    "the resulting storage carries an operation, which cannot \
+                     be unparsed"
+                        .to_string()
+                }
+                BorrowedUnparseError::UnsatisfiedProperty(prop) => format!(
+                    "the resulting storage carries a sub-value that is not {prop}"
+                ),
+            }),
+            ScriptError::Encode(e) => Self::Execution(bounded_render(&e)),
+        }
+    }
+}
+
+/// Run a Michelson script against the current state without originating
+/// it, and return its resulting storage. The operations it emits are
+/// discarded.
+///
+/// # Precondition
+///
+/// **Callers must run this against a state they discard.** Interpreting a
+/// script writes through to durable storage — big-map contents and
+/// metadata, the global big-map id counter, the address registry — and a
+/// caller-supplied storage that drops an existing big-map id makes
+/// `interpret` *delete* that big map. Nothing in this crate enforces
+/// this; `tezosx_run_code_fn` does, with a reverted `SafeStorage`.
+pub fn run_code<
+    Host: StorageV1,
+    KS,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+>(
+    rk: &mut RuntimeKeyspaces<Host, KS>,
+    registry: &R,
+    journal: &mut TezosXJournal,
+    params: &RunCodeParams,
+) -> Result<RunCodeOutput, RunCodeError> {
+    // Declared first so it outlives every `Micheline` borrowed from its
+    // arena, including the ones held by `ctx` below.
+    let parser = Parser::new();
+    let arena = &parser.arena;
+
+    let host_err = |e: tezos_storage::error::Error| RunCodeError::Host(e.to_string());
+
+    let account = context::originated_from_kt1(&params.self_address).map_err(host_err)?;
+
+    let mut operation_gas = TezlinkOperationGas::start_milligas(params.milligas)
+        .map_err(|e| RunCodeError::Execution(e.to_string()))?;
+
+    let balance = match params.balance {
+        Some(balance) => balance,
+        None => account
+            .balance(rk.host())
+            .map_err(host_err)?
+            .0
+            .try_into()
+            .map_err(|_| {
+                RunCodeError::Execution("Contract balance overflows u64".to_string())
+            })?,
+    };
+    let balance: i64 = balance
+        .try_into()
+        .map_err(|_| RunCodeError::Execution("Balance overflows i64".to_string()))?;
+    let amount: i64 = params
+        .amount
+        .try_into()
+        .map_err(|_| RunCodeError::Execution("Amount overflows i64".to_string()))?;
+
+    // L1 defaults `SOURCE` to `Implicit_account_repr.zero` — the all-zero
+    // `tz1`, which is what `ContractTz1Hash::default()` yields.
+    let payer_pkh = params
+        .payer
+        .clone()
+        .unwrap_or_else(|| PublicKeyHash::Ed25519(ContractTz1Hash::default()));
+    let payer_account =
+        context::implicit_from_public_key_hash(&payer_pkh).map_err(host_err)?;
+
+    let self_address = AddressHash::Kt1(params.self_address.clone());
+    // L1 resolves `sender` and `payer` together: a `payer` given without a
+    // `sender` becomes the sender too. `SENDER` falls back to `self` only
+    // when neither is given (`sender_and_payer`, `lib_plugin/RPC.ml`).
+    let sender = params.sender.clone().unwrap_or_else(|| {
+        params
+            .payer
+            .clone()
+            .map_or_else(|| self_address.clone(), AddressHash::Implicit)
+    });
+    let contract_account = account_storage::TezosOriginatedAccount {
+        path: account.path().clone(),
+        kt1: account.kt1().clone(),
+    };
+
+    let mut next_temporary_id = BigMapId { value: (-1).into() };
+    let mut counter = 0u128;
+
+    let mut tc_ctx = TcCtx {
+        rk,
+        operation_gas: &mut operation_gas,
+        big_map_diff: BTreeMap::new(),
+        interpret_context: InterpretContext::new(),
+        next_temporary_id: &mut next_temporary_id,
+    };
+    let mut operation_ctx = OperationCtx {
+        source: &payer_account,
+        counter: &mut counter,
+        applied_counters: BTreeSet::new(),
+        level: &params.level,
+        now: &params.now,
+        chain_id: &params.chain_id,
+        source_public_key: &[],
+        crac_chain_depth: 0,
+        crac_origin: None,
+        delegated_storage_cost: 0,
+    };
+    let mut ctx = Ctx {
+        tc_ctx: &mut tc_ctx,
+        exec_ctx: ExecCtx {
+            sender,
+            amount,
+            self_address,
+            balance,
+            contract_account,
+        },
+        operation_ctx: &mut operation_ctx,
+        journal,
+        registry,
+        address_registry_diff: Vec::new(),
+    };
+
+    // Wrapped so the temporary big_maps this run allocated are cleared on
+    // the failure paths too, not only on the way out.
+    let result: Result<Vec<u8>, RunCodeError> = (|| {
+        let parameter = Micheline::decode_raw(arena, &params.input, ctx.gas())
+            .map_err(|_: OutOfGas| RunCodeError::Execution(GAS_EXHAUSTED.to_string()))?
+            .map_err(|e| RunCodeError::Execution(bounded_render(&e)))?;
+
+        // Forged big-map ids are allowed, as on L1 (`~internal:true`, and
+        // the storage side has no knob anyway); rejecting them in the
+        // parameter would not contain anything — the storage can name the
+        // same id — and would break legitimate dry runs. Views are not
+        // typechecked either, as on L1, which validates them at
+        // origination and `CREATE_CONTRACT` instead. Both are covered by
+        // this function's precondition.
+        let (_operations, storage) = interpret_encoded_script(
+            &params.script,
+            &params.storage,
+            &params.entrypoint,
+            parameter,
+            &parser,
+            &mut ctx,
+            AllowForgedLazyStorageId::Yes,
+        )
+        .map_err(RunCodeError::from)?;
+        Ok(storage)
+    })();
+
+    // Release the `&mut` borrow on `tc_ctx` before clearing through it.
+    drop(ctx);
+
+    // Clear the temporary range so a second run against the same state
+    // does not restart allocation at -1 and collide. It does *not* make
+    // the run clean — see the precondition.
+    if let Err(err) =
+        clear_temporary_big_maps(tc_ctx.rk.host_mut(), tc_ctx.next_temporary_id)
+    {
+        log!(
+            Error,
+            "Cleaning the temporary big_map in the storage failed: {err}"
+        );
+    }
+
+    Ok(RunCodeOutput { storage: result? })
+}
+
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host, KS>(
@@ -3124,6 +3419,244 @@ mod tests {
     /// root, used to build the account/big-map paths in tests.
     fn test_root() -> OwnedPath {
         OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT)
+    }
+
+    /// Pins [`run_code`](crate::run_code)'s step-constant semantics where
+    /// they differ from the applied path — a drift there is invisible
+    /// until an RPC consumer notices the wrong answer.
+    mod run_code {
+        use crate::gas::TezlinkOperationGas;
+        use crate::{run_code, RunCodeError, RunCodeParams};
+        use mir::ast::{AddressHash, Entrypoint, Micheline};
+        use mir::gas::Gas;
+        use mir::parser::Parser;
+        use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
+        use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+        use tezos_smart_rollup::types::Timestamp;
+        use tezos_tezlink::enc_wrappers::BlockNumber;
+        use tezosx_interfaces::testing::NotWiredRegistry;
+        use tezosx_interfaces::RuntimeId;
+        use tezosx_journal::TezosXJournal;
+
+        const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
+        const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
+        const TZ1: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
+        /// L1's `Implicit_account_repr.zero`, the default `SOURCE`.
+        const TZ1_NULL: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
+
+        fn encode(micheline: Micheline<'_>) -> Vec<u8> {
+            micheline
+                .encode(&mut Gas::default())
+                .expect("encoding fits the default gas budget")
+                .expect("the value is encodable")
+        }
+
+        /// `balance` is given explicitly so the run does not depend on any
+        /// account existing in the mock host.
+        fn params(
+            script: Vec<u8>,
+            storage: Vec<u8>,
+            input: Vec<u8>,
+            sender: Option<AddressHash>,
+            payer: Option<mir::ast::PublicKeyHash>,
+        ) -> RunCodeParams {
+            RunCodeParams {
+                script,
+                storage,
+                input,
+                entrypoint: Entrypoint::default(),
+                self_address: ContractKt1Hash::from_b58check(KT1).expect("valid KT1"),
+                sender,
+                payer,
+                amount: 0,
+                balance: Some(0),
+                milligas: TezlinkOperationGas::MAX_LIMIT,
+                chain_id: ChainId::from([0u8; 4]),
+                level: BlockNumber { block_number: 1 },
+                now: Timestamp::from(0i64),
+            }
+        }
+
+        fn run(params: &RunCodeParams) -> Result<Vec<u8>, RunCodeError> {
+            let mut rk = MockRuntimeKeyspaces::default();
+            run_code(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                params,
+            )
+            .map(|output| output.storage)
+        }
+
+        /// An unoriginated `storage + 1` script with storage `41` and a
+        /// `Unit` parameter, encoded.
+        fn incr_fixture<'a>(parser: &'a Parser<'a>) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+            let script = encode(
+                parser
+                    .parse_top_level(
+                        "parameter unit; storage nat; \
+                         code { CDR; PUSH nat 1; ADD; NIL operation; PAIR }",
+                    )
+                    .expect("the script parses"),
+            );
+            let storage = encode(parser.parse("41").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+            (script, storage, input)
+        }
+
+        /// The baseline: a script that was never originated runs against
+        /// caller-supplied storage, and the storage it returns comes back.
+        #[test]
+        fn returns_the_resulting_storage() {
+            let parser = Parser::new();
+            let (script, storage, input) = incr_fixture(&parser);
+
+            let result =
+                run(&params(script, storage, input, None, None)).expect("it runs");
+
+            assert_eq!(result, encode(parser.parse("42").expect("parses")));
+        }
+
+        /// `tezosx_run_code_fn` runs this inside a [`SafeStorage`]
+        /// transaction it always reverts: reads must resolve through the
+        /// snapshot, and the state must come back untouched.
+        #[test]
+        fn runs_and_reverts_inside_a_safe_storage_transaction() {
+            use tezos_evm_runtime::safe_storage::TMP_PATH;
+            use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+            use tezos_smart_rollup_host::storage::StorageV1;
+
+            let parser = Parser::new();
+            let (script, storage, input) = incr_fixture(&parser);
+
+            let mut rk = MockRuntimeKeyspaces::default();
+            let probe = RefPath::assert_from(b"/tez/tez_accounts/probe");
+            rk.host_mut()
+                .store_write_all(&probe, b"before")
+                .expect("the probe is written");
+
+            let mut safe_rk = rk
+                .to_safe_host(vec![OwnedPath::from(crate::context::TEZOS_ACCOUNTS_ROOT)]);
+            safe_rk.host_mut().start().expect("the snapshot is taken");
+            run_code(
+                &mut safe_rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &params(script, storage, input, None, None),
+            )
+            .expect("it runs");
+            safe_rk
+                .host_mut()
+                .revert()
+                .expect("the snapshot is dropped");
+
+            assert_eq!(
+                rk.host_mut()
+                    .store_read_all(&probe)
+                    .expect("the probe survives"),
+                b"before"
+            );
+            assert!(
+                rk.host_mut()
+                    .store_has(&TMP_PATH)
+                    .expect("/tmp is readable")
+                    .is_none(),
+                "the reverted snapshot should leave no `/tmp` behind"
+            );
+        }
+
+        /// L1 resolves `sender` and `payer` together: a `payer` given
+        /// without a `sender` is the sender too, and `SENDER` falls back to
+        /// `self` only when neither is given. Defaulting it to `self`
+        /// unconditionally — as this entrypoint first did — stores `False`.
+        #[test]
+        fn sender_falls_back_to_payer() {
+            let parser = Parser::new();
+            // `parse_top_level` borrows the source for as long as the
+            // parser, so a `format!` temporary would not live long enough.
+            let source = format!(
+                "parameter unit; storage bool; \
+                 code {{ DROP; SENDER; PUSH address \"{TZ1}\"; \
+                 COMPARE; EQ; NIL operation; PAIR }}"
+            );
+            let script =
+                encode(parser.parse_top_level(&source).expect("the script parses"));
+            let storage = encode(parser.parse("False").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let payer = match AddressHash::try_from(TZ1).expect("valid tz1") {
+                AddressHash::Implicit(pkh) => pkh,
+                other => panic!("expected an implicit account, got {other:?}"),
+            };
+
+            let result =
+                run(&params(script, storage, input, None, Some(payer))).expect("it runs");
+
+            assert_eq!(
+                result,
+                encode(parser.parse("True").expect("parses")),
+                "`SENDER` should be the payer, not `self`"
+            );
+        }
+
+        /// The other half of the pair: a `sender` given without a `payer`
+        /// is used verbatim and leaves `SOURCE` on its own default.
+        #[test]
+        fn sender_without_payer_keeps_the_null_source() {
+            let parser = Parser::new();
+            let source = format!(
+                "parameter unit; storage bool; \
+                 code {{ DROP; \
+                 SENDER; PUSH address \"{KT1_SENDER}\"; COMPARE; EQ; \
+                 SOURCE; PUSH address \"{TZ1_NULL}\"; COMPARE; EQ; \
+                 AND; NIL operation; PAIR }}"
+            );
+            let script =
+                encode(parser.parse_top_level(&source).expect("the script parses"));
+            let storage = encode(parser.parse("False").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let sender = AddressHash::try_from(KT1_SENDER).expect("valid KT1");
+
+            let result = run(&params(script, storage, input, Some(sender), None))
+                .expect("it runs");
+
+            assert_eq!(
+                result,
+                encode(parser.parse("True").expect("parses")),
+                "`SENDER` should be the given address and `SOURCE` the null tz1"
+            );
+        }
+
+        /// A `FAILWITH` is the caller's script failing, not the host
+        /// failing. The node keys on that distinction: the host kind is a
+        /// transient error clients may retry, this one is permanent.
+        #[test]
+        fn failwith_is_an_execution_error() {
+            let parser = Parser::new();
+            let script = encode(
+                parser
+                    .parse_top_level(
+                        "parameter unit; storage unit; \
+                         code { DROP; PUSH string \"boom\"; FAILWITH }",
+                    )
+                    .expect("the script parses"),
+            );
+            let storage = encode(parser.parse("Unit").expect("the storage parses"));
+            let input = encode(parser.parse("Unit").expect("the parameter parses"));
+
+            let err = run(&params(script, storage, input, None, None))
+                .expect_err("the script fails");
+
+            assert!(
+                matches!(err, RunCodeError::Execution(_)),
+                "a FAILWITH is not a host failure: {err:?}"
+            );
+            assert!(
+                err.to_string().contains("boom"),
+                "the failure value should survive into the message: {err}"
+            );
+        }
     }
 
     /// Test-only SafeStorage roots matching [`test_root`], so the inner

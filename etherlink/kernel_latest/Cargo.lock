@@ -1254,6 +1254,7 @@ dependencies = [
  "hex",
  "http",
  "mir",
+ "nom",
  "num-bigint",
  "num-derive",
  "num-traits",
