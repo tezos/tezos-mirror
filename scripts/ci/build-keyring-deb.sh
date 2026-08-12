@@ -95,9 +95,10 @@ export DEBEMAIL="${DEBEMAIL:-contact@nomadic-labs.com}"
 debchange --changelog "${KEYRING_DIR}/debian/changelog" \
   --newversion "${KEYRING_VERSION}" "Octez archive keyring update"
 # Pin the changelog date for reproducibility: debchange stamps it with the
-# current local time. We do not use its --date option because that was only
-# added in devscripts 2.24.2 and bookworm ships 2.23.4; once we drop bookworm
-# this can become `debchange --date "$DEB_DATE" ...`.
+# current local time. We do not use its --date option because it is unavailable
+# in the older devscripts shipped by some of the distributions we build on
+# (devscripts < 2.24.2, where --date was added). This script can be invoked
+# from build-deb-local.sh on such a host.
 #
 # Example changelog signature:
 #  -- Albert Dupont <albert@dupont.com>  Wed, 24 Jul 2026 17:31:42 +0200

@@ -108,8 +108,9 @@ TIMESTAMP=$(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y%m%d%H%M')
 
 # Overwrite the date of the most recent changelog entry with DEB_DATE. debchange
 # stamps it with the current local time. We do not use its --date option because
-# that was only added in devscripts 2.24.2 and bookworm ships 2.23.4; once we
-# drop bookworm this can become `debchange --date "$DEB_DATE" ...`.
+# it is unavailable in the older devscripts shipped by some of the
+# distributions we build on (e.g. Ubuntu 22.04/24.04 ship devscripts < 2.24.2,
+# which is where --date was added).
 #
 # Example changelog signature:
 #  -- Albert Dupont <albert@dupont.com>  Wed, 24 Jul 2026 17:31:42 +0200
