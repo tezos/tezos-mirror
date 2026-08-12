@@ -1596,14 +1596,21 @@ pub mod tests {
     #[macro_export]
     macro_rules! make_default_ctx {
         ($ctx:ident, $rk:ident) => {
+            $crate::make_default_ctx!(
+                $ctx,
+                $rk,
+                tezosx_journal::TemporaryBigMapIdAllocator::new()
+            );
+        };
+        // Third form for the frames of one operation, which share its allocator.
+        ($ctx:ident, $rk:ident, $temporary_big_map_id_allocator:expr) => {
             let mut operation_gas = TezlinkOperationGas::default();
             let mut $ctx = TcCtx {
                 rk: &mut $rk,
                 operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 interpret_context: $crate::mir_ctx::InterpretContext::new(),
-                temporary_big_map_id_allocator:
-                    tezosx_journal::TemporaryBigMapIdAllocator::new(),
+                temporary_big_map_id_allocator: $temporary_big_map_id_allocator,
             };
         };
     }
@@ -2832,6 +2839,97 @@ pub mod tests {
 
         assert!(ctx.rk.host().store_has(&path1).unwrap().is_none());
         assert!(ctx.rk.host().store_has(&path2).unwrap().is_none());
+    }
+
+    /// The frames of one operation share its allocator, so a second frame must
+    /// continue the sequence instead of restarting it (L2-1937), and one clear
+    /// must cover what all of them allocated.
+    #[test]
+    fn temporary_big_map_ids_are_shared_across_frames() {
+        let mut rk = RuntimeKeyspaces::default();
+        let allocator = tezosx_journal::TemporaryBigMapIdAllocator::new();
+        let outer = {
+            make_default_ctx!(ctx, rk, allocator.clone());
+            ctx.big_map_new(&Type::Int, &Type::String, true).unwrap()
+        };
+        let inner = {
+            make_default_ctx!(ctx, rk, allocator.clone());
+            ctx.big_map_new(&Type::Int, &Type::String, true).unwrap()
+        };
+        assert!(outer.is_temporary() && inner.is_temporary());
+        assert_ne!(outer, inner, "the second frame restarted the sequence");
+
+        clear_temporary_big_maps(rk.host_mut(), &allocator).unwrap();
+
+        for id in [&outer, &inner] {
+            assert!(
+                rk.host()
+                    .store_has(&big_map_path(id).unwrap())
+                    .unwrap()
+                    .is_none(),
+                "clear must remove {id}"
+            );
+        }
+    }
+
+    /// Clearing walks the IDs handed out down to the first one. It must stop
+    /// there: permanent IDs sit on the other side of 0 and progress the other
+    /// way, so walking one ID too far would delete a live big map.
+    #[test]
+    fn clear_temporary_big_maps_spares_permanent_big_maps() {
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
+        // Two permanent maps, so one of them has a non-zero ID to walk onto.
+        let _ = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let permanent = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
+        let permanent_path = big_map_path(&permanent).unwrap();
+
+        // Nothing handed out yet: nothing to clear.
+        clear_temporary_big_maps(ctx.rk.host_mut(), &TemporaryBigMapIdAllocator::new())
+            .unwrap();
+        assert!(ctx.rk.host().store_has(&permanent_path).unwrap().is_some());
+
+        let temporary = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
+            .unwrap();
+
+        assert!(ctx
+            .rk
+            .host()
+            .store_has(&big_map_path(&temporary).unwrap())
+            .unwrap()
+            .is_none());
+        assert!(
+            ctx.rk.host().store_has(&permanent_path).unwrap().is_some(),
+            "clearing the temporary IDs must spare {permanent}"
+        );
+    }
+
+    /// A frame that reverts keeps its IDs handed out but takes its big maps
+    /// with it, so clearing walks over IDs with nothing in the store.
+    #[test]
+    fn clear_temporary_big_maps_tolerates_absent_big_maps() {
+        let mut rk = RuntimeKeyspaces::default();
+        make_default_ctx!(ctx, rk);
+        // Cleared last, after the reverted one, so an abort would spare it.
+        let live = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        let reverted = ctx.big_map_new(&Type::Int, &Type::String, true).unwrap();
+        ctx.rk
+            .host_mut()
+            .store_delete(&big_map_path(&reverted).unwrap())
+            .unwrap();
+
+        clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
+            .unwrap();
+
+        assert!(
+            ctx.rk
+                .host()
+                .store_has(&big_map_path(&live).unwrap())
+                .unwrap()
+                .is_none(),
+            "the absent {reverted} aborted the clearing before {live}"
+        );
     }
 
     /// The TezosX gateway exposes three synthetic views today:
