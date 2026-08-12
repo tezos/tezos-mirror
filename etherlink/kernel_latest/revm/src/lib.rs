@@ -560,7 +560,14 @@ where
     // run transaction of the same operation.
     let alias_delegation = journal.evm.take_pending_alias_delegation();
     let block_env = block_env(block_constants)?;
-    let call_depth = journal.evm.revm_call_depth().unwrap_or(0) as usize;
+    let is_cross_runtime = matches!(
+        origin,
+        TransactionOrigin::CrossRuntime { .. } | TransactionOrigin::CrossRuntimeStatic
+    );
+    let call_depth = journal
+        .evm
+        .revm_call_depth()
+        .unwrap_or(if is_cross_runtime { 1 } else { 0 }) as usize;
     let tx = tx_env(
         rk.host_mut(),
         journal,
@@ -574,10 +581,6 @@ where
         &mut origin,
     )?;
 
-    let is_cross_runtime = matches!(
-        origin,
-        TransactionOrigin::CrossRuntime { .. } | TransactionOrigin::CrossRuntimeStatic
-    );
     // A user-input transaction was natively signed: have the commit
     // classify its caller as Native if still unclassified. The tag
     // rides the info write the nonce bump forces anyway, so this
