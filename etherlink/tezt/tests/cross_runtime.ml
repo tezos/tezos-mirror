@@ -19112,11 +19112,8 @@ let test_crac_nested_frames_temporary_big_map_ids () =
   (* The big map in [sink_outer] still only holds the 0 key. *)
   let* () = check_binding "sink_outer" outer_big_map_id "0" ~expected:true in
   let* () = check_binding "sink_outer" outer_big_map_id "1" ~expected:false in
-  (* TODO L2-1937: [sink_inner] has a binding to 0 because its temporary big map
-     ID collided with that of [sink_outer]: the test succeeeds with
-     [~expected = true], i.e. 0 has a binding, while it should be false because 0
-     is not part of this big map. *)
-  let* () = check_binding "sink_inner" inner_big_map_id "0" ~expected:true in
+  (* The big map in [sink_inner] still only holds the 1 key. *)
+  let* () = check_binding "sink_inner" inner_big_map_id "0" ~expected:false in
   let* () = check_binding "sink_inner" inner_big_map_id "1" ~expected:true in
   unit
 
