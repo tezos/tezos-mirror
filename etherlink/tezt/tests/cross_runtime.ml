@@ -2963,7 +2963,8 @@ end
 (** Registers a sequencer-only CRAC runner test on the sandbox.  Builds
  *  a {!CracRunnerWrapper.S} and passes it to [body]. *)
 let register_crac_runner_test ~title ?(tags = [])
-    ?(minimum_base_fee_per_gas = crac_minimum_base_fee_per_gas) body =
+    ?(minimum_base_fee_per_gas = crac_minimum_base_fee_per_gas) ?da_fee_per_byte
+    ?sequencer_pool_address body =
   let with_runtimes = Tezosx_runtime.[Tezos] in
   let tags =
     ["tezosx"]
@@ -2978,6 +2979,8 @@ let register_crac_runner_test ~title ?(tags = [])
     ~tags
     ~with_runtimes
     ~minimum_base_fee_per_gas
+    ?da_fee_per_byte
+    ?sequencer_pool_address
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer ->
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3548,6 +3551,153 @@ let test_crac_tez_to_evm_reverts () =
     TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge
   in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
+  unit
+
+(** Sequencer pool address and inclusion fee shared by the two fee
+ *  tests below. The fee is charged per byte on the EVM deployments
+ *  they make too, so keep it low enough that those stay affordable. *)
+let fee_sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185"
+
+let fee_da_fee_per_byte = Wei.of_tez (Tez.of_mutez_int 1)
+
+(** Registers a CRAC runner test that bills an inclusion fee to a known
+ *  sequencer pool, and hands the body a way to read that pool. *)
+let register_crac_fee_test ~title body =
+  register_crac_runner_test
+    ~title
+    ~tags:["da_fee"; "sequencer_pool_address"]
+    ~da_fee_per_byte:fee_da_fee_per_byte
+    ~sequencer_pool_address:fee_sequencer_pool_address
+  @@ fun (module Wrapper) ->
+  let pool_balance () =
+    let*@ balance =
+      Rpc.get_balance ~address:fee_sequencer_pool_address Wrapper.sequencer
+    in
+    return balance
+  in
+  body (module Wrapper : CracRunnerWrapper.S) pool_balance
+
+(** The inclusion fee owed to the sequencer for a Michelson operation
+ *  crossing into the EVM must reach the pool, whether or not the
+ *  crossing reverts.
+ *
+ *     TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]
+ *
+ *  The Michelson runtime credits the pool, which is also the coinbase
+ *  the EVM sub-execution rewards, so a commit of the EVM journal can
+ *  write an older balance over that credit. *)
+let test_crac_tez_to_evm_da_fee_credited () =
+  register_crac_fee_test
+    ~title:"CRAC: TEZ->EVM credits the sequencer its inclusion fee"
+  @@ fun (module Wrapper) pool_balance ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM runner" ;
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  let* crossing_before = pool_balance () in
+  Log.debug ~prefix "Call the TEZ bridge crossing into the EVM" ;
+  let* () = TezRunner.call_run tez_bridge in
+  let* crossing_after = pool_balance () in
+  Log.debug ~prefix "Verify the crossing reached the EVM" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  let crossing_credit = Wei.(crossing_after - crossing_before) in
+  Check.((crossing_credit <> Wei.zero) Wei.typ)
+    ~error_msg:
+      "The inclusion fee of a Michelson operation crossing into the EVM was \
+       dropped: the sequencer pool received no credit at all" ;
+  (* A crossing that reverts backtracks the operation, but the sequencer
+     posted it to the inbox all the same and is still owed for it. *)
+  Log.debug ~prefix "Deploy a reverting EVM runner" ;
+  let* evm_reverter = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  let* tez_reverting_bridge = TezCrossRuntimeRunnerEvm.originate evm_reverter in
+  let* reverted_before = pool_balance () in
+  Log.debug ~prefix "Call the TEZ bridge whose crossing reverts" ;
+  let* () = TezRunner.call_run tez_reverting_bridge in
+  let* reverted_after = pool_balance () in
+  Log.debug ~prefix "Verify the crossing did revert" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage
+      ~expected_counter:0
+      tez_reverting_bridge
+  in
+  let reverted_credit = Wei.(reverted_after - reverted_before) in
+  Log.debug
+    ~prefix
+    "Pool credit: crossing %s wei, reverted crossing %s wei"
+    (Wei.to_string crossing_credit)
+    (Wei.to_string reverted_credit) ;
+  Check.((reverted_credit <> Wei.zero) Wei.typ)
+    ~error_msg:
+      "A Michelson operation whose crossing reverted paid an inclusion fee \
+       that never reached the sequencer, so the fee was destroyed" ;
+  unit
+
+(** The inclusion fee owed to the sequencer for an EVM transaction
+ *  crossing into Michelson must reach the pool, whether or not the
+ *  crossing reverts.
+ *
+ *     EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
+ *
+ *  This direction is billed by the EVM fee updates rather than by the
+ *  Michelson runtime. *)
+let test_crac_evm_to_tez_da_fee_credited () =
+  register_crac_fee_test
+    ~title:"CRAC: EVM->TEZ credits the sequencer its inclusion fee"
+  @@ fun (module Wrapper) pool_balance ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let* crossing_before = pool_balance () in
+  Log.debug ~prefix "Call the EVM bridge crossing into Michelson" ;
+  let* _ = EvmRunner.call_run evm_bridge in
+  let* crossing_after = pool_balance () in
+  Log.debug ~prefix "Verify the crossing reached Michelson" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  let crossing_credit = Wei.(crossing_after - crossing_before) in
+  Check.((crossing_credit <> Wei.zero) Wei.typ)
+    ~error_msg:
+      "The inclusion fee of an EVM transaction crossing into Michelson was \
+       dropped: the sequencer pool received no credit at all" ;
+  (* A crossing that reverts fails the whole EVM transaction, which is
+     still charged for the data it posted. *)
+  Log.debug ~prefix "Originate a reverting TEZ runner" ;
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_reverting_bridge =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter
+  in
+  let* reverted_before = pool_balance () in
+  Log.debug ~prefix "Call the EVM bridge whose crossing reverts" ;
+  let* _ = EvmRunner.call_run ~expected_status:false evm_reverting_bridge in
+  let* reverted_after = pool_balance () in
+  Log.debug ~prefix "Verify the crossing did revert" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage
+      ~expected_counter:0
+      evm_reverting_bridge
+  in
+  let reverted_credit = Wei.(reverted_after - reverted_before) in
+  Log.debug
+    ~prefix
+    "Pool credit: crossing %s wei, reverted crossing %s wei"
+    (Wei.to_string crossing_credit)
+    (Wei.to_string reverted_credit) ;
+  Check.((reverted_credit <> Wei.zero) Wei.typ)
+    ~error_msg:
+      "An EVM transaction whose crossing reverted paid an inclusion fee that \
+       never reached the sequencer, so the fee was destroyed" ;
   unit
 
 (** CRAC: when a Michelson transaction makes a single CRAC into EVM,
@@ -18986,6 +19136,8 @@ let () =
   test_crac_evm_to_tez_materializes_alias () ;
   test_crac_evm_to_tez_revert_drops_alias () ;
   test_crac_tez_to_evm_reverts () ;
+  test_crac_tez_to_evm_da_fee_credited () ;
+  test_crac_evm_to_tez_da_fee_credited () ;
   test_crac_tez_to_evm_fake_tx_in_block () ;
   test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks () ;
   test_crac_tez_to_evm_inner_logs_in_receipt () ;
