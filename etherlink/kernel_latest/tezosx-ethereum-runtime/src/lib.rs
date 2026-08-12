@@ -450,13 +450,12 @@ where
     // (`X-Tezos-Source`) instead of `TxEnv.caller`, via a custom
     // `ORIGIN` opcode handler (see `etherlink_origin` in
     // `revm/src/lib.rs`). `TxEnv.caller` — and therefore `msg.sender`,
-    // REVM's pre-execution nonce bump, and the value deduction — stays
-    // on the immediate caller (`X-Tezos-Sender`) exactly as it did
-    // before L2-1363, so the EOA-only guard is restored without any of
-    // the side effects of overloading `TxEnv.caller`. An originator of
-    // `None` falls back to the standard `TxEnv.caller` →
-    // `tx.origin == msg.sender` semantics (a direct EOA call). See
-    // L2-1363 / L2-1441.
+    // and the value deduction — stays on the immediate caller
+    // (`X-Tezos-Sender`) exactly as it did before L2-1363, so the
+    // EOA-only guard is restored without any of the side effects of
+    // overloading `TxEnv.caller`. An originator of `None` falls back
+    // to the standard `TxEnv.caller` → `tx.origin == msg.sender` semantics
+    // (a direct EOA call). See L2-1363 / L2-1441.
     //
     // The originator is per-call: save the outer frame's value and
     // restore it on return (same shape as `crac_chain_depth` above).
@@ -1978,17 +1977,23 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 
-    /// Sanity check: the inbound-CRAC originator (`X-Tezos-Source`)
-    /// drives the `ORIGIN` opcode via the kernel's custom handler, not
-    /// `TxEnv.caller`, so REVM's pre-execution nonce bump stays on the
-    /// immediate caller (the sender alias) and never touches the
-    /// originator's on-chain nonce — even when the originator is the
-    /// outer-tx signing EOA on an `EVM -> Michelson -> EVM` round-trip.
-    /// Asserts the persisted nonce of `source` stays at `0` after the
-    /// inbound CRAC; a future regression that re-overloads
-    /// `TxEnv.caller` would make this test read `1` instead.
+    /// An inbound CRAC must not move *any* nonce.
+    ///
+    /// The originator (`X-Tezos-Source`) drives the `ORIGIN` opcode via
+    /// the kernel's custom handler rather than `TxEnv.caller`, so it is
+    /// never the account REVM's pre-execution accounting touches — even
+    /// when the originator is the outer-tx signing EOA on an
+    /// `EVM -> Michelson -> EVM` round-trip. A future regression that
+    /// re-overloads `TxEnv.caller` would make `source` read `1`.
+    ///
+    /// The immediate caller (`X-Tezos-Sender`) is not spared either: it
+    /// authored no transaction, so its nonce is not replay protection for
+    /// this crossing and
+    /// `EtherlinkHandler::validate_against_state_and_deduct_caller`
+    /// suppresses the bump. Losing that suppression would make `sender`
+    /// read `1`.
     #[test]
-    fn inbound_crac_does_not_leak_origin_nonce_bump() {
+    fn inbound_crac_does_not_leak_origin_caller_nonce_bump() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let block_constants = BlockConstants::test_block_with_no_fees();
@@ -2020,6 +2025,13 @@ mod tests {
         assert_eq!(
             info.nonce, 0,
             "inbound CRAC must not leak its pre-execution nonce bump onto the originator"
+        );
+
+        let sender_account = StorageAccount::from_address(&sender).unwrap();
+        let info = sender_account.info(&mut host).unwrap();
+        assert_eq!(
+            info.nonce, 0,
+            "inbound CRAC must not bump the forwarded sender's nonce either"
         );
     }
 

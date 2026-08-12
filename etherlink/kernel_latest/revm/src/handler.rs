@@ -3,11 +3,15 @@
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    context::{result::HaltReason, ContextTr, JournalTr},
+    context::{
+        journaled_state::account::JournaledAccountTr, result::HaltReason, ContextTr,
+        JournalTr,
+    },
     context_interface::{Cfg, LocalContextTr, Transaction},
     handler::{
-        execution::create_init_frame, EthFrame, EvmTr, EvmTrError, FrameResult, FrameTr,
-        Handler,
+        execution::create_init_frame,
+        pre_execution::validate_against_state_and_deduct_caller, EthFrame, EvmTr,
+        EvmTrError, FrameResult, FrameTr, Handler,
     },
     inspector::InspectorHandler,
     interpreter::{
@@ -54,6 +58,35 @@ where
     type Evm = EVM;
     type Error = ERROR;
     type HaltReason = HaltReason;
+
+    /// Validate the caller against its state and deduct the transaction costs.
+    /// Contrary to vanilla REVM, bumping the caller nonce only happens when
+    /// the call is top-level (depth is 0). Cross-runtime calls should not have
+    /// nonce bump.
+    ///
+    /// **When bumping REVM to 38** — check the upstream implemention consists in
+    /// calling validate_against_state_and_deduct_caller and nothing more.
+    fn validate_against_state_and_deduct_caller(
+        &self,
+        evm: &mut Self::Evm,
+    ) -> Result<(), Self::Error> {
+        let caller_address = evm.ctx().tx().caller();
+        let nonce_before = evm
+            .ctx()
+            .journal_mut()
+            .load_account(caller_address)?
+            .info
+            .nonce;
+        validate_against_state_and_deduct_caller::<_, Self::Error>(evm.ctx())?;
+        if self.call_depth != 0 {
+            evm.ctx()
+                .journal_mut()
+                .load_account_with_code_mut(caller_address)?
+                .data
+                .set_nonce(nonce_before);
+        }
+        Ok(())
+    }
 
     /// Flip `is_static = true` on the top-level call frame when built
     /// via [`Self::new_static`]. The rest of the body is a verbatim
