@@ -709,10 +709,21 @@
 
 ### Storage versions
 
+- The storage version is now 64. It carries no data migration: the version is
+  the signal on which the node gates the `tezosx_run_code` entrypoint. (!22729)
 - The storage version is now 61. (!22099)
 
 ### Internals
 
+- Added a `tezosx_run_code` kernel entrypoint that runs an arbitrary Michelson
+  script against the current state without originating it — script, storage,
+  parameter and the step constants are all inputs, the resulting storage comes
+  back out, and the emitted operations are discarded. Gas is clamped to the
+  runtime's per-operation cap, and the interpretation runs inside a storage
+  transaction that is always reverted, so the entrypoint leaves the state it
+  was given untouched. No user-visible effect on its own: it is the primitive
+  the node's Michelson script helpers (`run_script_view` first) are built on.
+  (!22729)
 - The cross-runtime gateway no longer clones each leg's request body and
   full response into the journal's in-memory HTTP-trace stack unless HTTP
   trace capture is requested. The clone is gated on the `http_trace_enabled`

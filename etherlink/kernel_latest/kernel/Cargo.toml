@@ -68,6 +68,7 @@ tezos-smart-rollup-encoding.workspace = true
 tezos-smart-rollup-installer-config.workspace = true
 tezos-smart-rollup-storage.workspace = true
 num-bigint.workspace = true
+nom.workspace = true
 
 tezos_data_encoding.workspace = true
 tezos-protocol.workspace = true

@@ -1217,6 +1217,12 @@ where
             host.store_write(&ENABLE_TEZOS_RUNTIME_V63, &[], 0)?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V64 => {
+            // Starting version 64, the kernel exposes the `tezosx_run_code`
+            // entrypoint. No data to migrate: the version is the signal the
+            // node gates the entrypoint on.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
