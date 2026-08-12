@@ -1145,7 +1145,12 @@ pub fn clear_temporary_big_maps<Host: StorageV1>(
     next_temp_id: &mut BigMapId,
 ) -> Result<(), LazyStorageError> {
     while next_temp_id.dec() {
-        remove_big_map(host, next_temp_id)?;
+        // An ID can have no storage: the frame that allocated it may have
+        // reverted, and the counter does not roll back with it.
+        match remove_big_map(host, next_temp_id) {
+            Ok(()) | Err(LazyStorageError::RuntimeError(RuntimeError::PathNotFound)) => {}
+            Err(err) => return Err(err),
+        }
     }
     Ok(())
 }
