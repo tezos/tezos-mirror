@@ -247,6 +247,9 @@ pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 =
 // rehash).
 pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 100;
 
+// Shared with the Michelson %call gateway; see tezosx_constants.
+pub(crate) const MAX_HTTP_CALL_HEADERS: usize = tezosx_constants::MAX_HTTP_CALL_HEADERS;
+
 // `resolveAddress` flat base cost — ABI decode + dispatch + runtime
 // validation. 1 500 covers per-call dispatch overhead, consistent with
 // the derive_alias family of costs.
