@@ -41,6 +41,17 @@ let fail_to_stake_with_unfinalizable_unstake_requests ~loc staker ~amount =
         errs)
     (stake staker amount)
 
+let fail_to_stake_amount_too_small ~loc staker ~amount =
+  assert_failure
+    ~expected_error:(fun _ errs ->
+      Error_helpers.check_error_constructor_name
+        ~loc
+        ~expected:
+          (Protocol.Staking_pseudotokens_storage.Stake_amount_too_small
+             Protocol.Tez_repr.zero)
+        errs)
+    (stake staker amount)
+
 (** Initializes of scenarios with 2 cases:
      - staker = delegate
      - staker != delegate
@@ -882,21 +893,14 @@ let test_pseudotokens_roundings =
       `Staked
       (Tez.of_mutez (Int64.add amount 10_000_057_186L))
   in
-  (assert_success ~loc:__LOC__
-  @@ stake "staker" (Amount Tez.one_mutez)
-     (* All computations for stakes are rounded down *)
-     (* Formula : amount_staked * total_pseudotokens / total_staked_tez *)
-     (* 1 * 20_000_000_001 / 20_000_114_375 = 0 pseudotokens issued *)
-     --> check_staker_issued_pseudotokens ~loc:__LOC__ 0L
-     (* Stake formula = total_staked_tez * pseudotokens / total_pseudotokens *)
-     (* Stake before = 20_000_114_375 * 10_000_000_001 / 20_000_000_001 = 10_000_057_188 *)
-     (* Stake after = (20_000_114_375 + 1) * (10_000_000_001 + 0) / (20_000_000_001 + 0) = 10_000_057_188 *)
-     (* Difference = 10_000_057_188 - 10_000_057_188 = 0 *)
-     --> check_staker_staked_tokens_increase ~loc:__LOC__ 0L
-     (* Stake before = 20_000_114_375 * 10_000_000_000 / 20_000_000_001 = 10_000_057_186 *)
-     (* Stake after = (20_000_114_375 + 1) * 10_000_000_000 / (20_000_000_001 + 0) = 10_000_057_187 *)
-     (* Difference = 10_000_057_187 - 10_000_057_186 = 1 *)
-     --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
+  (* All computations for stakes are rounded down.
+     Formula: amount_staked * total_pseudotokens / total_staked_tez.
+     Here 1 * 20_000_000_001 / 20_000_114_375 = 0 pseudotokens would be issued,
+     so the operation is rejected. *)
+  fail_to_stake_amount_too_small
+    ~loc:__LOC__
+    "staker"
+    ~amount:(Amount Tez.one_mutez)
   --> (assert_success ~loc:__LOC__
       @@ stake "staker" (Amount (Tez.of_mutez 2L))
          (* 2 * 20_000_000_001 / 20_000_114_375 = 1 pseudotoken issued *)

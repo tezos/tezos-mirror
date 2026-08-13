@@ -1609,6 +1609,6 @@ let register ~protocols =
   test_staking protocols ;
   test_fix_delegated_balance protocols ;
   test_delegate_parameter_UX protocols ;
-  (* The fix lives in the Ushuaia (025) plugin. *)
+  (* The fix lives in the Alpha protocol and in the Ushuaia (025) plugin. *)
   test_stake_too_small_to_mint_pseudotokens
-    (List.filter (fun p -> p = Protocol.U025) protocols)
+    (List.filter (fun p -> p = Protocol.Alpha || p = Protocol.U025) protocols)
