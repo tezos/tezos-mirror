@@ -81,9 +81,9 @@ pub struct CallTrace {
     logs: Option<Vec<Log>>,
     /// `depth` is helpful to reconstruct the tree of call on the EVM node's side.
     depth: u16,
-    /// Intrinsic gas of the transaction this frame belongs to, captured when
-    /// the frame opens (an inner cross-runtime leg has its own TxEnv, so a
-    /// tracer-global value would be overwritten mid-crossing). Added to
+    /// Intrinsic gas of the traced transaction, captured when the frame
+    /// opens. Zero on every frame but the top-level one, which alone
+    /// accounts intrinsic gas as geth's callTracer does. Added to
     /// `gas_used` at close; not part of the encoded trace.
     initial_gas: u64,
 }
@@ -347,7 +347,12 @@ where
         let depth = self.call_trace.len() as u16;
         self.saw_call = self.saw_call || inputs.scheme != CallScheme::StaticCall;
 
-        let initial_gas = self.initial_gas(context.tx());
+        // Only the top-level frame accounts the transaction's intrinsic gas.
+        let initial_gas = if depth == 0 {
+            self.initial_gas(context.tx())
+        } else {
+            0
+        };
 
         let (type_, from) = match inputs.scheme {
             CallScheme::Call => ("CALL", inputs.caller),
@@ -394,7 +399,12 @@ where
         let depth = self.call_trace.len() as u16;
         self.saw_call = true;
 
-        let initial_gas = self.initial_gas(context.tx());
+        // Only the top-level frame accounts the transaction's intrinsic gas.
+        let initial_gas = if depth == 0 {
+            self.initial_gas(context.tx())
+        } else {
+            0
+        };
 
         let (type_, from) = match inputs.scheme() {
             CreateScheme::Create => ("CREATE", inputs.caller()),
