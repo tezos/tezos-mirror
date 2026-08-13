@@ -5,7 +5,100 @@
 Entries for the next release live as one file per merge request under
 [`.changes/tezosx/`](.changes/tezosx/), to avoid rebase conflicts and entries
 stranded above a freshly cut release header. See
-[`.changes/tezosx/README.md`](.changes/tezosx/README.md).
+[`.changes/README.md`](.changes/README.md).
+
+## Version 0.9 (b8c07fbb0f27d0c4d48ef8e88d82b480fdb4aae4)
+
+### EVM Runtime
+
+- Fix a bug where an inbound cross-runtime EVM sub-execution failing before it
+  entered the interpreter (a transaction validation error) drained the journal
+  it shares with the outer EVM transaction, reverting state the outer frames
+  had already written, and left the inbound value credit applied. (!22703)
+- Emits `CrossRuntimeCallSent` events before actually processing an incoming
+  cross-runtime call. (!22701)
+- A block carrying a deposit, an FA deposit, an operation posted via the delayed
+  inbox or a cross-runtime call can be finalized again. The transaction objects
+  those produce carry no signature, and the persisted `BlockInProgress` holding
+  one could no longer be decoded, so such a block could not be resumed after a
+  reboot, and a block containing a cross-runtime call could not be built at all
+  on the instant-confirmation path, where the block in progress is re-read after
+  every transaction. (!22683)
+- Fixed a base-fee inflation: the gas of a Michelson operation performing a
+  cross-runtime call to EVM was added twice to the block's execution gas — once
+  by the Michelson runtime and once again when registering the synthetic EVM
+  transaction — raising the base fee of the following blocks for every user of
+  the EVM interface. (!22664)
+
+### Michelson Runtime
+
+- Temporary big map IDs are now handed out by a single counter, shared by every
+  Michelson frame of a manager operation, instead of one counter per frame. A
+  nested cross-runtime frame used to restart the counter at `-1` and allocate IDs
+  already in use by the frame that called it: both wrote to the same big map, and
+  returning from the nested frame cleared big maps the outer frame was still
+  using. Temporary big maps are now cleared once, at the end of the transaction. (!22708)
+- Restores O(1) behavior for updating, copying and dropping a big map. Gas
+  costs are updated accordingly. (!22706)
+
+### Native Atomic Composability
+
+- Reject a CRAC `%call` gateway request carrying too many HTTP headers as a
+  failed operation, instead of letting it abort block production. (!22723)
+- The inclusion fee of a Michelson operation that makes a cross-runtime call
+  into the EVM reaches the sequencer. It was credited before the EVM journal
+  was committed, and that commit wrote the pool balance it had read before the
+  credit, dropping the fee the operation had already paid for. (!22721)
+- EVM alias nonces are no longer being bumped on ingoing cross-runtime calls. (!22719)
+- The synthetic Ethereum transaction mirroring a Michelson-originated crossing
+  now derives its hash from that operation's hash rather than from the block
+  number and the cross-runtime call id. That makes them predictable. (!22718)
+- The synthetic Tezos operation mirroring an EVM-originated crossing
+  now derives its hash from that transaction's hash rather than from the block
+  number and the cross-runtime call id. That makes them predictable. (!22718)
+- The origination of an alias inside a failing cross-runtime call is correctly
+  reported as `backtracked`. (!22705)
+- **Breaking change:** a cross-runtime call whose target runtime is the
+  caller's own runtime is now refused. Only the generic `call` (EVM) and
+  `%call` (Michelson) gateway entrypoints could express such a target — via a
+  `http://ethereum/...` URL from the EVM runtime or a `http://tezos/...` URL
+  from the Michelson runtime — for both the POST and GET methods; the typed
+  entrypoints (`callMichelson`, `callMichelsonView`, `%call_evm`,
+  `staticcallEvm`) always target the other runtime and are unaffected. Such a
+  call was not a real boundary crossing: the callee executed against the
+  caller's own journal state, so the inbound error path drained the shared
+  journal and desynced the outer frames' checkpoints, after which a revert
+  could silently fail to unwind state. It also granted no capability — a
+  target on the caller's own runtime is reachable natively: a POST by a plain
+  EVM `CALL` or a Michelson internal operation, with that runtime's ordinary
+  rollback semantics, and a GET by the `VIEW` instruction. On the EVM side the
+  refusal is a catchable revert of the gateway `CALL`; on the Michelson side,
+  which has no catch, it backtracks the manager operation. (!22702)
+- Alias materialization no longer forwards a pre-existing alias balance to
+  the native account: it only installs the forwarder delegation and its
+  storage. The alias forwarder now sweeps its full balance (payment plus
+  any residue) on any incoming interaction, retains sub-mutez amounts
+  instead of reverting, and treats a zero-value call to a materialized
+  alias as a sweep trigger. Dust on a not-yet-materialized alias no longer
+  makes the native account's first crossing fail. (!22691)
+
+### Storage versions
+
+- The storage version is now 64. It carries no data migration: the version is
+  the signal on which the node gates the `tezosx_run_code` entrypoint. (!22651)
+
+### Internals
+
+- Desambiguate runtimes when logging about storing a new block in the durable
+  storage. (!22714)
+- Added a `tezosx_run_code` kernel entrypoint that runs an arbitrary Michelson
+  script against the current state without originating it — script, storage,
+  parameter and the step constants are all inputs, the resulting storage comes
+  back out, and the emitted operations are discarded. Gas is clamped to the
+  runtime's per-operation cap, and the interpretation runs inside a storage
+  transaction that is always reverted, so the entrypoint leaves the state it
+  was given untouched. No user-visible effect on its own: it is the primitive
+  the node's Michelson script helpers (`run_script_view` first) are built on. (!22651)
 
 ## Version 0.8 (92258d046043a2ceed7a6400687a1bfa28893096)
 
