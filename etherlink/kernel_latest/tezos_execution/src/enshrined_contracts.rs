@@ -423,14 +423,6 @@ const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 =
 /// `HeaderMap` insertion (hash + bucket insert + potential rehash).
 const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 10_000;
 
-/// Maximum number of caller-supplied headers accepted by the `%call`
-/// gateway entrypoint. A CRAC HTTP call only needs a handful of headers;
-/// this defensive cap sits far below the vendored `http` crate's
-/// `HeaderMap` usable capacity (¾ · MAX_SIZE = ¾ · (1<<15) = 24576), past
-/// which the crate's panicking `insert` traps the kernel. Rejecting early
-/// turns a would-be trap into a graceful failed operation.
-const MAX_HTTP_CALL_HEADERS: usize = 1024;
-
 /// Keccak256 selector computation in %call_evm.
 const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
 
@@ -1506,13 +1498,14 @@ where
     // operation-level revert). This is done before `inject_context_headers`,
     // whose panicking `HeaderMap::insert` would otherwise overflow the vendored
     // `http` crate's capacity and trap the kernel.
-    if request.headers().len() > MAX_HTTP_CALL_HEADERS {
+    if request.headers().len() > tezosx_constants::MAX_HTTP_CALL_HEADERS {
         let response = http::Response::builder()
             .status(http::StatusCode::BAD_REQUEST)
             .body(
                 format!(
-                    "too many headers ({} > {MAX_HTTP_CALL_HEADERS})",
-                    request.headers().len()
+                    "too many headers ({} > {})",
+                    request.headers().len(),
+                    tezosx_constants::MAX_HTTP_CALL_HEADERS
                 )
                 .into_bytes(),
             )
@@ -2376,7 +2369,7 @@ pub(crate) mod tests {
 
         // `build_http_request` accepts an over-cap header set (fallible fill);
         // the count cap lives in `dispatch_crac_call`, before header injection.
-        let names: Vec<String> = (0..MAX_HTTP_CALL_HEADERS + 1)
+        let names: Vec<String> = (0..tezosx_constants::MAX_HTTP_CALL_HEADERS + 1)
             .map(|i| format!("h{i}"))
             .collect();
         let headers: Vec<(String, String)> =

@@ -78,3 +78,7 @@ pub const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
 /// Per-hop cost of deriving an alias string (BLAKE2b-160 + base58check or
 /// hex encoding). Conservative against the actual hashing + encoding work.
 pub const DERIVE_ALIAS_STRING_COST: u64 = 1_500;
+
+/// Max HTTP headers for a cross-runtime gateway call. Used by both the
+/// gateway's Michelson `%call` and EVM `call()` entrypoints.
+pub const MAX_HTTP_CALL_HEADERS: usize = 1024;
