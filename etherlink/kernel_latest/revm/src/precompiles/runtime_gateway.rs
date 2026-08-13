@@ -2272,6 +2272,53 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_reject_if_too_many_headers_reverts_as_client_error() {
+        let headers: Vec<(String, String)> = (0..=MAX_HTTP_CALL_HEADERS)
+            .map(|i| (format!("h{i}"), "v".to_string()))
+            .collect();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &headers,
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .expect("under-physical-limit request builds");
+        let mut gas = Gas::new(u64::MAX);
+        let err = reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+            .expect_err("over-cap header count must be rejected");
+        assert!(
+            matches!(
+                err,
+                CustomPrecompileError::Revert(msg, _)
+                    if msg.contains("too many headers") && msg.contains("400")
+            ),
+            "over-cap header count must revert as a 400 client error"
+        );
+    }
+
+    #[test]
+    fn test_accept_headers_at_cap_boundary() {
+        // Exactly MAX_HTTP_CALL_HEADERS headers must be accepted (count <= MAX).
+        // With test_reject_if_too_many_headers_reverts_as_client_error (MAX + 1,
+        // rejected) this pins the boundary to `<=`, not `<`.
+        let headers: Vec<(String, String)> = (0..MAX_HTTP_CALL_HEADERS)
+            .map(|i| (format!("h{i}"), "v".to_string()))
+            .collect();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &headers,
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .expect("at-cap request builds");
+        let mut gas = Gas::new(u64::MAX);
+        reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+            .expect("exactly MAX headers must be accepted");
+    }
+
     // --- inject_tezos_headers: amount edge cases ---
 
     #[test]
