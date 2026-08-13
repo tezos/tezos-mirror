@@ -1586,6 +1586,17 @@ let test_stake_too_small_to_mint_pseudotokens =
     ~error_msg:
       "expected the staked pool to have appreciated (staked_balance %L > \
        pseudotokens %R)" ;
+  (* The stake command reports the amount that would actually be credited. *)
+  let* stake_stdout =
+    Client.spawn_stake (Tez.of_int 100) ~staker:staker.alias client
+    |> Process.check_and_read_stdout
+  in
+  if not (stake_stdout =~ rex "staking .* will credit .* of stake to the staker")
+  then
+    Test.fail
+      "Expected the stake command to report the credited stake. Got:\n%s"
+      stake_stdout ;
+  let* () = bake_n ~endpoint ~protocol client 1 in
   (* A 1-mutez stake now maps to zero pseudotokens and must be rejected. *)
   let dust_stake =
     Client.spawn_stake (Tez.of_mutez_int 1) ~staker:staker.alias client
