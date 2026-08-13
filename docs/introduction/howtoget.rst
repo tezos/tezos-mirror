@@ -106,7 +106,6 @@ using ``apt`` directly from our APT repository.
 We support the following distribution/releases:
 
 - ``debian/trixie``
-- ``debian/bookworm``
 - ``ubuntu/jammy`` (up to Octez version 24 included), becoming ``ubuntu/22.04`` (starting from Octez version 25)
 - ``ubuntu/noble`` (up to Octez version 24 included), becoming ``ubuntu/24.04`` (starting from Octez version 25)
 - ``ubuntu/26.04`` (starting from Octez version 25)
@@ -165,9 +164,6 @@ To remove the Octez packages you can simply run the following command.
 
   sudo apt-get autopurge -y octez-baker
 
-If migrating from Serokell packages you can check out migration documentation
-:doc:`./serokell`.
-
 To upgrade packages, use ``apt-get update`` and ``apt-get upgrade``.
 If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
 
@@ -193,7 +189,7 @@ If runnning Octez as services, see also how to :ref:`restart them <services_upgr
 	  sudo apt-get upgrade
 
 	Debian users are not affected: the Debian repository keeps using codenames
-	(``debian/trixie``, ``debian/bookworm``).
+	(``debian/trixie``).
 
 .. _getting_static_binaries:
 

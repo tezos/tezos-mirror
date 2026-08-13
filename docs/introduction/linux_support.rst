@@ -22,8 +22,6 @@ All combinations below are provided for both **amd64** and **arm64**.
 +-----------+----------+-------------------------+
 | Release   | Codename | Upstream end of support |
 +===========+==========+=========================+
-| Debian 12 | bookworm | June 2026 (ended)       |
-+-----------+----------+-------------------------+
 | Debian 13 | trixie   | August 2028             |
 +-----------+----------+-------------------------+
 
@@ -67,9 +65,6 @@ a known end of support:
 +----------------------+---------------------------+--------------------------+
 | Release              | Upstream end of support   | Dropped from Octez       |
 +======================+===========================+==========================+
-| Debian 12 (bookworm) | June 2026 (LTS until      | Octez release v26        |
-|                      | June 2028, not covered)   |                          |
-+----------------------+---------------------------+--------------------------+
 | Debian 13 (trixie)   | August 2028               | First Octez release      |
 |                      |                           | after August 2028        |
 +----------------------+---------------------------+--------------------------+
@@ -93,4 +88,8 @@ Recent changes
 | v25           | Ubuntu repositories moved from codenames (``jammy``,       |
 |               | ``noble``) to version numbers (``22.04``, ``24.04``);      |
 |               | Ubuntu 26.04 added                                         |
++---------------+------------------------------------------------------------+
+| v26           | Debian 12 (bookworm) support dropped (end of regular       |
+|               | upstream security support); only Debian 13 (trixie) is     |
+|               | supported                                                  |
 +---------------+------------------------------------------------------------+

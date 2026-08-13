@@ -28,7 +28,7 @@ Usage: $0 <DISTRIBUTION> <RELEASES..>
 
 <DISTRIBUTION>: The linux distribution, eg. debian or ubuntu
 
-<RELEASES>: The release of the Linux distribution, e.g. '22_04', '24_04', 'bookworm'.
+<RELEASES>: The release of the Linux distribution, e.g. '22_04', '24_04', 'trixie'.
 This argument can be repeated to build for multiple releases.
 
 Set the ARCHITECTURES env variable of packages built for
@@ -47,7 +47,7 @@ DISTRIBUTION=${1}
 shift
 # The release of the linux distribution for which
 # we are creating the apt repository
-# E.g. '22_04 24_04', 'bookworm'
+# E.g. '22_04 24_04', 'trixie'
 RELEASES=$*
 
 # If it's a protected branch the value of $bucket will

@@ -28,7 +28,7 @@ apt_repo_debian:
   script:
   - . ./scripts/version.sh
   - apt-get install -y --update apt-utils debsigs
-  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
+  - ./scripts/ci/create_debian_repo.sh debian trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -248,7 +248,6 @@ oc.build-debian:
   parallel:
     matrix:
     - RELEASE:
-      - bookworm
       - trixie
       TAGS:
       - gcp_very_high_cpu

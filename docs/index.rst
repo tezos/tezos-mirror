@@ -164,7 +164,6 @@ You may also access this whole documentation as a single `text file <https://oct
    introduction/howtouse
    introduction/howtorun
    introduction/services
-   introduction/serokell
    introduction/versioning
    BREAKING CHANGES <introduction/breaking_changes>
 

@@ -18,7 +18,7 @@
 #   (CI_COMMIT_REF_NAME). From the repository root, run it via the systemd
 #   Docker harness:
 #
-#     DISTRIBUTION=debian RELEASE=bookworm \
+#     DISTRIBUTION=debian RELEASE=trixie \
 #       scripts/packaging/tests/systemd-docker-test.sh \
 #       scripts/packaging/tests/deb/test-keyring-user-journey.sh \
 #       images/packages/debian-systemd-tests.Dockerfile

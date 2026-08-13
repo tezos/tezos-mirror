@@ -14,7 +14,6 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-bookworm-master-e92d4ade
   - container_scanning_tezos-debian-trixie-master-e92d4ade
   - container_scanning_tezos-ubuntu-22.04-master-e92d4ade
   - container_scanning_tezos-ubuntu-24.04-master-e92d4ade
@@ -23,7 +22,6 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-bookworm-master-e92d4ade
   - container_scanning_tezos-debian-trixie-master-e92d4ade
   - container_scanning_tezos-ubuntu-22.04-master-e92d4ade
   - container_scanning_tezos-ubuntu-24.04-master-e92d4ade
@@ -115,39 +113,6 @@ container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     REPORT: gl-container-scanning-report-tezos-tezos-octez-evm-node-latest.json
-
-container_scanning_tezos-debian-bookworm-master-e92d4ade:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . ./scripts/ci/docker_wait_for_daemon.sh
-  - . ./scripts/ci/container_scanning_generate_reports_with_gcp.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
-  variables:
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-e92d4ade
-    REPORT: gl-container-scanning-report-tezos-debian-bookworm-master-e92d4ade.json
-  artifacts:
-    paths:
-    - gl-container-scanning-report-tezos-debian-bookworm-master-e92d4ade.json
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
 
 container_scanning_tezos-debian-trixie-master-e92d4ade:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade

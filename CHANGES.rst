@@ -103,6 +103,12 @@ Packaging
   ``octez-signer``, and ``octez-dal-node`` packages.
   (MR :gl:`!21826`)
 
+- Dropped support for Debian 12 (``bookworm``). Debian packages are now only
+  built and tested for Debian 13 (``trixie``). Users on Debian 12 can upgrade
+  their system to Debian 13 to keep receiving Octez packages, or build Octez
+  from source (see the installation documentation).
+  (MR :gl:`!22355`)
+
 Smart Rollup node
 -----------------
 
