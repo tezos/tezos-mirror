@@ -3529,6 +3529,7 @@ mod tests {
             let mut safe_rk = rk
                 .to_safe_host(vec![OwnedPath::from(crate::context::TEZOS_ACCOUNTS_ROOT)]);
             safe_rk.host_mut().start().expect("the snapshot is taken");
+            safe_rk.checkpoint().expect("the frame is opened");
             run_code(
                 &mut safe_rk,
                 &NotWiredRegistry,
@@ -3536,6 +3537,7 @@ mod tests {
                 &params(script, storage, input, None, None),
             )
             .expect("it runs");
+            safe_rk.revert_inner().expect("the frame is closed");
             safe_rk
                 .host_mut()
                 .revert()

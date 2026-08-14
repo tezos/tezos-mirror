@@ -44,11 +44,12 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -776,8 +777,8 @@ fn run_code_from_input<Host, KS>(
     payload: &[u8],
 ) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     use tezos_execution::RunCodeError;
 
@@ -849,18 +850,25 @@ where
     safe_rk.host_mut().start().map_err(|err| {
         RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
     })?;
+    // Open a keyspace frame alongside the `/tmp` copy.
+    safe_rk
+        .checkpoint()
+        .map_err(|err| RunCodeError::Host(format!("cannot frame the state: {err:?}")))?;
 
     let result =
         tezos_execution::run_code(&mut safe_rk, &registry, &mut journal, &params);
 
-    match (result, safe_rk.host_mut().revert()) {
+    // The `/tmp` copy and the keyspace frames cover disjoint roots: revert
+    // both.
+    match (result, safe_rk.revert_both()) {
         (result, Ok(())) => result,
-        (Ok(_), Err(err)) => Err(RunCodeError::Host(format!(
-            "cannot revert the simulation: {err:?}"
+        // A failed revert makes the simulation result unusable.
+        (Ok(_), Err(why)) => Err(RunCodeError::Host(format!(
+            "cannot revert the simulation: {why}"
         ))),
         // The run's own error is the one the caller asked about.
-        (Err(run_err), Err(err)) => {
-            log!(Error, "Reverting the run_code simulation failed: {:?}", err);
+        (Err(run_err), Err(why)) => {
+            log!(Error, "Reverting the run_code simulation failed: {}", why);
             Err(run_err)
         }
     }
