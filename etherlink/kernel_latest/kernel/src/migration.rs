@@ -1223,6 +1223,13 @@ where
             // node gates the entrypoint on.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V65 => {
+            // Starting version 65, the `callTracer` accounts the
+            // transaction's intrinsic gas on the top-level frame only. No
+            // data to migrate: the version is the signal that tells the node
+            // whether the traces a kernel produces need correcting.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
