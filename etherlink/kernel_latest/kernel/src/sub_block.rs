@@ -43,7 +43,7 @@ use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
 
@@ -191,8 +191,8 @@ pub fn handle_run_transaction<Host, KS>(
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WithGas,
-    KS: KeySpace,
+    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     let __attrs = [
         (
@@ -246,6 +246,8 @@ where
         }
         None => {
             safe_rk.host_mut().start()?;
+            // Open a keyspace frame alongside the `/tmp` copy.
+            safe_rk.checkpoint()?;
 
             BlockInProgress {
                 number: input_data.block_number,
@@ -279,7 +281,7 @@ where
 
     block_in_progress.repush_tx(input_data.tx);
 
-    let result = compute(
+    let computed = compute(
         &mut safe_rk,
         &registry,
         &config,
@@ -289,21 +291,34 @@ where
         sequencer_pool_address,
         None,
         http_trace_enabled,
-    )?;
+    );
 
-    match result {
-        BlockInProgressComputationResult::RebootNeeded => Err(anyhow!(
-            "Critical: Reboot is required by a single transaction execution"
-        )),
-        BlockInProgressComputationResult::Finished { .. } => {
+    let err = match computed {
+        Ok(BlockInProgressComputationResult::Finished { .. }) => {
             storage::store_block_in_progress(safe_rk.host_mut(), &block_in_progress)?;
             block_storage::store_current_transactions_receipts(
                 safe_rk.host_mut(),
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 &block_in_progress.cumulative_receipts,
             )?;
-            Ok(())
+            // The frame stays open until `assemble_block`, in a later run:
+            // mark it. Here and not before `compute`, so the marker only
+            // announces progress that is stored.
+            safe_rk.create_reboot_marker()?;
+            return Ok(());
         }
+        Ok(BlockInProgressComputationResult::RebootNeeded) => {
+            anyhow!("Critical: Reboot is required by a single transaction execution")
+        }
+        Err(err) => err,
+    };
+
+    // A transaction that fails takes the whole block with it, as dropping
+    // `/tmp` did before the keyspaces. Disjoint roots, so both go.
+    match safe_rk.revert_both() {
+        // The transaction's own error is the one the caller asked about.
+        Ok(()) => Err(err),
+        Err(why) => Err(err.context(why)),
     }
 }
 
