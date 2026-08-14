@@ -9,9 +9,14 @@
 //! the only keyspace load of a kernel invocation.
 
 use std::borrow::{Borrow, BorrowMut};
+use std::marker::PhantomData;
 
 use tezos_evm_logging::{log, set_global_verbosity, Level};
+use thiserror::Error;
+
 use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, Name};
 use tezos_smart_rollup_mock::MockHost;
 
@@ -27,6 +32,7 @@ pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
 pub struct RuntimeKeyspaces<Host, KS> {
     host: Host,
     base: KS,
+    keyspaces: Keyspaces<KS>,
 }
 
 impl<Host, KS> RuntimeKeyspaces<Host, KS> {
@@ -50,10 +56,41 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
         &mut self.host
     }
 
-    /// The keyspaces under transactional control. `/base` is not one of them:
-    /// nothing checkpoints it.
-    fn snapshotted_keyspaces(&mut self) -> impl Iterator<Item = &mut KS> {
-        std::iter::empty()
+    /// Open a frame on every keyspace.
+    ///
+    /// On `Err`, some keyspaces may be framed and some not: the caller must
+    /// abort the run.
+    pub fn checkpoint(&mut self) -> Result<(), SnapshotError>
+    where
+        KS: SafeKeyspace,
+        Host: KeySpaceLoader<KeySpace = KS::Live>,
+    {
+        for keyspace in self.keyspaces.iter_mut() {
+            keyspace.checkpoint(&mut self.host)?;
+        }
+        Ok(())
+    }
+
+    /// Commit the innermost frame of every keyspace.
+    pub fn commit_inner(&mut self) -> Result<(), SnapshotError>
+    where
+        KS: SafeKeyspace,
+    {
+        for keyspace in self.keyspaces.iter_mut() {
+            keyspace.commit_inner()?;
+        }
+        Ok(())
+    }
+
+    /// Revert the innermost frame of every keyspace.
+    pub fn revert_inner(&mut self) -> Result<(), SnapshotError>
+    where
+        KS: SafeKeyspace,
+    {
+        for keyspace in self.keyspaces.iter_mut() {
+            keyspace.revert_inner()?;
+        }
+        Ok(())
     }
 
     /// End the kernel run. A keyspace left at a non-zero depth is one whose
@@ -63,7 +100,7 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
     where
         KS: SafeKeyspace,
     {
-        for keyspace in self.snapshotted_keyspaces().filter(|ks| ks.depth() > 0) {
+        for keyspace in self.keyspaces.iter_mut().filter(|ks| ks.depth() > 0) {
             log!(
                 Level::Error,
                 "kernel run ended with {} open frame(s) on {}, reverting to its bedrock",
@@ -85,7 +122,7 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
     where
         KS: SafeKeyspace,
     {
-        for keyspace in self.snapshotted_keyspaces() {
+        for keyspace in self.keyspaces.iter_mut().filter(|ks| ks.depth() > 0) {
             keyspace.create_reboot_marker()?;
         }
         Ok(())
@@ -97,7 +134,7 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
     where
         KS: SafeKeyspace,
     {
-        for keyspace in self.snapshotted_keyspaces() {
+        for keyspace in self.keyspaces.iter_mut() {
             keyspace.commit_all()?;
         }
         Ok(())
@@ -114,7 +151,33 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
                 world_states,
             },
             base: &mut self.base,
+            keyspaces: Keyspaces::new(),
         }
+    }
+}
+
+/// A root [`RuntimeKeyspaces::revert_both`] could not revert.
+#[derive(Debug, Error)]
+pub enum RevertError {
+    #[error("cannot revert the /tmp copy: {0:?}")]
+    TmpCopy(RuntimeError),
+    #[error("cannot revert the keyspace frames: {0}")]
+    Frames(#[from] SnapshotError),
+}
+
+impl<Host, KS> RuntimeKeyspaces<SafeStorage<&mut Host>, &mut KS>
+where
+    Host: StorageV1,
+    KS: SafeKeyspace,
+{
+    /// Revert both roots this scope covers, the `/tmp` copy and the keyspace
+    /// frames. Both are attempted before either is reported.
+    pub fn revert_both(&mut self) -> Result<(), RevertError> {
+        let tmp_copy = self.host_mut().revert();
+        let frames = self.revert_inner();
+        tmp_copy.map_err(RevertError::TmpCopy)?;
+        frames?;
+        Ok(())
     }
 }
 
@@ -141,7 +204,35 @@ where
         let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
         set_global_verbosity(read_logs_verbosity(&base));
         let base = SnapshottedKeySpace::start(&mut host, base)?;
-        Ok(Self { host, base })
+        Ok(Self {
+            host,
+            base,
+            keyspaces: Keyspaces::new(),
+        })
+    }
+}
+
+/// The keyspaces under transactional control, currently none. `/base` is not
+/// one of them.
+///
+/// A field of its own so that `self.host` and `self.keyspaces` can be
+/// borrowed at the same time.
+struct Keyspaces<KS> {
+    _keyspace: PhantomData<KS>,
+}
+
+impl<KS> Keyspaces<KS> {
+    /// A handle on no keyspace at all.
+    fn new() -> Self {
+        Self {
+            _keyspace: PhantomData,
+        }
+    }
+
+    /// Lends each keyspace in turn. Putting a keyspace under transactional
+    /// control means adding an entry here.
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut KS> {
+        [].into_iter()
     }
 }
 
