@@ -206,6 +206,21 @@ macro_rules! define_hash {
             }
         }
 
+        const _: () =
+            // The encoding factor for b58check with a given `prefix` is overapproximated by Bitcoin
+            // Core's src/base58.cpp as 138/100 × (prefix + size + 4) + 1. We re-use the same logic
+            // (using `< BOUND` instead of + 1 <= BOUND` to please clippy).
+            // See https://github.com/bitcoin/bitcoin/blob/master/src/base58.cpp
+            //
+            // If you get a build error due to this line, this is because you are trying to add
+            // a new HashType variant whose encoded size exceeds
+            // `base58::B58CHECK_ENCODED_MAX_SIZE`. Increase it accordingly.
+            assert!(
+                138 * (HashType::$name.base58check_prefix().len() + HashType::$name.size() + 4)
+                    / 100
+                    < crate::base58::B58CHECK_ENCODED_MAX_SIZE
+            );
+
         impl std::ops::Deref for $name {
             type Target = [u8; { HashType::$name.size() }];
 
@@ -438,7 +453,7 @@ pub enum HashType {
 
 impl HashType {
     #[inline]
-    pub fn base58check_prefix(&self) -> &'static [u8] {
+    pub const fn base58check_prefix(&self) -> &'static [u8] {
         use prefix_bytes::*;
         match self {
             HashType::ChainId => &CHAIN_ID,
