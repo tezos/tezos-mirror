@@ -126,7 +126,8 @@ pub fn compute<Host, KS>(
     http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
-    Host: StorageV1 + WithGas,
+    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Queue length {}.", block_in_progress.queue_length());
     // iteration over all remaining transaction in the block
@@ -343,7 +344,8 @@ pub fn compute_bip<Host, KS>(
     http_trace_enabled: bool,
 ) -> anyhow::Result<BlockComputationResult>
 where
-    Host: StorageV1 + WithGas,
+    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     let constants = chain_config.constants(
         rk.host_mut(),

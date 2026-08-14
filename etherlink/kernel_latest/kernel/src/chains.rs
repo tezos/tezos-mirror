@@ -48,6 +48,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
 };
@@ -55,7 +56,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -631,7 +632,8 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        KS: SafeKeyspace,
     {
         match transaction {
             TezosXTransaction::Ethereum(transaction) => {
@@ -777,7 +779,8 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        KS: SafeKeyspace,
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
@@ -1118,7 +1121,8 @@ pub fn apply_tezos_operation<Host, KS>(
     enable_da_fees: bool,
 ) -> Result<crate::apply::ExecutionResult<TezosExecutionInfo>, anyhow::Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     let level = block_constants.level;
     let now = block_in_progress.timestamp;
