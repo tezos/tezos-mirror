@@ -2926,6 +2926,8 @@ where
         safe_rk.host_mut().promote_http_trace()?;
     }
     safe_rk.host_mut().start()?;
+    // Open a new frame for the application phase.
+    safe_rk.checkpoint().map_err(frame_abort)?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
@@ -2953,6 +2955,7 @@ where
             Debug,
             "Committing the changes because the batch was successfully applied."
         );
+        safe_rk.commit_inner().map_err(frame_abort)?;
         safe_rk.host_mut().promote()?;
         if block_ctx.tracing_enabled {
             safe_rk.host_mut().promote_trace()?;
@@ -2966,6 +2969,7 @@ where
             "Reverting the changes because some operation failed."
         );
         log!(Debug, "Processed operations: {processed_ops:#?}");
+        safe_rk.revert_inner().map_err(frame_abort)?;
         safe_rk.host_mut().revert()?;
         // Clear the in-memory EVM journal: safe_rk.host_mut().revert() only
         // rolls back Tezos durable storage but cannot affect the in-memory REVM
