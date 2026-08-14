@@ -43,7 +43,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -249,7 +249,8 @@ where
 
 pub fn run<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas,
+    Host:
+        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
     KS: SafeKeyspace,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
@@ -291,8 +292,9 @@ pub fn single_run<Host, KS>(
     rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas,
-    KS: KeySpace,
+    Host:
+        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     // We always start by doing the migration if needed.
     match stage_zero(rk) {

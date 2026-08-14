@@ -39,6 +39,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -323,7 +324,7 @@ pub fn assemble_block<Host, KS>(
 ) -> Result<(), anyhow::Error>
 where
     Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let __attrs = [
         (
