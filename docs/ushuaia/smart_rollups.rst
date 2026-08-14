@@ -297,7 +297,7 @@ Because nodes have the length of the refutation period to challenge another node
 
 When this last commitment becomes cemented, the bond becomes available for recovery.
 This can happen when the node stops making commitments for any reason, including when it is set to ``bailout`` mode or when it stops running (which is dangerous because it is not available to defend uncemented commitments).
-You can check if you have a frozen bond on a given Smart Rollup by passing the address of the Smart Rollup and your account address to the RPC endpoint `GET ../<block_id>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<pkh>/staked_on_commitment <https://octez.tezos.com/docs/active/rpc.html#get-block-id-context-smart-rollups-smart-rollup-smart-rollup-address-staker-pkh-staked-on-commitment>`__.
+You can check if you have a frozen bond on a given Smart Rollup by passing the address of the Smart Rollup and your account address to the RPC endpoint `GET ../<block_id>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<pkh>/staked_on_commitment <./rpc.html#get-block-id-context-smart-rollups-smart-rollup-smart-rollup-address-staker-pkh-staked-on-commitment>`__.
 This RPC returns the newest uncemented commitment on which your account staked; if it returns nothing, you do not have an uncemented commitment and thus can recover your bond.
 
 Recovering the bond safely takes a few steps; in general, node operators follow these steps:

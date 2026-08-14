@@ -315,7 +315,7 @@ A predefined Docker compose file is available at :src:`scripts/docker/bake.yml`.
 It aims at helping you launch **a testnet** baker quickly, providing services for an Octez node, a DAL node, a baker, and an accuser.
 You may copy the compose file in the directory where you want to run the baker::
 
-    wget https://gitlab.com/tezos/tezos/-/blob/master/scripts/docker/bake.yml
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
 
 The client, node, and DAL data are stored in the following subdirectories of your current directory, respectively: ``./client_data/``, ``./node_data/``, and ``./dal_data/``.
 You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
@@ -336,7 +336,7 @@ First, you have to make some choices:
 Create an environment file called ``.env`` in your current directory with a content of the following form::
 
     LIQUIDITY_BAKING_VOTE='pass'
-    NETWORK='tallinnnet'
+    NETWORK='ushuaianet'
 
 and build the compose file::
 
