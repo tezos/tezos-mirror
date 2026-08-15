@@ -1161,75 +1161,74 @@ impl<'a> TypedValue<'a> {
     /// silently skip it while the mutable walk still compile-errored, so the
     /// two would diverge.
     ///
-    /// The lock-step is on variant coverage only. This walk is still
-    /// recursive, and it neither memoizes nor is bounded by anything, where
-    /// the mutable walk is iterative and memoized. That is deliberate rather
-    /// than an oversight, because the two see different values: this one runs
-    /// on the storage returned by `typecheck_storage`, parsed from Micheline
-    /// before the contract body runs, so it is a tree with no `Rc` sharing and
-    /// no `DUP`-built DAG can reach it. Its depth is bounded by the storage
-    /// type, hence by `MICHELSON_MAXIMUM_TYPE_SIZE`, and at that depth its
-    /// frame fits the kernel's 1 MiB stack with room to spare — which the
-    /// mutable walk's did not once it grew a rebuild, which is what forced
-    /// that one onto a worklist. Converting this one too would be tidier and
-    /// costs little; it is left alone here to keep the diff to the walk that
-    /// had to change.
+    /// The lock-step is on variant coverage only. Both walks are iterative,
+    /// but this one does not memoize, where the mutable walk does. That is
+    /// deliberate rather than an oversight, because the two see different
+    /// values: this one runs on the storage returned by `typecheck_storage`,
+    /// parsed from Micheline before the contract body runs, so it is a tree
+    /// with no `Rc` sharing that no `DUP`-built DAG can reach. Nothing is
+    /// visited twice, so a memo table would have nothing to save.
     fn for_each_big_map<'b>(&'b self, f: &mut impl FnMut(&'b BigMap<'a>)) {
         use crate::ast::Or::*;
         use TypedValue::*;
-        match self {
-            Int(_) => {}
-            Nat(_) => {}
-            Mutez(_) => {}
-            Bool(_) => {}
-            Unit => {}
-            String(_) => {}
-            Bytes(_) => {}
-            Address(_) => {}
-            KeyHash(_) => {}
-            Key(_) => {}
-            Signature(_) => {}
-            ChainId(_) => {}
-            Contract(_) => {}
-            Timestamp(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381Fr(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G1(_) => {}
-            #[cfg(feature = "bls")]
-            Bls12381G2(_) => {}
-            Pair(l, r) => {
-                l.for_each_big_map(f);
-                r.for_each_big_map(f);
-            }
-            Or(p) => match p {
-                Left(x) | Right(x) => x.for_each_big_map(f),
-            },
-            Option(p) => {
-                if let Some(x) = p {
-                    x.for_each_big_map(f)
+        // Explicit worklist. Children are pushed in reverse so they pop in source
+        // order.
+        let mut worklist: Vec<&'b TypedValue<'a>> = vec![self];
+        while let Some(value) = worklist.pop() {
+            match value {
+                Int(_) => {}
+                Nat(_) => {}
+                Mutez(_) => {}
+                Bool(_) => {}
+                Unit => {}
+                String(_) => {}
+                Bytes(_) => {}
+                Address(_) => {}
+                KeyHash(_) => {}
+                Key(_) => {}
+                Signature(_) => {}
+                ChainId(_) => {}
+                Contract(_) => {}
+                Timestamp(_) => {}
+                #[cfg(feature = "bls")]
+                Bls12381Fr(_) => {}
+                #[cfg(feature = "bls")]
+                Bls12381G1(_) => {}
+                #[cfg(feature = "bls")]
+                Bls12381G2(_) => {}
+                Pair(l, r) => {
+                    worklist.push(r);
+                    worklist.push(l);
                 }
-            }
-            List(l) => l.iter().for_each(|v| v.for_each_big_map(f)),
-            Set(_) => {
-                // Elements are comparable and so have no big maps
-            }
-            Map(m) => m.values().for_each(|v| v.for_each_big_map(f)),
-            BigMap(m) => f(m),
-            Ticket(_) => {
-                // Value is comparable, has no big map
-            }
-            Lambda(_) => {
-                // Can contain only pushable values, thus no big maps
-            }
-            Operation(op) => match &op.operation {
-                crate::ast::Operation::TransferTokens(t) => t.param.for_each_big_map(f),
-                crate::ast::Operation::SetDelegate(_) => {}
-                crate::ast::Operation::Emit(_) => {}
-                crate::ast::Operation::CreateContract(cc) => {
-                    cc.storage.for_each_big_map(f)
+                Or(p) => match p {
+                    Left(x) | Right(x) => worklist.push(x),
+                },
+                Option(p) => {
+                    if let Some(x) = p {
+                        worklist.push(x)
+                    }
                 }
-            },
+                List(l) => l.iter().rev().for_each(|v| worklist.push(v)),
+                Set(_) => {
+                    // Elements are comparable and so have no big maps
+                }
+                Map(m) => m.values().rev().for_each(|v| worklist.push(v)),
+                BigMap(m) => f(m),
+                Ticket(_) => {
+                    // Value is comparable, has no big map
+                }
+                Lambda(_) => {
+                    // Can contain only pushable values, thus no big maps
+                }
+                Operation(op) => match &op.operation {
+                    crate::ast::Operation::TransferTokens(t) => worklist.push(&t.param),
+                    crate::ast::Operation::SetDelegate(_) => {}
+                    crate::ast::Operation::Emit(_) => {}
+                    crate::ast::Operation::CreateContract(cc) => {
+                        worklist.push(&cc.storage)
+                    }
+                },
+            }
         }
     }
 
@@ -2153,26 +2152,17 @@ mod review_verification {
         }
     }
 
-    /// [TypedValue::for_each_big_map] is still recursive, where the mutable
-    /// walk is not, so its depth budget is a live constraint rather than a
-    /// formality — and nothing pinned it.
+    /// [TypedValue::for_each_big_map] walks the deepest value that can reach
+    /// it without touching the native stack per level.
     ///
-    /// What makes it safe is that the value it walks is bounded twice over.
-    /// Michelson has no recursive types, so a value is never deeper than its
-    /// type; and this walk only ever sees the *committed* storage, parsed at a
-    /// declared type, so [MICHELSON_MAXIMUM_TYPE_SIZE] applies to it — unlike
+    /// The value it walks is bounded twice over. Michelson has no recursive
+    /// types, so a value is never deeper than its type; and this walk only
+    /// ever sees the *committed* storage, parsed at a declared type, so
+    /// [MICHELSON_MAXIMUM_TYPE_SIZE] applies to it — unlike
     /// instruction-synthesised types, which escape that cap. The depths below
     /// are what the cap actually permits, per shape: `list t` costs one type
     /// node per level, `pair a b` and `map k v` cost two. So these are the
     /// deepest values that can reach this function at all.
-    ///
-    /// The margin is real but not generous, which is the point of deriving the
-    /// depths rather than picking them: `map` is the most expensive shape, and
-    /// at twice its reachable depth this test overflows. Safety here is
-    /// arithmetic — cap times frame size against 1 MiB — where
-    /// [TypedValue::update_big_maps] is depth-independent by construction. A
-    /// few extra locals in this function would eat the margin silently, and
-    /// this is what would catch that.
     #[test]
     fn read_only_walk_survives_the_deepest_reachable_spine() {
         use crate::typechecker::MICHELSON_MAXIMUM_TYPE_SIZE as MAX_TY;
