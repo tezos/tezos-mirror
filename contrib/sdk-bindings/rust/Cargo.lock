@@ -1208,8 +1208,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 [[package]]
 name = "rpds"
 version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0e15515d3ce3313324d842629ea4905c25a13f81953eadb88f85516f59290a4"
+source = "git+https://github.com/trilitech/rpds?rev=c5d2c8b68c6125c2a43bdf803e3aaa627ae997f6#c5d2c8b68c6125c2a43bdf803e3aaa627ae997f6"
 dependencies = [
  "archery",
 ]
