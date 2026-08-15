@@ -4,24 +4,33 @@
 
 //! Representation for typed Michelson `list 'a` values.
 
+use std::rc::Rc;
+
+use rpds::Vector;
+
 /// A representation of a Michelson list.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct MichelsonList<T>(Vec<T>);
+pub struct MichelsonList<T>(Vector<T>);
+
+impl<T> MichelsonList<Rc<T>> {
+    /// Remove an element from the start of the list. O(log n); the returned
+    /// `Rc` is a refcount bump, never a payload copy.
+    pub fn uncons(&mut self) -> Option<Rc<T>> {
+        let res = self.0.last().cloned();
+        self.0.drop_last_mut();
+        res
+    }
+}
 
 impl<T> MichelsonList<T> {
     /// Construct a new empty list.
     pub fn new() -> Self {
-        MichelsonList(Vec::new())
+        MichelsonList(Vector::new())
     }
 
     /// Add an element to the start of the list.
     pub fn cons(&mut self, x: T) {
-        self.0.push(x)
-    }
-
-    /// Remove an element from the start of the list.
-    pub fn uncons(&mut self) -> Option<T> {
-        self.0.pop()
+        self.0.push_back_mut(x)
     }
 
     /// Get the list length, i.e. the number of elements.
@@ -35,11 +44,6 @@ impl<T> MichelsonList<T> {
         // delegate to `impl IntoIterator for &MichelsonList`
         self.into_iter()
     }
-
-    /// Construct an iterator over mutable references to the list elements.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.0.iter_mut().rev()
-    }
 }
 
 impl<T> Default for MichelsonList<T> {
@@ -48,25 +52,33 @@ impl<T> Default for MichelsonList<T> {
     }
 }
 
-/// Owning iterator for [MichelsonList].
-pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
+/// Owning iterator for [MichelsonList]. Holds the list and unconses one
+/// element per step, so nothing is materialised up front and each yielded
+/// `Rc` is released by the list as it is handed out.
+pub struct IntoIter<T>(MichelsonList<Rc<T>>);
 
 impl<T> Iterator for IntoIter<T> {
-    type Item = T;
+    type Item = Rc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        self.0.uncons()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
+        let n = self.0.len();
+        (n, Some(n))
     }
 }
 
 impl<T> ExactSizeIterator for IntoIter<T> {}
 
 /// Non-owning iterator for [MichelsonList].
-pub struct Iter<'a, T>(std::iter::Rev<core::slice::Iter<'a, T>>);
+//
+// NB: `rpds::vector::Iter` is parameterised by the shared-pointer kind, and
+// `RcK` lives in `archery`, which is not one of our dependencies. Naming the
+// associated type instead pins the very same iterator (`Vector<T>` defaults to
+// `RcK`) without pulling `archery` into `Cargo.toml`.
+pub struct Iter<'a, T>(std::iter::Rev<<&'a Vector<T> as IntoIterator>::IntoIter>);
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
@@ -92,11 +104,11 @@ impl<T> DoubleEndedIterator for Iter<'_, T> {
     }
 }
 
-impl<T> IntoIterator for MichelsonList<T> {
+impl<T> IntoIterator for MichelsonList<Rc<T>> {
     type IntoIter = IntoIter<T>;
-    type Item = T;
+    type Item = Rc<T>;
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0.into_iter().rev())
+        IntoIter(self)
     }
 }
 
@@ -110,9 +122,8 @@ impl<'a, T> IntoIterator for &'a MichelsonList<T> {
 
 /// Construct a `MichelsonList<T>` from `Vec<T>`. O(n).
 impl<T> From<Vec<T>> for MichelsonList<T> {
-    fn from(mut value: Vec<T>) -> Self {
-        value.reverse();
-        MichelsonList(value)
+    fn from(value: Vec<T>) -> Self {
+        MichelsonList(value.into_iter().rev().collect())
     }
 }
 
@@ -121,14 +132,6 @@ impl<T> From<Vec<T>> for MichelsonList<std::rc::Rc<T>> {
     fn from(mut value: Vec<T>) -> Self {
         value.reverse();
         MichelsonList(value.into_iter().map(std::rc::Rc::new).collect())
-    }
-}
-
-/// Extract a `Vec<T>` from `MichelsonList<T>`. O(n).
-impl<T> From<MichelsonList<T>> for Vec<T> {
-    fn from(MichelsonList(mut vec): MichelsonList<T>) -> Self {
-        vec.reverse();
-        vec
     }
 }
 
@@ -167,17 +170,26 @@ mod tests {
 
     #[test]
     fn uncons() {
-        let mut lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
-        assert_eq!(lst.uncons(), Some(1));
-        assert_eq!(lst.uncons(), Some(2));
-        assert_eq!(lst.uncons(), Some(3));
+        let mut lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
+        assert_eq!(lst.uncons(), Some(Rc::new(1)));
+        assert_eq!(lst.uncons(), Some(Rc::new(2)));
+        assert_eq!(lst.uncons(), Some(Rc::new(3)));
         assert_eq!(lst.uncons(), None);
     }
 
     #[test]
     fn into_iter() {
-        let lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
-        assert_eq!(lst.into_iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+        let lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
+        assert_eq!(
+            lst.into_iter().collect::<Vec<_>>(),
+            vec![Rc::new(1), Rc::new(2), Rc::new(3)]
+        );
+
+        // The list drops each element as it hands it out, so the caller gets
+        // sole ownership.
+        for elt in MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]) {
+            assert_eq!(Rc::strong_count(&elt), 1);
+        }
     }
 
     #[test]
@@ -185,14 +197,6 @@ mod tests {
         assert_eq!(
             MichelsonList::<i32>::from_iter(1..=3),
             MichelsonList::<i32>::from(vec![1, 2, 3])
-        );
-    }
-
-    #[test]
-    fn to_vec() {
-        assert_eq!(
-            Vec::from(MichelsonList::<i32>::from(vec![1, 2, 3])),
-            vec![1, 2, 3]
         );
     }
 
