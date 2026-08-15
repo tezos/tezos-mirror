@@ -44,6 +44,19 @@ impl<T> MichelsonList<T> {
         // delegate to `impl IntoIterator for &MichelsonList`
         self.into_iter()
     }
+
+    /// Consume the list and yield the elements it exclusively owned, leaving
+    /// shared elements and the subtrees holding them untouched.
+    ///
+    /// This is what the iterative `Drop` needs: a list that another value still
+    /// holds has no dying element, and a list produced by mutating a shared one
+    /// owns only the handful of nodes it had to copy. Draining with [Self::uncons]
+    /// instead visits all n elements and copy-on-writes the spine of each,
+    /// which is work proportional to the length of a list nobody is really
+    /// freeing. The order in which elements are yielded is unspecified.
+    pub(crate) fn drain_owned(self) -> impl Iterator<Item = T> {
+        self.0.drain_owned()
+    }
 }
 
 impl<T> Default for MichelsonList<T> {
@@ -204,4 +217,49 @@ mod tests {
     fn default() {
         assert_eq!(MichelsonList::default(), MichelsonList::<()>::new());
     }
+
+    #[test]
+    fn drain_owned_yields_every_element_of_a_sole_owner() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+        assert_eq!(list.drain_owned().count(), N as usize);
+    }
+
+    #[test]
+    fn drain_owned_yields_nothing_of_a_shared_list() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+
+        // Required for the test, even if list isn't used, we still need to clone
+        // to show shared.drain_owned does not traverse anything
+        #[allow(clippy::redundant_clone)]
+        let shared = list.clone();
+
+        // Nothing is dying: `list` still holds every element.
+        assert_eq!(shared.drain_owned().count(), 0);
+    }
+
+    /// The drop-path property this whole design exists for: the transient a
+    /// mutating instruction leaves behind (`DUP; CONS`, and the same shape for
+    /// `UPDATE`) owns only what it had to copy, so draining it costs a handful
+    /// of steps rather than one per element. Before `drain_owned` this walk
+    /// visited all `N` of them — work proportional to a list nobody was
+    /// freeing, against the flat price of `CONS`.
+    #[test]
+    fn drain_owned_of_a_transient_does_not_scale_with_length() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+
+        let mut transient = list.clone();
+        transient.cons(Rc::new(-1));
+
+        // Only the freshly consed element is exclusively the transient's; the
+        // rest are still held by `list`. In particular this must not grow with
+        // `N` — a leaf holds at most 32 elements, so the bound is the size of
+        // the path `cons` copied, not the length of the list.
+        let drained = transient.drain_owned().count();
+        assert!(drained <= 32, "drained {drained} elements, expected O(1)");
+        assert_eq!(list.len(), N as usize);
+    }
+
+    /// Long enough that a per-element walk is unmistakable against an
+    /// ownership-bounded one.
+    const N: i32 = 10_000;
 }
