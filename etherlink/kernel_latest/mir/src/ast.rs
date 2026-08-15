@@ -2201,7 +2201,15 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
                 if let Ok(capture) = Rc::try_unwrap(capture) {
                     push_rc(capture.into_arg_val(), stack);
                 }
-                cur = Closure::unwrap_rc(inner);
+                // Stop at the first co-owned link instead of cloning past it:
+                // everything below is kept alive by that other owner, so there
+                // is nothing to drain, and whoever drops last walks it. Cloning
+                // (as `Closure::unwrap_rc` does) copies one spine level per
+                // iteration and discards each copy.
+                match Rc::try_unwrap(inner) {
+                    Ok(inner) => cur = inner,
+                    Err(_) => return,
+                }
             }
             // `cur` is now the terminal `Closure::Lambda`. Its body code is an
             // `Rc<[Instruction]>` which, on drop, re-enters `Drop for
