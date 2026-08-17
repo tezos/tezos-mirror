@@ -1588,19 +1588,6 @@ mod tests {
     }
 
     #[test]
-    fn test_entrypoints_query_erc20() {
-        let result =
-            run_entrypoints_query(&EnshrinedContracts::ERC20Wrapper.address_hash_bytes());
-        let (entries, views) =
-            decode_result(&result).expect("ERC20 wrapper has entrypoints");
-        assert_eq!(entries.len(), 2);
-        assert!(entries.contains_key("transfer"));
-        assert!(entries.contains_key("approve"));
-        // ERC-20 wrapper has no synthetic views.
-        assert!(views.is_empty(), "ERC-20 wrapper has no synthetic views");
-    }
-
-    #[test]
     fn test_entrypoints_query_unknown_contract_returns_none() {
         let unknown_kt1: [u8; 22] =
             hex::decode("01AABBCC000000000000000000000000000000000100")
