@@ -50,18 +50,6 @@ pub const ALWAYS_REVERT_SOL_CONTRACT: PredeployedContract = PredeployedContract 
     ]),
 };
 
-/// FA1.2 Wrapper contract deployed at a precompile address.
-/// Provides an EVM-friendly interface for calling FA1.2 token contracts
-/// on the Michelson runtime via the RuntimeGateway.
-pub const FA12_WRAPPER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
-    code: include_bytes!("../../contracts/predeployed/fa12_wrapper.bin"),
-    code_hash: FixedBytes::new([
-        0x04, 0xc9, 0xf7, 0xcb, 0x31, 0x9c, 0x77, 0x7b, 0x28, 0x6b, 0x99, 0x83, 0x9c,
-        0x35, 0x7e, 0x32, 0x63, 0x23, 0x78, 0x1a, 0x1b, 0x85, 0x1b, 0x78, 0x04, 0x0e,
-        0xbd, 0x71, 0x52, 0x40, 0xd4, 0xec,
-    ]),
-};
-
 /// AliasForwarder contract deployed at a precompile address.
 /// Alias addresses use EIP-7702 delegation to point to this contract.
 pub const ALIAS_FORWARDER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
@@ -132,11 +120,6 @@ pub fn alias_forwarder_delegation_code_hash() -> B256 {
     bytes_hash(alias_forwarder_delegation().original_byte_slice())
 }
 
-pub const FA12_WRAPPER_SOL_ADDR: Address = Address(FixedBytes::new([
-    0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0xff, 0xff, 0x09,
-]));
-
 pub(crate) const VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS: Address =
     Address(FixedBytes::new([
         0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -172,7 +155,7 @@ pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0xde, 0xad,
 ]));
 
-pub(crate) const CUSTOMS: [Address; 10] = [
+pub(crate) const CUSTOMS: [Address; 9] = [
     XTZ_BRIDGE_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
@@ -181,7 +164,6 @@ pub(crate) const CUSTOMS: [Address; 10] = [
     CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS,
     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
     ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
-    FA12_WRAPPER_SOL_ADDR,
     VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
 ];
 
@@ -312,8 +294,7 @@ pub(crate) const SEQUENCER_KEY_CHANGE_SIGN_TAG: &[u8] = b"sequencer_change";
 mod test {
     use super::{
         PredeployedContract, ALIAS_FORWARDER_SOL_CONTRACT, ALWAYS_REVERT_SOL_CONTRACT,
-        FA12_WRAPPER_SOL_CONTRACT, FA_BRIDGE_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
     };
 
     use crate::helpers::storage::bytes_hash;
@@ -357,10 +338,5 @@ mod test {
     #[test]
     fn check_alias_forwarder_sol_code_hash() {
         check_code_hash_validity(&ALIAS_FORWARDER_SOL_CONTRACT)
-    }
-
-    #[test]
-    fn check_fa12_wrapper_sol_code_hash() {
-        check_code_hash_validity(&FA12_WRAPPER_SOL_CONTRACT)
     }
 }
