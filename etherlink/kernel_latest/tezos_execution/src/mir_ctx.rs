@@ -670,7 +670,6 @@ pub fn enshrined_synthetic_views(
                 Type::new_option(Type::new_pair(Type::Nat, Type::String)),
             ),
         ],
-        crate::enshrined_contracts::EnshrinedContracts::ERC20Wrapper => vec![],
     }
 }
 
@@ -2926,16 +2925,6 @@ pub mod tests {
         );
     }
 
-    /// The ERC-20 wrapper has no synthetic views today; pin this so
-    /// the encoded `views` list is empty for that contract.
-    #[test]
-    fn test_erc20_wrapper_has_no_synthetic_views() {
-        let views = enshrined_synthetic_views(
-            crate::enshrined_contracts::EnshrinedContracts::ERC20Wrapper,
-        );
-        assert!(views.is_empty());
-    }
-
     /// Enforce that every view enumerated in
     /// [`enshrined_synthetic_views`] has a matching dispatch arm in
     /// [`CtxTrait::try_dispatch_enshrined_view`]. Without this test,
@@ -3026,10 +3015,7 @@ pub mod tests {
         // Recover each enshrined contract's KT1 from its 22-byte
         // address-hash encoding (`[0x01][20-byte hash][0x00]`).
         let arena = Arena::new();
-        for contract in [
-            EnshrinedContracts::TezosXGateway,
-            EnshrinedContracts::ERC20Wrapper,
-        ] {
+        for contract in [EnshrinedContracts::TezosXGateway] {
             let bytes = contract.address_hash_bytes();
             let kt1 = ContractKt1Hash::try_from_bytes(&bytes[1..21]).unwrap();
             for (name, _, _) in enshrined_synthetic_views(contract) {
