@@ -18,5 +18,5 @@ sudo apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
-./rustup-init.sh --profile minimal --default-toolchain 1.88.0 -y
+./rustup-init.sh --profile minimal --default-toolchain 1.94.0 -y
 # [get sources]

@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-RISCV_RUSTC_VERSION = 1.88.0
+RISCV_RUSTC_VERSION = 1.94.0
 
 .PHONY: all
 all: check test

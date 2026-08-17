@@ -234,6 +234,8 @@ DAL node
 Miscellaneous
 -------------
 
+- The recommended Rust version was bumped from 1.88.0 to 1.94.0.
+
 - Teztale archiver: ``--backup-dir`` now backs up **every** failed POST,
   including ``/rights`` and ``/dal_shards`` which were previously dropped
   silently. Each failed POST is stored verbatim (path + body) as one record, so
