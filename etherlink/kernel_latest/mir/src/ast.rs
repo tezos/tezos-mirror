@@ -2166,17 +2166,17 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             push_rc(rc, stack);
         }
         TV::List(l) => {
-            for rc in take(l) {
+            for rc in take(l).drain_owned() {
                 push_rc(rc, stack);
             }
         }
         TV::Set(s) => {
-            for rc in rb_set_into_vec(take(s)) {
+            for rc in take(s).drain_owned() {
                 push_rc(rc, stack);
             }
         }
         TV::Map(m) => {
-            for (k, v) in rb_map_into_vec(take(m)) {
+            for (k, v) in take(m).drain_owned() {
                 push_rc(k, stack);
                 push_rc(v, stack);
             }
@@ -2201,7 +2201,15 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
                 if let Ok(capture) = Rc::try_unwrap(capture) {
                     push_rc(capture.into_arg_val(), stack);
                 }
-                cur = Closure::unwrap_rc(inner);
+                // Stop at the first co-owned link instead of cloning past it:
+                // everything below is kept alive by that other owner, so there
+                // is nothing to drain, and whoever drops last walks it. Cloning
+                // (as `Closure::unwrap_rc` does) copies one spine level per
+                // iteration and discards each copy.
+                match Rc::try_unwrap(inner) {
+                    Ok(inner) => cur = inner,
+                    Err(_) => return,
+                }
             }
             // `cur` is now the terminal `Closure::Lambda`. Its body code is an
             // `Rc<[Instruction]>` which, on drop, re-enters `Drop for
@@ -2249,16 +2257,17 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
         TV::BigMap(m) => {
             // The in-memory keys/values (and the lazy-storage overlay diff) are
             // held behind `Rc`; push the handles so a deep value drops
-            // iteratively without being cloned first.
+            // iteratively without being cloned first. Same ownership rule as the
+            // container arms above.
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
-                    for (k, v) in rb_map_into_vec(take(map)) {
+                    for (k, v) in take(map).drain_owned() {
                         push_rc(k, stack);
                         push_rc(v, stack);
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
-                    for (k, v) in rb_map_into_vec(take(&mut from_id.overlay)) {
+                    for (k, v) in take(&mut from_id.overlay).drain_owned() {
                         push_rc(k, stack);
                         if let Some(v) = v {
                             push_rc(v, stack);
@@ -3350,6 +3359,126 @@ mod drop_safety {
             tv.into_micheline_optimized_legacy(&arena, &mut gas)
                 .unwrap();
         });
+    }
+}
+
+#[cfg(test)]
+mod drain_owned {
+    //! The set/map counterparts of the [MichelsonList::drain_owned] tests in
+    //! [michelson_list]: the same ownership rule drives the `TV::Set`,
+    //! `TV::Map` and `TV::BigMap` arms of [extract_tv_children].
+    use super::*;
+
+    /// Long enough that a per-element walk is unmistakable against an
+    /// ownership-bounded one.
+    const N: i32 = 10_000;
+
+    fn set(range: std::ops::Range<i32>) -> RedBlackTreeSet<Rc<i32>> {
+        range.map(Rc::new).collect()
+    }
+
+    fn map(range: std::ops::Range<i32>) -> RedBlackTreeMap<Rc<i32>, Rc<i32>> {
+        range.map(|i| (Rc::new(i), Rc::new(-i))).collect()
+    }
+
+    #[test]
+    fn drain_owned_yields_every_element_of_a_sole_owner_set() {
+        assert_eq!(set(0..N).drain_owned().count(), N as usize);
+    }
+
+    #[test]
+    fn drain_owned_yields_every_entry_of_a_sole_owner_map() {
+        assert_eq!(map(0..N).drain_owned().count(), N as usize);
+    }
+
+    /// The elements come out in an unspecified order, but they all come out,
+    /// and each exactly once.
+    #[test]
+    fn drain_owned_yields_the_elements_themselves() {
+        let mut drained: Vec<Rc<i32>> = set(0..3).drain_owned().collect();
+        drained.sort();
+        assert_eq!(drained, vec![Rc::new(0), Rc::new(1), Rc::new(2)]);
+
+        let mut drained: Vec<(Rc<i32>, Rc<i32>)> = map(0..3).drain_owned().collect();
+        drained.sort();
+        assert_eq!(
+            drained,
+            vec![
+                (Rc::new(0), Rc::new(0)),
+                (Rc::new(1), Rc::new(-1)),
+                (Rc::new(2), Rc::new(-2)),
+            ]
+        );
+    }
+
+    #[test]
+    fn drain_owned_yields_nothing_of_a_shared_set() {
+        let s = set(0..N);
+
+        // Required for the test, even if `s` isn't used, we still need to clone
+        // to show shared.drain_owned does not traverse anything
+        #[allow(clippy::redundant_clone)]
+        let shared = s.clone();
+
+        // Nothing is dying: `s` still holds every element.
+        assert_eq!(shared.drain_owned().count(), 0);
+    }
+
+    #[test]
+    fn drain_owned_yields_nothing_of_a_shared_map() {
+        let m = map(0..N);
+
+        #[allow(clippy::redundant_clone)]
+        let shared = m.clone();
+
+        assert_eq!(shared.drain_owned().count(), 0);
+    }
+
+    /// The drop-path property this whole design exists for, in its `DUP;
+    /// UPDATE` shape: inserting into a copy of a shared set only allocates the
+    /// root-to-leaf path it had to rewrite, and every entry hanging off that
+    /// path is still held by the original. So exactly one element — the one
+    /// just inserted — is dying, whatever `N` is. Before `drain_owned` this
+    /// walk visited all `N` of them.
+    #[test]
+    fn drain_owned_of_a_transient_set_does_not_scale_with_size() {
+        let s = set(0..N);
+
+        let mut transient = s.clone();
+        transient.insert_mut(Rc::new(N));
+
+        assert_eq!(transient.drain_owned().count(), 1);
+        assert_eq!(s.size(), N as usize);
+    }
+
+    /// [drain_owned_of_a_transient_set_does_not_scale_with_size] for maps.
+    #[test]
+    fn drain_owned_of_a_transient_map_does_not_scale_with_size() {
+        let m = map(0..N);
+
+        let mut transient = m.clone();
+        transient.insert_mut(Rc::new(N), Rc::new(-N));
+
+        assert_eq!(transient.drain_owned().count(), 1);
+        assert_eq!(m.size(), N as usize);
+    }
+
+    /// The other half of `UPDATE`: removing from a copy of a shared container
+    /// rewrites a path but kills nothing, because the removed entry — like
+    /// every other — is still held by the original.
+    #[test]
+    fn drain_owned_of_a_removal_transient_yields_nothing() {
+        let s = set(0..N);
+        let mut transient = s.clone();
+        assert!(transient.remove_mut(&Rc::new(N / 2)));
+        assert_eq!(transient.drain_owned().count(), 0);
+        assert_eq!(s.size(), N as usize);
+
+        let m = map(0..N);
+        let mut transient = m.clone();
+        assert!(transient.remove_mut(&Rc::new(N / 2)));
+        assert_eq!(transient.drain_owned().count(), 0);
+        assert_eq!(m.size(), N as usize);
     }
 }
 

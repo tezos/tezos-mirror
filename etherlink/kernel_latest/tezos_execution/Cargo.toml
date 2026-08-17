@@ -44,6 +44,10 @@ tezosx-journal.workspace = true
 pretty_assertions = "1.4.0"
 http.workspace = true
 tezosx-interfaces = { workspace = true, features = ["testing"] }
-# Pinned: rpds >= 1.1.1 pulls archery >= 1.2.2 (edition 2024 / MSRV 1.85),
-# which the sdk-bindings workspace (Rust 1.83) cannot build.
-rpds = "=1.1.0"
+# Fork carrying `drain_owned`, which the iterative `Drop` needs to release a
+# container without walking elements it does not own.
+#
+# Based on 1.1.0 on purpose, not on the fork's own HEAD: that is 1.2.2-pre and
+# pulls archery >= 1.2.2 (edition 2024 / MSRV 1.85), which the sdk-bindings
+# workspace (Rust 1.83) cannot build.
+rpds = { git = "https://github.com/trilitech/rpds", rev = "c5d2c8b68c6125c2a43bdf803e3aaa627ae997f6" }
