@@ -11,6 +11,7 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{RuntimeError, ValueType},
 };
+use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/base/trace");
@@ -188,6 +189,20 @@ impl<Host: StorageV1> SafeStorage<&mut Host> {
 
     pub fn revert(&mut self) -> Result<(), RuntimeError> {
         self.host.store_delete(&TMP_PATH)
+    }
+}
+
+/// Forwards to the underlying host: a keyspace loaded here reads and writes
+/// the live root, not the `/tmp` mirror, so its backups survive
+/// [`Self::revert`].
+impl<Host: KeySpaceLoader> KeySpaceLoader for SafeStorage<&mut Host> {
+    type KeySpace = Host::KeySpace;
+
+    fn load_or_create(
+        &mut self,
+        name: Name,
+    ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
+        self.host.load_or_create(name)
     }
 }
 
