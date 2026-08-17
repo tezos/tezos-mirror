@@ -27,10 +27,10 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            DERIVE_ALIAS_STRING_COST, HEADER_VALIDATION_PER_HEADER, ORIGIN_OF_BASE_COST,
-            RESOLVE_ADDRESS_BASE_COST, RUNTIME_GATEWAY_BASE_COST,
-            RUNTIME_GATEWAY_PER_WORD_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            VALUE_TRANSFER_SURCHARGE,
+            DERIVE_ALIAS_STRING_COST, HEADER_VALIDATION_PER_HEADER,
+            MAX_HTTP_CALL_HEADERS, ORIGIN_OF_BASE_COST, RESOLVE_ADDRESS_BASE_COST,
+            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PER_WORD_COST,
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, VALUE_TRANSFER_SURCHARGE,
         },
         guard::charge,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
@@ -174,6 +174,38 @@ fn charge_and_encode_crac_response(
     )?;
     charge_payload(gas, body.len())?;
     Ok((body,).abi_encode_params())
+}
+
+// Reject too many headers before injecting the trusted X-Tezos-* headers via
+// the panicking HeaderMap::insert. Mirrors the Michelson %call gateway cap.
+fn reject_if_too_many_headers(
+    request: &http::Request<Vec<u8>>,
+    target_runtime: RuntimeId,
+    gas: &mut Gas,
+    base_fee_per_gas: u64,
+) -> Result<(), CustomPrecompileError> {
+    let count = request.headers().len();
+    if count <= MAX_HTTP_CALL_HEADERS {
+        return Ok(());
+    }
+    let response = http::Response::builder()
+        .status(http::StatusCode::BAD_REQUEST)
+        .body(
+            format!("too many headers ({count} > {MAX_HTTP_CALL_HEADERS})").into_bytes(),
+        )
+        .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
+    match classify_and_charge_crac_response(
+        response,
+        target_runtime,
+        gas,
+        base_fee_per_gas,
+    ) {
+        Err(revert) => Err(revert),
+        Ok(_) => Err(CustomPrecompileError::Revert(
+            format!("too many headers ({count} > {MAX_HTTP_CALL_HEADERS})"),
+            *gas,
+        )),
+    }
 }
 
 /// Build an `http::Request<Vec<u8>>` from ABI-decoded parameters.
@@ -1246,6 +1278,13 @@ where
                             gas,
                         )
                     })?;
+            reject_if_too_many_headers(
+                &request,
+                target_runtime,
+                &mut gas,
+                context.block().basefee(),
+            )?;
+
             let crac_id = context.journal().crac_id();
             // Inject X-Tezos-* headers with trusted execution context.
             // These carry the call context that the target runtime's `serve`
@@ -2231,6 +2270,53 @@ mod tests {
             result,
             Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("X-Tezos-* headers are forbidden")
         ));
+    }
+
+    #[test]
+    fn test_reject_if_too_many_headers_reverts_as_client_error() {
+        let headers: Vec<(String, String)> = (0..=MAX_HTTP_CALL_HEADERS)
+            .map(|i| (format!("h{i}"), "v".to_string()))
+            .collect();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &headers,
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .expect("under-physical-limit request builds");
+        let mut gas = Gas::new(u64::MAX);
+        let err = reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+            .expect_err("over-cap header count must be rejected");
+        assert!(
+            matches!(
+                err,
+                CustomPrecompileError::Revert(msg, _)
+                    if msg.contains("too many headers") && msg.contains("400")
+            ),
+            "over-cap header count must revert as a 400 client error"
+        );
+    }
+
+    #[test]
+    fn test_accept_headers_at_cap_boundary() {
+        // Exactly MAX_HTTP_CALL_HEADERS headers must be accepted (count <= MAX).
+        // With test_reject_if_too_many_headers_reverts_as_client_error (MAX + 1,
+        // rejected) this pins the boundary to `<=`, not `<`.
+        let headers: Vec<(String, String)> = (0..MAX_HTTP_CALL_HEADERS)
+            .map(|i| (format!("h{i}"), "v".to_string()))
+            .collect();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &headers,
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .expect("at-cap request builds");
+        let mut gas = Gas::new(u64::MAX);
+        reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+            .expect("exactly MAX headers must be accepted");
     }
 
     // --- inject_tezos_headers: amount edge cases ---
