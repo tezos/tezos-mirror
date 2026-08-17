@@ -4,24 +4,33 @@
 
 //! Representation for typed Michelson `list 'a` values.
 
+use std::rc::Rc;
+
+use rpds::Vector;
+
 /// A representation of a Michelson list.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct MichelsonList<T>(Vec<T>);
+pub struct MichelsonList<T>(Vector<T>);
+
+impl<T> MichelsonList<Rc<T>> {
+    /// Remove an element from the start of the list. O(log n); the returned
+    /// `Rc` is a refcount bump, never a payload copy.
+    pub fn uncons(&mut self) -> Option<Rc<T>> {
+        let res = self.0.last().cloned();
+        self.0.drop_last_mut();
+        res
+    }
+}
 
 impl<T> MichelsonList<T> {
     /// Construct a new empty list.
     pub fn new() -> Self {
-        MichelsonList(Vec::new())
+        MichelsonList(Vector::new())
     }
 
     /// Add an element to the start of the list.
     pub fn cons(&mut self, x: T) {
-        self.0.push(x)
-    }
-
-    /// Remove an element from the start of the list.
-    pub fn uncons(&mut self) -> Option<T> {
-        self.0.pop()
+        self.0.push_back_mut(x)
     }
 
     /// Get the list length, i.e. the number of elements.
@@ -36,9 +45,17 @@ impl<T> MichelsonList<T> {
         self.into_iter()
     }
 
-    /// Construct an iterator over mutable references to the list elements.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.0.iter_mut().rev()
+    /// Consume the list and yield the elements it exclusively owned, leaving
+    /// shared elements and the subtrees holding them untouched.
+    ///
+    /// This is what the iterative `Drop` needs: a list that another value still
+    /// holds has no dying element, and a list produced by mutating a shared one
+    /// owns only the handful of nodes it had to copy. Draining with [Self::uncons]
+    /// instead visits all n elements and copy-on-writes the spine of each,
+    /// which is work proportional to the length of a list nobody is really
+    /// freeing. The order in which elements are yielded is unspecified.
+    pub(crate) fn drain_owned(self) -> impl Iterator<Item = T> {
+        self.0.drain_owned()
     }
 }
 
@@ -48,25 +65,33 @@ impl<T> Default for MichelsonList<T> {
     }
 }
 
-/// Owning iterator for [MichelsonList].
-pub struct IntoIter<T>(std::iter::Rev<std::vec::IntoIter<T>>);
+/// Owning iterator for [MichelsonList]. Holds the list and unconses one
+/// element per step, so nothing is materialised up front and each yielded
+/// `Rc` is released by the list as it is handed out.
+pub struct IntoIter<T>(MichelsonList<Rc<T>>);
 
 impl<T> Iterator for IntoIter<T> {
-    type Item = T;
+    type Item = Rc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        self.0.uncons()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
+        let n = self.0.len();
+        (n, Some(n))
     }
 }
 
 impl<T> ExactSizeIterator for IntoIter<T> {}
 
 /// Non-owning iterator for [MichelsonList].
-pub struct Iter<'a, T>(std::iter::Rev<core::slice::Iter<'a, T>>);
+//
+// NB: `rpds::vector::Iter` is parameterised by the shared-pointer kind, and
+// `RcK` lives in `archery`, which is not one of our dependencies. Naming the
+// associated type instead pins the very same iterator (`Vector<T>` defaults to
+// `RcK`) without pulling `archery` into `Cargo.toml`.
+pub struct Iter<'a, T>(std::iter::Rev<<&'a Vector<T> as IntoIterator>::IntoIter>);
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
@@ -92,11 +117,11 @@ impl<T> DoubleEndedIterator for Iter<'_, T> {
     }
 }
 
-impl<T> IntoIterator for MichelsonList<T> {
+impl<T> IntoIterator for MichelsonList<Rc<T>> {
     type IntoIter = IntoIter<T>;
-    type Item = T;
+    type Item = Rc<T>;
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0.into_iter().rev())
+        IntoIter(self)
     }
 }
 
@@ -110,9 +135,8 @@ impl<'a, T> IntoIterator for &'a MichelsonList<T> {
 
 /// Construct a `MichelsonList<T>` from `Vec<T>`. O(n).
 impl<T> From<Vec<T>> for MichelsonList<T> {
-    fn from(mut value: Vec<T>) -> Self {
-        value.reverse();
-        MichelsonList(value)
+    fn from(value: Vec<T>) -> Self {
+        MichelsonList(value.into_iter().rev().collect())
     }
 }
 
@@ -121,14 +145,6 @@ impl<T> From<Vec<T>> for MichelsonList<std::rc::Rc<T>> {
     fn from(mut value: Vec<T>) -> Self {
         value.reverse();
         MichelsonList(value.into_iter().map(std::rc::Rc::new).collect())
-    }
-}
-
-/// Extract a `Vec<T>` from `MichelsonList<T>`. O(n).
-impl<T> From<MichelsonList<T>> for Vec<T> {
-    fn from(MichelsonList(mut vec): MichelsonList<T>) -> Self {
-        vec.reverse();
-        vec
     }
 }
 
@@ -167,17 +183,26 @@ mod tests {
 
     #[test]
     fn uncons() {
-        let mut lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
-        assert_eq!(lst.uncons(), Some(1));
-        assert_eq!(lst.uncons(), Some(2));
-        assert_eq!(lst.uncons(), Some(3));
+        let mut lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
+        assert_eq!(lst.uncons(), Some(Rc::new(1)));
+        assert_eq!(lst.uncons(), Some(Rc::new(2)));
+        assert_eq!(lst.uncons(), Some(Rc::new(3)));
         assert_eq!(lst.uncons(), None);
     }
 
     #[test]
     fn into_iter() {
-        let lst = MichelsonList::<i32>::from(vec![1, 2, 3]);
-        assert_eq!(lst.into_iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+        let lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
+        assert_eq!(
+            lst.into_iter().collect::<Vec<_>>(),
+            vec![Rc::new(1), Rc::new(2), Rc::new(3)]
+        );
+
+        // The list drops each element as it hands it out, so the caller gets
+        // sole ownership.
+        for elt in MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]) {
+            assert_eq!(Rc::strong_count(&elt), 1);
+        }
     }
 
     #[test]
@@ -189,15 +214,52 @@ mod tests {
     }
 
     #[test]
-    fn to_vec() {
-        assert_eq!(
-            Vec::from(MichelsonList::<i32>::from(vec![1, 2, 3])),
-            vec![1, 2, 3]
-        );
-    }
-
-    #[test]
     fn default() {
         assert_eq!(MichelsonList::default(), MichelsonList::<()>::new());
     }
+
+    #[test]
+    fn drain_owned_yields_every_element_of_a_sole_owner() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+        assert_eq!(list.drain_owned().count(), N as usize);
+    }
+
+    #[test]
+    fn drain_owned_yields_nothing_of_a_shared_list() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+
+        // Required for the test, even if list isn't used, we still need to clone
+        // to show shared.drain_owned does not traverse anything
+        #[allow(clippy::redundant_clone)]
+        let shared = list.clone();
+
+        // Nothing is dying: `list` still holds every element.
+        assert_eq!(shared.drain_owned().count(), 0);
+    }
+
+    /// The drop-path property this whole design exists for: the transient a
+    /// mutating instruction leaves behind (`DUP; CONS`, and the same shape for
+    /// `UPDATE`) owns only what it had to copy, so draining it costs a handful
+    /// of steps rather than one per element. Before `drain_owned` this walk
+    /// visited all `N` of them — work proportional to a list nobody was
+    /// freeing, against the flat price of `CONS`.
+    #[test]
+    fn drain_owned_of_a_transient_does_not_scale_with_length() {
+        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+
+        let mut transient = list.clone();
+        transient.cons(Rc::new(-1));
+
+        // Only the freshly consed element is exclusively the transient's; the
+        // rest are still held by `list`. In particular this must not grow with
+        // `N` — a leaf holds at most 32 elements, so the bound is the size of
+        // the path `cons` copied, not the length of the list.
+        let drained = transient.drain_owned().count();
+        assert!(drained <= 32, "drained {drained} elements, expected O(1)");
+        assert_eq!(list.len(), N as usize);
+    }
+
+    /// Long enough that a per-element walk is unmistakable against an
+    /// ownership-bounded one.
+    const N: i32 = 10_000;
 }

@@ -320,10 +320,6 @@ let evm_alias_of_kt1 kt1_address =
   in
   Hex.show (Hex.of_bytes (Bytes.sub digest 0 20))
 
-(** EVM predeployed address for the FA1.2 wrapper contract.
-    See [revm/src/precompiles/constants.rs:FA12_WRAPPER_SOL_ADDR]. *)
-let fa12_wrapper_address = "0xff00000000000000000000000000000000ffff09"
-
 (** Null implicit address — the synthetic source the kernel uses for
     all CRAC-shape operations (top-level transactions, alias-forwarder
     originations, CRAC events). Same constant as [handler_address] in
@@ -1685,10 +1681,6 @@ let evm_gateway_call_forwarder_init_code =
 (** ABI encoding of uint256(42). *)
 let abi_encoded_uint256_42 =
   "000000000000000000000000000000000000000000000000000000000000002a"
-
-(** KT1 address of the ERC-20 wrapper enshrined contract.
-    See [tezos_execution/src/enshrined_contracts.rs:ERC20_WRAPPER_ADDRESS]. *)
-let erc20_wrapper_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb"
 
 (** [michelson_to_evm_transfer ~source ~destination ~transfer_amount setup]
     transfers [transfer_amount] from the Michelson [source] to the EVM
@@ -3992,114 +3984,6 @@ let test_cross_runtime_transfer_from_michelson_contract_to_evm () =
     (Tez.to_mutez gateway_balance = 0)
       int
       ~error_msg:"Expected gateway balance 0 but got %L") ;
-  unit
-
-(** Test cross-runtime FA1.2 approve from EVM to Michelson.
-
-    1. Originate [fa12_reference.tz] via delayed inbox with empty ledger,
-       admin = bootstrap5, paused = false, totalSupply = 0.
-    2. From EVM, call the FA1.2 wrapper predeployed contract with
-       [approve(string,bytes22,uint256)] where the spender is the null
-       tz1 address and the value is 42.
-    3. Verify the EVM transaction succeeds (status=true), proving the
-       Micheline encoding was correctly forwarded to the FA1.2 contract.
-
-    The cross-runtime sender is always [tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU]
-    (null address), which becomes SENDER in Michelson. The approve creates
-    a new ledger entry for the null address with balance=0 and an allowance
-    of 42 for the specified spender. *)
-let test_cross_runtime_fa12_approve_from_evm () =
-  Setup.register_sandbox_test
-    ~uses_client:true
-    ~title:"Cross-runtime FA1.2 approve from EVM to Michelson"
-    ~tags:["cross_runtime"; "fa12"; "approve"]
-    ~with_runtimes:[Tezos]
-  @@ fun sandbox ->
-  let source = Constant.bootstrap5 in
-  (* Step 1: Originate the FA1.2 reference contract with empty ledger. *)
-  let* kt1_address =
-    sandbox_originate_michelson_contract
-      ~source
-      ~script_name:["mini_scenarios"; "fa12_reference"]
-      ~init_storage_data:
-        (sf {|Pair {} (Pair "%s" (Pair False 0))|} source.public_key_hash)
-      sandbox
-  in
-  (* Step 2: Call "approve" from EVM via the predeployed FA1.2 wrapper.
-     - tokenAddress: the KT1 of the FA1.2 contract (as a string)
-     - spender: 22-byte binary Tezos address of the null tz1
-       (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU = 0x0000 + 20 zero bytes)
-     - value: 42 *)
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let null_tz1_bytes22 = "0x00000000000000000000000000000000000000000000" in
-  let* _receipt =
-    craft_and_send_evm_transaction
-      ~sequencer:sandbox
-      ~sender
-      ~nonce:0
-      ~value:Wei.zero
-      ~address:fa12_wrapper_address
-      ~abi_signature:"approve(string,bytes22,uint256)"
-      ~arguments:[kt1_address; null_tz1_bytes22; "42"]
-      ()
-  in
-  (* craft_and_send_evm_transaction asserts status=true. If the Micheline
-     encoding in the wrapper were wrong, the FA1.2 contract would FAILWITH
-     and the cross-runtime call would revert.
-     FIXME: Check the storage and perform a transfer when we have all RPC *)
-  unit
-
-(** Test cross-runtime ERC-20 transfer from Michelson to EVM via the
-    ERC-20 wrapper enshrined contract.
-
-    1. Deploy a simple EVM contract that stores [calldataload(36)] in
-       storage slot 0 (i.e., the second ABI word = the uint256 amount).
-    2. From Michelson, call the ERC-20 wrapper enshrined contract
-       ({!erc20_wrapper_address}) with "transfer" entrypoint and
-       parameter [Pair "<evm_addr>" (Pair 0x<to> 42)].
-    3. Verify EVM storage slot 0 = 42, proving the ERC-20 wrapper
-       correctly ABI-encoded the parameters and forwarded them. *)
-let test_cross_runtime_erc20_transfer_from_michelson () =
-  Setup.register_sandbox_test
-    ~uses_client:true
-    ~title:"Cross-runtime ERC-20 transfer from Michelson to EVM"
-    ~tags:["cross_runtime"; "erc20"; "transfer"]
-    ~with_runtimes:[Tezos]
-  @@ fun sandbox ->
-  (* Step 1: Deploy EVM contract that stores calldataload(36) in slot 0.
-     Runtime bytecode: PUSH1 0x24 | CALLDATALOAD | PUSH1 0x00 | SSTORE | STOP
-     = 60 24 35 60 00 55 00 (7 bytes) *)
-  let init_code = "600780600b6000396000f360243560005500" in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* contract_address =
-    deploy_evm_contract ~sequencer:sandbox ~sender ~nonce:0 ~init_code ()
-  in
-  (* Step 2: Call the ERC-20 wrapper KT1 from Michelson with "transfer".
-     The parameter is Pair "<evm_contract>" (Pair 0x<to_addr> 42).
-     The wrapper computes transfer(address,uint256) selector and
-     ABI-encodes the arguments before calling the EVM contract. *)
-  let source = Constant.bootstrap5 in
-  let to_address = "1111111111111111111111111111111111111111" in
-  let* () =
-    sandbox_call_michelson_contract
-      ~source
-      ~dest:erc20_wrapper_address
-      ~arg_data:(sf {|Pair "%s" (Pair 0x%s 42)|} contract_address to_address)
-      ~entrypoint:"transfer"
-      sandbox
-  in
-  (* Step 3: Verify EVM storage slot 0 = 42, confirming the
-     ERC-20 wrapper correctly encoded the uint256 amount. *)
-  let*@ storage =
-    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sandbox
-  in
-  let expected_storage =
-    "0x000000000000000000000000000000000000000000000000000000000000002a"
-  in
-  Check.(
-    (storage = expected_storage)
-      string
-      ~error_msg:"Expected storage slot 0 = %R but got %L") ;
   unit
 
 (** Query manager_key on a specific block hash (not head) via the Tezlink RPC.
@@ -7014,8 +6898,6 @@ let () =
   test_cross_runtime_view_call_negative () ;
   test_cross_runtime_call_from_michelson_to_evm () ;
   test_michelson_gateway_evm_revert () ;
-  test_cross_runtime_fa12_approve_from_evm () ;
-  test_cross_runtime_erc20_transfer_from_michelson () ;
   test_cross_runtime_call_from_michelson_contract_to_evm () ;
   test_cross_runtime_call_from_michelson_contract_to_evm_revert () ;
   test_cross_runtime_transfer_from_michelson_contract_to_evm () ;

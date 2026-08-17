@@ -4872,6 +4872,133 @@ mod test {
                  gas, not the inner cross-runtime leg's"
             );
         }
+
+        /// A nested frame (a plain `CALL` opcode, not the transaction's
+        /// top-level frame) must report only the gas its own execution
+        /// spent.
+        ///
+        /// The regression: every `call`/`create` hook added the
+        /// transaction's intrinsic gas (21000 + calldata cost) to the
+        /// frame's `gas_used`, inflating every nested frame and breaking
+        /// the `trace.gasUsed >= Σ trace.calls[i].gasUsed` invariant
+        /// (previewnet block 210148).
+        #[test]
+        fn nested_frame_does_not_account_intrinsic_gas() {
+            let mut host = MockKernelHost::default();
+            let registry = Registry::new();
+            let block_constants = BlockConstants::test_block_with_no_fees();
+            let block = block_env(&block_constants).unwrap();
+
+            let tx = TxEnv {
+                kind: TxKind::Call(Address::ZERO),
+                data: Bytes::new(),
+                ..Default::default()
+            };
+
+            let nested_gas_spent = 10_000u64;
+            let outer_gas_spent = 50_000u64;
+            let tx_hash = B256::from([0xE8; 32]);
+
+            let mut tracer = CallTracer::new(
+                CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                DEFAULT_SPEC_ID,
+                Some(tx_hash),
+            );
+
+            {
+                let db = EtherlinkVMDB::new(&mut host, &registry, &block_constants, None)
+                    .unwrap();
+                let mut evm_journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let mut journaled_state = Journal::new_with_inner(db, &mut evm_journal);
+                journaled_state.set_spec_id(DEFAULT_SPEC_ID);
+
+                let cfg = CfgEnv::new()
+                    .with_chain_id(block_constants.chain_id.as_u64())
+                    .with_spec_and_mainnet_gas_params(DEFAULT_SPEC_ID);
+
+                let mut ctx = Context {
+                    tx: &tx,
+                    block: &block,
+                    cfg,
+                    journaled_state,
+                    chain: (),
+                    local: LocalContext::default(),
+                    error: Ok(()),
+                };
+
+                let mut outer_inputs = call_inputs(900_000);
+                let mut nested_inputs = call_inputs(400_000);
+
+                // depth 0: the transaction's top-level frame opens.
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut outer_inputs,
+                );
+
+                // depth 1: a plain nested CALL opens and closes within
+                // the same transaction.
+                ctx.journaled_state.checkpoint();
+                Inspector::<_, EthInterpreter>::call(
+                    &mut tracer,
+                    &mut ctx,
+                    &mut nested_inputs,
+                );
+                let mut nested_outcome = call_outcome(nested_gas_spent);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &nested_inputs,
+                    &mut nested_outcome,
+                );
+                ctx.journaled_state.checkpoint_commit();
+
+                // depth 0: the top-level frame closes.
+                let mut outer_outcome = call_outcome(outer_gas_spent);
+                Inspector::<_, EthInterpreter>::call_end(
+                    &mut tracer,
+                    &mut ctx,
+                    &outer_inputs,
+                    &mut outer_outcome,
+                );
+            }
+
+            let result = ExecutionResult::Success {
+                reason: SuccessReason::Stop,
+                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            };
+            tracer
+                .finalize(&mut host, &result)
+                .expect("tracer finalization should succeed");
+
+            let path =
+                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
+                    .unwrap();
+            let storage = IndexableStorage::new_owned_path(path);
+            let length = storage.length(&host).unwrap();
+            let traces: Vec<Vec<u8>> = (0..length)
+                .map(|index| storage.get_value(&host, index).unwrap())
+                .collect();
+            assert_eq!(traces.len(), 2, "expected the outer and nested frames");
+
+            let nested_frame = traces
+                .iter()
+                .map(|bytes| Rlp::new(bytes))
+                .find(|trace| trace_depth(trace) == 1)
+                .expect("the nested frame should be recorded");
+
+            assert_eq!(
+                trace_gas_used(&nested_frame),
+                nested_gas_spent,
+                "a nested frame must report only its own spent gas, without \
+                 the transaction's intrinsic gas"
+            );
+        }
     }
 
     #[test]

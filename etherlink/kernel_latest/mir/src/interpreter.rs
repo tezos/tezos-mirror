@@ -548,7 +548,7 @@ enum InterpFrame<'a, 'b> {
     },
     IterList {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        remaining: michelson_list::IntoIter<TypedValue<'a>>,
     },
     IterSet {
         body: CodeRef<'a, 'b>,
@@ -560,7 +560,7 @@ enum InterpFrame<'a, 'b> {
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        remaining: michelson_list::IntoIter<TypedValue<'a>>,
         acc: Vec<Rc<TypedValue<'a>>>,
     },
     MapOptionAfter,
@@ -598,7 +598,7 @@ enum StepResult<'a, 'b> {
     OpenLoopLeft(CodeRef<'a, 'b>),
     OpenIterList {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        iter: michelson_list::IntoIter<TypedValue<'a>>,
     },
     OpenIterSet {
         body: CodeRef<'a, 'b>,
@@ -610,7 +610,7 @@ enum StepResult<'a, 'b> {
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        iter: michelson_list::IntoIter<TypedValue<'a>>,
     },
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
@@ -1443,6 +1443,10 @@ fn interpret_step<'a, 'b>(
             Ok(StepResult::OpenBlock(body))
         }
         I::IfCons(when_cons, when_nil) => {
+            // Flat cost, mirror of the argument at `I::Cons` below: `uncons`
+            // is O(log32 n) on the backing `rpds::Vector`, copying at most one
+            // trie node per level when the list is shared and mutating in
+            // place when it is not.
             ctx.gas().consume(interpret_cost::IF_CONS)?;
             let lst = match Rc::make_mut(stack.get_mut(0)?) {
                 V::List(lst) => lst,
@@ -1496,7 +1500,7 @@ fn interpret_step<'a, 'b>(
                     let lst = pop_v!(V::List);
                     Ok(StepResult::OpenIterList {
                         body,
-                        iter: Vec::from(lst).into_iter(),
+                        iter: lst.into_iter(),
                     })
                 }
                 overloads::Iter::Set => {
@@ -1519,7 +1523,7 @@ fn interpret_step<'a, 'b>(
             overloads::Map::List => {
                 ctx.gas().consume(interpret_cost::MAP_LIST)?;
                 let list = pop_v!(V::List);
-                let mut iter = Vec::from(list).into_iter();
+                let mut iter = list.into_iter();
                 if let Some(first) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stack.push(first);
@@ -2746,11 +2750,16 @@ fn interpret_one<'a>(
             stack.push(V::List(MichelsonList::new()));
         }
         I::Cons => {
+            // Flat cost. `cons` on the backing `rpds::Vector` is O(log32 n)
+            // -- it copies one trie node per level when the list is shared,
+            // and mutates in place when it is not. No case is O(n).
+            //
+            // The height is in turn pinned in the low single digits by the
+            // gas cap: at 845 gas a `CONS`, ~1M elements (height 3) costs
+            // ~886M gas.
             ctx.gas().consume(interpret_cost::CONS)?;
             let elt = pop_rc!();
             let mut lst = pop!(V::List);
-            // NB: this is slightly better than lists on average, but needs to
-            // be benchmarked.
             lst.cons(elt);
             stack.push(V::List(lst));
         }
@@ -4199,7 +4208,7 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterList {
                         body: body(),
-                        remaining: vec![deep()].into_iter(),
+                        remaining: MichelsonList::from(vec![deep()]).into_iter(),
                     },
                     InterpFrame::IterSet {
                         body: body(),
@@ -4211,7 +4220,7 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
-                        remaining: vec![deep()].into_iter(),
+                        remaining: MichelsonList::from(vec![deep()]).into_iter(),
                         acc: vec![deep()],
                     },
                     InterpFrame::MapMapAccum {
