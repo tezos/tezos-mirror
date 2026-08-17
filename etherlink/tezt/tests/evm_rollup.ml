@@ -473,7 +473,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       let* () = Client.bake_for_and_wait ~keys:[] client in
       let* level = Node.get_level node in
       let* _ =
-        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
+        (* Time to install the kernel depends on size, adjust if necessary. *)
+        Sc_rollup_node.wait_for_level ~timeout:300. sc_rollup_node level
       in
       unit
     else unit
