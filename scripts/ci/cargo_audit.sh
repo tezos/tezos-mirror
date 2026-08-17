@@ -182,9 +182,11 @@ else
   # Walk up from a directory to the nearest ancestor holding a Cargo.lock,
   # i.e. the workspace that owns a given manifest. Nearest and not
   # outermost, because some workspaces nest (src/rust_deps contains
-  # wasmer-3.3.0, rust_tezos_context and rust_igd_next, each with its own
-  # lock and its own .cargo/audit.toml). Prints nothing when the manifest
-  # belongs to no workspace, which leaves nothing to audit for it.
+  # wasmer-7.2.1, rust_tezos_context and rust_igd_next, each with its own
+  # lock, and each audited in its own right). A workspace carries a
+  # .cargo/audit.toml only when it has advisories to ignore, so most have
+  # none. Prints nothing when the manifest belongs to no workspace, which
+  # leaves nothing to audit for it.
   workspace_of() {
     d=$1
     while :; do

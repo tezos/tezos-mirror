@@ -35,7 +35,10 @@ done
 # as SKIP entries in the summary to keep the exclusion visible.
 is_vendored() {
   case "$1" in
-  src/rust_deps/wasmer-3.3.0/*) return 0 ;;
+  # Match any vendored wasmer, not just the current version: replacing the
+  # vendored copy lists the old tree's lock files as deletions, and those
+  # paths still reach this function.
+  src/rust_deps/wasmer-*/*) return 0 ;;
   *) return 1 ;;
   esac
 }
