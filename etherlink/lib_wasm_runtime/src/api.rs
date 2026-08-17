@@ -16,7 +16,8 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock, RwLockReadGuard},
 };
-use wasmer::{Engine, Features, Module, NativeEngineExt, Store, Target};
+use wasmer::sys::{Features, NativeEngineExt, Target};
+use wasmer::{Engine, Module, Store};
 use wasmer_compiler_cranelift::Cranelift;
 
 static TRACE_HOST_FUNS: OnceLock<bool> = OnceLock::new();
@@ -96,17 +97,36 @@ ocaml::custom!(Context);
 
 impl Context {
     pub fn new() -> Self {
-        let mut features = Features::new();
-        features
-            .bulk_memory(false)
-            .memory64(false)
-            .module_linking(false)
-            .multi_memory(false)
-            .multi_value(false)
-            .reference_types(true)
-            .simd(true)
-            .tail_call(false)
-            .threads(false);
+        // Every field is listed on purpose, and as a struct literal rather
+        // than through the `Features` setters. Two reasons. A literal without
+        // `..` fails to compile when wasmer adds a proposal, which forces a
+        // decision on it instead of inheriting whatever `Features::new()`
+        // defaults to -- and that default moves between releases, 7.2.1 having
+        // turned `extended_const` on. The setters, meanwhile, are not
+        // independent: `reference_types(true)` also enables `bulk_memory`, and
+        // `bulk_memory(false)` also disables `reference_types`, so a chain's
+        // outcome depends on the order it is written in.
+        //
+        // `bulk_memory` is enabled: the Octez WebAssembly interpreter
+        // implements it (`MemoryCopy`, `MemoryFill`, `MemoryInit`, `DataDrop`
+        // in src/lib_webassembly), rustc emits `memory.copy` and `memory.fill`
+        // for wasm32-unknown-unknown by default, and every Etherlink kernel
+        // therefore contains them.
+        let features = Features {
+            bulk_memory: true,
+            exceptions: false,
+            extended_const: false,
+            memory64: false,
+            module_linking: false,
+            multi_memory: false,
+            multi_value: false,
+            reference_types: true,
+            relaxed_simd: false,
+            simd: true,
+            tail_call: false,
+            threads: false,
+            wide_arithmetic: false,
+        };
 
         let config = Cranelift::new();
         let engine = NativeEngineExt::new(Box::new(config), Target::default(), features);
@@ -189,4 +209,46 @@ pub fn wasm_runtime_preload_kernel(
     let ctxt = ctxt.as_mut();
     let (_kernel, loaded) = ctxt.kernels_cache.load(&ctxt.engine, &tree)?;
     Ok(loaded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Modules in binary form on purpose: this exercises the Wasmer validator
+    // directly rather than `wat`, whose support for a proposal is independent
+    // from the features the engine enables.
+
+    // (module (global i32 (i32.const 3)))
+    const CONST_GLOBAL: &[u8] = b"\x00asm\x01\x00\x00\x00\x06\x06\x01\x7f\x00\x41\x03\x0b";
+
+    // (module (global i32 (i32.add (i32.const 1) (i32.const 2))))
+    const EXTENDED_CONST_GLOBAL: &[u8] =
+        b"\x00asm\x01\x00\x00\x00\x06\x09\x01\x7f\x00\x41\x01\x41\x02\x6a\x0b";
+
+    // (module (memory 1) (func (memory.copy (i32.const 0) (i32.const 1) (i32.const 2))))
+    const BULK_MEMORY: &[u8] = b"\x00asm\x01\x00\x00\x00\x01\x04\x01\x60\x00\x00\x03\x02\x01\x00\x05\x03\x01\x00\x01\x0a\x0e\x01\x0c\x00\x41\x00\x41\x01\x41\x02\xfc\x0a\x00\x00\x0b";
+
+    fn compiles(code: &[u8]) -> bool {
+        let ctxt = Context::new();
+        Kernel::new(&ctxt.engine, code).is_ok()
+    }
+
+    /// The proposals this runtime accepts must match the ones the Octez
+    /// WebAssembly interpreter implements: a module accepted here but rejected
+    /// there makes the two disagree on whether a kernel is valid, and one
+    /// rejected here but accepted there stops the node executing kernels at
+    /// all. Both directions have gone wrong, so both are pinned.
+    #[test]
+    fn wasm_proposals() {
+        assert!(compiles(CONST_GLOBAL), "plain constant global initialiser");
+        // Accepted: the interpreter implements bulk memory, and rustc emits
+        // memory.copy for wasm32-unknown-unknown in every kernel.
+        assert!(compiles(BULK_MEMORY), "bulk memory instruction");
+        // Rejected: the interpreter does not implement extended const.
+        assert!(
+            !compiles(EXTENDED_CONST_GLOBAL),
+            "extended constant expression must be rejected"
+        );
+    }
 }

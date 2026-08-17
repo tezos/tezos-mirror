@@ -209,6 +209,63 @@ let test_set_string_behaves_like_set () =
   in
   assert (exn_get = exn_get_string)
 
+(* Modules are given in binary form on purpose: this exercises the Wasmer
+   validator directly, rather than wat2wasm, whose support for a proposal is
+   independent from the features the engine enables. *)
+
+(* (module (global i32 (i32.const 3))) *)
+let const_global_module =
+  "\x00\x61\x73\x6d\x01\x00\x00\x00\x06\x06\x01\x7f\x00\x41\x03\x0b"
+
+(* (module (global i32 (i32.add (i32.const 1) (i32.const 2)))) -- a global whose
+   initialiser is an extended constant expression. *)
+let extended_const_global_module =
+  "\x00\x61\x73\x6d\x01\x00\x00\x00\x06\x09\x01\x7f\x00\x41\x01\x41\x02\x6a\x0b"
+
+(* (module (memory 1) (func (memory.copy (i32.const 0) (i32.const 1)
+                                         (i32.const 2)))) -- bulk memory.
+   rustc emits memory.copy for wasm32-unknown-unknown by default, so every
+   kernel contains this and it must compile. *)
+let bulk_memory_module =
+  "\x00\x61\x73\x6d\x01\x00\x00\x00\x01\x04\x01\x60\x00\x00\x03\x02\x01\x00\x05\x03\x01\x00\x01\x0a\x0e\x01\x0c\x00\x41\x00\x41\x01\x41\x02\xfc\x0a\x00\x00\x0b"
+
+let compiles code =
+  let config =
+    let open Config in
+    if is_compiler_available CRANELIFT then {compiler = CRANELIFT}
+    else {compiler = SINGLEPASS}
+  in
+  let store = Store.create (Engine.create config) in
+  match Module.create store Module.Binary code with
+  | modul ->
+      Module.delete modul ;
+      true
+  | exception _ -> false
+
+(* The proposals Wasmer accepts must stay in sync with the ones the Octez
+   WebAssembly interpreter implements: a module the fast execution accepts but
+   the interpreter rejects makes the two disagree on whether a kernel is valid,
+   and one it rejects but the interpreter accepts stops the node executing
+   kernels at all.
+
+   Both directions are pinned here because both have gone wrong. Wasmer's own
+   defaults are not the right set -- [wasmer_features_new] enables proposals
+   the interpreter lacks, and which ones changes between releases -- while the
+   [Features] setters are order-sensitive, [reference_types true] enabling bulk
+   memory and [bulk_memory false] disabling reference types. *)
+let test_wasm_proposals () =
+  let check msg expected code =
+    Alcotest.(check bool) msg expected (compiles code)
+  in
+  check "a plain constant global initialiser compiles" true const_global_module ;
+  (* Accepted: the interpreter implements bulk memory, and rustc emits it. *)
+  check "a bulk memory instruction compiles" true bulk_memory_module ;
+  (* Rejected: the interpreter does not implement extended const. *)
+  check
+    "an extended constant expression is rejected"
+    false
+    extended_const_global_module
+
 let tests =
   [
     ( "Memory",
@@ -216,6 +273,7 @@ let tests =
         ("get_string behaves like get", `Quick, test_get_string_behaves_like_get);
         ("set_string behaves like set", `Quick, test_set_string_behaves_like_set);
       ] );
+    ("Config", [("WebAssembly proposals", `Quick, test_wasm_proposals)]);
   ]
 
 let () = Alcotest.run ~__FILE__ "Wasmer" tests
