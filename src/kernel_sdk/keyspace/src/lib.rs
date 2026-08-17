@@ -20,6 +20,10 @@ pub mod irmin_ds;
 mod irmin_path_validator;
 pub mod wasm_nds;
 
+/// The budget a caller building names has to stay within.
+#[cfg(feature = "irmin-compat")]
+pub use irmin_path_validator::{MAX_KEYSPACE_NAME_SIZE, MAX_KEY_SIZE};
+
 /// Key creation error
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeyError {
