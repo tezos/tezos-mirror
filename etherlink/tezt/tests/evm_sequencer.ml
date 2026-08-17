@@ -8775,6 +8775,25 @@ let test_trace_transaction_call_trace_certain_depth =
         ~error_msg:"Wrong call list size, expected %R but got %L") ;
     return call_list
   in
+  (* The transaction's intrinsic gas is accounted only on the top-level
+     frame, so every frame's gasUsed covers its subcalls'. Regression: the
+     tracer used to inflate every nested frame by the intrinsic gas,
+     breaking this invariant. *)
+  let rec check_gas_used_covers_subcalls trace =
+    let gas_used trace =
+      JSON.(trace |-> "gasUsed" |> as_string) |> int_of_string
+    in
+    let subcalls = JSON.(trace |-> "calls" |> as_list) in
+    let subcalls_gas_used =
+      List.fold_left (fun acc subcall -> acc + gas_used subcall) 0 subcalls
+    in
+    Check.(
+      (gas_used trace >= subcalls_gas_used)
+        int
+        ~error_msg:"Frame's gasUsed %L should cover its subcalls' sum %R") ;
+    List.iter check_gas_used_covers_subcalls subcalls
+  in
+  check_gas_used_covers_subcalls trace_result ;
   (* The call list should be of size 4, 3 create and one call in depth *)
   let* depth_call_list = check_and_get_subcalls "CALL" 4 trace_result in
   (* Check that in a CREATE we can make a CALL *)
