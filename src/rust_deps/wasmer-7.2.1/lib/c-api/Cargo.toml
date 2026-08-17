@@ -1,0 +1,133 @@
+[package]
+name = "wasmer-c-api"
+description = "Wasmer C API library"
+categories = ["wasm", "api-bindings"]
+keywords = ["wasm", "webassembly", "runtime"]
+documentation = "https://wasmerio.github.io/wasmer/c-api/"
+readme = "README.md"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+exclude = ["examples/assets/**"]
+
+[lib]
+# The library name is `wasmer` so that we generate dylib like
+# `libwasmer.so`, `libwasmer.dylib`, `wasmer.dll` etc. But it creates
+# a conflict with the existing `wasmer` crate, see below.
+name = "wasmer" # ##lib.name##
+# ^ DO NOT REMOVE, it's used the `Makefile`, see `build-docs-capi`.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# We rename `wasmer` to `wasmer-api` to avoid the conflict with this
+# library name (see `[lib]`).
+wasmer-api = { version = "=7.2.1", path = "../api", default-features = false, package = "wasmer" }
+wasmer-c-api-imports = { version = "=7.2.1", path = "../c-api-imports", default-features = false }
+wasmer-compiler = { version = "=7.2.1", path = "../compiler", optional = true }
+wasmer-compiler-cranelift = { version = "=7.2.1", path = "../compiler-cranelift", optional = true }
+wasmer-compiler-singlepass = { version = "=7.2.1", path = "../compiler-singlepass", optional = true }
+wasmer-middlewares = { version = "=7.2.1", path = "../middlewares", optional = true }
+wasmer-types = { version = "=7.2.1", path = "../types" }
+anyhow.workspace = true
+enumset.workspace = true
+cfg-if.workspace = true
+libc.workspace = true
+thiserror.workspace = true
+paste.workspace = true
+tokio = { workspace = true, features = [
+  "rt",
+  "rt-multi-thread",
+  "io-util",
+  "sync",
+  "macros",
+], default-features = false }
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+
+[features]
+default = ["wat", "sys-default", "cranelift", "compiler", "middlewares"]
+wat = ["wasmer-api/wat", "wasmer-c-api-imports/wat"]
+middlewares = ["compiler", "wasmer-middlewares", "wasmer-api/wasmparser"]
+engine = ["compiler"]
+
+# Enable the `sys` backend.
+sys = ["wasmer-api/sys", "wasmer-compiler", "wasmer-c-api-imports/sys"]
+
+# Enable the `singlepass` compiler.
+singlepass = [
+  "dep:wasmer-compiler-singlepass",
+  "wasmer-api/singlepass",
+  "wasmer-c-api-imports/singlepass",
+  "compiler",
+]
+# Enable the `cranelift` compiler.
+cranelift = [
+  "dep:wasmer-compiler-cranelift",
+  "wasmer-api/cranelift",
+  "wasmer-c-api-imports/cranelift",
+  "compiler",
+]
+# Enable the use of compiler. Implies enabling the `sys` feature.
+compiler = [
+  "sys",
+  "wasmer-compiler",
+  "wasmer-api/compiler",
+  "wasmer-c-api-imports/compiler",
+  "wasmer-compiler/translator",
+  "wasmer-compiler/compiler",
+]
+
+# Enable the use of the headless compiler. Implies enabling the `sys` feature.
+compiler-headless = [
+  "sys",
+  "wasmer-artifact-load",
+  "static-artifact-load",
+  "wasmer-api/compiler",
+  "wasmer-c-api-imports/compiler",
+  "wasmer-compiler/translator",
+  "wasmer-compiler/compiler",
+]
+
+# Enable the `v8` backend.
+v8 = ["wasmer-api/v8", "wasmer-c-api-imports/v8"]
+
+# Enable the `sys` backend and use it as default. Notice that this does not
+# enable a default compiler, and users should therefore add one (or more) of
+# the `singlepass`, `cranelift` and `llvm` features.
+sys-default = [
+  "sys",
+  "wasmer-api/sys-default",
+  "wasmer-c-api-imports/sys-default",
+]
+
+# Enable the `v8` backend and use it as default.
+v8-default = ["v8", "wasmer-api/v8-default", "wasmer-c-api-imports/v8-default"]
+
+wasmer-artifact-load = [
+  "wasmer-compiler/wasmer-artifact-load",
+  "wasmer-c-api-imports/wasmer-artifact-load",
+]
+wasmer-artifact-create = [
+  "wasmer-compiler/wasmer-artifact-create",
+  "wasmer-c-api-imports/wasmer-artifact-create",
+]
+static-artifact-load = [
+  "wasmer-compiler/static-artifact-load",
+  "wasmer-c-api-imports/static-artifact-load",
+]
+static-artifact-create = [
+  "wasmer-compiler/static-artifact-create",
+  "wasmer-c-api-imports/static-artifact-create",
+]
+# Deprecated features.
+jit = ["compiler"]
+
+[build-dependencies]
+cbindgen = { workspace = true, default-features = false }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
