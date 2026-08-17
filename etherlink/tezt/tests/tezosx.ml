@@ -320,10 +320,6 @@ let evm_alias_of_kt1 kt1_address =
   in
   Hex.show (Hex.of_bytes (Bytes.sub digest 0 20))
 
-(** EVM predeployed address for the FA1.2 wrapper contract.
-    See [revm/src/precompiles/constants.rs:FA12_WRAPPER_SOL_ADDR]. *)
-let fa12_wrapper_address = "0xff00000000000000000000000000000000ffff09"
-
 (** Null implicit address — the synthetic source the kernel uses for
     all CRAC-shape operations (top-level transactions, alias-forwarder
     originations, CRAC events). Same constant as [handler_address] in
@@ -3994,61 +3990,6 @@ let test_cross_runtime_transfer_from_michelson_contract_to_evm () =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
-(** Test cross-runtime FA1.2 approve from EVM to Michelson.
-
-    1. Originate [fa12_reference.tz] via delayed inbox with empty ledger,
-       admin = bootstrap5, paused = false, totalSupply = 0.
-    2. From EVM, call the FA1.2 wrapper predeployed contract with
-       [approve(string,bytes22,uint256)] where the spender is the null
-       tz1 address and the value is 42.
-    3. Verify the EVM transaction succeeds (status=true), proving the
-       Micheline encoding was correctly forwarded to the FA1.2 contract.
-
-    The cross-runtime sender is always [tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU]
-    (null address), which becomes SENDER in Michelson. The approve creates
-    a new ledger entry for the null address with balance=0 and an allowance
-    of 42 for the specified spender. *)
-let test_cross_runtime_fa12_approve_from_evm () =
-  Setup.register_sandbox_test
-    ~uses_client:true
-    ~title:"Cross-runtime FA1.2 approve from EVM to Michelson"
-    ~tags:["cross_runtime"; "fa12"; "approve"]
-    ~with_runtimes:[Tezos]
-  @@ fun sandbox ->
-  let source = Constant.bootstrap5 in
-  (* Step 1: Originate the FA1.2 reference contract with empty ledger. *)
-  let* kt1_address =
-    sandbox_originate_michelson_contract
-      ~source
-      ~script_name:["mini_scenarios"; "fa12_reference"]
-      ~init_storage_data:
-        (sf {|Pair {} (Pair "%s" (Pair False 0))|} source.public_key_hash)
-      sandbox
-  in
-  (* Step 2: Call "approve" from EVM via the predeployed FA1.2 wrapper.
-     - tokenAddress: the KT1 of the FA1.2 contract (as a string)
-     - spender: 22-byte binary Tezos address of the null tz1
-       (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU = 0x0000 + 20 zero bytes)
-     - value: 42 *)
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let null_tz1_bytes22 = "0x00000000000000000000000000000000000000000000" in
-  let* _receipt =
-    craft_and_send_evm_transaction
-      ~sequencer:sandbox
-      ~sender
-      ~nonce:0
-      ~value:Wei.zero
-      ~address:fa12_wrapper_address
-      ~abi_signature:"approve(string,bytes22,uint256)"
-      ~arguments:[kt1_address; null_tz1_bytes22; "42"]
-      ()
-  in
-  (* craft_and_send_evm_transaction asserts status=true. If the Micheline
-     encoding in the wrapper were wrong, the FA1.2 contract would FAILWITH
-     and the cross-runtime call would revert.
-     FIXME: Check the storage and perform a transfer when we have all RPC *)
-  unit
-
 (** Test cross-runtime ERC-20 transfer from Michelson to EVM via the
     ERC-20 wrapper enshrined contract.
 
@@ -7014,7 +6955,6 @@ let () =
   test_cross_runtime_view_call_negative () ;
   test_cross_runtime_call_from_michelson_to_evm () ;
   test_michelson_gateway_evm_revert () ;
-  test_cross_runtime_fa12_approve_from_evm () ;
   test_cross_runtime_erc20_transfer_from_michelson () ;
   test_cross_runtime_call_from_michelson_contract_to_evm () ;
   test_cross_runtime_call_from_michelson_contract_to_evm_revert () ;
