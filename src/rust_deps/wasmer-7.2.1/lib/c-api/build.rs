@@ -78,7 +78,15 @@ fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    build_wasm_c_api_headers(&crate_dir, &out_dir);
+    // Octez patch: skip the cbindgen header generation when
+    // OCTEZ_RUST_DEPS_NO_WASMER_HEADERS is set, which the build.sh scripts
+    // driving cargo from dune do. The generation step copies the header it
+    // produces back into the crate directory, which is read-only under dune,
+    // so it aborts with "Unable to copy the generated C bindings:
+    // PermissionDenied". The header is committed pre-generated instead.
+    if env::var("OCTEZ_RUST_DEPS_NO_WASMER_HEADERS").is_err() {
+        build_wasm_c_api_headers(&crate_dir, &out_dir);
+    }
     build_inline_c_env_vars();
     build_cdylib_link_arg();
 }
@@ -364,15 +372,22 @@ fn shared_object_dir() -> PathBuf {
     shared_object_dir.pop();
     shared_object_dir.pop(); // "debug" or "release"
 
+    // Octez patch: the section below is disabled. It rejects any cargo target
+    // directory not named `target` or after the target triple, which the
+    // OCTEZ_*_TARGET_DIR knobs in the build.sh scripts driving cargo from dune
+    // are free to set. Nothing depends on the result being exact: it only
+    // feeds inline-c env vars and cdylib link args, and Octez links the
+    // staticlib.
+    //
     // We either find `target` or the target triple if cross-compiling.
-    if shared_object_dir.file_name() != Some(OsStr::new("target")) {
-        let target = env::var("TARGET").unwrap();
-        if shared_object_dir.file_name() != Some(OsStr::new("llvm-cov-target")) {
-            assert_eq!(shared_object_dir.file_name(), Some(OsStr::new(&target)));
-        } else {
-            shared_object_dir.set_file_name(&target);
-        }
-    }
+    // if shared_object_dir.file_name() != Some(OsStr::new("target")) {
+    //     let target = env::var("TARGET").unwrap();
+    //     if shared_object_dir.file_name() != Some(OsStr::new("llvm-cov-target")) {
+    //         assert_eq!(shared_object_dir.file_name(), Some(OsStr::new(&target)));
+    //     } else {
+    //         shared_object_dir.set_file_name(&target);
+    //     }
+    // }
 
     shared_object_dir.push(env::var("PROFILE").unwrap());
 

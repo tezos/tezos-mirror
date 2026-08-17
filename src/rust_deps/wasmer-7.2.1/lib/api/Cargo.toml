@@ -143,7 +143,7 @@ singlepass = ["compiler", "wasmer-compiler-singlepass"]
 cranelift = ["compiler", "wasmer-compiler-cranelift"]
 
 # --- Enable the v8 backend and use it as default backend.
-v8 = ["wasm-c-api", "std", "dep:tempfile", "dep:which", "dep:xz", "dep:ureq"]
+v8 = ["wasm-c-api", "std", "dep:tempfile", "dep:which", "dep:xz", "dep:ureq", "dep:bindgen"]
 # --- Enable the v8 backend and use it as defaul backend only if it is the only one enabled.
 v8-default = ["v8", "wat"]
 
@@ -188,12 +188,17 @@ which = { workspace = true, optional = true }
 xz = { workspace = true, optional = true }
 zip = { workspace = true, optional = true, features = ["deflate"] }
 
+# Octez patch: made optional and gated behind `v8`. build.rs only touches
+# bindgen under `#[cfg(feature = "v8")]`, but an unconditional build-dependency
+# is compiled regardless, which drags in clang-sys and makes llvm-config a
+# build requirement -- on musl through bindgen's `static` feature, which wants
+# static LLVM. Octez never enables `v8`, so this is pure build cost.
 [target.'cfg(not(target_env = "musl"))'.build-dependencies]
-bindgen = { workspace = true, default-features = true }
+bindgen = { workspace = true, default-features = true, optional = true }
 
 # musl does not support dlopen/dlsym functionality used by the bindgen (using libclang).
 [target.'cfg(target_env = "musl")'.build-dependencies]
-bindgen = { workspace = true, default-features = false, features = [
+bindgen = { workspace = true, default-features = false, optional = true, features = [
   "logging",
   "prettyplease",
   "static",
