@@ -60,11 +60,21 @@ or to 'script-inputs/released-executables script-inputs/experimental-executables
 OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 # Build minimal, bare and debug images
+#
+# Note the publish-before-test inversion: [create_docker_image.sh --push]
+# pushes each per-arch image to the registry *during* the bake build, so the
+# smoke test below runs against the already-published per-arch tag. A
+# smoke-test failure therefore leaves an unsigned per-arch tag live in the
+# registry. This is bounded: the user-facing multi-arch tags are only
+# assembled later by [docker:merge_manifests] on success, and nothing is
+# signed until [docker_sign.sh] runs -- so a consumer verifying the cosign
+# signature never trusts a tag that failed the smoke test.
 
 # Disable the quote-warning from shellcheck so that we can pass the
 # optional --rust-toolchain-image / --sccache-bucket arguments.
 # shellcheck disable=SC2046
 ./scripts/create_docker_image.sh \
+  --push \
   --image-name "${DOCKER_IMAGE_NAME}" \
   --image-version "${DOCKER_IMAGE_TAG}" \
   --runtime-image "${runtime_image}" \
@@ -78,13 +88,9 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi
   )
 
-# auth gitlab or dockerhub registry
-# notice the different namespace for gitlab and that we remove the `-`
-# Test bare image
+# Test bare image. [create_docker_image.sh --push] already published it to
+# the registry, so [docker run] auto-pulls it when absent locally.
 REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
-
-# Push minimal, bare and debug images
-./scripts/ci/docker_push_all.sh
 
 # Sign images
 ./scripts/ci/docker_sign.sh
