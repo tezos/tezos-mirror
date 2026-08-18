@@ -15,7 +15,9 @@ class Octez < Formula
   version "%%VERSION%%"
   license "MIT"
 
-  build_dependencies = %w[pkg-config coreutils autoconf rsync wget unzip opam protobuf cmake make rustup gcc]
+  # llvm provides libclang, which bindgen needs to generate the RocksDB FFI
+  # bindings pulled in by the rollup node's on-disk NDS backend.
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget unzip opam protobuf cmake make rustup gcc llvm]
   build_dependencies.each do |dependency|
     depends_on dependency => :build
   end
