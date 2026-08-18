@@ -209,17 +209,54 @@ check_redirects() {
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.94.0")
+  authorized_version="1.94.0"
 
+  # A pin is exempt when it is deliberately not on the authorized version.
+  # Keep the reason next to the pattern: an exemption without one is how a
+  # stale toolchain hides.
+  is_exempt_toolchain() {
+    case "$1" in
+    # Built through its own set of CI images, which ship an older toolchain.
+    contrib/sdk-bindings/*) return 0 ;;
+    # The live kernel, and the only etherlink/kernel_* that tracks the bump.
+    etherlink/kernel_latest/*) return 1 ;;
+    # Frozen kernel snapshots: pinned to the toolchain they were released
+    # with, like frozen protocols.
+    etherlink/kernel_*) return 0 ;;
+    *) return 1 ;;
+    esac
+  }
+
+  # Every pin in the tree, both bare `rust-toolchain` files and
+  # `rust-toolchain.toml` ones, wherever they live. Scoping this to
+  # `src/**/rust-toolchain` used to leave the repository root, etherlink/ and
+  # every .toml pin unchecked, so a partial version bump passed silently.
   declare -a rust_toolchain_files
-  mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"
+  mapfile -t rust_toolchain_files < <(
+    find . \
+      \( -path ./_build -o -path ./_opam -o -path ./vendors \) -prune -o \
+      \( -name rust-toolchain -o -name rust-toolchain.toml \) -print |
+      sed 's|^\./||' | sort
+  )
 
+  if [ "${#rust_toolchain_files[@]}" -eq 0 ]; then
+    say "found no rust-toolchain file at all: the search is broken"
+    return 1
+  fi
+
+  toolchain_exit_code=0
   for file in "${rust_toolchain_files[@]}"; do
-    if [[ ! "${authorized_version[*]}" =~ $(cat "${file}") ]]; then
-      say "in ${file}: version $(cat "${file}") is not authorized"
-      exit 1
+    if is_exempt_toolchain "${file}"; then
+      continue
+    fi
+    # Bare files hold the version alone; .toml files hold `channel = "x.y.z"`.
+    version=$(sed -n -e 's/^channel *= *"\(.*\)"/\1/p' -e '/^[0-9]/p' "${file}" | head -n 1)
+    if [ "${version}" != "${authorized_version}" ]; then
+      say "in ${file}: version '${version}' is not authorized (expected ${authorized_version})"
+      toolchain_exit_code=1
     fi
   done
+  return $toolchain_exit_code
 }
 
 check_licenses_git_new() {
