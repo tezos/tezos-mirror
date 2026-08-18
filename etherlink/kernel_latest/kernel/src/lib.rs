@@ -33,7 +33,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -43,7 +43,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -92,7 +92,7 @@ fn switch_to_public_rollup<Host, KS>(
 ) -> Result<(), Error>
 where
     Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     if rk.base().contains(&PRIVATE_FLAG_KEY) {
         log!(Info, "Submitting outbox message to make the rollup public.");
@@ -113,7 +113,7 @@ pub fn stage_zero<Host, KS>(
 ) -> Result<MigrationStatus, Error>
 where
     Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Entering stage zero.");
     init_storage_versioning(rk)?;
@@ -133,8 +133,8 @@ pub fn stage_one<Host, KS>(
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
@@ -163,7 +163,7 @@ fn init_storage_versioning<Host, KS>(
 ) -> Result<(), Error>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     // Reconcile the storage version into the `/base` keyspace once, at stage
     // zero: this is the only place that reads the legacy /evm/ path.
@@ -249,8 +249,7 @@ where
 
 pub fn run<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> Result<(), anyhow::Error>
 where
-    Host:
-        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
@@ -292,8 +291,7 @@ pub fn single_run<Host, KS>(
     rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host:
-        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     // We always start by doing the migration if needed.

@@ -33,6 +33,7 @@ use tezos_ethereum::tx_common::{
 };
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -564,7 +565,8 @@ pub fn revm_run_transaction<Host, KS>(
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -628,7 +630,8 @@ fn apply_ethereum_transaction_common<Host, KS>(
     debug_features: &DebugFeatures,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -791,7 +794,8 @@ pub fn pure_xtz_deposit<Host, KS>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     // Fees are set to zero, this is an internal call to the XTZ bridge
     // solidity contract.
@@ -939,7 +943,8 @@ pub fn pure_fa_deposit<Host, KS>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
@@ -1020,7 +1025,8 @@ fn apply_fa_deposit<Host, KS>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     let execution_outcome = pure_fa_deposit(
         rk,
@@ -1283,7 +1289,8 @@ pub fn apply_transaction<Host, KS>(
     debug_features: &DebugFeatures,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(

@@ -21,11 +21,11 @@ use anyhow::Ok;
 use std::ops::Add;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::KeySpace;
 
@@ -36,8 +36,8 @@ pub fn fetch_proxy_blueprints<Host, KS>(
     common: &CommonConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     if let Some(ProxyInboxContent { transactions }) =
         read_proxy_inbox(rk, smart_rollup_address, common, chain_configuration)?
@@ -118,8 +118,8 @@ fn fetch_sequencer_blueprints<Host, KS>(
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     match read_sequencer_inbox(
         rk,
@@ -160,8 +160,8 @@ pub fn fetch_blueprints<Host, KS>(
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     match &mut config.mode {
         ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
@@ -197,6 +197,7 @@ mod tests {
     };
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
@@ -881,14 +882,12 @@ mod tests {
         }
     }
 
-    fn setup_dal_signal<KS>(
-        rk: &mut RuntimeKeyspaces<MockKernelHost, KS>,
+    fn setup_dal_signal(
+        rk: &mut MockRuntimeKeyspaces,
         conf: &mut Configuration,
         signal_slots: Option<Vec<u8>>,
         filled_slots: Option<Vec<u8>>,
-    ) where
-        KS: KeySpace,
-    {
+    ) {
         let dal_slots = if let Some(slots) = signal_slots {
             slots
         } else {

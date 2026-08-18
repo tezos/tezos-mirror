@@ -15,7 +15,7 @@ use revm_etherlink::{
 };
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
+use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
 use tezosx_journal::{RuntimeId, TezosXJournal};
 use thiserror::Error;
 
@@ -207,8 +207,8 @@ fn u256_to_u128(value: U256) -> u128 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_transaction<KS>(
-    rk: &mut RuntimeKeyspaces<MockKernelHost, KS>,
+fn execute_transaction(
+    rk: &mut MockRuntimeKeyspaces,
     unit: &TestUnit,
     env: &mut Env,
     spec_id: SpecId,

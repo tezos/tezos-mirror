@@ -338,7 +338,7 @@ pub fn assemble_block<Host, KS>(
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + KeySpaceLoader,
     KS: SafeKeyspace,
 {
     let __attrs = [

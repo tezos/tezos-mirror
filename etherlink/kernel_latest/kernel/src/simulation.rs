@@ -39,12 +39,11 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use evm_inspectors::TracerInput;
 use tezos_smart_rollup::types::Timestamp;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::CracId;
 
@@ -396,8 +395,8 @@ impl Evaluation {
         Error,
     >
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
         let minimum_base_fee_per_gas =
@@ -724,8 +723,8 @@ pub fn start_simulation_mode<Host, KS>(
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    Host: WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(rk.host_mut())?;
@@ -827,8 +826,8 @@ mod tests {
     #[cfg(test)]
     fn create_contract<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> H160
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         let timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));

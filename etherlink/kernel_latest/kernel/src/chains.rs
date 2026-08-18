@@ -48,7 +48,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
 };
@@ -56,7 +56,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -166,7 +166,7 @@ impl ExperimentalFeatures {
     pub fn read_from_storage<Host, KS>(rk: &RuntimeKeyspaces<Host, KS>) -> Self
     where
         Host: StorageV1,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         let (enable_michelson_gas_refund, tezos_runtime_enabled) = (
             crate::storage::enable_michelson_gas_refund(rk.base()),
@@ -576,7 +576,7 @@ impl TezosXChainConfig {
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
         Host: StorageV1,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             rk,
@@ -632,7 +632,7 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        Host: KeyspaceHost<KS>,
         KS: SafeKeyspace,
     {
         match transaction {
@@ -728,8 +728,8 @@ impl TezosXChainConfig {
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost,
-        KS: KeySpace,
+        Host: WasmHost + KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         start_simulation_mode(rk, registry, &self.spec_id)
     }
@@ -779,7 +779,7 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        Host: KeyspaceHost<KS>,
         KS: SafeKeyspace,
     {
         let tx_hash = operation.tx_hash;
@@ -1121,7 +1121,7 @@ pub fn apply_tezos_operation<Host, KS>(
     enable_da_fees: bool,
 ) -> Result<crate::apply::ExecutionResult<TezosExecutionInfo>, anyhow::Error>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     let level = block_constants.level;
