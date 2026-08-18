@@ -35,6 +35,7 @@ tezosx-interfaces.workspace = true
 
 # SDK
 tezos-evm-runtime.workspace = true
+tezos-smart-rollup-keyspace.workspace = true
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-encoding.workspace = true

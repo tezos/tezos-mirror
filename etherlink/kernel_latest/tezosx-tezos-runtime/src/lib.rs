@@ -16,6 +16,7 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
 use tezos_data_encoding::{enc::BinWriter, types::Narith};
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::{
     account_storage::TezosAccount,
     context, cross_runtime_transfer,
@@ -639,7 +640,8 @@ fn execute_request<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     match *request.method() {
         http::Method::POST => {
@@ -676,7 +678,8 @@ fn execute_entrypoint_call<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     // Drain on entry, NOT on exit: pending alias-origination
     // internal ops in the journal at this point can only belong
@@ -1133,7 +1136,8 @@ impl RuntimeInterface for TezosRuntime {
         gas_remaining: u64,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         // The native address is stored in `alias_info` as the UTF-8
         // bytes of the canonical address string. Decode once for the
@@ -1365,7 +1369,8 @@ impl RuntimeInterface for TezosRuntime {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         // Open a dispatch slot for this CRAC entry so that any inner
         // %collect_result deposits land here. The slot is owned by
@@ -1414,6 +1419,7 @@ impl RuntimeInterface for TezosRuntime {
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         let host = rk.host();
         // Malformed → Unknown, no charge.

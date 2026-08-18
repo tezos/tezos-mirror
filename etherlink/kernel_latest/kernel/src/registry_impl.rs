@@ -21,6 +21,7 @@ impl RegistryImpl {
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{Registry, RuntimeInterface};
@@ -44,7 +45,8 @@ impl Registry for RegistryImpl {
         tezosx_interfaces::TezosXRuntimeError,
     >
     where
-        Host: StorageV1,
+        KS: SafeKeyspace,
+        Host: KeyspaceHost<KS>,
     {
         match target_runtime {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.ensure_alias(
@@ -109,6 +111,7 @@ impl Registry for RegistryImpl {
     >
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
@@ -127,7 +130,8 @@ impl Registry for RegistryImpl {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        KS: SafeKeyspace,
+        Host: KeyspaceHost<KS>,
     {
         journal.record_request(&request);
         let response = match request.uri().host() {

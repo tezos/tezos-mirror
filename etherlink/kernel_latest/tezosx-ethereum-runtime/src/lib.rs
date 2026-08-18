@@ -27,6 +27,7 @@ use revm_etherlink::{
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
@@ -90,7 +91,8 @@ impl EthereumRuntime {
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        KS: SafeKeyspace,
+        Host: KeyspaceHost<KS>,
     {
         // Ensure the AliasForwarder precompile code is available
         // (it should be initialized at kernel startup, but verify it exists)
@@ -313,7 +315,8 @@ fn execute_request<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     match *request.method() {
         http::Method::POST => execute_call(runtime, registry, rk, journal, request),
@@ -384,7 +387,8 @@ fn execute_call<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -526,7 +530,8 @@ fn execute_static_call<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -622,7 +627,8 @@ impl RuntimeInterface for EthereumRuntime {
         gas_remaining: u64,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         // The native address is stored in `alias_info` as the UTF-8
         // bytes of the canonical address string. Decode once for the
@@ -722,7 +728,8 @@ impl RuntimeInterface for EthereumRuntime {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         build_response(execute_request(self, registry, rk, journal, request))
     }
@@ -749,6 +756,7 @@ impl RuntimeInterface for EthereumRuntime {
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         // Malformed → Unknown, no charge.
         let address = match Address::from_hex(addr) {

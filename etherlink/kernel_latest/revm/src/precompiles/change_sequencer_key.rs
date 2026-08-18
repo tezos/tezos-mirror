@@ -16,7 +16,6 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
 use crate::{
@@ -32,6 +31,7 @@ use crate::{
     },
 };
 use evm_types::{DatabasePrecompileStateChanges, SequencerKeyChange};
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 sol! {
     contract ChangeSequencerKey {
@@ -54,8 +54,8 @@ pub(crate) fn change_sequencer_key_precompile<'j, CTX, Host, KS, R>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,

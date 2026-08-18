@@ -11,6 +11,7 @@
 
 use std::cell::{Cell, RefCell};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
@@ -66,6 +67,7 @@ impl Registry for UnimplementedRegistry {
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
@@ -129,6 +131,7 @@ impl Registry for NotWiredRegistry {
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
@@ -268,6 +271,7 @@ impl Registry for MockRegistry {
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         Ok((crate::Classification::Unknown, 0))
     }
@@ -370,7 +374,8 @@ impl Registry for StubRegistry {
         gas_remaining: u64,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         self.inner.ensure_alias(
             rk,
@@ -428,6 +433,7 @@ impl Registry for StubRegistry {
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         let count = self.read_count.get();
         self.read_count.set(count + 1);
@@ -448,7 +454,8 @@ impl Registry for StubRegistry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         self.inner.serve(rk, journal, request)
     }

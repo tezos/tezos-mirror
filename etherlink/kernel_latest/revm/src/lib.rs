@@ -33,6 +33,7 @@ use tezos_evm_logging::{
     __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
 };
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
@@ -249,7 +250,8 @@ fn etherlink_origin<'a, Host, KS, R>(
         EthInterpreter,
     >,
 ) where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use crate::journal::CrossRuntimeCall;
@@ -273,7 +275,8 @@ fn etherlink_origin<'a, Host, KS, R>(
 fn install_etherlink_origin<'a, Host, KS, R, INSP>(
     evm: &mut EvmInspection<'a, Host, KS, INSP, R>,
 ) where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
@@ -313,7 +316,8 @@ fn etherlink_gasprice<'a, Host, KS, R>(
         EthInterpreter,
     >,
 ) where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use revm::interpreter::Host as InterpHost;
@@ -330,7 +334,8 @@ fn etherlink_gasprice<'a, Host, KS, R>(
 fn install_etherlink_gasprice<'a, Host, KS, R, INSP>(
     evm: &mut EvmInspection<'a, Host, KS, INSP, R>,
 ) where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
@@ -358,7 +363,8 @@ fn build_evm_inspector_context<'a, Host, KS, R>(
     alias_delegation: Option<Address>,
 ) -> Result<EvmInspection<'a, Host, KS, TracerInspector, R>, EvmRunError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     let mut cfg = CfgEnv::new()
@@ -419,7 +425,8 @@ fn build_evm_context<'a, Host, KS, R: Registry<Journal = tezosx_journal::TezosXJ
     alias_delegation: Option<Address>,
 ) -> Result<EvmContext<'a, Host, KS, R>, EvmRunError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -464,7 +471,7 @@ where
 fn execute_transaction<
     'a,
     Host,
-    KS,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
     evm_context: &mut EvmContext<'a, Host, KS, R>,
@@ -474,7 +481,7 @@ fn execute_transaction<
     call_depth: usize,
 ) -> Result<ExecutionResult, EVMError<EvmDbError>>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
 {
     let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
         if transaction_hash.is_some() && cfg!(feature = "tracing") {
@@ -510,8 +517,8 @@ where
 /// alias-init sub-call resolves it. The write commits with the
 /// transaction and reverts with the frame.
 fn install_alias_delegation<
-    Host: StorageV1,
-    KS,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
     journaled_state: &mut Journal<'_, Host, KS, R>,
@@ -535,7 +542,7 @@ fn install_alias_delegation<
 pub fn run_transaction<
     'a,
     Host,
-    KS,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
     rk: &'a mut RuntimeKeyspaces<Host, KS>,
@@ -553,7 +560,7 @@ pub fn run_transaction<
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EvmRunError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
 {
     // Consume the pending alias delegation before any fallible step
     // so an early return cannot leave it dangling for the next
@@ -827,6 +834,7 @@ mod test {
         use primitive_types::U256 as PU256;
         use revm::primitives::{hardfork::SpecId, Address, U256};
         use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+        use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -912,7 +920,8 @@ mod test {
                 gas_remaining: u64,
             ) -> Result<(String, tezosx_interfaces::AliasResolution), TezosXRuntimeError>
             where
-                Host: StorageV1,
+                Host: KeyspaceHost<KS>,
+                KS: SafeKeyspace,
             {
                 match target_runtime {
                     RuntimeId::Tezos => self.mock_tezos.ensure_alias(
@@ -972,6 +981,7 @@ mod test {
             ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
             where
                 Host: StorageV1,
+                KS: SafeKeyspace,
             {
                 match addr_runtime {
                     RuntimeId::Tezos => self.mock_tezos.read_origin(rk, addr, budget),
@@ -986,7 +996,8 @@ mod test {
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
             where
-                Host: StorageV1,
+                Host: KeyspaceHost<KS>,
+                KS: SafeKeyspace,
             {
                 match request.uri().host() {
                     Some("tezos") | Some("stub") => {
@@ -1197,6 +1208,7 @@ mod test {
             ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
             where
                 Host: StorageV1,
+                KS: SafeKeyspace,
             {
                 // Mock: always return Unknown with no consumption.
                 Ok((tezosx_interfaces::Classification::Unknown, 0))
