@@ -53,36 +53,36 @@ for target_tag in ${target_tags}; do
   for docker_image in ${docker_images}; do
     echo "### Promoting ${docker_image}: ${source_tag} -> ${target_tag}"
 
-    # Promote per-arch images
-    amends=''
+    sources=''
     for docker_architecture in ${docker_architectures}; do
       source_arch_tag="${docker_architecture}_${source_tag}"
       target_arch_tag="${docker_architecture}_${target_tag}"
 
-      echo "Pulling ${docker_image}:${source_arch_tag}"
-      docker pull "${docker_image}:${source_arch_tag}"
-
-      # Verify signature before promoting
+      # Verify signature on the source per-arch tag before promoting.
       ./scripts/ci/docker_verify_signature.sh "${docker_image}:${source_arch_tag}"
 
       if [ "${skip_per_arch_tags}" = false ]; then
-        echo "Tagging ${docker_image}:${source_arch_tag} -> ${docker_image}:${target_arch_tag}"
-        docker tag "${docker_image}:${source_arch_tag}" "${docker_image}:${target_arch_tag}"
-        docker push "${docker_image}:${target_arch_tag}"
+        echo "Copying ${docker_image}:${source_arch_tag} -> ${docker_image}:${target_arch_tag}"
+        # [imagetools create] copies the source index as-is, keeping the
+        # attestation referrers attached to it.
+        docker buildx imagetools create \
+          --tag "${docker_image}:${target_arch_tag}" \
+          "${docker_image}:${source_arch_tag}"
 
         # Sign individual architecture image
         ./scripts/ci/docker_sign.sh "${docker_image}:${target_arch_tag}"
 
-        amends="${amends} --amend ${docker_image}:${target_arch_tag}"
+        sources="${sources} ${docker_image}:${target_arch_tag}"
       else
-        amends="${amends} --amend ${docker_image}:${source_arch_tag}"
+        sources="${sources} ${docker_image}:${source_arch_tag}"
       fi
     done
 
-    # Create and push multi-arch manifest
+    # Create multi-arch manifest from per-arch sources, preserving attestation
+    # referrers attached to each per-arch index.
     echo "Creating manifest for ${docker_image}:${target_tag}"
-    eval "docker manifest create ${docker_image}:${target_tag}${amends}"
-    docker manifest push "${docker_image}:${target_tag}"
+    # shellcheck disable=SC2086
+    docker buildx imagetools create --tag "${docker_image}:${target_tag}" ${sources}
 
     # Sign multi-arch manifest
     ./scripts/ci/docker_sign.sh "${docker_image}:${target_tag}"
