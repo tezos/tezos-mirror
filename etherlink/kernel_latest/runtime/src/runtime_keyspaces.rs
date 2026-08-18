@@ -17,12 +17,13 @@ use thiserror::Error;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, Name};
 use tezos_smart_rollup_mock::MockHost;
 
 use crate::runtime::{read_logs_verbosity, KernelHost, MockKernelHost};
 use crate::safe_storage::SafeStorage;
-use crate::snapshot::{SafeKeyspace, SnapshotError, SnapshottedKeySpace};
+use crate::snapshot::{PreviousRun, SafeKeyspace, SnapshotError, SnapshottedKeySpace};
 
 /// Name of the `/base` keyspace, holding kernel configuration and
 /// node-interaction values that do not belong to any world state.
@@ -189,6 +190,7 @@ impl<R, H>
 where
     KernelHost<R, H>: KeySpaceLoader,
     H: BorrowMut<R> + Borrow<R>,
+    R: WasmHost,
 {
     /// Build the kernel host over `host`, load the keyspaces, and apply the
     /// log verbosity recorded under `/base`.
@@ -197,13 +199,26 @@ where
     /// a reboot interrupted is re-attached before any caller looks: `start`
     /// reads the in-progress marker and takes depth 0 back when it is set.
     ///
-    /// `Err` is unreachable on the kernel host: it starts from an empty
-    /// registry, and the names loaded here do not overlap.
+    /// Whether the previous run was cut short is read before any `start`, since
+    /// `start` is what would otherwise adopt an interrupted run's writes.
     pub fn init(host: H) -> Result<Self, SnapshotError> {
         let mut host = KernelHost::init(host);
+        // Unused for now, but the kernel will want to know whether it is
+        // resuming an aborted keyspace.
+        let _previous = if host
+            .last_run_aborted()
+            .map_err(SnapshotError::PreviousRun)?
+        {
+            log!(Level::Error, "The previous kernel run was cut short");
+            PreviousRun::Aborted
+        } else {
+            PreviousRun::Complete
+        };
         let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
         set_global_verbosity(read_logs_verbosity(&base));
-        let base = SnapshottedKeySpace::start(&mut host, base)?;
+        // `/base` belongs to no block: reverting it would drop blueprints from
+        // an inbox level that cannot be read twice.
+        let base = SnapshottedKeySpace::start(&mut host, base, PreviousRun::Complete)?;
         Ok(Self {
             host,
             base,

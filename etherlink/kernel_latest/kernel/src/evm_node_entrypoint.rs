@@ -81,7 +81,7 @@ pub extern "C" fn populate_delayed_inbox() {
 #[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
@@ -110,7 +110,7 @@ pub extern "C" fn drop_delayed_transaction() {
 #[allow(dead_code)]
 pub fn drop_delayed_transaction_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
@@ -137,7 +137,7 @@ pub extern "C" fn single_tx_execution() {
 #[allow(dead_code)]
 pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
@@ -226,7 +226,7 @@ pub extern "C" fn tezosx_simulate() {
 #[allow(dead_code)]
 pub fn tezosx_simulate_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
@@ -547,7 +547,7 @@ pub extern "C" fn tezosx_michelson_entrypoints() {
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_entry<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
@@ -668,7 +668,7 @@ impl From<Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>>
 #[allow(dead_code)]
 pub fn tezosx_run_code_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage,
+    Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut rk: RuntimeKeyspaces<KernelHost<Host, &mut Host>, _> =
         match RuntimeKeyspaces::init(host) {
