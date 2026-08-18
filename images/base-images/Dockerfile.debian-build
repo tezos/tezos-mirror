@@ -23,6 +23,10 @@ COPY --chown=tezos:tezos \
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 # the package sccache is not available on ubuntu jammy
+#
+# clang and libclang-dev are needed by bindgen, which RocksDB uses to
+# generate its FFI bindings. RocksDB is pulled in by the on-disk NDS
+# backend of the smart rollup node, which is part of 'make release'.
 #hadolint ignore=DL3008,DL3009
 RUN apt-get update && \
     apt-get install --no-install-recommends -y bubblewrap \
@@ -30,6 +34,7 @@ RUN apt-get update && \
       patch unzip curl wget ca-certificates \
       opam jq bc cargo \
       autoconf cmake libev-dev \
+      clang libclang-dev \
       libffi-dev libgmp-dev \
       libhidapi-dev pkg-config \
       zlib1g-dev debhelper debconf \
