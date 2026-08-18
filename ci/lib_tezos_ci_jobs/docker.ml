@@ -242,6 +242,7 @@ let job_script_docker_verify_image =
         (* Scripts that are directly called by this job. *)
         "scripts/ci/docker_initialize.sh";
         "scripts/ci/docker_verify_signature.sh";
+        "scripts/ci/docker_verify_attestation.sh";
         (* Scripts that are called by [docker_initialize.sh]. *)
         "scripts/ci/docker_wait_for_daemon.sh";
         "scripts/ci/docker_check_version.sh";

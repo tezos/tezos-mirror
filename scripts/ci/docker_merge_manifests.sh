@@ -44,3 +44,12 @@ for docker_image in ${docker_images}; do
     ./scripts/ci/docker_verify_signature.sh "${docker_image}:${docker_tag}"
   done
 done
+
+# Attestation verification: the SLSA provenance and SBOM referrers must still
+# be reachable on the merged multi-arch tags.
+for docker_image in ${docker_images}; do
+  echo "### Verifying attestations for docker image: ${docker_image}"
+  for docker_tag in ${docker_tags}; do
+    ./scripts/ci/docker_verify_attestation.sh "${docker_image}:${docker_tag}"
+  done
+done

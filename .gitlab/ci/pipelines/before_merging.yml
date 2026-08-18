@@ -4148,6 +4148,7 @@ oc.docker:amd64:
     - scripts/ci/docker_release.sh
     - scripts/ci/docker_sign.sh
     - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_attestation.sh
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh
@@ -4206,6 +4207,7 @@ oc.docker:arm64:
     - scripts/ci/docker_release.sh
     - scripts/ci/docker_sign.sh
     - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_attestation.sh
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh
@@ -4574,6 +4576,7 @@ oc.script.docker_verify_image_amd64:
     - scripts/ci/docker_release.sh
     - scripts/ci/docker_sign.sh
     - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_attestation.sh
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh
@@ -4625,6 +4628,7 @@ oc.script.docker_verify_image_arm64:
     - scripts/ci/docker_release.sh
     - scripts/ci/docker_sign.sh
     - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_attestation.sh
     - scripts/ci/docker_verify_signature.sh
     - scripts/ci/docker_wait_for_daemon.sh
     - scripts/create_docker_image.sh

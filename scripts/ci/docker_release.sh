@@ -97,3 +97,7 @@ REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${D
 
 # Verify signature
 ./scripts/ci/docker_verify_signature.sh
+
+# Verify the SLSA provenance + SBOM attestations on every pushed image.
+# Exits non-zero if any of them is missing or malformed.
+./scripts/ci/docker_verify_attestation.sh
