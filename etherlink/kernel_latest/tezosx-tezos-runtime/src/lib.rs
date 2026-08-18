@@ -1406,15 +1406,16 @@ impl RuntimeInterface for TezosRuntime {
         })
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
         budget: u64,
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
     {
+        let host = rk.host();
         // Malformed → Unknown, no charge.
         let contract = match Contract::from_b58check(addr) {
             Ok(c) => c,
@@ -3521,7 +3522,6 @@ mod tests {
     mod read_origin_tests {
         use super::*;
         use tezos_crypto_rs::hash::ChainId;
-        use tezos_evm_runtime::runtime::MockKernelHost;
         use tezosx_interfaces::{
             Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
         };
@@ -3534,12 +3534,12 @@ mod tests {
         //     no stored `/origin`), even when unrecorded. Charges ALIAS_LOOKUP_MILLIGAS.
         #[test]
         fn read_origin_implicit_returns_native() {
-            let host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::default();
             let runtime = test_runtime();
 
             let budget = 1_000_000;
             let (class, consumed) = runtime
-                .read_origin(&host, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
+                .read_origin(&rk, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
                 .unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
@@ -3548,12 +3548,12 @@ mod tests {
         // (d) Malformed address → Unknown, no charge
         #[test]
         fn read_origin_malformed_address_returns_unknown_no_charge() {
-            let host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::default();
             let runtime = test_runtime();
 
             let budget = 1_000_000;
             let (class, consumed) = runtime
-                .read_origin(&host, "not-a-tezos-address", budget)
+                .read_origin(&rk, "not-a-tezos-address", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, 0); // malformed → no charge
@@ -3564,7 +3564,7 @@ mod tests {
         fn read_origin_kt1_address_returns_native() {
             use tezos_crypto_rs::hash::ContractKt1Hash;
 
-            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::default();
             let runtime = test_runtime();
 
             // Use a real-looking KT1 derived from blake2b to avoid parse errors.
@@ -3573,10 +3573,10 @@ mod tests {
             ));
             let kt1_b58 = kt1.to_base58_check();
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(&mut host, &Origin::Native).unwrap();
+            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
 
             let budget = 1_000_000;
-            let (class, consumed) = runtime.read_origin(&host, &kt1_b58, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &kt1_b58, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
         }

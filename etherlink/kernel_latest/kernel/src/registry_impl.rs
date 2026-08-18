@@ -97,9 +97,9 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: tezosx_interfaces::RuntimeId,
         addr: &str,
         budget: u64,
@@ -112,10 +112,10 @@ impl Registry for RegistryImpl {
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
-                self.tezos.read_origin(host, addr, budget)
+                self.tezos.read_origin(rk, addr, budget)
             }
             tezosx_interfaces::RuntimeId::Ethereum => {
-                self.ethereum.read_origin(host, addr, budget)
+                self.ethereum.read_origin(rk, addr, budget)
             }
         }
     }
@@ -158,7 +158,7 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::{
         AccountInfo, AccountOrigin, StorageAccount,
     };
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezosx_interfaces::{
         Classification, RuntimeId, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
     };
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn read_origin_dispatches_to_ethereum_runtime() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
 
         let addr =
@@ -212,7 +212,7 @@ mod tests {
         let mut account = StorageAccount::from_address(&addr).unwrap();
         account
             .set_info(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     origin: AccountOrigin::Native,
                     ..AccountInfo::default()
@@ -222,7 +222,7 @@ mod tests {
 
         let budget = 100_000;
         let (class, consumed) = registry
-            .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
+            .read_origin(&rk, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
         assert_eq!(class, Classification::Native);
         assert_eq!(consumed, ALIAS_LOOKUP_COST); // recorded origin → no back-stop charge
@@ -230,14 +230,14 @@ mod tests {
 
     #[test]
     fn read_origin_dispatches_to_tezos_runtime() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
 
         // An implicit tz1 is Native by construction — no seeding needed.
         let budget = 1_000_000;
         let (class, consumed) = registry
             .read_origin(
-                &host,
+                &rk,
                 RuntimeId::Tezos,
                 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 budget,
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn read_origin_ethereum_unknown_address_fires_backstop() {
-        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
 
         let addr =
@@ -263,7 +263,7 @@ mod tests {
         let mut account = StorageAccount::from_address(&addr).unwrap();
         account
             .set_info(
-                &mut host,
+                rk.host_mut(),
                 AccountInfo {
                     code_hash,
                     ..AccountInfo::default()
@@ -273,7 +273,7 @@ mod tests {
 
         let budget = 100_000;
         let (class, consumed) = registry
-            .read_origin(&host, RuntimeId::Ethereum, &addr_str, budget)
+            .read_origin(&rk, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
         assert_eq!(class, Classification::Native);
         assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn read_origin_tezos_implicit_address_native_no_backstop_charge() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
 
         let budget = 1_000_000;
@@ -292,7 +292,7 @@ mod tests {
         // only the flat lookup milligas is charged.
         let (class, consumed) = registry
             .read_origin(
-                &host,
+                &rk,
                 RuntimeId::Tezos,
                 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 budget,

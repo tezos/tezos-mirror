@@ -741,9 +741,9 @@ impl RuntimeInterface for EthereumRuntime {
         Ok(address.0.to_vec())
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
         budget: u64,
     ) -> Result<(Classification, u64), TezosXRuntimeError>
@@ -765,7 +765,7 @@ impl RuntimeInterface for EthereumRuntime {
             return Err(TezosXRuntimeError::OutOfGas);
         }
         let account = StorageAccount::from_address(&address)?;
-        let info = account.info_without_migration(host).map_err(|e| {
+        let info = account.info_without_migration(rk.host()).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
         })?;
         let cls = match info {
@@ -2539,8 +2539,7 @@ mod tests {
             set_account_with_code(rk.host_mut(), &addr);
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2566,8 +2565,7 @@ mod tests {
                 .unwrap();
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2580,8 +2578,7 @@ mod tests {
             let (_, addr_str) = evm_addr(0xdd);
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2605,8 +2602,7 @@ mod tests {
                 .unwrap();
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2635,8 +2631,7 @@ mod tests {
                 .unwrap();
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Alias(alias_info));
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
@@ -2648,8 +2643,7 @@ mod tests {
             let runtime = EthereumRuntime::default();
 
             let budget = 100_000;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), "not-hex", budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, "not-hex", budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, 0); // malformed → no charge
         }
@@ -2662,7 +2656,7 @@ mod tests {
 
             let budget = 100_000;
             let (class, consumed) = runtime
-                .read_origin(rk.host(), "0x00112233445566778899aabbccddeeff0011", budget)
+                .read_origin(&rk, "0x00112233445566778899aabbccddeeff0011", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, 0); // malformed → no charge
@@ -2677,9 +2671,7 @@ mod tests {
 
             // Budget below ALIAS_LOOKUP_COST: fails at the read
             let budget = ALIAS_LOOKUP_COST - 1;
-            let err = runtime
-                .read_origin(rk.host(), &addr_str, budget)
-                .unwrap_err();
+            let err = runtime.read_origin(&rk, &addr_str, budget).unwrap_err();
             assert_eq!(err, tezosx_interfaces::TezosXRuntimeError::OutOfGas);
         }
 
@@ -2691,8 +2683,7 @@ mod tests {
             let (_, addr_str) = evm_addr(0x22);
 
             let budget = ALIAS_LOOKUP_COST;
-            let (class, consumed) =
-                runtime.read_origin(rk.host(), &addr_str, budget).unwrap();
+            let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, budget);
         }

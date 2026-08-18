@@ -963,9 +963,9 @@ mod test {
                 }
             }
 
-            fn read_origin<Host>(
+            fn read_origin<Host, KS>(
                 &self,
-                host: &Host,
+                rk: &RuntimeKeyspaces<Host, KS>,
                 addr_runtime: RuntimeId,
                 addr: &str,
                 budget: u64,
@@ -974,8 +974,8 @@ mod test {
                 Host: StorageV1,
             {
                 match addr_runtime {
-                    RuntimeId::Tezos => self.mock_tezos.read_origin(host, addr, budget),
-                    RuntimeId::Ethereum => self.ethereum.read_origin(host, addr, budget),
+                    RuntimeId::Tezos => self.mock_tezos.read_origin(rk, addr, budget),
+                    RuntimeId::Ethereum => self.ethereum.read_origin(rk, addr, budget),
                 }
             }
 
@@ -1189,9 +1189,9 @@ mod test {
                     .map_err(|e| TezosXRuntimeError::ConversionError(format!("{e}")))
             }
 
-            fn read_origin<Host>(
+            fn read_origin<Host, KS>(
                 &self,
-                _host: &Host,
+                _rk: &RuntimeKeyspaces<Host, KS>,
                 _addr: &str,
                 _budget: u64,
             ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>

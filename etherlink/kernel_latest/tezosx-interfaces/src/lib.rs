@@ -116,9 +116,9 @@ pub trait Registry {
     ///
     /// Callers that cross gas-unit boundaries must convert `budget` into
     /// `addr_runtime`'s unit before calling and convert `consumed` back after.
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: RuntimeId,
         addr: &str,
         budget: u64,
@@ -220,9 +220,9 @@ pub trait RuntimeInterface {
     ///
     /// For the Tezos runtime, no back-stop is applied — a storage miss
     /// returns `Unknown` after charging `ALIAS_LOOKUP_MILLIGAS`.
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
         budget: u64,
     ) -> Result<(Classification, u64 /* consumed */), TezosXRuntimeError>

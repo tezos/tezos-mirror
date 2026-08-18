@@ -57,9 +57,9 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::address_from_string")
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _gas: u64,
@@ -120,9 +120,9 @@ impl Registry for NotWiredRegistry {
         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: RuntimeId,
         _addr: &str,
         _gas: u64,
@@ -259,9 +259,9 @@ impl Registry for MockRegistry {
         Ok(address_str.as_bytes().to_vec())
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: u64,
@@ -419,9 +419,9 @@ impl Registry for StubRegistry {
         }
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: u64,

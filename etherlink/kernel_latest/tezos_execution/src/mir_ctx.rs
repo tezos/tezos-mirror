@@ -741,13 +741,9 @@ impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
             },
             _ => return Some(Ok(None)),
         };
-        // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.rk.host();
-        let operation_gas: &mut crate::gas::TezlinkOperationGas =
-            self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_origin_of_get(
-            host,
-            operation_gas,
+            self.tc_ctx.rk,
+            self.tc_ctx.operation_gas,
             self.registry,
             addr_str,
             source_runtime_nat,
@@ -793,13 +789,9 @@ impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
             },
             _ => return Some(Ok(None)),
         };
-        // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.rk.host();
-        let operation_gas: &mut crate::gas::TezlinkOperationGas =
-            self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_resolve_address_get(
-            host,
-            operation_gas,
+            self.tc_ctx.rk,
+            self.tc_ctx.operation_gas,
             self.registry,
             addr_str,
             source_runtime_nat,
