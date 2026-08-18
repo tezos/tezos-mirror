@@ -43,6 +43,11 @@ variable "CI_JOB_ID" { default = "" }
 variable "CI_JOB_URL" { default = "" }
 variable "CI_COMMIT_SHA" { default = "" }
 
+# When "true", variant targets are pushed to the registry and carry SLSA
+# provenance + SBOM attestations; otherwise they are loaded into the local
+# image store with no attestations. Set from create_docker_image.sh --push.
+variable "PUSH" { default = "false" }
+
 # Intermediate image: the compiled Octez binaries. Referenced by the variants
 # as a build context (target:build); never loaded or pushed on its own.
 target "build" {
@@ -110,10 +115,13 @@ target "_variant" {
     "com.tezos.build-job-url"        = CI_JOB_URL
     "com.tezos.build-tezos-revision" = CI_COMMIT_SHA
   }
-  # Variants are loaded into the local image store. Pushing to the registry is
-  # done downstream by scripts/ci/docker_push_all.sh (which also signs), so it
-  # is intentionally not wired through bake here.
-  output = ["type=docker"]
+  output = PUSH == "true" ? ["type=image,push=true"] : ["type=docker"]
+  # Attestations (SLSA provenance + CycloneDX/SPDX SBOM) are only meaningful
+  # on the pushed image index; the local `type=docker` exporter cannot carry
+  # them. The intermediate `build` target carries none (it is cacheonly and
+  # consumed in-graph). Because the build stage stays in-graph, attaching
+  # attestations here does NOT reintroduce a registry round-trip.
+  attest = PUSH == "true" ? ["type=provenance,mode=max", "type=sbom"] : []
 }
 
 target "debug" {

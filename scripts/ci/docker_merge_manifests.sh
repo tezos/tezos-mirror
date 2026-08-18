@@ -20,18 +20,17 @@ docker_tags="${short_tag} ${long_tag}"
 for docker_image in ${docker_images}; do
   echo "### Merging tags for docker image: ${docker_image}"
 
-  # Loop over architectures
-  amends=''
+  sources=''
   for docker_architecture in ${docker_architectures}; do
-    amends="${amends} --amend ${docker_image}:${docker_architecture}_${short_tag}"
+    sources="${sources} ${docker_image}:${docker_architecture}_${short_tag}"
   done
 
   # Loop over tags
   for docker_tag in ${docker_tags}; do
-    # Because of the variable amends, we use eval here to first construct the command
-    # by concatenating all the arguments together (space separated), then read and execute it
-    eval "docker manifest create ${docker_image}:${docker_tag}${amends}"
-    docker manifest push "${docker_image}:${docker_tag}"
+    # [imagetools create] preserves the attestation manifests (SLSA
+    # provenance, SBOM) attached to the per-arch images as OCI referrers.
+    # shellcheck disable=SC2086
+    docker buildx imagetools create --tag "${docker_image}:${docker_tag}" ${sources}
 
     # Sign image
     ./scripts/ci/docker_sign.sh "${docker_image}:${docker_tag}"
@@ -43,5 +42,14 @@ for docker_image in ${docker_images}; do
   echo "### Verifying signature for docker image: ${docker_image}"
   for docker_tag in ${docker_tags}; do
     ./scripts/ci/docker_verify_signature.sh "${docker_image}:${docker_tag}"
+  done
+done
+
+# Attestation verification: the SLSA provenance and SBOM referrers must still
+# be reachable on the merged multi-arch tags.
+for docker_image in ${docker_images}; do
+  echo "### Verifying attestations for docker image: ${docker_image}"
+  for docker_tag in ${docker_tags}; do
+    ./scripts/ci/docker_verify_attestation.sh "${docker_image}:${docker_tag}"
   done
 done

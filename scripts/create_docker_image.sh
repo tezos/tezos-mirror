@@ -35,6 +35,7 @@ sccache_bucket=""
 # explicitly).
 runtime_image=""
 build_deps_image=""
+push="false"
 
 # usage and help
 usage() {
@@ -52,6 +53,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
   [--sccache-bucket <BUCKET> ]
+  [--push]
 
 DESCRIPTION
     Builds the Octez Docker distribution.
@@ -141,6 +143,11 @@ OPTIONS
             RUSTC_WRAPPER=sccache is activated in build.Dockerfile,
             caching Rust artifacts in GCS across builds.
 
+    Output
+        --push
+            Push the built variants to the registry instead of loading
+            them into the local image store.
+
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
@@ -154,6 +161,7 @@ CURRENT VALUES
     COMMIT_DATETIME: $commit_datetime
     COMMIT_TAG: $commit_tag
     SCCACHE_BUCKET: $sccache_bucket
+    PUSH: $push
 
 SEE ALSO
     For more information, see 'images/README.md' and
@@ -162,7 +170,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -224,6 +232,9 @@ while true; do
   --sccache-bucket)
     shift
     sccache_bucket="$1"
+    ;;
+  --push)
+    push="true"
     ;;
   -h | --help)
     usage
@@ -312,6 +323,17 @@ fi
 
 echo "### Building tezos via docker buildx bake (targets: ${bake_targets})..."
 
+# The attestation and push exporters require the docker-container buildx
+# driver, which the default builder does not provide. The entitlement is for
+# build.Dockerfile's [RUN --network=host] (sccache).
+builder_arg=""
+if [ "$push" = "true" ]; then
+  docker buildx inspect octez-bake > /dev/null 2>&1 ||
+    docker buildx create --name octez-bake --driver docker-container \
+      --buildkitd-flags "--allow-insecure-entitlement network.host" > /dev/null
+  builder_arg="--builder octez-bake"
+fi
+
 # shellcheck disable=SC2086
 IMAGE_NAME="$image_name" \
   MINIMAL_IMAGE_NAME="${image_name%?}" \
@@ -326,12 +348,11 @@ IMAGE_NAME="$image_name" \
   COMMIT_SHORT_SHA="$commit_short_sha" \
   RUST_TOOLCHAIN_IMAGE="$rust_toolchain_image" \
   SCCACHE_GCS_BUCKET="$sccache_bucket" \
+  PUSH="$push" \
   docker buildx bake \
+  $builder_arg \
   --allow network.host \
   -f "$src_dir/docker-bake.hcl" \
   $bake_targets
 
-# The variants are loaded into the local image store; the "build" target is
-# cache-only (no image). Pushing to the registry is delegated to
-# docker_push_all.sh downstream.
 echo "### Successfully ran docker buildx bake (targets: ${bake_targets})"
