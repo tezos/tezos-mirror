@@ -7,6 +7,34 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.10 (6d47b6a1268f623c80c493b0c321ccd222aaf1b8)
+
+### EVM Runtime
+
+- The FA1.2 wrapper contract bytecode is no longer deployed
+  as a precompile at kernel initialization. (!22743)
+- The `callTracer` no longer adds the transaction's intrinsic gas (21000 +
+  calldata cost) to every frame's `gas` and `gasUsed`: only the transaction's
+  top-level frame accounts it, as on geth. Nested frames were inflated by at
+  least 21000 gas each, breaking the `gasUsed >= Σ subcalls' gasUsed`
+  invariant. (!22733)
+
+### Michelson Runtime
+
+- Removed the ERC-20 wrapper enshrined contract
+(`KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb`). (!22744)
+- Duplicating a list no longer copies it, so `CONS` and `IF_CONS` cost the same
+  whatever the length of the list they are given. (!22741)
+- Discarding a list, map, set, big map or closure traverses each of the values it
+  owns exactly once, instead of re-walking what it shares with other values. (!22741)
+
+### Storage versions
+
+- The storage version is now 65. It carries no data migration: the version is
+  the signal that tells the node whether the `callTracer` traces a kernel
+  produces account the transaction's intrinsic gas on the top-level frame
+  only. (!22733)
+
 ## Version 0.9 (b8c07fbb0f27d0c4d48ef8e88d82b480fdb4aae4)
 
 ### EVM Runtime
