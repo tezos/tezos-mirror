@@ -94,6 +94,16 @@ Codec
 Docker Images
 -------------
 
+- Octez release Docker images now carry a SLSA provenance attestation
+  (``--provenance=mode=max``) and a CycloneDX/SPDX SBOM
+  (``--sbom=true``) emitted by BuildKit. The provenance records the
+  build inputs (source revision, build args, layer digests, builder
+  version); the SBOM enumerates the packages installed in the image.
+  Both are attached as OCI referrers preserved across multi-arch
+  merges and release promotions. See
+  ``docs/introduction/cosign-verify.rst`` for how to inspect them.
+  (MR :gl:`!22018`)
+
 Packaging
 ---------
 
