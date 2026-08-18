@@ -12,7 +12,7 @@
 #
 # With --image-names: additionally computes Octez distribution image names
 # (DOCKER_IMAGE_NAME, DOCKER_IMAGE_TAG) via docker_image_names.sh.
-# Required by Octez distribution jobs (docker_release.sh, docker_push_all.sh,
+# Required by Octez distribution jobs (docker_release.sh,
 # docker_merge_manifests.sh, docker_sign.sh, docker_verify_signature.sh).
 
 ./scripts/ci/docker_wait_for_daemon.sh

@@ -256,7 +256,6 @@ let job_script_docker_verify_image =
         (* Scripts that are called by [docker_release.sh]. *)
         "scripts/create_docker_image.sh";
         "scripts/ci/docker_smoke_test.sh";
-        "scripts/ci/docker_push_all.sh";
         "scripts/ci/docker_sign.sh";
         (* TODO: since the Docker build jobs already call [docker_verify_signature.sh],
            why have a job dedicated to running [docker_verify_signature.sh]? *)
