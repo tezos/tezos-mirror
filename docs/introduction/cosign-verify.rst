@@ -113,25 +113,25 @@ attached to the image index as an OCI (`Open Container Initiative
 <https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers>`_
 — a separate manifest that points back at the image it describes.
 
-To dump the raw SLSA predicate for a given platform (``tezos/tezos:master`` is
-a multi-platform tag, so buildx returns a map keyed by ``os/arch``; pick the
-entry you want with ``jq``):
+You dump the raw SLSA predicate for a given platform.
+
+For instance for ``tezos/tezos:master``:
 
 .. code-block:: bash
 
     docker buildx imagetools inspect --format '{{json .Provenance}}' tezos/tezos:master \
       | jq '.["linux/amd64"].SLSA // .SLSA'
 
-The ``jq`` filter is needed because ``{{json .Provenance}}`` returns a
-wrapper, not the bare predicate that SLSA tooling expects; the filter unwraps
-it for both single- and multi-platform tags.
+Note that this is a multi-platform tag, so buildx returns a map keyed by
+``os/arch``; pick the entry you want with ``jq``.
 
 Each platform image has exactly one attestation manifest, marked
 ``vnd.docker.reference.type=attestation-manifest`` in the image index (visible
 with ``docker buildx imagetools inspect --raw``); it carries both the SLSA
 provenance and the SBOM described below as `in-toto
 <https://in-toto.io/docs/what-is-in-toto/>`_ payloads
-(``application/vnd.in-toto+json``).
+(``application/vnd.in-toto+json``).  To inspect the SBOM, see
+`Inspecting the Software Bill of Materials (SBOM)`_ below.
 
 .. note::
 
