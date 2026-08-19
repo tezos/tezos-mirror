@@ -37,13 +37,14 @@ use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
 
@@ -125,7 +126,8 @@ pub fn compute<Host, KS>(
     http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
-    Host: StorageV1 + WithGas,
+    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Queue length {}.", block_in_progress.queue_length());
     // iteration over all remaining transaction in the block
@@ -342,7 +344,8 @@ pub fn compute_bip<Host, KS>(
     http_trace_enabled: bool,
 ) -> anyhow::Result<BlockComputationResult>
 where
-    Host: StorageV1 + WithGas,
+    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     let constants = chain_config.constants(
         rk.host_mut(),
@@ -395,7 +398,7 @@ fn revert_block<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     log!(
         Error,
@@ -412,6 +415,9 @@ where
         error
     );
     rk.host_mut().revert()?;
+    // The `/tmp` copy and the keyspace frames cover disjoint roots: revert
+    // both.
+    rk.revert_inner()?;
     drop_blueprint(rk.base_mut(), number)?;
     Ok(())
 }
@@ -510,7 +516,7 @@ pub fn promote_block<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(rk.host_mut())?;
@@ -518,6 +524,9 @@ where
     rk.host_mut().promote()?;
     rk.host_mut().promote_trace()?;
     rk.host_mut().promote_http_trace()?;
+    // The `/tmp` copy and the keyspace frames cover disjoint roots: promote
+    // both.
+    rk.commit_inner()?;
     drop_blueprint(rk.base_mut(), block_header.blueprint_header.number)?;
     store_current_block_header(rk.base_mut(), &block_header)?;
 
@@ -549,8 +558,9 @@ pub fn produce<Host, KS>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas,
-    KS: KeySpace,
+    Host:
+        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(rk.host_mut())?;
 
@@ -633,6 +643,8 @@ where
         // We are going to execute a new block, we copy the storage to allow
         // to revert if the block fails.
         safe_rk.host_mut().start()?;
+        // Open a keyspace frame alongside the `/tmp` copy.
+        safe_rk.checkpoint()?;
     }
 
     let processed_blueprint = block_in_progress.number;
@@ -1191,8 +1203,12 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>)
     where
-        Host: HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader,
-        KS: KeySpace,
+        Host: HostReveal
+            + StorageV1
+            + WasmHost
+            + WithGas
+            + KeySpaceLoader<KeySpace = KS::Live>,
+        KS: SafeKeyspace,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];

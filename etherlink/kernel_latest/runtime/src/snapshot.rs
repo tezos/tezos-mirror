@@ -16,11 +16,16 @@
 //! A run that cannot close its frames has [`SafeKeyspace::revert_all`], which
 //! puts the live state back to the bedrock.
 //!
+//! A run the PVM cuts short leaves no marker and runs no [`Drop`], so its
+//! bedrock survives. [`PreviousRun`] tells `start`, which puts the live state
+//! back to it instead of adopting it.
+//!
 //! Every backup is named after the keyspace it copies, under the `/__snapshot`
 //! prefix it keeps for itself.
 
 use thiserror::Error;
 
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{
     Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError, KeySpaceWriteError, Name,
     NameError,
@@ -44,6 +49,19 @@ pub enum SnapshotError {
     TooManyFrames,
     #[error(transparent)]
     InvalidName(#[from] NameError),
+    /// Reading whether the previous run was cut short failed.
+    #[error("cannot read whether the previous run was cut short: {0:?}")]
+    PreviousRun(RuntimeError),
+}
+
+/// What the run before this one left behind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviousRun {
+    /// It reached its end, or there was no previous run.
+    Complete,
+    /// The PVM cut it short, so its writes sit in the live keyspace with no
+    /// close behind them. Read from `WasmHost::last_run_aborted`.
+    Aborted,
 }
 
 const FRAME_PREFIX: &str = "/__snapshot/frame";
@@ -122,9 +140,13 @@ impl<KS: KeySpace> SnapshottedKeySpace<KS> {
     ///
     /// The marker is cleared here, so a run that wants to survive the next
     /// reboot has to mark itself again.
+    ///
+    /// A marker wins over `previous`: its backups are taken back either way.
+    /// With no marker, `previous` decides which way the copy goes.
     pub fn start(
         loader: &mut impl KeySpaceLoader<KeySpace = KS>,
         live: KS,
+        previous: PreviousRun,
     ) -> Result<Self, SnapshotError> {
         // Frame names are the longest generated names for this root. Since the
         // fixed-width depth makes every frame name equally long, validating depth 0
@@ -148,8 +170,12 @@ impl<KS: KeySpace> SnapshottedKeySpace<KS> {
                 }
                 this.meta.clear();
             }
-            // Nothing to take back: the live state becomes the bedrock.
-            None => this.bedrock.copy_from(&this.live),
+            None => match previous {
+                // Nothing to take back: the live state becomes the bedrock.
+                PreviousRun::Complete => this.bedrock.copy_from(&this.live),
+                // Nothing to keep either: the bedrock comes back over it.
+                PreviousRun::Aborted => this.live.copy_from(&this.bedrock),
+            },
         }
         Ok(this)
     }
@@ -463,7 +489,8 @@ mod tests {
         loader: &mut impl KeySpaceLoader<KeySpace = KS>,
         live: KS,
     ) -> SnapshottedKeySpace<KS> {
-        let mut snapshot = SnapshottedKeySpace::start(loader, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(loader, live, PreviousRun::Complete).unwrap();
         snapshot.checkpoint(loader).unwrap();
         snapshot
     }
@@ -551,7 +578,7 @@ mod tests {
         // Refused at the top of the run, not at the first checkpoint that would
         // have tried to back it up.
         assert!(matches!(
-            SnapshottedKeySpace::start(&mut host, live),
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete),
             Err(SnapshotError::InvalidName(NameError::NameTooLong))
         ));
     }
@@ -562,7 +589,8 @@ mod tests {
         // The longest root whose backups still have names.
         let root = root_of::<{ MAX_KEYSPACE_NAME_SIZE - FRAME_NAME_OVERHEAD }>();
         let live = host.load_or_create(root).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
 
         // Deeper than one digit, on a root with no byte to spare.
         for _ in 0..12 {
@@ -660,6 +688,50 @@ mod tests {
         assert_eq!(snapshot.bedrock().get(&key(b"/stale")), None);
     }
 
+    #[test]
+    fn starting_after_a_trap_gives_up_the_interrupted_block() {
+        let mut host = MockKernelHost::default();
+        // A run the PVM cut short runs no `Drop`, so its bedrock survives.
+        {
+            let mut bedrock = host.load_or_create(bedrock_a()).unwrap();
+            bedrock.set(&key(b"/balance"), b"promoted").unwrap();
+        }
+        // Its own writes stay in the live root.
+        let mut live = host.load_or_create(root_a()).unwrap();
+        live.set(&key(b"/balance"), b"half-written").unwrap();
+        live.set(&key(b"/leftover"), b"garbage").unwrap();
+
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Aborted).unwrap();
+
+        // The interrupted block is gone, as deleting `/tmp` did before.
+        assert_eq!(snapshot.get(&key(b"/balance")), Some(b"promoted".to_vec()));
+        assert_eq!(snapshot.get(&key(b"/leftover")), None);
+        assert_eq!(snapshot.depth(), 0);
+    }
+
+    #[test]
+    fn a_trap_does_not_undo_a_run_that_reached_its_end() {
+        let mut host = MockKernelHost::default();
+        {
+            let mut bedrock = host.load_or_create(bedrock_a()).unwrap();
+            bedrock.set(&key(b"/balance"), b"stale").unwrap();
+        }
+        let mut live = host.load_or_create(root_a()).unwrap();
+        live.set(&key(b"/balance"), b"promoted").unwrap();
+
+        // Same storage, but a complete previous run: the stale bedrock is
+        // replaced, not applied.
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
+
+        assert_eq!(snapshot.get(&key(b"/balance")), Some(b"promoted".to_vec()));
+        assert_eq!(
+            snapshot.bedrock().get(&key(b"/balance")),
+            Some(b"promoted".to_vec())
+        );
+    }
+
     // ----- Marker -----
 
     #[test]
@@ -669,7 +741,8 @@ mod tests {
         live.set(&key(b"/balance"), b"live-data").unwrap();
 
         // No marker, so nothing is taken back.
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
 
         // The live root is untouched.
@@ -689,7 +762,8 @@ mod tests {
 
         // No marker, so the next run starts over.
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
         assert_eq!(snapshot.get(&key(b"/balance")), Some(b"committed".to_vec()));
     }
@@ -708,7 +782,8 @@ mod tests {
         drop(snapshot);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         snapshot.set(&key(b"/balance"), b"in flight").unwrap();
         snapshot.revert_all();
 
@@ -727,7 +802,8 @@ mod tests {
         drop(snapshot);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
         assert_eq!(snapshot.get(&key(b"/balance")), Some(b"initial".to_vec()));
     }
@@ -748,13 +824,15 @@ mod tests {
 
         // The marker is per root, so ROOT_A's says nothing about ROOT_B.
         let live_b = host.load_or_create(root_b()).unwrap();
-        let snapshot_b = SnapshottedKeySpace::start(&mut host, live_b).unwrap();
+        let snapshot_b =
+            SnapshottedKeySpace::start(&mut host, live_b, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot_b.depth(), 0);
         drop(snapshot_b);
 
         // ROOT_A takes its own frame back and reverts it.
         let live_a = host.load_or_create(root_a()).unwrap();
-        let mut snapshot_a = SnapshottedKeySpace::start(&mut host, live_a).unwrap();
+        let mut snapshot_a =
+            SnapshottedKeySpace::start(&mut host, live_a, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot_a.depth(), 1);
         snapshot_a.revert_inner().unwrap();
         assert_eq!(snapshot_a.get(&key(b"/balance")), Some(b"initial".to_vec()));
@@ -1040,7 +1118,8 @@ mod tests {
         );
 
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 1);
         // The interrupted run's writes are still live, and the backup below
         // the frames was taken back as it stood.
@@ -1057,7 +1136,8 @@ mod tests {
         interrupted_transaction(&mut host);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         snapshot.set(&key(b"/balance"), b"more-partial").unwrap();
         snapshot.revert_inner().unwrap();
 
@@ -1071,7 +1151,8 @@ mod tests {
         interrupted_transaction(&mut host);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         snapshot.set(&key(b"/balance"), b"reboot2").unwrap();
         snapshot.commit_inner().unwrap();
 
@@ -1084,7 +1165,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut live = host.load_or_create(root_a()).unwrap();
         live.set(&key(b"/balance"), b"initial").unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
 
         snapshot.checkpoint(&mut host).unwrap();
         snapshot.set(&key(b"/balance"), b"committed").unwrap();
@@ -1103,7 +1185,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut live = host.load_or_create(root_a()).unwrap();
         live.set(&key(b"/v"), b"before").unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
 
         snapshot.checkpoint(&mut host).unwrap();
         snapshot.set(&key(b"/v"), b"during").unwrap();
@@ -1114,7 +1197,8 @@ mod tests {
 
         // No marker, so there is nothing to take back.
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
     }
 
@@ -1125,7 +1209,9 @@ mod tests {
         {
             let mut live = host.load_or_create(root_a()).unwrap();
             live.set(&key(b"/v"), b"before").unwrap();
-            let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+            let mut snapshot =
+                SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete)
+                    .unwrap();
             snapshot.checkpoint(&mut host).unwrap();
             snapshot.set(&key(b"/v"), b"during").unwrap();
             snapshot.create_reboot_marker().unwrap();
@@ -1133,7 +1219,8 @@ mod tests {
         }
 
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 1);
         snapshot.revert_inner().unwrap();
 
@@ -1148,7 +1235,9 @@ mod tests {
         {
             let mut live = host.load_or_create(root_a()).unwrap();
             live.set(&key(b"/v"), b"before").unwrap();
-            let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+            let mut snapshot =
+                SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete)
+                    .unwrap();
             snapshot.checkpoint(&mut host).unwrap();
             snapshot.set(&key(b"/v"), b"block").unwrap();
             snapshot.checkpoint(&mut host).unwrap();
@@ -1158,7 +1247,8 @@ mod tests {
         }
 
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 2);
 
         // The inner frame undoes the operation, the outer one the block.
@@ -1256,12 +1346,14 @@ mod tests {
         interrupted_transaction(&mut host);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 1);
         drop(snapshot);
 
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
     }
 
@@ -1270,7 +1362,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut live = host.load_or_create(root_a()).unwrap();
         live.set(&key(b"/balance"), b"untouched").unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
 
         // Closing with no frame open is an error, not a no-op.
         assert!(matches!(
@@ -1318,7 +1411,8 @@ mod tests {
         // One snapshot for the whole run, one frame per block.
         let mut host = MockKernelHost::default();
         let live = host.load_or_create(root_a()).unwrap();
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
 
         // With no frame open, writes go straight to the live root.
         snapshot.set(&key(b"/v"), b"genesis").unwrap();
@@ -1344,7 +1438,8 @@ mod tests {
         let mut live = host.load_or_create(root_a()).unwrap();
         live.set(&key(b"/balance"), b"pre-run").unwrap();
 
-        let mut snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let mut snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         snapshot.set(&key(b"/balance"), b"settled").unwrap();
         snapshot.commit_all().unwrap();
 
@@ -1420,7 +1515,8 @@ mod tests {
 
         // The next run starts over from the reverted live state.
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
         assert_eq!(snapshot.get(&key(b"/v")), Some(b"pre-run".to_vec()));
     }
@@ -1440,7 +1536,8 @@ mod tests {
         // The marker went with the revert, so the next start begins fresh
         // rather than resuming the given-up run.
         let live = host.load_or_create(root_a()).unwrap();
-        let snapshot = SnapshottedKeySpace::start(&mut host, live).unwrap();
+        let snapshot =
+            SnapshottedKeySpace::start(&mut host, live, PreviousRun::Complete).unwrap();
         assert_eq!(snapshot.depth(), 0);
         assert_eq!(snapshot.get(&key(b"/v")), Some(b"pre-run".to_vec()));
     }

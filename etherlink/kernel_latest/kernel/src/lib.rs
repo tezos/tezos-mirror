@@ -33,6 +33,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -42,7 +43,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -248,8 +249,9 @@ where
 
 pub fn run<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas,
-    KS: KeySpace,
+    Host:
+        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
@@ -257,14 +259,22 @@ where
         .mark_for_reboot()
         .expect("This function should never fail");
     match single_run(rk) {
-        Ok(SingleRunStatus::Reboot) => Ok(()),
+        // Mark the open frames so the next run takes them back.
+        Ok(SingleRunStatus::Reboot) => {
+            rk.create_reboot_marker()
+                .expect("This function should never fail");
+            Ok(())
+        }
         Ok(SingleRunStatus::Finished) => {
+            rk.end_kernel_run();
             rk.host_mut()
                 .clear_reboot_mark()
                 .expect("This function should never fail");
             Ok(())
         }
         Err(err) => {
+            // Revert any frame the failed run left open.
+            rk.end_kernel_run();
             rk.host_mut()
                 .clear_reboot_mark()
                 .expect("This function should never fail");
@@ -282,8 +292,9 @@ pub fn single_run<Host, KS>(
     rk: &mut RuntimeKeyspaces<Host, KS>,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + WithGas,
-    KS: KeySpace,
+    Host:
+        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     // We always start by doing the migration if needed.
     match stage_zero(rk) {

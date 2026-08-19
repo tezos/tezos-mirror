@@ -43,9 +43,11 @@ use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_storage::error::Error as StorageError;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
@@ -2849,6 +2851,12 @@ pub fn get_required_da_fees(
     Ok(da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64))
 }
 
+/// A frame that fails to open or close is a storage failure, not an invalid
+/// operation: it aborts the block.
+fn frame_abort(err: tezos_evm_runtime::snapshot::SnapshotError) -> OperationError {
+    OperationError::BlockAbort(format!("keyspace frame: {err:?}"))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host, KS>(
     rk: &mut RuntimeKeyspaces<Host, KS>,
@@ -2862,7 +2870,8 @@ pub fn validate_and_apply_operation<Host, KS>(
     safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    KS: SafeKeyspace,
 {
     // Sum declared fees (mutez) from all operation contents before
     // `operation` is moved into validation.
@@ -2884,6 +2893,8 @@ where
     let mut safe_rk = rk.to_safe_host(safe_roots.to_vec());
 
     safe_rk.host_mut().start()?;
+    // Open a keyspace frame alongside the `/tmp` copy.
+    safe_rk.checkpoint().map_err(frame_abort)?;
 
     log!(Debug, "Verifying that the batch is valid");
 
@@ -2896,6 +2907,7 @@ where
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(Debug, "Reverting the changes because the batch is invalid.");
+            safe_rk.revert_inner().map_err(frame_abort)?;
             safe_rk.host_mut().revert()?;
             return Err(OperationError::Validation(validity_err));
         }
@@ -2903,6 +2915,7 @@ where
 
     log!(Debug, "Batch is valid!");
 
+    safe_rk.commit_inner().map_err(frame_abort)?;
     safe_rk.host_mut().promote()?;
     // Skip trace promotion (and its store_has probe) when the tracer is off:
     // no trace data was written, so there is nothing to move out of /tmp.
@@ -2913,6 +2926,8 @@ where
         safe_rk.host_mut().promote_http_trace()?;
     }
     safe_rk.host_mut().start()?;
+    // Open a new frame for the application phase.
+    safe_rk.checkpoint().map_err(frame_abort)?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
@@ -2940,6 +2955,7 @@ where
             Debug,
             "Committing the changes because the batch was successfully applied."
         );
+        safe_rk.commit_inner().map_err(frame_abort)?;
         safe_rk.host_mut().promote()?;
         if block_ctx.tracing_enabled {
             safe_rk.host_mut().promote_trace()?;
@@ -2953,6 +2969,7 @@ where
             "Reverting the changes because some operation failed."
         );
         log!(Debug, "Processed operations: {processed_ops:#?}");
+        safe_rk.revert_inner().map_err(frame_abort)?;
         safe_rk.host_mut().revert()?;
         // Clear the in-memory EVM journal: safe_rk.host_mut().revert() only
         // rolls back Tezos durable storage but cannot affect the in-memory REVM
@@ -3332,6 +3349,9 @@ pub(crate) mod test_utils {
 mod tests {
     use tezosx_journal::TezosXHashes;
 
+    use tezos_evm_runtime::snapshot::SafeKeyspace;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
+
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
     use crate::context;
@@ -3529,6 +3549,7 @@ mod tests {
             let mut safe_rk = rk
                 .to_safe_host(vec![OwnedPath::from(crate::context::TEZOS_ACCOUNTS_ROOT)]);
             safe_rk.host_mut().start().expect("the snapshot is taken");
+            safe_rk.checkpoint().expect("the frame is opened");
             run_code(
                 &mut safe_rk,
                 &NotWiredRegistry,
@@ -3536,6 +3557,7 @@ mod tests {
                 &params(script, storage, input, None, None),
             )
             .expect("it runs");
+            safe_rk.revert_inner().expect("the frame is closed");
             safe_rk
                 .host_mut()
                 .revert()
@@ -10128,7 +10150,8 @@ mod tests {
         init_receiver: &str,
     ) -> BigMapTransfer
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        KS: SafeKeyspace,
     {
         let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
