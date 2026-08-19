@@ -7,6 +7,7 @@
 
 type Environment.Error_monad.error +=
   | Increase_paid_storage_amount_overflow of Z.t
+  | Delegate_cannot_stake_during_finalization_of_slashed_period
 
 (** Fast shell-side state threaded through block validation. *)
 type block_validation_state
@@ -62,6 +63,17 @@ val stake_mints_no_pseudotoken :
   Protocol.Alpha_context.t ->
   staker:Protocol.Alpha_context.public_key_hash ->
   amount:Protocol.Alpha_context.Tez.t ->
+  bool Environment.Error_monad.tzresult Lwt.t
+
+(** [delegate_stake_while_slashed_in_current_finalization_delay ctxt ~delegate]
+    returns [true] if [delegate] is a delegate that has been slashed during the
+    last `unstake_finalization_delay + 1` cycles. This prevents a delegate to
+    re-stake non finalizable tez from unstake requests that have been
+    slashed. *)
+
+val delegate_stake_while_slashed_in_current_finalization_delay :
+  Protocol.Alpha_context.t ->
+  delegate:Protocol.Alpha_context.public_key_hash ->
   bool Environment.Error_monad.tzresult Lwt.t
 
 (** [check_execute_outbox_message context ~rollup ~output_proof] checks the

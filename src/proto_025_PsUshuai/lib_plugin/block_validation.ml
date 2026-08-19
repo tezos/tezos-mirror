@@ -482,7 +482,9 @@ let check_increase_paid_storage_amount amount_in_bytes :
   if Z.fits_int64 amount_in_bytes then return_unit
   else shell_fail (Increase_paid_storage_amount_overflow amount_in_bytes)
 
-type Environment.Error_monad.error += Stake_amount_too_small of Tez.t
+type Environment.Error_monad.error +=
+  | Stake_amount_too_small of Tez.t
+  | Delegate_cannot_stake_during_finalization_of_slashed_period
 
 let () =
   let open Environment.Error_monad in
@@ -501,6 +503,27 @@ let () =
     Data_encoding.(obj1 (req "amount" Tez.encoding))
     (function Stake_amount_too_small amount -> Some amount | _ -> None)
     (fun amount -> Stake_amount_too_small amount)
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Permanent
+    ~id:
+      "block_validation_plugin.delegate_cannot_stake_during_finalization_of_slashed_period"
+    ~title:"Delegate cannot stake until finalization of slashed period"
+    ~description:
+      "A delegate cannot stake while it has been slashed and related unstake \
+       requests cannot be finalized."
+    ~pp:(fun ppf _ ->
+      Format.fprintf
+        ppf
+        "A delegate cannot stake while it has been slashed and related unstake \
+         requests cannot be finalized.")
+    Data_encoding.unit
+    (function
+      | Delegate_cannot_stake_during_finalization_of_slashed_period -> Some ()
+      | _ -> None)
+    (fun () -> Delegate_cannot_stake_during_finalization_of_slashed_period)
 
 (* [stake_mints_no_pseudotoken context ~staker ~amount] returns [true] when a
    [`stake`] of [amount] by [staker] would mint no staking pseudotoken. *)
@@ -549,6 +572,39 @@ let stake_mints_no_pseudotoken context ~staker ~amount :
                   lt
                     (mul pseudotokens (of_int64 (Tez.to_mutez amount)))
                     (of_int64 (Tez.to_mutez frozen_deposits_staked_tez)))
+
+let delegate_stake_while_slashed_in_current_finalization_delay context ~delegate
+    =
+  let open Environment.Error_monad in
+  let open Lwt_result_syntax in
+  let* is_delegate = Contract.is_delegate context delegate in
+  if is_delegate then
+    (* Slashing history is available only at raw context *)
+    let raw_context = Alpha_context.Internal_for_tests.to_raw context in
+    let delay = Constants.unstake_finalization_delay context + 1 in
+    let current_cycle = Cycle_storage.current raw_context in
+    let slashed_cycle_horizon =
+      Cycle_repr.sub current_cycle delay
+      |> Option.value ~default:Cycle_repr.root
+    in
+    let* slashing_history =
+      Storage.Slashed_deposits.find raw_context delegate
+    in
+    match slashing_history with
+    | None -> return_false
+    | Some slashing_history ->
+        (* Check if there is a cycle between `current_cycle -
+         unstake_finalization_delay - 1` and `current_cycle` where the
+         delegate has been slashed. If so, the stake operation is rejected.
+         Note that the history is sorted in ascendent order of the cycles, so
+         we need to go through the whole list before finding a potential culprit. *)
+        let slashed_during_unstake_delay =
+          List.exists
+            (fun (cycle, _) -> Cycle_repr.(cycle >= slashed_cycle_horizon))
+            slashing_history
+        in
+        return slashed_during_unstake_delay
+  else return_false
 
 let check_execute_outbox_message context ~rollup ~output_proof =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -648,7 +704,17 @@ let check_block_operation {context; seen_games}
             in
             if mints_no_pseudotoken then
               shell_fail (Stake_amount_too_small amount)
-            else return seen_games
+            else
+              let* delegate_stake_from_slashed_unstake =
+                delegate_stake_while_slashed_in_current_finalization_delay
+                  context
+                  ~delegate:staker
+                |> Lwt.map Environment.wrap_tzresult
+              in
+              if delegate_stake_from_slashed_unstake then
+                shell_fail
+                  Delegate_cannot_stake_during_finalization_of_slashed_period
+              else return seen_games
         | _ -> return seen_games)
       seen_games
       (Operation.to_list (Contents_list contents))
