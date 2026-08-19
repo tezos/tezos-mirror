@@ -105,7 +105,9 @@ export DEBUG='true'
 release-cli create \
   --name="${release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="🔗 New Release Page: https://octez.tezos.com/releases/grafazos/" \
+  --description="Download Grafazos, Grafana dashboards to monitor Octez nodes on the Tezos blockchain.
+
+🔗 New Release Page: https://octez.tezos.com/releases/grafazos/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Dashboards\",\"url\":\"${dashboards_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Grafazos source\",\"url\":\"${source_url}\",\"link_type\":\"other\"}"
