@@ -111,17 +111,9 @@ gitlab_binaries_url=$(package_web_path "${gitlab_octez_binaries_package_name}")
 
 echo "Release"
 
-deprecated_release_name="${gitlab_release_name} - GitLab Releases Deprecated, See octez.tezos.com/releases/octez-smart-rollup-node/"
-
 release-cli create \
-  --name="${deprecated_release_name}" \
+  --name="${gitlab_release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="⚠️ **DEPRECATION NOTICE** ⚠️
-
-This GitLab release page is deprecated. Please use our new dedicated release page for the latest releases and information.
-
-🔗 **New Release Page: https://octez.tezos.com/releases/octez-smart-rollup-node/**
-
-This page will no longer be updated. All future releases and updates will be available on the new release page." \
+  --description="🔗 New Release Page: https://octez.tezos.com/releases/octez-smart-rollup-node/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}"
