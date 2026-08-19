@@ -28,6 +28,10 @@ members = [
         "instrument",
 ]
 
+[workspace.dependencies.num-traits]
+version = "0.2"
+default-features = false
+
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.6.0"
 path = "../../sdk/rust/crypto"

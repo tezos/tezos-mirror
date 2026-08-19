@@ -15,6 +15,7 @@ irmin-compat = []
 
 [dependencies]
 hex-literal.workspace = true
+num-traits.workspace = true
 thiserror.workspace = true
 
 [dependencies.tezos-smart-rollup-constants]
