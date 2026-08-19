@@ -96,6 +96,8 @@ export DEBUG='true'
 release-cli create \
   --name="${release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="🔗 New Release Page: https://octez.tezos.com/releases/teztale/" \
+  --description="Download Teztale, a monitoring tool for the Tezos blockchain.
+
+🔗 New Release Page: https://octez.tezos.com/releases/teztale/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${binaries_url}\",\"link_type\":\"package\"}"
