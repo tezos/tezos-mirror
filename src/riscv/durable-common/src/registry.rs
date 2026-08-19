@@ -24,7 +24,7 @@ use octez_riscv_data::hash::PartialHash;
 use octez_riscv_data::hash::PartialHashFold;
 use octez_riscv_data::merkle_proof::FromProof;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
-use octez_riscv_data::merkle_proof::proof_tree::ProofPart;
+use octez_riscv_data::merkle_proof::proof_tree::ProofTree;
 use octez_riscv_data::mode::Mode;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::ProvableExt;
@@ -34,7 +34,7 @@ use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_data::mode::utils::catch_not_found;
 use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry::Registry;
-use octez_riscv_durable_storage::storage::KeyValueStore;
+use octez_riscv_durable_storage::storage::WriteableKeyValueStore;
 
 use crate::api_common::BackgroundKeyValueStore;
 use crate::api_common::RegistryApply;
@@ -58,23 +58,22 @@ pub trait GcNames: Send + Sync + 'static {
 
 /// Wrapper to enable customizing OCaml GC's resource tracking.
 #[repr(transparent)]
-pub struct RegistryState<KV: KeyValueStore, G> {
+pub struct RegistryState<KV: WriteableKeyValueStore, G> {
     inner: Registry<KV, Normal>,
     _phantom: PhantomData<G>,
 }
 
 impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
     /// Construct a new registry.
-    pub fn new(repo: KV::Repo) -> Result<Self, OperationalError> {
-        let reg = Registry::new(repo)?;
-        Ok(Self {
-            inner: reg,
+    pub fn new(repo: KV::Repo) -> Self {
+        Self {
+            inner: Registry::new(repo),
             _phantom: PhantomData,
-        })
+        }
     }
 }
 
-impl<KV: KeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
+impl<KV: WriteableKeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
     fn from(value: Registry<KV, Normal>) -> Self {
         Self {
             inner: value,
@@ -83,7 +82,7 @@ impl<KV: KeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
     }
 }
 
-impl<KV: KeyValueStore, G> Deref for RegistryState<KV, G> {
+impl<KV: WriteableKeyValueStore, G> Deref for RegistryState<KV, G> {
     type Target = Registry<KV, Normal>;
 
     fn deref(&self) -> &Self::Target {
@@ -91,7 +90,7 @@ impl<KV: KeyValueStore, G> Deref for RegistryState<KV, G> {
     }
 }
 
-impl<KV: KeyValueStore, G> DerefMut for RegistryState<KV, G> {
+impl<KV: WriteableKeyValueStore, G> DerefMut for RegistryState<KV, G> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
@@ -112,7 +111,7 @@ where
     }
 }
 
-impl<KV: KeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
+impl<KV: WriteableKeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
     const IMMUTABLE_NAME: &'static str = G::IMMUTABLE_NAME;
     const MUTABLE_NAME: &'static str = G::MUTABLE_NAME;
 }
@@ -144,13 +143,13 @@ where
 type DynCommand<KV, M> = dyn FnOnce(&mut Registry<KV, M>) + Send;
 
 /// Two possible commands to send: operation or exit.
-enum Command<KV: KeyValueStore, M: Mode> {
+enum Command<KV: WriteableKeyValueStore, M: Mode> {
     Operation(Box<DynCommand<KV, M>>),
     Exit,
 }
 
 /// Registry whose state is kept in a background thread.
-pub struct BackgroundRegistry<KV: KeyValueStore, G, M: Mode> {
+pub struct BackgroundRegistry<KV: WriteableKeyValueStore, G, M: Mode> {
     cmd_sender: SyncSender<Command<KV, M>>,
     handle: Option<JoinHandle<()>>,
     /// The proof this registry replays against, retained for verify mode only.
@@ -245,7 +244,7 @@ where
         let (cmd_sender, cmd_receiver) = sync_channel::<Command<KV, Verify>>(1);
 
         let handle = std::thread::spawn(move || {
-            let mut verify = match Registry::<KV, Verify>::from_proof(ProofPart::Present(&proof)) {
+            let mut verify = match Registry::<KV, Verify>::from_proof(ProofTree::present(&proof)) {
                 Ok(suspended) => {
                     let Ok(()) = init_sender.send(Ok(())) else {
                         return;
@@ -329,7 +328,7 @@ where
 /// by the time the OCaml major GC finishes.
 impl<KV, G, M> std::ops::Drop for BackgroundRegistry<KV, G, M>
 where
-    KV: KeyValueStore,
+    KV: WriteableKeyValueStore,
     M: Mode,
 {
     fn drop(&mut self) {
@@ -349,7 +348,7 @@ where
 
 impl<KV, G, M> ocaml::Custom for BackgroundRegistry<KV, G, M>
 where
-    KV: KeyValueStore,
+    KV: WriteableKeyValueStore,
     G: GcNames,
     M: Mode,
 {

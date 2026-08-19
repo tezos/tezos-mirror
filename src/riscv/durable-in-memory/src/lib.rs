@@ -33,6 +33,7 @@ use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_data::codec::Bincode;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::merkle_proof::proof::Proof as NdsProof;
 use octez_riscv_data::merkle_proof::proof::deserialise_proof;
@@ -205,7 +206,7 @@ impl From<Infallible> for InvalidArgumentError {
 #[ocaml::func]
 #[ocaml::sig("unit -> registry")]
 pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer<Registry>> {
-    let registry = RegistryState::new(InMemoryRepo::default())?;
+    let registry = RegistryState::new(InMemoryRepo::default());
 
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
@@ -698,8 +699,10 @@ pub fn octez_riscv_durable_in_memory_deserialise_proof(
     // We discard the verify state, as it was deserialised with the stream deserialiser -
     // so currently doesn't have support for verify operations directly. (TZX-161)
     let (proof, _state) =
-        deserialise_proof::<DsRegistry<InMemoryKeyValueStore, Verify>, _>(proof.0.iter().copied())
-            .map_err(|err| err.to_string())?;
+        deserialise_proof::<Bincode, DsRegistry<InMemoryKeyValueStore, Verify>, _>(
+            proof.0.iter().copied(),
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(SafePointer::from(Proof(proof)))
 }

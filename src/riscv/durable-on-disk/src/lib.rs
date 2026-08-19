@@ -34,6 +34,7 @@ use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_data::codec::Bincode;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::merkle_proof::proof::Proof as NdsProof;
 use octez_riscv_data::merkle_proof::proof::deserialise_proof;
@@ -219,7 +220,7 @@ pub fn octez_riscv_durable_on_disk_registry_new(
     repo: SafePointer<Repo>,
 ) -> OcamlFallible<SafePointer<Registry>> {
     let dir = repo.0.clone();
-    let registry = RegistryState::new(dir)?;
+    let registry = RegistryState::new(dir);
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
 
@@ -733,10 +734,11 @@ pub fn octez_riscv_durable_on_disk_deserialise_proof(
 ) -> Result<SafePointer<Proof>, String> {
     // The stream pass reconstructs the proof tree (and a verify-side state we discard);
     // `start_verify` then runs the proof-tree pass to obtain a verifiable registry.
-    let (proof, _state) = deserialise_proof::<ds_registry::Registry<PersistenceLayer, Verify>, _>(
-        proof.0.iter().copied(),
-    )
-    .map_err(|err| err.to_string())?;
+    let (proof, _state) =
+        deserialise_proof::<Bincode, ds_registry::Registry<PersistenceLayer, Verify>, _>(
+            proof.0.iter().copied(),
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(SafePointer::from(Proof(proof)))
 }

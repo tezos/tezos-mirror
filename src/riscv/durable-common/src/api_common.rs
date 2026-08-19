@@ -24,7 +24,7 @@ use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::registry::Registry;
 use octez_riscv_durable_storage::registry::RegistryMode;
-use octez_riscv_durable_storage::storage::KeyValueStore;
+use octez_riscv_durable_storage::storage::WriteableKeyValueStore;
 use trait_set::trait_set;
 
 use crate::BytesParam;
@@ -36,8 +36,8 @@ use crate::registry::GcNames;
 use crate::split_ds_errors;
 
 trait_set! {
-    /// [`KeyValueStore`] that can be used in a background thread
-    pub trait BackgroundKeyValueStore = KeyValueStore + Send + Sync + 'static;
+    /// [`WriteableKeyValueStore`] that can be used in a background thread
+    pub trait BackgroundKeyValueStore = WriteableKeyValueStore + Send + Sync + 'static;
 }
 
 /// Trait allowing specialised implementations for the `MutableState<...<Registry>>` pattern by each mode.
@@ -58,7 +58,7 @@ trait_set! {
 /// [`not_found`]: octez_riscv_data::mode::utils::not_found
 /// [`catch_not_found`]: octez_riscv_data::mode::utils::catch_not_found
 /// [`NotFound`]: octez_riscv_data::mode::utils::NotFound
-pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
+pub trait RegistryApply<KV: WriteableKeyValueStore, M: Mode> {
     /// Deterministic divergence error captured while applying an operation.
     ///
     /// [`Infallible`] for Normal/Prove; [`NotFound`] for Verify.
@@ -114,7 +114,7 @@ where
     S: RegistryApply<KV, M, NotFoundError = Infallible>,
     ds_registry::Registry<KV, M>: Foldable<HashFold>,
 {
-    let Ok(hash) = state.apply_ro(move |registry| registry.fold(HashFold))?;
+    let Ok(hash) = state.apply_ro(move |registry| registry.fold(HashFold::default()))?;
 
     Ok(BytesWrapper::from(hash))
 }
