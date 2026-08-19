@@ -24,6 +24,7 @@ use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::registry::Registry;
 use octez_riscv_durable_storage::registry::RegistryMode;
+use octez_riscv_durable_storage::storage::PersistentKeyValueStore;
 use octez_riscv_durable_storage::storage::ReadableKeyValueStore;
 use octez_riscv_durable_storage::storage::WriteableKeyValueStore;
 use trait_set::trait_set;
@@ -43,6 +44,10 @@ trait_set! {
     /// [`WriteableKeyValueStore`] that can be used in a background thread
     pub trait BackgroundWriteableKeyValueStore =
         WriteableKeyValueStore + BackgroundReadableKeyValueStore;
+
+    /// [`PersistentKeyValueStore`] that can be used in a background thread
+    pub trait BackgroundPersistentKeyValueStore =
+        PersistentKeyValueStore + BackgroundWriteableKeyValueStore;
 }
 
 /// Trait allowing specialised implementations for the `MutableState<...<Registry>>` pattern by each mode.

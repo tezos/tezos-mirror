@@ -5,6 +5,7 @@
 //! Shared types and logic for the RISC-V durable storage OCaml API.
 
 pub mod api_common;
+pub mod imm_registry;
 pub mod registry;
 
 use bytes::Bytes;
