@@ -227,6 +227,72 @@ pub fn octez_riscv_durable_in_memory_registry_from_imm(
     SafePointer::from(state.to_mut_state())
 }
 
+// Normal mode - immutable registry
+//
+// The read half of the registry and database API, over a registry that cannot be written to. The
+// mutating operations have no immutable counterpart: a caller that needs one recovers a live
+// registry with [`octez_riscv_durable_in_memory_registry_from_imm`] first.
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> bytes")]
+pub fn octez_riscv_durable_in_memory_imm_registry_hash(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<BytesWrapper<Hash>> {
+    api_common::registry_hash(&*state)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64")]
+pub fn octez_riscv_durable_in_memory_imm_registry_size(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<u64> {
+    let Ok(size) = api_common::registry_size(&*state)?;
+    Ok(size)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (bool, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_exists(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<bool> {
+    api_common::database_exists(&*state, db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "imm_registry -> int64 -> bytes -> int64 -> int64 -> (bytes, invalid_argument_error) result"
+)]
+pub fn octez_riscv_durable_in_memory_imm_database_read(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+    offset: u64,
+    len: u64,
+) -> SplitDsResult<BytesWrapper<Vec<u8>>> {
+    api_common::database_read(&*state, db_index, key, offset, len)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (int64, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_value_length(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<u64> {
+    api_common::value_length(&*state, db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> (bytes, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_hash(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+) -> SplitDsResult<BytesWrapper<Hash>> {
+    api_common::database_hash(&*state, db_index)
+}
+
 #[ocaml::func]
 #[ocaml::sig("registry -> bytes")]
 pub fn octez_riscv_durable_in_memory_registry_hash(
