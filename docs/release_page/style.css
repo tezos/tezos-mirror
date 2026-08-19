@@ -29,6 +29,13 @@ body {
     color: #1D2227;
 }
 
+.page-header .page-intro {
+    max-width: 700px;
+    margin: 10px auto 0;
+    font-size: 0.95em;
+    color: #55606B;
+}
+
 /* Unordered List Styles */
 ul {
     list-style-type: square;
