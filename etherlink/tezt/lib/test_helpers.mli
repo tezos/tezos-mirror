@@ -435,3 +435,52 @@ val tezlink_endpoint : Evm_node.t -> Client.endpoint
 
 (** Client initialised against the tezlink RPC served by [evm_node]. *)
 val tezlink_client : Evm_node.t -> Client.t Lwt.t
+
+(** Direct (non JSON-RPC) endpoints exposed by a sequencer node. *)
+module Sequencer_rpc : sig
+  (** [get_blueprint sequencer number] fetches the blueprint at level
+      [number] from [sequencer]. *)
+  val get_blueprint : Evm_node.t -> int64 -> JSON.t Lwt.t
+
+  (** [get_smart_rollup_address sequencer] fetches the smart rollup address
+      [sequencer] is configured with. *)
+  val get_smart_rollup_address : Evm_node.t -> string Lwt.t
+end
+
+(** [get_rollup_kernel_version ~sc_rollup_node ()] reads the kernel version
+    from the durable storage of [sc_rollup_node]. *)
+val get_rollup_kernel_version :
+  ?kernel:Kernel.t -> sc_rollup_node:Sc_rollup_node.t -> unit -> string Lwt.t
+
+(** [check_kernel_version ~evm_node ~equal expected] checks that the kernel
+    version reported by [evm_node] is [expected] when [equal], and that it
+    differs from it otherwise. Returns the version. *)
+val check_kernel_version :
+  evm_node:Evm_node.t -> equal:bool -> string -> string Lwt.t
+
+(** Base fee of the transactions hardcoded in the tests. *)
+val base_fee_for_hardcoded_tx : Wei.t
+
+(** A deliberately high DA fee, used to show it does not apply to the
+    delayed inbox. *)
+val arb_da_fee_for_delayed_inbox : Wei.t
+
+(** [get_one_receipt_from_latest_or_fail evm_node] returns the receipt of the
+    single transaction of the latest block, and fails if the block does not
+    contain exactly one. *)
+val get_one_receipt_from_latest_or_fail :
+  Evm_node.t -> Transaction.transaction_receipt Lwt.t
+
+(** [expect_failure msg k] fails with [msg] if [k ()] succeeds. *)
+val expect_failure :
+  (unit Lwt.t, Format.formatter, unit, 'a) format4 ->
+  (unit -> 'b Lwt.t) ->
+  unit Lwt.t
+
+(** [Protocol] extended with a [register_test] that fails at run time, to
+    catch tests registering directly instead of going through
+    [register_test] or [register_both]. Sequencer test files alias it with
+    [module Protocol = Test_helpers.Protocol_no_direct_register]. *)
+module Protocol_no_direct_register : sig
+  include module type of Protocol
+end

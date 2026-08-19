@@ -450,7 +450,24 @@ let _etherlink_tezts =
   tezt
     [
       "evm_rollup";
-      "evm_sequencer";
+      "block_production";
+      "bridge_deposits";
+      "bridge_withdrawals";
+      "call_tracer";
+      "delayed_deposits";
+      "delayed_transactions";
+      "eip7702";
+      "evm_semantics";
+      "flush_reorg";
+      "kernel_upgrades";
+      "node_cli";
+      "observer";
+      "sequencer_lifecycle";
+      "sequencer_upgrades";
+      "storage";
+      "tracing";
+      "tx_queue";
+      "websockets";
       "validate";
       "dal_sequencer";
       "eth_call";
