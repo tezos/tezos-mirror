@@ -29,6 +29,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::{
     keyspace, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
@@ -729,13 +730,20 @@ pub fn store_sequencer_pool_address(
     Ok(())
 }
 
+/// The error a missing key reads as, for the integer accessors that require
+/// one to be present.
+fn path_not_found() -> tezos_storage::error::Error {
+    tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)
+}
+
 #[allow(dead_code)]
 pub fn read_l1_level(base: &impl KeySpace) -> Result<u32, Error> {
-    Ok(keyspace::read_u32_le(base, &L1_LEVEL_KEY)?)
+    base.get_le(&L1_LEVEL_KEY)
+        .ok_or_else(|| path_not_found().into())
 }
 
 pub fn store_l1_level(base: &mut impl KeySpace, level: u32) -> Result<(), Error> {
-    keyspace::write_u32_le(base, &L1_LEVEL_KEY, level)?;
+    base.store_le(&L1_LEVEL_KEY, level)?;
     Ok(())
 }
 
@@ -743,14 +751,16 @@ pub fn store_last_info_per_level_timestamp(
     base: &mut impl KeySpace,
     timestamp: Timestamp,
 ) -> Result<(), Error> {
-    keyspace::write_i64_le(base, &INFO_PER_LEVEL_TIMESTAMP_KEY, timestamp.i64())?;
+    base.store_le(&INFO_PER_LEVEL_TIMESTAMP_KEY, timestamp.i64())?;
     Ok(())
 }
 
 pub fn read_last_info_per_level_timestamp(
     base: &impl KeySpace,
 ) -> Result<Timestamp, Error> {
-    let timestamp = keyspace::read_i64_le(base, &INFO_PER_LEVEL_TIMESTAMP_KEY)?;
+    let timestamp: i64 = base
+        .get_le(&INFO_PER_LEVEL_TIMESTAMP_KEY)
+        .ok_or_else(path_not_found)?;
     Ok(timestamp.into())
 }
 
@@ -771,7 +781,7 @@ pub fn read_kernel_security_governance(base: &impl KeySpace) -> Option<ContractK
 }
 
 pub fn read_maximum_allowed_ticks(base: &impl KeySpace) -> Option<u64> {
-    keyspace::read_u64_le(base, &MAXIMUM_ALLOWED_TICKS_KEY).ok()
+    base.get_le(&MAXIMUM_ALLOWED_TICKS_KEY)
 }
 
 pub fn enter_stage_one(base: &mut impl KeySpace) -> Result<(), Error> {
@@ -807,7 +817,7 @@ pub fn store_storage_version(
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
-    base.set(&STORAGE_VERSION_KEY, storage_version.to_le_bytes())?;
+    base.store_le(&STORAGE_VERSION_KEY, storage_version)?;
     Ok(())
 }
 
@@ -815,7 +825,9 @@ pub fn store_storage_version(
 pub fn read_storage_version(base: &impl KeySpace) -> Result<StorageVersion, Error> {
     // The version is reconciled into `/base` by `init_storage_versioning` at
     // stage zero, so every read here goes through the keyspace alone.
-    let version_u64 = keyspace::read_u64_le(base, &STORAGE_VERSION_KEY)?;
+    let version_u64: u64 = base
+        .get_le(&STORAGE_VERSION_KEY)
+        .ok_or_else(path_not_found)?;
     let version = FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
     log!(Debug, "Current storage version: {:?}", version);
     Ok(version)
@@ -1026,9 +1038,8 @@ pub fn store_event(base: &mut impl KeySpace, event: &Event) -> anyhow::Result<()
 
 pub fn delayed_inbox_timeout(base: &impl KeySpace) -> anyhow::Result<u64> {
     // The default timeout is 12 hours
-    let default_timeout = 43200;
-    let timeout =
-        keyspace::read_u64_le_default(base, &DELAYED_INBOX_TIMEOUT_KEY, default_timeout)?;
+    let default_timeout: u64 = 43200;
+    let timeout: u64 = base.get_le_or(&DELAYED_INBOX_TIMEOUT_KEY, default_timeout);
     if timeout == default_timeout {
         log!(
             Debug,
@@ -1048,12 +1059,9 @@ pub fn delayed_inbox_timeout(base: &impl KeySpace) -> anyhow::Result<u64> {
 }
 
 pub fn delayed_inbox_min_levels(base: &impl KeySpace) -> anyhow::Result<u32> {
-    let default_min_levels = 720;
-    let min_levels = keyspace::read_u32_le_default(
-        base,
-        &DELAYED_INBOX_MIN_LEVELS_KEY,
-        default_min_levels,
-    )?;
+    let default_min_levels: u32 = 720;
+    let min_levels: u32 =
+        base.get_le_or(&DELAYED_INBOX_MIN_LEVELS_KEY, default_min_levels);
     if min_levels == default_min_levels {
         log!(
             Debug,
@@ -1091,10 +1099,9 @@ pub fn is_enable_fa_bridge(base: &impl KeySpace) -> bool {
 }
 
 pub fn max_blueprint_lookahead_in_seconds(base: &impl KeySpace) -> anyhow::Result<i64> {
-    Ok(keyspace::read_i64_le(
-        base,
-        &MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY,
-    )?)
+    Ok(base
+        .get_le(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS_KEY)
+        .ok_or_else(path_not_found)?)
 }
 
 /// Smart Contract of the delayed bridge

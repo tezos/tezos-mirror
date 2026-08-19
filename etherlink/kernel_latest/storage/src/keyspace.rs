@@ -20,129 +20,10 @@ use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
-/// Return an unsigned 8 bytes value at the given `key`.
-///
-/// NB: The given bytes are interpreted in little endian order. Mirroring
-/// the root [`read_u64_le`](crate::read_u64_le), a value shorter than 8
-/// bytes is zero-extended rather than rejected.
-pub fn read_u64_le(ks: &impl KeySpace, key: &Key) -> Result<u64, Error> {
-    let mut bytes = [0; std::mem::size_of::<u64>()];
-    ks.read(key, 0, bytes.as_mut_slice())
-        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
-    Ok(u64::from_le_bytes(bytes))
-}
-
-/// Return an unsigned 8 bytes value at the given `key`, or `default` when
-/// the key is absent.
-///
-/// Mirrors the root [`read_u64_le_default`](crate::read_u64_le_default): a
-/// missing key (or a value shorter than 8 bytes) yields `default` rather
-/// than an error.
-pub fn read_u64_le_default(
-    ks: &impl KeySpace,
-    key: &Key,
-    default: u64,
-) -> Result<u64, Error> {
-    match ks.get_prefix_exact::<{ std::mem::size_of::<u64>() }>(key) {
-        Some(bytes) => Ok(u64::from_le_bytes(bytes)),
-        None => Ok(default),
-    }
-}
-
-/// Return an unsigned 4 bytes value at the given `key`.
-///
-/// NB: The given bytes are interpreted in little endian order. The value
-/// must hold at least 4 bytes.
-pub fn read_u32_le(ks: &impl KeySpace, key: &Key) -> Result<u32, Error> {
-    let bytes = ks
-        .get_prefix_exact::<{ std::mem::size_of::<u32>() }>(key)
-        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
-    Ok(u32::from_le_bytes(bytes))
-}
-
-/// Return an unsigned 4 bytes value at the given `key`, or `default` when
-/// the key is absent.
-///
-/// The 4-bytes counterpart of [`read_u64_le_default`]: a missing key (or a
-/// value shorter than 4 bytes) yields `default` rather than an error.
-pub fn read_u32_le_default(
-    ks: &impl KeySpace,
-    key: &Key,
-    default: u32,
-) -> Result<u32, Error> {
-    match ks.get_prefix_exact::<{ std::mem::size_of::<u32>() }>(key) {
-        Some(bytes) => Ok(u32::from_le_bytes(bytes)),
-        None => Ok(default),
-    }
-}
-
-/// Write an unsigned 4 bytes value at the given `key`.
-///
-/// NB: The value is stored in little endian order, byte-compatible with the
-/// root [`store_read_slice`](crate::store_read_slice)/`store_write` pair.
-pub fn write_u32_le(ks: &mut impl KeySpace, key: &Key, value: u32) -> Result<(), Error> {
-    ks.set(key, value.to_le_bytes()).map_err(Error::from)
-}
-
-/// Return an unsigned 2 bytes value at the given `key`.
-///
-/// NB: The given bytes are interpreted in little endian order. The value
-/// must hold at least 2 bytes.
-pub fn read_u16_le(ks: &impl KeySpace, key: &Key) -> Result<u16, Error> {
-    let bytes = ks
-        .get_prefix_exact::<{ std::mem::size_of::<u16>() }>(key)
-        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
-    Ok(u16::from_le_bytes(bytes))
-}
-
-/// Return an unsigned 2 bytes value at the given `key`, or `default` when
-/// the key is absent.
-///
-/// Mirrors the root [`read_u16_le_default`](crate::read_u16_le_default): a
-/// missing key (or a value shorter than 2 bytes) yields `default` rather
-/// than an error.
-pub fn read_u16_le_default(
-    ks: &impl KeySpace,
-    key: &Key,
-    default: u16,
-) -> Result<u16, Error> {
-    match ks.get_prefix_exact::<{ std::mem::size_of::<u16>() }>(key) {
-        Some(bytes) => Ok(u16::from_le_bytes(bytes)),
-        None => Ok(default),
-    }
-}
-
-/// Write an unsigned 2 bytes value at the given `key`.
-///
-/// NB: The value is stored in little endian order, byte-compatible with the
-/// root [`store_read_slice`](crate::store_read_slice)/`store_write` pair.
-pub fn write_u16_le(ks: &mut impl KeySpace, key: &Key, value: u16) -> Result<(), Error> {
-    ks.set(key, value.to_le_bytes()).map_err(Error::from)
-}
-
-/// Write a signed 8 bytes value at the given `key`.
-///
-/// NB: The value is stored in little endian order.
-pub fn write_i64_le(ks: &mut impl KeySpace, key: &Key, value: i64) -> Result<(), Error> {
-    ks.set(key, value.to_le_bytes()).map_err(Error::from)
-}
-
-/// Return a signed 8 bytes value at the given `key`.
-///
-/// NB: The given bytes are interpreted in little endian order. The value
-/// must hold at least 8 bytes.
-pub fn read_i64_le(ks: &impl KeySpace, key: &Key) -> Result<i64, Error> {
-    let bytes = ks
-        .get_prefix_exact::<{ std::mem::size_of::<i64>() }>(key)
-        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
-    Ok(i64::from_le_bytes(bytes))
-}
-
 /// Return a base58 contract address at the given `key`.
 pub fn read_b58_kt1(ks: &impl KeySpace, key: &Key) -> Option<ContractKt1Hash> {
-    let mut buffer = [0; KT1_B58_SIZE];
-    let read = ks.read(key, 0, buffer.as_mut_slice())?;
-    let kt1_b58 = std::str::from_utf8(&buffer[..read]).ok()?;
+    let buffer: [u8; KT1_B58_SIZE] = ks.get_prefix_exact(key)?;
+    let kt1_b58 = std::str::from_utf8(&buffer).ok()?;
     ContractKt1Hash::from_b58check(kt1_b58).ok()
 }
 
@@ -191,6 +72,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     const KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
@@ -210,17 +92,14 @@ mod tests {
         host.store_write_all(&path, &42u64.to_le_bytes()).unwrap();
 
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_u64_le(&ks, &key(b"/number")), Ok(42));
+        assert_eq!(ks.get_le(&key(b"/number")), Some(42u64));
     }
 
     #[test]
     fn u64_le_missing_key_is_path_not_found() {
         let mut host = MockKernelHost::default();
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(
-            read_u64_le(&ks, &key(b"/missing")),
-            Err(Error::Runtime(RuntimeError::PathNotFound))
-        );
+        assert_eq!(ks.get_le::<8, u64>(&key(b"/missing")), None);
     }
 
     #[test]
@@ -229,9 +108,9 @@ mod tests {
         {
             let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
             // Absent keys fall back to the supplied default.
-            assert_eq!(read_u64_le_default(&ks, &key(b"/u64"), 7), Ok(7));
-            assert_eq!(read_u32_le_default(&ks, &key(b"/u32"), 7), Ok(7));
-            assert_eq!(read_u16_le_default(&ks, &key(b"/u16"), 7), Ok(7));
+            assert_eq!(ks.get_le_or(&key(b"/u64"), 7u64), 7);
+            assert_eq!(ks.get_le_or(&key(b"/u32"), 7u32), 7);
+            assert_eq!(ks.get_le_or(&key(b"/u16"), 7u16), 7);
         }
         host.store_write_all(&RefPath::assert_from(b"/ks/u64"), &9u64.to_le_bytes())
             .unwrap();
@@ -240,9 +119,9 @@ mod tests {
         host.store_write_all(&RefPath::assert_from(b"/ks/u16"), &9u16.to_le_bytes())
             .unwrap();
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_u64_le_default(&ks, &key(b"/u64"), 7), Ok(9));
-        assert_eq!(read_u32_le_default(&ks, &key(b"/u32"), 7), Ok(9));
-        assert_eq!(read_u16_le_default(&ks, &key(b"/u16"), 7), Ok(9));
+        assert_eq!(ks.get_le_or(&key(b"/u64"), 7u64), 9);
+        assert_eq!(ks.get_le_or(&key(b"/u32"), 7u32), 9);
+        assert_eq!(ks.get_le_or(&key(b"/u16"), 7u16), 9);
     }
 
     #[test]
@@ -253,7 +132,24 @@ mod tests {
             .unwrap();
 
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_i64_le(&ks, &key(b"/number")), Ok(-42));
+        assert_eq!(ks.get_le(&key(b"/number")), Some(-42i64));
+    }
+
+    #[test]
+    fn be_reads_the_same_bytes_the_other_way_round() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(
+            &RefPath::assert_from(b"/ks/number"),
+            &0x0102_0304u32.to_be_bytes(),
+        )
+        .unwrap();
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_be(&key(b"/number")), Some(0x0102_0304u32));
+        // The same bytes read little-endian give the byte-swapped value, so
+        // the two readers cannot be confused for one another.
+        assert_eq!(ks.get_le(&key(b"/number")), Some(0x0403_0201u32));
+        assert_eq!(ks.get_be_or(&key(b"/missing"), 7u32), 7);
     }
 
     #[test]
@@ -284,80 +180,38 @@ mod tests {
         assert_eq!(read_b58_kt1(&ks, &key(b"/missing")), None);
     }
 
-    // The write helpers must land their bytes at the absolute path the
-    // relative key resolves to, so a value migrated to a keyspace writer
-    // stays readable at its historical durable location.
+    // An integer written through the keyspace must land at the absolute path
+    // the relative key resolves to, so a migrated value stays readable at its
+    // historical durable location.
 
     #[test]
-    fn write_u32_le_lands_at_absolute_path_and_round_trips() {
+    fn written_integers_land_at_their_absolute_path_and_round_trip() {
         let mut host = MockKernelHost::default();
         {
             let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-            write_u32_le(&mut ks, &key(b"/level"), 7).unwrap();
+            ks.store_le(&key(b"/level"), 7u32).unwrap();
+            ks.store_le(&key(b"/nb_chunks"), 7u16).unwrap();
+            ks.store_le(&key(b"/ts"), -42i64).unwrap();
         }
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/ks/level"))
                 .unwrap(),
             7u32.to_le_bytes()
         );
-        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_u32_le(&ks, &key(b"/level")), Ok(7));
-    }
-
-    #[test]
-    fn write_u16_le_lands_at_absolute_path_and_round_trips() {
-        let mut host = MockKernelHost::default();
-        {
-            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-            write_u16_le(&mut ks, &key(b"/nb_chunks"), 7).unwrap();
-        }
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/ks/nb_chunks"))
                 .unwrap(),
             7u16.to_le_bytes()
         );
-        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_u16_le(&ks, &key(b"/nb_chunks")), Ok(7));
-    }
-
-    #[test]
-    fn write_i64_le_lands_at_absolute_path_and_round_trips() {
-        let mut host = MockKernelHost::default();
-        {
-            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-            write_i64_le(&mut ks, &key(b"/ts"), -42).unwrap();
-        }
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/ks/ts"))
                 .unwrap(),
             (-42i64).to_le_bytes()
         );
+
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_i64_le(&ks, &key(b"/ts")), Ok(-42));
-    }
-
-    #[test]
-    fn store_rlp_byte_compatible_with_absolute_helper() {
-        // Same value, same resolved path, written through the keyspace helper
-        // vs the root `store_rlp`: the durable bytes must be identical.
-        let mut ks_host = MockKernelHost::default();
-        {
-            let mut ks = ks_host.load_or_create("/ks".parse().unwrap()).unwrap();
-            store_rlp(&1234u64, &mut ks, &key(b"/blob")).unwrap();
-        }
-        let mut raw_host = MockKernelHost::default();
-        crate::store_rlp(&1234u64, &mut raw_host, &RefPath::assert_from(b"/ks/blob"))
-            .unwrap();
-
-        assert_eq!(
-            ks_host
-                .store_read_all(&RefPath::assert_from(b"/ks/blob"))
-                .unwrap(),
-            raw_host
-                .store_read_all(&RefPath::assert_from(b"/ks/blob"))
-                .unwrap()
-        );
-        let ks = ks_host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(read_rlp::<u64>(&ks, &key(b"/blob")), Ok(1234));
+        assert_eq!(ks.get_le(&key(b"/level")), Some(7u32));
+        assert_eq!(ks.get_le(&key(b"/nb_chunks")), Some(7u16));
+        assert_eq!(ks.get_le(&key(b"/ts")), Some(-42i64));
     }
 }

@@ -32,6 +32,7 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::{keyspace, read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
@@ -281,7 +282,9 @@ fn store_blueprint_generation(
 
 fn read_blueprint_nb_chunks(base: &impl KeySpace, number: U256) -> Result<u16, Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    keyspace::read_u16_le(base, &key).map_err(Error::from)
+    base.get_le(&key).ok_or_else(|| {
+        tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+    })
 }
 
 fn store_blueprint_nb_chunks(
@@ -290,7 +293,7 @@ fn store_blueprint_nb_chunks(
     nb_chunks: u16,
 ) -> Result<(), Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    keyspace::write_u16_le(base, &key, nb_chunks).map_err(Error::from)
+    base.store_le(&key, nb_chunks).map_err(Error::from)
 }
 
 fn store_blueprint_chunk(
