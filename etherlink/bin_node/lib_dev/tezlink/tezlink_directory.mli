@@ -15,12 +15,10 @@ val register_tezlink_services :
   (module Tezlink_backend_sig.S) ->
   unit Tezos_rpc.Directory.t
 
-(** [protocol_for_block_or_level ~allowing_mock block_result]
-    returns the protocol and next protocol modules for the given block.
-    When [allowing_mock] is true, levels 0 and 1 return the zero and
-    genesis protocol modules respectively. *)
+(** [protocol_for_block_or_level block_result]
+    returns the protocol and next protocol modules for the given block,
+    resolved from the block's own [protocol]/[next_protocol]. *)
 val protocol_for_block_or_level :
-  allowing_mock:bool ->
   L2_types.Tezos_block.t tzresult ->
   (module Tezos_services.Tezlink_protocol)
   * (module Tezos_services.Tezlink_protocol)

@@ -676,69 +676,6 @@ module Tezlink_imported_protocol = Tezlink_Ushuai_protocol
 module Current_block_services =
   Make_block_service (Tezlink_imported_protocol) (Tezlink_imported_protocol)
 
-module Tezlink_zero_protocol = struct
-  include Tezos_shell_services.Block_services.Fake_protocol
-
-  let mock_block_header_metadata _ : block_header_metadata tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_metadata"
-      ~dst:block_header_metadata_encoding
-      ~src:Data_encoding.empty
-      ()
-
-  let mock_block_header_data ~chain_id:_ : block_header_data tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_data"
-      ~dst:block_header_data_encoding
-      ~src:Data_encoding.empty
-      ()
-end
-
-module Tezlink_genesis_protocol = struct
-  include Tezos_protocol_000_Ps9mPmXa.Protocol
-
-  let mock_block_header_metadata _ : block_header_metadata tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_metadata"
-      ~dst:block_header_metadata_encoding
-      ~src:Data_encoding.empty
-      ()
-
-  let mock_block_header_data ~chain_id : block_header_data tzresult =
-    let bootstrap_account =
-      Imported_protocol_parameters.Default_parameters.make_bootstrap_account
-        ( baker_account.pkh,
-          baker_account.pk,
-          Imported_context.Tez.of_mutez_exn baker_account.balance,
-          None,
-          None )
-    in
-    let parameter =
-      Imported_protocol_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts:[bootstrap_account]
-        (Tezlink_constants.all_constants ()).parametric
-    in
-    let parameter_format_json =
-      Imported_protocol_parameters.Default_parameters.json_of_parameters
-        ~chain_id
-        parameter
-    in
-    let protocol_parameters =
-      Data_encoding.Binary.to_bytes_exn Data_encoding.json parameter_format_json
-    in
-    Result_syntax.return
-      {
-        command =
-          Data.Command.Activate
-            {
-              protocol = Imported_protocol.hash;
-              fitness = [];
-              protocol_parameters;
-            };
-        signature = Signature.V0.zero;
-      }
-end
-
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
 let wrap conv impl p q i =
