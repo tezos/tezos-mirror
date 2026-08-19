@@ -215,6 +215,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Sc_rollup.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
+  Slashed_delegate_stake_from_unstaked_tez.register ~protocols ;
   Storage_maintenance.register ~protocols ;
   Storage_reconstruction.register ~protocols ;
   Storage_snapshots.register ~protocols ;
