@@ -520,24 +520,16 @@ let tezlink_protocol_of_protocol = function
   | L2_types.Tezos_block.Protocol.U025 ->
       (module Tezlink_Ushuai_protocol : Tezlink_protocol)
 
-let protocol_for_block_or_level ~allowing_mock block_result :
+let protocol_for_block_or_level block_result :
     (module Tezlink_protocol) * (module Tezlink_protocol) =
   let imported =
     ( (module Tezlink_imported_protocol : Tezlink_protocol),
       (module Tezlink_imported_protocol : Tezlink_protocol) )
   in
   match block_result with
-  | Ok (block : L2_types.Tezos_block.t) -> (
-      match block.level with
-      | 0l when allowing_mock ->
-          ( (module Tezlink_zero_protocol : Tezlink_protocol),
-            (module Tezlink_genesis_protocol : Tezlink_protocol) )
-      | 1l when allowing_mock ->
-          ( (module Tezlink_genesis_protocol : Tezlink_protocol),
-            tezlink_protocol_of_protocol block.next_protocol )
-      | _ ->
-          ( tezlink_protocol_of_protocol block.protocol,
-            tezlink_protocol_of_protocol block.next_protocol ))
+  | Ok (block : L2_types.Tezos_block.t) ->
+      ( tezlink_protocol_of_protocol block.protocol,
+        tezlink_protocol_of_protocol block.next_protocol )
   | _ ->
       (* TezosX PoC also uses the same backend as Tezlink for now. So when
         requesting the block, it fails as blocks are not stored at the same path.
@@ -558,7 +550,7 @@ let register_dynamic_block_services ~l2_chain_id
   let*! tezlink_block = retrieve_block (module Backend) chain block in
   let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
       =
-    protocol_for_block_or_level ~allowing_mock:(block <> `Head 0) tezlink_block
+    protocol_for_block_or_level tezlink_block
   in
   let module Block_header = Make_block_header (Proto) (Next_proto) in
   let module S = Block_header.Block_services.S in
@@ -864,13 +856,12 @@ let register_monitor_heads ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
 
          The protocol hashes are resolved from the block itself with the same
          logic as the block services, so this keeps applying the right filter
-         across future Michelson-interface protocol migrations. Heads are live
-         blocks, so [allowing_mock] is [false], like the [Head 0] block RPC. *)
+         across future Michelson-interface protocol migrations. *)
       let head_of_block (block : L2_types.Tezos_block.t) =
         let open Result_syntax in
         let ( (module Proto : Tezlink_protocol),
               (module Next_proto : Tezlink_protocol) ) =
-          protocol_for_block_or_level ~allowing_mock:false (Ok block)
+          protocol_for_block_or_level (Ok block)
         in
         if
           requested_or_any query#protocols Proto.hash
