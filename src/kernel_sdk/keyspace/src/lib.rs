@@ -80,6 +80,26 @@ impl Key {
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_ref()
     }
+
+    /// A key made of `self` followed by `suffix`.
+    ///
+    /// Takes anything that reads as bytes, so a constant segment (`Key`) and a
+    /// computed one (a `String` from `format!`) compose the same way.
+    // TODO: https://linear.app/tezos/issue/L2-1971
+    // A key builder would take over the composition rules this leaves to the
+    // caller: irmin separators, prefix overlap, and bytes hex-encoded only to
+    // survive path validation.
+    pub fn concat(&self, suffix: impl AsRef<[u8]>) -> Result<Self, KeyError> {
+        let mut bytes = self.as_bytes().to_vec();
+        bytes.extend_from_slice(suffix.as_ref());
+        Self::try_from(bytes)
+    }
+}
+
+impl AsRef<[u8]> for Key {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
 }
 
 impl AsRef<v2::Key> for Key {
