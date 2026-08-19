@@ -34,9 +34,11 @@ use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_data::mode::utils::catch_not_found;
 use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry::Registry;
+use octez_riscv_durable_storage::storage::ReadableKeyValueStore;
 use octez_riscv_durable_storage::storage::WriteableKeyValueStore;
 
-use crate::api_common::BackgroundKeyValueStore;
+use crate::api_common::BackgroundWriteableKeyValueStore;
+use crate::api_common::ReadableRegistryApply;
 use crate::api_common::RegistryApply;
 
 /// Type alias for a mutable registry state backed by a generic key-value store.
@@ -58,12 +60,12 @@ pub trait GcNames: Send + Sync + 'static {
 
 /// Wrapper to enable customizing OCaml GC's resource tracking.
 #[repr(transparent)]
-pub struct RegistryState<KV: WriteableKeyValueStore, G> {
+pub struct RegistryState<KV: ReadableKeyValueStore, G> {
     inner: Registry<KV, Normal>,
     _phantom: PhantomData<G>,
 }
 
-impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
+impl<KV: BackgroundWriteableKeyValueStore, G> RegistryState<KV, G> {
     /// Construct a new registry.
     pub fn new(repo: KV::Repo) -> Self {
         Self {
@@ -73,7 +75,7 @@ impl<KV: BackgroundKeyValueStore, G> RegistryState<KV, G> {
     }
 }
 
-impl<KV: WriteableKeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
+impl<KV: ReadableKeyValueStore, G> From<Registry<KV, Normal>> for RegistryState<KV, G> {
     fn from(value: Registry<KV, Normal>) -> Self {
         Self {
             inner: value,
@@ -82,7 +84,7 @@ impl<KV: WriteableKeyValueStore, G> From<Registry<KV, Normal>> for RegistryState
     }
 }
 
-impl<KV: WriteableKeyValueStore, G> Deref for RegistryState<KV, G> {
+impl<KV: ReadableKeyValueStore, G> Deref for RegistryState<KV, G> {
     type Target = Registry<KV, Normal>;
 
     fn deref(&self) -> &Self::Target {
@@ -98,7 +100,7 @@ impl<KV: WriteableKeyValueStore, G> DerefMut for RegistryState<KV, G> {
 
 impl<KV, G> TryClone for RegistryState<KV, G>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone,
 {
     type Error = OperationalError;
@@ -111,31 +113,37 @@ where
     }
 }
 
-impl<KV: WriteableKeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
+impl<KV: ReadableKeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
     const IMMUTABLE_NAME: &'static str = G::IMMUTABLE_NAME;
     const MUTABLE_NAME: &'static str = G::MUTABLE_NAME;
 }
 
-impl<KV, G> RegistryApply<KV, Normal> for DsRegistry<KV, G>
+impl<KV, G> ReadableRegistryApply<KV, Normal> for DsRegistry<KV, G>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Send + Sync,
 {
     type NotFoundError = Infallible;
-
-    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
-    where
-        F: FnOnce(&mut Registry<KV, Normal>) -> R + Send + 'static,
-        KV::Repo: Clone,
-    {
-        Ok(Ok(MutableState::apply(self, fun)?))
-    }
 
     fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&Registry<KV, Normal>) -> R + Send + 'static,
     {
         Ok(Ok(MutableState::apply_ro(self, fun)))
+    }
+}
+
+impl<KV, G> RegistryApply<KV, Normal> for DsRegistry<KV, G>
+where
+    KV: BackgroundWriteableKeyValueStore,
+    KV::Repo: Send + Sync,
+{
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
+    where
+        F: FnOnce(&mut Registry<KV, Normal>) -> R + Send + 'static,
+        KV::Repo: Clone,
+    {
+        Ok(Ok(MutableState::apply(self, fun)?))
     }
 }
 
@@ -161,7 +169,7 @@ pub struct BackgroundRegistry<KV: WriteableKeyValueStore, G, M: Mode> {
 
 impl<'a, KV, G> TryFrom<&'a Registry<KV, Normal>> for BackgroundRegistry<KV, G, Prove<'static>>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     G: GcNames,
 {
@@ -233,7 +241,7 @@ pub enum BuildVerifyError {
 
 impl<KV, G> BackgroundRegistry<KV, G, Verify>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     G: GcNames,
 {
     /// Build a verify-mode registry that replays operations against `proof`.
@@ -285,7 +293,7 @@ where
 
 impl<KV, G> BackgroundRegistry<KV, G, Verify>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Send + Sync,
 {
     /// Compute the registry root hash in verify mode.
@@ -389,26 +397,32 @@ macro_rules! background_apply {
     }};
 }
 
-impl<KV, G> RegistryApply<KV, Prove<'static>> for BackgroundRegistry<KV, G, Prove<'static>>
+impl<KV, G> ReadableRegistryApply<KV, Prove<'static>> for BackgroundRegistry<KV, G, Prove<'static>>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Send + Sync,
 {
     type NotFoundError = Infallible;
-
-    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
-    where
-        F: FnOnce(&mut Registry<KV, Prove<'static>>) -> R + Send + 'static,
-        R: Send + 'static,
-        KV::Repo: Clone,
-    {
-        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
-    }
 
     fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
     where
         F: FnOnce(&Registry<KV, Prove<'static>>) -> R + Send + 'static,
         R: Send + 'static,
+    {
+        Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
+    }
+}
+
+impl<KV, G> RegistryApply<KV, Prove<'static>> for BackgroundRegistry<KV, G, Prove<'static>>
+where
+    KV: BackgroundWriteableKeyValueStore,
+    KV::Repo: Send + Sync,
+{
+    fn apply<F, R>(&self, fun: F) -> Result<Result<R, Infallible>, OperationalError>
+    where
+        F: FnOnce(&mut Registry<KV, Prove<'static>>) -> R + Send + 'static,
+        R: Send + 'static,
+        KV::Repo: Clone,
     {
         Ok(Ok(background_apply!(self, fun, KV, Prove<'static>)?))
     }
@@ -432,27 +446,33 @@ macro_rules! background_apply_verify {
     }};
 }
 
-impl<KV, G> RegistryApply<KV, Verify> for BackgroundRegistry<KV, G, Verify>
+impl<KV, G> ReadableRegistryApply<KV, Verify> for BackgroundRegistry<KV, G, Verify>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Send + Sync,
 {
     // Verify mode replays against a proof; a touch of absent data diverges with `NotFound`.
     type NotFoundError = NotFound;
 
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, NotFound>, OperationalError>
+    where
+        F: FnOnce(&Registry<KV, Verify>) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        background_apply_verify!(self, fun, KV)
+    }
+}
+
+impl<KV, G> RegistryApply<KV, Verify> for BackgroundRegistry<KV, G, Verify>
+where
+    KV: BackgroundWriteableKeyValueStore,
+    KV::Repo: Send + Sync,
+{
     fn apply<F, R>(&self, fun: F) -> Result<Result<R, NotFound>, OperationalError>
     where
         F: FnOnce(&mut Registry<KV, Verify>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone,
-    {
-        background_apply_verify!(self, fun, KV)
-    }
-
-    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, NotFound>, OperationalError>
-    where
-        F: FnOnce(&Registry<KV, Verify>) -> R + Send + 'static,
-        R: Send + 'static,
     {
         background_apply_verify!(self, fun, KV)
     }
