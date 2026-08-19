@@ -114,6 +114,8 @@ echo "Release"
 release-cli create \
   --name="${gitlab_release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="🔗 New Release Page: https://octez.tezos.com/releases/octez-smart-rollup-node/" \
+  --description="Download the Octez Smart Rollup node, part of a reference implementation for the Tezos blockchain.
+
+🔗 New Release Page: https://octez.tezos.com/releases/octez-smart-rollup-node/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}"
