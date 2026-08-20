@@ -758,8 +758,8 @@ mod tests {
     use crate::chains::{DebugFeatures, TezlinkContent};
     use crate::chains::{
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
-        TezosXChainConfig, TezosXTransaction, EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        TEZOS_ACCOUNTS_ROOT, TEZ_SAFE_STORAGE_ROOT_PATH,
+        TezosXChainConfig, TezosXTransaction, TEZOS_ACCOUNTS_ROOT,
+        TEZ_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -1006,8 +1006,6 @@ mod tests {
     /// [`crate::kernel`].
     fn init_safe_storage_roots(host: &mut impl StorageV1) {
         host.store_write_all(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, b"placeholder")
-            .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
@@ -2735,8 +2733,7 @@ mod tests {
     #[test]
     fn test_first_blocks() {
         let mut rk = RuntimeKeyspaces::default();
-        // TezosXChainConfig::storage_root_paths lists EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-        // so SafeStorage::start()'s store_copy needs each safe root to exist.
+        // SafeStorage::start()'s store_copy needs each safe root to exist.
         init_safe_storage_roots(rk.host_mut());
 
         let chain_config = dummy_tezosx_config(SpecId::default());

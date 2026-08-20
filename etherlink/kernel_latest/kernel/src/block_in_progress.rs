@@ -42,6 +42,7 @@ use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
 use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
@@ -502,6 +503,7 @@ impl BlockInProgress {
     ) -> Result<L2Block, anyhow::Error>
     where
         Host: StorageV1,
+        KS: KeySpace,
     {
         let michelson_commitment = crate::state_hash::michelson_ops_commitment(
             &self.cumulative_tezos_operation_receipts.list,
@@ -513,7 +515,7 @@ impl BlockInProgress {
             self.timestamp,
         );
         let state_root =
-            crate::state_hash::evm_state_hash(rk.host_mut(), &blueprint_hash);
+            crate::state_hash::evm_state_hash(rk.eth_accounts(), &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
             rk.host_mut(),

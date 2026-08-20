@@ -17,7 +17,7 @@
 //!  || michelson_ops_commitment
 //!  || timestamp_le_bytes
 //! )
-//! evm_state_hash          = keccak256(h(/evm/eth_accounts) || blueprint_hash)
+//! evm_state_hash          = keccak256(h_keyspace(/evm/eth_accounts) || blueprint_hash)
 //! tez_accounts_state_hash = keccak256(h(/tez/tez_accounts) || blueprint_hash)
 //! ```
 //!
@@ -44,13 +44,13 @@
 //! so that, at a given level, both runtimes' state hashes diverge
 //! together.
 
-use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_smart_rollup_core::STORE_HASH_SIZE;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::block::AppliedOperation;
 
 use crate::chains::TEZOS_ACCOUNTS_ROOT;
@@ -98,25 +98,21 @@ pub fn blueprint_hash(
     hasher.finalize().into()
 }
 
-fn runtime_state_hash<Host: StorageV1>(
-    host: &mut Host,
-    accounts_path: &impl Path,
-    blueprint_hash: &[u8; 32],
-) -> Vec<u8> {
-    let accounts = safe_store_get_hash(host, accounts_path);
+/// Keccak over an accounts subtree hash and the blueprint hash.
+fn runtime_state_hash(accounts: &[u8], blueprint_hash: &[u8; 32]) -> Vec<u8> {
     let mut hasher = Keccak256::new();
-    hasher.update(&accounts);
+    hasher.update(accounts);
     hasher.update(blueprint_hash);
     hasher.finalize().to_vec()
 }
 
-/// Compute `keccak256(h(/evm/eth_accounts) || blueprint_hash)`
-/// and return it as a byte vector suitable for `EthBlock::state_root`.
-pub fn evm_state_hash<Host: StorageV1>(
-    host: &mut Host,
+/// Compute `keccak256(h_keyspace(/evm/eth_accounts) || blueprint_hash)` and
+/// return it as a byte vector suitable for `EthBlock::state_root`.
+pub fn evm_state_hash(
+    eth_accounts: &impl KeySpace,
     blueprint_hash: &[u8; 32],
 ) -> Vec<u8> {
-    runtime_state_hash(host, &EVM_ACCOUNTS_PATH, blueprint_hash)
+    runtime_state_hash(&eth_accounts.hash(), blueprint_hash)
 }
 
 /// Compute `keccak256(h(/tez/tez_accounts) || blueprint_hash)` and return
@@ -125,13 +121,23 @@ pub fn tez_accounts_state_hash<Host: StorageV1>(
     host: &mut Host,
     blueprint_hash: &[u8; 32],
 ) -> Vec<u8> {
-    runtime_state_hash(host, &TEZOS_ACCOUNTS_ROOT, blueprint_hash)
+    runtime_state_hash(
+        &safe_store_get_hash(host, &TEZOS_ACCOUNTS_ROOT),
+        blueprint_hash,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_smart_rollup_host::path::RefPath;
+
+    /// Durable root of the EVM accounts, spelled out rather than derived from
+    /// the keyspace name: the tests below pin the keyspace hash to the host
+    /// hash of this exact prefix, and a shared builder would let the two sides
+    /// move together unnoticed.
+    const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/eth_accounts");
 
     fn fixture_inputs() -> (
         [TransactionHash; 2],
@@ -191,18 +197,43 @@ mod tests {
     #[test]
     fn evm_and_tez_accounts_state_hashes_are_independent() {
         let (valid, delayed, michelson, ts) = fixture_inputs();
-        let mut host = MockHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
 
         // Write something distinct under each accounts path so the
         // subtree hashes differ. An empty subtree maps to the same
         // sentinel for both and would trivially match.
-        host.store_write_all(&EVM_ACCOUNTS_PATH, b"evm").unwrap();
-        host.store_write_all(&TEZOS_ACCOUNTS_ROOT, b"tez").unwrap();
+        rk.host_mut()
+            .store_write_all(&EVM_ACCOUNTS_PATH, b"evm")
+            .unwrap();
+        rk.host_mut()
+            .store_write_all(&TEZOS_ACCOUNTS_ROOT, b"tez")
+            .unwrap();
 
         let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
-        let evm = evm_state_hash(&mut host, &bh);
-        let tez = tez_accounts_state_hash(&mut host, &bh);
+        let evm = evm_state_hash(rk.eth_accounts(), &bh);
+        let tez = tez_accounts_state_hash(rk.host_mut(), &bh);
 
         assert_ne!(evm, tez);
+    }
+
+    /// The keyspace hashes the same subtree the raw host does, so moving the
+    /// root out of the mirror leaves `state_root` byte-identical. A drift here
+    /// would change every block's `state_root` at the upgrade.
+    #[test]
+    fn evm_hash_matches_the_durable_subtree_hash() {
+        let (valid, delayed, michelson, ts) = fixture_inputs();
+        let mut rk = MockRuntimeKeyspaces::default();
+        rk.host_mut()
+            .store_write_all(&EVM_ACCOUNTS_PATH, b"evm")
+            .unwrap();
+
+        let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
+        let through_keyspace = evm_state_hash(rk.eth_accounts(), &bh);
+        let through_host = runtime_state_hash(
+            &safe_store_get_hash(rk.host_mut(), &EVM_ACCOUNTS_PATH),
+            &bh,
+        );
+
+        assert_eq!(through_keyspace, through_host);
     }
 }
