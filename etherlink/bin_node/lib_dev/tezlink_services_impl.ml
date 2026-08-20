@@ -327,6 +327,7 @@ let make (ctxt : Evm_ro_context.t) =
        only the Tezos X Michelson runtime exposes. The directory is
        shared, so the route must answer here too — as unsupported. *)
     let run_script_view _chain _block ~contract:_ ~view:_ ~input:_ ~chain_id:_
-        ~unlimited_gas:_ ~gas:_ ~payer:_ ~now:_ ~level:_ ~unparsing_mode:_ =
+        ~unlimited_gas:_ ~gas:_ ~payer:_ ~sender:_ ~now:_ ~level:_
+        ~unparsing_mode:_ =
       failwith "run_script_view is unsupported in this backend"
   end : Tezlink_backend_sig.S)

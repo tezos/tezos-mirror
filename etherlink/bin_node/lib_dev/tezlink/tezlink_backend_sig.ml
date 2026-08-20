@@ -159,11 +159,19 @@ module type S = sig
         accepted but raises nothing;
       - [payer] is what [SOURCE] reports inside the view, defaulting to
         the null implicit account;
+      - [sender] is inert for an ordinary view — [VIEW] replaces the
+        callee's [SENDER] with the caller's [SELF_ADDRESS], which this
+        RPC pins to the viewed contract, as on L1 — but it is the calling
+        contract for the enshrined synthetic views, where it reaches the
+        EVM as [msg.sender]. An implicit [sender] is rejected there:
+        only an originated contract can execute [VIEW];
       - [now] and [level] (the raw integers behind L1's
         [Script_timestamp.t] and [Script_int.n num]) default to the
         block's own values;
-      - [SELF], [SENDER] and [BALANCE] describe [contract] and [AMOUNT]
-        is zero — the [VIEW] instruction sets them, not the caller. *)
+      - for an ordinary view [SELF], [SENDER] and [BALANCE] describe
+        [contract] and [AMOUNT] is zero — the [VIEW] instruction sets
+        them, not the caller. For an enshrined target [SELF] is [sender]
+        instead. *)
   val run_script_view :
     [`Main] ->
     block_param ->
@@ -174,6 +182,7 @@ module type S = sig
     unlimited_gas:bool ->
     gas:Z.t option ->
     payer:Tezos_types.Contract.implicit option ->
+    sender:Tezos_types.Contract.t option ->
     now:Z.t option ->
     level:Z.t option ->
     unparsing_mode:
