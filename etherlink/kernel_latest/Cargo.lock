@@ -2656,6 +2656,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
@@ -3316,6 +3317,7 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "thiserror 1.0.69",
  "tracing",
+ "trait-set",
 ]
 
 [[package]]
@@ -3680,6 +3682,7 @@ dependencies = [
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezos_crypto_rs",
  "tezos_ethereum_latest",
  "tezosx-interfaces",
@@ -3694,6 +3697,7 @@ dependencies = [
  "primitive-types",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezosx-journal",
  "tezosx-types",
 ]
@@ -3740,6 +3744,7 @@ dependencies = [
  "tezos-protocol",
  "tezos-smart-rollup",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezos-storage-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
@@ -3911,6 +3916,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "trait-set"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b79e2e9c9ab44c6d7c20d5976961b47e8f49ac199154daa514b77cd1ab536625"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

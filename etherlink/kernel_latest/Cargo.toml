@@ -146,6 +146,7 @@ http = { path = "../../vendors/http" }
 # miscs
 format_no_std = "1.2.0"
 cfg-if = "1.0.4"
+trait-set = "0.3.0"
 
 # kernel execution profiling
 nop-macros = { version = "0.2.0" }

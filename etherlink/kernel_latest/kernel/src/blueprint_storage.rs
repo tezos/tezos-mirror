@@ -26,6 +26,7 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
@@ -555,7 +556,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host, KS>(
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
@@ -625,7 +626,7 @@ pub fn fetch_delayed_txs<Host, KS>(
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let (mut delayed_txs, total_size) =
         match TezosXChainConfig::fetch_hashes_from_delayed_inbox(
@@ -682,7 +683,7 @@ fn parse_and_validate_blueprint<Host, KS>(
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
@@ -801,7 +802,7 @@ fn read_all_chunks_and_validate<Host, KS>(
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let mut chunks = vec![];
     let mut size = 0;
@@ -878,7 +879,7 @@ pub fn read_blueprint<Host, KS>(
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let exists = blueprint_exists(rk.base(), number)?;
     if exists {
@@ -922,7 +923,7 @@ pub fn read_next_blueprint<Host, KS>(
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<EVMBlockHeader>(rk.base()) {

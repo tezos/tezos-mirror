@@ -11,6 +11,7 @@ use revm::{
     },
 };
 use tezos_ethereum::wei::{mutez_to_evm_gas, Wei};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_interfaces::{
     canonicalize_native_address, gas,
     headers::{format_tez_from_wei, parse_u64_opt},
@@ -36,6 +37,7 @@ use crate::{
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::OriginalSource;
 
@@ -364,9 +366,10 @@ fn charge_delegated_storage_cost(
 /// charge — those stay in the outer dispatch arm.
 fn dispatch_origin_of<
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    host: &Host,
+    rk: &RuntimeKeyspaces<Host, KS>,
     registry: &R,
     addr_str: String,
     source_runtime: RuntimeId,
@@ -388,7 +391,7 @@ fn dispatch_origin_of<
                         )
                     })?;
             registry
-                .read_origin(host, source_runtime, &addr_str, budget)
+                .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
                     CustomPrecompileError::Revert(format!("originOf: {e}"), *gas)
                 })?
@@ -445,9 +448,10 @@ fn reject_same_runtime_target(
 /// guard, or the initial `RESOLVE_ADDRESS_BASE_COST` charge.
 fn dispatch_resolve_address<
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    host: &Host,
+    rk: &RuntimeKeyspaces<Host, KS>,
     registry: &R,
     addr_str: String,
     source_runtime: RuntimeId,
@@ -483,7 +487,7 @@ fn dispatch_resolve_address<
                         )
                     })?;
             registry
-                .read_origin(host, source_runtime, &addr_str, budget)
+                .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
                     CustomPrecompileError::Revert(format!("resolveAddress: {e}"), *gas)
                 })?
@@ -542,7 +546,7 @@ fn dispatch_resolve_address<
                         )
                     })?;
             let (inverse_class, consumed_dest) = registry
-                .read_origin(host, target_runtime, &derived, dest_budget)
+                .read_origin(rk, target_runtime, &derived, dest_budget)
                 .map_err(|e| {
                     CustomPrecompileError::Revert(
                         format!("resolveAddress: destination check error: {e}"),
@@ -578,8 +582,8 @@ fn burn_gateway_residual<'j, CTX, Host, KS, R>(
     gas: &mut Gas,
 ) -> Result<(), CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -630,8 +634,8 @@ fn emit_crac_sent<'j, CTX, Host, KS, R>(
     target_address: String,
     amount: U256,
 ) where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -672,8 +676,8 @@ fn build_original_source<'j, CTX, Host, KS, R>(
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -739,8 +743,8 @@ fn capture_original_source<'j, CTX, Host, KS, R>(
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -766,8 +770,8 @@ fn resolve_original_source<'j, CTX, Host, KS, R>(
     remaining_evm_gas: u64,
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -798,8 +802,8 @@ fn resolve_aliases<'j, CTX, Host, KS, R>(
     source: Address,
 ) -> Result<(String, String), CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -913,8 +917,8 @@ fn inject_tezos_headers_from_context<'j, CTX, Host, KS, R>(
     gas: Gas,
 ) -> Result<(), CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -946,8 +950,8 @@ pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, KS, R>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -1380,7 +1384,7 @@ where
                 None
             };
             let output = dispatch_origin_of(
-                context.db().rk.host(),
+                context.db().rk,
                 context.db().registry,
                 call.addr,
                 source_runtime,
@@ -1438,7 +1442,7 @@ where
                 None
             };
             let output = dispatch_resolve_address(
-                context.db().rk.host(),
+                context.db().rk,
                 context.db().registry,
                 call.addr,
                 source_runtime,
@@ -1469,7 +1473,7 @@ where
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::SolCall;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_protocol::contract::Contract;
     use tezosx_interfaces::testing::StubRegistry;
     use tezosx_interfaces::{AliasInfo, Classification, RuntimeId};
@@ -1642,11 +1646,11 @@ mod tests {
     /// → (true, Recorded, addr).
     #[test]
     fn resolve_address_same_runtime_short_circuit() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             addr.clone(),
             RuntimeId::Ethereum,
@@ -1663,10 +1667,10 @@ mod tests {
     /// → (false, 0, "").
     #[test]
     fn resolve_address_same_runtime_malformed_addr() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             "not-a-tz1".to_string(),
             RuntimeId::Tezos,
@@ -1682,7 +1686,7 @@ mod tests {
     /// Alias{target, native}: direct lookup → (true, Recorded, native).
     #[test]
     fn resolve_address_alias_direct_lookup() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let native_addr = "KT1_NATIVE".to_string();
         let alias_info = AliasInfo {
             runtime: RuntimeId::Tezos,
@@ -1692,7 +1696,7 @@ mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
 
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
@@ -1715,7 +1719,7 @@ mod tests {
     /// target_runtime (Tezos), which would fail if source_runtime were passed.
     #[test]
     fn resolve_address_native_to_derived_recorded() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let source_addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let derived_alias = "KT1_DERIVED";
 
@@ -1733,7 +1737,7 @@ mod tests {
         );
 
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             source_addr.to_string(),
             RuntimeId::Ethereum,
@@ -1749,7 +1753,7 @@ mod tests {
     /// Native source → derivation → destination has NO inverse → DERIVED.
     #[test]
     fn resolve_address_native_to_derived_not_recorded() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let source_addr = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let derived_alias = "KT1_DERIVED";
 
@@ -1761,7 +1765,7 @@ mod tests {
         );
 
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             source_addr.to_string(),
             RuntimeId::Ethereum,
@@ -1781,7 +1785,7 @@ mod tests {
     /// takes the derivation path for a Native classification.
     #[test]
     fn resolve_address_evm_native_uses_derivation_path() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let addr_str = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
         let registry = StubRegistry::with_alias_and_expected_runtime(
             Classification::Native,
@@ -1790,7 +1794,7 @@ mod tests {
             RuntimeId::Tezos,
         );
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             addr_str.to_string(),
             RuntimeId::Ethereum,
@@ -1805,10 +1809,10 @@ mod tests {
     /// EVM Unknown → (false, 0, "").
     #[test]
     fn resolve_address_evm_unknown() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let output = dispatch_resolve_address(
-            &host,
+            &rk,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
@@ -1825,10 +1829,10 @@ mod tests {
     /// originOf: Unknown → (0, 0, "").
     #[test]
     fn dispatch_origin_of_unknown() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let output = dispatch_origin_of(
-            &host,
+            &rk,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
             RuntimeId::Tezos,
@@ -1842,11 +1846,11 @@ mod tests {
     /// originOf: Native → (1, source_runtime, addr).
     #[test]
     fn dispatch_origin_of_native() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Native);
         let addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string();
         let output = dispatch_origin_of(
-            &host,
+            &rk,
             &registry,
             addr,
             RuntimeId::Tezos,
@@ -1861,7 +1865,7 @@ mod tests {
     /// originOf: Alias → (2, home_runtime, native_addr).
     #[test]
     fn dispatch_origin_of_alias() {
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let alias_info = AliasInfo {
             runtime: RuntimeId::Tezos,
             native_address: b"KT1_X".to_vec(),
@@ -1869,7 +1873,7 @@ mod tests {
         let registry =
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let output = dispatch_origin_of(
-            &host,
+            &rk,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,
@@ -1886,7 +1890,7 @@ mod tests {
         // Durable storage would classify this address as Unknown; a
         // staged overlay entry must take precedence, skip the durable
         // read, and charge the lookup cost.
-        let host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::default();
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let staged = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Tezos,
@@ -1894,7 +1898,7 @@ mod tests {
         });
         let mut gas = Gas::new(GAS_LIMIT);
         let output = dispatch_origin_of(
-            &host,
+            &rk,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
             RuntimeId::Ethereum,

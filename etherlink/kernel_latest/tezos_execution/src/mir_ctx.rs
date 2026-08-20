@@ -31,6 +31,7 @@ use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
@@ -359,7 +360,9 @@ pub fn read_address_counter<Host: StorageV1>(
         .0)
 }
 
-impl<'a, Host: StorageV1, KS, R: Registry> CtxTrait<'a> for Ctx<'_, 'a, Host, KS, R> {
+impl<'a, Host: KeyspaceHost<KS>, KS: SafeKeyspace, R: Registry> CtxTrait<'a>
+    for Ctx<'_, 'a, Host, KS, R>
+{
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -696,7 +699,7 @@ pub fn enshrined_synthetic_views(
     }
 }
 
-impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
+impl<'a, Host: KeyspaceHost<KS>, KS: SafeKeyspace, R: Registry> Ctx<'_, 'a, Host, KS, R> {
     /// Body of the `originOf` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     ///
@@ -741,13 +744,9 @@ impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
             },
             _ => return Some(Ok(None)),
         };
-        // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.rk.host();
-        let operation_gas: &mut crate::gas::TezlinkOperationGas =
-            self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_origin_of_get(
-            host,
-            operation_gas,
+            self.tc_ctx.rk,
+            self.tc_ctx.operation_gas,
             self.registry,
             addr_str,
             source_runtime_nat,
@@ -793,13 +792,9 @@ impl<'a, Host: StorageV1, KS, R: Registry> Ctx<'_, 'a, Host, KS, R> {
             },
             _ => return Some(Ok(None)),
         };
-        // Distinct-field borrows.
-        let host: &Host = self.tc_ctx.rk.host();
-        let operation_gas: &mut crate::gas::TezlinkOperationGas =
-            self.tc_ctx.operation_gas;
         let result = crate::enshrined_contracts::dispatch_resolve_address_get(
-            host,
-            operation_gas,
+            self.tc_ctx.rk,
+            self.tc_ctx.operation_gas,
             self.registry,
             addr_str,
             source_runtime_nat,

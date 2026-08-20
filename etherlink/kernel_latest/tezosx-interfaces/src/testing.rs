@@ -11,6 +11,7 @@
 
 use std::cell::{Cell, RefCell};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
@@ -57,15 +58,16 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::address_from_string")
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _gas: u64,
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
@@ -120,15 +122,16 @@ impl Registry for NotWiredRegistry {
         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: RuntimeId,
         _addr: &str,
         _gas: u64,
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
@@ -259,15 +262,16 @@ impl Registry for MockRegistry {
         Ok(address_str.as_bytes().to_vec())
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: u64,
     ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         Ok((crate::Classification::Unknown, 0))
     }
@@ -370,7 +374,8 @@ impl Registry for StubRegistry {
         gas_remaining: u64,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         self.inner.ensure_alias(
             rk,
@@ -419,15 +424,16 @@ impl Registry for StubRegistry {
         }
     }
 
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        _host: &Host,
+        _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: u64,
     ) -> Result<(Classification, u64), TezosXRuntimeError>
     where
         Host: StorageV1,
+        KS: SafeKeyspace,
     {
         let count = self.read_count.get();
         self.read_count.set(count + 1);
@@ -448,7 +454,8 @@ impl Registry for StubRegistry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
     {
         self.inner.serve(rk, journal, request)
     }

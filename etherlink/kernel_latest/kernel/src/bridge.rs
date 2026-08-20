@@ -29,6 +29,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
@@ -490,7 +491,8 @@ pub fn apply_tezosx_xtz_deposit<Host, KS>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
 where
-    Host: StorageV1,
+    KS: SafeKeyspace,
+    Host: KeyspaceHost<KS>,
 {
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {

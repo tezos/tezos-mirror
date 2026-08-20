@@ -43,11 +43,10 @@ use tezos_data_encoding::types::Narith;
 use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_storage::error::Error as StorageError;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
@@ -853,7 +852,8 @@ fn execute_internal_operations<'a, Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<SubtreeStatus, ApplyOperationError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let mut root = InternalOpFrame {
         pending: internal_operations.into_iter(),
@@ -934,7 +934,8 @@ fn execute_pending_operations<'a, Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<Option<(PendingParent, InternalOpFrame<'a>)>, ApplyOperationError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     for OperationInfo { operation, counter } in frame.pending.by_ref() {
         // Where this operation's own receipt, appended below, lands.
@@ -1339,7 +1340,8 @@ fn transfer<'a, Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<TransferOutcome, CracError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let TransferStep {
         success,
@@ -1421,7 +1423,8 @@ fn transfer_step<'a, Host, KS>(
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
 ) -> Result<TransferStep<'a>, CracError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -1998,16 +2001,17 @@ impl From<ScriptError<'_>> for RunCodeError {
 /// caller-supplied storage that drops an existing big-map id makes
 /// `interpret` *delete* that big map. Nothing in this crate enforces
 /// this; `tezosx_run_code_fn` does, with a reverted `SafeStorage`.
-pub fn run_code<
-    Host: StorageV1,
-    KS,
-    R: Registry<Journal = tezosx_journal::TezosXJournal>,
->(
+pub fn run_code<Host, KS, R>(
     rk: &mut RuntimeKeyspaces<Host, KS>,
     registry: &R,
     journal: &mut TezosXJournal,
     params: &RunCodeParams,
-) -> Result<RunCodeOutput, RunCodeError> {
+) -> Result<RunCodeOutput, RunCodeError>
+where
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+{
     // Declared first so it outlives every `Micheline` borrowed from its
     // arena, including the ones held by `ctx` below.
     let parser = Parser::new();
@@ -2160,7 +2164,8 @@ fn transfer_external<'a, Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<(TransferTarget, u64, SubtreeStatus), CracError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     log!(Debug,
         "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
@@ -2270,7 +2275,8 @@ pub fn cross_runtime_transfer<'a, Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<CrossRuntimeTransferResult, CracTransferError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let entrypoint = &parameters.entrypoint;
     let value = Micheline::decode_raw(&parser.arena, &parameters.value, tc_ctx.gas())
@@ -2870,7 +2876,7 @@ pub fn validate_and_apply_operation<Host, KS>(
     safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     // Sum declared fees (mutez) from all operation contents before
@@ -3070,7 +3076,8 @@ fn apply_batch<Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<(Vec<ProcessedOperation>, bool), String>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let validate::ValidatedBatch {
         source_account,
@@ -3155,7 +3162,8 @@ fn apply_operation<Host, KS>(
     nonce_counter: &mut u16,
 ) -> Result<ProcessedOperation, String>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let mut internal_operations_receipts: Vec<TaggedInternalOp> = Vec::new();
     let mut gas = validated_operation.gas;
@@ -3349,8 +3357,7 @@ pub(crate) mod test_utils {
 mod tests {
     use tezosx_journal::TezosXHashes;
 
-    use tezos_evm_runtime::snapshot::SafeKeyspace;
-    use tezos_smart_rollup_keyspace::KeySpaceLoader;
+    use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
@@ -10150,7 +10157,7 @@ mod tests {
         init_receiver: &str,
     ) -> BigMapTransfer
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+        Host: KeyspaceHost<KS>,
         KS: SafeKeyspace,
     {
         let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)

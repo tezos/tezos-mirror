@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
@@ -228,7 +229,8 @@ pub(crate) fn execute_enshrined_contract<'a, Host, KS>(
               + HasDelegatedStorageCost),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
@@ -1026,7 +1028,8 @@ fn inject_context_headers<'a, Host, KS>(
               + HasDelegatedStorageCost),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let target_host = request.uri().host().map(str::to_string);
     let target_runtime = target_host
@@ -1376,7 +1379,8 @@ fn dispatch_crac_call<'a, Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()).into());
@@ -1468,8 +1472,8 @@ const RESOLUTION_DERIVED_NAT: u64 = 1;
 /// covers the primary alias lookup and, for EVM sources, the code-presence
 /// back-stop when it fires — is converted back to milligas and charged
 /// to `operation_gas`. Callers do not pre-charge anything.
-fn classify_origin_for_view<'a, Host, R>(
-    host: &Host,
+fn classify_origin_for_view<'a, Host, KS, R>(
+    rk: &RuntimeKeyspaces<Host, KS>,
     registry: &R,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     source_runtime: RuntimeId,
@@ -1477,6 +1481,7 @@ fn classify_origin_for_view<'a, Host, R>(
 ) -> Result<Classification, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Convert available milligas to source_runtime's native unit and pass as budget.
@@ -1489,7 +1494,7 @@ where
         .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
 
     let (classification, consumed) = registry
-        .read_origin(host, source_runtime, addr_str, budget)
+        .read_origin(rk, source_runtime, addr_str, budget)
         .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?;
 
     // Charge what read_origin consumed (alias lookup + back-stop when it fired).
@@ -1514,8 +1519,8 @@ where
 /// destination side. The `Recorded` upgrade fires when the destination
 /// already has an Alias record pointing back to `source_runtime` with
 /// the same `basis`; otherwise the result is `Derived`.
-fn derive_alias_for_view<'a, Host, R>(
-    host: &Host,
+fn derive_alias_for_view<'a, Host, KS, R>(
+    rk: &RuntimeKeyspaces<Host, KS>,
     registry: &R,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     source_runtime: RuntimeId,
@@ -1524,6 +1529,7 @@ fn derive_alias_for_view<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     operation_gas
@@ -1536,13 +1542,8 @@ where
         })
         .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?;
 
-    let inverse_class = classify_origin_for_view(
-        host,
-        registry,
-        operation_gas,
-        target_runtime,
-        &derived,
-    )?;
+    let inverse_class =
+        classify_origin_for_view(rk, registry, operation_gas, target_runtime, &derived)?;
 
     let resolution_nat: u64 = match inverse_class {
         Classification::Alias(info_back)
@@ -1574,8 +1575,8 @@ where
 /// On an invalid runtime ID (`source_runtime` does not map to a known
 /// [`RuntimeId`]), returns `Err(InterpretError::FailedWith(...))` with
 /// the Michelson payload `(Pair "INVALID_RUNTIME_ID" received_nat)`.
-pub fn dispatch_origin_of_get<'a, Host, R>(
-    host: &Host,
+pub fn dispatch_origin_of_get<'a, Host, KS, R>(
+    rk: &RuntimeKeyspaces<Host, KS>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     addr_str: &str,
@@ -1583,19 +1584,15 @@ pub fn dispatch_origin_of_get<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // ── Runtime ID validation ────────────────────────────────────────────
     let source_runtime = runtime_id_from_nat(source_runtime_nat)?;
 
     // ── Origin lookup (back-stop included inside classify_origin_for_view) ──
-    let classification = classify_origin_for_view(
-        host,
-        registry,
-        operation_gas,
-        source_runtime,
-        addr_str,
-    )?;
+    let classification =
+        classify_origin_for_view(rk, registry, operation_gas, source_runtime, addr_str)?;
 
     // ── Encode result as `or unit (or nat (pair nat string))` ────────────
     encode_origin_of(classification, source_runtime)
@@ -1609,8 +1606,8 @@ where
 /// - Unknown source  → `None`
 /// - Resolved target → `Some (Pair <resolution_nat> <translated_addr>)`
 ///   where `resolution_nat` is 0 (Recorded) or 1 (Derived).
-pub fn dispatch_resolve_address_get<'a, Host, R>(
-    host: &Host,
+pub fn dispatch_resolve_address_get<'a, Host, KS, R>(
+    rk: &RuntimeKeyspaces<Host, KS>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     addr_str: &str,
@@ -1619,6 +1616,7 @@ pub fn dispatch_resolve_address_get<'a, Host, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
+    KS: SafeKeyspace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Reusing `EnshrinedViewDispatchError::AliasResolution` for all three
@@ -1649,13 +1647,8 @@ where
     }
 
     // ── Origin lookup (back-stop included inside classify_origin_for_view) ──
-    let classification = classify_origin_for_view(
-        host,
-        registry,
-        operation_gas,
-        source_runtime,
-        addr_str,
-    )?;
+    let classification =
+        classify_origin_for_view(rk, registry, operation_gas, source_runtime, addr_str)?;
 
     // ── Routing ─────────────────────────────────────────────────────────
     // Exhaustive over all three `Classification` arms so the compiler
@@ -1687,7 +1680,7 @@ where
                 addr_str.as_bytes().to_vec()
             };
             derive_alias_for_view(
-                host,
+                rk,
                 registry,
                 operation_gas,
                 source_runtime,
@@ -1702,7 +1695,7 @@ where
             // which the direct-lookup arm above already handled. Kept so
             // the derivation surface is correct in 3+ runtime futures.
             derive_alias_for_view(
-                host,
+                rk,
                 registry,
                 operation_gas,
                 source_runtime,
@@ -1868,7 +1861,8 @@ pub fn dispatch_staticcall_evm_get<'a, Host, KS, R>(
     calldata: &[u8],
 ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias
@@ -5241,7 +5235,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5266,7 +5260,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5286,7 +5280,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5305,7 +5299,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5329,7 +5323,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Native);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -5353,7 +5347,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5372,7 +5366,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1abc",
@@ -5405,7 +5399,7 @@ pub(crate) mod tests {
         let mut gas = make_gas(10_000_000);
         let addr = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             addr,
@@ -5427,7 +5421,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "not-an-address",
@@ -5454,7 +5448,7 @@ pub(crate) mod tests {
             StubRegistry::with_classification(Classification::Alias(alias_info));
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5487,7 +5481,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             tezos_addr,
@@ -5516,7 +5510,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             tezos_addr,
@@ -5537,7 +5531,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5561,7 +5555,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -5579,7 +5573,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "not_a_valid_address_at_all",
@@ -5600,7 +5594,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_origin_of_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "not_a_valid_address_at_all",
@@ -5631,7 +5625,7 @@ pub(crate) mod tests {
         );
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -5669,7 +5663,7 @@ pub(crate) mod tests {
         .expecting_native_address(lowercase.as_bytes().to_vec());
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             mixed_case,
@@ -5689,7 +5683,7 @@ pub(crate) mod tests {
         let registry = StubRegistry::with_classification(Classification::Unknown);
         let mut gas = make_gas(10_000_000);
         let result = dispatch_resolve_address_get(
-            rk.host(),
+            &rk,
             &mut gas,
             &registry,
             "tz1abc",

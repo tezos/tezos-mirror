@@ -11,7 +11,6 @@ use revm::{
     primitives::{Address, Bytes},
 };
 
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
 use crate::{
@@ -36,6 +35,7 @@ use crate::{
 };
 
 use super::constants::DEBUGS;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
@@ -86,8 +86,8 @@ impl EtherlinkPrecompiles {
         inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, CustomPrecompileAbort>
     where
-        Host: StorageV1 + 'j,
-        KS: 'j,
+        Host: KeyspaceHost<KS> + 'j,
+        KS: SafeKeyspace + 'j,
         R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
         CTX: ContextTr<
             Db = EtherlinkVMDB<'j, Host, KS, R>,
@@ -158,8 +158,8 @@ impl EtherlinkPrecompiles {
 
 impl<'j, CTX, Host, KS, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,

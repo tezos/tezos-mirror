@@ -11,7 +11,6 @@ use revm::{
     primitives::Bytes,
 };
 
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
 use crate::{
@@ -26,6 +25,7 @@ use crate::{
     },
 };
 use evm_types::{CustomPrecompileError, FaDepositWithProxy, IntoWithRemainder};
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 sol! {
     contract Table {
@@ -67,8 +67,8 @@ pub(crate) fn table_precompile<'j, CTX, Host, KS, R>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    Host: StorageV1 + 'j,
-    KS: 'j,
+    Host: KeyspaceHost<KS> + 'j,
+    KS: SafeKeyspace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, Host, KS, R>,

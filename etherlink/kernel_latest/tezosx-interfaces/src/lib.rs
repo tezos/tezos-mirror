@@ -21,6 +21,7 @@ pub use tezosx_types::{
 #[cfg(feature = "testing")]
 use primitive_types::U256;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 
 /// Result of an alias-resolution call.
@@ -93,7 +94,8 @@ pub trait Registry {
         gas_remaining: u64,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1;
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace;
 
     fn compute_alias(&self, alias_info: AliasInfo) -> Result<String, TezosXRuntimeError>;
 
@@ -116,15 +118,16 @@ pub trait Registry {
     ///
     /// Callers that cross gas-unit boundaries must convert `budget` into
     /// `addr_runtime`'s unit before calling and convert `consumed` back after.
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: RuntimeId,
         addr: &str,
         budget: u64,
     ) -> Result<(Classification, u64 /* consumed */), TezosXRuntimeError>
     where
-        Host: StorageV1;
+        Host: StorageV1,
+        KS: SafeKeyspace;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
     fn serve<Host, KS>(
@@ -134,7 +137,8 @@ pub trait Registry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1;
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace;
 }
 
 pub trait RuntimeInterface {
@@ -172,7 +176,8 @@ pub trait RuntimeInterface {
         gas_remaining: u64,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1;
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace;
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
@@ -194,7 +199,8 @@ pub trait RuntimeInterface {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1;
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace;
 
     /// The URL host that identifies this runtime in HTTP requests routed
     /// by the registry (e.g. `"tezos"`, `"ethereum"`).
@@ -220,14 +226,15 @@ pub trait RuntimeInterface {
     ///
     /// For the Tezos runtime, no back-stop is applied — a storage miss
     /// returns `Unknown` after charging `ALIAS_LOOKUP_MILLIGAS`.
-    fn read_origin<Host>(
+    fn read_origin<Host, KS>(
         &self,
-        host: &Host,
+        rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
         budget: u64,
     ) -> Result<(Classification, u64 /* consumed */), TezosXRuntimeError>
     where
-        Host: StorageV1;
+        Host: StorageV1,
+        KS: SafeKeyspace;
 
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;

@@ -37,7 +37,7 @@ use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
-use tezos_evm_runtime::snapshot::SafeKeyspace;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
@@ -126,7 +126,7 @@ pub fn compute<Host, KS>(
     http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
-    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: WithGas + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     log!(Debug, "Queue length {}.", block_in_progress.queue_length());
@@ -291,8 +291,8 @@ fn build_next_bip_from_blueprints<Host, KS>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
 where
-    Host: HostReveal + StorageV1 + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + StorageV1 + WasmHost + KeySpaceLoader,
+    KS: SafeKeyspace,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) =
@@ -344,7 +344,7 @@ pub fn compute_bip<Host, KS>(
     http_trace_enabled: bool,
 ) -> anyhow::Result<BlockComputationResult>
 where
-    Host: StorageV1 + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: WithGas + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     let constants = chain_config.constants(
@@ -397,7 +397,7 @@ fn revert_block<Host, KS>(
     error: anyhow::Error,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
     KS: SafeKeyspace,
 {
     log!(
@@ -427,8 +427,8 @@ pub fn health_check<Host, KS>(
     config: &mut Configuration,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost,
-    KS: KeySpace,
+    Host: WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     if rk.host().last_run_aborted()? {
         log!(Error, "Something went wrong during previous kernel_run");
@@ -515,7 +515,7 @@ pub fn promote_block<Host, KS>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + KeySpaceLoader,
     KS: SafeKeyspace,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
@@ -558,8 +558,7 @@ pub fn produce<Host, KS>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host:
-        HostReveal + StorageV1 + WasmHost + WithGas + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(rk.host_mut())?;
@@ -1203,11 +1202,7 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>)
     where
-        Host: HostReveal
-            + StorageV1
-            + WasmHost
-            + WithGas
-            + KeySpaceLoader<KeySpace = KS::Live>,
+        Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
         KS: SafeKeyspace,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -1254,7 +1249,7 @@ mod tests {
     ) -> TezosXChainConfig
     where
         Host: StorageV1 + KeySpaceLoader,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         rk.host_mut()
             .store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
@@ -2422,7 +2417,7 @@ mod tests {
     fn first_block<Host, KS>(rk: &mut RuntimeKeyspaces<Host, KS>) -> TezosXBlockConstants
     where
         Host: StorageV1 + KeySpaceLoader,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         let timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));

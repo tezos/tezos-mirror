@@ -27,6 +27,7 @@ use tezos_crypto_rs::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
@@ -287,7 +288,7 @@ pub fn fetch_tezosx_configuration<Host, KS>(
 ) -> TezosXChainConfig
 where
     Host: StorageV1,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id

@@ -37,6 +37,7 @@ use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -92,7 +93,7 @@ where
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace;
+        KS: SafeKeyspace;
 
     fn handle_deposit<Host, KS>(
         rk: &mut RuntimeKeyspaces<Host, KS>,
@@ -103,7 +104,7 @@ where
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace;
+        KS: SafeKeyspace;
 
     fn handle_fa_deposit<Host, KS>(
         rk: &mut RuntimeKeyspaces<Host, KS>,
@@ -114,7 +115,7 @@ where
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace;
+        KS: SafeKeyspace;
 }
 
 impl InputHandler for ProxyInput {
@@ -130,7 +131,7 @@ impl InputHandler for ProxyInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
@@ -162,13 +163,17 @@ impl InputHandler for ProxyInput {
         Ok(())
     }
 
-    fn handle_deposit<Host: HostReveal, KS: KeySpace>(
+    fn handle_deposit<Host, KS>(
         rk: &mut RuntimeKeyspaces<Host, KS>,
         deposit: Deposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        KS: SafeKeyspace,
+        Host: HostReveal,
+    {
         inbox_content
             .transactions
             .push(handle_deposit(rk.host_mut(), deposit)?);
@@ -176,13 +181,17 @@ impl InputHandler for ProxyInput {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host: HostReveal, KS: KeySpace>(
+    fn handle_fa_deposit<Host, KS>(
         rk: &mut RuntimeKeyspaces<Host, KS>,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        KS: SafeKeyspace,
+        Host: HostReveal,
+    {
         inbox_content
             .transactions
             .push(handle_fa_deposit(rk.host_mut(), fa_deposit)?);
@@ -218,7 +227,7 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
@@ -298,7 +307,7 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
         let level = read_l1_level(rk.base())?;
@@ -316,7 +325,7 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: KeySpace,
+        KS: SafeKeyspace,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
         let level = read_l1_level(rk.base())?;
@@ -410,7 +419,7 @@ fn force_kernel_upgrade<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     match upgrade::read_kernel_upgrade(rk.base())? {
         Some(kernel_upgrade) => {
@@ -439,7 +448,7 @@ fn import_dal_attested_slots<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal,
-    KS: KeySpace,
+    KS: SafeKeyspace,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
@@ -505,7 +514,7 @@ pub fn handle_input<Host, KS, Mode>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    KS: SafeKeyspace,
     Mode: Parsable + InputHandler,
 {
     match input {
@@ -570,8 +579,8 @@ fn read_and_dispatch_input<Host, KS, Mode>(
     chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
@@ -620,8 +629,8 @@ pub fn read_proxy_inbox<Host, KS>(
     chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -688,8 +697,8 @@ pub fn read_sequencer_inbox<Host, KS>(
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
+    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the

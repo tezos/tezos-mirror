@@ -41,6 +41,7 @@ use evm_types::{
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
@@ -107,8 +108,12 @@ impl<'a, Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJourna
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<'a, Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    JournalTr for Journal<'a, Host, KS, R>
+impl<
+        'a,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
+        R: Registry<Journal = tezosx_journal::TezosXJournal>,
+    > JournalTr for Journal<'a, Host, KS, R>
 {
     type Database = EtherlinkVMDB<'a, Host, KS, R>;
     type State = EvmState;
@@ -544,8 +549,11 @@ impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    Journal<'_, Host, KS, R>
+impl<
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
+        R: Registry<Journal = tezosx_journal::TezosXJournal>,
+    > Journal<'_, Host, KS, R>
 {
     pub fn get_and_increment_global_counter(
         &mut self,
@@ -762,10 +770,12 @@ pub trait CrossRuntimeCall {
     fn cross_runtime_originator(&self) -> Option<Address>;
 }
 
-impl<'a, Host, KS, R: Registry<Journal = TezosXJournal>> CrossRuntimeCall
-    for Journal<'a, Host, KS, R>
-where
-    Host: StorageV1,
+impl<
+        'a,
+        Host: KeyspaceHost<KS>,
+        KS: SafeKeyspace,
+        R: Registry<Journal = TezosXJournal>,
+    > CrossRuntimeCall for Journal<'a, Host, KS, R>
 {
     fn tezosx_resolve_source_alias(
         &mut self,
@@ -990,7 +1000,8 @@ pub fn commit_evm_journal_from_external<Host, KS>(
     sequencer_credit: Option<(Address, U256)>,
 ) -> Result<Vec<Withdrawal>, EvmRunError>
 where
-    Host: StorageV1,
+    Host: KeyspaceHost<KS>,
+    KS: SafeKeyspace,
 {
     // Cross-runtime callers are classified through their staged alias,
     // never as Native: no caller to classify here.
