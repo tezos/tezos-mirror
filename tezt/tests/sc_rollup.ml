@@ -9755,47 +9755,25 @@ let build_dangling_hash_refute ~sc_rollup client =
 
    [wasm_2_0_0] because the plugin's [check_proof] only replays WASM proofs.
    Registered on protocol 025 only: that is where this plugin gate lives. *)
-let test_refute_dangling_hash_proof_dropped_at_forging =
-  let commitment_period = 5 in
-  register_test
-    ~__FILE__
-    ~kind:"wasm_2_0_0"
-    ~tags:["refutation"; "game"; "proof"; "irmin"; "baker"; "plugin"]
-    ~title:
-      "Sc_rollup, dangling_hash proof: baker drops un-appliable refute op at \
-       forging (plugin)"
-  @@ fun protocol ->
-  let* node, client =
-    setup_l1 ~commitment_period ~challenge_window:100 protocol
-  in
-  let keys =
-    Account.Bootstrap.keys
-    |> Array.map (fun k -> k.Account.alias)
-    |> Array.to_list
-  in
-  let* sc_rollup =
-    originate_sc_rollup
-      ~keys
-      ~kind:"wasm_2_0_0"
-      ~src:Constant.bootstrap1.alias
-      client
-  in
-  (* Generic single-tick game setup, shared with the DAL-overflow tests: two
-     conflicting single-tick commitments, then [p1] starts the dispute, so the
-     next expected move is a proof move. *)
-  let* () =
-    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup client
-  in
-  let* op = build_dangling_hash_refute ~sc_rollup client in
+(* Shared driver for the two tests below. Both build an operation whose
+   APPLICATION aborts with an Irmin exception, and both check the same three
+   things: the mempool validates it (operation validation does not replay
+   proofs), it is still a live reproducer through the protocol alone, and the
+   plugin gate keeps it out of blocks -- so the baker's node survives.
+
+   [what] names the operation kind in failure messages. *)
+let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
+    op =
   (* (1) Operation validation does not verify the proof, so the mempool accepts
      the op: it is [validated], hence a forging candidate. *)
   let* (`OpHash oph) = Operation.inject op client in
   let* mempool = Mempool.get_mempool client in
   if not (List.mem oph mempool.validated) then
     Test.fail
-      "Expected the malicious refute operation %s to be 'validated' (operation \
+      "Expected the malicious %s operation %s to be 'validated' (operation \
        validation does not verify PVM proofs). validated=[%s] \
        branch_delayed=[%s] refused=[%s]"
+      what
       oph
       (String.concat "," mempool.validated)
       (String.concat "," mempool.branch_delayed)
@@ -9865,11 +9843,12 @@ let test_refute_dangling_hash_proof_dropped_at_forging =
       (fun exn ->
         Test.fail
           "The node did not switch to the block the baker just injected (%s). \
-           The un-appliable refute operation %s was included in that block -- \
+           The un-appliable %s operation %s was included in that block -- \
            forging only validates operations, it does not apply them -- so \
            applying the block aborts (see step 2) and takes the node down with \
            it."
           (Printexc.to_string exn)
+          what
           oph)
   in
   Check.((level_after = level_before + 1) int)
@@ -9890,6 +9869,177 @@ let test_refute_dangling_hash_proof_dropped_at_forging =
     oph
     level_after ;
   unit
+
+let test_refute_dangling_hash_proof_dropped_at_forging =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"wasm_2_0_0"
+    ~tags:["refutation"; "game"; "proof"; "irmin"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dangling_hash proof: baker drops un-appliable refute op at \
+       forging (plugin)"
+  @@ fun protocol ->
+  let* node, client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"wasm_2_0_0"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* Generic single-tick game setup, shared with the DAL-overflow tests: two
+     conflicting single-tick commitments, then [p1] starts the dispute, so the
+     next expected move is a proof move. *)
+  let* () =
+    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup client
+  in
+  let* op = build_dangling_hash_refute ~sc_rollup client in
+  check_un_appliable_op_kept_out_of_blocks
+    ~protocol
+    ~node
+    ~client
+    ~keys
+    ~what:"refute"
+    op
+
+(* ------------------------------------------------------------------------ *)
+(* Outbox execution whose proof replay raises an Irmin exception             *)
+(* ------------------------------------------------------------------------ *)
+
+let hex_of_string s =
+  String.concat
+    ""
+    (List.map
+       (fun c -> sf "%02x" (Char.code c))
+       (List.of_seq (String.to_seq s)))
+
+(* A serialized WASM-PVM output proof whose Merkle state is the same poisoned
+   shape as [malicious_dangling_hash_pvm_step] -- one extender over a blinded
+   inode, which makes [irmin-pack] raise [Dangling_hash] while Irmin LOADS the
+   proof, before any of its hashes is checked.
+
+   [Sc_rollup_wasm.V2_0_0]'s [output_proof_encoding] is
+
+     obj2 (req "output_proof" <Tree2 tree proof>)
+          (req "output_proof_output" <outbox_level, message_index, message>)
+
+   so the bytes are that tree proof followed by a minimal well-formed output.
+
+   Unlike the refutation case the [before] hash cannot be arbitrary:
+   [Sc_rollup_operations.validate_and_decode_output_proof] checks
+   [state_of_output_proof proof = compressed_state] of the cemented commitment
+   BEFORE calling [verify_output_proof], and [state_of_output_proof] is exactly
+   the proof's [before] hash. So the proof is assembled here, around the
+   rollup's own cemented state, rather than recorded as a literal. *)
+let malicious_dangling_hash_output_proof ~compressed_state =
+  let zero_hash = String.concat "" (List.init 32 (fun _ -> "00")) in
+  let before =
+    Tezos_crypto.Hashed.Smart_rollup_state_hash.(
+      of_b58check_exn compressed_state |> to_string)
+    |> hex_of_string
+  in
+  String.concat
+    ""
+    [
+      (* The tree proof is a [Data_encoding.Compact] encoding with a one-byte
+         tag: the tag byte first, then the payloads. The shapes are those of
+         [malicious_dangling_hash_pvm_step], hence the same tag byte. *)
+      "03";
+      (* version 2: the second bit must be set, the WASM PVM only accepts
+         binary (non-stream) proofs. *)
+      "0002";
+      before;
+      (* [after] is never reached: loading the state raises first. *)
+      zero_hash;
+      (* Extender {length = 1; segment = [0]; proof = Blinded_inode _} *)
+      "d8010140c0";
+      zero_hash;
+      (* output_proof_output: outbox level 0, message index 0, and an empty
+         [Atomic_transaction_batch] (tag 0, then a 4-byte list length). Only
+         its decoding matters -- the exception fires before the output is
+         looked at. *)
+      "00000000";
+      "00";
+      "00";
+      "00000000";
+    ]
+
+(* Same gate, same configuration and same impact as
+   [test_refute_dangling_hash_proof_dropped_at_forging] above, on the other
+   operation the plugin guards: [Sc_rollup_execute_outbox_message]. No
+   refutation game is needed -- a freshly originated rollup already has a
+   cemented commitment, its genesis one, which is all the protocol checks the
+   proof against before replaying it. *)
+let test_execute_outbox_dangling_hash_proof_dropped_at_forging =
+  register_test
+    ~__FILE__
+    ~kind:"wasm_2_0_0"
+    ~tags:["outbox"; "proof"; "irmin"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dangling_hash output proof: baker drops un-appliable outbox \
+       op at forging (plugin)"
+  @@ fun protocol ->
+  let* node, client = setup_l1 protocol in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"wasm_2_0_0"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* A fresh rollup's last cemented commitment is its genesis commitment. *)
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let cemented_commitment =
+    JSON.(genesis_info |-> "commitment_hash" |> as_string)
+  in
+  let* commitment =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
+         ~sc_rollup
+         ~hash:cemented_commitment
+         ()
+  in
+  let output_proof =
+    malicious_dangling_hash_output_proof
+      ~compressed_state:commitment.compressed_state
+  in
+  let* op =
+    Operation.Manager.(
+      operation
+        [
+          make ~source:Constant.bootstrap1
+          @@ sc_rollup_execute_outbox_message
+               ~sc_rollup
+               ~cemented_commitment
+               ~output_proof
+               ();
+        ]
+        client)
+  in
+  check_un_appliable_op_kept_out_of_blocks
+    ~protocol
+    ~node
+    ~client
+    ~keys
+    ~what:"outbox execution"
+    op
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -10018,6 +10168,8 @@ let register ~protocols =
   (* The plugin gate on proofs raising an Irmin exception only exists in the
      protocol 025 plugin. *)
   test_refute_dangling_hash_proof_dropped_at_forging
+    (List.filter (fun p -> Protocol.number p = 025) protocols) ;
+  test_execute_outbox_dangling_hash_proof_dropped_at_forging
     (List.filter (fun p -> Protocol.number p = 025) protocols) ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
