@@ -893,3 +893,105 @@ let tezlink_endpoint evm_node =
 
 let tezlink_client evm_node =
   Client.init ~endpoint:(tezlink_endpoint evm_node) ()
+
+module Sequencer_rpc = struct
+  let get_blueprint sequencer number =
+    Runnable.run
+    @@ Curl.get
+         ~name:("curl#" ^ Evm_node.name sequencer)
+         ~args:["--fail"]
+         (Evm_node.endpoint sequencer
+         ^ "/evm/blueprint/" ^ Int64.to_string number)
+
+  let get_smart_rollup_address sequencer =
+    let* res =
+      Runnable.run
+      @@ Curl.get
+           ~name:("curl#" ^ Evm_node.name sequencer)
+           ~args:["--fail"]
+           (Evm_node.endpoint sequencer ^ "/evm/smart_rollup_address")
+    in
+    return (JSON.as_string res)
+end
+
+let get_rollup_kernel_version ?(kernel = Kernel.Latest) ~sc_rollup_node () =
+  let* kernel_version =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:(Durable_storage_path.kernel_version kernel)
+         ()
+  in
+  match kernel_version with
+  | None -> Test.fail "Kernel version not found in rollup node durable storage"
+  | Some hex -> return (Hex.to_string (`Hex hex))
+
+let check_kernel_version ~evm_node ~equal expected =
+  let open Rpc.Syntax in
+  let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
+  if equal then
+    Check.((kernel_version = expected) string)
+      ~error_msg:"Expected kernelVersion to be %R, got %L"
+  else
+    Check.((kernel_version <> expected) string)
+      ~error_msg:"Expected kernelVersion to be different than %R" ;
+  return kernel_version
+
+let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
+
+let arb_da_fee_for_delayed_inbox = Wei.of_eth_int 10_000
+(* da fee doesn't apply to delayed inbox, set it arbitrarily high
+   to prove this *)
+
+let get_one_receipt_from_latest_or_fail evm_node =
+  let open Rpc.Syntax in
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:false ~block:"latest" evm_node
+  in
+  match block.transactions with
+  | Hash [tx_hash] -> (
+      let*@ rpc_res = Rpc.get_transaction_receipt ~tx_hash evm_node in
+      match rpc_res with
+      | Some receipt -> return receipt
+      | None -> Test.fail "Could not fetch the transaction receipt")
+  | Hash _ | Empty ->
+      Test.fail
+        "Received a block with a transaction count different than the one \
+         expected"
+  | Full _ ->
+      Test.fail
+        "The EVM node returned the full transaction objects while it was \
+         expected to return only the hashes"
+
+let expect_failure msg k =
+  Lwt.catch
+    (fun () ->
+      let* _ = k () in
+      Test.fail msg)
+    (fun _ -> unit)
+
+module Protocol_no_direct_register = struct
+  include Protocol
+
+  let register_test ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
+      ?uses_admin_client ?supports ?additional_tags
+      (_body : Protocol.t -> unit Lwt.t) protocols =
+    Protocol.register_test
+      ~__FILE__
+      ~title
+      ~tags
+      ?uses
+      ?uses_node
+      ?uses_client
+      ?uses_admin_client
+      ?supports
+      ?additional_tags
+      (fun _protocol ->
+        Test.fail
+          ~loc:__LOC__
+          "Do not call Protocol.register_test directly. Use register_test, or \
+           register_both instead.")
+      protocols
+  [@@warning "-unused-value-declaration"]
+end

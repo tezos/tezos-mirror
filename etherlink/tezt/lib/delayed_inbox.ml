@@ -160,3 +160,59 @@ let send_tezos_operation_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
   in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   Lwt.return hash
+
+let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
+    ?(amount = Tez.one) ?expect_failure ~sc_rollup_node ~client ~l1_contracts
+    ~sc_rollup_address ?(sender = Constant.bootstrap2) raw_tx =
+  let expected_hash =
+    `Hex raw_tx |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address raw_tx)
+      ~amount
+      ~giver:sender.public_key_hash
+      ~receiver:l1_contracts.Setup.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      ?expect_failure
+      client
+  in
+  let* () =
+    if wait_for_next_level then
+      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+      unit
+    else unit
+  in
+  Lwt.return expected_hash
+
+let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
+    ~depositor ~receiver ~sc_rollup_node ~sc_rollup_address client =
+  let* () =
+    Client.transfer
+      ~entrypoint:"set"
+      ~arg:
+        (sf
+           "Pair %S (Pair (Right (Right %s%s)) 0)"
+           sc_rollup_address
+           receiver
+           (remove_0x proxy))
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.Setup.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* () =
+    Client.transfer
+      ~entrypoint:"mint"
+      ~arg:(sf "Pair (Pair 0 None) %d" amount)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.Setup.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  unit
