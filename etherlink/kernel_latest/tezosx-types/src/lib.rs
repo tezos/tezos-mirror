@@ -113,6 +113,8 @@ pub enum TezosXRuntimeError {
     Storage(KernelStorageError),
     #[error("Path error: {0}")]
     Path(#[from] tezos_smart_rollup_host::path::PathError),
+    #[error(transparent)]
+    Key(#[from] tezos_smart_rollup_keyspace::KeyError),
     #[error("Custom error: {0}")]
     Custom(String),
     /// The request is malformed (invalid URL, missing/invalid headers, bad

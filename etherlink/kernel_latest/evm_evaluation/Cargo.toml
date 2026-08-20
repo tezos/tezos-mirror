@@ -17,6 +17,7 @@ revm.workspace = true
 tezos_ethereum = { workspace = true, features = ["evaluation"] }
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-keyspace.workspace = true
 tezos-smart-rollup-core.workspace = true
 serde.workspace = true
 

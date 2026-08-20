@@ -493,15 +493,15 @@ impl Evaluation {
         // zero address if necessary.
         if from.is_zero() {
             if let Some(value) = self.value {
-                let mut info = simulation_caller.info(rk.host_mut())?;
+                let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
                 info.balance = u256_to_alloy(&value.saturating_add(max_gas_to_pay));
-                simulation_caller.set_info_without_code(rk.host_mut(), info)?;
+                simulation_caller.set_info_without_code(rk.eth_accounts_mut(), info)?;
             }
         }
 
-        let mut info = simulation_caller.info(rk.host_mut())?;
+        let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
-        simulation_caller.set_info_without_code(rk.host_mut(), info)?;
+        simulation_caller.set_info_without_code(rk.eth_accounts_mut(), info)?;
 
         // Simulation only: an inbound CREATE_CONTRACT reached from a
         // simulated call derives its KT1 from the zero seed and so
@@ -848,10 +848,10 @@ mod tests {
             Address::from_hex("0x2424242424242424242424242424242424242424").unwrap();
         // give some funds to caller
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-        let mut info = caller_account.info(rk.host_mut()).unwrap();
+        let mut info = caller_account.info(rk.eth_accounts_mut()).unwrap();
         info.balance = u256_to_alloy(&U256::MAX);
         caller_account
-            .set_info_without_code(rk.host_mut(), info)
+            .set_info_without_code(rk.eth_accounts_mut(), info)
             .unwrap();
         let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
 

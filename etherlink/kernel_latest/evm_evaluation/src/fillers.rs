@@ -10,7 +10,7 @@ use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
 };
 use crate::{write_host, write_out, DiffMap, ReportMap, ReportValue};
-use tezos_evm_runtime::runtime::MockKernelHost;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 use crate::models::TxPartIndices;
 
@@ -90,7 +90,7 @@ fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
 }
 
 fn check_should_not_exist(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     account: &StorageAccount,
     invalid_state: &mut bool,
     shouldnotexist: &Option<String>,
@@ -102,7 +102,7 @@ fn check_should_not_exist(
             code,
             nonce,
             ..
-        } = account.info(host).unwrap();
+        } = account.info(eth_accounts).unwrap();
 
         let balance_is_zero = balance == U256::ZERO;
         let no_code = code.is_none() || code.unwrap().is_empty();
@@ -118,14 +118,14 @@ fn check_should_not_exist(
 }
 
 fn check_balance(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     account: &StorageAccount,
     invalid_state: &mut bool,
     balance: &Option<primitive_types::U256>,
     hex_address: &str,
 ) {
     if let Some(balance) = balance {
-        match account.info(host) {
+        match account.info(eth_accounts) {
             Ok(current_info) => {
                 if current_info.balance != u256_to_alloy(balance) {
                     *invalid_state = true;
@@ -143,17 +143,20 @@ fn check_balance(
 }
 
 fn check_code(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     account: &StorageAccount,
     invalid_state: &mut bool,
     code: &Option<Bytes>,
     hex_address: &str,
 ) {
     if let Some(code) = &code {
-        let info = account.info(host).unwrap(); // Ensure the account exists.
+        let info = account.info(eth_accounts).unwrap(); // Ensure the account exists.
         let mut code = code.to_vec();
         trim_trailing_zeros(&mut code);
-        match CodeStorage::new(&info.code_hash).unwrap().get_code(host) {
+        match CodeStorage::new(&info.code_hash)
+            .unwrap()
+            .get_code(eth_accounts)
+        {
             Ok(Some(current_code)) => {
                 let mut current_code = current_code.original_byte_slice().to_vec();
                 trim_trailing_zeros(&mut current_code);
@@ -173,14 +176,14 @@ fn check_code(
 }
 
 fn check_nonce(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     account: &StorageAccount,
     invalid_state: &mut bool,
     nonce: &Option<u64>,
     hex_address: &str,
 ) {
     if let Some(nonce) = nonce {
-        match account.info(host) {
+        match account.info(eth_accounts) {
             Ok(current_info) => {
                 if current_info.nonce != *nonce {
                     *invalid_state = true;
@@ -198,7 +201,7 @@ fn check_nonce(
 }
 
 fn check_storage(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     account: &StorageAccount,
     invalid_state: &mut bool,
     storage: &Option<HashMap<H256, H256>>,
@@ -209,7 +212,8 @@ fn check_storage(
             write_host!("Account {}: storage matched (both empty).", hex_address);
         }
         for (index, value) in storage.iter() {
-            match account.get_storage(host, &U256::from_be_bytes(h256_to_alloy(index).0))
+            match account
+                .get_storage(eth_accounts, &U256::from_be_bytes(h256_to_alloy(index).0))
             {
                 Ok(current_storage_value) => {
                     let storage_value = value;
@@ -236,7 +240,7 @@ fn check_storage(
 }
 
 fn check_durable_storage(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     filler_expectation_result: &HashMap<String, AccountInfoFiller>,
     status: &mut TestResult,
 ) {
@@ -254,7 +258,7 @@ fn check_durable_storage(
         // Enable checks when fields are available in the source filler file.
 
         check_should_not_exist(
-            host,
+            eth_accounts,
             &account,
             &mut invalid_state,
             &info.shouldnotexist,
@@ -262,17 +266,23 @@ fn check_durable_storage(
         );
 
         check_balance(
-            host,
+            eth_accounts,
             &account,
             &mut invalid_state,
             &info.balance,
             &hex_address,
         );
 
-        check_code(host, &account, &mut invalid_state, &info.code, &hex_address);
+        check_code(
+            eth_accounts,
+            &account,
+            &mut invalid_state,
+            &info.code,
+            &hex_address,
+        );
 
         check_nonce(
-            host,
+            eth_accounts,
             &account,
             &mut invalid_state,
             &info.nonce,
@@ -280,7 +290,7 @@ fn check_durable_storage(
         );
 
         check_storage(
-            host,
+            eth_accounts,
             &account,
             &mut invalid_state,
             &info.storage,
@@ -320,7 +330,7 @@ pub fn output_result(file: &mut Option<File>, name: &str, status: TestResult) {
 
 #[allow(clippy::too_many_arguments)]
 pub fn process(
-    host: &mut MockKernelHost,
+    eth_accounts: &mut impl KeySpace,
     filler_source: FillerSource,
     spec_name: &SpecName,
     report_map: &mut ReportMap,
@@ -351,7 +361,11 @@ pub fn process(
                     write_host!("CONFIG NETWORK ---- {}", spec_name.to_str());
                     write_host!("CHECK  NETWORK ---- {}\n", filler_network);
 
-                    check_durable_storage(host, &filler_expectation.result, &mut status);
+                    check_durable_storage(
+                        eth_accounts,
+                        &filler_expectation.result,
+                        &mut status,
+                    );
                 }
             }
         }

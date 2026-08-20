@@ -37,6 +37,7 @@ use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, OperationDataAndMetadata, OperationResultSum,
@@ -155,17 +156,14 @@ pub enum Validity {
 //       arguably, effective_gas_price should be set on EthereumTransactionCommon
 //       directly - initialised when constructed.
 #[instrument(skip_all)]
-pub fn is_valid_ethereum_transaction_common<Host>(
-    host: &mut Host,
+pub fn is_valid_ethereum_transaction_common(
+    eth_accounts: &mut impl KeySpace,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
     effective_gas_price: U256,
     is_delayed: bool,
     limits: &EvmLimits,
-) -> Result<Validity, Error>
-where
-    Host: StorageV1,
-{
+) -> Result<Validity, Error> {
     // Chain id is correct.
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
@@ -192,7 +190,7 @@ where
     };
 
     let account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
-    let info = account.info(host)?;
+    let info = account.info(eth_accounts)?;
 
     // The transaction nonce is valid.
     if info.nonce != transaction.nonce {
@@ -212,7 +210,7 @@ where
     }
 
     if let Some(code) = revm_etherlink::storage::code::CodeStorage::new(&info.code_hash)?
-        .get_code(host)?
+        .get_code(eth_accounts)?
     {
         // The sender does not have code (EIP-3607) or isn't an EIP-7702 authorized account.
         if !code.is_empty()
@@ -635,7 +633,7 @@ where
 {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
-        rk.host_mut(),
+        rk.eth_accounts_mut(),
         transaction,
         block_constants,
         effective_gas_price,
@@ -676,7 +674,9 @@ where
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
-        if let Err(e) = caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&cost)) {
+        if let Err(e) =
+            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&cost))
+        {
             return Err(anyhow::anyhow!(
                 "Failed to charge {caller} additional fees of {}: {}",
                 cost,
@@ -814,7 +814,7 @@ where
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit
     // this top-level transaction needs.
-    caller_account.add_balance(rk.host_mut(), u256_to_alloy(&value))?;
+    caller_account.add_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
@@ -860,7 +860,8 @@ where
             // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
             // uncredited.
             if !execution_outcome.result.is_success() {
-                caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&value))?;
+                caller_account
+                    .sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
             }
             close_tezosx_journal(
                 rk.host_mut(),
@@ -873,7 +874,7 @@ where
         Err(err) => {
             close_tezosx_journal(rk.host_mut(), journal, None)?;
             // Something went wrong, we remove the added balance for the xtz deposit.
-            caller_account.sub_balance(rk.host_mut(), u256_to_alloy(&value))?;
+            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
             Err(err)
         }
     }
@@ -1192,6 +1193,7 @@ pub fn handle_transaction_result<Host, KS>(
 ) -> Result<RuntimeExecutionInfo, anyhow::Error>
 where
     Host: StorageV1,
+    KS: KeySpace,
 {
     match transaction_result {
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -1221,7 +1223,7 @@ where
             push_withdrawals_to_outbox(rk.host_mut(), outbox_queue, withdrawals)?;
 
             if pay_fees {
-                fee_updates.apply(rk.host_mut(), caller, sequencer_pool_address)?;
+                fee_updates.apply(rk, caller, sequencer_pool_address)?;
             }
 
             let tx_object = make_object(
@@ -1393,8 +1395,9 @@ pub(crate) mod tests {
         transaction::TransactionType,
         tx_common::EthereumTransactionCommon,
     };
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
 
     const CHAIN_ID: u32 = 1337;
@@ -1420,11 +1423,11 @@ pub(crate) mod tests {
         H160::from_slice(data)
     }
 
-    fn set_balance(host: &mut MockKernelHost, address: &H160, balance: U256) {
+    fn set_balance(eth_accounts: &mut impl KeySpace, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
-        let mut info = account.info(host).unwrap_or_default();
+        let mut info = account.info(eth_accounts).unwrap_or_default();
         info.balance = u256_to_alloy(&balance);
-        account.set_info(host, info).unwrap();
+        account.set_info(eth_accounts, info).unwrap();
     }
 
     fn resign(transaction: EthereumTransactionCommon) -> EthereumTransactionCommon {
@@ -1468,7 +1471,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_valid() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
@@ -1478,11 +1482,11 @@ pub(crate) mod tests {
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1498,7 +1502,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_invalid_cannot_prepay() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1510,11 +1515,11 @@ pub(crate) mod tests {
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1530,7 +1535,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_invalid_signature() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1542,11 +1548,11 @@ pub(crate) mod tests {
         let mut transaction = valid_tx(gas_limit);
         transaction.signature = None;
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1562,7 +1568,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_invalid_wrong_nonce() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1576,11 +1583,11 @@ pub(crate) mod tests {
         transaction = resign(transaction);
 
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1596,7 +1603,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_invalid_wrong_chain_id() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1608,11 +1616,11 @@ pub(crate) mod tests {
         transaction = resign(transaction);
 
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1628,7 +1636,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_is_invalid_max_fee_less_than_base_fee() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1644,7 +1653,7 @@ pub(crate) mod tests {
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1660,7 +1669,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_tx_invalid_not_enough_gas_for_fee() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1668,7 +1678,7 @@ pub(crate) mod tests {
         let gas_price = U256::from(21000);
         let balance = U256::from(21000) * gas_price;
         // fund account
-        set_balance(&mut host, &address, balance);
+        set_balance(eth_accounts, &address, balance);
 
         let gas_limit = 21000; // gas limit is not enough to cover fees
         let mut transaction = valid_tx(gas_limit);
@@ -1677,7 +1687,7 @@ pub(crate) mod tests {
 
         // act
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,
@@ -1691,7 +1701,7 @@ pub(crate) mod tests {
         );
 
         let res = is_valid_ethereum_transaction_common(
-            &mut host,
+            eth_accounts,
             &transaction,
             &block_constants,
             gas_price,

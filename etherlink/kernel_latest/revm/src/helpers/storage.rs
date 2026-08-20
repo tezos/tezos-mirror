@@ -3,38 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::error::EvmDbError;
 use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
 use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, storage::StorageV1};
-
-#[cfg(test)]
-pub fn read_u64_le(host: &impl StorageV1, path: &impl Path) -> Result<u64, RuntimeError> {
-    let mut bytes = [0; std::mem::size_of::<u64>()];
-    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
-    Ok(u64::from_le_bytes(bytes))
-}
-
-pub fn read_u64_le_default(
-    host: &impl StorageV1,
-    path: &impl Path,
-    default: u64,
-) -> Result<u64, EvmDbError> {
-    match host.store_read(path, 0, std::mem::size_of::<u64>()) {
-        Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
-            let actual = bytes.len();
-            let bytes_array: [u8; std::mem::size_of::<u64>()] = bytes
-                .try_into()
-                .map_err(|_| EvmDbError::UnexpectedBytesLength {
-                    expected: std::mem::size_of::<u64>(),
-                    actual,
-                })?;
-            Ok(u64::from_le_bytes(bytes_array))
-        }
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(err) => Err(EvmDbError::Runtime(err)),
-    }
-}
 
 pub fn read_u256_le_default(
     host: &impl StorageV1,
@@ -46,57 +17,6 @@ pub fn read_u256_le_default(
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(runtime_error) => Err(runtime_error),
     }
-}
-
-pub fn read_u256_be_default(
-    host: &impl StorageV1,
-    path: &impl Path,
-    default: U256,
-) -> Result<U256, RuntimeError> {
-    match host.store_read(path, 0, 32) {
-        Ok(bytes) if bytes.len() == 32 => Ok(U256::from_be_slice(&bytes)),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
-        Err(runtime_error) => Err(runtime_error),
-    }
-}
-
-pub fn read_b256_be_opt(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> Result<Option<B256>, RuntimeError> {
-    match host.store_read(path, 0, 32) {
-        Ok(bytes) if bytes.len() == 32 => Ok(Some(B256::from_slice(&bytes))),
-        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(runtime_error) => Err(runtime_error),
-    }
-}
-
-pub fn read_b256_be_default(
-    host: &impl StorageV1,
-    path: &impl Path,
-    default: B256,
-) -> Result<B256, RuntimeError> {
-    match read_b256_be_opt(host, path)? {
-        Some(v) => Ok(v),
-        None => Ok(default),
-    }
-}
-
-/// Turn a `PathNotFound` error into success: deleting a node that does
-/// not exist is a no-op.
-pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
-    match res {
-        Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
-        Err(err) => Err(err),
-    }
-}
-
-pub fn write_u64_le(
-    host: &mut impl StorageV1,
-    path: &impl Path,
-    value: u64,
-) -> Result<(), RuntimeError> {
-    host.store_write(path, value.to_le_bytes().as_slice(), 0)
 }
 
 pub fn write_u256_le(

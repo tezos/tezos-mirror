@@ -972,16 +972,16 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
-    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
+    fn set_balance(eth_accounts: &mut impl KeySpace, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
-        let mut info = account.info(host).unwrap();
+        let mut info = account.info(eth_accounts).unwrap();
         info.balance = u256_to_alloy(&balance);
-        account.set_info(host, info).unwrap();
+        account.set_info(eth_accounts, info).unwrap();
     }
 
-    fn get_balance(host: &mut impl StorageV1, address: &H160) -> U256 {
+    fn get_balance(eth_accounts: &mut impl KeySpace, address: &H160) -> U256 {
         let account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
-        let info = account.info(host).unwrap();
+        let info = account.info(eth_accounts).unwrap();
         alloy_to_u256(&info.balance)
     }
 
@@ -1220,7 +1220,11 @@ mod tests {
         store_blueprints(rk.base_mut(), vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        set_balance(rk.host_mut(), &sender, U256::from(10000000000000000000u64));
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         produce(
@@ -2119,7 +2123,7 @@ mod tests {
         store_blueprints(rk.base_mut(), vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        set_balance(rk.host_mut(), &sender, U256::from(30000u64));
+        set_balance(rk.eth_accounts_mut(), &sender, U256::from(30000u64));
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         produce(
             &mut rk,
@@ -2158,7 +2162,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         set_balance(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
@@ -2198,7 +2202,11 @@ mod tests {
         store_blueprints(rk.base_mut(), vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        set_balance(rk.host_mut(), &sender, U256::from(5000000000000000u64));
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(5000000000000000u64),
+        );
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         produce(
@@ -2236,7 +2244,7 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance = get_balance(rk.host_mut(), &dest_address);
+        let dest_balance = get_balance(rk.eth_accounts_mut(), &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -2270,7 +2278,11 @@ mod tests {
         );
 
         let sender = dummy_eth_caller();
-        set_balance(rk.host_mut(), &sender, U256::from(10000000000000000000u64));
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         // Produce block for blueprint containing transaction_0
@@ -2294,7 +2306,7 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance = get_balance(rk.host_mut(), &dest_address);
+        let dest_balance = get_balance(rk.eth_accounts_mut(), &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -2332,7 +2344,11 @@ mod tests {
         store_blueprints(rk.base_mut(), vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        set_balance(rk.host_mut(), &sender, U256::from(10000000000000000000u64));
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
         store_block_fees(rk.host_mut(), &dummy_block_fees).unwrap();
 
         produce(
@@ -2384,7 +2400,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         let initial_sender_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.host_mut(), &sender, initial_sender_balance);
+        set_balance(rk.eth_accounts_mut(), &sender, initial_sender_balance);
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         produce(
@@ -2398,8 +2414,8 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(rk.host_mut(), &sender);
-        let dest_balance = get_balance(rk.host_mut(), &dest_address);
+        let sender_balance = get_balance(rk.eth_accounts_mut(), &sender);
+        let dest_balance = get_balance(rk.eth_accounts_mut(), &dest_address);
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
@@ -2450,7 +2466,11 @@ mod tests {
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        set_balance(rk.host_mut(), &sender, U256::from(10000000000000000000u64));
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
 
         // tx is valid because correct nonce and account provisionned
         let valid_tx = Transaction {
@@ -2512,8 +2532,8 @@ mod tests {
         // the transaction should not have been processed
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(rk.host_mut(), &sender);
-        let dest_balance = get_balance(rk.host_mut(), &dest_address);
+        let sender_balance = get_balance(rk.eth_accounts_mut(), &sender);
+        let dest_balance = get_balance(rk.eth_accounts_mut(), &dest_address);
         assert_eq!(sender_balance, U256::from(10000000000000000000u64));
         assert_eq!(dest_balance, U256::from(0u64))
     }
@@ -2669,7 +2689,7 @@ mod tests {
         // Get the balance before the transaction, i.e. 0.
         let caller_account =
             StorageAccount::from_address(&h160_to_alloy(&caller)).unwrap();
-        let info = caller_account.info(rk.host_mut()).unwrap();
+        let info = caller_account.info(rk.eth_accounts_mut()).unwrap();
         let default_nonce = info.nonce;
         assert_eq!(default_nonce, 0, "default nonce should be 0");
 
@@ -2678,7 +2698,7 @@ mod tests {
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
         let fees = U256::from(21000) * tx.gas_limit_with_fees();
-        set_balance(rk.host_mut(), &caller, fees);
+        set_balance(rk.eth_accounts_mut(), &caller, fees);
 
         // Prepare a invalid transaction, i.e. with not enough funds.
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
@@ -2704,7 +2724,7 @@ mod tests {
         );
 
         // Nonce should not have been bumped
-        let info = caller_account.info(rk.host_mut()).unwrap();
+        let info = caller_account.info(rk.eth_accounts_mut()).unwrap();
         let nonce = info.nonce;
         assert_eq!(nonce, default_nonce, "nonce should not have been bumped");
     }
@@ -2856,7 +2876,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.host_mut(), &sender, sender_initial_balance);
+        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -2945,7 +2965,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.host_mut(), &sender, sender_initial_balance);
+        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -3066,7 +3086,7 @@ mod tests {
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
         set_balance(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
@@ -3121,7 +3141,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         set_balance(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
@@ -3198,7 +3218,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         set_balance(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );

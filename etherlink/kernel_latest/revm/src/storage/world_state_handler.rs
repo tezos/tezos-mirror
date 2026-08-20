@@ -10,26 +10,15 @@ use revm::{
 };
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, PathError, RefPath},
-    runtime::RuntimeError,
-    storage::StorageV1,
-};
+use tezos_ethereum::keyspace::KeySpaceExtU256;
+use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
 use tezosx_interfaces::{AliasInfo, Origin};
 
 use evm_types::{FaDepositWithProxy, PrecompileStateError};
 
-use crate::{
-    error::EvmDbError,
-    helpers::storage::{
-        allow_path_not_found, read_b256_be_default, read_u256_be_default,
-        read_u256_le_default, read_u64_le_default, write_u256_le,
-    },
-    storage::code::CodeStorage,
-};
-
-/// Path where EVM accounts are stored.
-pub const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/eth_accounts");
+use crate::{error::EvmDbError, storage::code::CodeStorage};
 
 /// Path where the L1 address of our withdrawals ticketer is stored.
 pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
@@ -62,42 +51,42 @@ pub const SEQUENCER_KEY_CHANGE_COUNTER_PATH: RefPath =
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
-const NONCE_PATH: RefPath = RefPath::assert_from(b"/nonce");
+const NONCE: Key = Key::from_static(b"/nonce");
 
 /// Path where an account balance, ether held, is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
-const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
+const BALANCE: Key = Key::from_static(b"/balance");
 
 /// "Internal" accounts - accounts with contract code have a contract code hash.
 /// This value is computed when the code is stored and kept for future queries. This
 /// path should be prefixed with the path to where the account is stored for the world
 /// state or for the current transaction.
-const CODE_HASH_PATH: RefPath = RefPath::assert_from(b"/code.hash");
+const CODE_HASH: Key = Key::from_static(b"/code.hash");
 
 /// "Internal" accounts - accounts with contract code, have their code stored here.
 /// This path should be prefixed with the path to where the account is stored for the
 /// world state or for the current transaction.
-const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
+const CODE: Key = Key::from_static(b"/code");
 
 /// Path where all the infos of a contract are stored in the same key.
 /// This path must contains balance, nonce and code hash. This is the new
 /// format for saving the accounts infos that overrides the previous one.
-const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+const INFO: Key = Key::from_static(b"/info");
 
 /// The contracts of "internal" accounts have their own storage area. The account
 /// location prefixed to this path gives the root path (prefix) to where such storage
 /// values are kept. Each index in durable storage gives one complete path to one
 /// such 256 bit integer value in storage.
-const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
+const STORAGE_ROOT: Key = Key::from_static(b"/storage");
 
 /// Path where global counter is stored.
-const GLOBAL_COUNTER_PATH: RefPath = RefPath::assert_from(b"/withdrawal_counter");
+const GLOBAL_COUNTER: Key = Key::from_static(b"/withdrawal_counter");
 
 /// Path where global ticket table is stored.
-const TICKET_STORAGE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
+const TICKET_STORAGE: Key = Key::from_static(b"/ticket_table");
 
 /// Path where global deposit table is stored.
-const DEPOSIT_QUEUE_TABLE: RefPath = RefPath::assert_from(b"/deposits_table");
+const DEPOSIT_QUEUE_TABLE: Key = Key::from_static(b"/deposits_table");
 
 /// If a contract tries to read a value from storage and it has previously not written
 /// anything to this location or if it wrote the default value, then it gets this
@@ -110,18 +99,17 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 /// Default nonce value for an account.
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
-pub fn account_path(address: &Address) -> Result<OwnedPath, PathError> {
-    let path_string = format!("/{address:x}");
-    OwnedPath::try_from(path_string)
+pub fn account_key(address: &Address) -> Result<Key, KeyError> {
+    Key::try_from(format!("/{address:x}"))
 }
 
-pub fn path_from_u256(index: &U256) -> Result<OwnedPath, PathError> {
-    let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
-    OwnedPath::try_from(path_string)
+pub fn key_from_u256(index: &U256) -> Result<Key, KeyError> {
+    Key::try_from(format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes())))
 }
 
 pub struct StorageAccount {
-    path: OwnedPath,
+    /// This account's subtree, relative to the accounts keyspace.
+    key: Key,
 }
 
 /// Origin classification of an account, carried as the fourth field of
@@ -348,123 +336,113 @@ impl From<AccountInfo> for RevmAccountInfo {
 }
 
 impl StorageAccount {
-    pub fn from_address(address: &Address) -> Result<Self, PathError> {
-        let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
-        Ok(path.into())
+    pub fn from_address(address: &Address) -> Result<Self, KeyError> {
+        Ok(Self {
+            key: account_key(address)?,
+        })
     }
 
-    pub fn from_path(path: OwnedPath) -> Self {
-        Self { path }
+    /// Key of `segment` under this account.
+    fn segment_key(&self, segment: &Key) -> Result<Key, KeyError> {
+        self.key.concat(segment)
     }
 
-    pub fn info(&self, host: &mut impl StorageV1) -> Result<AccountInfo, EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read(&path, 0, AccountInfo::MAX_RLP_SIZE) {
-            Ok(bytes) => Ok(AccountInfo::decode(&Rlp::new(&bytes))
-                .map_err(|_| RuntimeError::DecodingError)?),
-            Err(RuntimeError::PathNotFound) => {
-                // If we don't have the informations inside of `INFO_PATH` it's either :
-                // - We don't have the account created yet
-                // - The account is stored in the old format (each field in a different key)
-                // In the last case we need to migrate the account to the new format
-                // We are not verifying if the keys where existing before for code readibility,
-                // this code will run only once for an old address so the overhead is minimal.
-
-                let balance_path = concat(&self.path, &BALANCE_PATH)?;
-                let nonce_path = concat(&self.path, &NONCE_PATH)?;
-                let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
-                let code_path = concat(&self.path, &CODE_PATH)?;
-
-                let info = AccountInfo {
-                    balance: read_u256_le_default(
-                        host,
-                        &balance_path,
-                        BALANCE_DEFAULT_VALUE,
-                    )?,
-                    nonce: read_u64_le_default(host, &nonce_path, NONCE_DEFAULT_VALUE)?,
-                    code_hash: read_b256_be_default(host, &code_hash_path, KECCAK_EMPTY)?,
-                    // Split-field accounts predate classification.
-                    origin: AccountOrigin::Unclassified,
-                    code: None,
-                };
-
-                // Historic check, kept bit-for-bit: it compares the
-                // code hash against the zero hash (the old derived
-                // default), not `KECCAK_EMPTY`.
-                if info.balance == BALANCE_DEFAULT_VALUE
-                    && info.nonce == NONCE_DEFAULT_VALUE
-                    && info.code_hash == B256::ZERO
-                {
-                    // Account doesn't exist
-                    return Ok(AccountInfo::default());
-                }
-
-                // Write migration
-                match host.store_read_all(&code_path) {
-                    Ok(bytes) => {
-                        CodeStorage::add(
-                            host,
-                            Bytecode::new_raw_checked(Bytes::from(bytes))
-                                .map_err(|_| RuntimeError::DecodingError)?
-                                .original_byte_slice(),
-                            Some(info.code_hash),
-                        )?;
-                    }
-                    Err(RuntimeError::PathNotFound) => (),
-                    Err(err) => return Err(EvmDbError::Runtime(err)),
-                };
-                self.write_info_record(host, &info.rlp_bytes_checked()?)?;
-
-                // Delete legacy account entries
-                for path in &[balance_path, nonce_path, code_hash_path, code_path] {
-                    match host.store_delete(path) {
-                        Ok(()) | Err(RuntimeError::PathNotFound) => (),
-                        Err(err) => return Err(EvmDbError::Runtime(err)),
-                    };
-                }
-
-                Ok(info)
-            }
-            Err(err) => Err(EvmDbError::Runtime(err)),
+    pub fn info(
+        &self,
+        eth_accounts: &mut impl KeySpace,
+    ) -> Result<AccountInfo, EvmDbError> {
+        if let Some(bytes) = eth_accounts.get(&self.segment_key(&INFO)?) {
+            return Ok(AccountInfo::decode(&Rlp::new(&bytes))
+                .map_err(|_| RuntimeError::DecodingError)?);
         }
+
+        // Without an `INFO` record it's either :
+        // - We don't have the account created yet
+        // - The account is stored in the old format (each field in a different key)
+        // In the last case we need to migrate the account to the new format
+        // We are not verifying if the keys existed before for code readability,
+        // this code will run only once for an old address so the overhead is minimal.
+
+        let balance_key = self.segment_key(&BALANCE)?;
+        let nonce_key = self.segment_key(&NONCE)?;
+        let code_hash_key = self.segment_key(&CODE_HASH)?;
+        let code_key = self.segment_key(&CODE)?;
+
+        let info = AccountInfo {
+            balance: eth_accounts.get_evm_u256_le_or(&balance_key, BALANCE_DEFAULT_VALUE),
+            nonce: eth_accounts.get_le_or(&nonce_key, NONCE_DEFAULT_VALUE),
+            code_hash: eth_accounts
+                .get_prefix_exact::<32>(&code_hash_key)
+                .map_or(KECCAK_EMPTY, B256::from),
+            // Split-field accounts predate classification.
+            origin: AccountOrigin::Unclassified,
+            code: None,
+        };
+
+        // Historic check, kept bit-for-bit: it compares the
+        // code hash against the zero hash (the old derived
+        // default), not `KECCAK_EMPTY`.
+        if info.balance == BALANCE_DEFAULT_VALUE
+            && info.nonce == NONCE_DEFAULT_VALUE
+            && info.code_hash == B256::ZERO
+        {
+            // Account doesn't exist
+            return Ok(AccountInfo::default());
+        }
+
+        // Write migration
+        if let Some(bytes) = eth_accounts.get(&code_key) {
+            CodeStorage::add(
+                eth_accounts,
+                Bytecode::new_raw_checked(Bytes::from(bytes))
+                    .map_err(|_| RuntimeError::DecodingError)?
+                    .original_byte_slice(),
+                Some(info.code_hash),
+            )?;
+        }
+        self.write_info_record(eth_accounts, &info.rlp_bytes_checked()?)?;
+
+        // Delete legacy account entries
+        for key in &[balance_key, nonce_key, code_hash_key, code_key] {
+            eth_accounts.delete(key);
+        }
+
+        Ok(info)
     }
 
     pub fn info_without_migration(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
     ) -> Result<Option<AccountInfo>, EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read(&path, 0, AccountInfo::MAX_RLP_SIZE) {
-            Ok(bytes) => Ok(Some(
+        match eth_accounts.get(&self.segment_key(&INFO)?) {
+            Some(bytes) => Ok(Some(
                 AccountInfo::decode(&Rlp::new(&bytes))
                     .map_err(|_| RuntimeError::DecodingError)?,
             )),
-            Err(RuntimeError::PathNotFound) => Ok(None),
-            Err(err) => Err(EvmDbError::Runtime(err)),
+            None => Ok(None),
         }
     }
 
     /// Persist an already-encoded info record at this account's
     /// `/info`.
     ///
-    /// Uses `store_write` at offset 0 rather than `store_write_all`,
+    /// Writes at offset 0 rather than replacing the whole value,
     /// relying on the invariant documented on [`AccountInfo::MAX_RLP_SIZE`]
     /// that the record only ever grows: a write at offset 0 then always
     /// fully covers the previous content, so no stale trailing bytes can
     /// remain.
     ///
-    /// If that invariant is ever broken — a field becomes variable-size
-    /// and can shrink, or a classification can be downgraded — switch
-    /// this back to `store_write_all`; otherwise a shorter rewrite would
+    /// If that invariant is ever broken, a field becomes variable-size
+    /// and can shrink, or a classification can be downgraded, switch
+    /// this back to a whole-value write; otherwise a shorter rewrite would
     /// leave trailing bytes from the previous record and corrupt the
     /// next decode.
     fn write_info_record(
         &self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         value: &[u8],
     ) -> Result<(), EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
-        host.store_write(&path, value, 0)?;
+        eth_accounts.write(&self.segment_key(&INFO)?, 0, value)?;
         Ok(())
     }
 
@@ -473,162 +451,141 @@ impl StorageAccount {
     /// origin travels inside the info they read.
     pub fn set_info(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         mut new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
         if let Some(code) = new_infos.code.take() {
             CodeStorage::add(
-                host,
+                eth_accounts,
                 code.original_byte_slice(),
                 Some(new_infos.code_hash),
             )?;
         }
         let value = new_infos.rlp_bytes_checked()?;
-        self.write_info_record(host, &value)
+        self.write_info_record(eth_accounts, &value)
     }
 
     /// Same as [`Self::set_info`] but ignores the in-memory bytecode
     /// instead of persisting it to the code storage.
     pub fn set_info_without_code(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
         let value = new_infos.rlp_bytes_checked()?;
-        self.write_info_record(host, &value)
-    }
-
-    pub fn delete_info(&mut self, host: &mut impl StorageV1) -> Result<(), EvmDbError> {
-        let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_delete(&path) {
-            Ok(()) | Err(RuntimeError::PathNotFound) => (),
-            Err(err) => return Err(EvmDbError::Runtime(err)),
-        };
-        Ok(())
+        self.write_info_record(eth_accounts, &value)
     }
 
     // In the future we might want to optimize reading to not use `info`.
     pub fn add_balance(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         amount: U256,
     ) -> Result<(), EvmDbError> {
-        let mut info = self.info(host)?;
+        let mut info = self.info(eth_accounts)?;
         let current = info.balance;
         info.balance = current
             .checked_add(amount)
             .ok_or(EvmDbError::BalanceOverflow { current, amount })?;
-        self.set_info(host, info)
+        self.set_info(eth_accounts, info)
     }
 
     // In the future we might want to optimize reading to not use `info`.
     pub fn sub_balance(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         amount: U256,
     ) -> Result<(), EvmDbError> {
-        let mut info = self.info(host)?;
+        let mut info = self.info(eth_accounts)?;
         let current = info.balance;
         info.balance = current
             .checked_sub(amount)
             .ok_or(EvmDbError::BalanceUnderflow { current, amount })?;
-        self.set_info(host, info)
+        self.set_info(eth_accounts, info)
     }
 
-    pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, PathError> {
-        let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
-        let index_path = path_from_u256(index)?;
-        concat(&storage_path, &index_path)
+    pub fn storage_key(&self, index: &U256) -> Result<Key, KeyError> {
+        self.segment_key(&STORAGE_ROOT)?
+            .concat(key_from_u256(index)?)
     }
 
     pub fn get_storage(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
         index: &U256,
     ) -> Result<U256, EvmDbError> {
-        let path = self.storage_path(index)?;
-        Ok(read_u256_be_default(host, &path, STORAGE_DEFAULT_VALUE)?)
+        let key = self.storage_key(index)?;
+        Ok(eth_accounts.get_evm_u256_be_or(&key, STORAGE_DEFAULT_VALUE))
     }
 
     pub fn set_storage(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         index: &U256,
         value: &U256,
     ) -> Result<(), EvmDbError> {
-        let path = self.storage_path(index)?;
-        let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
-
-        Ok(host.store_write(&path, &value_bytes, 0)?)
+        let key = self.storage_key(index)?;
+        Ok(eth_accounts.set(&key, value.to_be_bytes::<{ U256::BYTES }>())?)
     }
 
     pub(crate) fn read_global_counter(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
     ) -> Result<U256, PrecompileStateError> {
-        let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
-        Ok(read_u256_le_default(host, &path, U256::ZERO)?)
+        let key = self.segment_key(&GLOBAL_COUNTER)?;
+        Ok(eth_accounts.get_evm_u256_le_or(&key, U256::ZERO))
     }
 
     pub(crate) fn write_global_counter(
         &self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         value: U256,
     ) -> Result<(), EvmDbError> {
-        let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
-        Ok(write_u256_le(host, &path, value)?)
+        let key = self.segment_key(&GLOBAL_COUNTER)?;
+        Ok(eth_accounts.store_evm_u256_le(&key, value)?)
     }
 
-    fn ticket_path(
-        &self,
-        ticket_hash: &U256,
-        owner: &Address,
-    ) -> Result<OwnedPath, PathError> {
-        concat(
-            &self.path,
-            &concat(
-                &TICKET_STORAGE_PATH,
-                &concat(&path_from_u256(ticket_hash)?, &account_path(owner)?)?,
-            )?,
-        )
+    fn ticket_key(&self, ticket_hash: &U256, owner: &Address) -> Result<Key, KeyError> {
+        self.segment_key(&TICKET_STORAGE)?
+            .concat(key_from_u256(ticket_hash)?)?
+            .concat(account_key(owner)?)
     }
 
     pub fn read_ticket_balance(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<U256, PrecompileStateError> {
-        let path = self.ticket_path(ticket_hash, owner)?;
-        Ok(read_u256_le_default(host, &path, U256::ZERO)?)
+        let key = self.ticket_key(ticket_hash, owner)?;
+        Ok(eth_accounts.get_evm_u256_le_or(&key, U256::ZERO))
     }
 
     pub fn write_ticket_balance(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         ticket_hash: &U256,
         owner: &Address,
         amount: U256,
     ) -> Result<(), EvmDbError> {
-        let path = self.ticket_path(ticket_hash, owner)?;
-        write_u256_le(host, &path, amount)?;
+        let key = self.ticket_key(ticket_hash, owner)?;
+        eth_accounts.store_evm_u256_le(&key, amount)?;
         Ok(())
     }
 
     /// Delete the durable ticket-balance node for `(ticket_hash, owner)`.
     ///
     /// A zero balance is read-equivalent to an absent node (see
-    /// [`Self::read_ticket_balance`], which defaults a missing path to
+    /// [`Self::read_ticket_balance`], which defaults a missing key to
     /// [`U256::ZERO`]), so a balance that reaches zero must leave no durable
     /// trace. Deleting an already-absent node is a no-op.
     pub(crate) fn delete_ticket_balance(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<(), EvmDbError> {
-        let path = self.ticket_path(ticket_hash, owner)?;
-        allow_path_not_found(host.store_delete(&path))?;
+        eth_accounts.delete(&self.ticket_key(ticket_hash, owner)?);
         Ok(())
     }
 
@@ -641,59 +598,53 @@ impl StorageAccount {
     #[cfg(test)]
     pub(crate) fn ticket_balance_node_exists(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<bool, EvmDbError> {
-        let path = self.ticket_path(ticket_hash, owner)?;
-        Ok(host.store_has(&path)?.is_some())
+        Ok(eth_accounts.contains(&self.ticket_key(ticket_hash, owner)?))
     }
 
-    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, PathError> {
-        concat(
-            &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
-            &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
-        )
+    fn deposit_key(&self, withdrawal_id: &U256) -> Result<Key, KeyError> {
+        self.segment_key(&DEPOSIT_QUEUE_TABLE)?
+            .concat(format!("/{withdrawal_id}"))
     }
 
     pub(crate) fn write_deposit(
         &mut self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         deposit_id: &U256,
         deposit: &FaDepositWithProxy,
     ) -> Result<(), EvmDbError> {
-        let deposit_path = self.deposit_path(deposit_id)?;
-        Ok(host.store_write_all(&deposit_path, &deposit.rlp_bytes())?)
+        let deposit_key = self.deposit_key(deposit_id)?;
+        Ok(eth_accounts.set(&deposit_key, deposit.rlp_bytes())?)
     }
 
     pub(crate) fn read_deposit_from_queue(
         &self,
-        host: &impl StorageV1,
+        eth_accounts: &impl KeySpace,
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, PrecompileStateError> {
-        let deposit_path = self.deposit_path(deposit_id)?;
-        let bytes = host.store_read_all(&deposit_path)?;
+        let deposit_key = self.deposit_key(deposit_id)?;
+        let bytes = eth_accounts
+            .get(&deposit_key)
+            .ok_or(RuntimeError::PathNotFound)?;
         Ok(FaDepositWithProxy::from_raw(bytes)?)
     }
 
     pub(crate) fn remove_deposit_from_queue(
         &self,
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         deposit_id: &U256,
     ) -> Result<(), EvmDbError> {
-        let deposit_path = self.deposit_path(deposit_id)?;
-        Ok(host.store_delete(&deposit_path)?)
-    }
-}
-
-impl From<OwnedPath> for StorageAccount {
-    fn from(path: OwnedPath) -> Self {
-        Self { path }
+        eth_accounts.delete(&self.deposit_key(deposit_id)?);
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::error::EvmDbError;
     use crate::{
         precompiles::constants::{
@@ -707,21 +658,23 @@ mod test {
         primitives::{Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
-    use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        MockRuntimeKeyspaces, ETH_ACCOUNTS_KEYSPACE_NAME,
+    };
+    use tezos_smart_rollup_keyspace::KeySpace;
 
     fn bytecode_from_static(bytes: &'static [u8]) -> Result<Bytecode, EvmDbError> {
         Ok(Bytecode::new_legacy(Bytes::from_static(bytes)))
     }
 
     fn check_account_code_info_fetching(
-        host: &mut impl StorageV1,
+        eth_accounts: &mut impl KeySpace,
         code_voucher: Bytecode,
         code_hash_voucher: FixedBytes<32>,
     ) {
         let bytecode = CodeStorage::new(&code_hash_voucher)
             .unwrap()
-            .get_code(host)
+            .get_code(eth_accounts)
             .unwrap()
             .unwrap_or_default();
 
@@ -730,11 +683,12 @@ mod test {
 
     #[test]
     fn check_withdrawal_code_info_fetching() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let code_voucher = bytecode_from_static(XTZ_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
-            &mut host,
+            eth_accounts,
             code_voucher,
             XTZ_BRIDGE_SOL_CONTRACT.code_hash,
         );
@@ -742,11 +696,12 @@ mod test {
 
     #[test]
     fn check_fa_withdrawal_code_info_fetching() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let code_voucher = bytecode_from_static(FA_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
-            &mut host,
+            eth_accounts,
             code_voucher,
             FA_BRIDGE_SOL_CONTRACT.code_hash,
         );
@@ -754,12 +709,13 @@ mod test {
 
     #[test]
     fn check_internal_forwarder_code_info_fetching() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let code_voucher =
             bytecode_from_static(INTERNAL_FORWARDER_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
-            &mut host,
+            eth_accounts,
             code_voucher,
             INTERNAL_FORWARDER_SOL_CONTRACT.code_hash,
         );
@@ -767,10 +723,11 @@ mod test {
 
     #[test]
     fn check_empty_account_code_info_fetching() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let code_voucher = Bytecode::new();
 
-        check_account_code_info_fetching(&mut host, code_voucher, KECCAK_EMPTY);
+        check_account_code_info_fetching(eth_accounts, code_voucher, KECCAK_EMPTY);
     }
 
     #[test]
@@ -907,7 +864,8 @@ mod test {
         use revm::primitives::Address;
         use tezosx_interfaces::{AliasInfo, RuntimeId};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
 
         for (i, origin) in [
             AccountOrigin::Native,
@@ -922,18 +880,21 @@ mod test {
         {
             let addr = Address::from_slice(&[i as u8 + 1; 20]);
             let mut account = StorageAccount::from_address(&addr).unwrap();
-            assert!(account.info_without_migration(&host).unwrap().is_none());
+            assert!(account
+                .info_without_migration(eth_accounts)
+                .unwrap()
+                .is_none());
 
             account
                 .set_info_without_code(
-                    &mut host,
+                    eth_accounts,
                     AccountInfo {
                         origin: origin.clone(),
                         ..AccountInfo::default()
                     },
                 )
                 .unwrap();
-            let read_back = account.info(&mut host).unwrap().origin;
+            let read_back = account.info(eth_accounts).unwrap().origin;
             assert_eq!(read_back, origin);
         }
     }
@@ -950,7 +911,8 @@ mod test {
         use revm::primitives::Address;
         use tezosx_interfaces::{AliasInfo, RuntimeId};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let addr = Address::from_slice(&[0x42; 20]);
         let mut account = StorageAccount::from_address(&addr).unwrap();
 
@@ -964,14 +926,14 @@ mod test {
         ] {
             account
                 .set_info_without_code(
-                    &mut host,
+                    eth_accounts,
                     AccountInfo {
                         origin: origin.clone(),
                         ..AccountInfo::default()
                     },
                 )
                 .unwrap();
-            let read_back = account.info(&mut host).unwrap().origin;
+            let read_back = account.info(eth_accounts).unwrap().origin;
             assert_eq!(read_back, origin);
         }
     }
@@ -984,50 +946,107 @@ mod test {
         use crate::storage::world_state_handler::StorageAccount;
         use revm::primitives::{Address, U256};
 
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let mut system = StorageAccount::from_address(&Address::ZERO).unwrap();
         let ticket_hash = U256::from(1);
         let owner = Address::from_slice(&[0x11; 20]);
 
         // A fresh key has no durable node...
         assert!(!system
-            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .ticket_balance_node_exists(eth_accounts, &ticket_hash, &owner)
             .unwrap());
         // ...and deleting an absent balance is a tolerated no-op.
         system
-            .delete_ticket_balance(&mut host, &ticket_hash, &owner)
+            .delete_ticket_balance(eth_accounts, &ticket_hash, &owner)
             .unwrap();
         assert!(!system
-            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .ticket_balance_node_exists(eth_accounts, &ticket_hash, &owner)
             .unwrap());
 
         // A non-zero balance creates the node.
         system
-            .write_ticket_balance(&mut host, &ticket_hash, &owner, U256::from(7))
+            .write_ticket_balance(eth_accounts, &ticket_hash, &owner, U256::from(7))
             .unwrap();
         assert!(system
-            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .ticket_balance_node_exists(eth_accounts, &ticket_hash, &owner)
             .unwrap());
         assert_eq!(
             system
-                .read_ticket_balance(&host, &ticket_hash, &owner)
+                .read_ticket_balance(eth_accounts, &ticket_hash, &owner)
                 .unwrap(),
             U256::from(7)
         );
 
         // Draining to zero deletes the node instead of persisting a zero.
         system
-            .delete_ticket_balance(&mut host, &ticket_hash, &owner)
+            .delete_ticket_balance(eth_accounts, &ticket_hash, &owner)
             .unwrap();
         assert!(!system
-            .ticket_balance_node_exists(&host, &ticket_hash, &owner)
+            .ticket_balance_node_exists(eth_accounts, &ticket_hash, &owner)
             .unwrap());
         // The read is still zero, identical to an absent node.
         assert_eq!(
             system
-                .read_ticket_balance(&host, &ticket_hash, &owner)
+                .read_ticket_balance(eth_accounts, &ticket_hash, &owner)
                 .unwrap(),
             U256::ZERO
+        );
+    }
+
+    /// The durable path a key of the accounts keyspace resolves to: the
+    /// keyspace prepends its own name to every key it is handed.
+    fn durable(key: &Key) -> Vec<u8> {
+        let name = ETH_ACCOUNTS_KEYSPACE_NAME.to_string();
+        [name.as_bytes(), key.as_bytes()].concat()
+    }
+
+    #[test]
+    fn account_keys_keep_their_durable_paths() {
+        let address = Address::from_slice(&[0xab; 20]);
+        let account = StorageAccount::from_address(&address).unwrap();
+        let prefix = format!("/evm/eth_accounts/{address:x}");
+
+        assert_eq!(
+            durable(&account.segment_key(&INFO).unwrap()),
+            format!("{prefix}/info").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.segment_key(&BALANCE).unwrap()),
+            format!("{prefix}/balance").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.segment_key(&NONCE).unwrap()),
+            format!("{prefix}/nonce").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.segment_key(&CODE_HASH).unwrap()),
+            format!("{prefix}/code.hash").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.segment_key(&CODE).unwrap()),
+            format!("{prefix}/code").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.segment_key(&GLOBAL_COUNTER).unwrap()),
+            format!("{prefix}/withdrawal_counter").into_bytes()
+        );
+
+        let index = U256::from(1);
+        let index_hex = hex::encode::<[u8; 32]>(index.to_be_bytes());
+        assert_eq!(
+            durable(&account.storage_key(&index).unwrap()),
+            format!("{prefix}/storage/{index_hex}").into_bytes()
+        );
+
+        let owner = Address::from_slice(&[0xcd; 20]);
+        assert_eq!(
+            durable(&account.ticket_key(&index, &owner).unwrap()),
+            format!("{prefix}/ticket_table/{index_hex}/{owner:x}").into_bytes()
+        );
+        assert_eq!(
+            durable(&account.deposit_key(&index).unwrap()),
+            format!("{prefix}/deposits_table/1").into_bytes()
         );
     }
 }

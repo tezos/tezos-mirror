@@ -26,7 +26,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezosx_journal::{RuntimeId, TezosXJournal};
 
 mod deserializer;
@@ -201,15 +201,17 @@ fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P, report: &mut Report) -> Fi
     fixtures
 }
 
-fn fill_state(host: &mut impl StorageV1, state: HashMap<Address, Account>) {
+fn fill_state(eth_accounts: &mut impl KeySpace, state: HashMap<Address, Account>) {
     for (address, info) in state {
         let mut storage_account = StorageAccount::from_address(&address).unwrap();
         for (index, value) in &info.storage {
-            storage_account.set_storage(host, index, value).unwrap();
+            storage_account
+                .set_storage(eth_accounts, index, value)
+                .unwrap();
         }
         storage_account
             .set_info(
-                host,
+                eth_accounts,
                 EtherlinkAccountInfo::with_origin(
                     info.into(),
                     AccountOrigin::Unclassified,
@@ -220,7 +222,7 @@ fn fill_state(host: &mut impl StorageV1, state: HashMap<Address, Account>) {
 }
 
 fn check_result(
-    host: &mut impl StorageV1,
+    eth_accounts: &mut impl KeySpace,
     state: HashMap<Address, Account>,
     output_file: &mut Option<File>,
     total_gas_refunded: U256,
@@ -231,7 +233,8 @@ fn check_result(
 
         let mut storage_error = String::new();
         for (index, expected_value) in &info.storage {
-            let commited_value = storage_account.get_storage(host, index).unwrap();
+            let commited_value =
+                storage_account.get_storage(eth_accounts, index).unwrap();
             if expected_value != &commited_value {
                 storage_error.push_str(&format!("==> Storage mismatch, for index {index}, got {commited_value} instead of {expected_value}.\n"));
             }
@@ -240,7 +243,8 @@ fn check_result(
         let mut expected_info: AccountInfo = info.into();
         // Compare on the revm view: the expected fixtures know nothing
         // about the origin classification the commit may have recorded.
-        let commited_info: AccountInfo = storage_account.info(host).unwrap().into();
+        let commited_info: AccountInfo =
+            storage_account.info(eth_accounts).unwrap().into();
 
         // ==> HACK
         // A few tests falsely expect the balance to not contain the refunded gas which
@@ -403,7 +407,7 @@ pub fn main() {
             for (spec_name, post_entrys) in post {
                 for PostEntry { state, indexes, .. } in post_entrys {
                     rk = prepare_rk();
-                    fill_state(rk.host_mut(), pre.clone());
+                    fill_state(rk.eth_accounts_mut(), pre.clone());
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
                     let block_constants =
@@ -452,7 +456,7 @@ pub fn main() {
                             .unwrap();
 
                     let final_result = check_result(
-                        rk.host_mut(),
+                        rk.eth_accounts_mut(),
                         state,
                         &mut output_file,
                         total_gas_refunded,
