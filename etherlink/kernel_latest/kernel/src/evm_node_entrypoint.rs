@@ -44,12 +44,12 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
+use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -777,7 +777,7 @@ fn run_code_from_input<Host, KS>(
     payload: &[u8],
 ) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS::Live>,
+    Host: KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
     use tezos_execution::RunCodeError;

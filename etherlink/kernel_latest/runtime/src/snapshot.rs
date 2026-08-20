@@ -24,8 +24,10 @@
 //! prefix it keeps for itself.
 
 use thiserror::Error;
+use trait_set::trait_set;
 
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{
     Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError, KeySpaceWriteError, Name,
     NameError,
@@ -272,6 +274,16 @@ pub trait SafeKeyspace: KeySpace {
     /// [`SnapshottedKeySpace::start`] takes their backups back. Call it before
     /// yielding to a reboot.
     fn create_reboot_marker(&mut self) -> Result<(), SnapshotError>;
+}
+
+trait_set! {
+    /// A host that reaches durable storage and mints the keyspaces a
+    /// [`SafeKeyspace`] transaction runs over.
+    ///
+    /// Blanket-implemented: a host meeting both halves already is one, so there
+    /// is nothing to write, and both supertraits stay in reach through it.
+    pub trait KeyspaceHost<KS: SafeKeyspace> =
+        StorageV1 + KeySpaceLoader<KeySpace = KS::Live>;
 }
 
 /// An unmarked run's backups are never read again: `start` only takes them back
