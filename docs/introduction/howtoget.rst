@@ -1,7 +1,7 @@
 .. _howtoget:
 
-Installing Octez
-================
+Installing Octez, the reference implementation of Tezos
+=======================================================
 
 In this how-to we explain how to get up-to-date binaries to run Tezos
 (more precisely, the "Octez" implementation of Tezos software)
