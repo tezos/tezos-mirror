@@ -6992,6 +6992,279 @@ let test_tezosx_single_tx_execution_input () =
     "Single transaction executed successfully with TezosX envelope format" ;
   unit
 
+(** The Michelson-runtime port of L1's [helpers/scripts/run_script_view],
+    driven through [octez-client run view] against [view_toplevel_lib.tz]
+    exactly like [tezt/tests/client_run_view.ml] drives the L1 one. *)
+let test_run_script_view () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view RPC on the Michelson runtime"
+    ~tags:["rpc"; "run_script_view"; "view"; "michelson"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let payer = Constant.bootstrap4 in
+  let init_balance = 1_000_000 in
+  let* kt1 =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      ~init_balance
+      sandbox
+  in
+  let* client = tezlink_client sandbox in
+  (* The client pretty-prints Micheline across several lines; collapse
+     whitespace so the expectations below stay readable. *)
+  let normalize_ws s =
+    String.split_on_char ' ' (String.map (function '\n' -> ' ' | c -> c) s)
+    |> List.filter (fun chunk -> chunk <> "")
+    |> String.concat " "
+  in
+  let run_view ?unparsing_mode ?input ?payer ?gas ?unlimited_gas view =
+    let* result =
+      Client.run_view
+        ?unparsing_mode
+        ?input
+        ?payer
+        ?gas
+        ?unlimited_gas
+        ~view
+        ~contract:kt1
+        client
+    in
+    return (normalize_ws (String.trim result))
+  in
+  let check_equal what ~got ~expected =
+    Check.(
+      (got = expected)
+        string
+        ~error_msg:(sf "%s: expected %%R but got %%L" what))
+  in
+
+  (* `add` computes `input + storage`. *)
+  let* result = run_view ~input:"10" "add" in
+  check_equal "view add" ~got:result ~expected:"15" ;
+
+  (* `id` has an empty body, so it returns the view's initial stack
+     element: the `(input, storage)` pair. *)
+  let* result = run_view ~input:"7" "id" in
+  check_equal "view id" ~got:result ~expected:"(Pair 7 5)" ;
+
+  (* The execution context, as L1 defines it: AMOUNT is zero, BALANCE is
+     the viewed contract's, SELF_ADDRESS and SENDER are both the viewed
+     contract (the VIEW instruction sets them), and SOURCE is `--payer`.
+     Right-comb pairs are printed linearized. *)
+  let* result =
+    run_view ~input:"Unit" ~payer:payer.Account.public_key_hash "step_constants"
+  in
+  let expected =
+    sf
+      {|(Pair (Pair 0 %d) (Pair "%s" "%s") "%s")|}
+      init_balance
+      kt1
+      kt1
+      payer.Account.public_key_hash
+  in
+  check_equal "view step_constants" ~got:result ~expected ;
+
+  (* `--payer` defaults to the null implicit account, like L1. *)
+  let* result = run_view ~input:"Unit" "step_constants" in
+  let expected =
+    sf
+      {|(Pair (Pair 0 %d) (Pair "%s" "%s") "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")|}
+      init_balance
+      kt1
+      kt1
+  in
+  check_equal "view step_constants with default payer" ~got:result ~expected ;
+
+  (* The kernel only emits optimized-legacy, so this asserts the node
+     really re-normalizes: in `Optimized` mode the addresses come back as
+     byte sequences and the comb pairs stay nested. *)
+  let* optimized =
+    run_view ~unparsing_mode:Client.Optimized ~input:"Unit" "step_constants"
+  in
+  Check.(
+    optimized
+    =~ rex
+         "^\\(Pair \\(Pair 0 1000000\\) \\(Pair \\(Pair 0x[0-9a-f]+ \
+          0x[0-9a-f]+\\) 0x[0-9a-f]+\\)\\)$")
+    ~error_msg:"Expected Optimized unparsing to emit raw addresses, got %L" ;
+
+  (* Error parity with L1: unknown view, contract with no script, and a
+     view that fails. Each message is the L1 one, so clients matching on
+     them keep working. *)
+  let failing ?input ?gas view ~contract ~msg =
+    Process.check_error
+      ~exit_code:1
+      ~msg
+      (Client.spawn_run_view ?input ?gas ~view ~contract client)
+  in
+  let* () =
+    failing
+      "unknown"
+      ~contract:kt1
+      ~input:"10"
+      ~msg:(rex "The contract ([^ ]+) does not have a view named `unknown`.")
+  in
+  let* () =
+    failing
+      "add"
+      ~contract:"KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N"
+      ~input:"10"
+      ~msg:(rex "A view was called on a contract with no script.")
+  in
+  (* Match on the rejection value — the view's `(input, storage)` pair —
+     to prove it reaches the caller. *)
+  let* () =
+    failing
+      "test_failwith"
+      ~contract:kt1
+      ~input:"10"
+      ~msg:(rex "Nat\\(10\\), Nat\\(5\\)")
+  in
+
+  (* `--gas` is honoured: recursive `fib` overruns a small budget. Unlike
+     L1, `--unlimited-gas` cannot lift the ceiling past the per-operation
+     cap, which is also the default. *)
+  let* () =
+    failing
+      "fib"
+      ~contract:kt1
+      ~input:"10"
+      ~gas:1000
+      ~msg:(rex "evm_node.dev.tezosx.run_script_view_failed")
+  in
+  let* result = run_view ~input:"10" ~unlimited_gas:true "fib" in
+  check_equal "view fib with unlimited gas" ~got:result ~expected:"55" ;
+
+  unit
+
+(** A CRAC out of a view must read the same clock the view does: the
+    caller's [now] / [level], not the blueprint's. The client has no
+    flag for either, so drive the RPC directly. *)
+let test_run_script_view_crac_step_constants () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view propagates now and level across a CRAC"
+    ~tags:["rpc"; "run_script_view"; "view"; "cross_runtime"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  (* Runtime (9B): <opcode> / PUSH1 0 / MSTORE / PUSH1 32 / PUSH1 0 /
+     RETURN, behind the 11-byte copy init the other CRAC tests use. *)
+  let deploy ~nonce ~opcode =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~nonce
+      ~init_code:(sf "600980600b6000396000f3%s60005260206000f3" opcode)
+      ()
+  in
+  (* TIMESTAMP and NUMBER. *)
+  let* timestamp_evm = deploy ~nonce:0 ~opcode:"42" in
+  let* number_evm = deploy ~nonce:1 ~opcode:"43" in
+  let originate_bridge ~alias evm_address =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["mini_scenarios"; "staticcall_evm_view"]
+      ~init_storage_data:(sf {|"%s"|} evm_address)
+      ~alias
+      sandbox
+  in
+  let* timestamp_kt1 = originate_bridge ~alias:"crac_now" timestamp_evm in
+  let* number_kt1 = originate_bridge ~alias:"crac_level" number_evm in
+
+  let endpoint = tezlink_foreign_endpoint sandbox in
+  let* chain_id = RPC_core.call endpoint @@ RPC.get_chain_chain_id () in
+  (* Distinctive values, far from any level or timestamp the sandbox
+     would produce on its own. *)
+  let now = 1_700_000_000 in
+  let level = 987_654 in
+  let read_evm kt1 =
+    let data =
+      RPC_core.Data
+        (`O
+           [
+             ("contract", `String kt1);
+             ("view", `String "read_evm");
+             ("input", `O [("prim", `String "Unit")]);
+             ("chain_id", `String chain_id);
+             ("unparsing_mode", `String "Readable");
+             ("now", `String (string_of_int now));
+             ("level", `String (string_of_int level));
+           ])
+    in
+    RPC_core.call endpoint
+    @@ RPC_core.make
+         ~data
+         POST
+         [
+           "chains";
+           "main";
+           "blocks";
+           "head";
+           "helpers";
+           "scripts";
+           "run_script_view";
+         ]
+         (fun json -> JSON.(json |-> "data" |-> "bytes" |> as_string))
+  in
+  let check ~what kt1 expected =
+    let* hex = read_evm kt1 in
+    Check.(
+      (Z.to_string (Z.of_string ("0x" ^ hex)) = string_of_int expected)
+        string
+        ~error_msg:(sf "%s: expected %%R but got %%L" what))
+    |> return
+  in
+  let* () = check ~what:"block.timestamp inside the CRAC" timestamp_kt1 now in
+  let* () = check ~what:"block.number inside the CRAC" number_kt1 level in
+  unit
+
+(** [run_script_view] rejects the two L1 fields the Michelson runtime
+    cannot honour, rather than silently computing against a different
+    state than the caller asked for. *)
+let test_run_script_view_unsupported_fields () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view rejects other_contracts and extra_big_maps"
+    ~tags:["rpc"; "run_script_view"; "view"; "michelson"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* kt1 =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      sandbox
+  in
+  let* client = tezlink_client sandbox in
+  let* () =
+    Process.check_error
+      ~exit_code:1
+        (* The client does not link the EVM node's error registry, so it
+         renders the raw error id and payload. *)
+      ~msg:(rex {|"field": "other_contracts"|})
+      (Client.spawn_run_view
+         ~view:"add"
+         ~contract:kt1
+         ~input:"10"
+         ~other_contracts:(sf {|{Contract "%s" nat}|} kt1)
+         client)
+  in
+  Process.check_error
+    ~exit_code:1
+    ~msg:(rex {|"field": "extra_big_maps"|})
+    (Client.spawn_run_view
+       ~view:"add"
+       ~contract:kt1
+       ~input:"10"
+       ~extra_big_maps:{|{Big_map 0 nat nat {}}|}
+       client)
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -7080,4 +7353,7 @@ let () =
   test_meta_block_rpcs_without_michelson_runtime () ;
   test_michelson_address_registry () ;
   test_michelson_address_registry_view_lambda () ;
-  test_tezosx_single_tx_execution_input ()
+  test_tezosx_single_tx_execution_input () ;
+  test_run_script_view () ;
+  test_run_script_view_crac_step_constants () ;
+  test_run_script_view_unsupported_fields ()

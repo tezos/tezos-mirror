@@ -5,7 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Entrypoints_decode_error of string
+module Micheline = Tezos_micheline.Micheline
+
+type error +=
+  | Entrypoints_decode_error of string
+  | Run_script_view_decode_error of string
+  | Run_script_view_failed of string
+  | Run_script_view_host_error of string
+  | Kernel_entrypoint_unavailable of {
+      entrypoint : string;
+      storage_version : int;
+    }
 
 let () =
   register_error_kind
@@ -17,7 +27,65 @@ let () =
     ~pp:(fun ppf msg -> Format.fprintf ppf "Entrypoints decode error: %s" msg)
     Data_encoding.(obj1 (req "msg" string))
     (function Entrypoints_decode_error msg -> Some msg | _ -> None)
-    (fun msg -> Entrypoints_decode_error msg)
+    (fun msg -> Entrypoints_decode_error msg) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.run_script_view_decode_error"
+    ~title:"run_script_view result decode error"
+    ~description:
+      "Failed to decode the run_script_view result returned by the kernel."
+    ~pp:(fun ppf msg ->
+      Format.fprintf ppf "run_script_view decode error: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Run_script_view_decode_error msg -> Some msg | _ -> None)
+    (fun msg -> Run_script_view_decode_error msg) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.run_script_view_failed"
+    ~title:"Michelson view simulation failed"
+    ~description:"The simulation of a Michelson view failed."
+    ~pp:(fun ppf msg ->
+      Format.fprintf ppf "Michelson view simulation failed: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Run_script_view_failed msg -> Some msg | _ -> None)
+    (fun msg -> Run_script_view_failed msg) ;
+  register_error_kind
+    (* [`Temporary]: a storage/host failure is infrastructure, not a
+       deterministic script rejection, so a client retrying on transient
+       errors must be able to tell the two apart. *)
+    `Temporary
+    ~id:"evm_node.dev.tezosx.run_script_view_host_error"
+    ~title:"Michelson view simulation could not read the state"
+    ~description:
+      "A durable-storage failure prevented the simulation of a Michelson view."
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "Michelson view simulation could not read the state: %s"
+        msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Run_script_view_host_error msg -> Some msg | _ -> None)
+    (fun msg -> Run_script_view_host_error msg) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.kernel_entrypoint_unavailable"
+    ~title:"Kernel entrypoint unavailable"
+    ~description:
+      "The kernel running at the requested block does not expose the \
+       entrypoint this RPC is served through."
+    ~pp:(fun ppf (entrypoint, storage_version) ->
+      Format.fprintf
+        ppf
+        "The kernel at storage version %d does not expose the %s entrypoint"
+        storage_version
+        entrypoint)
+    Data_encoding.(obj2 (req "entrypoint" string) (req "storage_version" int31))
+    (function
+      | Kernel_entrypoint_unavailable {entrypoint; storage_version} ->
+          Some (entrypoint, storage_version)
+      | _ -> None)
+    (fun (entrypoint, storage_version) ->
+      Kernel_entrypoint_unavailable {entrypoint; storage_version})
 
 (* Decode the entrypoints + synthetic-views result written by the
    kernel's tezosx_michelson_entrypoints entrypoint.
@@ -108,12 +176,223 @@ let decode_entrypoints_result bytes =
       tzfail
         (Entrypoints_decode_error "Invalid RLP structure for entrypoints result")
 
+(* Kernel IPC for `tezosx_run_code`: [input_encoding] mirrors the kernel's
+   [RunCodeInput] derives and [run_code_result_encoding] its
+   [RunCodeResult] union ([evm_node_entrypoint.rs]), whose unit tests pin
+   the wire bytes. *)
+module Run_code = struct
+  (* [now] and [level] are unbounded on the RPC but the runtime carries
+     them as an i64 and a u32; reject out-of-range values instead of
+     wrapping. A negative [now] would reach the EVM side as a u64. *)
+  let bounded name fits convert z =
+    let open Result_syntax in
+    if fits z then return (convert z)
+    else
+      tzfail
+        (Run_script_view_failed
+           (Format.asprintf "`%s` is out of range: %a" name Z.pp_print z))
+
+  let bounded_int64 name =
+    bounded name (fun z -> Z.fits_int64 z && Z.geq z Z.zero) Z.to_int64
+
+  (* The wire carries the raw u32 bits, so [Z.to_int32_unsigned] is the
+     right conversion even though the field reads as [int32]. *)
+  let bounded_level =
+    bounded
+      "level"
+      (fun z -> Z.fits_int32_unsigned z && Z.geq z Z.zero)
+      Z.to_int32_unsigned
+
+  (* Runs on caller-controlled data (the viewer script embeds the caller's
+     [input] verbatim); return the failure rather than raising. *)
+  let expr_bytes expr =
+    match
+      Data_encoding.Binary.to_bytes
+        Tezlink_imports.Imported_context.Script.expr_encoding
+        expr
+    with
+    | Ok bytes -> Result_syntax.return bytes
+    | Error err ->
+        Result_syntax.tzfail
+          (Run_script_view_decode_error
+             (Format.asprintf
+                "Cannot encode a Micheline expression: %a"
+                Data_encoding.Binary.pp_write_error
+                err))
+
+  let input_encoding =
+    Data_encoding.(
+      merge_objs
+        (obj10
+           (req "script" bytes)
+           (req "storage" bytes)
+           (req "input" bytes)
+           (req "entrypoint" string)
+           (req "chain_id" Chain_id.encoding)
+           (req "self" Tezos_types.Contract.encoding)
+           (req "amount" int64)
+           (opt "sender" Tezos_types.Contract.encoding)
+           (opt "payer" Signature.V3.Public_key_hash.encoding)
+           (opt "balance" int64))
+        (obj3 (opt "gas" int64) (opt "now" int64) (opt "level" int32)))
+
+  let encode_input ~script ~storage ~input ~entrypoint ~chain_id ~self ~amount
+      ~sender ~payer ~balance ~gas ~now ~level =
+    let open Result_syntax in
+    let* gas = Option.map_e (bounded_int64 "gas") gas in
+    let* now = Option.map_e (bounded_int64 "now") now in
+    let* level = Option.map_e bounded_level level in
+    let* script = expr_bytes script in
+    let* storage = expr_bytes storage in
+    let* input = expr_bytes input in
+    match
+      Data_encoding.Binary.to_bytes
+        input_encoding
+        ( ( script,
+            storage,
+            input,
+            entrypoint,
+            chain_id,
+            self,
+            amount,
+            sender,
+            payer,
+            balance ),
+          (gas, now, level) )
+    with
+    | Ok bytes -> return bytes
+    | Error err ->
+        tzfail
+          (Run_script_view_decode_error
+             (Format.asprintf
+                "Cannot encode the run_code input: %a"
+                Data_encoding.Binary.pp_write_error
+                err))
+
+  type run_code_result =
+    | Success of bytes
+    | Execution_error of string
+    | Host_error of string
+
+  (* An unknown tag fails decoding outright: a future kernel-side variant
+     must not be misread as a permanent script rejection. *)
+  let run_code_result_encoding =
+    Data_encoding.(
+      union
+        [
+          case
+            (Tag 0)
+            ~title:"success"
+            (obj1 (req "storage" bytes))
+            (function Success storage -> Some storage | _ -> None)
+            (fun storage -> Success storage);
+          case
+            (Tag 1)
+            ~title:"execution_error"
+            string
+            (function Execution_error msg -> Some msg | _ -> None)
+            (fun msg -> Execution_error msg);
+          case
+            (Tag 2)
+            ~title:"host_error"
+            string
+            (function Host_error msg -> Some msg | _ -> None)
+            (fun msg -> Host_error msg);
+        ])
+
+  let decode_result bytes =
+    let open Result_syntax in
+    let* result =
+      match Data_encoding.Binary.of_bytes run_code_result_encoding bytes with
+      | Ok result -> return result
+      | Error err ->
+          tzfail
+            (Run_script_view_decode_error
+               (Format.asprintf
+                  "Invalid run_code result: %a"
+                  Data_encoding.Binary.pp_read_error
+                  err))
+    in
+    match result with
+    | Execution_error msg -> tzfail (Run_script_view_failed msg)
+    | Host_error msg -> tzfail (Run_script_view_host_error msg)
+    | Success storage -> (
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Imported_context.Script.expr_encoding
+            storage
+        with
+        | Some expr -> return expr
+        | None ->
+            tzfail
+              (Run_script_view_decode_error
+                 "Failed to decode the resulting storage as Micheline"))
+
+  (* A mocked protocol context for the plugin functions borrowed from L1.
+     **Only functions that never read the context's contents may run
+     against it** — it is a genesis context, so anything consulting real
+     state would answer plausibly and wrongly, not fail. Today's users
+     ([script_view_type], [parse_ty], [normalize_data]) only charge gas,
+     unlimited here. Forced once: building it is expensive and context
+     values are functional. *)
+  let dummy_context = lazy (Tezlink_mock.init_dummy_context ())
+
+  let normalize ~unparsing_mode ~output_type value =
+    let open Lwt_result_syntax in
+    match unparsing_mode with
+    | Tezlink_imports.Imported_protocol.Script_ir_unparser.Optimized_legacy ->
+        (* The kernel's native output form: normalizing to it is the
+           identity for every constructor, so skip the context entirely. *)
+        return value
+    | Readable | Optimized ->
+        let* ctxt = Lazy.force dummy_context in
+        let*? Tezlink_imports.Imported_protocol.Script_typed_ir.Ex_ty ty, ctxt =
+          Tezlink_imports.Imported_env.wrap_tzresult
+          @@ Tezlink_imports.Imported_protocol.Script_ir_translator.parse_ty
+               ctxt
+               ~legacy:true
+               ~allow_lazy_storage:true
+               ~allow_operation:false
+               ~allow_contract:true
+               ~allow_ticket:true
+               (Micheline.root output_type)
+        in
+        let normalized =
+          Tezlink_imports.Imported_protocol_plugin.RPC.Scripts.Normalize_data
+          .normalize_data
+            ~unparsing_mode
+            ty
+            ctxt
+            (Micheline.root value)
+        in
+        return (Micheline.strip_locations normalized)
+end
+
 let make (ctxt : Evm_ro_context.t) =
   (module struct
     type block_param =
       [ `Head of int32
       | `Level of int32
       | `Hash of Ethereum_types.block_hash * int32 ]
+
+    (* Same as [Evm_ro_context.execute_entrypoint], but refuses upfront when
+       the kernel that produced [state] is too old to export [entrypoint]:
+       the call would otherwise leave the IPC result path empty and be
+       reported as an opaque failure. *)
+    let execute_kernel_entrypoint state ~available ~input_path ~input
+        ~output_path ~entrypoint =
+      let open Lwt_result_syntax in
+      let* storage_version = Durable_storage.storage_version state in
+      if not (available ~storage_version) then
+        tzfail (Kernel_entrypoint_unavailable {entrypoint; storage_version})
+      else
+        Evm_ro_context.execute_entrypoint
+          ctxt
+          state
+          ~input_path
+          ~input
+          ~output_path
+          ~entrypoint
 
     let shell_block_param_to_block_number =
       let open Lwt_result_syntax in
@@ -249,6 +528,30 @@ let make (ctxt : Evm_ro_context.t) =
          handled by the kernel-entrypoints fall-through in [get_script]. *)
       Durable_storage.read_contract_code c state
 
+    (* The stub script of a code-less originated contract (an enshrined
+       TezosX contract): unit storage and FAILWITH code, carrying the
+       entrypoints and synthetic views returned by the kernel. [None] if
+       the kernel does not know the contract either. *)
+    let enshrined_script c state =
+      let open Lwt_result_syntax in
+      let addr_bytes =
+        Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding c
+      in
+      let* bytes =
+        execute_kernel_entrypoint
+          state
+          ~available:Storage_version.tezosx_michelson_entrypoints
+          ~input_path:Durable_storage_path.Tezosx_entrypoints.input
+          ~input:addr_bytes
+          ~output_path:Durable_storage_path.Tezosx_entrypoints.result
+          ~entrypoint:"tezosx_michelson_entrypoints"
+      in
+      let* result = decode_entrypoints_result bytes in
+      match result with
+      | None -> return_none
+      | Some (_, entries, views) ->
+          return_some (Tezlink_mock.script_of_metadata ~views entries)
+
     let get_script chain block c =
       let open Lwt_result_syntax in
       let* code = get_code chain block c in
@@ -264,31 +567,10 @@ let make (ctxt : Evm_ro_context.t) =
       | None -> (
           match c with
           | Implicit _ -> return_none
-          | Originated _ -> (
-              (* Enshrined TezosX contract — no code in durable storage.
-                 Derive the script from the entrypoints returned by the
-                 kernel, using a unit storage and FAILWITH code as stubs. *)
+          | Originated _ ->
               let* eth_block = shell_block_param_to_eth_block_param block in
-              let addr_bytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Tezos_types.Contract.encoding
-                  c
-              in
               let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
-              let* bytes =
-                Evm_ro_context.execute_entrypoint
-                  ctxt
-                  state
-                  ~input_path:Durable_storage_path.Tezosx_entrypoints.input
-                  ~input:addr_bytes
-                  ~output_path:Durable_storage_path.Tezosx_entrypoints.result
-                  ~entrypoint:"tezosx_michelson_entrypoints"
-              in
-              let* result = decode_entrypoints_result bytes in
-              match result with
-              | None -> return_none
-              | Some (_, entries, views) ->
-                  return_some (Tezlink_mock.script_of_metadata ~views entries)))
+              enshrined_script c state)
 
     let manager_key _chain block contract =
       let open Lwt_result_syntax in
@@ -488,9 +770,9 @@ let make (ctxt : Evm_ro_context.t) =
           in
           let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
           let* bytes =
-            Evm_ro_context.execute_entrypoint
-              ctxt
+            execute_kernel_entrypoint
               state
+              ~available:Storage_version.tezosx_michelson_entrypoints
               ~input_path:Durable_storage_path.Tezosx_entrypoints.input
               ~input:(Bytes.of_string addr_bytes)
               ~output_path:Durable_storage_path.Tezosx_entrypoints.result
@@ -506,4 +788,126 @@ let make (ctxt : Evm_ro_context.t) =
                 in
                 return_some (unreachable, normalized)
               else return_some (unreachable, entries))
+
+    (* Mirrors L1's `run_script_view` handler: resolve the view's declared
+       types, synthesise the very same viewer script L1 builds
+       (`View_helpers.make_michelson_viewer_script`), run it, and read the
+       value back out of its storage. The only difference is where the
+       script runs — the kernel's `run_code` entrypoint rather than an
+       in-process `Script_interpreter.execute`. *)
+    let run_script_view chain block ~contract ~view ~input ~chain_id
+        ~unlimited_gas ~gas ~payer ~now ~level ~unparsing_mode =
+      let open Lwt_result_syntax in
+      let `Main = chain in
+      let module Imported = Tezlink_imports.Imported_protocol in
+      let module View_helpers =
+        Tezlink_imports.Imported_protocol_plugin.View_helpers
+      in
+      let proto e =
+        Result_syntax.tzfail (Tezlink_imports.Imported_env.wrap_tzerror e)
+      in
+      let*? contract_hash =
+        match contract with
+        | Tezlink_imports.Imported_context.Contract.Originated hash ->
+            Result_syntax.return hash
+        | Implicit _ ->
+            (* Unreachable through the RPC: the service types the
+               contract with [Contract.originated_encoding]. *)
+            Result_syntax.tzfail
+              (Run_script_view_failed
+                 "A view can only be called on an originated contract")
+      in
+      let* eth_block = shell_block_param_to_eth_block_param block in
+      (* One checkout serves the code read and the kernel entrypoints
+         below: the state is functional, [execute_entrypoint] never
+         commits, and the tree is thrown away with the request. *)
+      let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
+      let* on_chain_code = Durable_storage.read_contract_code contract state in
+      let* code =
+        match on_chain_code with
+        | Some code -> return code
+        | None -> (
+            (* No on-chain code: the enshrined stub carries the synthetic
+               views. *)
+            let* script = enshrined_script contract state in
+            match script with
+            | None ->
+                Lwt.return (proto View_helpers.Viewed_contract_has_no_script)
+            | Some {code; _} -> (
+                match Data_encoding.force_decode code with
+                | Some code -> return code
+                | None ->
+                    tzfail
+                      (Run_script_view_decode_error
+                         "Cannot decode the script code")))
+      in
+      (* Under unlimited gas: the requested budget only applies to the run
+         itself. Gas-only, so the mocked context is sound here. *)
+      let* proto_ctxt = Lazy.force Run_code.dummy_context in
+      let* input_ty, output_ty =
+        let*! res =
+          View_helpers.script_view_type proto_ctxt contract_hash code view
+        in
+        Lwt.return (Tezlink_imports.Imported_env.wrap_tzresult res)
+      in
+      let viewer =
+        View_helpers.make_michelson_viewer_script
+          contract
+          view
+          input
+          input_ty
+          output_ty
+      in
+      let*? viewer_code, viewer_storage =
+        match
+          ( Data_encoding.force_decode viewer.code,
+            Data_encoding.force_decode viewer.storage )
+        with
+        | Some code, Some storage -> Result_syntax.return (code, storage)
+        | _ ->
+            Result_syntax.tzfail
+              (Run_script_view_decode_error "Cannot decode the viewer script")
+      in
+      (* L1 caps `unlimited_gas` at the largest representable milligas; the
+         runtime's own per-operation cap is lower and the kernel clamps to
+         it, so [None] already expresses "as much as allowed". *)
+      let gas = if unlimited_gas then None else gas in
+      let unit_parameter =
+        Micheline.strip_locations
+          (Micheline.Prim (0, Imported.Michelson_v1_primitives.D_Unit, [], []))
+      in
+      let*? input_bytes =
+        Run_code.encode_input
+          ~script:viewer_code
+          ~storage:viewer_storage
+          ~input:unit_parameter
+          ~entrypoint:"default"
+          ~chain_id
+          ~self:contract
+          ~amount:0L
+          ~sender:None
+          ~payer
+          ~balance:None
+          ~gas
+          ~now
+          ~level
+      in
+      let* bytes =
+        execute_kernel_entrypoint
+          state
+          ~available:Storage_version.tezosx_run_code
+          ~input_path:Durable_storage_path.Tezosx_run_code.input
+          ~input:input_bytes
+          ~output_path:Durable_storage_path.Tezosx_run_code.result
+          ~entrypoint:"tezosx_run_code"
+      in
+      let*? storage = Run_code.decode_result bytes in
+      let*? value =
+        Tezlink_imports.Imported_env.wrap_tzresult
+          (View_helpers.extract_value_from_storage storage)
+      in
+      Run_code.normalize
+        ~unparsing_mode
+        ~output_type:(Micheline.strip_locations output_ty)
+        (Micheline.strip_locations value)
   end : Tezlink_backend_sig.S)

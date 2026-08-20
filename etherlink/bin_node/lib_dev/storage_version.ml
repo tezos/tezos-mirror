@@ -56,3 +56,13 @@ let simulation_trace_ipc_moved_to_base ~storage_version = storage_version >= 60
    upgrade migrates the blocks). *)
 let michelson_blocks_at_world_state_root ~storage_version =
   storage_version >= 62
+
+(* Version gates: the node serves part of the Michelson runtime through
+   kernel entrypoints, and a kernel that predates one has no such WASM
+   export — the call would leave the IPC result path empty and surface as
+   an opaque failure. [tezosx_michelson_entrypoints] exists from V51 on
+   (added under V50, so V51 is the first version every kernel carrying it
+   holds), [tezosx_run_code] from V64 on. *)
+let tezosx_michelson_entrypoints ~storage_version = storage_version >= 51
+
+let tezosx_run_code ~storage_version = storage_version >= 64
