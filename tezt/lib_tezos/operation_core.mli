@@ -614,6 +614,18 @@ module Manager : sig
     unit ->
     payload
 
+  (** [sc_rollup_execute_outbox_message ~sc_rollup ~cemented_commitment
+      ~output_proof] builds a smart-rollup outbox execution manager operation
+      payload. [output_proof] is the hexadecimal representation of the
+      serialized output proof, as the protocol encodes that field with
+      [Data_encoding.string Hex]. *)
+  val sc_rollup_execute_outbox_message :
+    sc_rollup:string ->
+    cemented_commitment:string ->
+    output_proof:string ->
+    unit ->
+    payload
+
   (** A representation of a manager operation. This includes generic
      parameters common to all manager operations. See {!val:make}. *)
   type t
