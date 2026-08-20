@@ -971,6 +971,11 @@ module Manager = struct
         opponent : string;
         refutation : sc_rollup_refutation;
       }
+    | Sc_rollup_execute_outbox_message of {
+        sc_rollup : string;
+        cemented_commitment : string;
+        output_proof : string;
+      }
 
   let reveal (account : Account.key) ?proof () =
     Reveal {public_key = account.public_key; proof}
@@ -1009,6 +1014,11 @@ module Manager = struct
 
   let sc_rollup_refute ~refutation ~sc_rollup ~opponent () =
     Sc_rollup_refute {sc_rollup; opponent; refutation}
+
+  let sc_rollup_execute_outbox_message ~sc_rollup ~cemented_commitment
+      ~output_proof () =
+    Sc_rollup_execute_outbox_message
+      {sc_rollup; cemented_commitment; output_proof}
 
   type t = {
     source : Account.key;
@@ -1078,6 +1088,16 @@ module Manager = struct
           sc_rollup
           opponent
           refutation
+    | Sc_rollup_execute_outbox_message
+        {sc_rollup; cemented_commitment; output_proof} ->
+        [
+          ("kind", `String "smart_rollup_execute_outbox_message");
+          ("rollup", `String sc_rollup);
+          ("cemented_commitment", `String cemented_commitment);
+          (* [output_proof] is encoded as [string Hex] by the protocol, so the
+             JSON carries the proof's hexadecimal representation. *)
+          ("output_proof", `String output_proof);
+        ]
 
   let json client {source; counter; fee; gas_limit; storage_limit; payload} =
     let* counter =
@@ -1139,7 +1159,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Sc_rollup_refute _ ->
+    | Sc_rollup_refute _ | Sc_rollup_execute_outbox_message _ ->
         let fee = Option.value fee ~default:12_000 in
         let gas_limit = Option.value gas_limit ~default:12_000 in
         let storage_limit = Option.value storage_limit ~default:1028 in
