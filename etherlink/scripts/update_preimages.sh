@@ -93,7 +93,10 @@ tar xzf "$TMP_DIR/wasm-$NETWORK.tar.gz" -C "$TMP_DIR"
 for GIT_COMMIT in "$@"; do
   echo "adding preimages for commit $GIT_COMMIT"
 
-  ROOT_HASH="$(sed -e 's/ROOT_HASH: //' < "etherlink/kernels-$GIT_COMMIT/root_hash")"
+  ROOT_HASH="$(
+    grep '^ROOT_HASH:' < "etherlink/kernels-$GIT_COMMIT/root_hash" |
+      sed -e 's/ROOT_HASH: //'
+  )"
 
   smart-rollup-installer get-reveal-installer -u "etherlink/kernels-$GIT_COMMIT/evm_kernel.wasm" -P "$TMP_DIR/wasm_2_0_0" --output /dev/null > /dev/null
 
