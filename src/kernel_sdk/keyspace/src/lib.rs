@@ -252,8 +252,13 @@ pub trait KeySpace {
         self.read_exact_in(key, 0)
     }
 
-    /// Read a portion of the value associated with the key and return the number of bytes written.
-    /// Returns `None` if the key does not exist, or if the offset is invalid.
+    /// Reads the value at `key` into `buffer`, starting at `offset`, and
+    /// returns how many bytes it wrote there.
+    ///
+    /// `buffer` is a ceiling rather than a demand: at most its length is
+    /// read, and a shorter count means the value ended first, not that the
+    /// read fell short. `None` when the key is absent, or when `offset` is
+    /// past the end of the value.
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize>;
 
     /// Read the exact number of bytes from a portion of the value associated with the key and return them in a fixed-size array.
@@ -270,15 +275,37 @@ pub trait KeySpace {
         }
     }
 
-    /// Write the given value to the key.
+    /// Replaces the whole value at `key`, creating the key if absent.
+    ///
+    /// Use [`Self::write`] to overwrite part of a value and keep the rest.
+    ///
+    /// # Errors
+    ///
+    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when `value` exceeds the
+    ///   largest value the key space accepts.
     fn set(
         &mut self,
         key: &Key,
         value: impl AsRef<[u8]>,
     ) -> Result<(), KeySpaceWriteError>;
 
-    /// Write data to the value at the given key starting at the given offset.
-    /// Returns the number of bytes written.
+    /// Overwrites the `data.len()` bytes of the value at `key` that start at
+    /// `offset`, and returns `data.len()`.
+    ///
+    /// - Never truncates: the bytes before `offset` and those past
+    ///   `offset + data.len()` stay as they are. Writing a shorter encoding
+    ///   at `offset` 0 therefore leaves the tail of the longer one it
+    ///   replaced behind, where [`Self::set`] drops it.
+    /// - Extends the value when the write runs past its end; an `offset`
+    ///   equal to the current length appends.
+    /// - `offset` 0 on an absent key creates it.
+    ///
+    /// # Errors
+    ///
+    /// - [`KeySpaceWriteError::InvalidOffset`] when `offset` is past the
+    ///   current length of the value, an absent key counting as length 0.
+    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when the write would push
+    ///   the value past the largest the key space accepts.
     fn write(
         &mut self,
         key: &Key,
