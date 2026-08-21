@@ -28,9 +28,13 @@ sha3.workspace = true
 libsecp256k1.workspace = true
 
 tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup-keyspace.workspace = true
 
 # Useful to keep the same types between the execution and evaluation
 serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+tezos-evm-runtime.workspace = true
 
 [features]
 default = []

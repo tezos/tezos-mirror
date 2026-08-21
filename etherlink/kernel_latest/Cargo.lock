@@ -3639,7 +3639,9 @@ dependencies = [
  "rlp",
  "serde",
  "sha3",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-keyspace",
  "thiserror 1.0.69",
 ]
 

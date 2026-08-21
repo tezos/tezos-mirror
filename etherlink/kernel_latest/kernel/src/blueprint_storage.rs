@@ -20,6 +20,7 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
+use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
     decode_timestamp,
@@ -210,25 +211,6 @@ fn blueprint_generation_key(number: U256) -> Result<Key, StorageError> {
     blueprint_key(number, "/generation")
 }
 
-// 32-byte little-endian `U256` read/write through a keyspace handle, mirroring
-// the byte layout of the absolute-path helpers. Kept local to the kernel crate
-// since the storage crate has no `primitive_types` dependency.
-fn write_u256_le(base: &mut impl KeySpace, key: &Key, value: U256) -> Result<(), Error> {
-    let mut buffer = [0u8; 32];
-    value.to_little_endian(&mut buffer);
-    base.set(key, buffer).map_err(Error::from)
-}
-
-// Reads a 32-byte little-endian `U256`, falling back to `default` when the key
-// is absent or not a value — matching the `PathNotFound | StoreNotAValue` arms
-// of the previous absolute-path readers.
-fn read_u256_le_or_default(base: &impl KeySpace, key: &Key, default: U256) -> U256 {
-    match base.get_prefix_exact::<32>(key) {
-        Some(buffer) => U256::from_little_endian(&buffer),
-        None => default,
-    }
-}
-
 // The blueprint accessors below route `/base/blueprints` through the `/base`
 // keyspace, each loading the handle transiently.
 
@@ -236,18 +218,15 @@ fn read_current_generation_or_default(
     base: &impl KeySpace,
     default: U256,
 ) -> Result<U256, Error> {
-    Ok(read_u256_le_or_default(
-        base,
-        &BLUEPRINT_CURRENT_GENERATION_KEY,
-        default,
-    ))
+    Ok(base.get_u256_le_or(&BLUEPRINT_CURRENT_GENERATION_KEY, default))
 }
 
 fn store_current_generation(
     base: &mut impl KeySpace,
     generation: U256,
 ) -> Result<(), Error> {
-    write_u256_le(base, &BLUEPRINT_CURRENT_GENERATION_KEY, generation)
+    base.store_u256_le(&BLUEPRINT_CURRENT_GENERATION_KEY, generation)
+        .map_err(Error::from)
 }
 
 fn increment_current_generation(base: &mut impl KeySpace) -> Result<(), Error> {
@@ -268,7 +247,7 @@ fn read_blueprint_generation_or_default(
     default: U256,
 ) -> Result<U256, Error> {
     let key = blueprint_generation_key(number)?;
-    Ok(read_u256_le_or_default(base, &key, default))
+    Ok(base.get_u256_le_or(&key, default))
 }
 
 fn store_blueprint_generation(
@@ -277,7 +256,7 @@ fn store_blueprint_generation(
     generation: U256,
 ) -> Result<(), Error> {
     let key = blueprint_generation_key(number)?;
-    write_u256_le(base, &key, generation)
+    base.store_u256_le(&key, generation).map_err(Error::from)
 }
 
 fn read_blueprint_nb_chunks(base: &impl KeySpace, number: U256) -> Result<u16, Error> {
