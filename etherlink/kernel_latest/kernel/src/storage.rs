@@ -32,7 +32,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 use tezos_storage::{
-    keyspace, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
+    get_b58_kt1, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
     store_bin, store_read_slice, write_u256_le, write_u64_le,
 };
 
@@ -765,7 +765,7 @@ pub fn read_last_info_per_level_timestamp(
 }
 
 pub fn read_admin(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    keyspace::read_b58_kt1(base, &ADMIN_KEY)
+    get_b58_kt1(base, &ADMIN_KEY)
 }
 
 pub fn read_sequencer_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
@@ -773,11 +773,11 @@ pub fn read_sequencer_governance(host: &mut impl StorageV1) -> Option<ContractKt
 }
 
 pub fn read_kernel_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    keyspace::read_b58_kt1(base, &KERNEL_GOVERNANCE_KEY)
+    get_b58_kt1(base, &KERNEL_GOVERNANCE_KEY)
 }
 
 pub fn read_kernel_security_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    keyspace::read_b58_kt1(base, &KERNEL_SECURITY_GOVERNANCE_KEY)
+    get_b58_kt1(base, &KERNEL_SECURITY_GOVERNANCE_KEY)
 }
 
 pub fn read_maximum_allowed_ticks(base: &impl KeySpace) -> Option<u64> {
@@ -1109,7 +1109,7 @@ pub fn max_blueprint_lookahead_in_seconds(base: &impl KeySpace) -> anyhow::Resul
 /// This smart contract is used to submit transactions to the rollup
 /// when in sequencer mode
 pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    keyspace::read_b58_kt1(base, &DELAYED_BRIDGE_KEY)
+    get_b58_kt1(base, &DELAYED_BRIDGE_KEY)
 }
 
 #[cfg(test)]

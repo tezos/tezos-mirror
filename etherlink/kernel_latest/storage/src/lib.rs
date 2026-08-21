@@ -7,7 +7,6 @@
 
 pub mod error;
 pub mod helpers;
-pub mod keyspace;
 
 use crate::error::Error;
 
@@ -26,6 +25,7 @@ use tezos_nom::error::DecodeError;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 /// The size of one 256 bit word. Size in bytes.
 pub const WORD_SIZE: usize = 32usize;
@@ -211,6 +211,14 @@ pub fn read_b58_kt1(host: &impl StorageV1, path: &impl Path) -> Option<ContractK
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
 }
 
+/// Returns the base58 contract address at the given `key`, over the same
+/// bytes as [`read_b58_kt1`] reads at the path the key resolves to.
+pub fn get_b58_kt1(ks: &impl KeySpace, key: &Key) -> Option<ContractKt1Hash> {
+    let buffer: [u8; KT1_B58_SIZE] = ks.get_prefix_exact(key)?;
+    let kt1_b58 = std::str::from_utf8(&buffer).ok()?;
+    ContractKt1Hash::from_b58check(kt1_b58).ok()
+}
+
 /// Store the `value` into the storage at the given `path`
 ///
 /// The stored value must implement BinWriter
@@ -334,6 +342,8 @@ mod tests {
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     const PATH: RefPath = RefPath::assert_from(b"/some/value");
 
@@ -386,5 +396,145 @@ mod tests {
         let read_opt: Result<Option<Narith>, _> =
             read_optional_nom_value_bounded(&host, &PATH, 1);
         assert!(read_opt.is_err());
+    }
+
+    const KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
+
+    fn key(bytes: &[u8]) -> Key {
+        Key::from_bytes(bytes).unwrap()
+    }
+
+    // Each value written through the raw host at the absolute path must read
+    // back identically through the keyspace helper at the relative key: the
+    // helpers must not change the byte layout.
+
+    #[test]
+    fn u64_le_byte_compatible_with_absolute_helper() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/ks/number");
+        host.store_write_all(&path, &42u64.to_le_bytes()).unwrap();
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_le(&key(b"/number")), Some(42u64));
+    }
+
+    #[test]
+    fn u64_le_missing_key_is_path_not_found() {
+        let mut host = MockKernelHost::default();
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_le::<8, u64>(&key(b"/missing")), None);
+    }
+
+    #[test]
+    fn le_default_helpers_return_default_when_absent_and_value_when_present() {
+        let mut host = MockKernelHost::default();
+        {
+            let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            // Absent keys fall back to the supplied default.
+            assert_eq!(ks.get_le_or(&key(b"/u64"), 7u64), 7);
+            assert_eq!(ks.get_le_or(&key(b"/u32"), 7u32), 7);
+            assert_eq!(ks.get_le_or(&key(b"/u16"), 7u16), 7);
+        }
+        host.store_write_all(&RefPath::assert_from(b"/ks/u64"), &9u64.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/ks/u32"), &9u32.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/ks/u16"), &9u16.to_le_bytes())
+            .unwrap();
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_le_or(&key(b"/u64"), 7u64), 9);
+        assert_eq!(ks.get_le_or(&key(b"/u32"), 7u32), 9);
+        assert_eq!(ks.get_le_or(&key(b"/u16"), 7u16), 9);
+    }
+
+    #[test]
+    fn i64_le_round_trips() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/ks/number");
+        host.store_write_all(&path, &(-42i64).to_le_bytes())
+            .unwrap();
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_le(&key(b"/number")), Some(-42i64));
+    }
+
+    #[test]
+    fn be_reads_the_same_bytes_the_other_way_round() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(
+            &RefPath::assert_from(b"/ks/number"),
+            &0x0102_0304u32.to_be_bytes(),
+        )
+        .unwrap();
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_be(&key(b"/number")), Some(0x0102_0304u32));
+        // The same bytes read little-endian give the byte-swapped value, so
+        // the two readers cannot be confused for one another.
+        assert_eq!(ks.get_le(&key(b"/number")), Some(0x0403_0201u32));
+        assert_eq!(ks.get_be_or(&key(b"/missing"), 7u32), 7);
+    }
+
+    #[test]
+    fn b58_kt1_byte_compatible_with_absolute_helper() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/ks/contract");
+        host.store_write_all(&path, KT1.as_bytes()).unwrap();
+
+        assert_eq!(
+            crate::read_b58_kt1(&host, &path),
+            ContractKt1Hash::from_b58check(KT1).ok()
+        );
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(
+            get_b58_kt1(&ks, &key(b"/contract")),
+            ContractKt1Hash::from_b58check(KT1).ok()
+        );
+    }
+
+    #[test]
+    fn b58_kt1_missing_or_garbage_is_none() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/ks/garbage");
+        host.store_write_all(&path, b"not a contract").unwrap();
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(get_b58_kt1(&ks, &key(b"/garbage")), None);
+        assert_eq!(get_b58_kt1(&ks, &key(b"/missing")), None);
+    }
+
+    // An integer written through the keyspace must land at the absolute path
+    // the relative key resolves to, so a migrated value stays readable at its
+    // historical durable location.
+
+    #[test]
+    fn written_integers_land_at_their_absolute_path_and_round_trip() {
+        let mut host = MockKernelHost::default();
+        {
+            let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+            ks.store_le(&key(b"/level"), 7u32).unwrap();
+            ks.store_le(&key(b"/nb_chunks"), 7u16).unwrap();
+            ks.store_le(&key(b"/ts"), -42i64).unwrap();
+        }
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/level"))
+                .unwrap(),
+            7u32.to_le_bytes()
+        );
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/nb_chunks"))
+                .unwrap(),
+            7u16.to_le_bytes()
+        );
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/ks/ts"))
+                .unwrap(),
+            (-42i64).to_le_bytes()
+        );
+
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_le(&key(b"/level")), Some(7u32));
+        assert_eq!(ks.get_le(&key(b"/nb_chunks")), Some(7u16));
+        assert_eq!(ks.get_le(&key(b"/ts")), Some(-42i64));
     }
 }
