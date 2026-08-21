@@ -12,12 +12,8 @@
 //!
 //! [`StorageV1`]: tezos_smart_rollup_host::storage::StorageV1
 
-use crate::error::Error;
 use crate::KT1_B58_SIZE;
-use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
-use tezos_ethereum::rlp_helpers::FromRlpBytes;
-use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 /// Return a base58 contract address at the given `key`.
@@ -25,45 +21,6 @@ pub fn read_b58_kt1(ks: &impl KeySpace, key: &Key) -> Option<ContractKt1Hash> {
     let buffer: [u8; KT1_B58_SIZE] = ks.get_prefix_exact(key)?;
     let kt1_b58 = std::str::from_utf8(&buffer).ok()?;
     ContractKt1Hash::from_b58check(kt1_b58).ok()
-}
-
-/// Store `src` (which must be encodable) as rlp bytes at the given `key`.
-///
-/// Mirrors the root [`store_rlp`](crate::store_rlp): the same encoded bytes
-/// are written, so a value migrated to a keyspace key resolving to the same
-/// durable path round-trips unchanged.
-pub fn store_rlp<T: Encodable>(
-    src: &T,
-    ks: &mut impl KeySpace,
-    key: &Key,
-) -> Result<(), Error> {
-    ks.set(key, src.rlp_bytes()).map_err(Error::from)
-}
-
-/// Return a decodable value stored as rlp bytes at the given `key`.
-///
-/// Mirrors the root [`read_rlp`](crate::read_rlp), returning
-/// [`RuntimeError::PathNotFound`] when the key is absent.
-pub fn read_rlp<T: Decodable>(ks: &impl KeySpace, key: &Key) -> Result<T, Error> {
-    let bytes = ks
-        .get(key)
-        .ok_or(Error::Runtime(RuntimeError::PathNotFound))?;
-    FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
-}
-
-/// Return a decodable value stored as rlp bytes at the given `key`, or
-/// `None` if the key is absent.
-///
-/// Mirrors the root [`read_optional_rlp`](crate::read_optional_rlp): a
-/// missing key yields `None` rather than an error.
-pub fn read_optional_rlp<T: Decodable>(
-    ks: &impl KeySpace,
-    key: &Key,
-) -> Result<Option<T>, Error> {
-    match ks.get(key) {
-        Some(bytes) => Ok(Some(FromRlpBytes::from_rlp_bytes(&bytes)?)),
-        None => Ok(None),
-    }
 }
 
 #[cfg(test)]

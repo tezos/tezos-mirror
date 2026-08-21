@@ -76,6 +76,45 @@ pub trait KeySpaceExtNum: KeySpace {
 
 impl<KS: KeySpace> KeySpaceExtNum for KS {}
 
+/// Rlp reads and writes over a [`KeySpace`].
+#[cfg(feature = "rlp")]
+pub trait KeySpaceExtRlp: KeySpace {
+    /// Writes the rlp encoding of `value` at `key`.
+    fn store_rlp<T: rlp::Encodable>(
+        &mut self,
+        key: &Key,
+        value: &T,
+    ) -> Result<(), KeySpaceWriteError> {
+        self.set(key, value.rlp_bytes())
+    }
+
+    /// Returns the rlp value at `key`, or `None` when the key is absent.
+    /// Bytes that do not decode into `T` are a [`rlp::DecoderError`].
+    fn read_rlp<T: rlp::Decodable>(
+        &self,
+        key: &Key,
+    ) -> Result<Option<T>, rlp::DecoderError> {
+        match self.get(key) {
+            Some(bytes) => rlp::decode(&bytes).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// [`Self::read_rlp`], falling back to `default` when the key is absent.
+    /// Only absence takes the fallback, bytes that do not decode stay an
+    /// error.
+    fn read_rlp_or<T: rlp::Decodable>(
+        &self,
+        key: &Key,
+        default: T,
+    ) -> Result<T, rlp::DecoderError> {
+        Ok(self.read_rlp(key)?.unwrap_or(default))
+    }
+}
+
+#[cfg(feature = "rlp")]
+impl<KS: KeySpace> KeySpaceExtRlp for KS {}
+
 #[cfg(all(test, feature = "irmin-compat"))]
 mod tests {
     use super::*;
@@ -118,5 +157,30 @@ mod tests {
         assert_eq!(ks.get_le_or(&missing, 7u64), 7);
         assert_eq!(ks.get_be_or(&missing, 7u16), 7);
         assert_eq!(ks.get_le::<8, u64>(&missing), None);
+    }
+
+    #[cfg(feature = "rlp")]
+    #[test]
+    fn rlp_accessors_round_trip_and_report_an_absent_key() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/rlp");
+        let k = key(b"/value");
+
+        ks.store_rlp(&k, &vec![1u8, 2, 3]).unwrap();
+        assert_eq!(ks.read_rlp::<Vec<u8>>(&k).unwrap(), Some(vec![1, 2, 3]));
+
+        // The bytes written are the rlp encoding itself, so a reader of the
+        // raw value sees them unchanged.
+        assert_eq!(ks.get(&k), Some(rlp::encode(&vec![1u8, 2, 3]).to_vec()));
+
+        // An absent key is `None`, or the default where the caller asked for
+        // one, while bytes that do not decode are an error either way.
+        let missing = key(b"/missing");
+        assert_eq!(ks.read_rlp::<Vec<u8>>(&missing).unwrap(), None);
+        assert_eq!(ks.read_rlp_or(&missing, vec![9u8]).unwrap(), vec![9]);
+        ks.set(&k, [0xc0, 0xff]).unwrap();
+        assert!(ks.read_rlp::<Vec<u8>>(&k).is_err());
+        assert!(ks.read_rlp_or(&k, vec![9u8]).is_err());
     }
 }

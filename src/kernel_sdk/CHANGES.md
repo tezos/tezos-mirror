@@ -8,6 +8,8 @@
   `get_le`, `get_be`, their `_or` counterparts, `store_le` and
   `store_be`. The width comes from the integer type, so a caller never names
   a byte count.
+- Add `KeySpaceExtRlp` behind the `rlp` feature, `store_rlp`, `read_rlp` and
+  `read_rlp_or` for every `KeySpace`.
 - Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
 - Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.

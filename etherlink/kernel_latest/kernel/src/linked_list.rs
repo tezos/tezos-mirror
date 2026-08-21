@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
 use tezos_ethereum::rlp_helpers::{append_option, decode_field, decode_option, next};
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::keyspace::{read_optional_rlp, read_rlp, store_rlp};
 
 /// Doubly linked list backed by a [`KeySpace`].
 ///
@@ -181,23 +181,27 @@ where
 
     fn save_data(&self, ks: &mut impl KeySpace, prefix: &Key, data: &Elt) -> Result<()> {
         let key = Self::data_key(&self.id, prefix)?;
-        store_rlp(data, ks, &key).context("cannot save the pointer's data")
+        ks.store_rlp(&key, data)
+            .context("cannot save the pointer's data")
     }
 
     fn get_data(&self, ks: &impl KeySpace, prefix: &Key) -> Result<Elt> {
         let key = Self::data_key(&self.id, prefix)?;
-        read_rlp(ks, &key).context("cannot read the pointer's data")
+        ks.read_rlp(&key)
+            .context("cannot read the pointer's data")?
+            .context("the pointer's data is missing")
     }
 
     /// Load the pointer from the keyspace.
     fn read(ks: &impl KeySpace, prefix: &Key, id: &Id) -> Result<Option<Self>> {
-        read_optional_rlp(ks, &Self::pointer_key(id, prefix)?)
+        ks.read_rlp(&Self::pointer_key(id, prefix)?)
             .context("cannot read the pointer")
     }
 
     /// Save the pointer in the keyspace.
     fn save(&self, ks: &mut impl KeySpace, prefix: &Key) -> Result<()> {
-        store_rlp(self, ks, &self.key(prefix)?).context("cannot save pointer to storage")
+        ks.store_rlp(&self.key(prefix)?, self)
+            .context("cannot save pointer to storage")
     }
 
     /// Removes the pointer and its data from the keyspace.
@@ -240,13 +244,15 @@ where
     /// Only save the back and front pointers.
     fn save(&self, ks: &mut impl KeySpace) -> Result<()> {
         let key = Self::metadata_key(&self.prefix)?;
-        store_rlp(self, ks, &key).context("cannot save linked list to the storage")
+        ks.store_rlp(&key, self)
+            .context("cannot save linked list to the storage")
     }
 
     /// Load the LinkedList from the keyspace.
     fn read(ks: &impl KeySpace, prefix: &Key) -> Result<Option<Self>> {
         let key = Self::metadata_key(prefix)?;
-        read_optional_rlp(ks, &key).context("cannot read linked list from the storage")
+        ks.read_rlp(&key)
+            .context("cannot read linked list from the storage")
     }
 
     /// Returns true if the list contains no elements.
@@ -333,11 +339,8 @@ where
         else {
             return Ok(None);
         };
-        read_optional_rlp(
-            ks,
-            &Pointer::<Id, Elt>::data_key(&pointer.id, &self.prefix)?,
-        )
-        .context("cannot read the pointer's data")
+        ks.read_rlp(&Pointer::<Id, Elt>::data_key(&pointer.id, &self.prefix)?)
+            .context("cannot read the pointer's data")
     }
 
     /// Removes and returns the element at position index within the vector.

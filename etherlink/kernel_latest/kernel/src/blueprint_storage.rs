@@ -32,9 +32,9 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
+use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtNum, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::{keyspace, read_rlp, store_rlp};
+use tezos_storage::{read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
@@ -303,7 +303,7 @@ fn store_blueprint_chunk(
     chunk: &StoreBlueprint,
 ) -> Result<(), Error> {
     let key = blueprint_chunk_key(number, chunk_index)?;
-    keyspace::store_rlp(chunk, base, &key).map_err(Error::from)
+    base.store_rlp(&key, chunk).map_err(Error::from)
 }
 
 pub fn store_sequencer_blueprint(
@@ -480,14 +480,17 @@ pub fn store_current_block_header(
     base: &mut impl KeySpace,
     current_block_header: &BlockHeader<ChainHeader>,
 ) -> Result<(), Error> {
-    keyspace::store_rlp(current_block_header, base, &EVM_CURRENT_BLOCK_HEADER_KEY)
+    base.store_rlp(&EVM_CURRENT_BLOCK_HEADER_KEY, current_block_header)
         .map_err(Error::from)
 }
 
 pub fn read_current_block_header<H: Decodable>(
     base: &impl KeySpace,
 ) -> Result<BlockHeader<H>, Error> {
-    Ok(keyspace::read_rlp(base, &EVM_CURRENT_BLOCK_HEADER_KEY)?)
+    base.read_rlp(&EVM_CURRENT_BLOCK_HEADER_KEY)?
+        .ok_or_else(|| {
+            tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+        })
 }
 
 pub fn read_current_blueprint_header(
@@ -790,7 +793,9 @@ fn read_blueprint_chunk(
     chunk_index: u16,
 ) -> Result<StoreBlueprint, Error> {
     let key = blueprint_chunk_key(number, chunk_index)?;
-    keyspace::read_rlp(base, &key).map_err(Error::from)
+    base.read_rlp(&key)?.ok_or_else(|| {
+        tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
