@@ -10,6 +10,11 @@ let add_rpc_directory ro_ctxt ~l2_chain_id ~add_operation dir = function
       Tezos_rpc.Directory.merge
         (Tezlink_directory.register_tezlink_services
            ~l2_chain_id
+           ~node_version:
+             (Constants.michelson_runtime_node_version
+                ~smart_rollup_address:
+                  (ro_ctxt : Evm_ro_context.t).smart_rollup_address
+                ~l2_chain_id)
            (Tezos_backend.make ro_ctxt)
            ~add_operation
            ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte

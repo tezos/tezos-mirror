@@ -215,6 +215,11 @@ let start_public_server (type f) ~(mode : f Mode.t)
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
+             ~node_version:
+               (Constants.michelson_runtime_node_version
+                  ~smart_rollup_address:
+                    (ro_ctxt : Evm_ro_context.t).smart_rollup_address
+                  ~l2_chain_id)
              (Tezlink_services_impl.make ro_ctxt)
              ~add_operation:add_operation_with_tick
              ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte

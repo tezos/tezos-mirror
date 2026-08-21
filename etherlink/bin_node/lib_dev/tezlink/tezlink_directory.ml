@@ -93,9 +93,7 @@ let check_block =
         (Unsupported_block_parameter
            (Tezos_shell_services.Block_services.to_string block))
 
-let version () =
-  (* TODO: #7857 need proper implementation *)
-  Lwt_result_syntax.return Tezlink_mock.version
+let version ~node_version () = Lwt_result_syntax.return node_version
 
 let make_contract_info contract_balance counter_opt contract_script =
   let open Lwt_result_syntax in
@@ -1006,7 +1004,7 @@ let register_monitor_heads ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
+let build_dir ~l2_chain_id ~node_version ~add_operation ~get_da_fee_per_byte
     ~get_michelson_base_fee_per_gas backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   let base_dir =
@@ -1030,7 +1028,8 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
          let* hash = ethereum_to_tezos_block_hash input_hash in
          return (hash, input_time))
   |> register_monitor_heads ~l2_chain_id backend
-  |> register ~service:Tezos_services.version ~impl:(fun () () () -> version ())
+  |> register ~service:Tezos_services.version ~impl:(fun () () () ->
+         version ~node_version ())
   |> register_with_conversion
        ~service:Tezos_services.injection_operation
        ~impl:(fun
@@ -1048,11 +1047,12 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services ~l2_chain_id ~add_operation ~get_da_fee_per_byte
-    ~get_michelson_base_fee_per_gas backend =
+let register_tezlink_services ~l2_chain_id ~node_version ~add_operation
+    ~get_da_fee_per_byte ~get_michelson_base_fee_per_gas backend =
   let directory =
     build_dir
       ~l2_chain_id
+      ~node_version
       ~add_operation
       ~get_da_fee_per_byte
       ~get_michelson_base_fee_per_gas

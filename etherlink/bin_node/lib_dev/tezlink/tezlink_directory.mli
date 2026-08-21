@@ -8,6 +8,7 @@
 
 val register_tezlink_services :
   l2_chain_id:L2_types.chain_id ->
+  node_version:Tezos_version.Octez_node_version.t ->
   add_operation:(bytes -> Ethereum_types.hash tzresult Lwt.t) ->
   get_da_fee_per_byte:(unit -> Tezos_types.Tez.nanotez tzresult Lwt.t) ->
   get_michelson_base_fee_per_gas:
