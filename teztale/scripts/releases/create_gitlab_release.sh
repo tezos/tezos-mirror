@@ -93,17 +93,11 @@ fi
 # Enable release-cli verbose mode
 export DEBUG='true'
 
-deprecated_release_name="${release_name} - GitLab Releases Deprecated, See octez.tezos.com/releases/teaztale/"
-
 release-cli create \
-  --name="${deprecated_release_name}" \
+  --name="${release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="⚠️ **DEPRECATION NOTICE** ⚠️
+  --description="Download Teztale, a monitoring tool for the Tezos blockchain.
 
-This GitLab release page is deprecated. Please use our new dedicated release page for the latest releases and information.
-
-🔗 **New Release Page: https://octez.tezos.com/releases/teztale/**
-
-This page will no longer be updated. All future releases and updates will be available on the new release page." \
+🔗 New Release Page: https://octez.tezos.com/releases/teztale/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${binaries_url}\",\"link_type\":\"package\"}"
