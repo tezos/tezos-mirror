@@ -50,6 +50,27 @@ The sections will contain:
   - A list of links to download binaries stored in `release-page-test.nomadic-labs.com/releases/rollup-node/rollup-node-vx.y/binaries/`.
   - A link to the packages install instructions.
 
+## Rendering the whole site
+
+The invocations above render a single component's page. To render the whole
+release site at once, use `--site`:
+
+```shell
+release_page --site --bucket BUCKET --url URL --path PATH --output-dir DIR
+```
+
+This renders every component from the built-in catalog (`site_catalog` in
+`release_site/src/release_page.ml`), each from its published `versions.json`,
+into `DIR`: octez at the root, each other component under its own
+subdirectory. The catalog is the single source of truth for which components
+belong to the site and which asset types each one publishes.
+
+This is what the `release_site.render` CI job runs (through
+`release_site/scripts/render_release_site.sh`, which also generates the octez
+RSS feed, uploads the site and invalidates the CDN). Rendering is owned by
+`release_site` and always operates on the whole site, as described in the
+vocabulary section above; components only deploy their own assets.
+
 The script lists the assets by reading the contents of directories in
 `s3://release-page-test.nomadic-labs.com/releases/`.
 
