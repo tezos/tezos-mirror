@@ -188,3 +188,14 @@ nav[class='contents'] {
 [data-theme='dark'] .mermaid path {
     stroke: white!important;
 }
+
+/* icon links (sidebar header)
+ * --------------------------
+ */
+
+/* The theme caps icon link images at 1.5em, which is too small for the
+ * "Up to Tezos docs" and "Documentation map" buttons.
+ */
+ul.navbar-icon-links img.icon-link-image {
+    height: 2em;
+}
