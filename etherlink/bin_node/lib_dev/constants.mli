@@ -54,3 +54,12 @@ val kernel_is_newer : kernel -> than:kernel -> bool
 (** Returns the root hash of a released kernel, or [None] for [Latest]
     whose root hash changes over time. *)
 val root_hash_from_released_kernel : kernel -> Hex.t option
+
+(** [michelson_runtime_node_version ~smart_rollup_address ~l2_chain_id] is the
+    version reported by the [/version] RPC of the Michelson runtime. Its chain
+    name is prefixed with [TEZOS_MAINNET] on Mainnet, which is how
+    [octez-client] selects the Mainnet disclaimer over the testnet one. *)
+val michelson_runtime_node_version :
+  smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  l2_chain_id:L2_types.chain_id ->
+  Tezos_version.Octez_node_version.t

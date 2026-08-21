@@ -346,6 +346,7 @@ let evm_node_lib_dev =
         octez_workers |> open_;
         octez_connpool;
         octez_rpc_http_client_unix;
+        octez_version;
         octez_version_value;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
