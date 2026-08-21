@@ -115,6 +115,90 @@ pub trait KeySpaceExtRlp: KeySpace {
 #[cfg(feature = "rlp")]
 impl<KS: KeySpace> KeySpaceExtRlp for KS {}
 
+/// Error returned by [`KeySpaceExtBin::store_bin`].
+#[cfg(feature = "tezos-encoding")]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum StoreBinError {
+    /// The value could not be encoded.
+    #[error("value does not encode: {0}")]
+    Encode(#[from] tezos_data_encoding::enc::BinError),
+    /// The encoded value could not be written at the key.
+    #[error(transparent)]
+    Write(#[from] KeySpaceWriteError),
+}
+
+/// Error returned by [`KeySpaceExtBin::read_nom`]: the bytes at the key are
+/// not exactly one encoding of the requested type, whether they fall short of
+/// one or leave bytes over.
+#[cfg(feature = "tezos-encoding")]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("value does not decode: {0}")]
+pub struct NomReadError(String);
+
+/// The decoder's error borrows the bytes it stopped on, so it is rendered
+/// here to outlive the read.
+#[cfg(feature = "tezos-encoding")]
+impl From<tezos_data_encoding::nom::NomError<'_>> for NomReadError {
+    fn from(err: tezos_data_encoding::nom::NomError<'_>) -> Self {
+        NomReadError(format!("{err:?}"))
+    }
+}
+
+/// Binary reads and writes over a [`KeySpace`], through the
+/// `tezos_data_encoding` [`BinWriter`] and [`NomReader`] traits.
+///
+/// [`BinWriter`]: tezos_data_encoding::enc::BinWriter
+/// [`NomReader`]: tezos_data_encoding::nom::NomReader
+#[cfg(feature = "tezos-encoding")]
+pub trait KeySpaceExtBin: KeySpace {
+    /// Writes the binary encoding of `value` at `key`.
+    ///
+    /// # Errors
+    ///
+    /// - [`StoreBinError::Encode`] when `value` does not encode.
+    /// - [`StoreBinError::Write`] when the encoding exceeds the largest value
+    ///   the key space accepts.
+    fn store_bin(
+        &mut self,
+        key: &Key,
+        value: &impl tezos_data_encoding::enc::BinWriter,
+    ) -> Result<(), StoreBinError> {
+        let mut bytes = Vec::new();
+        value.bin_write(&mut bytes)?;
+        Ok(self.set(key, bytes)?)
+    }
+
+    /// Returns the value whose binary encoding is stored at `key`, or `None`
+    /// when the key is absent.
+    ///
+    /// The decoder consumes the whole value: bytes left over are a
+    /// [`NomReadError`], not a shorter value.
+    fn read_nom<T: for<'a> tezos_data_encoding::nom::NomReader<'a>>(
+        &self,
+        key: &Key,
+    ) -> Result<Option<T>, NomReadError> {
+        let Some(bytes) = self.get(key) else {
+            return Ok(None);
+        };
+        Ok(Some(T::nom_read_exact(&bytes)?))
+    }
+
+    /// [`Self::read_nom`], falling back to `default` when the key is absent.
+    /// Only absence takes the fallback, bytes that do not decode stay an
+    /// error.
+    fn read_nom_or<T: for<'a> tezos_data_encoding::nom::NomReader<'a>>(
+        &self,
+        key: &Key,
+        default: T,
+    ) -> Result<T, NomReadError> {
+        Ok(self.read_nom(key)?.unwrap_or(default))
+    }
+}
+
+#[cfg(feature = "tezos-encoding")]
+impl<KS: KeySpace> KeySpaceExtBin for KS {}
+
+/// Tests for the extension traits, over a key space minted on a mock host.
 #[cfg(all(test, feature = "irmin-compat"))]
 mod tests {
     use super::*;
@@ -182,5 +266,38 @@ mod tests {
         ks.set(&k, [0xc0, 0xff]).unwrap();
         assert!(ks.read_rlp::<Vec<u8>>(&k).is_err());
         assert!(ks.read_rlp_or(&k, vec![9u8]).is_err());
+    }
+
+    #[cfg(feature = "tezos-encoding")]
+    #[test]
+    fn bin_accessors_round_trip_and_reject_a_partial_value() {
+        use tezos_data_encoding::types::Narith;
+
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/bin");
+        let k = key(b"/value");
+        let value: Narith = 300u64.into();
+
+        ks.store_bin(&k, &value).unwrap();
+        assert_eq!(ks.read_nom::<Narith>(&k).unwrap(), Some(value.clone()));
+
+        // An absent key is `None`, or the default where there is one.
+        let missing = key(b"/missing");
+        let fallback: Narith = 7u64.into();
+        assert_eq!(ks.read_nom::<Narith>(&missing).unwrap(), None);
+        assert_eq!(
+            ks.read_nom_or(&missing, fallback.clone()).unwrap(),
+            fallback
+        );
+        assert_eq!(ks.read_nom_or(&k, fallback.clone()).unwrap(), value);
+
+        // A value the decoder cannot finish is an error, and so is one it
+        // finishes with bytes to spare. The default does not cover either.
+        ks.set(&k, [0x80]).unwrap();
+        assert!(ks.read_nom::<Narith>(&k).is_err());
+        assert!(ks.read_nom_or(&k, fallback.clone()).is_err());
+        ks.set(&k, [0x01, 0x01]).unwrap();
+        assert!(ks.read_nom::<Narith>(&k).is_err());
     }
 }

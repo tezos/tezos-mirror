@@ -13,6 +13,7 @@ publish = false
 default = ["irmin-compat"]
 irmin-compat = []
 rlp = ["dep:rlp"]
+tezos-encoding = ["dep:tezos_data_encoding"]
 
 [dependencies]
 hex-literal.workspace = true
@@ -20,6 +21,10 @@ num-traits.workspace = true
 thiserror.workspace = true
 
 [dependencies.rlp]
+workspace = true
+optional = true
+
+[dependencies.tezos_data_encoding]
 workspace = true
 optional = true
 
