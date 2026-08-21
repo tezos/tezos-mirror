@@ -48,7 +48,9 @@ export DEBUG='true'
 release-cli create \
   --name="${gitlab_release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
-  --description="🔗 New Release Page: https://octez.tezos.com/releases/" \
+  --description="Download Octez, a reference implementation for the Tezos blockchain.
+
+🔗 New Release Page: https://octez.tezos.com/releases/" \
   --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Changelog\",\"url\":\"https://octez.tezos.com/docs/CHANGES.html#version-${gitlab_release_no_dot}\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Announcement\",\"url\":\"https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html\",\"link_type\":\"other\"}" \
