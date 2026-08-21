@@ -223,15 +223,6 @@ module Operation_metadata = struct
     return (Operation_metadata {contents})
 end
 
-let version =
-  let open Tezos_version.Octez_node_version in
-  Tezos_version.
-    {
-      version = Tezos_version_parser.default;
-      network_version = Network_version.Internal_for_tests.mock ();
-      commit_info = Some {commit_hash = ""; commit_date = ""};
-    }
-
 (* This module is a fake storage representation, the raw services gives access to the
    real context. Unfortunately, some values are useless for Tezlink, so we don't want
    to store them in the durable storage. So let's do their mock here *)
