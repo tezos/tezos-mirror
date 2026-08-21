@@ -5,10 +5,13 @@ FROM ${IMAGE}
 
 COPY scripts/packaging/homebrew_install.sh /tmp
 
+# clang and libclang-dev are needed by bindgen, which RocksDB uses to
+# generate its FFI bindings. RocksDB is pulled in by the on-disk NDS
+# backend of the smart rollup node, which is part of 'make release'.
 #hadolint ignore=DL3008,DL3009
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    curl autoconf cmake g++ libev-dev libffi-dev libgmp-dev git \
+    curl autoconf cmake g++ libev-dev libffi-dev libgmp-dev git clang libclang-dev \
     libprotobuf-dev libsqlite3-dev libzstd-dev protobuf-compiler libhidapi-dev \
     pkg-config zlib1g-dev libpq-dev cargo && \
   touch /.dockerenv && \
