@@ -9747,19 +9747,24 @@ let build_dangling_hash_refute ~sc_rollup client =
    few milliseconds after subscribing to the mempool and usually never sees the
    op at all.
 
-   Step (2) establishes that the recorded proof is a live reproducer: applied
-   outside the plugin -- the [helpers/preapply/operations] RPC applies
-   operations with the protocol directly -- it aborts. Without that step the
-   test could pass vacuously if the literal ever stopped decoding, since the
-   plugin rejects undecodable proofs too.
+   Steps (2) and (3) establish that the recorded proof is a live reproducer:
+   applied outside the plugin -- [helpers/preapply/operations] and
+   [run_operation] both apply operations with the protocol directly -- it
+   aborts. Without them the test could pass vacuously if the literal ever
+   stopped decoding, since the plugin rejects undecodable proofs too. They also
+   pin that those two RPCs answer the failure instead of taking the node down
+   with them, which is what makes the exception harmless outside block
+   application.
 
    [wasm_2_0_0] because the plugin's [check_proof] only replays WASM proofs.
    Registered on protocol 025 only: that is where this plugin gate lives. *)
 (* Shared driver for the two tests below. Both build an operation whose
-   APPLICATION aborts with an Irmin exception, and both check the same three
+   APPLICATION aborts with an Irmin exception, and both check the same four
    things: the mempool validates it (operation validation does not replay
-   proofs), it is still a live reproducer through the protocol alone, and the
-   plugin gate keeps it out of blocks -- so the baker's node survives.
+   proofs), it is still a live reproducer through the protocol alone, the RPCs
+   that do replay it ([preapply/operations] and [run_operation]) report the
+   failure and keep serving, and the plugin gate keeps it out of blocks -- so
+   the baker's node survives.
 
    [what] names the operation kind in failure messages. *)
 let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
@@ -9804,7 +9809,41 @@ let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
     "OK (2): applying the operation outside the plugin aborts (HTTP %d): %s"
     response.code
     body ;
-  (* (3) Hand the baker an external operations pool holding exactly the
+  (* (3) [run_operation] is the other RPC that applies the operation with the
+     protocol and without the plugin, so it aborts on the same exception. What
+     matters here is that it aborts as an RPC failure and NOTHING MORE: the
+     exception must surface to the caller as a 500, not be routed through the
+     shell's critical-context-error path the way a failed block application is.
+     Anyone can call this RPC on a public node, so the day that changes, one
+     unsigned operation takes any node down without ever being baked. *)
+  let* run_input = Operation.make_run_operation_input op client in
+  let* run_response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data run_input)))
+  in
+  let run_body = JSON.encode run_response.body in
+  if run_response.code = 200 then
+    Test.fail
+      "Expected run_operation on the malicious %s operation to abort, but it \
+       returned HTTP 200 with body: %s."
+      what
+      run_body ;
+  if run_body =~! rex "dangling hash" then
+    Test.fail
+      "Expected run_operation to abort on the Irmin exception, but it failed \
+       with (HTTP %d): %s. The operation is no longer a reproducer through \
+       this path, so this step would no longer exercise anything."
+      run_response.code
+      run_body ;
+  (* The node answered the failure rather than dying on it -- and this call
+     also proves it is still alive after both RPCs above. *)
+  let* (_ : JSON.t) = Node.RPC.call node @@ RPC.get_chain_block_header () in
+  Log.info
+    "OK (3): run_operation aborts (HTTP %d) and the node is still serving RPCs."
+    run_response.code ;
+  (* (4) Hand the baker an external operations pool holding exactly the
      malicious op and nothing else, and forge one block on the node's context
      (see the configuration discussion above the test). *)
   let pool_file = Temp.file "operations_pool.json" in
@@ -9845,8 +9884,8 @@ let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
           "The node did not switch to the block the baker just injected (%s). \
            The un-appliable %s operation %s was included in that block -- \
            forging only validates operations, it does not apply them -- so \
-           applying the block aborts (see step 2) and takes the node down with \
-           it."
+           applying the block aborts (see steps 2 and 3) and takes the node \
+           down with it."
           (Printexc.to_string exn)
           what
           oph)
@@ -9859,12 +9898,12 @@ let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
   then
     Test.fail
       "The un-appliable operation %s was included in the forged block at level \
-       %d; it must be dropped at forging, since applying it aborts (see step \
-       2), which would make the block un-appliable for every other node."
+       %d; it must be dropped at forging, since applying it aborts (see steps \
+       2 and 3), which would make the block un-appliable for every other node."
       oph
       level_after ;
   Log.info
-    "OK (3): the operation %s was dropped at forging and the block at level %d \
+    "OK (4): the operation %s was dropped at forging and the block at level %d \
      was produced cleanly."
     oph
     level_after ;
