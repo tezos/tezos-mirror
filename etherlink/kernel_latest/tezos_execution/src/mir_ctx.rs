@@ -2096,10 +2096,9 @@ pub mod tests {
         dump_big_map_walk(&mut storage, &mut root, true, &mut seen).unwrap();
         // Extract the two operation big maps back out in AST order (left, right).
         let (op1, op2) = match &mut root {
-            TypedValue::Pair(l, r) => (
-                take_big_map(std::rc::Rc::make_mut(l)),
-                take_big_map(std::rc::Rc::make_mut(r)),
-            ),
+            TypedValue::Pair(l, r) => {
+                (take_big_map(l.make_mut()), take_big_map(r.make_mut()))
+            }
             other => panic!("expected Pair, got {other:?}"),
         };
 

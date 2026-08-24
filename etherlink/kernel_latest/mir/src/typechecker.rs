@@ -6488,11 +6488,13 @@ mod typecheck_tests {
     #[test]
     fn deeply_nested_pair_packs() {
         use crate::ast::IntoMicheline;
-        use std::rc::Rc;
         const DEPTH: usize = 100_000;
         let mut deep: TypedValue<'_> = TypedValue::Unit;
         for _ in 0..DEPTH {
-            deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+            deep = TypedValue::Pair(
+                RcTypedValue::new(TypedValue::Unit),
+                RcTypedValue::new(deep),
+            );
         }
         let arena: typed_arena::Arena<Micheline<'_>> = typed_arena::Arena::new();
         let mich = deep

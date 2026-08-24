@@ -639,7 +639,7 @@ fn extract_callback(
         TypedValue::Option(Some(rc)) => {
             let rc = std::mem::take(rc);
             let addr = take_payload!(
-                unwrap_rc(rc),
+                unwrap_rc(rc.into()),
                 TypedValue::Contract(addr),
                 return Err(TransferError::GatewayError(format!(
                     "{entrypoint_name}: expected contract in callback option"
@@ -794,41 +794,41 @@ fn extract_call_params(
         ))
     );
     let dest = take_payload!(
-        unwrap_rc(dest_rc),
+        unwrap_rc(dest_rc.into()),
         TypedValue::String(dest),
         return Err(TransferError::GatewayError(
             "call: expected string for destination".into(),
         ))
     );
     let (sig_rc, inner2_rc) = take_payload!(
-        unwrap_rc(inner_rc),
+        unwrap_rc(inner_rc.into()),
         TypedValue::Pair(sig_rc, inner2_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (method_sig, (abi_params, callback))".into(),
         ))
     );
     let method_sig = take_payload!(
-        unwrap_rc(sig_rc),
+        unwrap_rc(sig_rc.into()),
         TypedValue::String(method_sig),
         return Err(TransferError::GatewayError(
             "call: expected string for method signature".into(),
         ))
     );
     let (params_rc, callback_rc) = take_payload!(
-        unwrap_rc(inner2_rc),
+        unwrap_rc(inner2_rc.into()),
         TypedValue::Pair(params_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (abi_params, callback)".into(),
         ))
     );
     let abi_params = take_payload!(
-        unwrap_rc(params_rc),
+        unwrap_rc(params_rc.into()),
         TypedValue::Bytes(abi_params),
         return Err(TransferError::GatewayError(
             "call: expected bytes for ABI parameters".into(),
         ))
     );
-    let callback = extract_callback(unwrap_rc(callback_rc), "call_evm")?;
+    let callback = extract_callback(unwrap_rc(callback_rc.into()), "call_evm")?;
     Ok((dest, method_sig, abi_params, callback))
 }
 
@@ -848,21 +848,21 @@ fn extract_http_call_request(
         ))
     );
     let url = take_payload!(
-        unwrap_rc(url_rc),
+        unwrap_rc(url_rc.into()),
         TypedValue::String(url),
         return Err(TransferError::GatewayError(
             "http_call: expected string for URL".into(),
         ))
     );
     let (headers_rc, body_method_rc) = take_payload!(
-        unwrap_rc(inner_rc),
+        unwrap_rc(inner_rc.into()),
         TypedValue::Pair(headers_rc, body_method_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (headers, (body, (method, callback)))".into(),
         ))
     );
     let headers_list = take_payload!(
-        unwrap_rc(headers_rc),
+        unwrap_rc(headers_rc.into()),
         TypedValue::List(headers_list),
         return Err(TransferError::GatewayError(
             "http_call: expected list for headers".into(),
@@ -872,21 +872,21 @@ fn extract_http_call_request(
         .into_iter()
         .map(|item| {
             let (name_rc, val_rc) = take_payload!(
-                unwrap_rc(item),
+                unwrap_rc(item.into()),
                 TypedValue::Pair(name_rc, val_rc),
                 return Err(TransferError::GatewayError(
                     "http_call: expected pair (name, value) in headers list".into(),
                 ))
             );
             let name = take_payload!(
-                unwrap_rc(name_rc),
+                unwrap_rc(name_rc.into()),
                 TypedValue::String(name),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header name".into(),
                 ))
             );
             let val = take_payload!(
-                unwrap_rc(val_rc),
+                unwrap_rc(val_rc.into()),
                 TypedValue::String(val),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header value".into(),
@@ -896,34 +896,34 @@ fn extract_http_call_request(
         })
         .collect::<Result<_, _>>()?;
     let (body_rc, method_callback_rc) = take_payload!(
-        unwrap_rc(body_method_rc),
+        unwrap_rc(body_method_rc.into()),
         TypedValue::Pair(body_rc, method_callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (body, (method, callback))".into(),
         ))
     );
     let body = take_payload!(
-        unwrap_rc(body_rc),
+        unwrap_rc(body_rc.into()),
         TypedValue::Bytes(body),
         return Err(TransferError::GatewayError(
             "http_call: expected bytes for body".into(),
         ))
     );
     let (method_rc, callback_rc) = take_payload!(
-        unwrap_rc(method_callback_rc),
+        unwrap_rc(method_callback_rc.into()),
         TypedValue::Pair(method_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (method, callback)".into(),
         ))
     );
     let method = take_payload!(
-        unwrap_rc(method_rc),
+        unwrap_rc(method_rc.into()),
         TypedValue::Nat(method),
         return Err(TransferError::GatewayError(
             "http_call: expected nat for method".into(),
         ))
     );
-    let callback = extract_callback(unwrap_rc(callback_rc), "call")?;
+    let callback = extract_callback(unwrap_rc(callback_rc.into()), "call")?;
     let request = build_http_request(&url, &headers, &body, method)?;
     Ok((request, callback))
 }

@@ -764,13 +764,13 @@ pub enum TypedValue<'a> {
     Bool(bool),
     String(String),
     Unit,
-    Pair(Rc<Self>, Rc<Self>),
-    Option(Option<Rc<Self>>),
+    Pair(RcTypedValue<'a>, RcTypedValue<'a>),
+    Option(Option<RcTypedValue<'a>>),
     List(MichelsonList<Rc<Self>>),
     Set(RedBlackTreeSet<Rc<Self>>),
     Map(RedBlackTreeMap<Rc<Self>, Rc<Self>>),
     BigMap(BigMap<'a>),
-    Or(Or<Rc<Self>, Rc<Self>>),
+    Or(Or<RcTypedValue<'a>, RcTypedValue<'a>>),
     Address(Address),
     ChainId(ChainId),
     Contract(Address),
@@ -1468,7 +1468,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     TV::List(l) => {
                         let mut elems: Vec<TypedValue<'a>> = std::mem::take(l)
                             .into_iter()
-                            .map(TypedValue::unwrap_rc)
+                            .map(|x| TypedValue::unwrap_rc(x.into()))
                             .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1479,7 +1479,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         let mut elems: Vec<TypedValue<'a>> =
                             rb_set_into_vec(std::mem::take(s))
                                 .into_iter()
-                                .map(TypedValue::unwrap_rc)
+                                .map(|x| TypedValue::unwrap_rc(x.into()))
                                 .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1487,28 +1487,38 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     TV::Map(m) => {
-                        let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
+                        let mut entries: Vec<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)> =
                             rb_map_into_vec(std::mem::take(m));
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
                         while let Some((key, val)) = entries.pop() {
                             frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                val.into(),
+                            )));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                key.into(),
+                            )));
                         }
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
-                            let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
-                                rb_map_into_vec(m);
+                            let mut entries: Vec<(
+                                Rc<TypedValue<'a>>,
+                                Rc<TypedValue<'a>>,
+                            )> = rb_map_into_vec(m);
                             frames.push(TvImFrame::BuildSeqOf {
                                 count: entries.len(),
                             });
                             while let Some((key, val)) = entries.pop() {
                                 frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    val.into(),
+                                )));
+                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
+                                    key.into(),
+                                )));
                             }
                         }
                         big_map::BigMapContent::FromId(m) => {
@@ -1516,8 +1526,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             if m.overlay.is_empty() {
                                 results.push(id_part);
                             } else {
-                                let mut overlay: Vec<(Rc<Self>, Option<Rc<Self>>)> =
-                                    rb_map_into_vec(m.overlay);
+                                let mut overlay: Vec<(
+                                    Rc<TypedValue<'a>>,
+                                    Option<Rc<TypedValue<'a>>>,
+                                )> = rb_map_into_vec(m.overlay);
                                 frames.push(TvImFrame::BuildBigMapFromId {
                                     id_part,
                                     count: overlay.len(),
@@ -1529,7 +1541,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             frames
                                                 .push(TvImFrame::BuildPrim1(Prim::Some));
                                             frames.push(TvImFrame::Visit(
-                                                TypedValue::unwrap_rc(v),
+                                                TypedValue::unwrap_rc(v.into()),
                                             ));
                                         }
                                         None => {
@@ -1540,7 +1552,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                         }
                                     }
                                     frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                        key,
+                                        key.into(),
                                     )));
                                 }
                             }
@@ -1561,7 +1573,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     tt.destination_address,
                                 )));
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    tt.param,
+                                    tt.param.into(),
                                 )));
                             }
                             Operation::SetDelegate(sd) => {
@@ -1594,7 +1606,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     tag: em.tag,
                                 });
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    em.value,
+                                    em.value.into(),
                                 )));
                             }
                             Operation::CreateContract(cc) => {
@@ -1621,7 +1633,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     mutez_mich,
                                 });
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    cc.storage,
+                                    cc.storage.into(),
                                 )));
                             }
                         }
@@ -2070,44 +2082,47 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Take ownership of an `Rc`-shared value: moves it out when this is the
-    /// last reference, clones it otherwise. Prefer keeping the `Rc` when the
-    /// value is only read or forwarded — the clone is a deep copy of every
+    /// Take ownership of a shared value: moves it out when this is the last
+    /// reference, clones it otherwise. Prefer keeping the [RcTypedValue] when
+    /// the value is only read or forwarded — the clone is a deep copy of every
     /// inline payload, and those are unbounded.
-    pub fn unwrap_rc(rc: Rc<Self>) -> Self {
-        Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
+    pub fn unwrap_rc(rc: RcTypedValue<'a>) -> Self {
+        rc.unwrap_or_clone()
     }
 
     /// Convenience function to construct a new [Self::Pair].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Rc::new(l), Rc::new(r))
+        Self::Pair(RcTypedValue::new(l), RcTypedValue::new(r))
     }
 
-    /// Convenience function to construct a new [Self::Pair] from Rc values.
-    pub fn new_pair_rc(l: Rc<Self>, r: Rc<Self>) -> Self {
+    /// Convenience function to construct a new [Self::Pair] from already-shared
+    /// values.
+    pub fn new_pair_rc(l: RcTypedValue<'a>, r: RcTypedValue<'a>) -> Self {
         Self::Pair(l, r)
     }
 
     /// Convenience function to construct a new [Self::Option].
     pub fn new_option(x: Option<Self>) -> Self {
-        Self::Option(x.map(Rc::new))
+        Self::Option(x.map(RcTypedValue::new))
     }
 
-    /// Convenience function to construct a new [Self::Option] from Rc values.
-    pub fn new_option_rc(x: Option<Rc<Self>>) -> Self {
+    /// Convenience function to construct a new [Self::Option] from an
+    /// already-shared value.
+    pub fn new_option_rc(x: Option<RcTypedValue<'a>>) -> Self {
         Self::Option(x)
     }
 
     /// Convenience function to construct a new [Self::Or].
     pub fn new_or(x: Or<Self, Self>) -> Self {
         Self::Or(match x {
-            Or::Left(v) => Or::Left(Rc::new(v)),
-            Or::Right(v) => Or::Right(Rc::new(v)),
+            Or::Left(v) => Or::Left(RcTypedValue::new(v)),
+            Or::Right(v) => Or::Right(RcTypedValue::new(v)),
         })
     }
 
-    /// Convenience function to construct a new [Self::Or] from Rc values.
-    pub fn new_or_rc(x: Or<Rc<Self>, Rc<Self>>) -> Self {
+    /// Convenience function to construct a new [Self::Or] from an
+    /// already-shared value.
+    pub fn new_or_rc(x: Or<RcTypedValue<'a>, RcTypedValue<'a>>) -> Self {
         Self::Or(x)
     }
 
@@ -2307,12 +2322,12 @@ macro_rules! take_out_via_default_generic {
 }
 
 take_out_via_default_generic!(
-    Rc<TypedValue<'a>>,
-    Option<Rc<TypedValue<'a>>>,
+    RcTypedValue<'a>,
+    Option<RcTypedValue<'a>>,
     MichelsonList<Rc<TypedValue<'a>>>,
     RedBlackTreeSet<Rc<TypedValue<'a>>>,
     RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-    Or<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    Or<RcTypedValue<'a>, RcTypedValue<'a>>,
     Closure<'a>,
     Box<Ticket<'a>>,
     Box<OperationInfo<'a>>,
@@ -2321,17 +2336,15 @@ take_out_via_default_generic!(
 fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'a>>) {
     use std::mem::{replace, take};
     use TypedValue as TV;
-    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<DropNode<'a>>| {
-        if let Ok(v) = Rc::try_unwrap(rc) {
+    let push_rc = |rc: RcTypedValue<'a>, stack: &mut Vec<DropNode<'a>>| {
+        if let Ok(v) = rc.try_unwrap() {
             stack.push(DropNode::Value(v));
         }
     };
     match node {
         TV::Pair(l, r) => {
-            let old_l = replace(l, Rc::new(TV::Unit));
-            let old_r = replace(r, Rc::new(TV::Unit));
-            push_rc(old_l, stack);
-            push_rc(old_r, stack);
+            push_rc(take(l), stack);
+            push_rc(take(r), stack);
         }
         TV::Option(opt) => {
             if let Some(rc) = opt.take() {
@@ -2339,26 +2352,25 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             }
         }
         TV::Or(or) => {
-            let old = replace(or, Or::Left(Rc::new(TV::Unit)));
-            let rc = match old {
+            let rc = match take(or) {
                 Or::Left(r) | Or::Right(r) => r,
             };
             push_rc(rc, stack);
         }
         TV::List(l) => {
             for rc in take(l).drain_owned() {
-                push_rc(rc, stack);
+                push_rc(rc.into(), stack);
             }
         }
         TV::Set(s) => {
             for rc in take(s).drain_owned() {
-                push_rc(rc, stack);
+                push_rc(rc.into(), stack);
             }
         }
         TV::Map(m) => {
             for (k, v) in take(m).drain_owned() {
-                push_rc(k, stack);
-                push_rc(v, stack);
+                push_rc(k.into(), stack);
+                push_rc(v.into(), stack);
             }
         }
         TV::Lambda(closure) => {
@@ -2379,7 +2391,7 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             } = cur
             {
                 if let Ok(capture) = Rc::try_unwrap(capture) {
-                    push_rc(capture.into_arg_val(), stack);
+                    push_rc(capture.into_arg_val().into(), stack);
                 }
                 // Stop at the first co-owned link instead of cloning past it:
                 // everything below is kept alive by that other owner, so there
@@ -2422,14 +2434,13 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             // Operations carry `TypedValue` payloads (transfer parameter, emit
             // value, originated storage) that may be deep; drain them. They are
             // `Rc`-shared, so only the last owner actually drains one.
-            let unit = || Rc::new(TV::Unit);
             match &mut info.operation {
                 Operation::TransferTokens(tt) => {
-                    push_rc(replace(&mut tt.param, unit()), stack)
+                    push_rc(take(&mut tt.param).into(), stack)
                 }
-                Operation::Emit(e) => push_rc(replace(&mut e.value, unit()), stack),
+                Operation::Emit(e) => push_rc(take(&mut e.value).into(), stack),
                 Operation::CreateContract(c) => {
-                    push_rc(replace(&mut c.storage, unit()), stack)
+                    push_rc(take(&mut c.storage).into(), stack)
                 }
                 Operation::SetDelegate(_) => {}
             }
@@ -2442,15 +2453,15 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             match &mut m.content {
                 big_map::BigMapContent::InMemory(map) => {
                     for (k, v) in take(map).drain_owned() {
-                        push_rc(k, stack);
-                        push_rc(v, stack);
+                        push_rc(k.into(), stack);
+                        push_rc(v.into(), stack);
                     }
                 }
                 big_map::BigMapContent::FromId(from_id) => {
                     for (k, v) in take(&mut from_id.overlay).drain_owned() {
-                        push_rc(k, stack);
+                        push_rc(k.into(), stack);
                         if let Some(v) = v {
-                            push_rc(v, stack);
+                            push_rc(v.into(), stack);
                         }
                     }
                 }
@@ -3180,8 +3191,8 @@ mod test_untypers {
         // fix exists for.
         let shared = Rc::new(TypedValue::Bytes(vec![0xab; 32]));
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair_rc(
-            shared.clone(),
-            shared.clone(),
+            shared.clone().into(),
+            shared.clone().into(),
         ));
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
             in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
@@ -3223,17 +3234,17 @@ mod test_untypers {
 
         // Build (list unit) with 1000 shared references to the same empty list
         let inner_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&unit_list)).collect();
+            (0..1000).map(|_| unit_list.clone()).collect();
         let inner_list = Rc::new(TypedValue::List(MichelsonList::from(inner_lists)));
 
         // Build (list (list unit)) with 1000 shared references to the same (list unit)
         let middle_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&inner_list)).collect();
+            (0..1000).map(|_| inner_list.clone()).collect();
         let middle_list = Rc::new(TypedValue::List(MichelsonList::from(middle_lists)));
 
         // Build (list (list (list unit))) with 1000 shared references
         let outer_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&middle_list)).collect();
+            (0..1000).map(|_| middle_list.clone()).collect();
         let outer_list = TypedValue::List(MichelsonList::from(outer_lists));
 
         // This structure has 1000 * 1000 * 1000 = 1,000,000,000 virtual entries to traverse
@@ -3703,7 +3714,10 @@ mod debug_tests {
             .spawn(|| {
                 let mut deep: TypedValue<'_> = TypedValue::Unit;
                 for _ in 0..DEPTH {
-                    deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+                    deep = TypedValue::Pair(
+                        RcTypedValue::new(TypedValue::Unit),
+                        RcTypedValue::new(deep),
+                    );
                 }
                 let formatted = format!("{deep:?}");
                 assert!(formatted.starts_with("Pair("));

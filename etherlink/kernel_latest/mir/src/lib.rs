@@ -1577,7 +1577,7 @@ mod multisig_tests {
         >,
     ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
-        result.map(|(ops, val)| (ops.collect(), TypedValue::unwrap_rc(val)))
+        result.map(|(ops, val)| (ops.collect(), TypedValue::unwrap_rc(val.into())))
     }
 
     // From: https://github.com/murbard/smart-contracts/blob/eb2b7d81aedcfeaea219da8b66cdd86652bf42f7/multisig/michelson/multisig.tz

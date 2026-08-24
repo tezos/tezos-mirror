@@ -1594,11 +1594,11 @@ mod test {
         // charged. 40 shared pair levels = 40 nodes in memory but 2^40 expanded
         // leaves; with a small budget the metered COMPARE OOGs after ~budget
         // nodes (so this test terminates) instead of hanging on 2^40 nodes.
+        use crate::ast::RcTypedValue;
         use crate::ast::TypedValue as V;
-        use std::rc::Rc;
-        let mut shared = Rc::new(V::int(0));
+        let mut shared = RcTypedValue::new(V::int(0));
         for _ in 0..40 {
-            shared = Rc::new(V::new_pair_rc(shared.clone(), shared.clone()));
+            shared = RcTypedValue::new(V::new_pair_rc(shared.clone(), shared.clone()));
         }
         let mut gas = Gas::new(10_000);
         assert_eq!(

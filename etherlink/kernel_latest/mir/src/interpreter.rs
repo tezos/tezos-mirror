@@ -313,11 +313,16 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        let result = TypedValue::unwrap_rc(stack.pop().ok_or(
-            InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
-        )?);
+        let result = TypedValue::unwrap_rc(
+            stack
+                .pop()
+                .ok_or(InterpretError::InternalError(
+                    InterpretInvariant::EmptyValueStackPop,
+                ))?
+                .into(),
+        );
         let mut result = result;
-        let (operation_list, mut storage) = match &mut result {
+        let (operation_list, storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
             }
@@ -328,6 +333,9 @@ impl<'a> ContractScript<'a> {
                 .into())
             }
         };
+        // The storage travels as a raw `Rc` until the value stack moves onto
+        // the newtype.
+        let mut storage: Rc<TypedValue<'a>> = storage.into();
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
@@ -387,7 +395,7 @@ impl<'a> ContractScript<'a> {
 
         let mut ops = Vec::with_capacity(vec.len());
         for op in vec {
-            let mut op = TypedValue::unwrap_rc(op);
+            let mut op = TypedValue::unwrap_rc(op.into());
             match &mut op {
                 V::Operation(op) => ops.push(*std::mem::take(op)),
                 _ => {
@@ -995,7 +1003,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let cond = match TypedValue::unwrap_rc(pop_value(stk)?) {
+                let cond = match TypedValue::unwrap_rc(pop_value(stk)?.into()) {
                     TypedValue::Bool(b) => b,
                     _ => {
                         return Err(InterpretError::InternalError(
@@ -1018,7 +1026,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopLeftBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?);
+                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?.into());
                 let or = match &mut or_v {
                     TypedValue::Or(or) => std::mem::take(or),
                     _ => {
@@ -1078,7 +1086,7 @@ fn run_interp_driver<'a, 'b>(
             } => {
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    active_stack_mut(stacks)?.push(TypedValue::Pair(k, v));
+                    active_stack_mut(stacks)?.push(TypedValue::Pair(k.into(), v.into()));
                     frames.push(InterpFrame::IterMap { body, remaining });
                     frames.push(InterpFrame::NextInstr {
                         block: body,
@@ -1114,7 +1122,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::MapOptionAfter => {
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                stk.push(TypedValue::new_option_rc(Some(result)));
+                stk.push(TypedValue::new_option_rc(Some(result.into())));
             }
             InterpFrame::MapMapAccum {
                 body,
@@ -1132,7 +1140,7 @@ fn run_interp_driver<'a, 'b>(
                 acc.insert_mut(prev_key, new_val);
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    stk.push(TypedValue::Pair(k.clone(), v));
+                    stk.push(TypedValue::Pair(k.clone().into(), v.into()));
                     frames.push(InterpFrame::MapMapAccum {
                         body,
                         remaining,
@@ -1170,7 +1178,8 @@ fn run_interp_driver<'a, 'b>(
                     saved_balance,
                 );
                 let result = pop_value(&mut sub)?;
-                active_stack_mut(stacks)?.push(TypedValue::new_option_rc(Some(result)));
+                active_stack_mut(stacks)?
+                    .push(TypedValue::new_option_rc(Some(result.into())));
             }
         }
     }
@@ -1399,7 +1408,7 @@ fn interpret_step<'a, 'b>(
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
             // pattern match (E0509); borrow the field and `take_out` it,
             // leaving the drained value to drop trivially at end of block.
-            let mut v = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut v = TypedValue::unwrap_rc(pop_value(stack)?.into());
             match &mut v {
                 #[allow(unused_parens)]
                 $p(i) => $crate::ast::TakeOut::take_out(i),
@@ -1561,7 +1570,7 @@ fn interpret_step<'a, 'b>(
                 let mut iter = crate::ast::rb_map_into_vec(map).into_iter();
                 if let Some((k, v)) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    stack.push(TypedValue::Pair(k.clone(), v));
+                    stack.push(TypedValue::Pair(k.clone().into(), v.into()));
                     Ok(StepResult::OpenMapMap {
                         body,
                         iter,
@@ -1620,7 +1629,10 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = Rc::new(V::new_pair_rc(Rc::clone(capture.arg_val()), arg));
+                        arg = Rc::new(V::new_pair_rc(
+                            capture.arg_val().clone().into(),
+                            arg.into(),
+                        ));
                         closure = Closure::unwrap_rc(inner);
                     }
                 }
@@ -1713,7 +1725,10 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair_rc(input, Rc::new(storage))];
+            let initial = stk![TypedValue::new_pair_rc(
+                input.into(),
+                RcTypedValue::new(storage)
+            )];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -1788,7 +1803,7 @@ fn interpret_one<'a>(
 
     macro_rules! pop {
         () => {{
-            TypedValue::unwrap_rc(pop_rc!())
+            TypedValue::unwrap_rc(pop_rc!().into())
         }};
         ($p:path) => {{
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
@@ -2671,14 +2686,14 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::PAIR)?;
             let l = pop_rc!();
             let r = pop_rc!();
-            stack.push(V::new_pair_rc(l, r));
+            stack.push(V::new_pair_rc(l.into(), r.into()));
         }
         I::PairN(n) => {
             ctx.gas().consume(interpret_cost::pair_n(*n as usize)?)?;
             let res = stack
                 .drain_top(*n as usize)?
                 .rev()
-                .reduce(|acc, e| V::new_pair_rc(e, acc).into())
+                .reduce(|acc, e| V::new_pair_rc(e.into(), acc.into()).into())
                 .ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
@@ -2699,10 +2714,10 @@ fn interpret_one<'a>(
             // Rust frame per nesting level -- a depth-N right-comb on the
             // stack with `UNPAIR (N+1)` would otherwise overflow the kernel's
             // ~1 MiB Rust stack around N ≈ 100. L2-1434 in-scope item.
-            let mut cur = pop_rc!();
+            let mut cur: RcTypedValue<'a> = pop_rc!().into();
             let total = *n as usize;
             stack.reserve(total);
-            let mut lefts: Vec<Rc<TypedValue<'a>>> =
+            let mut lefts: Vec<RcTypedValue<'a>> =
                 Vec::with_capacity(total.saturating_sub(1));
             for _ in 0..(n - 1) {
                 let next = match cur.as_ref() {
@@ -2728,7 +2743,7 @@ fn interpret_one<'a>(
         I::ISome => {
             ctx.gas().consume(interpret_cost::SOME)?;
             let v = pop_rc!();
-            stack.push(V::new_option_rc(Some(v)));
+            stack.push(V::new_option_rc(Some(v.into())));
         }
         I::None => {
             ctx.gas().consume(interpret_cost::NONE)?;
@@ -2763,7 +2778,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CONS)?;
             let elt = pop_rc!();
             let mut lst = pop!(V::List);
-            lst.cons(elt);
+            lst.cons(elt.into());
             stack.push(V::List(lst));
         }
         I::Concat(overload) => match overload {
@@ -2936,7 +2951,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key_rc, map.size())?)?;
                 let result = map.get(&*key_rc);
-                stack.push(V::new_option_rc(result.cloned()));
+                stack.push(V::new_option_rc(result.cloned().map(Into::into)));
             }
             overloads::Get::BigMap => {
                 let key_rc = pop_rc!();
@@ -2945,13 +2960,26 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key_rc, len)?)?;
                 let result = map.get(arena, &key_rc, *ctx.lazy_storage())?;
-                stack.push(V::new_option_rc(result));
+                stack.push(V::new_option_rc(result.map(Into::into)));
             }
         },
         I::GetN(n) => {
             ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
             let comb_rc = pop_rc!();
-            let field = get_nth_field_rc(*n, &comb_rc)?;
+            // The first step reads the stack cell (still a raw `Rc`); the
+            // pair fields below are already `RcTypedValue`.
+            let field = match (*n, comb_rc.as_ref()) {
+                (0, _) => comb_rc.clone(),
+                (1, V::Pair(l, _)) => l.clone().into(),
+                (_, V::Pair(_, r)) => get_nth_field_rc(*n - 2, r)?.into(),
+                _ => {
+                    return Err(InterpretError::InternalError(
+                        InterpretInvariant::TypeMismatch {
+                            expected: "V::Pair",
+                        },
+                    ))
+                }
+            };
             stack.push(field);
         }
         I::Update(overload) => match overload {
@@ -2962,7 +2990,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key_rc, set.size())?)?;
                 if new_present {
-                    set.insert_mut(key_rc);
+                    set.insert_mut(key_rc.into());
                 } else {
                     set.remove_mut(&*key_rc);
                 }
@@ -2978,7 +3006,7 @@ fn interpret_one<'a>(
                         map.remove_mut(&*key_rc);
                     }
                     Some(val) => {
-                        map.insert_mut(key_rc, val);
+                        map.insert_mut(key_rc.into(), val.into());
                     }
                 }
             }
@@ -2989,7 +3017,7 @@ fn interpret_one<'a>(
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
-                map.update(key, opt_new_val);
+                map.update(key.into(), opt_new_val.map(Into::into));
             }
         },
         I::GetAndUpdate(overload) => match overload {
@@ -3005,10 +3033,10 @@ fn interpret_one<'a>(
                         map.remove_mut(&*key_rc);
                     }
                     Some(val) => {
-                        map.insert_mut(key_rc, val);
+                        map.insert_mut(key_rc.into(), val.into());
                     }
                 }
-                stack.push(V::new_option_rc(opt_old_val));
+                stack.push(V::new_option_rc(opt_old_val.map(Into::into)));
             }
             overloads::GetAndUpdate::BigMap => {
                 let key = pop_rc!();
@@ -3019,8 +3047,8 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
-                map.update(key, opt_new_val);
-                stack.push(V::new_option_rc(opt_old_val));
+                map.update(key.into(), opt_new_val.map(Into::into));
+                stack.push(V::new_option_rc(opt_old_val.map(Into::into)));
             }
         },
         I::Size(overload) => {
@@ -3043,8 +3071,29 @@ fn interpret_one<'a>(
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop_rc!();
-            let slot = get_nth_field_slot_mut(*n, stack.get_mut(0)?)?;
-            *slot = new_val;
+            // The first step edits the stack cell (still a raw `Rc`); the
+            // pair fields below are already `RcTypedValue`.
+            if *n == 0 {
+                *stack.get_mut(0)? = new_val;
+            } else {
+                let slot = match Rc::make_mut(stack.get_mut(0)?) {
+                    V::Pair(l, r) => {
+                        if *n == 1 {
+                            l
+                        } else {
+                            get_nth_field_slot_mut(*n - 2, r)?
+                        }
+                    }
+                    _ => {
+                        return Err(InterpretError::InternalError(
+                            InterpretInvariant::TypeMismatch {
+                                expected: "V::Pair",
+                            },
+                        ))
+                    }
+                };
+                *slot = new_val.into();
+            }
         }
         I::ChainId => {
             ctx.gas().consume(interpret_cost::CHAIN_ID)?;
@@ -3118,7 +3167,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::TRANSFER_TOKENS)?;
             stack.push(V::new_operation(
                 Operation::TransferTokens(TransferTokens {
-                    param,
+                    param: param.into(),
                     amount: mutez_amount,
                     destination_address: contract_address,
                 }),
@@ -3196,12 +3245,12 @@ fn interpret_one<'a>(
         I::Left => {
             ctx.gas().consume(interpret_cost::LEFT)?;
             let left = pop_rc!();
-            stack.push(V::new_or_rc(Or::Left(left)));
+            stack.push(V::new_or_rc(Or::Left(left.into())));
         }
         I::Right => {
             ctx.gas().consume(interpret_cost::RIGHT)?;
             let right = pop_rc!();
-            stack.push(V::new_or_rc(Or::Right(right)));
+            stack.push(V::new_or_rc(Or::Right(right.into())));
         }
         I::Lambda(lam) => {
             ctx.gas().consume(interpret_cost::LAMBDA)?;
@@ -3240,7 +3289,7 @@ fn interpret_one<'a>(
             stack.push(V::Lambda(Closure::Apply {
                 capture: Rc::new(AppliedCapture::new(
                     arg_ty.clone(),
-                    arg_val,
+                    arg_val.into(),
                     arg_ty_micheline,
                     arg_val_micheline,
                     cached_unparse_cost,
@@ -3474,7 +3523,7 @@ fn interpret_one<'a>(
             stack.push(TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: tag.clone(),
-                    value: emit_val,
+                    value: emit_val.into(),
                     arg_ty: arg_ty.clone(),
                 }),
                 counter,
@@ -3550,7 +3599,7 @@ fn interpret_one<'a>(
                 Operation::CreateContract(CreateContract {
                     delegate: opt_keyhash,
                     amount,
-                    storage,
+                    storage: storage.into(),
                     code: cs.clone(), // This clone is cheap since it is an Rc.
                     micheline_code: micheline,
                     address,
@@ -3585,14 +3634,14 @@ pub fn compute_contract_address(
 
 fn get_nth_field_slot_mut<'a, 'b>(
     mut m: u16,
-    mut slot: &'a mut Rc<TypedValue<'b>>,
-) -> Result<&'a mut Rc<TypedValue<'b>>, InterpretError<'b>> {
+    mut slot: &'a mut RcTypedValue<'b>,
+) -> Result<&'a mut RcTypedValue<'b>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         if m == 0 {
             return Ok(slot);
         }
-        match Rc::make_mut(slot) {
+        match slot.make_mut() {
             V::Pair(l, r) => {
                 if m == 1 {
                     return Ok(l);
@@ -3627,8 +3676,8 @@ fn get_nth_field_slot_mut<'a, 'b>(
 /// hence `m -= 2`.
 fn get_nth_field_rc<'b>(
     mut m: u16,
-    mut val: &Rc<TypedValue<'b>>,
-) -> Result<Rc<TypedValue<'b>>, InterpretError<'b>> {
+    mut val: &RcTypedValue<'b>,
+) -> Result<RcTypedValue<'b>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         match (m, &**val) {
@@ -4068,9 +4117,9 @@ mod interpreter_tests {
         // physically impossible (it would never terminate / would OOM), so
         // a passing assertion proves the walk was actually cut short.
         const K: usize = 64;
-        let mut node = Rc::new(V::int(0));
+        let mut node = RcTypedValue::new(V::int(0));
         for _ in 0..K {
-            node = Rc::new(V::new_pair_rc(Rc::clone(&node), Rc::clone(&node)));
+            node = RcTypedValue::new(V::new_pair_rc(node.clone(), node.clone()));
         }
         // O(1) clones of the shared DAG root (two refcount bumps each).
         let value = (*node).clone();
@@ -5370,8 +5419,8 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         let mut ctx = Ctx::default();
         let mut stack = IStack::new();
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(V::new_option_rc(Some(Rc::clone(&operand)))); // option holding a leaf shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_option_rc(Some(operand.clone()))); // option holding a leaf shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[Map(overloads::Map::Option, vec![])], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -8545,7 +8594,7 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        TypedValue::unwrap_rc(stack.pop().unwrap())
+        TypedValue::unwrap_rc(stack.pop().unwrap().into())
     }
 
     #[test]
