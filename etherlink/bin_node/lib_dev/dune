@@ -15,6 +15,7 @@
   octez-libs.tezos-workers
   octez-connpool
   octez-libs.rpc-http-client-unix
+  octez-libs.version
   octez-version.value
   octez-libs.stdlib-unix
   octez-evm-node-libs.evm_node_lib_dev_encoding

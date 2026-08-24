@@ -166,3 +166,39 @@ let root_hash_from_released_kernel = function
         (`Hex
            "0083d8142e9c5f2a35ead6eb31d6344f3803f90eacb03ccfb6c482df353f85908a")
   | Previewnet02 | Previewnet04 | Previewnet05 | Previewnet06 | Latest -> None
+
+let michelson_runtime_node_version ~smart_rollup_address ~l2_chain_id =
+  (* We're using the L1 naming convention with a [TEZOS_(MAINNET|TESTNET)] prefix
+     so that the [octez-client] prints the disclaimers accordingly. *)
+  let network =
+    match network_of_address smart_rollup_address with
+    | Some Configuration.Mainnet -> "MAINNET"
+    | Some Testnet -> "TESTNET"
+    | Some Shadownet -> "SHADOWNET"
+    | Some Previewnet -> "PREVIEWNET"
+    | None -> "CUSTOM"
+  in
+  let chain_name =
+    Format.asprintf
+      "TEZOS_%s_TEZOSX_%a"
+      network
+      L2_types.Chain_id.pp
+      l2_chain_id
+  in
+  Tezos_version.Octez_node_version.
+    {
+      version = Tezos_version_value.Current_git_info.octez_evm_node_version;
+      network_version =
+        {
+          chain_name = Distributed_db_version.Name.of_string chain_name;
+          (* No DB nor P2P version for Tezos X, so using a default value. *)
+          distributed_db_version = Distributed_db_version.zero;
+          p2p_version = P2p_version.zero;
+        };
+      commit_info =
+        Some
+          {
+            commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+            commit_date = Tezos_version_value.Current_git_info.committer_date;
+          };
+    }
