@@ -222,3 +222,203 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 end
 
 include Impl
+
+(* FIXME: https://linear.app/tezos/issue/L2-1427
+   Currently unused: nothing instantiates this PVM yet.  It reuses
+   {!Wasm_2_0_0_dual_state.Fast_pvm_params} (empty config, no activation
+   factory), so the [Nds_host_functions] gate stays closed and NDS never
+   activates; wiring the node to open the dual context backend and pass a
+   live activation factory is the remaining work. *)
+
+(** Dual-storage instantiation of the WASM PVM, packaging the shared
+    {!Wasm_2_0_0_dual_state} backend (the [Irmin + NDS] context and the dual
+    state/proof machine) as a {!Pvm_sig.S}. *)
+module Impl_dual_state : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch =
+struct
+  module Dual_state = Wasm_2_0_0_dual_state.Dual_state
+
+  type repo = Wasm_2_0_0_dual_state.repo
+
+  module Wasm_dual_pvm :
+    Sc_rollup.Wasm_2_0_0PVM.S
+      with type context = ([`Read | `Write], repo) Context_sigs.raw_index
+       and type state = Dual_state.state
+       and type proof = Dual_state.proof =
+  Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
+    include Wasm_2_0_0_dual_state.Machine
+
+    let compute_step =
+      compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+  end)
+
+  include Wasm_dual_pvm
+  module Ctxt_wrapper = Context.Wrapper.Make (Wasm_2_0_0_dual_state.Dual_context)
+
+  (* Reused verbatim from {!Impl}: backend-independent. *)
+  let kind = Impl.kind
+
+  let new_dissection = Impl.new_dissection
+
+  module Inspect_durable_state = struct
+    let lookup (state : Dual_state.state) keys =
+      let open Lwt_syntax in
+      let key =
+        Tezos_scoru_wasm.Durable.key_of_string_exn ("/" ^ String.concat "/" keys)
+      in
+      let* durable =
+        Wasm_2_0_0_irmin_state.Encoding_runner.decode_durable_storage
+          state.Dual_state.irmin
+      in
+      Tezos_scoru_wasm.Durable.find_value_as_bytes durable key
+  end
+
+  let string_of_status : status -> string = function
+    | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
+        Format.asprintf
+          "Waiting for preimage reveal %a"
+          Sc_rollup_reveal_hash.pp
+          hash
+    | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
+    | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
+        Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
+    | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
+        "Waiting for DAL parameters"
+    | Computing -> "Computing"
+    | Waiting_for_reveal (Request_adal_page _) ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           To be implemented. *)
+        assert false
+
+  let eval_many ?(check_invalid_kernel = true) ?(fallback_to_slow_vm = true)
+      ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
+    Wasm_2_0_0_dual_state.Machine.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
+      ~hooks:
+        (Wasm_2_0_0_utilities.hooks ~check_invalid_kernel ~fallback_to_slow_vm)
+
+  (** Mirror of {!Impl.Mutable_state} over the dual state: a reference
+      to an immutable dual state, with all immutable functionality
+      wrapped around the reference. *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type repo = repo
+       and type status = status
+       and type t = Ctxt_wrapper.mut_state = struct
+    include Wasm_2_0_0_dual_state.Dual_context.PVMState
+
+    type t = Wasm_2_0_0_dual_state.Dual_context.mut_state
+
+    type hash = Sc_rollup.State_hash.t
+
+    type nonrec repo = repo
+
+    type nonrec status = status
+
+    let get_tick state = get_tick (Dual_state.read state)
+
+    let state_hash state = state_hash (Dual_state.read state)
+
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ level = get_current_level (Dual_state.read state) in
+      Option.map Raw_level.to_int32 level
+
+    let get_outbox level state =
+      get_outbox (Raw_level.of_int32_exn level) (Dual_state.read state)
+
+    let get_status ~is_reveal_enabled state =
+      get_status ~is_reveal_enabled (Dual_state.read state)
+
+    let set_initial_state ~empty =
+      let open Lwt_syntax in
+      let+ state = initial_state ~empty:(Dual_state.read empty) in
+      Dual_state.write empty state
+
+    let install_boot_sector state boot_sector =
+      let open Lwt_syntax in
+      let+ new_state =
+        install_boot_sector (Dual_state.read state) boot_sector
+      in
+      Dual_state.write state new_state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled (Dual_state.read state)
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input (Dual_state.read state) in
+      Dual_state.write state imm_state ;
+      return_unit
+
+    let eval_many ?check_invalid_kernel ?fallback_to_slow_vm ~reveal_builtins
+        ~write_debug ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ?check_invalid_kernel
+          ?fallback_to_slow_vm
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          (Dual_state.read mut_state)
+      in
+      Dual_state.write mut_state imm_state ;
+      return steps
+
+    module Inspect_durable_state = struct
+      let lookup state keys =
+        Inspect_durable_state.lookup (Dual_state.read state) keys
+    end
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state =
+          Internal_for_tests.insert_failure (Dual_state.read state)
+        in
+        Dual_state.write state imm_state ;
+        return_unit
+    end
+  end
+
+  module Unsafe_patches = struct
+    type t = unsafe_patch
+
+    (* Reused verbatim from {!Impl}: depends only on [unsafe_patch]. *)
+    let of_patch = Impl.Unsafe_patches.of_patch
+
+    let apply state unsafe_patch =
+      let open Lwt_syntax in
+      match unsafe_patch with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          let* registered_max_nb_ticks =
+            Wasm_2_0_0_dual_state.Machine.Unsafe.get_max_nb_ticks state
+          in
+          let max_nb_ticks = Z.of_int64 max_nb_ticks in
+          if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
+            Format.ksprintf
+              invalid_arg
+              "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
+              (Z.to_string registered_max_nb_ticks)
+              (Z.to_string max_nb_ticks) ;
+          Wasm_2_0_0_dual_state.Machine.Unsafe.set_max_nb_ticks
+            max_nb_ticks
+            state
+      | Patch_durable_storage {key; value} ->
+          Wasm_2_0_0_dual_state.Machine.Unsafe.durable_set ~key ~value state
+      | Patch_PVM_version {version} ->
+          Wasm_2_0_0_dual_state.Machine.Unsafe.set_pvm_version ~version state
+
+    let apply_mutable state patch =
+      let open Lwt_syntax in
+      let+ patched_state = apply (Dual_state.read state) patch in
+      Dual_state.write state patched_state
+  end
+end
