@@ -84,3 +84,16 @@ val check_execute_outbox_message :
   rollup:Protocol.Alpha_context.Sc_rollup.t ->
   output_proof:string ->
   unit Environment.Error_monad.tzresult Lwt.t
+
+(** [check_refute_proof context ~rollup ~stakers ~choice ~proof] checks the
+    validity of a given refutation [proof] at tick [choice] for the game between
+    [stakers]. Returns an error if not the case. *)
+val check_refute_proof :
+  Protocol.Alpha_context.t ->
+  rollup:Protocol.Alpha_context.Sc_rollup.t ->
+  stakers:Protocol.Alpha_context.Sc_rollup.Game.Index.t ->
+  choice:Protocol.Alpha_context.Sc_rollup.Tick.t ->
+  proof:
+    Protocol.Alpha_context.Sc_rollup.Proof.serialized
+    Protocol.Alpha_context.Sc_rollup.Proof.t ->
+  unit Environment.Error_monad.tzresult Lwt.t

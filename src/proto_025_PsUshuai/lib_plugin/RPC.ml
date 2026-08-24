@@ -1385,6 +1385,41 @@ module Scripts = struct
         | _ -> return_unit)
       (Operation.to_list (Contents_list contents))
 
+  let check_refutation_proof context
+      ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    List.iter_es
+      (fun op ->
+        match op with
+        | Contents
+            (Manager_operation
+               {
+                 source;
+                 operation = Sc_rollup_refute {rollup; opponent; refutation};
+                 _;
+               }) ->
+            let stakers =
+              Protocol.Alpha_context.Sc_rollup.Game.Index.make source opponent
+            in
+            let* () =
+              match refutation with
+              | Protocol.Alpha_context.Sc_rollup.Game.Move
+                  {
+                    step = Protocol.Alpha_context.Sc_rollup.Game.Proof proof;
+                    choice;
+                  } ->
+                  Block_validation.check_refute_proof
+                    context
+                    ~rollup
+                    ~stakers
+                    ~choice
+                    ~proof
+              | _ -> return_unit
+            in
+            return_unit
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
+
   (** Validate and apply the operation but skip signature checks; do
       not support consensus operations.
 
@@ -1404,6 +1439,7 @@ module Scripts = struct
     in
     let*? () = check_increase_paid_storage packed_operation in
     let* () = check_stake_operations context packed_operation in
+    let* () = check_refutation_proof context packed_operation in
     let* () = check_execute_outbox_messages context packed_operation in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in

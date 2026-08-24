@@ -187,7 +187,7 @@ let find_section_around_choice dissection choice =
    level. The proven level is read from the inclusion proof's target (last)
    cell. *)
 let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
-  let open Lwt_result_syntax in
+  let open Environment.Error_monad.Lwt_result_syntax in
   match proof.Proof.input_proof with
   | Some (Proof.Inbox_proof {level = claimed_level; proof = serialized; _}) -> (
       match Inbox.of_serialized_proof serialized with
@@ -217,7 +217,7 @@ let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
               in
               if Raw_level.equal proven_level claimed_level then return_unit
               else
-                shell_fail
+                tzfail
                   (Sc_rollup_inbox_proof_claimed_level_mismatch
                      {claimed_level; proven_level})))
   | _ ->
@@ -299,22 +299,18 @@ let check_proof context rollup game (proof : Proof.serialized Proof.t) =
       in
       return_unit
 
-let check_refute_proof context rollup stakers choice
-    (proof : Proof.serialized Proof.t) :
-    unit Environment.Error_monad.shell_tzresult Lwt.t =
-  let open Lwt_result_syntax in
+let check_refute_proof context ~rollup ~stakers ~choice
+    ~(proof : Proof.serialized Proof.t) :
+    unit Environment.Error_monad.tzresult Lwt.t =
+  let open Environment.Error_monad.Lwt_result_syntax in
   let* _ctxt, game_opt =
     Sr.Refutation_storage.find_game context rollup stakers
-    |> Lwt.map Environment.wrap_tzresult
   in
   match game_opt with
   | None -> return_unit
   | Some game -> (
       let* () = check_inbox_proof_level proof in
-      let* () =
-        check_proof context rollup game proof
-        |> Lwt.map Environment.wrap_tzresult
-      in
+      let* () = check_proof context rollup game proof in
       match game.Game.game_state with
       | Game.Dissecting {dissection; _} -> (
           match find_section_around_choice dissection choice with
@@ -326,7 +322,7 @@ let check_refute_proof context rollup stakers choice
                   stop_chunk.Sr.Dissection_chunk.tick
               in
               if Z.compare dist Z.one > 0 then
-                shell_fail
+                tzfail
                   (Sc_rollup_proof_on_multi_tick_section_during_dissecting dist)
               else
                 (* Even on a single-tick section, a proof whose agreed start
@@ -337,7 +333,7 @@ let check_refute_proof context rollup stakers choice
                    honest staker's bond. Reject it like a multi-tick proof. *)
                 match start_chunk.Sr.Dissection_chunk.state_hash with
                 | None ->
-                    shell_fail
+                    tzfail
                       (Sc_rollup_proof_on_missing_start_state_during_dissecting
                          (Sr.Tick.to_z start_chunk.Sr.Dissection_chunk.tick))
                 | Some _ -> return_unit))
@@ -670,7 +666,8 @@ let check_block_operation {context; seen_games}
             let* () =
               match refutation with
               | Game.Move {step = Game.Proof proof; choice} ->
-                  check_refute_proof context rollup stakers choice proof
+                  check_refute_proof context ~rollup ~stakers ~choice ~proof
+                  |> Lwt.map Environment.wrap_tzresult
               | _ -> return_unit
             in
             return seen_games
