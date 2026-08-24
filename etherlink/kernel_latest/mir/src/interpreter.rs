@@ -3772,8 +3772,8 @@ mod interpreter_tests {
             // only the interpretation itself is counted.
             let prog = [
                 Dup(None),
-                Push(Rc::new(V::Bool(true))),
-                Push(Rc::new(V::int(0))),
+                Push(RcTypedValue::new(V::Bool(true))),
+                Push(RcTypedValue::new(V::int(0))),
                 Update(overloads::Update::Set),
             ];
             let gas_before = ctx.gas().milligas().unwrap();
@@ -3921,7 +3921,7 @@ mod interpreter_tests {
     /// would charge a second `INTERPRET_RET` for a synthetic wrapper block.
     #[test]
     fn top_level_seq_matches_block_gas() {
-        let body = vec![Push(Rc::new(V::int(1))), Drop(None)];
+        let body = vec![Push(RcTypedValue::new(V::int(1))), Drop(None)];
 
         // Production shape: `Seq(body).interpret(..)`.
         let arena_a: &Arena<Micheline> = Box::leak(Box::default());
@@ -5543,7 +5543,7 @@ mod interpreter_tests {
     fn interpret_does_not_clone_the_returned_storage() {
         use Instruction as I;
         const SIZE: usize = 16 * 1024 * 1024;
-        let value = Rc::new(V::String("0".repeat(SIZE)));
+        let value = RcTypedValue::new(V::String("0".repeat(SIZE)));
         let contract: ContractScript = ContractScript {
             code: Seq(vec![I::Drop(None), I::Push(value.clone()), I::Nil, I::Pair]),
             parameter: Type::Unit,
@@ -5570,9 +5570,8 @@ mod interpreter_tests {
             )
             .unwrap();
         let allocated = thread_allocated_bytes() - before;
-        assert_eq!(
-            storage.as_ptr(),
-            Rc::as_ptr(&value),
+        assert!(
+            storage.ptr_eq(&value),
             "finalization deep-copied the shared returned storage"
         );
         assert!(
@@ -5714,7 +5713,10 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::nat(10), V::nat(0)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Push(Rc::new(V::nat(0))), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Push(RcTypedValue::new(V::nat(0))), &mut ctx, &mut stack)
+                .is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -5725,9 +5727,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::nat(1))),
+                Push(RcTypedValue::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(Rc::new(V::Bool(false)))
+                Push(RcTypedValue::new(V::Bool(false)))
             ])],
             &mut ctx,
             &mut stack,
@@ -5743,9 +5745,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::nat(1))),
+                Push(RcTypedValue::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(Rc::new(V::Bool(false)))
+                Push(RcTypedValue::new(V::Bool(false)))
             ])],
             &mut ctx,
             &mut stack,
@@ -5761,7 +5763,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::int(-1))),
+                Push(RcTypedValue::new(V::int(-1))),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
@@ -5792,7 +5794,7 @@ mod interpreter_tests {
             interpret(
                 &[LoopLeft(vec![
                     Drop(None),
-                    Push(Rc::new(V::new_or(Or::Right(V::int(1)))))
+                    Push(RcTypedValue::new(V::new_or(Or::Right(V::int(1)))))
                 ])],
                 &mut ctx,
                 &mut stack
@@ -6132,7 +6134,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         assert_eq!(
             interpret(
-                &[Push(Rc::new(V::String("foo".to_owned())))],
+                &[Push(RcTypedValue::new(V::String("foo".to_owned())))],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -6145,7 +6147,11 @@ mod interpreter_tests {
     fn push_unit_value() {
         let mut stack = Stack::new();
         assert_eq!(
-            interpret(&[Push(Rc::new(V::Unit))], &mut Ctx::default(), &mut stack),
+            interpret(
+                &[Push(RcTypedValue::new(V::Unit))],
+                &mut Ctx::default(),
+                &mut stack
+            ),
             Ok(())
         );
         assert_eq!(stack, stk![V::Unit]);
@@ -6170,7 +6176,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(Rc::new(V::new_pair(
+            &[Push(RcTypedValue::new(V::new_pair(
                 V::int(-5),
                 V::new_pair(V::nat(3), V::Bool(false))
             )))],
@@ -6198,7 +6204,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(Rc::new(V::new_option(Some(V::int(-5)))))],
+            &[Push(RcTypedValue::new(V::new_option(Some(V::int(-5)))))],
             &mut ctx,
             &mut stack
         )
@@ -6218,7 +6224,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(Rc::new(V::new_pair(
+                Push(RcTypedValue::new(V::new_pair(
                     V::int(-5),
                     V::new_pair(V::nat(3), V::Bool(false))
                 ))),
@@ -6244,7 +6250,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(Rc::new(V::new_pair(
+                Push(RcTypedValue::new(V::new_pair(
                     V::new_pair(V::nat(3), V::Bool(false)),
                     V::int(-5),
                 ))),
@@ -6389,7 +6395,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_1() {
-        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
+        let code = vec![IfNone(vec![Push(RcTypedValue::new(V::int(5)))], vec![])];
         // with Some
         let mut stack = stk![V::new_option(Some(V::int(42)))];
         let mut ctx = Ctx::default();
@@ -6406,7 +6412,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_2() {
-        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
+        let code = vec![IfNone(vec![Push(RcTypedValue::new(V::int(5)))], vec![])];
         // with None
         let mut stack = stk![V::new_option(None)];
         let mut ctx = Ctx::default();
@@ -6426,7 +6432,7 @@ mod interpreter_tests {
     fn if_cons_cons() {
         let code = vec![IfCons(
             vec![Swap, Drop(None)],
-            vec![Push(Rc::new(V::int(0)))],
+            vec![Push(RcTypedValue::new(V::int(0)))],
         )];
         let mut stack = stk![V::List(vec![V::int(1), V::int(2)].into())];
         let mut ctx = Ctx::default();
@@ -6447,7 +6453,7 @@ mod interpreter_tests {
     fn if_cons_nil() {
         let code = vec![IfCons(
             vec![Swap, Drop(None)],
-            vec![Push(Rc::new(V::int(0)))],
+            vec![Push(RcTypedValue::new(V::int(0)))],
         )];
         let mut stack = stk![V::List(MichelsonList::new())];
         let mut ctx = Ctx::default();
@@ -6465,7 +6471,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_left() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
+        let code = vec![IfLeft(
+            vec![],
+            vec![Drop(None), Push(RcTypedValue::new(V::int(0)))],
+        )];
         let mut stack = stk![V::new_or(or::Or::Left(V::int(1)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -6481,7 +6490,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_right() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
+        let code = vec![IfLeft(
+            vec![],
+            vec![Drop(None), Push(RcTypedValue::new(V::int(0)))],
+        )];
         let mut stack = stk![V::new_or(or::Or::Right(V::Unit))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -6599,7 +6611,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
-                &[Push(Rc::new(V::List(
+                &[Push(RcTypedValue::new(V::List(
                     vec![V::int(1), V::int(2), V::int(3),].into()
                 )))],
                 &mut ctx,
@@ -6656,7 +6668,11 @@ mod interpreter_tests {
             (V::int(2), V::String("bar".to_owned())),
         ]);
         assert_eq!(
-            interpret(&[Push(Rc::new(V::Map(map.clone())))], &mut ctx, &mut stack),
+            interpret(
+                &[Push(RcTypedValue::new(V::Map(map.clone())))],
+                &mut ctx,
+                &mut stack
+            ),
             Ok(())
         );
         assert_eq!(stack, stk![V::Map(map)]);
@@ -8219,7 +8235,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8248,7 +8264,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8322,7 +8338,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8358,7 +8374,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8584,7 +8600,12 @@ mod interpreter_tests {
         // round.
         let mut body = Vec::new();
         for _ in 0..ITERATIONS {
-            body.extend([Dup(None), Push(Rc::new(V::Unit)), Exec, Drop(None)]);
+            body.extend([
+                Dup(None),
+                Push(RcTypedValue::new(V::Unit)),
+                Exec,
+                Drop(None),
+            ]);
         }
 
         let run = |capture: RcTypedValue<'static>| -> u32 {

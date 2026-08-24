@@ -583,7 +583,7 @@ pub mod interpret_cost {
     /// [`FRAME_PUSH`]: L1 has no analogue because its recursive OCaml
     /// interpreter does not materialize a fresh sub-stack per `Apply`
     /// invocation — the OCaml runtime stack absorbs the inner frame
-    /// under TCE. MIR allocates a `Vec<Rc<TypedValue>>` per push
+    /// under TCE. MIR allocates a `Vec<RcTypedValue>` per push
     /// (`Vec` header + initial allocation + initial entries: lambda +
     /// arg for `EXEC`, view arg for `VIEW`), so the host-memory
     /// footprint per push is ~5 × that of a bare [`FRAME_PUSH`];

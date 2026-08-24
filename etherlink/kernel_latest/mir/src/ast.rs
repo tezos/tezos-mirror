@@ -2488,10 +2488,10 @@ pub enum Instruction<'a> {
     Abs,
     IsNat,
     Loop(Vec<Self>),
-    /// `PUSH ty v`. The literal is wrapped in [`Rc`] so the hot path of the
+    /// `PUSH ty v`. The literal is shared as an [`RcTypedValue`] so the hot path of the
     /// interpreter is a refcount bump rather than a deep clone of the value
     /// (which can be expensive for big-num literals like `PUSH nat 10^18`).
-    Push(Rc<TypedValue<'a>>),
+    Push(RcTypedValue<'a>),
     Swap,
     Failwith(Type),
     Never,
@@ -2632,8 +2632,7 @@ fn extract_instr_children<'a>(node: &mut Instruction<'a>, stack: &mut Vec<DropNo
             // stays on the heap rather than recursing across the boundary one
             // native frame per level (L2-1672). Only owned when the `Rc` is not
             // shared.
-            let old = replace(rc, Rc::new(TypedValue::Unit));
-            if let Ok(tv) = Rc::try_unwrap(old) {
+            if let Ok(tv) = take(rc).try_unwrap() {
                 stack.push(DropNode::Value(tv));
             }
         }
@@ -3415,13 +3414,13 @@ mod drop_safety {
     #[test]
     fn drop_deep_push_constant() {
         // Dropping `PUSH <deep constant>` must drain the pushed value rather
-        // than recurse through its `Rc<TypedValue>` spine.
+        // than recurse through its `RcTypedValue` spine.
         on_kernel_stack(|| {
             let mut content = TypedValue::Unit;
             for _ in 0..DEPTH {
                 content = TypedValue::new_pair(TypedValue::Unit, content);
             }
-            let instr = Instruction::Push(Rc::new(content));
+            let instr = Instruction::Push(RcTypedValue::new(content));
             drop(instr);
         });
     }
