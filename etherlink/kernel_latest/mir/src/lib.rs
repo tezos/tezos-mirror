@@ -487,8 +487,7 @@ mod tests {
                 crate::typechecker::AllowForgedLazyStorageId::No,
             );
         use TypedValue as TV;
-        let result = interp_res.unwrap();
-        match result.1.as_ref() {
+        match interp_res.unwrap().1.as_ref() {
             TV::Map(m) => {
                 assert_eq!(
                     m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
@@ -1428,7 +1427,7 @@ mod multisig_tests {
                         }),
                         counter: 0
                     }],
-                    TV::new_pair(
+                    RcTypedValue::new(TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                         TV::new_pair(
                             TV::Nat(threshold),
@@ -1436,7 +1435,7 @@ mod multisig_tests {
                                 PUBLIC_KEY.try_into().unwrap()
                             )]))
                         )
-                    )
+                    ))
                 ))
             );
         })
@@ -1503,7 +1502,7 @@ mod multisig_tests {
                         ))),
                         counter: 0
                     }],
-                    TV::new_pair(
+                    RcTypedValue::new(TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                         TV::new_pair(
                             TV::Nat(threshold),
@@ -1511,7 +1510,7 @@ mod multisig_tests {
                                 PUBLIC_KEY.try_into().unwrap()
                             )]))
                         )
-                    )
+                    ))
                 ))
             );
         })
@@ -1558,7 +1557,7 @@ mod multisig_tests {
             assert_eq!(
                 collect_ops(interp_res),
                 Err(ContractInterpretError::InterpretError(
-                    InterpretError::FailedWith(T::Unit, std::rc::Rc::new(TV::Unit))
+                    InterpretError::FailedWith(T::Unit, RcTypedValue::new(TV::Unit))
                 ))
             );
         })
@@ -1569,15 +1568,12 @@ mod multisig_tests {
     // This function collects the iterator into a vector so we can use `assert_eq!`.
     fn collect_ops<'a>(
         result: Result<
-            (
-                impl Iterator<Item = OperationInfo<'a>>,
-                std::rc::Rc<TypedValue<'a>>,
-            ),
+            (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
             ContractInterpretError<'a>,
         >,
-    ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
+    ) -> Result<(Vec<OperationInfo<'a>>, RcTypedValue<'a>), ContractInterpretError<'a>>
     {
-        result.map(|(ops, val)| (ops.collect(), TypedValue::unwrap_rc(val.into())))
+        result.map(|(ops, val)| (ops.collect(), val))
     }
 
     // From: https://github.com/murbard/smart-contracts/blob/eb2b7d81aedcfeaea219da8b66cdd86652bf42f7/multisig/michelson/multisig.tz

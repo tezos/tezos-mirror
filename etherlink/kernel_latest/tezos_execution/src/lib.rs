@@ -14,7 +14,8 @@ use mir::ast::BorrowedUnparseError;
 use mir::ast::IntoMicheline;
 use mir::ast::Micheline;
 use mir::ast::{
-    AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens, TypedValue,
+    AddressHash, Entrypoint, OperationInfo, PublicKeyHash, RcTypedValue, TransferTokens,
+    TypedValue,
 };
 use mir::context::CtxTrait;
 use mir::context::LookupViewError;
@@ -1160,7 +1161,7 @@ where
                             // a `DUP`ed operation hold the same payload, so
                             // `unwrap_rc` here would deep-copy it, unmetered
                             // and before anything charges for it (L2-1836).
-                            storage,
+                            storage.into(),
                             &Origin::Native,
                         );
                         match receipt {
@@ -2503,7 +2504,7 @@ pub fn typecheck_code_and_storage<'a, Host: StorageV1, KS>(
 /// anything (L2-1836).
 fn handle_storage_with_big_maps<'a, Host: StorageV1, KS>(
     ctx: &mut TcCtx<'a, Host, KS>,
-    storage: Rc<TypedValue<'a>>,
+    storage: RcTypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
 
@@ -2547,7 +2548,7 @@ pub fn originate_contract<'a, Host, KS>(
     sender_account: &impl TezosAccount,
     initial_balance: &Narith,
     script_code: Option<&[u8]>,
-    script_storage: Rc<TypedValue<'a>>,
+    script_storage: RcTypedValue<'a>,
     origin: &Origin,
 ) -> Result<OriginationSuccess, OriginationError>
 where
@@ -3309,7 +3310,7 @@ where
                     source_account,
                     balance,
                     Some(&script.code),
-                    Rc::new(storage),
+                    Rc::new(storage).into(),
                     &Origin::Native,
                 ),
                 Err(err) => Err(err),

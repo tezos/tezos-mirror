@@ -378,7 +378,7 @@ mod tests {
         // The value is the lambda produced above; `TypedValue` itself
         // implements `IntoMicheline` (delegating to its `Closure`), so the
         // `Closure` need not be moved out of it.
-        let value = TypedValue::unwrap_rc(stack.pop().unwrap().into());
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
@@ -416,7 +416,7 @@ mod tests {
         // The value is the lambda produced above; `TypedValue` itself
         // implements `IntoMicheline` (delegating to its `Closure`), so the
         // `Closure` need not be moved out of it.
-        let value = TypedValue::unwrap_rc(stack.pop().unwrap().into());
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(
@@ -475,7 +475,7 @@ mod tests {
         // The value is the lambda produced above; `TypedValue` itself
         // implements `IntoMicheline` (delegating to its `Closure`), so the
         // `Closure` need not be moved out of it.
-        let value = TypedValue::unwrap_rc(stack.pop().unwrap().into());
+        let value = TypedValue::unwrap_rc(stack.pop().unwrap());
         let arena = Arena::new();
         let mut gas = Gas::default();
         assert_eq!(

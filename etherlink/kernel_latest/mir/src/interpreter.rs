@@ -57,7 +57,7 @@ pub enum InterpretError<'a> {
     NegativeMutez,
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, Rc<TypedValue<'a>>),
+    FailedWith(Type, RcTypedValue<'a>),
     /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
     #[error("Overflow")]
     Overflow,
@@ -148,9 +148,7 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
 impl<'a> Drop for InterpretError<'a> {
     fn drop(&mut self) {
         if let InterpretError::FailedWith(_, v) = self {
-            if let Some(inner) = Rc::get_mut(v) {
-                crate::ast::drain_deep_typed_value(inner);
-            }
+            v.drain_if_unique();
         }
     }
 }
@@ -287,7 +285,7 @@ impl<'a> ContractScript<'a> {
         // typechecked with forged ids allowed.
         parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
-        (impl Iterator<Item = OperationInfo<'a>>, Rc<TypedValue<'a>>),
+        (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
         ContractInterpretError<'a>,
     > {
         let wrapped_parameter = self.wrap_parameter(
@@ -313,16 +311,11 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        let result = TypedValue::unwrap_rc(
-            stack
-                .pop()
-                .ok_or(InterpretError::InternalError(
-                    InterpretInvariant::EmptyValueStackPop,
-                ))?
-                .into(),
-        );
+        let result = TypedValue::unwrap_rc(stack.pop().ok_or(
+            InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
+        )?);
         let mut result = result;
-        let (operation_list, storage) = match &mut result {
+        let (operation_list, mut storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
             }
@@ -333,9 +326,6 @@ impl<'a> ContractScript<'a> {
                 .into())
             }
         };
-        // The storage travels as a raw `Rc` until the value stack moves onto
-        // the newtype.
-        let mut storage: Rc<TypedValue<'a>> = storage.into();
         let mut operation_list = TypedValue::unwrap_rc(operation_list);
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
@@ -545,7 +535,7 @@ enum InterpFrame<'a, 'b> {
         idx: usize,
     },
     AfterDip {
-        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        protected: crate::stack::Stack<RcTypedValue<'a>>,
         opt_height: Option<u16>,
     },
     LoopBody {
@@ -599,7 +589,7 @@ enum StepResult<'a, 'b> {
     OpenBlock(CodeRef<'a, 'b>),
     OpenDip {
         body: CodeRef<'a, 'b>,
-        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        protected: crate::stack::Stack<RcTypedValue<'a>>,
         opt_height: Option<u16>,
     },
     OpenLoop(CodeRef<'a, 'b>),
@@ -689,7 +679,7 @@ fn interpret<'a, 'b>(
     // they are dropped. `pop()` would hand the caller an inner sub-stack, so
     // take the bottom (the caller's own) explicitly. A leftover sub-stack may
     // hold a deep runtime-built value (e.g. a LOOP-built PAIR comb); draining
-    // it iteratively keeps the recursive `Rc<TypedValue>` destructor from
+    // it iteratively keeps the recursive `RcTypedValue` destructor from
     // overflowing the kernel's ~1 MiB Rust stack (L2-1446). On success there is
     // exactly one entry, so the drain loop is a no-op.
     let mut stacks = stacks.into_iter();
@@ -745,37 +735,35 @@ fn restore_pending_view_context<'a>(
 
 /// Drain every value left on a value stack iteratively before it is dropped,
 /// so a deep runtime-built value (e.g. a `LOOP`-built `PAIR` comb) does not
-/// overflow the kernel's ~1 MiB Rust stack via the recursive `Rc<TypedValue>`
+/// overflow the kernel's ~1 MiB Rust stack via the recursive `RcTypedValue`
 /// destructor. Uniquely-owned values are flattened with
 /// [`crate::ast::drain_deep_typed_value`]; shared values are left to their
 /// other owners -- only their `Rc` refcount is decremented, which does not
 /// recurse. L2-1446.
 fn drain_value_stack(stack: &mut IStack<'_>) {
-    while let Some(rc) = stack.pop() {
-        if let Ok(mut v) = Rc::try_unwrap(rc) {
-            crate::ast::drain_deep_typed_value(&mut v);
-        }
+    while let Some(mut rc) = stack.pop() {
+        rc.drain_if_unique();
     }
 }
 
 /// In-place sibling of [`drain_value_stack`] for value stacks that the
 /// caller still observes after the drain runs. Walks the stack twice:
 ///
-/// 1. First pass: every `Rc<TypedValue>` that is *aliased* on the same
+/// 1. First pass: every `RcTypedValue` that is *aliased* on the same
 ///    stack (e.g. via `DUP` on a runtime-built deep value, leaving two
 ///    `Rc::clone` siblings of the same inner tree at refcount ≥ 2) is
-///    replaced in place by a shallow `Rc<TypedValue::Unit>` sentinel.
+///    replaced in place by a shallow `Unit` sentinel.
 ///    Each replacement decrements the original `Rc`'s strong count; once
 ///    only one alias remains on the stack the surviving slot becomes
 ///    uniquely-owned.
-/// 2. Second pass: every now-uniquely-owned `Rc<TypedValue>` is drained
+/// 2. Second pass: every now-uniquely-owned `RcTypedValue` is drained
 ///    in place via [`crate::ast::drain_deep_typed_value`], flattening the
 ///    deep composite spine while preserving the variant tag.
 ///
 /// Atomic variants (`Int`, `Nat`, `Unit`, …) survive both passes
 /// untouched — `drain_deep_typed_value` is a no-op on them, and they are
 /// never aliased deeply enough to trigger the sentinel replacement (the
-/// recursive `Rc<TypedValue>` destructor only overflows on deep
+/// recursive `RcTypedValue` destructor only overflows on deep
 /// composites). The first-pass sentinel replacement loses the original
 /// value at *aliased* slots; this is the documented in-place-drain
 /// contract for error-path teardown: callers on the Err path must not
@@ -791,8 +779,8 @@ fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
     // this layer without a recursive walk.
     for i in 0..stack.len() {
         if let Ok(rc) = stack.get_mut(i) {
-            if Rc::strong_count(rc) > 1 {
-                *rc = Rc::new(TypedValue::Unit);
+            if rc.strong_count() > 1 {
+                *rc = RcTypedValue::default();
             }
         }
     }
@@ -801,37 +789,39 @@ fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
     // own Drop will handle). Drain the composite spine.
     for i in 0..stack.len() {
         if let Ok(rc) = stack.get_mut(i) {
-            if let Some(v) = Rc::get_mut(rc) {
-                crate::ast::drain_deep_typed_value(v);
-            }
+            rc.drain_if_unique();
         }
     }
 }
 
-/// Drain every `Rc<TypedValue>` still held by the control-flow worklist before
+/// Drain every `RcTypedValue` still held by the control-flow worklist before
 /// the frames are dropped, mirroring [`drain_value_stack`]. On the error-unwind
 /// path a frame may carry a deep runtime-built value -- a `DIP`-protected comb,
 /// or the not-yet-consumed elements / accumulator of an `ITER`/`MAP` over a
-/// deep collection -- whose recursive `Rc<TypedValue>` destructor would
+/// deep collection -- whose recursive `RcTypedValue` destructor would
 /// overflow the kernel's ~1 MiB Rust stack. Control-only frames (`NextInstr`,
 /// `LoopBody`, `AfterExec`, `AfterView`, ...) hold no values and are skipped.
 /// L2-1446.
 fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
-    let mut pending: Vec<Rc<TypedValue<'_>>> = Vec::new();
+    let mut pending: Vec<RcTypedValue<'_>> = Vec::new();
     for frame in frames {
         match frame {
             InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
-            InterpFrame::IterList { remaining, .. } => pending.extend(remaining),
-            InterpFrame::IterSet { remaining, .. } => pending.extend(remaining),
+            InterpFrame::IterList { remaining, .. } => {
+                pending.extend(remaining.map(Into::into))
+            }
+            InterpFrame::IterSet { remaining, .. } => {
+                pending.extend(remaining.map(Into::into))
+            }
             InterpFrame::IterMap { remaining, .. } => {
                 for (k, v) in remaining {
-                    pending.push(k);
-                    pending.push(v);
+                    pending.push(k.into());
+                    pending.push(v.into());
                 }
             }
             InterpFrame::MapListAccum { remaining, acc, .. } => {
-                pending.extend(remaining);
-                pending.extend(acc);
+                pending.extend(remaining.map(Into::into));
+                pending.extend(acc.into_iter().map(Into::into));
             }
             InterpFrame::MapMapAccum {
                 remaining,
@@ -840,14 +830,14 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
                 ..
             } => {
                 for (k, v) in remaining {
-                    pending.push(k);
-                    pending.push(v);
+                    pending.push(k.into());
+                    pending.push(v.into());
                 }
                 for (k, v) in crate::ast::rb_map_into_vec(acc) {
-                    pending.push(k);
-                    pending.push(v);
+                    pending.push(k.into());
+                    pending.push(v.into());
                 }
-                pending.extend(current_key);
+                pending.extend(current_key.map(Into::into));
             }
             InterpFrame::NextInstr { .. }
             | InterpFrame::LoopBody { .. }
@@ -857,10 +847,8 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
             | InterpFrame::AfterView { .. } => {}
         }
     }
-    for rc in pending {
-        if let Ok(mut v) = Rc::try_unwrap(rc) {
-            crate::ast::drain_deep_typed_value(&mut v);
-        }
+    for mut rc in pending {
+        rc.drain_if_unique();
     }
 }
 
@@ -878,7 +866,7 @@ fn active_stack_mut<'a, 'c>(
 /// Pop a value off a sub stack, turning an empty stack into the structured
 /// `EmptyValueStackPop` invariant (the recursive interpreter relied on
 /// typechecking having ensured the value was present).
-fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<Rc<TypedValue<'a>>, InterpretError<'a>> {
+fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<RcTypedValue<'a>, InterpretError<'a>> {
     stk.pop().ok_or(InterpretError::InternalError(
         InterpretInvariant::EmptyValueStackPop,
     ))
@@ -1003,7 +991,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let cond = match TypedValue::unwrap_rc(pop_value(stk)?.into()) {
+                let cond = match TypedValue::unwrap_rc(pop_value(stk)?) {
                     TypedValue::Bool(b) => b,
                     _ => {
                         return Err(InterpretError::InternalError(
@@ -1026,7 +1014,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopLeftBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?.into());
+                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?);
                 let or = match &mut or_v {
                     TypedValue::Or(or) => std::mem::take(or),
                     _ => {
@@ -1102,7 +1090,7 @@ fn run_interp_driver<'a, 'b>(
                 // The body just finished; its result is on top of the stack.
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                acc.push(result);
+                acc.push(result.into());
                 if let Some(elem) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(elem);
@@ -1122,7 +1110,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::MapOptionAfter => {
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                stk.push(TypedValue::new_option_rc(Some(result.into())));
+                stk.push(TypedValue::new_option_rc(Some(result)));
             }
             InterpFrame::MapMapAccum {
                 body,
@@ -1137,7 +1125,7 @@ fn run_interp_driver<'a, 'b>(
                 let prev_key = current_key.ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
-                acc.insert_mut(prev_key, new_val);
+                acc.insert_mut(prev_key, new_val.into());
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(TypedValue::Pair(k.clone().into(), v.into()));
@@ -1178,8 +1166,7 @@ fn run_interp_driver<'a, 'b>(
                     saved_balance,
                 );
                 let result = pop_value(&mut sub)?;
-                active_stack_mut(stacks)?
-                    .push(TypedValue::new_option_rc(Some(result.into())));
+                active_stack_mut(stacks)?.push(TypedValue::new_option_rc(Some(result)));
             }
         }
     }
@@ -1408,7 +1395,7 @@ fn interpret_step<'a, 'b>(
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
             // pattern match (E0509); borrow the field and `take_out` it,
             // leaving the drained value to drop trivially at end of block.
-            let mut v = TypedValue::unwrap_rc(pop_value(stack)?.into());
+            let mut v = TypedValue::unwrap_rc(pop_value(stack)?);
             match &mut v {
                 #[allow(unused_parens)]
                 $p(i) => $crate::ast::TakeOut::take_out(i),
@@ -1460,7 +1447,7 @@ fn interpret_step<'a, 'b>(
             // trie node per level when the list is shared and mutating in
             // place when it is not.
             ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = match Rc::make_mut(stack.get_mut(0)?) {
+            let lst = match stack.get_mut(0)?.make_mut() {
                 V::List(lst) => lst,
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -1629,9 +1616,9 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = Rc::new(V::new_pair_rc(
+                        arg = RcTypedValue::new(V::new_pair_rc(
                             capture.arg_val().clone().into(),
-                            arg.into(),
+                            arg,
                         ));
                         closure = Closure::unwrap_rc(inner);
                     }
@@ -1725,10 +1712,8 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair_rc(
-                input.into(),
-                RcTypedValue::new(storage)
-            )];
+            let initial =
+                stk![TypedValue::new_pair_rc(input, RcTypedValue::new(storage))];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -1773,7 +1758,7 @@ fn interpret_one<'a>(
     use Instruction as I;
     use TypedValue as V;
 
-    // Two macros: `pop_rc!` keeps the `Rc<TypedValue>`, `pop!` calls
+    // Two macros: `pop_rc!` keeps the `RcTypedValue`, `pop!` calls
     // `unwrap_rc` on it. Prefer `pop_rc!` for read-only / forwarding
     // access (no risk of deep-cloning a shared collection); use `pop!`
     // only when the value is consumed by value.
@@ -1803,7 +1788,7 @@ fn interpret_one<'a>(
 
     macro_rules! pop {
         () => {{
-            TypedValue::unwrap_rc(pop_rc!().into())
+            TypedValue::unwrap_rc(pop_rc!())
         }};
         ($p:path) => {{
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
@@ -1841,7 +1826,7 @@ fn interpret_one<'a>(
 
     // `pop_ref!(x, Foo)` pops the stack and binds `x` as a borrow into
     // `V::Foo`'s payload, without cloning. Expands to two `let`s so the
-    // intermediate `Rc<TypedValue>` lives in the caller's scope and `x`
+    // intermediate `RcTypedValue` lives in the caller's scope and `x`
     // stays a valid reference.
     macro_rules! pop_ref {
         ($var:ident, $ctor:tt) => {
@@ -1862,7 +1847,7 @@ fn interpret_one<'a>(
     macro_rules! top_mut {
         ($p:path) => {{
             let top_rc = stack.get_mut(0)?;
-            match Rc::make_mut(top_rc) {
+            match top_rc.make_mut() {
                 #[allow(unused_parens)]
                 $p(i) => i,
                 _ => {
@@ -2686,14 +2671,14 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::PAIR)?;
             let l = pop_rc!();
             let r = pop_rc!();
-            stack.push(V::new_pair_rc(l.into(), r.into()));
+            stack.push(V::new_pair_rc(l, r));
         }
         I::PairN(n) => {
             ctx.gas().consume(interpret_cost::pair_n(*n as usize)?)?;
             let res = stack
                 .drain_top(*n as usize)?
                 .rev()
-                .reduce(|acc, e| V::new_pair_rc(e.into(), acc.into()).into())
+                .reduce(|acc, e| V::new_pair_rc(e, acc).into())
                 .ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
@@ -2714,7 +2699,7 @@ fn interpret_one<'a>(
             // Rust frame per nesting level -- a depth-N right-comb on the
             // stack with `UNPAIR (N+1)` would otherwise overflow the kernel's
             // ~1 MiB Rust stack around N ≈ 100. L2-1434 in-scope item.
-            let mut cur: RcTypedValue<'a> = pop_rc!().into();
+            let mut cur = pop_rc!();
             let total = *n as usize;
             stack.reserve(total);
             let mut lefts: Vec<RcTypedValue<'a>> =
@@ -2743,7 +2728,7 @@ fn interpret_one<'a>(
         I::ISome => {
             ctx.gas().consume(interpret_cost::SOME)?;
             let v = pop_rc!();
-            stack.push(V::new_option_rc(Some(v.into())));
+            stack.push(V::new_option_rc(Some(v)));
         }
         I::None => {
             ctx.gas().consume(interpret_cost::NONE)?;
@@ -2966,20 +2951,7 @@ fn interpret_one<'a>(
         I::GetN(n) => {
             ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
             let comb_rc = pop_rc!();
-            // The first step reads the stack cell (still a raw `Rc`); the
-            // pair fields below are already `RcTypedValue`.
-            let field = match (*n, comb_rc.as_ref()) {
-                (0, _) => comb_rc.clone(),
-                (1, V::Pair(l, _)) => l.clone().into(),
-                (_, V::Pair(_, r)) => get_nth_field_rc(*n - 2, r)?.into(),
-                _ => {
-                    return Err(InterpretError::InternalError(
-                        InterpretInvariant::TypeMismatch {
-                            expected: "V::Pair",
-                        },
-                    ))
-                }
-            };
+            let field = get_nth_field_rc(*n, &comb_rc)?;
             stack.push(field);
         }
         I::Update(overload) => match overload {
@@ -3071,29 +3043,8 @@ fn interpret_one<'a>(
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop_rc!();
-            // The first step edits the stack cell (still a raw `Rc`); the
-            // pair fields below are already `RcTypedValue`.
-            if *n == 0 {
-                *stack.get_mut(0)? = new_val;
-            } else {
-                let slot = match Rc::make_mut(stack.get_mut(0)?) {
-                    V::Pair(l, r) => {
-                        if *n == 1 {
-                            l
-                        } else {
-                            get_nth_field_slot_mut(*n - 2, r)?
-                        }
-                    }
-                    _ => {
-                        return Err(InterpretError::InternalError(
-                            InterpretInvariant::TypeMismatch {
-                                expected: "V::Pair",
-                            },
-                        ))
-                    }
-                };
-                *slot = new_val.into();
-            }
+            let slot = get_nth_field_slot_mut(*n, stack.get_mut(0)?)?;
+            *slot = new_val;
         }
         I::ChainId => {
             ctx.gas().consume(interpret_cost::CHAIN_ID)?;
@@ -3245,12 +3196,12 @@ fn interpret_one<'a>(
         I::Left => {
             ctx.gas().consume(interpret_cost::LEFT)?;
             let left = pop_rc!();
-            stack.push(V::new_or_rc(Or::Left(left.into())));
+            stack.push(V::new_or_rc(Or::Left(left)));
         }
         I::Right => {
             ctx.gas().consume(interpret_cost::RIGHT)?;
             let right = pop_rc!();
-            stack.push(V::new_or_rc(Or::Right(right.into())));
+            stack.push(V::new_or_rc(Or::Right(right)));
         }
         I::Lambda(lam) => {
             ctx.gas().consume(interpret_cost::LAMBDA)?;
@@ -4033,7 +3984,7 @@ mod interpreter_tests {
 
     /// L2-1446: a deep runtime-built value (e.g. a `LOOP`/`PAIR`-built comb)
     /// left on a value stack at interpreter teardown must be flattened
-    /// iteratively, not recursed through the `Rc<TypedValue>` destructor. This
+    /// iteratively, not recursed through the `RcTypedValue` destructor. This
     /// exercises `drain_value_stack`, which the driver (for EXEC/View
     /// sub-stacks) and `ContractScript::interpret` (for the caller stack) call
     /// on their error paths. Runs on a 1 MiB worker thread matching the kernel
@@ -4076,15 +4027,15 @@ mod interpreter_tests {
                 for _ in 0..DEPTH {
                     deep = V::new_pair(V::int(0), deep);
                 }
-                let shared = Rc::new(deep);
+                let shared = RcTypedValue::new(deep);
                 // Two Rc::clone siblings (refcount=2) plus a shallow marker
                 // on top — matches the runtime shape of `PUSH ; LOOP { PAIR }
                 // ; DUP ; PUSH 1 ; FAILWITH`. FAILWITH pops the marker, the
                 // shared deep value stays on bottom twice.
                 let mut stack: IStack = Stack::new();
-                stack.push(Rc::clone(&shared));
+                stack.push(shared.clone());
                 stack.push(shared);
-                stack.push(Rc::new(V::int(42)));
+                stack.push(RcTypedValue::new(V::int(42)));
                 let outcome =
                     interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
                 assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
@@ -4128,7 +4079,7 @@ mod interpreter_tests {
         // through the full `ContractInterpretError` Display chain.
         let cie = ContractInterpretError::from(InterpretError::FailedWith(
             Type::Int,
-            Rc::new(value.clone()),
+            RcTypedValue::new(value.clone()),
         ));
         let rendered = display_bounded(&cie, CAP);
         assert!(
@@ -4147,7 +4098,7 @@ mod interpreter_tests {
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
-        let err = InterpretError::FailedWith(Type::Int, Rc::new(value));
+        let err = InterpretError::FailedWith(Type::Int, RcTypedValue::new(value));
         let rendered_dbg = debug_bounded(&err, CAP);
         assert!(
             rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
@@ -5369,8 +5320,8 @@ mod interpreter_tests {
             code: vec![Drop(None), Unit].into(),
         }));
         stack.push(lambda);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // argument on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // argument on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[Exec], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -5392,8 +5343,8 @@ mod interpreter_tests {
             entrypoint: Entrypoint::default(),
         });
         stack.push(address);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // input on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // input on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(
             &[IView {
@@ -5454,8 +5405,8 @@ mod interpreter_tests {
             entrypoint: Entrypoint::default(),
         });
         stack.push(address);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // view input on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // view input on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(
             &[IView {
@@ -5481,9 +5432,9 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         let mut ctx = Ctx::default();
         let mut stack = IStack::new();
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
         stack.push(V::new_pair(V::Bytes(vec![]), V::Unit));
-        stack.push(Rc::clone(&operand)); // new field value on top, shared with `operand`
+        stack.push(operand.clone()); // new field value on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[UpdateN(1)], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -5500,12 +5451,12 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         // strings: the shared operand is the first (top) operand.
         {
-            let operand = Rc::new(V::String("0".repeat(SIZE)));
+            let operand = RcTypedValue::new(V::String("0".repeat(SIZE)));
             let mut ctx = Ctx::default();
             ctx.gas = Gas::new(1000); // below concat_string_pair(SIZE)
             let mut stack = IStack::new();
             stack.push(V::String(String::new())); // second operand (small)
-            stack.push(Rc::clone(&operand)); // first operand on top, shared
+            stack.push(operand.clone()); // first operand on top, shared
             let before = thread_allocated_bytes();
             let outcome = interpret(
                 &[Concat(overloads::Concat::TwoStrings)],
@@ -5523,11 +5474,11 @@ mod interpreter_tests {
         }
         // bytes: the shared operand is the second operand.
         {
-            let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+            let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
             let mut ctx = Ctx::default();
             ctx.gas = Gas::new(1000); // below concat_bytes_pair(SIZE)
             let mut stack = IStack::new();
-            stack.push(Rc::clone(&operand)); // second operand, shared
+            stack.push(operand.clone()); // second operand, shared
             stack.push(V::Bytes(vec![])); // first operand on top (small)
             let before = thread_allocated_bytes();
             let outcome =
@@ -5619,8 +5570,9 @@ mod interpreter_tests {
             )
             .unwrap();
         let allocated = thread_allocated_bytes() - before;
-        assert!(
-            std::rc::Rc::ptr_eq(&storage, &value),
+        assert_eq!(
+            storage.as_ptr(),
+            Rc::as_ptr(&value),
             "finalization deep-copied the shared returned storage"
         );
         assert!(
@@ -6168,7 +6120,10 @@ mod interpreter_tests {
                 &mut Ctx::default(),
                 &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(Type::Nat, Rc::new(V::nat(20))))
+            Err(InterpretError::FailedWith(
+                Type::Nat,
+                RcTypedValue::new(V::nat(20))
+            ))
         );
     }
 
@@ -7827,9 +7782,9 @@ mod interpreter_tests {
     fn pack_shared_value_is_not_deep_copied() {
         const SIZE: usize = 16 * 1024 * 1024;
         // Two `Rc` siblings (refcount 2) — the runtime shape of `DUP ; PACK`.
-        let shared = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let shared = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
         let mut stack: IStack = Stack::new();
-        stack.push(Rc::clone(&shared));
+        stack.push(shared.clone());
         stack.push(shared);
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(1000); // far too little to serialize 16 MiB
@@ -8460,10 +8415,10 @@ mod interpreter_tests {
             micheline_code: Micheline::Seq(&[]),
             code: vec![Drop(None), Unit].into(),
         });
-        let capture = Rc::new(V::Bytes(vec![0; 4096]));
+        let capture = RcTypedValue::new(V::Bytes(vec![0; 4096]));
         let mut stack = IStack::new();
         stack.push(V::Lambda(lambda));
-        stack.push(Rc::clone(&capture));
+        stack.push(capture.clone());
 
         interpret_one(
             &Apply {
@@ -8478,7 +8433,7 @@ mod interpreter_tests {
             V::Lambda(Closure::Apply {
                 capture: applied_capture,
                 ..
-            }) => assert!(Rc::ptr_eq(applied_capture.arg_val(), &capture)),
+            }) => assert!(Rc::as_ptr(applied_capture.arg_val()) == capture.as_ptr()),
             value => panic!("expected applied closure, got {value:?}"),
         }
     }
@@ -8594,7 +8549,7 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        TypedValue::unwrap_rc(stack.pop().unwrap().into())
+        TypedValue::unwrap_rc(stack.pop().unwrap())
     }
 
     #[test]

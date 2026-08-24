@@ -4,7 +4,7 @@
 
 use mir::ast::{
     Address, AddressHash, BinWriter, ByteReprTrait, Operation, OperationInfo,
-    TransferTokens, TypedValue,
+    RcTypedValue, TransferTokens, TypedValue,
 };
 use mir::ast::{PublicKeyHash, Type};
 use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
@@ -1735,7 +1735,7 @@ fn make_invalid_runtime_id_error<'a>(
 ) -> mir::interpreter::InterpretError<'a> {
     mir::interpreter::InterpretError::FailedWith(
         mir::ast::Type::new_pair(mir::ast::Type::String, mir::ast::Type::Nat),
-        Rc::new(TypedValue::new_pair(
+        RcTypedValue::new(TypedValue::new_pair(
             TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
             TypedValue::Nat(received.clone()),
         )),

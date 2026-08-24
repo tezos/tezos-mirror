@@ -1336,9 +1336,9 @@ pub fn dump_big_map_updates<'a>(
 pub fn dump_big_map_updates_shared<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
     started_with_map_ids: &[BigMapId],
-    root: &Rc<TypedValue<'a>>,
+    root: &RcTypedValue<'a>,
     temporary: bool,
-) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+) -> Result<Option<RcTypedValue<'a>>, LazyStorageError> {
     // Same three phases as [dump_big_map_updates], which documents the policy
     // driving each of them.
     let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
@@ -1422,10 +1422,10 @@ pub fn dump_big_map_walk<'a>(
 /// anything (L2-1836).
 pub fn dump_big_map_walk_shared<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
-    root: &Rc<TypedValue<'a>>,
+    root: &RcTypedValue<'a>,
     temporary: bool,
     seen_source_ids: &mut BTreeSet<BigMapId>,
-) -> Result<(Option<Rc<TypedValue<'a>>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
+) -> Result<(Option<RcTypedValue<'a>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
     let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
     // Same visitor contract as [dump_big_map_walk]; only the ownership of the
     // root differs, so the two stay in lock-step.
@@ -1440,9 +1440,7 @@ pub fn dump_big_map_walk_shared<'a>(
             )
         })?;
 
-    // The rebuilt node is shared as an `RcTypedValue`; hand it back in the
-    // root's raw `Rc` spelling until the root positions move to the newtype.
-    Ok((updated.map(Into::into), deferred_in_place_updates))
+    Ok((updated, deferred_in_place_updates))
 }
 
 /// Runs the mutable walk against a throwaway unmetered storage, for tests that

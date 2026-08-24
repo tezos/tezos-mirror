@@ -1302,7 +1302,7 @@ impl RuntimeInterface for TezosRuntime {
                 &source_account,
                 &Narith(0u64.into()),
                 None,
-                std::rc::Rc::new(typed_storage),
+                std::rc::Rc::new(typed_storage).into(),
                 &origin,
             )
             .map_err(|e| {
