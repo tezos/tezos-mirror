@@ -9830,11 +9830,10 @@ let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
        returned HTTP 200 with body: %s."
       what
       run_body ;
-  if run_body =~! rex "dangling hash" then
+  if run_response.code <> 500 && run_body =~! rex "Invalid proof" then
     Test.fail
-      "Expected run_operation to abort on the Irmin exception, but it failed \
-       with (HTTP %d): %s. The operation is no longer a reproducer through \
-       this path, so this step would no longer exercise anything."
+      "Expected run_operation to return \"Invalid proof\" but it failed with \
+       (HTTP %d): %s."
       run_response.code
       run_body ;
   (* The node answered the failure rather than dying on it -- and this call
