@@ -861,7 +861,7 @@ impl<'a> TypedValue<'a> {
             /// Pops one per element, in element order.
             BuildList(&'b MichelsonList<RcTypedValue<'a>>),
             /// Pops one per entry, in ascending key order.
-            BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+            BuildMap(&'b RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
             /// Pops 1: the transfer parameter.
             BuildTransferTokens(&'b OperationInfo<'a>, &'b TransferTokens<'a>),
             /// Pops 1: the originated storage.
@@ -1020,7 +1020,7 @@ impl<'a> TypedValue<'a> {
                             // are visited.
                             frames.push(Frame::BuildMap(m));
                             for (_, x) in m.iter().rev() {
-                                push_child_raw(&mut frames, x);
+                                push_child(&mut frames, x);
                             }
                         }
                         BigMap(m) => {
@@ -1114,7 +1114,7 @@ impl<'a> TypedValue<'a> {
                         let mut new = orig.clone();
                         for ((k, _), new_v) in orig.iter().zip(results.drain(at..)) {
                             if let Some(new_v) = new_v {
-                                new.insert_mut(k.clone(), new_v.into());
+                                new.insert_mut(k.clone(), new_v);
                             }
                         }
                         results.push(Some(RcTypedValue::new(Map(new))));
@@ -1917,8 +1917,8 @@ mod review_verification {
                             bm(4),
                         )])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
-                            Rc::new(TypedValue::int(0)),
-                            Rc::new(bm(5)),
+                            RcTypedValue::new(TypedValue::int(0)),
+                            RcTypedValue::new(bm(5)),
                         )])),
                     ),
                 ),
@@ -2077,8 +2077,8 @@ mod review_verification {
                             RcTypedValue::new(operation_carrying(bm(5))),
                         ])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
-                            Rc::new(TypedValue::int(0)),
-                            Rc::new(bm(6)),
+                            RcTypedValue::new(TypedValue::int(0)),
+                            RcTypedValue::new(bm(6)),
                         )])),
                     ),
                 ),
@@ -2135,8 +2135,8 @@ mod review_verification {
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
                 TypedValue::Map(RedBlackTreeMap::from_iter([(
-                    Rc::new(TypedValue::int(0)),
-                    Rc::new(acc),
+                    RcTypedValue::new(TypedValue::int(0)),
+                    RcTypedValue::new(acc),
                 )]))
             })
         }
@@ -2198,8 +2198,8 @@ mod review_verification {
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
                 TypedValue::Map(RedBlackTreeMap::from_iter([(
-                    Rc::new(TypedValue::int(0)),
-                    Rc::new(acc),
+                    RcTypedValue::new(TypedValue::int(0)),
+                    RcTypedValue::new(acc),
                 )]))
             })
         }
@@ -2583,13 +2583,13 @@ mod review_verification {
     /// an assertion that ascending is right.
     #[test]
     fn walk_visits_map_values_in_key_order_and_keeps_them_paired() {
-        let key = |k: i64| Rc::new(TypedValue::int(k));
+        let key = |k: i64| RcTypedValue::new(TypedValue::int(k));
         // Inserted out of order on purpose: iteration order must come from the
         // tree, not from insertion.
         let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
-            (key(2), Rc::new(leaf_big_map(2))),
-            (key(0), Rc::new(leaf_big_map(0))),
-            (key(1), Rc::new(leaf_big_map(1))),
+            (key(2), RcTypedValue::new(leaf_big_map(2))),
+            (key(0), RcTypedValue::new(leaf_big_map(0))),
+            (key(1), RcTypedValue::new(leaf_big_map(1))),
         ]));
 
         // Renumber each big map to id + 10, so the rebuilt map shows where
@@ -2632,12 +2632,12 @@ mod review_verification {
     /// map, which is what makes the rebuild copy-on-write rather than a copy.
     #[test]
     fn walk_rebuilds_only_the_changed_map_entry() {
-        let key = |k: i64| Rc::new(TypedValue::int(k));
-        let low = Rc::new(TypedValue::Bytes(vec![0x0a; 32]));
-        let high = Rc::new(TypedValue::Bytes(vec![0x0b; 32]));
+        let key = |k: i64| RcTypedValue::new(TypedValue::int(k));
+        let low = RcTypedValue::new(TypedValue::Bytes(vec![0x0a; 32]));
+        let high = RcTypedValue::new(TypedValue::Bytes(vec![0x0b; 32]));
         let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
             (key(0), low.clone()),
-            (key(1), Rc::new(leaf_big_map(9))),
+            (key(1), RcTypedValue::new(leaf_big_map(9))),
             (key(2), high.clone()),
         ]));
 
@@ -2649,11 +2649,11 @@ mod review_verification {
             panic!("root is no longer a map")
         };
         assert!(
-            Rc::ptr_eq(m.get(&key(0)).unwrap(), &low),
+            m.get(&key(0)).unwrap().ptr_eq(&low),
             "a big-map-free entry was copied"
         );
         assert!(
-            Rc::ptr_eq(m.get(&key(2)).unwrap(), &high),
+            m.get(&key(2)).unwrap().ptr_eq(&high),
             "a big-map-free entry was copied"
         );
     }

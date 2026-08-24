@@ -767,8 +767,8 @@ pub enum TypedValue<'a> {
     Pair(RcTypedValue<'a>, RcTypedValue<'a>),
     Option(Option<RcTypedValue<'a>>),
     List(MichelsonList<RcTypedValue<'a>>),
-    Set(RedBlackTreeSet<Rc<Self>>),
-    Map(RedBlackTreeMap<Rc<Self>, Rc<Self>>),
+    Set(RedBlackTreeSet<RcTypedValue<'a>>),
+    Map(RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
     BigMap(BigMap<'a>),
     Or(Or<RcTypedValue<'a>, RcTypedValue<'a>>),
     Address(Address),
@@ -1023,10 +1023,10 @@ pub(crate) enum DebugFrame<'b, 'a: 'b> {
     // the container, so the ", " separator is emitted *before* every
     // non-first entry (no trailing comma).
     MapEntries(
-        std::vec::IntoIter<(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>)>,
+        std::vec::IntoIter<(&'b RcTypedValue<'a>, &'b RcTypedValue<'a>)>,
         bool,
     ),
-    SetEntries(std::vec::IntoIter<&'b Rc<TypedValue<'a>>>, bool),
+    SetEntries(std::vec::IntoIter<&'b RcTypedValue<'a>>, bool),
     ListEntries(crate::ast::michelson_list::Iter<'b, RcTypedValue<'a>>, bool),
 }
 
@@ -1476,7 +1476,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         let mut elems: Vec<TypedValue<'a>> =
                             rb_set_into_vec(std::mem::take(s))
                                 .into_iter()
-                                .map(|x| TypedValue::unwrap_rc(x.into()))
+                                .map(TypedValue::unwrap_rc)
                                 .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1484,19 +1484,15 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     TV::Map(m) => {
-                        let mut entries: Vec<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)> =
+                        let mut entries: Vec<(RcTypedValue<'a>, RcTypedValue<'a>)> =
                             rb_map_into_vec(std::mem::take(m));
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
                         while let Some((key, val)) = entries.pop() {
                             frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                val.into(),
-                            )));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                key.into(),
-                            )));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
+                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
                         }
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
@@ -1779,8 +1775,8 @@ impl<'a> TypedValue<'a> {
         enum Frame<'v, 'a> {
             Visit(&'v TypedValue<'a>),
             ListNext(michelson_list::Iter<'v, RcTypedValue<'a>>),
-            SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
-            MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
+            SetNext(std::vec::IntoIter<&'v RcTypedValue<'a>>),
+            MapNext(std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v RcTypedValue<'a>)>),
             /// A big map's in-memory entries. Distinct from [Frame::MapNext]
             /// only in the container it drains; both hold `Rc`-shared entries.
             BigMapEltNext(
@@ -2322,8 +2318,8 @@ take_out_via_default_generic!(
     RcTypedValue<'a>,
     Option<RcTypedValue<'a>>,
     MichelsonList<RcTypedValue<'a>>,
-    RedBlackTreeSet<Rc<TypedValue<'a>>>,
-    RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    RedBlackTreeSet<RcTypedValue<'a>>,
+    RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
     Or<RcTypedValue<'a>, RcTypedValue<'a>>,
     Closure<'a>,
     Box<Ticket<'a>>,
@@ -2361,13 +2357,13 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
         }
         TV::Set(s) => {
             for rc in take(s).drain_owned() {
-                push_rc(rc.into(), stack);
+                push_rc(rc, stack);
             }
         }
         TV::Map(m) => {
             for (k, v) in take(m).drain_owned() {
-                push_rc(k.into(), stack);
-                push_rc(v.into(), stack);
+                push_rc(k, stack);
+                push_rc(v, stack);
             }
         }
         TV::Lambda(closure) => {
@@ -2864,7 +2860,7 @@ pub mod test_strategies {
                 })
                 .boxed(),
             T::Set(elt) => prop::collection::btree_set(typed_value_by_type(elt), 0..=3)
-                .prop_map(|set| V::Set(set.into_iter().map(Rc::new).collect()))
+                .prop_map(|set| V::Set(set.into_iter().map(RcTypedValue::new).collect()))
                 .boxed(),
             T::Map(m) => {
                 let (key_ty, val_ty) = m.as_ref();
@@ -2876,7 +2872,7 @@ pub mod test_strategies {
                 .prop_map(|map| {
                     V::Map(
                         map.into_iter()
-                            .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                            .map(|(k, v)| (RcTypedValue::new(k), RcTypedValue::new(v)))
                             .collect(),
                     )
                 })

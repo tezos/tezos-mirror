@@ -550,11 +550,11 @@ enum InterpFrame<'a, 'b> {
     },
     IterSet {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<RcTypedValue<'a>>,
     },
     IterMap {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        remaining: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
@@ -564,9 +564,9 @@ enum InterpFrame<'a, 'b> {
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
-        acc: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-        current_key: Option<Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
+        acc: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
+        current_key: Option<RcTypedValue<'a>>,
     },
     /// EXEC body just finished on the top sub stack; pop sub stack,
     /// take its single result, push to the new top stack.
@@ -600,11 +600,11 @@ enum StepResult<'a, 'b> {
     },
     OpenIterSet {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        iter: std::vec::IntoIter<RcTypedValue<'a>>,
     },
     OpenIterMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        iter: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
@@ -613,8 +613,8 @@ enum StepResult<'a, 'b> {
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
-        first_key: Rc<TypedValue<'a>>,
+        iter: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
+        first_key: RcTypedValue<'a>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
     OpenExec {
@@ -808,13 +808,11 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
         match frame {
             InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
             InterpFrame::IterList { remaining, .. } => pending.extend(remaining),
-            InterpFrame::IterSet { remaining, .. } => {
-                pending.extend(remaining.map(Into::into))
-            }
+            InterpFrame::IterSet { remaining, .. } => pending.extend(remaining),
             InterpFrame::IterMap { remaining, .. } => {
                 for (k, v) in remaining {
-                    pending.push(k.into());
-                    pending.push(v.into());
+                    pending.push(k);
+                    pending.push(v);
                 }
             }
             InterpFrame::MapListAccum { remaining, acc, .. } => {
@@ -828,14 +826,14 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
                 ..
             } => {
                 for (k, v) in remaining {
-                    pending.push(k.into());
-                    pending.push(v.into());
+                    pending.push(k);
+                    pending.push(v);
                 }
                 for (k, v) in crate::ast::rb_map_into_vec(acc) {
-                    pending.push(k.into());
-                    pending.push(v.into());
+                    pending.push(k);
+                    pending.push(v);
                 }
-                pending.extend(current_key.map(Into::into));
+                pending.extend(current_key);
             }
             InterpFrame::NextInstr { .. }
             | InterpFrame::LoopBody { .. }
@@ -1072,7 +1070,7 @@ fn run_interp_driver<'a, 'b>(
             } => {
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    active_stack_mut(stacks)?.push(TypedValue::Pair(k.into(), v.into()));
+                    active_stack_mut(stacks)?.push(TypedValue::Pair(k, v));
                     frames.push(InterpFrame::IterMap { body, remaining });
                     frames.push(InterpFrame::NextInstr {
                         block: body,
@@ -1123,10 +1121,10 @@ fn run_interp_driver<'a, 'b>(
                 let prev_key = current_key.ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
-                acc.insert_mut(prev_key, new_val.into());
+                acc.insert_mut(prev_key, new_val);
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    stk.push(TypedValue::Pair(k.clone().into(), v.into()));
+                    stk.push(TypedValue::Pair(k.clone(), v));
                     frames.push(InterpFrame::MapMapAccum {
                         body,
                         remaining,
@@ -1555,7 +1553,7 @@ fn interpret_step<'a, 'b>(
                 let mut iter = crate::ast::rb_map_into_vec(map).into_iter();
                 if let Some((k, v)) = iter.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    stack.push(TypedValue::Pair(k.clone().into(), v.into()));
+                    stack.push(TypedValue::Pair(k.clone(), v));
                     Ok(StepResult::OpenMapMap {
                         body,
                         iter,
@@ -2934,7 +2932,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key_rc, map.size())?)?;
                 let result = map.get(&*key_rc);
-                stack.push(V::new_option_rc(result.cloned().map(Into::into)));
+                stack.push(V::new_option_rc(result.cloned()));
             }
             overloads::Get::BigMap => {
                 let key_rc = pop_rc!();
@@ -2960,7 +2958,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key_rc, set.size())?)?;
                 if new_present {
-                    set.insert_mut(key_rc.into());
+                    set.insert_mut(key_rc);
                 } else {
                     set.remove_mut(&*key_rc);
                 }
@@ -2976,7 +2974,7 @@ fn interpret_one<'a>(
                         map.remove_mut(&*key_rc);
                     }
                     Some(val) => {
-                        map.insert_mut(key_rc.into(), val.into());
+                        map.insert_mut(key_rc, val);
                     }
                 }
             }
@@ -3003,10 +3001,10 @@ fn interpret_one<'a>(
                         map.remove_mut(&*key_rc);
                     }
                     Some(val) => {
-                        map.insert_mut(key_rc.into(), val.into());
+                        map.insert_mut(key_rc, val);
                     }
                 }
-                stack.push(V::new_option_rc(opt_old_val.map(Into::into)));
+                stack.push(V::new_option_rc(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
                 let key = pop_rc!();
@@ -3693,20 +3691,20 @@ mod interpreter_tests {
         super::interpret_one(i, ctx, temp, stack)
     }
 
-    fn rc_set<'a, I>(values: I) -> RedBlackTreeSet<Rc<TypedValue<'a>>>
+    fn rc_set<'a, I>(values: I) -> RedBlackTreeSet<RcTypedValue<'a>>
     where
         I: IntoIterator<Item = TypedValue<'a>>,
     {
-        values.into_iter().map(Rc::new).collect()
+        values.into_iter().map(RcTypedValue::new).collect()
     }
 
-    fn rc_map<'a, I>(values: I) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>
+    fn rc_map<'a, I>(values: I) -> RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>
     where
         I: IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
     {
         values
             .into_iter()
-            .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+            .map(|(key, value)| (RcTypedValue::new(key), RcTypedValue::new(value)))
             .collect()
     }
 
@@ -4213,11 +4211,12 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterSet {
                         body: body(),
-                        remaining: vec![deep().into()].into_iter(),
+                        remaining: vec![deep()].into_iter(),
                     },
                     InterpFrame::IterMap {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep().into())].into_iter(),
+                        remaining: vec![(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter(),
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
@@ -4226,9 +4225,12 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapMapAccum {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep().into())].into_iter(),
-                        acc: [(Rc::new(V::int(0)), deep().into())].into_iter().collect(),
-                        current_key: Some(deep().into()),
+                        remaining: vec![(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter(),
+                        acc: [(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter()
+                            .collect(),
+                        current_key: Some(deep()),
                     },
                 ];
                 drain_value_frames(frames);

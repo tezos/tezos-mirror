@@ -5242,7 +5242,7 @@ fn step_typecheck_value<'a, 'b>(
                 });
                 frames.push(TvFrame::Visit { v: next, t: elem_t });
             } else {
-                results.push(TV::Set(acc.into_iter().map(Rc::new).collect()));
+                results.push(TV::Set(acc.into_iter().map(RcTypedValue::new).collect()));
             }
             Ok(())
         }
@@ -5311,7 +5311,9 @@ fn step_typecheck_value<'a, 'b>(
                         MapFinalize::Map => {
                             results.push(TV::Map(
                                 acc.into_iter()
-                                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                                    .map(|(k, v)| {
+                                        (RcTypedValue::new(k), RcTypedValue::new(v))
+                                    })
                                     .collect(),
                             ));
                         }
@@ -8887,7 +8889,7 @@ mod typecheck_tests {
             Ok(Push(Rc::new(TypedValue::Set(
                 [TypedValue::int(1), TypedValue::int(2)]
                     .into_iter()
-                    .map(Rc::new)
+                    .map(RcTypedValue::new)
                     .collect()
             ))))
         );
@@ -8967,7 +8969,7 @@ mod typecheck_tests {
                     (TypedValue::int(2), TypedValue::String("bar".to_owned()))
                 ]
                 .into_iter()
-                .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+                .map(|(key, value)| (RcTypedValue::new(key), RcTypedValue::new(value)))
                 .collect()
             ))))
         );
