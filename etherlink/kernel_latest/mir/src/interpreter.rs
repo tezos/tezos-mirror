@@ -1613,7 +1613,7 @@ fn interpret_step<'a, 'b>(
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
                         arg = RcTypedValue::new(V::new_pair_rc(
-                            capture.arg_val().clone().into(),
+                            capture.arg_val().clone(),
                             arg,
                         ));
                         closure = Closure::unwrap_rc(inner);
@@ -3236,7 +3236,7 @@ fn interpret_one<'a>(
             stack.push(V::Lambda(Closure::Apply {
                 capture: Rc::new(AppliedCapture::new(
                     arg_ty.clone(),
-                    arg_val.into(),
+                    arg_val,
                     arg_ty_micheline,
                     arg_val_micheline,
                     cached_unparse_cost,
@@ -8433,7 +8433,7 @@ mod interpreter_tests {
             V::Lambda(Closure::Apply {
                 capture: applied_capture,
                 ..
-            }) => assert!(Rc::as_ptr(applied_capture.arg_val()) == capture.as_ptr()),
+            }) => assert!(applied_capture.arg_val().ptr_eq(&capture)),
             value => panic!("expected applied closure, got {value:?}"),
         }
     }
@@ -8519,7 +8519,7 @@ mod interpreter_tests {
     // The capture-unparse cache is irrelevant to those tests (EXEC and `Rc`
     // sharing ignore it), so a trivial one is used; tests that exercise the
     // cache build it through `APPLY` via `cached_applied_drop_closure`.
-    fn applied_drop_closure(capture: Rc<TypedValue<'static>>) -> TypedValue<'static> {
+    fn applied_drop_closure(capture: RcTypedValue<'static>) -> TypedValue<'static> {
         TypedValue::Lambda(Closure::Apply {
             capture: Rc::new(AppliedCapture::new(
                 Type::Bytes,
@@ -8568,15 +8568,15 @@ mod interpreter_tests {
 
         // Cloning an applied closure -- exactly what `EXEC` does to a `DUP`'d
         // closure -- must share the capture allocation, not deep-copy it.
-        let capture = Rc::new(V::Bytes(vec![0; 1 << 16]));
+        let capture = RcTypedValue::new(V::Bytes(vec![0; 1 << 16]));
         let arg_val_of = |tv: &TypedValue<'static>| match tv {
             TypedValue::Lambda(Closure::Apply { capture, .. }) => {
-                Rc::clone(capture.arg_val())
+                capture.arg_val().clone()
             }
             value => panic!("expected applied closure, got {value:?}"),
         };
-        let closure = applied_drop_closure(Rc::clone(&capture));
-        assert!(Rc::ptr_eq(&arg_val_of(&closure.clone()), &capture));
+        let closure = applied_drop_closure(capture.clone());
+        assert!(arg_val_of(&closure.clone()).ptr_eq(&capture));
 
         // The closure takes `unit` and returns `unit` (`DROP ; UNIT`), so each
         // loop iteration `DUP`s it, pushes the `unit` argument, `EXEC`s the
@@ -8587,25 +8587,22 @@ mod interpreter_tests {
             body.extend([Dup(None), Push(Rc::new(V::Unit)), Exec, Drop(None)]);
         }
 
-        let run = |capture: Rc<TypedValue<'static>>| -> u32 {
+        let run = |capture: RcTypedValue<'static>| -> u32 {
             let mut ctx = Ctx::default();
-            let mut stack = stk![applied_drop_closure(Rc::clone(&capture))];
+            let mut stack = stk![applied_drop_closure(capture.clone())];
             let start_milligas = ctx.gas().milligas().unwrap();
             interpret(&body, &mut ctx, &mut stack).unwrap();
             // The surviving closure still points at the *original* capture
             // allocation: the loop never re-allocated it.
             assert_eq!(stack.len(), 1);
-            assert!(Rc::ptr_eq(
-                &arg_val_of(stack.get(0).unwrap().as_ref()),
-                &capture
-            ));
+            assert!(arg_val_of(stack.get(0).unwrap().as_ref()).ptr_eq(&capture));
             start_milligas - ctx.gas().milligas().unwrap()
         };
 
         // Flat `EXEC` gas is acceptable now precisely because the per-iteration
         // work is O(1): the same flat charge for a 1-byte and a 64-KiB capture.
         let large_gas = run(capture);
-        let small_gas = run(Rc::new(V::Bytes(vec![0; 1])));
+        let small_gas = run(RcTypedValue::new(V::Bytes(vec![0; 1])));
         assert_eq!(large_gas, small_gas);
         assert!(large_gas > 0);
     }

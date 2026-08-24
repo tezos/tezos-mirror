@@ -2375,7 +2375,7 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             } = cur
             {
                 if let Ok(capture) = Rc::try_unwrap(capture) {
-                    push_rc(capture.into_arg_val().into(), stack);
+                    push_rc(capture.into_arg_val(), stack);
                 }
                 // Stop at the first co-owned link instead of cloning past it:
                 // everything below is kept alive by that other owner, so there
@@ -3061,7 +3061,7 @@ mod test_untypers {
         let cost = Gas::default().milligas().unwrap() - gas.milligas().unwrap();
         let capture = Rc::new(AppliedCapture::new(
             Type::Int,
-            Rc::new(TypedValue::int(7)),
+            RcTypedValue::new(TypedValue::int(7)),
             arg_ty_mich,
             arg_val_mich,
             cost,
@@ -3308,7 +3308,7 @@ mod drop_safety {
             });
             let capture = Rc::new(AppliedCapture::new(
                 Type::Unit,
-                Rc::new(TypedValue::Unit),
+                RcTypedValue::new(TypedValue::Unit),
                 Micheline::Seq(&[]),
                 Micheline::Seq(&[]),
                 0,
@@ -3343,7 +3343,7 @@ mod drop_safety {
                 tv = TypedValue::Lambda(Closure::Apply {
                     capture: Rc::new(AppliedCapture::new(
                         Type::new_lambda(Type::Unit, Type::Unit),
-                        Rc::new(tv),
+                        RcTypedValue::new(tv),
                         Micheline::Seq(&[]),
                         Micheline::Seq(&[]),
                         0,
@@ -3373,7 +3373,7 @@ mod drop_safety {
                 tv = TypedValue::Lambda(Closure::Apply {
                     capture: Rc::new(AppliedCapture::new(
                         Type::new_lambda(Type::Unit, Type::Unit),
-                        Rc::new(tv),
+                        RcTypedValue::new(tv),
                         Micheline::Seq(&[]),
                         Micheline::Seq(&[]),
                         0,
@@ -3514,7 +3514,7 @@ mod drop_safety {
         on_kernel_stack(|| {
             let capture = Rc::new(AppliedCapture::new(
                 Type::Unit,
-                Rc::new(TypedValue::Unit),
+                RcTypedValue::new(TypedValue::Unit),
                 Micheline::Seq(&[]),
                 Micheline::Seq(&[]),
                 0,

@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use crate::gas::{Gas, OutOfGas};
 
-use super::{Instruction, IntoMicheline, Micheline, Type, TypedValue};
+use super::{Instruction, IntoMicheline, Micheline, RcTypedValue, Type, TypedValue};
 
 /// Michelson lambda. Can be either non-recursive or recursive. Michelson
 /// lambdas carry their own raw [Micheline] representation to ensure consistent
@@ -84,7 +84,7 @@ pub enum Closure<'a> {
 /// independent of both value and type size.
 pub struct AppliedCapture<'a> {
     arg_ty: Type,
-    arg_val: Rc<TypedValue<'a>>,
+    arg_val: RcTypedValue<'a>,
     cached_unparsed_arg: CachedUnparsedArg<'a>,
 }
 
@@ -97,7 +97,7 @@ struct CachedUnparsedArg<'a> {
 impl<'a> AppliedCapture<'a> {
     pub(crate) fn new(
         arg_ty: Type,
-        arg_val: Rc<TypedValue<'a>>,
+        arg_val: RcTypedValue<'a>,
         arg_ty_micheline: Micheline<'a>,
         arg_val_micheline: Micheline<'a>,
         unparse_cost: u32,
@@ -117,14 +117,14 @@ impl<'a> AppliedCapture<'a> {
         &self.arg_ty
     }
 
-    pub(crate) fn arg_val(&self) -> &Rc<TypedValue<'a>> {
+    pub(crate) fn arg_val(&self) -> &RcTypedValue<'a> {
         &self.arg_val
     }
 
     /// Consume the capture, returning its typed value. Used by the iterative
     /// drop to drain a (possibly deep) captured value onto the worklist
     /// instead of recursing through a nested `TypedValue` destructor.
-    pub(crate) fn into_arg_val(self) -> Rc<TypedValue<'a>> {
+    pub(crate) fn into_arg_val(self) -> RcTypedValue<'a> {
         self.arg_val
     }
 
@@ -279,7 +279,7 @@ mod tests {
     /// 1 MiB worker thread; a regression to recursive walking would overflow.
     #[test]
     fn deeply_nested_closure_apply_debug_format() {
-        use crate::ast::{Micheline, Type};
+        use crate::ast::{Micheline, RcTypedValue, Type};
         const DEPTH: usize = 100_000;
         std::thread::Builder::new()
             .stack_size(1024 * 1024)
@@ -292,7 +292,7 @@ mod tests {
                 // spine cheap to build.
                 let capture = Rc::new(super::AppliedCapture::new(
                     Type::Unit,
-                    Rc::new(TypedValue::Unit),
+                    RcTypedValue::new(TypedValue::Unit),
                     Micheline::Seq(&[]),
                     Micheline::Seq(&[]),
                     0,
@@ -324,7 +324,7 @@ mod tests {
     /// recursion would overflow even at small DEPTH.
     #[test]
     fn deep_apply_arg_lambda_debug_does_not_overflow() {
-        use crate::ast::{Micheline, Type};
+        use crate::ast::{Micheline, RcTypedValue, Type};
         const DEPTH: usize = 100_000;
         std::thread::Builder::new()
             .stack_size(1024 * 1024)
@@ -338,7 +338,7 @@ mod tests {
                 let mut c = leaf();
                 let capture = Rc::new(super::AppliedCapture::new(
                     Type::new_lambda(Type::Unit, Type::Unit),
-                    Rc::new(TypedValue::Lambda(leaf())),
+                    RcTypedValue::new(TypedValue::Lambda(leaf())),
                     Micheline::Seq(&[]),
                     Micheline::Seq(&[]),
                     0,
