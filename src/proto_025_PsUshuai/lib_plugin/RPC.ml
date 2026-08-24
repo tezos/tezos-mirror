@@ -1366,6 +1366,25 @@ module Scripts = struct
         | _ -> return_unit)
       (Operation.to_list (Contents_list contents))
 
+  let check_execute_outbox_messages context
+      ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    List.iter_es
+      (function
+        | Contents
+            (Manager_operation
+               {
+                 operation =
+                   Sc_rollup_execute_outbox_message {rollup; output_proof; _};
+                 _;
+               }) ->
+            Block_validation.check_execute_outbox_message
+              context
+              ~rollup
+              ~output_proof
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
+
   (** Validate and apply the operation but skip signature checks; do
       not support consensus operations.
 
@@ -1385,6 +1404,7 @@ module Scripts = struct
     in
     let*? () = check_increase_paid_storage packed_operation in
     let* () = check_stake_operations context packed_operation in
+    let* () = check_execute_outbox_messages context packed_operation in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
     let* _validate_operation_state =

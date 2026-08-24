@@ -75,3 +75,12 @@ val delegate_stake_while_slashed_in_current_finalization_delay :
   Protocol.Alpha_context.t ->
   delegate:Protocol.Alpha_context.public_key_hash ->
   bool Environment.Error_monad.tzresult Lwt.t
+
+(** [check_execute_outbox_message context ~rollup ~output_proof] checks the
+    validity of a given [output_proof] against the rollup. Returns an error if
+    not the case. *)
+val check_execute_outbox_message :
+  Protocol.Alpha_context.t ->
+  rollup:Protocol.Alpha_context.Sc_rollup.t ->
+  output_proof:string ->
+  unit Environment.Error_monad.tzresult Lwt.t
