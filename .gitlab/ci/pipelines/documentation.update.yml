@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.build_all:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d26a8bef
   stage: build
   tags:
   - gcp
@@ -62,7 +62,7 @@ documentation.build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation.docgen:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d26a8bef
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -107,7 +107,7 @@ documentation.docgen:
     - docs/shell/p2p_api.rst
 
 documentation.manuals:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d26a8bef
   stage: build
   tags:
   - gcp
@@ -139,7 +139,7 @@ documentation.manuals:
     - docs/user/node-config.json
 
 documentation.odoc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d26a8bef
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -182,7 +182,7 @@ documentation.odoc:
     when: always
 
 documentation.publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -235,7 +235,7 @@ documentation.publish:
   retry: 0
 
 oc.build_x86_64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -299,7 +299,7 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
   stage: build
   tags:
   - gcp_very_high_cpu

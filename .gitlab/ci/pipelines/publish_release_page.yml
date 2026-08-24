@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -66,7 +66,7 @@ grafazos.release-page-publish:
   retry: 0
 
 oc.docker:ci:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: images
   tags:
   - gcp
@@ -99,7 +99,7 @@ oc.docker:ci:amd64:
     - runner_system_failure
 
 octez-smart-rollup-node.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -136,7 +136,7 @@ octez-smart-rollup-node.release-page-publish:
   retry: 0
 
 release_page.publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -209,7 +209,7 @@ release_site.render:
   retry: 0
 
 teztale.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible

@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d26a8bef
   stage: build
   tags:
   - gcp
@@ -56,7 +56,7 @@ grafazos.build:
     when: on_success
 
 grafazos.gitlab_release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -78,7 +78,7 @@ grafazos.gitlab_release:
   retry: 0
 
 grafazos.release-page-deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -112,7 +112,7 @@ grafazos.release-page-deploy-assets:
   retry: 0
 
 grafazos.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
   stage: publish
   tags:
   - gcp_not_interruptible
