@@ -78,7 +78,7 @@ let job_render =
   CI.job
     "render"
     ~__POS__
-    ~image:Images.CI.release_page
+    ~image:Images.Base_images.alpine_release_page
     ~stage:Publish
     ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
     ~description:
