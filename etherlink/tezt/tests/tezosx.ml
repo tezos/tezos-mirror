@@ -4177,9 +4177,37 @@ let test_tezosx_simulation () =
   let giver = Constant.bootstrap1.public_key_hash in
   let receiver = Constant.bootstrap2.public_key_hash in
   let hooks =
+    let replace_field ~name ~pattern ~replacement =
+      (sf "\"%s\": %s" name pattern, sf "\"%s\": %s" name replacement)
+    in
+    let replace_int_field ~name ~replacement =
+      replace_field ~name ~pattern:"[0-9]+" ~replacement
+    in
+    let replace_string_field ~name ~pattern ~replacement =
+      let quote s = sf "\"%s\"" s in
+      replace_field
+        ~name
+        ~pattern:(quote pattern)
+        ~replacement:(quote replacement)
+    in
     let replacements =
       ("edsig\\w{94}", "[SIGNATURE]")
       :: ("\\w{250,}", "[SERIALIZED_OPERATION]")
+      :: replace_int_field ~name:"major" ~replacement:"[MAJOR]"
+      :: replace_int_field ~name:"minor" ~replacement:"[MINOR]"
+      :: replace_int_field ~name:"build" ~replacement:"[BUILD]"
+      :: replace_string_field
+           ~name:"chain_name"
+           ~pattern:"TEZOS_CUSTOM_TEZOSX_[^\"]*"
+           ~replacement:"TEZOS_CUSTOM_TEZOSX_[CHAIN_NAME_DETAILS]"
+      :: replace_string_field
+           ~name:"commit_hash"
+           ~pattern:"\\w{40}"
+           ~replacement:"[COMMIT_HASH]"
+      :: replace_string_field
+           ~name:"commit_date"
+           ~pattern:"[^\"]*"
+           ~replacement:"[COMMIT_DATE]"
       :: Tezos_regression.replacements
     in
     Tezos_regression.hooks_custom

@@ -31,9 +31,13 @@ This sequence of operations was run:
 
 >>>>0: http://[HOST]:[PORT]/tezlink/version
 <<<<0: 200 OK
-  { "version": { "major": 0, "minor": 0, "build": 0, "additional_info": "dev" },
-    "network_version": { "chain_name": "", "distributed_db_version": 0, "p2p_version": 0 },
-    "commit_info": { "commit_hash": "", "commit_date": "" } }
+  { "version": { "major": [MAJOR], "minor": [MINOR], "build": [BUILD], "additional_info": "dev" },
+    "network_version":
+      { "chain_name": "TEZOS_CUSTOM_TEZOSX_[CHAIN_NAME_DETAILS]",
+        "distributed_db_version": 0, "p2p_version": 0 },
+    "commit_info":
+      { "commit_hash": "[COMMIT_HASH]",
+        "commit_date": "[COMMIT_DATE]" } }
 >>>>1: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head/protocols
 <<<<1: 200 OK
   { "protocol": "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY",
