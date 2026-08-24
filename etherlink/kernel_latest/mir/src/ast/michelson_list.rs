@@ -4,18 +4,18 @@
 
 //! Representation for typed Michelson `list 'a` values.
 
-use std::rc::Rc;
-
 use rpds::Vector;
+
+use crate::ast::{RcTypedValue, TypedValue};
 
 /// A representation of a Michelson list.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MichelsonList<T>(Vector<T>);
 
-impl<T> MichelsonList<Rc<T>> {
+impl<'a> MichelsonList<RcTypedValue<'a>> {
     /// Remove an element from the start of the list. O(log n); the returned
-    /// `Rc` is a refcount bump, never a payload copy.
-    pub fn uncons(&mut self) -> Option<Rc<T>> {
+    /// handle is a refcount bump, never a payload copy.
+    pub fn uncons(&mut self) -> Option<RcTypedValue<'a>> {
         let res = self.0.last().cloned();
         self.0.drop_last_mut();
         res
@@ -67,11 +67,11 @@ impl<T> Default for MichelsonList<T> {
 
 /// Owning iterator for [MichelsonList]. Holds the list and unconses one
 /// element per step, so nothing is materialised up front and each yielded
-/// `Rc` is released by the list as it is handed out.
-pub struct IntoIter<T>(MichelsonList<Rc<T>>);
+/// handle is released by the list as it is handed out.
+pub struct IntoIter<'a>(MichelsonList<RcTypedValue<'a>>);
 
-impl<T> Iterator for IntoIter<T> {
-    type Item = Rc<T>;
+impl<'a> Iterator for IntoIter<'a> {
+    type Item = RcTypedValue<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.uncons()
@@ -83,7 +83,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> ExactSizeIterator for IntoIter<T> {}
+impl ExactSizeIterator for IntoIter<'_> {}
 
 /// Non-owning iterator for [MichelsonList].
 //
@@ -110,16 +110,16 @@ impl<T> ExactSizeIterator for Iter<'_, T> {}
 /// Iterating from the tail is free: the backing `Vec` is already stored
 /// tail-first, so [Iter] is a `Rev` over it. Lets a caller that must queue the
 /// elements onto a LIFO worklist push them back-to-front without collecting
-/// them first (see [`crate::ast::TypedValue::update_big_maps`]).
+/// them first (see [`TypedValue::update_big_maps`]).
 impl<T> DoubleEndedIterator for Iter<'_, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
     }
 }
 
-impl<T> IntoIterator for MichelsonList<Rc<T>> {
-    type IntoIter = IntoIter<T>;
-    type Item = Rc<T>;
+impl<'a> IntoIterator for MichelsonList<RcTypedValue<'a>> {
+    type IntoIter = IntoIter<'a>;
+    type Item = RcTypedValue<'a>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self)
     }
@@ -140,11 +140,11 @@ impl<T> From<Vec<T>> for MichelsonList<T> {
     }
 }
 
-/// Construct a `MichelsonList<Rc<T>>` from `Vec<T>`. O(n).
-impl<T> From<Vec<T>> for MichelsonList<std::rc::Rc<T>> {
-    fn from(mut value: Vec<T>) -> Self {
+/// Construct a `MichelsonList<RcTypedValue>` from `Vec<TypedValue>`. O(n).
+impl<'a> From<Vec<TypedValue<'a>>> for MichelsonList<RcTypedValue<'a>> {
+    fn from(mut value: Vec<TypedValue<'a>>) -> Self {
         value.reverse();
-        MichelsonList(value.into_iter().map(std::rc::Rc::new).collect())
+        MichelsonList(value.into_iter().map(RcTypedValue::new).collect())
     }
 }
 
@@ -155,9 +155,10 @@ impl<T> FromIterator<T> for MichelsonList<T> {
     }
 }
 
-/// Construct a `MichelsonList<Rc<T>>` from an iterator. O(n).
-impl<T> FromIterator<T> for MichelsonList<std::rc::Rc<T>> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+/// Construct a `MichelsonList<RcTypedValue>` from an iterator over
+/// `TypedValue`. O(n).
+impl<'a> FromIterator<TypedValue<'a>> for MichelsonList<RcTypedValue<'a>> {
+    fn from_iter<I: IntoIterator<Item = TypedValue<'a>>>(iter: I) -> Self {
         MichelsonList::from(Vec::from_iter(iter))
     }
 }
@@ -183,25 +184,28 @@ mod tests {
 
     #[test]
     fn uncons() {
-        let mut lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
-        assert_eq!(lst.uncons(), Some(Rc::new(1)));
-        assert_eq!(lst.uncons(), Some(Rc::new(2)));
-        assert_eq!(lst.uncons(), Some(Rc::new(3)));
+        let mut lst = MichelsonList::from(ints(1..=3));
+        assert_eq!(lst.uncons(), Some(RcTypedValue::new(TypedValue::int(1))));
+        assert_eq!(lst.uncons(), Some(RcTypedValue::new(TypedValue::int(2))));
+        assert_eq!(lst.uncons(), Some(RcTypedValue::new(TypedValue::int(3))));
         assert_eq!(lst.uncons(), None);
     }
 
     #[test]
     fn into_iter() {
-        let lst = MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]);
+        let lst = MichelsonList::from(ints(1..=3));
         assert_eq!(
             lst.into_iter().collect::<Vec<_>>(),
-            vec![Rc::new(1), Rc::new(2), Rc::new(3)]
+            ints(1..=3)
+                .into_iter()
+                .map(RcTypedValue::new)
+                .collect::<Vec<_>>()
         );
 
         // The list drops each element as it hands it out, so the caller gets
         // sole ownership.
-        for elt in MichelsonList::<Rc<i32>>::from(vec![1, 2, 3]) {
-            assert_eq!(Rc::strong_count(&elt), 1);
+        for elt in MichelsonList::from(ints(1..=3)) {
+            assert_eq!(elt.strong_count(), 1);
         }
     }
 
@@ -220,13 +224,13 @@ mod tests {
 
     #[test]
     fn drain_owned_yields_every_element_of_a_sole_owner() {
-        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+        let list = MichelsonList::<RcTypedValue>::from_iter(ints(0..N));
         assert_eq!(list.drain_owned().count(), N as usize);
     }
 
     #[test]
     fn drain_owned_yields_nothing_of_a_shared_list() {
-        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+        let list = MichelsonList::<RcTypedValue>::from_iter(ints(0..N));
 
         // Required for the test, even if list isn't used, we still need to clone
         // to show shared.drain_owned does not traverse anything
@@ -245,10 +249,10 @@ mod tests {
     /// freeing, against the flat price of `CONS`.
     #[test]
     fn drain_owned_of_a_transient_does_not_scale_with_length() {
-        let list = MichelsonList::<Rc<i32>>::from_iter(0..N);
+        let list = MichelsonList::from_iter(ints(0..N));
 
         let mut transient = list.clone();
-        transient.cons(Rc::new(-1));
+        transient.cons(RcTypedValue::new(TypedValue::int(-1)));
 
         // Only the freshly consed element is exclusively the transient's; the
         // rest are still held by `list`. In particular this must not grow with
@@ -262,4 +266,10 @@ mod tests {
     /// Long enough that a per-element walk is unmistakable against an
     /// ownership-bounded one.
     const N: i32 = 10_000;
+
+    /// The lists here hold `RcTypedValue`, so the fixtures are `Int` values
+    /// rather than bare integers.
+    fn ints(range: impl IntoIterator<Item = i32>) -> Vec<TypedValue<'static>> {
+        range.into_iter().map(TypedValue::int).collect()
+    }
 }

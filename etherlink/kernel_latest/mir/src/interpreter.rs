@@ -385,7 +385,7 @@ impl<'a> ContractScript<'a> {
 
         let mut ops = Vec::with_capacity(vec.len());
         for op in vec {
-            let mut op = TypedValue::unwrap_rc(op.into());
+            let mut op = TypedValue::unwrap_rc(op);
             match &mut op {
                 V::Operation(op) => ops.push(*std::mem::take(op)),
                 _ => {
@@ -546,7 +546,7 @@ enum InterpFrame<'a, 'b> {
     },
     IterList {
         body: CodeRef<'a, 'b>,
-        remaining: michelson_list::IntoIter<TypedValue<'a>>,
+        remaining: michelson_list::IntoIter<'a>,
     },
     IterSet {
         body: CodeRef<'a, 'b>,
@@ -558,8 +558,8 @@ enum InterpFrame<'a, 'b> {
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
-        remaining: michelson_list::IntoIter<TypedValue<'a>>,
-        acc: Vec<Rc<TypedValue<'a>>>,
+        remaining: michelson_list::IntoIter<'a>,
+        acc: Vec<RcTypedValue<'a>>,
     },
     MapOptionAfter,
     MapMapAccum {
@@ -596,7 +596,7 @@ enum StepResult<'a, 'b> {
     OpenLoopLeft(CodeRef<'a, 'b>),
     OpenIterList {
         body: CodeRef<'a, 'b>,
-        iter: michelson_list::IntoIter<TypedValue<'a>>,
+        iter: michelson_list::IntoIter<'a>,
     },
     OpenIterSet {
         body: CodeRef<'a, 'b>,
@@ -608,7 +608,7 @@ enum StepResult<'a, 'b> {
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
-        iter: michelson_list::IntoIter<TypedValue<'a>>,
+        iter: michelson_list::IntoIter<'a>,
     },
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
@@ -807,9 +807,7 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
     for frame in frames {
         match frame {
             InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
-            InterpFrame::IterList { remaining, .. } => {
-                pending.extend(remaining.map(Into::into))
-            }
+            InterpFrame::IterList { remaining, .. } => pending.extend(remaining),
             InterpFrame::IterSet { remaining, .. } => {
                 pending.extend(remaining.map(Into::into))
             }
@@ -820,8 +818,8 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
                 }
             }
             InterpFrame::MapListAccum { remaining, acc, .. } => {
-                pending.extend(remaining.map(Into::into));
-                pending.extend(acc.into_iter().map(Into::into));
+                pending.extend(remaining);
+                pending.extend(acc);
             }
             InterpFrame::MapMapAccum {
                 remaining,
@@ -1090,7 +1088,7 @@ fn run_interp_driver<'a, 'b>(
                 // The body just finished; its result is on top of the stack.
                 let stk = active_stack_mut(stacks)?;
                 let result = pop_value(stk)?;
-                acc.push(result.into());
+                acc.push(result);
                 if let Some(elem) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     stk.push(elem);
@@ -2763,7 +2761,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CONS)?;
             let elt = pop_rc!();
             let mut lst = pop!(V::List);
-            lst.cons(elt.into());
+            lst.cons(elt);
             stack.push(V::List(lst));
         }
         I::Concat(overload) => match overload {
@@ -4186,7 +4184,7 @@ mod interpreter_tests {
     /// Companion to [`drain_deep_value_stack_does_not_overflow`] for the
     /// control-flow worklist: every `InterpFrame` variant that owns runtime
     /// values is given a deep one, then `drain_value_frames` must flatten them
-    /// all without the recursive `Rc<TypedValue>` destructor overflowing the
+    /// all without the recursive `RcTypedValue` destructor overflowing the
     /// ~1 MiB worker stack. This is the value carried on the error-unwind path
     /// by a `DIP`-protected comb or an in-flight `ITER`/`MAP` (L2-1446).
     #[test]
@@ -4200,7 +4198,7 @@ mod interpreter_tests {
                     for _ in 0..DEPTH {
                         d = V::new_pair(V::int(0), d);
                     }
-                    Rc::new(d)
+                    RcTypedValue::new(d)
                 };
                 let empty: &[Instruction] = &[];
                 let body = || empty;
@@ -4215,11 +4213,11 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterSet {
                         body: body(),
-                        remaining: vec![deep()].into_iter(),
+                        remaining: vec![deep().into()].into_iter(),
                     },
                     InterpFrame::IterMap {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
+                        remaining: vec![(Rc::new(V::int(0)), deep().into())].into_iter(),
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
@@ -4228,9 +4226,9 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapMapAccum {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
-                        acc: [(Rc::new(V::int(0)), deep())].into_iter().collect(),
-                        current_key: Some(deep()),
+                        remaining: vec![(Rc::new(V::int(0)), deep().into())].into_iter(),
+                        acc: [(Rc::new(V::int(0)), deep().into())].into_iter().collect(),
+                        current_key: Some(deep().into()),
                     },
                 ];
                 drain_value_frames(frames);

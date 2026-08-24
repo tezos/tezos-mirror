@@ -859,7 +859,7 @@ impl<'a> TypedValue<'a> {
             /// Pops 1.
             BuildOption,
             /// Pops one per element, in element order.
-            BuildList(&'b MichelsonList<Rc<TypedValue<'a>>>),
+            BuildList(&'b MichelsonList<RcTypedValue<'a>>),
             /// Pops one per entry, in ascending key order.
             BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
             /// Pops 1: the transfer parameter.
@@ -1008,7 +1008,7 @@ impl<'a> TypedValue<'a> {
                         List(l) => {
                             frames.push(Frame::BuildList(l));
                             for x in l.iter().rev() {
-                                push_child_raw(&mut frames, x);
+                                push_child(&mut frames, x);
                             }
                         }
                         Set(_) => {
@@ -1094,12 +1094,10 @@ impl<'a> TypedValue<'a> {
                         results.truncate(at);
                         results.push(None);
                     } else {
-                        let new: Vec<Rc<TypedValue<'a>>> = orig
+                        let new: Vec<RcTypedValue<'a>> = orig
                             .iter()
                             .zip(results.drain(at..))
-                            .map(|(x, new_x)| {
-                                new_x.map(Rc::from).unwrap_or_else(|| x.clone())
-                            })
+                            .map(|(x, new_x)| new_x.unwrap_or_else(|| x.clone()))
                             .collect();
                         results.push(Some(RcTypedValue::new(List(new.into()))));
                     }
@@ -1915,7 +1913,9 @@ mod review_verification {
                 TypedValue::new_pair(
                     TypedValue::Option(Some(RcTypedValue::new(bm(3)))),
                     TypedValue::new_pair(
-                        TypedValue::List(MichelsonList::from(vec![Rc::new(bm(4))])),
+                        TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(
+                            bm(4),
+                        )])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
                             Rc::new(TypedValue::int(0)),
                             Rc::new(bm(5)),
@@ -1967,9 +1967,9 @@ mod review_verification {
         };
         // One payload, three operations — the `DUP`ed `list operation` shape.
         let mut root = TypedValue::List(MichelsonList::from(vec![
-            Rc::new(transfer(payload.clone(), 0)),
-            Rc::new(transfer(payload.clone(), 1)),
-            Rc::new(transfer(payload.clone(), 2)),
+            RcTypedValue::new(transfer(payload.clone(), 0)),
+            RcTypedValue::new(transfer(payload.clone(), 1)),
+            RcTypedValue::new(transfer(payload.clone(), 2)),
         ]));
         let shared_before = Rc::strong_count(&payload);
 
@@ -2006,7 +2006,7 @@ mod review_verification {
     /// value equality, which a deep copy would still satisfy.
     #[test]
     fn walk_leaves_big_map_free_subtrees_shared() {
-        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        let shared = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 64]));
         // The value shape of the L2-1831 reproduction: one operation `DUP`ed
         // into a three-element `list operation`, all three elements pointing
         // at a single allocation.
@@ -2015,14 +2015,14 @@ mod review_verification {
             shared.clone(),
             shared.clone(),
         ]));
-        let strong_before = Rc::strong_count(&shared);
+        let strong_before = shared.strong_count();
 
         let mut visited = 0;
         walk_big_maps(&mut root, &mut |_| visited += 1);
 
         assert_eq!(visited, 0, "no big map to visit");
         assert_eq!(
-            Rc::strong_count(&shared),
+            shared.strong_count(),
             strong_before,
             "the walk copied a big-map-free subtree"
         );
@@ -2030,7 +2030,7 @@ mod review_verification {
             panic!("root is no longer a list")
         };
         for element in elements.iter() {
-            assert!(Rc::ptr_eq(element, &shared));
+            assert!(element.ptr_eq(&shared));
         }
     }
 
@@ -2073,8 +2073,8 @@ mod review_verification {
                     TypedValue::Option(Some(RcTypedValue::new(bm(3)))),
                     TypedValue::new_pair(
                         TypedValue::List(MichelsonList::from(vec![
-                            Rc::new(bm(4)),
-                            Rc::new(operation_carrying(bm(5))),
+                            RcTypedValue::new(bm(4)),
+                            RcTypedValue::new(operation_carrying(bm(5))),
                         ])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
                             Rc::new(TypedValue::int(0)),
@@ -2129,7 +2129,7 @@ mod review_verification {
         }
         fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
-                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+                TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(acc)]))
             })
         }
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
@@ -2192,7 +2192,7 @@ mod review_verification {
         }
         fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
-                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+                TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(acc)]))
             })
         }
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
@@ -2238,7 +2238,7 @@ mod review_verification {
     fn walk_updates_big_maps_under_a_shared_spine() {
         let big_map = leaf_big_map;
         let shared_payload = RcTypedValue::new(TypedValue::Bytes(vec![0xcd; 64]));
-        let shared_spine = Rc::new(TypedValue::new_pair_rc(
+        let shared_spine = RcTypedValue::new(TypedValue::new_pair_rc(
             RcTypedValue::new(big_map(7)),
             shared_payload.clone(),
         ));
@@ -2285,14 +2285,14 @@ mod review_verification {
     /// `DUP; NIL t; SWAP; CONS; SWAP; CONS` repeated. `LEVELS` nodes, `2^LEVELS`
     /// occurrences.
     fn shared_dag(leaf: TypedValue<'static>, levels: usize) -> TypedValue<'static> {
-        let mut node = Rc::new(leaf);
+        let mut node = RcTypedValue::new(leaf);
         for _ in 0..levels {
-            node = Rc::new(TypedValue::List(MichelsonList::from(vec![
+            node = RcTypedValue::new(TypedValue::List(MichelsonList::from(vec![
                 node.clone(),
                 node,
             ])));
         }
-        TypedValue::unwrap_rc(node.into())
+        TypedValue::unwrap_rc(node)
     }
 
     /// A value's in-memory DAG can unfold to a tree exponentially larger than
@@ -2512,7 +2512,7 @@ mod review_verification {
         };
         let mut root = TypedValue::List(MichelsonList::from(
             (0..WIDTH)
-                .map(|i| Rc::new(TypedValue::int(i as i64)))
+                .map(|i| RcTypedValue::new(TypedValue::int(i as i64)))
                 .collect::<Vec<_>>(),
         ));
 
@@ -2531,11 +2531,11 @@ mod review_verification {
     /// exercised — a big map at either end would leave one of them empty.
     #[test]
     fn walk_carries_over_unchanged_list_elements() {
-        let first = Rc::new(TypedValue::Bytes(vec![0x01; 32]));
-        let last = Rc::new(TypedValue::Bytes(vec![0x02; 32]));
+        let first = RcTypedValue::new(TypedValue::Bytes(vec![0x01; 32]));
+        let last = RcTypedValue::new(TypedValue::Bytes(vec![0x02; 32]));
         let mut root = TypedValue::List(MichelsonList::from(vec![
             first.clone(),
-            Rc::new(leaf_big_map(5)),
+            RcTypedValue::new(leaf_big_map(5)),
             last.clone(),
         ]));
 
@@ -2553,8 +2553,8 @@ mod review_verification {
         };
         let elements: Vec<_> = elements.iter().collect();
         assert_eq!(elements.len(), 3, "the rebuild changed the list length");
-        assert!(Rc::ptr_eq(elements[0], &first), "the prefix was copied");
-        assert!(Rc::ptr_eq(elements[2], &last), "the suffix was copied");
+        assert!(elements[0].ptr_eq(&first), "the prefix was copied");
+        assert!(elements[2].ptr_eq(&last), "the suffix was copied");
         let mut ids = vec![];
         root.view_big_map_ids(&mut ids);
         assert_eq!(ids, vec![BigMapId::from(50)]);

@@ -766,7 +766,7 @@ pub enum TypedValue<'a> {
     Unit,
     Pair(RcTypedValue<'a>, RcTypedValue<'a>),
     Option(Option<RcTypedValue<'a>>),
-    List(MichelsonList<Rc<Self>>),
+    List(MichelsonList<RcTypedValue<'a>>),
     Set(RedBlackTreeSet<Rc<Self>>),
     Map(RedBlackTreeMap<Rc<Self>, Rc<Self>>),
     BigMap(BigMap<'a>),
@@ -1027,10 +1027,7 @@ pub(crate) enum DebugFrame<'b, 'a: 'b> {
         bool,
     ),
     SetEntries(std::vec::IntoIter<&'b Rc<TypedValue<'a>>>, bool),
-    ListEntries(
-        crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>,
-        bool,
-    ),
+    ListEntries(crate::ast::michelson_list::Iter<'b, RcTypedValue<'a>>, bool),
 }
 
 pub(crate) fn debug_fmt_walk<'a, 'b>(
@@ -1468,7 +1465,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     TV::List(l) => {
                         let mut elems: Vec<TypedValue<'a>> = std::mem::take(l)
                             .into_iter()
-                            .map(|x| TypedValue::unwrap_rc(x.into()))
+                            .map(TypedValue::unwrap_rc)
                             .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1781,7 +1778,7 @@ impl<'a> TypedValue<'a> {
 
         enum Frame<'v, 'a> {
             Visit(&'v TypedValue<'a>),
-            ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
+            ListNext(michelson_list::Iter<'v, RcTypedValue<'a>>),
             SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
             MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
             /// A big map's in-memory entries. Distinct from [Frame::MapNext]
@@ -2170,8 +2167,8 @@ impl<'a> TypedValue<'a> {
     }
 }
 
-/// Drains nested `Rc<TypedValue>` children iteratively, so the recursive
-/// `Rc<TypedValue>` destructor chain of a potentially deep value (e.g. a comb
+/// Drains nested `RcTypedValue` children iteratively, so the recursive
+/// `RcTypedValue` destructor chain of a potentially deep value (e.g. a comb
 /// of `Pair (Pair (... (Pair Int Int)))`) does not blow the WASM stack.
 ///
 /// Since L2-1672, [`TypedValue`] has an `impl Drop` that runs exactly this
@@ -2186,7 +2183,7 @@ impl<'a> TypedValue<'a> {
 /// A node on the unified drop worklist. Dropping a [`TypedValue`] and dropping
 /// an [`Instruction`] are mutually recursive across the `TypedValue` <->
 /// `Instruction` boundary: a `Closure::Lambda`'s body is `Rc<[Instruction]>`,
-/// and an `Instruction::Push` carries an `Rc<TypedValue>`. Draining each kind
+/// and an `Instruction::Push` carries an `RcTypedValue`. Draining each kind
 /// on its own worklist still crosses that boundary on the native stack — an
 /// alternating `Pair … (lambda { PUSH (pair … (lambda …)) … ; DROP })` value
 /// (which the iterative typecheck of L2-1663 now accepts up to the 10000-deep
@@ -2324,7 +2321,7 @@ macro_rules! take_out_via_default_generic {
 take_out_via_default_generic!(
     RcTypedValue<'a>,
     Option<RcTypedValue<'a>>,
-    MichelsonList<Rc<TypedValue<'a>>>,
+    MichelsonList<RcTypedValue<'a>>,
     RedBlackTreeSet<Rc<TypedValue<'a>>>,
     RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
     Or<RcTypedValue<'a>, RcTypedValue<'a>>,
@@ -2359,7 +2356,7 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
         }
         TV::List(l) => {
             for rc in take(l).drain_owned() {
-                push_rc(rc.into(), stack);
+                push_rc(rc, stack);
             }
         }
         TV::Set(s) => {
@@ -2862,7 +2859,7 @@ pub mod test_strategies {
             T::List(t) => prop::collection::vec(typed_value_by_type(t), 0..=3)
                 .prop_map(|x| {
                     V::List(MichelsonList::from(
-                        x.into_iter().map(Rc::new).collect::<Vec<_>>(),
+                        x.into_iter().map(RcTypedValue::new).collect::<Vec<_>>(),
                     ))
                 })
                 .boxed(),
@@ -3197,8 +3194,8 @@ mod test_untypers {
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
             in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
             TypedValue::List(MichelsonList::from(vec![
-                Rc::new(from_id(vec![])),
-                shared.clone(),
+                RcTypedValue::new(from_id(vec![])),
+                shared.clone().into(),
             ])),
         ));
     }
@@ -3228,22 +3225,24 @@ mod test_untypers {
         // where each inner list is shared via Rc.
         // With depth d and width w, this creates w^d virtual entries but only
         // O(w*d) actual allocations due to Rc sharing.
-        let unit_list = Rc::new(TypedValue::List(MichelsonList::from(
-            vec![] as Vec<Rc<TypedValue>>
+        let unit_list = RcTypedValue::new(TypedValue::List(MichelsonList::from(
+            vec![] as Vec<RcTypedValue>
         )));
 
         // Build (list unit) with 1000 shared references to the same empty list
-        let inner_lists: Vec<Rc<TypedValue>> =
+        let inner_lists: Vec<RcTypedValue> =
             (0..1000).map(|_| unit_list.clone()).collect();
-        let inner_list = Rc::new(TypedValue::List(MichelsonList::from(inner_lists)));
+        let inner_list =
+            RcTypedValue::new(TypedValue::List(MichelsonList::from(inner_lists)));
 
         // Build (list (list unit)) with 1000 shared references to the same (list unit)
-        let middle_lists: Vec<Rc<TypedValue>> =
+        let middle_lists: Vec<RcTypedValue> =
             (0..1000).map(|_| inner_list.clone()).collect();
-        let middle_list = Rc::new(TypedValue::List(MichelsonList::from(middle_lists)));
+        let middle_list =
+            RcTypedValue::new(TypedValue::List(MichelsonList::from(middle_lists)));
 
         // Build (list (list (list unit))) with 1000 shared references
-        let outer_lists: Vec<Rc<TypedValue>> =
+        let outer_lists: Vec<RcTypedValue> =
             (0..1000).map(|_| middle_list.clone()).collect();
         let outer_list = TypedValue::List(MichelsonList::from(outer_lists));
 

@@ -4875,11 +4875,11 @@ enum TvFrame<'a, 'b> {
     BuildSome,
     /// Pop a `TV::Address`, resolve a `Contract` at this type.
     BuildContract { contract_ty: Rc<Type> },
-    /// List element iteration: one `Rc<TypedValue>` per remaining child.
+    /// List element iteration: one `RcTypedValue` per remaining child.
     ListAccum {
         remaining: &'b [Micheline<'a>],
         elem_t: Type,
-        acc: Vec<Rc<TypedValue<'a>>>,
+        acc: Vec<RcTypedValue<'a>>,
     },
     /// Set element iteration with ordering check.
     SetAccum {
@@ -5204,7 +5204,7 @@ fn step_typecheck_value<'a, 'b>(
                     expected: "list elem",
                 },
             ))?;
-            acc.push(Rc::new(elem));
+            acc.push(RcTypedValue::new(elem));
             if let Some((next, rest)) = remaining.split_first() {
                 frames.push(TvFrame::ListAccum {
                     remaining: rest,
