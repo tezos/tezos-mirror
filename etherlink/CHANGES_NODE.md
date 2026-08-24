@@ -7,6 +7,38 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.65 (2026-08-24)
+
+This new release notably brings several improvements for the Michelson runtime,
+with new and fixed RPCs.
+
+This release will not apply any migration to the node’s store (version
+24), meaning it is possible to downgrade to previous versions.
+
+### RPCs changes
+
+- The Michelson runtime's `version` RPC now reports the node's own version and
+  commit, and a chain name identifying the network it follows. `octez-client`
+  uses that chain name to pick its disclaimer, and shows the Mainnet one on
+  Mainnet. (!22765)
+- The vestigial level-0/1 genesis protocol mock is removed; blocks are now always
+  decoded with their real protocol. (!22757)
+- Added the `run_script_view` RPC
+  (`POST /tezlink/chains/main/blocks/<block>/helpers/scripts/run_script_view`),
+  a port of the L1 helper: it simulates a call to a Michelson view and
+  returns the value it produces. (!22652 !22689)
+- The Michelson-runtime RPCs served through a kernel entrypoint —
+  `run_script_view`, and `/script` and `/entrypoints` on an enshrined
+  contract — now report an explicit error naming the entrypoint and the
+  storage version when the kernel running at the requested block is too
+  old to expose it, instead of failing as if the kernel had answered
+  nothing. (!22652)
+
+### Command-line interface changes
+
+- Fix `run observer --network previewnet` not being able to replay Tezos X
+  Previewnet from genesis. (!22695)
+
 ## Version 0.64 (2026-07-30)
 
 This new release notably add minimal support for the incoming next Etherlink
