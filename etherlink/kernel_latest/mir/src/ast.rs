@@ -1560,7 +1560,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     tt.destination_address,
                                 )));
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    tt.param.into(),
+                                    tt.param,
                                 )));
                             }
                             Operation::SetDelegate(sd) => {
@@ -1593,7 +1593,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     tag: em.tag,
                                 });
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    em.value.into(),
+                                    em.value,
                                 )));
                             }
                             Operation::CreateContract(cc) => {
@@ -1620,7 +1620,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     mutez_mich,
                                 });
                                 frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    cc.storage.into(),
+                                    cc.storage,
                                 )));
                             }
                         }
@@ -2419,13 +2419,9 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             // value, originated storage) that may be deep; drain them. They are
             // `Rc`-shared, so only the last owner actually drains one.
             match &mut info.operation {
-                Operation::TransferTokens(tt) => {
-                    push_rc(take(&mut tt.param).into(), stack)
-                }
-                Operation::Emit(e) => push_rc(take(&mut e.value).into(), stack),
-                Operation::CreateContract(c) => {
-                    push_rc(take(&mut c.storage).into(), stack)
-                }
+                Operation::TransferTokens(tt) => push_rc(take(&mut tt.param), stack),
+                Operation::Emit(e) => push_rc(take(&mut e.value), stack),
+                Operation::CreateContract(c) => push_rc(take(&mut c.storage), stack),
                 Operation::SetDelegate(_) => {}
             }
         }
@@ -3173,16 +3169,16 @@ mod test_untypers {
 
         // Nested under containers, and beside a shared leaf — the shape the
         // fix exists for.
-        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 32]));
+        let shared = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 32]));
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair_rc(
-            shared.clone().into(),
-            shared.clone().into(),
+            shared.clone(),
+            shared.clone(),
         ));
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
             in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
             TypedValue::List(MichelsonList::from(vec![
                 RcTypedValue::new(from_id(vec![])),
-                shared.clone().into(),
+                shared.clone(),
             ])),
         ));
     }
@@ -3254,7 +3250,7 @@ mod test_untypers {
             TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag,
-                    value: Rc::new(TypedValue::Unit),
+                    value: RcTypedValue::new(TypedValue::Unit),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3483,7 +3479,7 @@ mod drop_safety {
             let mut tv = TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag: None,
-                    value: Rc::new(deep_pair(DEPTH)),
+                    value: RcTypedValue::new(deep_pair(DEPTH)),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,

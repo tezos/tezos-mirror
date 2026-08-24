@@ -1161,7 +1161,7 @@ where
                             // a `DUP`ed operation hold the same payload, so
                             // `unwrap_rc` here would deep-copy it, unmetered
                             // and before anything charges for it (L2-1836).
-                            storage.into(),
+                            storage,
                             &Origin::Native,
                         );
                         match receipt {

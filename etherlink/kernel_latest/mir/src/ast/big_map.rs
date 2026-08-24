@@ -11,7 +11,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
     mem,
-    rc::Rc,
 };
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
@@ -926,18 +925,6 @@ impl<'a> TypedValue<'a> {
             frames.push(Frame::Visit(child.as_ref()));
         }
 
-        /// [push_child] for the container payloads still spelled
-        /// `Rc<TypedValue>`; removed once those move to [RcTypedValue].
-        fn push_child_raw<'b, 'a>(
-            frames: &mut Vec<Frame<'b, 'a>>,
-            child: &'b Rc<TypedValue<'a>>,
-        ) {
-            if Rc::strong_count(child) > 1 {
-                frames.push(Frame::Memoize(Rc::as_ptr(child)));
-            }
-            frames.push(Frame::Visit(child.as_ref()));
-        }
-
         /// Wraps a rebuilt operation back up, carrying the nonce over.
         fn rebuilt_operation<'a>(
             op: &OperationInfo<'a>,
@@ -1046,7 +1033,7 @@ impl<'a> TypedValue<'a> {
                         Operation(op) => match &op.operation {
                             crate::ast::Operation::TransferTokens(t) => {
                                 frames.push(Frame::BuildTransferTokens(op, t));
-                                push_child_raw(&mut frames, &t.param);
+                                push_child(&mut frames, &t.param);
                             }
                             crate::ast::Operation::SetDelegate(_) => results.push(None),
                             crate::ast::Operation::Emit(_) => {
@@ -1055,7 +1042,7 @@ impl<'a> TypedValue<'a> {
                             }
                             crate::ast::Operation::CreateContract(cc) => {
                                 frames.push(Frame::BuildCreateContract(op, cc));
-                                push_child_raw(&mut frames, &cc.storage);
+                                push_child(&mut frames, &cc.storage);
                             }
                         },
                     }
@@ -1128,9 +1115,9 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::TransferTokens(TransferTokens {
-                                // Already shared, and freshly built: stored
+                                // Already an `Rc`, and freshly built: stored
                                 // as is, no unwrap and no copy.
-                                param: param.into(),
+                                param,
                                 destination_address: t.destination_address.clone(),
                                 amount: t.amount,
                             }),
@@ -1144,7 +1131,7 @@ impl<'a> TypedValue<'a> {
                         rebuilt_operation(
                             op,
                             crate::ast::Operation::CreateContract(CreateContract {
-                                storage: storage.into(),
+                                storage,
                                 delegate: cc.delegate.clone(),
                                 amount: cc.amount,
                                 code: cc.code.clone(),
@@ -1833,6 +1820,7 @@ mod review_verification {
     use super::*;
     use crate::ast::{CreateContract, MichelsonList, Or, TransferTokens, Type};
     use rpds::RedBlackTreeSet;
+    use std::rc::Rc;
 
     /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
     /// keys off, with no overlay to complicate what a rebuild has to preserve.
@@ -1952,8 +1940,8 @@ mod review_verification {
     /// per operation.
     #[test]
     fn walk_leaves_shared_operation_payloads_shared() {
-        let payload = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
-        let transfer = |param: Rc<TypedValue<'static>>, counter| {
+        let payload = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 64]));
+        let transfer = |param: RcTypedValue<'static>, counter| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
                     param,
@@ -1973,14 +1961,14 @@ mod review_verification {
             RcTypedValue::new(transfer(payload.clone(), 1)),
             RcTypedValue::new(transfer(payload.clone(), 2)),
         ]));
-        let shared_before = Rc::strong_count(&payload);
+        let shared_before = payload.strong_count();
 
         walk_big_maps(&mut root, &mut |_| {
             panic!("the value holds no big map, so `f` must not be called")
         });
 
         assert_eq!(
-            Rc::strong_count(&payload),
+            payload.strong_count(),
             shared_before,
             "the walk copied a shared operation payload"
         );
@@ -1995,7 +1983,7 @@ mod review_verification {
                 panic!("element is no longer a transfer")
             };
             assert!(
-                Rc::ptr_eq(&t.param, &payload),
+                t.param.ptr_eq(&payload),
                 "an operation's payload was replaced by a copy"
             );
         }
@@ -2052,7 +2040,7 @@ mod review_verification {
         let operation_carrying = |inner: TypedValue<'static>| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
-                    param: Rc::new(inner),
+                    param: RcTypedValue::new(inner),
                     destination_address:
                         crate::ast::michelson_address::Address::try_from(
                             "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
@@ -2674,7 +2662,7 @@ mod review_verification {
         .unwrap();
         let mut root = TypedValue::new_operation(
             crate::ast::Operation::TransferTokens(TransferTokens {
-                param: Rc::new(leaf_big_map(3)),
+                param: RcTypedValue::new(leaf_big_map(3)),
                 destination_address: destination.clone(),
                 amount: 123_456,
             }),
@@ -2730,7 +2718,7 @@ mod review_verification {
             crate::ast::Operation::CreateContract(CreateContract {
                 delegate: Some(delegate.clone()),
                 amount: 999,
-                storage: Rc::new(leaf_big_map(4)),
+                storage: RcTypedValue::new(leaf_big_map(4)),
                 code: code.clone(),
                 micheline_code: &micheline_code,
                 address: address.clone(),

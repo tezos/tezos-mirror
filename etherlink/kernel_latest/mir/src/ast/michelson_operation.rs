@@ -6,7 +6,9 @@
 
 use std::rc::Rc;
 
-use super::{Address, ContractScript, FieldAnnotation, Micheline, Or, Type, TypedValue};
+use super::{
+    Address, ContractScript, FieldAnnotation, Micheline, Or, RcTypedValue, Type,
+};
 use tezos_crypto_rs::{hash::ContractKt1Hash, public_key_hash::PublicKeyHash};
 
 /// Representation of token transfer operation, created by `TRANSFER_TOKENS`
@@ -20,7 +22,7 @@ pub struct TransferTokens<'a> {
     /// be `DUP`ed into the returned operation list several times; storing the
     /// parameter inline made every such clone a full copy of it, enough to
     /// exhaust the kernel's `wasm32` heap (L2-1831).
-    pub param: Rc<TypedValue<'a>>,
+    pub param: RcTypedValue<'a>,
     /// Transfer destination.
     pub destination_address: Address,
     /// Transfer amount.
@@ -39,7 +41,7 @@ pub struct Emit<'a> {
     /// Event value.
     ///
     /// Shared behind an [Rc], see [TransferTokens::param].
-    pub value: Rc<TypedValue<'a>>,
+    pub value: RcTypedValue<'a>,
 
     /// Event type.
     ///
@@ -64,7 +66,7 @@ pub struct CreateContract<'a> {
     /// Contract's initial storage.
     ///
     /// Shared behind an [Rc], see [TransferTokens::param].
-    pub storage: Rc<TypedValue<'a>>,
+    pub storage: RcTypedValue<'a>,
     /// Contract's typechecked code.
     pub code: Rc<ContractScript<'a>>,
     /// Raw [Micheline] representation of the contract's code. The operation

@@ -3114,7 +3114,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::TRANSFER_TOKENS)?;
             stack.push(V::new_operation(
                 Operation::TransferTokens(TransferTokens {
-                    param: param.into(),
+                    param,
                     amount: mutez_amount,
                     destination_address: contract_address,
                 }),
@@ -3470,7 +3470,7 @@ fn interpret_one<'a>(
             stack.push(TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: tag.clone(),
-                    value: emit_val.into(),
+                    value: emit_val,
                     arg_ty: arg_ty.clone(),
                 }),
                 counter,
@@ -3546,7 +3546,7 @@ fn interpret_one<'a>(
                 Operation::CreateContract(CreateContract {
                     delegate: opt_keyhash,
                     amount,
-                    storage: storage.into(),
+                    storage,
                     code: cs.clone(), // This clone is cheap since it is an Rc.
                     micheline_code: micheline,
                     address,
@@ -7820,7 +7820,7 @@ mod interpreter_tests {
     #[test]
     fn transfer_tokens() {
         let tt = super::TransferTokens {
-            param: Rc::new(TypedValue::nat(42)),
+            param: RcTypedValue::new(TypedValue::nat(42)),
             destination_address: addr::Address::try_from(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
             )
@@ -9459,7 +9459,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: Rc::new(TypedValue::nat(20)),
+                    value: RcTypedValue::new(TypedValue::nat(20)),
                     arg_ty: Left(Type::Nat)
                 }),
                 100
@@ -9494,7 +9494,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: Rc::new(TypedValue::nat(20)),
+                    value: RcTypedValue::new(TypedValue::nat(20)),
                     arg_ty: Or::Right(emit_type_mich)
                 }),
                 100
@@ -10643,7 +10643,7 @@ mod interpreter_tests {
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: Rc::new(TypedValue::Unit),
+                storage: RcTypedValue::new(TypedValue::Unit),
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -10715,7 +10715,7 @@ mod interpreter_tests {
             )
             .unwrap();
 
-        let params: Vec<Rc<TypedValue>> = ops
+        let params: Vec<RcTypedValue> = ops
             .map(|op| match op.operation {
                 Operation::TransferTokens(tt) => tt.param,
                 other => panic!("expected TransferTokens, got {other:?}"),
@@ -10723,7 +10723,7 @@ mod interpreter_tests {
             .collect();
         assert_eq!(params.len(), 2);
         assert!(
-            Rc::ptr_eq(&params[0], &params[1]),
+            params[0].ptr_eq(&params[1]),
             "the duplicated operation's parameter was copied"
         );
     }

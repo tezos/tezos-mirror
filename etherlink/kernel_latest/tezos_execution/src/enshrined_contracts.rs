@@ -617,7 +617,7 @@ fn dispatch_callback<'a>(
     let counter = ctx.operation_counter();
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
-            param: Rc::new(TypedValue::Bytes(response_body)),
+            param: RcTypedValue::new(TypedValue::Bytes(response_body)),
             destination_address: destination,
             // The callback only delivers the response body.
             // Any value transfers from the EVM side happen as
