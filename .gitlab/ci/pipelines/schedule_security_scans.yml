@@ -6,7 +6,7 @@ stages:
 - test
 
 container_scanning_merge_reports:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -14,18 +14,18 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-trixie-master-e92d4ade
-  - container_scanning_tezos-ubuntu-22.04-master-e92d4ade
-  - container_scanning_tezos-ubuntu-24.04-master-e92d4ade
-  - container_scanning_tezos-ubuntu-26.04-master-e92d4ade
+  - container_scanning_tezos-debian-trixie-master-d26a8bef
+  - container_scanning_tezos-ubuntu-22.04-master-d26a8bef
+  - container_scanning_tezos-ubuntu-24.04-master-d26a8bef
+  - container_scanning_tezos-ubuntu-26.04-master-d26a8bef
   dependencies:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-trixie-master-e92d4ade
-  - container_scanning_tezos-ubuntu-22.04-master-e92d4ade
-  - container_scanning_tezos-ubuntu-24.04-master-e92d4ade
-  - container_scanning_tezos-ubuntu-26.04-master-e92d4ade
+  - container_scanning_tezos-debian-trixie-master-d26a8bef
+  - container_scanning_tezos-ubuntu-22.04-master-d26a8bef
+  - container_scanning_tezos-ubuntu-24.04-master-d26a8bef
+  - container_scanning_tezos-ubuntu-26.04-master-d26a8bef
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -46,7 +46,7 @@ container_scanning_merge_reports:
       container_scanning: gl-container-scanning-report.json
 
 container_scanning_slack_notification_tezos-tezos-latest:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -69,7 +69,7 @@ container_scanning_slack_notification_tezos-tezos-latest:
     REPORT: gl-container-scanning-report-tezos-tezos-latest.json
 
 container_scanning_slack_notification_tezos-tezos-master:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -92,7 +92,7 @@ container_scanning_slack_notification_tezos-tezos-master:
     REPORT: gl-container-scanning-report-tezos-tezos-master.json
 
 container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-monitoring:master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -114,8 +114,8 @@ container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
   variables:
     REPORT: gl-container-scanning-report-tezos-tezos-octez-evm-node-latest.json
 
-container_scanning_tezos-debian-trixie-master-e92d4ade:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+container_scanning_tezos-debian-trixie-master-d26a8bef:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -136,11 +136,11 @@ container_scanning_tezos-debian-trixie-master-e92d4ade:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
-    REPORT: gl-container-scanning-report-tezos-debian-trixie-master-e92d4ade.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d26a8bef
+    REPORT: gl-container-scanning-report-tezos-debian-trixie-master-d26a8bef.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-trixie-master-e92d4ade.json
+    - gl-container-scanning-report-tezos-debian-trixie-master-d26a8bef.json
   retry:
     max: 2
     when:
@@ -148,7 +148,7 @@ container_scanning_tezos-debian-trixie-master-e92d4ade:
     - runner_system_failure
 
 container_scanning_tezos-tezos-latest:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -181,7 +181,7 @@ container_scanning_tezos-tezos-latest:
     - runner_system_failure
 
 container_scanning_tezos-tezos-master:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -214,7 +214,7 @@ container_scanning_tezos-tezos-master:
     - runner_system_failure
 
 container_scanning_tezos-tezos-octez-evm-node-latest:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -246,8 +246,8 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
     - script_failure
     - runner_system_failure
 
-container_scanning_tezos-ubuntu-22.04-master-e92d4ade:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+container_scanning_tezos-ubuntu-22.04-master-d26a8bef:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -268,19 +268,19 @@ container_scanning_tezos-ubuntu-22.04-master-e92d4ade:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-e92d4ade
-    REPORT: gl-container-scanning-report-tezos-ubuntu-22.04-master-e92d4ade.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-d26a8bef
+    REPORT: gl-container-scanning-report-tezos-ubuntu-22.04-master-d26a8bef.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-22.04-master-e92d4ade.json
+    - gl-container-scanning-report-tezos-ubuntu-22.04-master-d26a8bef.json
   retry:
     max: 2
     when:
     - script_failure
     - runner_system_failure
 
-container_scanning_tezos-ubuntu-24.04-master-e92d4ade:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+container_scanning_tezos-ubuntu-24.04-master-d26a8bef:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -301,19 +301,19 @@ container_scanning_tezos-ubuntu-24.04-master-e92d4ade:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
-    REPORT: gl-container-scanning-report-tezos-ubuntu-24.04-master-e92d4ade.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-d26a8bef
+    REPORT: gl-container-scanning-report-tezos-ubuntu-24.04-master-d26a8bef.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-24.04-master-e92d4ade.json
+    - gl-container-scanning-report-tezos-ubuntu-24.04-master-d26a8bef.json
   retry:
     max: 2
     when:
     - script_failure
     - runner_system_failure
 
-container_scanning_tezos-ubuntu-26.04-master-e92d4ade:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-e92d4ade
+container_scanning_tezos-ubuntu-26.04-master-d26a8bef:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
   stage: test
   tags:
   - gcp
@@ -334,11 +334,11 @@ container_scanning_tezos-ubuntu-26.04-master-e92d4ade:
   services:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-e92d4ade
-    REPORT: gl-container-scanning-report-tezos-ubuntu-26.04-master-e92d4ade.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-d26a8bef
+    REPORT: gl-container-scanning-report-tezos-ubuntu-26.04-master-d26a8bef.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-26.04-master-e92d4ade.json
+    - gl-container-scanning-report-tezos-ubuntu-26.04-master-d26a8bef.json
   retry:
     max: 2
     when:
