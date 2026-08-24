@@ -557,6 +557,9 @@ let job_alpine_ci_merge =
       [
         ("REGISTRY", "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos");
         ("TAG", "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}");
+        (* Branch-only tag, as for the other base images: it lets a test branch
+           pin [base_images_tag] to its slug once instead of at every commit. *)
+        ("TAG_GENERIC", "${CI_COMMIT_REF_SLUG}");
       ]
     ~script:
       ("docker buildx create --driver docker-container --use --name tezos"
@@ -564,9 +567,11 @@ let job_alpine_ci_merge =
            (fun image_short_name ->
              Format.sprintf
                "docker buildx imagetools create --tag \
-                \"${REGISTRY}/alpine-%s:${TAG}\" \
+                \"${REGISTRY}/alpine-%s:${TAG}\" --tag \
+                \"${REGISTRY}/alpine-%s:${TAG_GENERIC}\" \
                 \"${REGISTRY}/alpine-%s:${TAG}-amd64\" \
                 \"${REGISTRY}/alpine-%s:${TAG}-arm64\""
+               image_short_name
                image_short_name
                image_short_name
                image_short_name)
@@ -581,7 +586,8 @@ let job_alpine_ci_merge =
            ])
     ~__POS__
     ~description:
-      "Merge the per-arch static alpine-* CI images into multi-arch manifests"
+      "Merge the per-arch static alpine-* CI images into multi-arch manifests, \
+       tagged both <ref-slug>-<short-sha> and <ref-slug>"
     ~only_if_changed:Files.ci_images
     ~needs:
       [
