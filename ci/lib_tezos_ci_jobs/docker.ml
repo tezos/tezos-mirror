@@ -22,19 +22,6 @@ let docker_release_script =
     Tezos_ci.Image.pp
     Tezos_ci.Images.Base_images.alpine_build
 
-(* [docker_release_script] extended for with-EVM builds with the L2 builder
-   image: the [debian-rust:trixie] base image, used directly. Builds without
-   EVM artifacts do not use it. *)
-let release_script contents =
-  match contents with
-  | `experimental_with_evm ->
-      Format.asprintf
-        "%s --rust-toolchain-image %a"
-        docker_release_script
-        Tezos_ci.Image.pp
-        Tezos_ci.Images.Base_images.debian_rust_trixie
-  | `released | `experimental -> docker_release_script
-
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
   CI.job
@@ -63,14 +50,11 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
       [
         ("DOCKER_VERSION", version);
         ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
-        ( "DOCKER_BUILD_TARGET",
-          match contents with
-          | `experimental_with_evm -> "with-evm-artifacts"
-          | `released | `experimental -> "without-evm-artifacts" );
+        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("IMAGE_ARCH_PREFIX", arch_str ^ "_");
         ( "EXECUTABLE_FILES",
           match contents with
-          | `experimental_with_evm | `experimental ->
+          | `experimental ->
               "script-inputs/released-executables \
                script-inputs/experimental-executables"
           | `released -> "script-inputs/released-executables" );
@@ -100,7 +84,7 @@ let job_docker_snapshot =
         (* Override the image tag computed by [docker_initialize.sh --image-names]
            (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
-        release_script contents;
+        docker_release_script;
       ]
     contents
     `real
@@ -117,10 +101,7 @@ let job_docker =
       "Build the Docker image for Octez for the specified architecture, with \
        experimental executables."
     ~scripts:
-      [
-        "./scripts/ci/docker_initialize.sh --image-names";
-        release_script contents;
-      ]
+      ["./scripts/ci/docker_initialize.sh --image-names"; docker_release_script]
     contents
     mode
     arch
@@ -160,13 +141,7 @@ let job_docker_merge_manifests_snapshot =
     ~needs:
       [
         (Job, job_docker_snapshot contents Amd64);
-        ( Job,
-          job_docker_snapshot
-            (match contents with
-            | `experimental_with_evm ->
-                (* No EVM node on arm64. *) `experimental
-            | `experimental | `released -> contents)
-            Arm64 );
+        (Job, job_docker_snapshot contents Arm64);
       ]
     ~scripts:
       [
@@ -190,14 +165,7 @@ let job_docker_merge_manifests =
     ~needs:
       [
         (Job, job_docker contents mode Amd64);
-        ( Job,
-          job_docker
-            (* EVM node is not available on arm64. *)
-            (match contents with
-            | `experimental_with_evm -> `experimental
-            | (`experimental | `released) as c -> c)
-            mode
-            Arm64 );
+        (Job, job_docker contents mode Arm64);
       ]
     ~scripts:
       [
@@ -214,7 +182,7 @@ let job_docker_promote_weekly =
       "Promote the master snapshot Docker image to the rolling [weekly] tag."
     ~stage:Publish
     ~retry:Tezos_ci.no_retry
-    ~needs:[(Job, job_docker_merge_manifests_snapshot `experimental_with_evm)]
+    ~needs:[(Job, job_docker_merge_manifests_snapshot `experimental)]
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:[("DOCKER_VERSION", version); ("CI_DOCKER_HUB", "true")]
@@ -263,16 +231,7 @@ let job_script_docker_verify_image =
         (* Scripts that are called by [create_docker_image.sh]. *)
         "scripts/version.sh";
       ]
-    ~needs:
-      [
-        ( Job,
-          job_docker
-            (match arch with
-            | Amd64 -> `experimental_with_evm
-            | Arm64 -> `experimental)
-            `test
-            arch );
-      ]
+    ~needs:[(Job, job_docker `experimental `test arch)]
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~retry:Tezos_ci.dind_retry
     ~variables:
@@ -288,7 +247,7 @@ let register () =
   Cacio.register_jobs
     Before_merging
     [
-      (Auto, job_docker `experimental_with_evm `test Amd64);
+      (Auto, job_docker `experimental `test Amd64);
       (Auto, job_docker `experimental `test Arm64);
       (Manual, job_script_docker_verify_image Amd64);
       (Manual, job_script_docker_verify_image Arm64);
@@ -296,19 +255,19 @@ let register () =
   Cacio.register_jobs
     Merge_train
     [
-      (Auto, job_docker `experimental_with_evm `test Amd64);
+      (Auto, job_docker `experimental `test Amd64);
       (Auto, job_docker `experimental `test Arm64);
     ] ;
   Cacio.register_jobs
     Master
-    [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
+    [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
     Scheduled_docker_build
-    [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
+    [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
     Scheduled_docker_master_snapshot
     [
-      (Auto, job_docker_merge_manifests_snapshot `experimental_with_evm);
+      (Auto, job_docker_merge_manifests_snapshot `experimental);
       (Auto, job_docker_promote_weekly);
     ] ;
   ()

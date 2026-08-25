@@ -429,7 +429,6 @@ oc.docker:amd64:
   - ./scripts/ci/docker_initialize.sh --image-names
   - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d26a8bef
     --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
-    --rust-toolchain-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d26a8bef
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -437,7 +436,7 @@ oc.docker:amd64:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: with-evm-artifacts
+    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
     IMAGE_ARCH_PREFIX: amd64_
