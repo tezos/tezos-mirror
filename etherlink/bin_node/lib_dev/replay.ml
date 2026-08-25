@@ -116,8 +116,14 @@ let trace_block ~tracer_kind ~disable_da_fees ?kernel ?kernel_verbosity ~number
   end in
   let tracer_config = Tracer_types.default_config in
   let config = {tracer_config with tracer = tracer_kind} in
+  (* Unlike the RPCs, the debug CLI keeps the kernel-faithful trace. *)
   let* output =
-    Tracer.trace_block executor (module Storage) ~block_number:number ~config
+    Tracer.trace_block
+      executor
+      (module Storage)
+      ~drop_reverted_logs:false
+      ~block_number:number
+      ~config
   in
   let json =
     Data_encoding.Json.construct Tracer_types.block_output_encoding output
@@ -150,9 +156,11 @@ let trace_transaction ~tracer_kind ~disable_da_fees ?kernel ?kernel_verbosity
   in
   let tracer_config = Tracer_types.default_config in
   let config = {tracer_config with tracer = tracer_kind} in
+  (* Unlike the RPCs, the debug CLI keeps the kernel-faithful trace. *)
   let* output =
     Tracer.trace_transaction
       executor
+      ~drop_reverted_logs:false
       ~block_number
       ~transaction_hash:tx_hash
       ~config

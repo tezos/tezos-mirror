@@ -100,6 +100,14 @@ module StructLoggerRead = struct
          ~struct_logs
 end
 
+module CallTracerRevertedLogs = struct
+  let rec drop ?(reverted = false) (node : Tracer_types.CallTracer.output) =
+    let open Tracer_types.CallTracer in
+    let reverted = reverted || Option.is_some node.error in
+    let logs = if reverted then None else node.logs in
+    {node with logs; calls = List.map (fun c -> drop ~reverted c) node.calls}
+end
+
 module CallTracerRead = struct
   (** Context used during the call trace rebuilding algorithm.
 
@@ -263,8 +271,10 @@ module CallTracerRead = struct
     return (Bytes.to_string value |> Z.of_bits |> Z.to_int)
 
   (** [read_outputs state] reads in the storage and interprets what
-     the kernel stored. *)
-  let read_outputs ~storage_version ?transaction_hash state =
+     the kernel stored. Every read path goes through here, making the
+     reverted-log drop unskippable; [drop_reverted_logs:false] opts out. *)
+  let read_outputs ~storage_version ?(drop_reverted_logs = true)
+      ?transaction_hash state =
     let open Lwt_result_syntax in
     let* length = call_trace_length ~storage_version state transaction_hash in
     (* there should at least be the top call *)
@@ -279,19 +289,24 @@ module CallTracerRead = struct
           in
           return (Some node)
       in
-      build_calltraces end_call_impl get_next
+      let+ outputs = build_calltraces end_call_impl get_next in
+      if drop_reverted_logs then List.map CallTracerRevertedLogs.drop outputs
+      else outputs
 
   (** [read_output state hash] reads in the storage and interprets what
      the kernel stored. *)
-  let read_output ~storage_version state transaction_hash =
+  let read_output ~storage_version ?drop_reverted_logs state transaction_hash =
     let open Lwt_result_syntax in
-    let* outputs = read_outputs ~storage_version ?transaction_hash state in
+    let* outputs =
+      read_outputs ~storage_version ?drop_reverted_logs ?transaction_hash state
+    in
     match outputs with
     | o :: _ -> return o
     | _ -> tzfail Tracer_types.Trace_not_found
 end
 
-let read_output ~storage_version config state root_indexed_hash =
+let read_output ~storage_version ?drop_reverted_logs config state
+    root_indexed_hash =
   let open Tracer_types in
   let open Lwt_result_syntax in
   match config.tracer with
@@ -302,22 +317,26 @@ let read_output ~storage_version config state root_indexed_hash =
       return (StructLoggerOutput output)
   | CallTracer ->
       let* output =
-        CallTracerRead.read_output ~storage_version state root_indexed_hash
+        CallTracerRead.read_output
+          ~storage_version
+          ?drop_reverted_logs
+          state
+          root_indexed_hash
       in
       return (CallTracerOutput output)
 
-let read_outputs ~storage_version config state =
+let read_outputs ~storage_version ?drop_reverted_logs config state =
   let open Tracer_types in
   let open Lwt_result_syntax in
   match config.tracer with
   | CallTracer ->
       Lwt_result.bind
-        (CallTracerRead.read_outputs ~storage_version state)
+        (CallTracerRead.read_outputs ~storage_version ?drop_reverted_logs state)
         (List.map_es (fun o -> return @@ CallTracerOutput o))
   | StructLogger -> tzfail @@ Tracer_types.Tracer_not_implemented "structLogger"
 
-let trace_transaction (module Exe : Evm_execution.S) ~block_number
-    ~transaction_hash ~config =
+let trace_transaction ?drop_reverted_logs (module Exe : Evm_execution.S)
+    ~block_number ~transaction_hash ~config =
   let open Lwt_result_syntax in
   let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
   let input = Tracer_types.input_rlp_encoder ~hash:transaction_hash config in
@@ -345,9 +364,14 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
       let* root_indexed_by_hash =
         is_tracing_root_indexed_by_hash ~storage_version hash evm_state
       in
-      read_output ~storage_version config evm_state root_indexed_by_hash
+      read_output
+        ~storage_version
+        ?drop_reverted_logs
+        config
+        evm_state
+        root_indexed_by_hash
 
-let trace_block (module Exe : Evm_execution.S)
+let trace_block ?drop_reverted_logs (module Exe : Evm_execution.S)
     (module Block_storage : Block_storage_sig.S) ~block_number ~config =
   let open Lwt_result_syntax in
   let*! () = Tracer_event.tracer_input (Tracer_types.config_to_string config) in
@@ -394,7 +418,7 @@ let trace_block (module Exe : Evm_execution.S)
       | Apply_failure -> tzfail Tracer_types.Trace_not_found
       | Apply_success {evm_state; _} ->
           let* storage_version = Durable_storage.storage_version evm_state in
-          read_outputs ~storage_version config evm_state
+          read_outputs ~storage_version ?drop_reverted_logs config evm_state
     in
     (* Now assemble the hash and traces *)
     List.combine
@@ -411,7 +435,8 @@ let trace_block (module Exe : Evm_execution.S)
       traces
     |> Lwt.return
 
-let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
+let trace_call ?drop_reverted_logs (module Exe : Evm_execution.S) ~call ~block
+    ~config =
   let open Lwt_result_syntax in
   let config_rlp = Tracer_types.input_rlp_encoder config in
   let set_config state =
@@ -443,4 +468,4 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
     Exe.execute ~alter_evm_state:set_config simulation_input block
   in
   let* storage_version = Durable_storage.storage_version evm_state in
-  read_output ~storage_version config evm_state None
+  read_output ~storage_version ?drop_reverted_logs config evm_state None
