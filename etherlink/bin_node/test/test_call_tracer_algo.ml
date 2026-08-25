@@ -531,6 +531,103 @@ let test_decoding_rlp_truncated_revert_reason =
                  (CallTracer.to_string call)) ;
           Lwt.return_unit)
 
+(* ── CallTracerRevertedLogs.drop ──────────────────────────────────────── *)
+
+(* Only [error], [logs] and [calls] matter to [drop]. *)
+let mk_frame ?error ?logs ?(calls = []) () =
+  let open Evm_node_lib_dev_encoding in
+  Tracer_types.CallTracer.
+    {
+      calls;
+      type_ = "CALL";
+      from = Ethereum_types.(Address (Hex (make_string 20 "19")));
+      to_ = None;
+      value = Z.zero;
+      gas = None;
+      gas_used = Z.zero;
+      input = Ethereum_types.Hex "";
+      output = None;
+      error;
+      revert_reason = None;
+      logs;
+    }
+
+let some_logs =
+  let open Evm_node_lib_dev_encoding in
+  [
+    Tracer_types.CallTracer.
+      {
+        address = Ethereum_types.(Address (Hex (make_string 20 "19")));
+        topics = [make_hex 32 "19"];
+        data = Ethereum_types.Hex "000102";
+      };
+  ]
+
+let check_drop input expected msg =
+  let actual = Evm_node_lib_dev.Tracer.CallTracerRevertedLogs.drop input in
+  Check.is_true
+    (actual = expected)
+    ~error_msg:
+      (Format.asprintf
+         "%s, expected \n%s \n but got \n%s"
+         msg
+         (to_string expected)
+         (to_string actual)) ;
+  Lwt.return_unit
+
+let test_drop_reverted_subtree =
+  register_unit_test
+    ~title:"CallTracer: drop clears logs of a whole reverted subtree"
+    ~tags:["call_tracer"; "debug"; "revert"; "drop_logs"]
+    (fun _protocol ->
+      let input =
+        mk_frame
+          ~logs:some_logs
+          ~calls:
+            [
+              mk_frame
+                ~error:"execution reverted"
+                ~logs:some_logs
+                ~calls:[mk_frame ~logs:some_logs ()]
+                ();
+            ]
+          ()
+      in
+      let expected =
+        mk_frame
+          ~logs:some_logs
+          ~calls:[mk_frame ~error:"execution reverted" ~calls:[mk_frame ()] ()]
+          ()
+      in
+      check_drop input expected "Reverted subtree logs should be dropped")
+
+let test_drop_keeps_successful_sibling =
+  register_unit_test
+    ~title:"CallTracer: drop keeps a successful sibling's logs"
+    ~tags:["call_tracer"; "debug"; "revert"; "drop_logs"; "sibling"]
+    (fun _protocol ->
+      let input =
+        mk_frame
+          ~logs:some_logs
+          ~calls:
+            [
+              mk_frame ~error:"execution reverted" ~logs:some_logs ();
+              mk_frame ~logs:some_logs ();
+            ]
+          ()
+      in
+      let expected =
+        mk_frame
+          ~logs:some_logs
+          ~calls:
+            [
+              mk_frame ~error:"execution reverted" ();
+              mk_frame ~logs:some_logs ();
+            ]
+          ()
+      in
+      check_drop input expected "Successful sibling's logs should survive")
+
 let protocols = Protocol.all
 
 let () =
@@ -546,6 +643,8 @@ let () =
   test_decoding_rlp protocols ;
   test_decoding_rlp_revert_reason protocols ;
   test_decoding_rlp_truncated_revert_reason protocols ;
+  test_drop_reverted_subtree protocols ;
+  test_drop_keeps_successful_sibling protocols ;
   ()
 
 let () = Test.run ()
