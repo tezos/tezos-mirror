@@ -459,7 +459,7 @@ oc.build:static-arm64-linux-released-binaries:
     ARCH: arm64
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
-    DUNE_BUILD_JOBS: -j 12
+    DUNE_BUILD_JOBS: -j 10
     EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
@@ -505,7 +505,7 @@ oc.build:static-x86_64-linux-released-binaries:
     ARCH: x86_64
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
-    DUNE_BUILD_JOBS: -j 12
+    DUNE_BUILD_JOBS: -j 10
     EXECUTABLE_FILES: script-inputs/octez-released-executables
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
