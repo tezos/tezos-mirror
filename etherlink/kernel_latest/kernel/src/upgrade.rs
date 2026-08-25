@@ -34,8 +34,9 @@ use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::{keyspace, read_optional_rlp};
+use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
 pub const KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/kernel_root_hash");
@@ -96,14 +97,14 @@ pub fn store_kernel_upgrade(
         kernel_upgrade.activation_timestamp
     );
     Event::Upgrade(kernel_upgrade.clone()).store(base, common)?;
-    keyspace::store_rlp(kernel_upgrade, base, &KERNEL_UPGRADE_KEY)
+    base.store_rlp(&KERNEL_UPGRADE_KEY, kernel_upgrade)
         .context("Failed to store kernel upgrade")
 }
 
 pub fn read_kernel_upgrade(
     base: &impl KeySpace,
 ) -> anyhow::Result<Option<KernelUpgrade>> {
-    keyspace::read_optional_rlp(base, &KERNEL_UPGRADE_KEY)
+    base.read_rlp(&KERNEL_UPGRADE_KEY)
         .context("Failed to decode kernel upgrade")
 }
 

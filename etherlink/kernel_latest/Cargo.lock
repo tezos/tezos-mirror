@@ -3491,6 +3491,8 @@ name = "tezos-smart-rollup-keyspace"
 version = "0.0.0"
 dependencies = [
  "hex-literal",
+ "num-traits",
+ "rlp",
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-core",
@@ -3637,7 +3639,9 @@ dependencies = [
  "rlp",
  "serde",
  "sha3",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-keyspace",
  "thiserror 1.0.69",
 ]
 

@@ -20,6 +20,7 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
+use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
     decode_timestamp,
@@ -32,8 +33,9 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtNum, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::{keyspace, read_rlp, store_rlp};
+use tezos_storage::{read_rlp, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
@@ -209,25 +211,6 @@ fn blueprint_generation_key(number: U256) -> Result<Key, StorageError> {
     blueprint_key(number, "/generation")
 }
 
-// 32-byte little-endian `U256` read/write through a keyspace handle, mirroring
-// the byte layout of the absolute-path helpers. Kept local to the kernel crate
-// since the storage crate has no `primitive_types` dependency.
-fn write_u256_le(base: &mut impl KeySpace, key: &Key, value: U256) -> Result<(), Error> {
-    let mut buffer = [0u8; 32];
-    value.to_little_endian(&mut buffer);
-    base.set(key, buffer).map_err(Error::from)
-}
-
-// Reads a 32-byte little-endian `U256`, falling back to `default` when the key
-// is absent or not a value — matching the `PathNotFound | StoreNotAValue` arms
-// of the previous absolute-path readers.
-fn read_u256_le_or_default(base: &impl KeySpace, key: &Key, default: U256) -> U256 {
-    match base.get_prefix_exact::<32>(key) {
-        Some(buffer) => U256::from_little_endian(&buffer),
-        None => default,
-    }
-}
-
 // The blueprint accessors below route `/base/blueprints` through the `/base`
 // keyspace, each loading the handle transiently.
 
@@ -235,18 +218,15 @@ fn read_current_generation_or_default(
     base: &impl KeySpace,
     default: U256,
 ) -> Result<U256, Error> {
-    Ok(read_u256_le_or_default(
-        base,
-        &BLUEPRINT_CURRENT_GENERATION_KEY,
-        default,
-    ))
+    Ok(base.get_u256_le_or(&BLUEPRINT_CURRENT_GENERATION_KEY, default))
 }
 
 fn store_current_generation(
     base: &mut impl KeySpace,
     generation: U256,
 ) -> Result<(), Error> {
-    write_u256_le(base, &BLUEPRINT_CURRENT_GENERATION_KEY, generation)
+    base.store_u256_le(&BLUEPRINT_CURRENT_GENERATION_KEY, generation)
+        .map_err(Error::from)
 }
 
 fn increment_current_generation(base: &mut impl KeySpace) -> Result<(), Error> {
@@ -267,7 +247,7 @@ fn read_blueprint_generation_or_default(
     default: U256,
 ) -> Result<U256, Error> {
     let key = blueprint_generation_key(number)?;
-    Ok(read_u256_le_or_default(base, &key, default))
+    Ok(base.get_u256_le_or(&key, default))
 }
 
 fn store_blueprint_generation(
@@ -276,12 +256,14 @@ fn store_blueprint_generation(
     generation: U256,
 ) -> Result<(), Error> {
     let key = blueprint_generation_key(number)?;
-    write_u256_le(base, &key, generation)
+    base.store_u256_le(&key, generation).map_err(Error::from)
 }
 
 fn read_blueprint_nb_chunks(base: &impl KeySpace, number: U256) -> Result<u16, Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    keyspace::read_u16_le(base, &key).map_err(Error::from)
+    base.get_le(&key).ok_or_else(|| {
+        tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+    })
 }
 
 fn store_blueprint_nb_chunks(
@@ -290,7 +272,7 @@ fn store_blueprint_nb_chunks(
     nb_chunks: u16,
 ) -> Result<(), Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    keyspace::write_u16_le(base, &key, nb_chunks).map_err(Error::from)
+    base.store_le(&key, nb_chunks).map_err(Error::from)
 }
 
 fn store_blueprint_chunk(
@@ -300,7 +282,7 @@ fn store_blueprint_chunk(
     chunk: &StoreBlueprint,
 ) -> Result<(), Error> {
     let key = blueprint_chunk_key(number, chunk_index)?;
-    keyspace::store_rlp(chunk, base, &key).map_err(Error::from)
+    base.store_rlp(&key, chunk).map_err(Error::from)
 }
 
 pub fn store_sequencer_blueprint(
@@ -477,14 +459,17 @@ pub fn store_current_block_header(
     base: &mut impl KeySpace,
     current_block_header: &BlockHeader<ChainHeader>,
 ) -> Result<(), Error> {
-    keyspace::store_rlp(current_block_header, base, &EVM_CURRENT_BLOCK_HEADER_KEY)
+    base.store_rlp(&EVM_CURRENT_BLOCK_HEADER_KEY, current_block_header)
         .map_err(Error::from)
 }
 
 pub fn read_current_block_header<H: Decodable>(
     base: &impl KeySpace,
 ) -> Result<BlockHeader<H>, Error> {
-    Ok(keyspace::read_rlp(base, &EVM_CURRENT_BLOCK_HEADER_KEY)?)
+    base.read_rlp(&EVM_CURRENT_BLOCK_HEADER_KEY)?
+        .ok_or_else(|| {
+            tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+        })
 }
 
 pub fn read_current_blueprint_header(
@@ -787,7 +772,9 @@ fn read_blueprint_chunk(
     chunk_index: u16,
 ) -> Result<StoreBlueprint, Error> {
     let key = blueprint_chunk_key(number, chunk_index)?;
-    keyspace::read_rlp(base, &key).map_err(Error::from)
+    base.read_rlp(&key)?.ok_or_else(|| {
+        tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound).into()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

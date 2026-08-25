@@ -23,8 +23,8 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::keyspace;
 
 use tezos_tezlink::operation::Operation;
 
@@ -390,11 +390,10 @@ impl DelayedInbox {
     ) -> Result<Option<Vec<Transaction>>> {
         // Read the override plus pop the whole batch against the threaded
         // `/base` handle.
-        let max_delayed_inbox_blueprint_length = keyspace::read_u16_le_default(
-            base,
+        let max_delayed_inbox_blueprint_length: u16 = base.get_le_or(
             &MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
             DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
-        )?;
+        );
         let mut popped: Vec<Transaction> = vec![];
         while let Some(tx) = self.pop_first(base)? {
             popped.push(tx);
@@ -634,17 +633,15 @@ mod tests {
     fn max_delayed_inbox_blueprint_length_resolves_to_absolute_path() {
         use tezos_smart_rollup_host::path::RefPath;
         use tezos_smart_rollup_host::storage::StorageV1;
-        use tezos_storage::keyspace;
+        use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 
         let mut rk = RuntimeKeyspaces::default();
 
         assert_eq!(
-            keyspace::read_u16_le_default(
-                rk.base(),
+            rk.base().get_le_or(
                 &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
-                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
-            )
-            .unwrap(),
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
+            ),
             super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
         );
 
@@ -655,12 +652,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            keyspace::read_u16_le_default(
-                rk.base(),
+            rk.base().get_le_or(
                 &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
-                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH,
-            )
-            .unwrap(),
+                super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
+            ),
             42
         );
     }
