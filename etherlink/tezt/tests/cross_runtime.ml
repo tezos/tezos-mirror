@@ -4202,16 +4202,6 @@ let crossing_subcalls frame =
 (** The alias-priming frames among a frame's direct sub-calls. *)
 let priming_subcalls frame = List.filter is_priming_frame (trace_subcalls frame)
 
-(* The (address, topics, data) triple of a trace log, lowercased for parity
-   comparison against [eth_getLogs]. *)
-let crac_trace_log_body log =
-  let open JSON in
-  ( String.lowercase_ascii (log |-> "address" |> as_string),
-    List.map
-      (fun t -> String.lowercase_ascii (as_string t))
-      (log |-> "topics" |> as_list),
-    String.lowercase_ascii (log |-> "data" |> as_string) )
-
 (* The logs of a single callTracer frame, [] when absent. *)
 let trace_frame_logs frame =
   match JSON.(frame |-> "logs" |> as_opt) with
@@ -4281,9 +4271,7 @@ let rec http_trace_inner_depth node =
    log-emitting frame intentionally diverges from [eth_getLogs]. *)
 let assert_crac_trace_log_parity ~sequencer ~prefix ~block_number trace =
   let trace_logs =
-    List.sort
-      compare
-      (List.map crac_trace_log_body (collect_crac_trace_logs trace))
+    List.sort compare (List.map trace_log_body (collect_crac_trace_logs trace))
   in
   let*@ receipt_logs =
     Rpc.get_logs
@@ -5709,7 +5697,7 @@ let test_crac_call_tracer_reentrant_child_revert_keeps_logs () =
       receipt_logs
   in
   Check.(
-    (List.mem (crac_trace_log_body marked_log) receipt_bodies = false)
+    (List.mem (trace_log_body marked_log) receipt_bodies = false)
       bool
       ~error_msg:
         (prefix

@@ -477,6 +477,15 @@ val expect_failure :
   (unit -> 'b Lwt.t) ->
   unit Lwt.t
 
+(** [trace_log_body log] is the (address, topics, data) triple of a callTracer
+    trace log, lowercased for comparison against [eth_getLogs]. *)
+val trace_log_body : JSON.t -> string * string list * string
+
+(** [trace_frame_has_logs_field frame] tells whether a callTracer frame
+    carries a [logs] field at all — geth omits it on reverted frames rather
+    than emitting an empty list. *)
+val trace_frame_has_logs_field : JSON.t -> bool
+
 (** [Protocol] extended with a [register_test] that fails at run time, to
     catch tests registering directly instead of going through
     [register_test] or [register_both]. Sequencer test files alias it with
