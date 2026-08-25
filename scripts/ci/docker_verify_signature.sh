@@ -46,11 +46,10 @@ cosign version
 
 # Usage: verify_image <IMAGE> <TAG>
 verify_image() {
-  # Pull images
-  docker pull "$1:$2"
-
-  # Get image digest (better than tag for precision)
-  IMAGE_DIGEST="$(docker image inspect "$1:$2" --format="{{index .RepoDigests 0}}")"
+  # Do not pull: per-arch tags are OCI indexes, so pulling one whose platform
+  # does not match the host fails with "no matching manifest". [imagetools
+  # inspect] resolves the index digest remotely.
+  IMAGE_DIGEST="$1@$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest')"
   echo "Image digest to verify: ${IMAGE_DIGEST}"
 
   # Get the location of image signature as reference
