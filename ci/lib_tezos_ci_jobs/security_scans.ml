@@ -108,7 +108,7 @@ let job_container_scanning_slack_notification =
       ("Report on Slack the results of the scan for [" ^ full_image_name ^ "]")
     ~stage:Test
     ~image:Images.Base_images.alpine_monitoring
-    ~needs:[(Cacio.Artifacts, job_container_scanning image)]
+    ~needs:[(Artifacts, job_container_scanning image)]
     ~variables:[("REPORT", report)]
     ~script:
       [

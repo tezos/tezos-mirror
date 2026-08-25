@@ -356,14 +356,15 @@ let job_test_keyring =
 (* Each of these jobs iterates over the releases supported by [name] for the
    given [pipeline_type] with [parallel:matrix], so we register one job per
    distribution rather than one per distribution/release pair. *)
-let jobs_for (name : Distro.name) pipeline_type =
+let jobs_for (name : Distro.name) pipeline_type :
+    (Cacio.trigger * Cacio.job) list =
   [
-    (Cacio.Auto, job_apt_repo name pipeline_type);
-    (Cacio.Auto, job_lintian name pipeline_type);
-    (Cacio.Auto, job_install_bin name pipeline_type);
-    (Cacio.Auto, job_install_bin_systemd name pipeline_type);
-    (Cacio.Auto, job_upgrade_bin_systemd name pipeline_type);
-    (Cacio.Auto, job_test_keyring name pipeline_type);
+    (Auto, job_apt_repo name pipeline_type);
+    (Auto, job_lintian name pipeline_type);
+    (Auto, job_install_bin name pipeline_type);
+    (Auto, job_install_bin_systemd name pipeline_type);
+    (Auto, job_upgrade_bin_systemd name pipeline_type);
+    (Auto, job_test_keyring name pipeline_type);
   ]
 
 let jobs pipeline_type =

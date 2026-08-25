@@ -369,7 +369,7 @@ let () =
   register
     "homebrew.daily"
     homebrew_daily
-    ~jobs:(Cacio.get_jobs Cacio.Homebrew_daily)
+    ~jobs:(Cacio.get_jobs Homebrew_daily)
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
   (* Rebuilds the base images on the [master-ci-images] branch.

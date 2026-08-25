@@ -290,7 +290,7 @@ let job_oc_unit_non_proto_x86_64 =
     ~image:Tezos_ci.Images.Base_images.alpine_test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Amd64
-    ~needs:[(Cacio.Artifacts, Kernels.job_build_kernels)]
+    ~needs:[(Artifacts, Kernels.job_build_kernels)]
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
     ~dune_cache:true
@@ -318,7 +318,7 @@ let job_oc_unit_non_proto_arm64 =
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Arm64
     ~storage:Ramfs
-    ~needs:[(Cacio.Artifacts, Kernels.job_build_kernels)]
+    ~needs:[(Artifacts, Kernels.job_build_kernels)]
     ~variables:
       [
         (* Make sure that [scripts/test_wrapper.sh] partitions
