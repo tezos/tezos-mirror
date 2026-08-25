@@ -1,15 +1,13 @@
 # check=skip=InvalidDefaultArgInFrom,SecretsUsedInArgOrEnv
 # Note: `check=skip` is file-global (BuildKit cannot scope it per line). It
-# suppresses InvalidDefaultArgInFrom (the `FROM ${BUILD_DEPS_IMAGE}` /
-# `${RUST_TOOLCHAIN_IMAGE}` ARGs are always supplied at build time) and the
+# suppresses InvalidDefaultArgInFrom (the `FROM ${BUILD_DEPS_IMAGE}` ARG is
+# always supplied at build time) and the
 # SecretsUsedInArgOrEnv false positive on
 # `ARG SCCACHE_GCS_KEY_PREFIX` (a path prefix, not a secret). A genuinely bad
 # FROM or a real secret in ARG/ENV added later will therefore not be flagged.
-# Full image references (name:tag) for the build-dependencies image (build
-# environment) and the rust-toolchain image (L2 builder), passed by
-# docker-bake.hcl.
+# Full image reference (name:tag) for the build-dependencies image (build
+# environment), passed by docker-bake.hcl.
 ARG BUILD_DEPS_IMAGE
-ARG RUST_TOOLCHAIN_IMAGE
 
 # hadolint ignore=DL3006
 FROM ${BUILD_DEPS_IMAGE} AS without-evm-artifacts
@@ -23,7 +21,7 @@ ARG GIT_SHORTREF
 ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
-RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
+RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters
 # Cargo registry: use the CI crates-io mirror proxy (requires --network=host)
 COPY --chown=tezos:nogroup images/ci/.cargo/config.toml /home/tezos/.cargo/config.toml
 # COPY layers are ordered by change frequency (rarely -> frequently) so that a
@@ -121,48 +119,3 @@ RUN while read -r protocol; do \
     mkdir -p tezos/parameters/"$protocol"-parameters && \
     cp tezos/src/proto_"$(echo "$protocol" | tr - _)"/parameters/*.json tezos/parameters/"$protocol"-parameters; \
     done < tezos/script-inputs/active_protocol_versions
-
-FROM ${RUST_TOOLCHAIN_IMAGE} AS layer2-builder
-# Re-declare sccache ARGs for this stage (ARGs are stage-scoped after FROM).
-ARG SCCACHE_GCS_BUCKET=""
-ARG SCCACHE_GCS_RW_MODE="READ_WRITE"
-ARG SCCACHE_GCS_KEY_PREFIX="sccache"
-ARG SCCACHE_IDLE_TIMEOUT="0"
-ARG SCCACHE_IGNORE_SERVER_IO_ERROR="1"
-ARG CARGO_INCREMENTAL="0"
-WORKDIR /home/tezos/
-RUN mkdir -p /home/tezos/evm_kernel
-COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
-COPY --chown=tezos:nogroup src evm_kernel/src
-COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
-COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
-COPY --chown=tezos:nogroup contrib evm_kernel/contrib
-COPY --chown=tezos:nogroup vendors evm_kernel/vendors
-# hadolint ignore=DL3059
-RUN --network=host \
-    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
-      if sccache --start-server 2>&1; then \
-        export RUSTC_WRAPPER=sccache; \
-        echo "### sccache enabled for layer2 (bucket: ${SCCACHE_GCS_BUCKET})"; \
-      else \
-        echo "### sccache server failed to start, compiling without cache"; \
-      fi; \
-    else \
-      echo "### sccache disabled for layer2 (no bucket configured)"; \
-    fi && \
-    make -C evm_kernel -f etherlink.mk build-deps \
-    && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
-    && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes evm_benchmark_kernel.wasm && \
-    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
-      echo "### sccache stats (layer2):"; \
-      sccache --show-stats || true; \
-    fi
-
-# We move the EVM kernel in the final image in a dedicated stage to parallelize
-# the two builder stages.
-FROM without-evm-artifacts AS with-evm-artifacts
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_installer.wasm evm_kernel
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_installer_preimages/ evm_kernel/_evm_installer_preimages
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_kernel.wasm evm_kernel
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/etherlink/config/benchmarking.yaml evm_kernel
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/etherlink/config/benchmarking_sequencer.yaml evm_kernel
