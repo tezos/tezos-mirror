@@ -4,8 +4,6 @@
 
 //! Utilities and types for representing a stack.
 
-use std::rc::Rc;
-
 use crate::ast::*;
 
 /// Error returned when a stack index is out of bounds.
@@ -17,7 +15,7 @@ pub struct StackOob;
 pub type TypeStack = Stack<Type>;
 
 /// Stack of [TypedValue]s. Named `IStack` for "interpeter stack".
-pub type IStack<'a> = Stack<Rc<TypedValue<'a>>>;
+pub type IStack<'a> = Stack<RcTypedValue<'a>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
 /// always-failing instructions. A failed stack can be unified (in terms of
@@ -259,11 +257,11 @@ impl<T> From<Vec<T>> for TopIsFirst<T> {
     }
 }
 
-impl<T> From<Vec<T>> for TopIsFirst<Rc<T>> {
-    fn from(mut data: Vec<T>) -> Self {
+impl<'a> From<Vec<TypedValue<'a>>> for TopIsFirst<RcTypedValue<'a>> {
+    fn from(mut data: Vec<TypedValue<'a>>) -> Self {
         data.reverse();
         Self(Stack::stack_from_vec(
-            data.into_iter().map(Rc::new).collect(),
+            data.into_iter().map(RcTypedValue::new).collect(),
         ))
     }
 }
@@ -274,10 +272,10 @@ impl<T> From<Vec<T>> for TopIsLast<T> {
     }
 }
 
-impl<T> From<Vec<T>> for TopIsLast<Rc<T>> {
-    fn from(data: Vec<T>) -> Self {
+impl<'a> From<Vec<TypedValue<'a>>> for TopIsLast<RcTypedValue<'a>> {
+    fn from(data: Vec<TypedValue<'a>>) -> Self {
         Self(Stack::stack_from_vec(
-            data.into_iter().map(Rc::new).collect(),
+            data.into_iter().map(RcTypedValue::new).collect(),
         ))
     }
 }

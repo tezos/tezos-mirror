@@ -11,7 +11,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
     mem,
-    rc::Rc,
 };
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
@@ -20,8 +19,8 @@ use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
 use super::{
-    CreateContract, Micheline, MichelsonList, OperationInfo, TransferTokens, Type,
-    TypedValue,
+    CreateContract, Micheline, MichelsonList, OperationInfo, RcTypedValue,
+    TransferTokens, Type, TypedValue,
 };
 use crate::ast::BorrowedUnparseError;
 use crate::gas::{tc_cost, OutOfGas};
@@ -31,20 +30,20 @@ use crate::typechecker::TcError;
 #[cfg(test)]
 pub(crate) fn in_memory_entries<'a>(
     entries: impl IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
-) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>> {
+) -> RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>> {
     entries
         .into_iter()
-        .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+        .map(|(k, v)| (RcTypedValue::new(k), RcTypedValue::new(v)))
         .collect()
 }
 
 #[cfg(test)]
 pub(crate) fn overlay_entries<'a>(
     entries: impl IntoIterator<Item = (TypedValue<'a>, Option<TypedValue<'a>>)>,
-) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>> {
+) -> RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>> {
     entries
         .into_iter()
-        .map(|(k, v)| (Rc::new(k), v.map(Rc::new)))
+        .map(|(k, v)| (RcTypedValue::new(k), v.map(RcTypedValue::new)))
         .collect()
 }
 
@@ -142,7 +141,7 @@ pub struct BigMapFromId<'a> {
     /// certain key points like the end of the contract execution this diff is
     /// dumped into the storage. Change in storage can be applied in-place or,
     /// if necessary, with copy of the stored map.
-    pub overlay: RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
+    pub overlay: RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>>,
 }
 
 /// The content of a big map, either backed by a map in the lazy
@@ -151,7 +150,7 @@ pub struct BigMapFromId<'a> {
 pub enum BigMapContent<'a> {
     /// Big map can be backed by no map in the lazy storage and yet
     /// stay fully in memory.
-    InMemory(RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+    InMemory(RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
     /// Otherwise they come from the lazy storage and have both an
     /// identifier and an overlay
     FromId(BigMapFromId<'a>),
@@ -183,7 +182,7 @@ impl<'a> BigMap<'a> {
     pub fn new(
         key_type: Type,
         value_type: Type,
-        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
     ) -> Self {
         Self {
             content: BigMapContent::InMemory(map),
@@ -203,7 +202,7 @@ impl<'a> BigMap<'a> {
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
         storage: &mut (impl LazyStorage<'a> + ?Sized),
-    ) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+    ) -> Result<Option<RcTypedValue<'a>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
             BigMapContent::FromId(BigMapFromId { id, overlay }) => {
@@ -214,7 +213,7 @@ impl<'a> BigMap<'a> {
                     Some(change) => change.clone(),
                     None => storage
                         .big_map_get(arena, id, key, &self.value_type)?
-                        .map(Rc::new),
+                        .map(RcTypedValue::new),
                 }
             }
         })
@@ -241,7 +240,7 @@ impl<'a> BigMap<'a> {
     }
 
     /// Michelson's `UPDATE`.
-    pub fn update(&mut self, key: Rc<TypedValue<'a>>, value: Option<Rc<TypedValue<'a>>>) {
+    pub fn update(&mut self, key: RcTypedValue<'a>, value: Option<RcTypedValue<'a>>) {
         match &mut self.content {
             BigMapContent::InMemory(m) => match value {
                 Some(value) => {
@@ -463,7 +462,7 @@ impl<'a, T: LazyStorage<'a> + ?Sized> LazyStorageBulkUpdate<'a> for T {}
 /// A `big_map` representation with metadata, used in [InMemoryLazyStorage].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct MapInfo<'a> {
-    map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
     key_type: Type,
     value_type: Type,
 }
@@ -471,7 +470,7 @@ pub(crate) struct MapInfo<'a> {
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
-        map: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+        map: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
         key_type: Type,
         value_type: Type,
     ) -> Self {
@@ -603,8 +602,10 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
                 info.map.remove_mut(key);
             }
             Some(value) => {
-                info.map
-                    .insert_mut(Rc::new(key.clone()), Rc::new(value.clone()));
+                info.map.insert_mut(
+                    RcTypedValue::new(key.clone()),
+                    RcTypedValue::new(value.clone()),
+                );
             }
         }
         Ok(())
@@ -689,7 +690,7 @@ mod test_big_map_operations {
     ) {
         assert_eq!(
             map.get(arena, &key, storage).unwrap(),
-            expected_val.clone().map(Rc::new)
+            expected_val.clone().map(RcTypedValue::new)
         );
         assert_eq!(map.mem(&key, storage).unwrap(), expected_val.is_some());
     }
@@ -782,7 +783,7 @@ impl<'a> TypedValue<'a> {
     ) -> Result<(), LazyStorageError> {
         if let Some(updated) = self.update_big_maps(storage, f)? {
             // Sole owner of a freshly built value, so this moves, never clones.
-            *self = TypedValue::unwrap_rc(updated);
+            *self = updated.unwrap_or_clone();
         }
         Ok(())
     }
@@ -841,7 +842,7 @@ impl<'a> TypedValue<'a> {
         &'b self,
         storage: &mut S,
         f: &mut impl FnMut(&mut S, &mut BigMap<'a>) -> Result<(), LazyStorageError>,
-    ) -> Result<Option<Rc<Self>>, LazyStorageError> {
+    ) -> Result<Option<RcTypedValue<'a>>, LazyStorageError> {
         use crate::ast::Or::*;
         use TypedValue::*;
 
@@ -851,7 +852,7 @@ impl<'a> TypedValue<'a> {
         enum Frame<'b, 'a> {
             Visit(&'b TypedValue<'a>),
             /// Pops 2: the left child's result, then the right one's.
-            BuildPair(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>),
+            BuildPair(&'b RcTypedValue<'a>, &'b RcTypedValue<'a>),
             /// Pops 1.
             BuildOr {
                 is_left: bool,
@@ -859,9 +860,9 @@ impl<'a> TypedValue<'a> {
             /// Pops 1.
             BuildOption,
             /// Pops one per element, in element order.
-            BuildList(&'b MichelsonList<Rc<TypedValue<'a>>>),
+            BuildList(&'b MichelsonList<RcTypedValue<'a>>),
             /// Pops one per entry, in ascending key order.
-            BuildMap(&'b RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>),
+            BuildMap(&'b RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
             /// Pops 1: the transfer parameter.
             BuildTransferTokens(&'b OperationInfo<'a>, &'b TransferTokens<'a>),
             /// Pops 1: the originated storage.
@@ -897,7 +898,7 @@ impl<'a> TypedValue<'a> {
         // keeps the ordinary case from paying for the bound.
         let mut big_map_free: BTreeSet<*const TypedValue<'a>> = BTreeSet::new();
         let mut frames: Vec<Frame<'b, 'a>> = vec![Frame::Visit(self)];
-        let mut results: Vec<std::option::Option<Rc<TypedValue<'a>>>> = Vec::new();
+        let mut results: Vec<std::option::Option<RcTypedValue<'a>>> = Vec::new();
 
         /// Queues `child`, remembering the answer if it is shared.
         ///
@@ -916,10 +917,10 @@ impl<'a> TypedValue<'a> {
         /// since "holds no big map" does not depend on how it was reached.
         fn push_child<'b, 'a>(
             frames: &mut Vec<Frame<'b, 'a>>,
-            child: &'b Rc<TypedValue<'a>>,
+            child: &'b RcTypedValue<'a>,
         ) {
-            if Rc::strong_count(child) > 1 {
-                frames.push(Frame::Memoize(Rc::as_ptr(child)));
+            if child.strong_count() > 1 {
+                frames.push(Frame::Memoize(child.as_ptr()));
             }
             frames.push(Frame::Visit(child.as_ref()));
         }
@@ -928,11 +929,13 @@ impl<'a> TypedValue<'a> {
         fn rebuilt_operation<'a>(
             op: &OperationInfo<'a>,
             operation: crate::ast::Operation<'a>,
-        ) -> std::option::Option<Rc<TypedValue<'a>>> {
-            Some(Rc::new(TypedValue::Operation(Box::new(OperationInfo {
-                operation,
-                counter: op.counter,
-            }))))
+        ) -> std::option::Option<RcTypedValue<'a>> {
+            Some(RcTypedValue::new(TypedValue::Operation(Box::new(
+                OperationInfo {
+                    operation,
+                    counter: op.counter,
+                },
+            ))))
         }
 
         while let Some(frame) = frames.pop() {
@@ -1012,7 +1015,7 @@ impl<'a> TypedValue<'a> {
                         BigMap(m) => {
                             let mut m = m.clone();
                             f(storage, &mut m)?;
-                            results.push(Some(Rc::new(BigMap(m))));
+                            results.push(Some(RcTypedValue::new(BigMap(m))));
                         }
                         Ticket(_) => {
                             // Value is comparable, has no big map
@@ -1056,7 +1059,7 @@ impl<'a> TypedValue<'a> {
                     let new_l = results.pop().expect("BuildPair: missing left");
                     results.push(match (new_l, new_r) {
                         (None, None) => None,
-                        (new_l, new_r) => Some(Rc::new(Pair(
+                        (new_l, new_r) => Some(RcTypedValue::new(Pair(
                             new_l.unwrap_or_else(|| l.clone()),
                             new_r.unwrap_or_else(|| r.clone()),
                         ))),
@@ -1064,15 +1067,13 @@ impl<'a> TypedValue<'a> {
                 }
                 Frame::BuildOr { is_left } => {
                     let new = results.pop().expect("BuildOr: missing child");
-                    results.push(
-                        new.map(|x| {
-                            Rc::new(Or(if is_left { Left(x) } else { Right(x) }))
-                        }),
-                    );
+                    results.push(new.map(|x| {
+                        RcTypedValue::new(Or(if is_left { Left(x) } else { Right(x) }))
+                    }));
                 }
                 Frame::BuildOption => {
                     let new = results.pop().expect("BuildOption: missing child");
-                    results.push(new.map(|x| Rc::new(Option(Some(x)))));
+                    results.push(new.map(|x| RcTypedValue::new(Option(Some(x)))));
                 }
                 Frame::BuildList(orig) => {
                     let at = results.len() - orig.len();
@@ -1082,12 +1083,12 @@ impl<'a> TypedValue<'a> {
                         results.truncate(at);
                         results.push(None);
                     } else {
-                        let new: Vec<Rc<TypedValue<'a>>> = orig
+                        let new: Vec<RcTypedValue<'a>> = orig
                             .iter()
                             .zip(results.drain(at..))
                             .map(|(x, new_x)| new_x.unwrap_or_else(|| x.clone()))
                             .collect();
-                        results.push(Some(Rc::new(List(new.into()))));
+                        results.push(Some(RcTypedValue::new(List(new.into()))));
                     }
                 }
                 Frame::BuildMap(orig) => {
@@ -1105,7 +1106,7 @@ impl<'a> TypedValue<'a> {
                                 new.insert_mut(k.clone(), new_v);
                             }
                         }
-                        results.push(Some(Rc::new(Map(new))));
+                        results.push(Some(RcTypedValue::new(Map(new))));
                     }
                 }
                 Frame::BuildTransferTokens(op, t) => {
@@ -1322,9 +1323,9 @@ pub fn dump_big_map_updates<'a>(
 pub fn dump_big_map_updates_shared<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
     started_with_map_ids: &[BigMapId],
-    root: &Rc<TypedValue<'a>>,
+    root: &RcTypedValue<'a>,
     temporary: bool,
-) -> Result<Option<Rc<TypedValue<'a>>>, LazyStorageError> {
+) -> Result<Option<RcTypedValue<'a>>, LazyStorageError> {
     // Same three phases as [dump_big_map_updates], which documents the policy
     // driving each of them.
     let mut seen_source_ids: BTreeSet<BigMapId> = BTreeSet::new();
@@ -1339,7 +1340,7 @@ pub fn dump_big_map_updates_shared<'a>(
 /// applied once every walk sharing the lazy storage has run.
 pub type DeferredBigMapUpdates<'a> = Vec<(
     BigMapId,
-    RedBlackTreeMap<Rc<TypedValue<'a>>, Option<Rc<TypedValue<'a>>>>,
+    RedBlackTreeMap<RcTypedValue<'a>, Option<RcTypedValue<'a>>>,
 )>;
 
 /// Apply the deferred in-place overlays returned by [dump_big_map_walk].
@@ -1408,10 +1409,10 @@ pub fn dump_big_map_walk<'a>(
 /// anything (L2-1836).
 pub fn dump_big_map_walk_shared<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
-    root: &Rc<TypedValue<'a>>,
+    root: &RcTypedValue<'a>,
     temporary: bool,
     seen_source_ids: &mut BTreeSet<BigMapId>,
-) -> Result<(Option<Rc<TypedValue<'a>>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
+) -> Result<(Option<RcTypedValue<'a>>, DeferredBigMapUpdates<'a>), LazyStorageError> {
     let mut deferred_in_place_updates: DeferredBigMapUpdates<'a> = Vec::new();
     // Same visitor contract as [dump_big_map_walk]; only the ownership of the
     // root differs, so the two stay in lock-step.
@@ -1819,6 +1820,7 @@ mod review_verification {
     use super::*;
     use crate::ast::{CreateContract, MichelsonList, Or, TransferTokens, Type};
     use rpds::RedBlackTreeSet;
+    use std::rc::Rc;
 
     /// A `big_map` leaf carrying `id` and nothing else — the shape the walk
     /// keys off, with no overlay to complicate what a rebuild has to preserve.
@@ -1897,14 +1899,16 @@ mod review_verification {
         let value = TypedValue::new_pair(
             TypedValue::new_pair(bm(0), bm(1)),
             TypedValue::new_pair(
-                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::Or(Or::Left(RcTypedValue::new(bm(2)))),
                 TypedValue::new_pair(
-                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::Option(Some(RcTypedValue::new(bm(3)))),
                     TypedValue::new_pair(
-                        TypedValue::List(MichelsonList::from(vec![Rc::new(bm(4))])),
+                        TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(
+                            bm(4),
+                        )])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
-                            Rc::new(TypedValue::int(0)),
-                            Rc::new(bm(5)),
+                            RcTypedValue::new(TypedValue::int(0)),
+                            RcTypedValue::new(bm(5)),
                         )])),
                     ),
                 ),
@@ -1936,8 +1940,8 @@ mod review_verification {
     /// per operation.
     #[test]
     fn walk_leaves_shared_operation_payloads_shared() {
-        let payload = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
-        let transfer = |param: Rc<TypedValue<'static>>, counter| {
+        let payload = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 64]));
+        let transfer = |param: RcTypedValue<'static>, counter| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
                     param,
@@ -1953,18 +1957,18 @@ mod review_verification {
         };
         // One payload, three operations — the `DUP`ed `list operation` shape.
         let mut root = TypedValue::List(MichelsonList::from(vec![
-            Rc::new(transfer(payload.clone(), 0)),
-            Rc::new(transfer(payload.clone(), 1)),
-            Rc::new(transfer(payload.clone(), 2)),
+            RcTypedValue::new(transfer(payload.clone(), 0)),
+            RcTypedValue::new(transfer(payload.clone(), 1)),
+            RcTypedValue::new(transfer(payload.clone(), 2)),
         ]));
-        let shared_before = Rc::strong_count(&payload);
+        let shared_before = payload.strong_count();
 
         walk_big_maps(&mut root, &mut |_| {
             panic!("the value holds no big map, so `f` must not be called")
         });
 
         assert_eq!(
-            Rc::strong_count(&payload),
+            payload.strong_count(),
             shared_before,
             "the walk copied a shared operation payload"
         );
@@ -1979,7 +1983,7 @@ mod review_verification {
                 panic!("element is no longer a transfer")
             };
             assert!(
-                Rc::ptr_eq(&t.param, &payload),
+                t.param.ptr_eq(&payload),
                 "an operation's payload was replaced by a copy"
             );
         }
@@ -1992,7 +1996,7 @@ mod review_verification {
     /// value equality, which a deep copy would still satisfy.
     #[test]
     fn walk_leaves_big_map_free_subtrees_shared() {
-        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 64]));
+        let shared = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 64]));
         // The value shape of the L2-1831 reproduction: one operation `DUP`ed
         // into a three-element `list operation`, all three elements pointing
         // at a single allocation.
@@ -2001,14 +2005,14 @@ mod review_verification {
             shared.clone(),
             shared.clone(),
         ]));
-        let strong_before = Rc::strong_count(&shared);
+        let strong_before = shared.strong_count();
 
         let mut visited = 0;
         walk_big_maps(&mut root, &mut |_| visited += 1);
 
         assert_eq!(visited, 0, "no big map to visit");
         assert_eq!(
-            Rc::strong_count(&shared),
+            shared.strong_count(),
             strong_before,
             "the walk copied a big-map-free subtree"
         );
@@ -2016,7 +2020,7 @@ mod review_verification {
             panic!("root is no longer a list")
         };
         for element in elements.iter() {
-            assert!(Rc::ptr_eq(element, &shared));
+            assert!(element.ptr_eq(&shared));
         }
     }
 
@@ -2036,7 +2040,7 @@ mod review_verification {
         let operation_carrying = |inner: TypedValue<'static>| {
             TypedValue::new_operation(
                 crate::ast::Operation::TransferTokens(TransferTokens {
-                    param: Rc::new(inner),
+                    param: RcTypedValue::new(inner),
                     destination_address:
                         crate::ast::michelson_address::Address::try_from(
                             "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
@@ -2054,17 +2058,17 @@ mod review_verification {
         let mut value = TypedValue::new_pair(
             TypedValue::new_pair(bm(0), bm(1)),
             TypedValue::new_pair(
-                TypedValue::Or(Or::Left(Rc::new(bm(2)))),
+                TypedValue::Or(Or::Left(RcTypedValue::new(bm(2)))),
                 TypedValue::new_pair(
-                    TypedValue::Option(Some(Rc::new(bm(3)))),
+                    TypedValue::Option(Some(RcTypedValue::new(bm(3)))),
                     TypedValue::new_pair(
                         TypedValue::List(MichelsonList::from(vec![
-                            Rc::new(bm(4)),
-                            Rc::new(operation_carrying(bm(5))),
+                            RcTypedValue::new(bm(4)),
+                            RcTypedValue::new(operation_carrying(bm(5))),
                         ])),
                         TypedValue::Map(RedBlackTreeMap::from_iter([(
-                            Rc::new(TypedValue::int(0)),
-                            Rc::new(bm(6)),
+                            RcTypedValue::new(TypedValue::int(0)),
+                            RcTypedValue::new(bm(6)),
                         )])),
                     ),
                 ),
@@ -2115,14 +2119,14 @@ mod review_verification {
         }
         fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
-                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+                TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(acc)]))
             })
         }
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
                 TypedValue::Map(RedBlackTreeMap::from_iter([(
-                    Rc::new(TypedValue::int(0)),
-                    Rc::new(acc),
+                    RcTypedValue::new(TypedValue::int(0)),
+                    RcTypedValue::new(acc),
                 )]))
             })
         }
@@ -2178,14 +2182,14 @@ mod review_verification {
         }
         fn deep_list(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
-                TypedValue::List(MichelsonList::from(vec![Rc::new(acc)]))
+                TypedValue::List(MichelsonList::from(vec![RcTypedValue::new(acc)]))
             })
         }
         fn deep_map(base: TypedValue<'static>, depth: usize) -> TypedValue<'static> {
             (0..depth).fold(base, |acc, _| {
                 TypedValue::Map(RedBlackTreeMap::from_iter([(
-                    Rc::new(TypedValue::int(0)),
-                    Rc::new(acc),
+                    RcTypedValue::new(TypedValue::int(0)),
+                    RcTypedValue::new(acc),
                 )]))
             })
         }
@@ -2223,9 +2227,9 @@ mod review_verification {
     #[test]
     fn walk_updates_big_maps_under_a_shared_spine() {
         let big_map = leaf_big_map;
-        let shared_payload = Rc::new(TypedValue::Bytes(vec![0xcd; 64]));
-        let shared_spine = Rc::new(TypedValue::new_pair_rc(
-            Rc::new(big_map(7)),
+        let shared_payload = RcTypedValue::new(TypedValue::Bytes(vec![0xcd; 64]));
+        let shared_spine = RcTypedValue::new(TypedValue::new_pair_rc(
+            RcTypedValue::new(big_map(7)),
             shared_payload.clone(),
         ));
         let mut root = TypedValue::List(MichelsonList::from(vec![
@@ -2253,7 +2257,7 @@ mod review_verification {
                 panic!("element is no longer a pair")
             };
             assert!(
-                Rc::ptr_eq(payload, &shared_payload),
+                payload.ptr_eq(&shared_payload),
                 "the big-map-free half of the pair was copied"
             );
         }
@@ -2271,14 +2275,14 @@ mod review_verification {
     /// `DUP; NIL t; SWAP; CONS; SWAP; CONS` repeated. `LEVELS` nodes, `2^LEVELS`
     /// occurrences.
     fn shared_dag(leaf: TypedValue<'static>, levels: usize) -> TypedValue<'static> {
-        let mut node = Rc::new(leaf);
+        let mut node = RcTypedValue::new(leaf);
         for _ in 0..levels {
-            node = Rc::new(TypedValue::List(MichelsonList::from(vec![
+            node = RcTypedValue::new(TypedValue::List(MichelsonList::from(vec![
                 node.clone(),
                 node,
             ])));
         }
-        TypedValue::unwrap_rc(node)
+        node.unwrap_or_clone()
     }
 
     /// A value's in-memory DAG can unfold to a tree exponentially larger than
@@ -2498,7 +2502,7 @@ mod review_verification {
         };
         let mut root = TypedValue::List(MichelsonList::from(
             (0..WIDTH)
-                .map(|i| Rc::new(TypedValue::int(i as i64)))
+                .map(|i| RcTypedValue::new(TypedValue::int(i as i64)))
                 .collect::<Vec<_>>(),
         ));
 
@@ -2517,11 +2521,11 @@ mod review_verification {
     /// exercised — a big map at either end would leave one of them empty.
     #[test]
     fn walk_carries_over_unchanged_list_elements() {
-        let first = Rc::new(TypedValue::Bytes(vec![0x01; 32]));
-        let last = Rc::new(TypedValue::Bytes(vec![0x02; 32]));
+        let first = RcTypedValue::new(TypedValue::Bytes(vec![0x01; 32]));
+        let last = RcTypedValue::new(TypedValue::Bytes(vec![0x02; 32]));
         let mut root = TypedValue::List(MichelsonList::from(vec![
             first.clone(),
-            Rc::new(leaf_big_map(5)),
+            RcTypedValue::new(leaf_big_map(5)),
             last.clone(),
         ]));
 
@@ -2539,8 +2543,8 @@ mod review_verification {
         };
         let elements: Vec<_> = elements.iter().collect();
         assert_eq!(elements.len(), 3, "the rebuild changed the list length");
-        assert!(Rc::ptr_eq(elements[0], &first), "the prefix was copied");
-        assert!(Rc::ptr_eq(elements[2], &last), "the suffix was copied");
+        assert!(elements[0].ptr_eq(&first), "the prefix was copied");
+        assert!(elements[2].ptr_eq(&last), "the suffix was copied");
         let mut ids = vec![];
         root.view_big_map_ids(&mut ids);
         assert_eq!(ids, vec![BigMapId::from(50)]);
@@ -2569,13 +2573,13 @@ mod review_verification {
     /// an assertion that ascending is right.
     #[test]
     fn walk_visits_map_values_in_key_order_and_keeps_them_paired() {
-        let key = |k: i64| Rc::new(TypedValue::int(k));
+        let key = |k: i64| RcTypedValue::new(TypedValue::int(k));
         // Inserted out of order on purpose: iteration order must come from the
         // tree, not from insertion.
         let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
-            (key(2), Rc::new(leaf_big_map(2))),
-            (key(0), Rc::new(leaf_big_map(0))),
-            (key(1), Rc::new(leaf_big_map(1))),
+            (key(2), RcTypedValue::new(leaf_big_map(2))),
+            (key(0), RcTypedValue::new(leaf_big_map(0))),
+            (key(1), RcTypedValue::new(leaf_big_map(1))),
         ]));
 
         // Renumber each big map to id + 10, so the rebuilt map shows where
@@ -2618,12 +2622,12 @@ mod review_verification {
     /// map, which is what makes the rebuild copy-on-write rather than a copy.
     #[test]
     fn walk_rebuilds_only_the_changed_map_entry() {
-        let key = |k: i64| Rc::new(TypedValue::int(k));
-        let low = Rc::new(TypedValue::Bytes(vec![0x0a; 32]));
-        let high = Rc::new(TypedValue::Bytes(vec![0x0b; 32]));
+        let key = |k: i64| RcTypedValue::new(TypedValue::int(k));
+        let low = RcTypedValue::new(TypedValue::Bytes(vec![0x0a; 32]));
+        let high = RcTypedValue::new(TypedValue::Bytes(vec![0x0b; 32]));
         let mut root = TypedValue::Map(RedBlackTreeMap::from_iter([
             (key(0), low.clone()),
-            (key(1), Rc::new(leaf_big_map(9))),
+            (key(1), RcTypedValue::new(leaf_big_map(9))),
             (key(2), high.clone()),
         ]));
 
@@ -2635,11 +2639,11 @@ mod review_verification {
             panic!("root is no longer a map")
         };
         assert!(
-            Rc::ptr_eq(m.get(&key(0)).unwrap(), &low),
+            m.get(&key(0)).unwrap().ptr_eq(&low),
             "a big-map-free entry was copied"
         );
         assert!(
-            Rc::ptr_eq(m.get(&key(2)).unwrap(), &high),
+            m.get(&key(2)).unwrap().ptr_eq(&high),
             "a big-map-free entry was copied"
         );
     }
@@ -2658,7 +2662,7 @@ mod review_verification {
         .unwrap();
         let mut root = TypedValue::new_operation(
             crate::ast::Operation::TransferTokens(TransferTokens {
-                param: Rc::new(leaf_big_map(3)),
+                param: RcTypedValue::new(leaf_big_map(3)),
                 destination_address: destination.clone(),
                 amount: 123_456,
             }),
@@ -2714,7 +2718,7 @@ mod review_verification {
             crate::ast::Operation::CreateContract(CreateContract {
                 delegate: Some(delegate.clone()),
                 amount: 999,
-                storage: Rc::new(leaf_big_map(4)),
+                storage: RcTypedValue::new(leaf_big_map(4)),
                 code: code.clone(),
                 micheline_code: &micheline_code,
                 address: address.clone(),

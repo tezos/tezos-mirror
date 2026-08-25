@@ -80,7 +80,7 @@ fn compare_typed_stacks(
     t1 == t2
         && s1.len() == s2.len()
         && std::iter::zip(s1, s2).all(|(v1, v2)| {
-            compare_typed_values(TypedValue::unwrap_rc(v1), TypedValue::unwrap_rc(v2))
+            compare_typed_values(v1.unwrap_or_clone(), v2.unwrap_or_clone())
         })
 }
 
@@ -98,7 +98,8 @@ fn unify_interpreter_error<'a>(
             match typecheck_value(value, ctx, typ, AllowForgedLazyStorageId::Yes) {
                 Ok(exp_typed_val) => compare_typed_values(
                     exp_typed_val,
-                    TypedValue::unwrap_rc(failed_typed_value.clone()),
+                    // `err` keeps its handle, so a move is impossible: clone.
+                    failed_typed_value.as_ref().clone(),
                 ),
                 Err(_) => false,
             }

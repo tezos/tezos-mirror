@@ -57,7 +57,7 @@ pub enum InterpretError<'a> {
     NegativeMutez,
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, Rc<TypedValue<'a>>),
+    FailedWith(Type, RcTypedValue<'a>),
     /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
     #[error("Overflow")]
     Overflow,
@@ -148,9 +148,7 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
 impl<'a> Drop for InterpretError<'a> {
     fn drop(&mut self) {
         if let InterpretError::FailedWith(_, v) = self {
-            if let Some(inner) = Rc::get_mut(v) {
-                crate::ast::drain_deep_typed_value(inner);
-            }
+            v.drain_if_unique();
         }
     }
 }
@@ -287,7 +285,7 @@ impl<'a> ContractScript<'a> {
         // typechecked with forged ids allowed.
         parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
-        (impl Iterator<Item = OperationInfo<'a>>, Rc<TypedValue<'a>>),
+        (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
         ContractInterpretError<'a>,
     > {
         let wrapped_parameter = self.wrap_parameter(
@@ -313,10 +311,12 @@ impl<'a> ContractScript<'a> {
 
         use TypedValue as V;
 
-        let result = TypedValue::unwrap_rc(stack.pop().ok_or(
-            InterpretError::InternalError(InterpretInvariant::EmptyValueStackPop),
-        )?);
-        let mut result = result;
+        let mut result = stack
+            .pop()
+            .ok_or(InterpretError::InternalError(
+                InterpretInvariant::EmptyValueStackPop,
+            ))?
+            .unwrap_or_clone();
         let (operation_list, mut storage) = match &mut result {
             V::Pair(operation_list, storage) => {
                 (std::mem::take(operation_list), std::mem::take(storage))
@@ -328,7 +328,7 @@ impl<'a> ContractScript<'a> {
                 .into())
             }
         };
-        let mut operation_list = TypedValue::unwrap_rc(operation_list);
+        let mut operation_list = operation_list.unwrap_or_clone();
         let lazy_storage = *ctx.lazy_storage();
         // Dump the contract result in two walks that share a single
         // removal decision. A big map can be moved out of the
@@ -387,7 +387,7 @@ impl<'a> ContractScript<'a> {
 
         let mut ops = Vec::with_capacity(vec.len());
         for op in vec {
-            let mut op = TypedValue::unwrap_rc(op);
+            let mut op = op.unwrap_or_clone();
             match &mut op {
                 V::Operation(op) => ops.push(*std::mem::take(op)),
                 _ => {
@@ -537,7 +537,7 @@ enum InterpFrame<'a, 'b> {
         idx: usize,
     },
     AfterDip {
-        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        protected: crate::stack::Stack<RcTypedValue<'a>>,
         opt_height: Option<u16>,
     },
     LoopBody {
@@ -548,27 +548,27 @@ enum InterpFrame<'a, 'b> {
     },
     IterList {
         body: CodeRef<'a, 'b>,
-        remaining: michelson_list::IntoIter<TypedValue<'a>>,
+        remaining: michelson_list::IntoIter<'a>,
     },
     IterSet {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<RcTypedValue<'a>>,
     },
     IterMap {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        remaining: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
     },
     MapListAccum {
         body: CodeRef<'a, 'b>,
-        remaining: michelson_list::IntoIter<TypedValue<'a>>,
-        acc: Vec<Rc<TypedValue<'a>>>,
+        remaining: michelson_list::IntoIter<'a>,
+        acc: Vec<RcTypedValue<'a>>,
     },
     MapOptionAfter,
     MapMapAccum {
         body: CodeRef<'a, 'b>,
-        remaining: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
-        acc: RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-        current_key: Option<Rc<TypedValue<'a>>>,
+        remaining: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
+        acc: RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
+        current_key: Option<RcTypedValue<'a>>,
     },
     /// EXEC body just finished on the top sub stack; pop sub stack,
     /// take its single result, push to the new top stack.
@@ -591,32 +591,32 @@ enum StepResult<'a, 'b> {
     OpenBlock(CodeRef<'a, 'b>),
     OpenDip {
         body: CodeRef<'a, 'b>,
-        protected: crate::stack::Stack<Rc<TypedValue<'a>>>,
+        protected: crate::stack::Stack<RcTypedValue<'a>>,
         opt_height: Option<u16>,
     },
     OpenLoop(CodeRef<'a, 'b>),
     OpenLoopLeft(CodeRef<'a, 'b>),
     OpenIterList {
         body: CodeRef<'a, 'b>,
-        iter: michelson_list::IntoIter<TypedValue<'a>>,
+        iter: michelson_list::IntoIter<'a>,
     },
     OpenIterSet {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<Rc<TypedValue<'a>>>,
+        iter: std::vec::IntoIter<RcTypedValue<'a>>,
     },
     OpenIterMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
+        iter: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
     },
     OpenMapList {
         body: CodeRef<'a, 'b>,
-        iter: michelson_list::IntoIter<TypedValue<'a>>,
+        iter: michelson_list::IntoIter<'a>,
     },
     OpenMapOption(CodeRef<'a, 'b>),
     OpenMapMap {
         body: CodeRef<'a, 'b>,
-        iter: std::vec::IntoIter<(Rc<TypedValue<'a>>, Rc<TypedValue<'a>>)>,
-        first_key: Rc<TypedValue<'a>>,
+        iter: std::vec::IntoIter<(RcTypedValue<'a>, RcTypedValue<'a>)>,
+        first_key: RcTypedValue<'a>,
     },
     /// EXEC: enter a lambda body on a fresh sub stack containing args.
     OpenExec {
@@ -681,7 +681,7 @@ fn interpret<'a, 'b>(
     // they are dropped. `pop()` would hand the caller an inner sub-stack, so
     // take the bottom (the caller's own) explicitly. A leftover sub-stack may
     // hold a deep runtime-built value (e.g. a LOOP-built PAIR comb); draining
-    // it iteratively keeps the recursive `Rc<TypedValue>` destructor from
+    // it iteratively keeps the recursive `RcTypedValue` destructor from
     // overflowing the kernel's ~1 MiB Rust stack (L2-1446). On success there is
     // exactly one entry, so the drain loop is a no-op.
     let mut stacks = stacks.into_iter();
@@ -737,37 +737,35 @@ fn restore_pending_view_context<'a>(
 
 /// Drain every value left on a value stack iteratively before it is dropped,
 /// so a deep runtime-built value (e.g. a `LOOP`-built `PAIR` comb) does not
-/// overflow the kernel's ~1 MiB Rust stack via the recursive `Rc<TypedValue>`
+/// overflow the kernel's ~1 MiB Rust stack via the recursive `RcTypedValue`
 /// destructor. Uniquely-owned values are flattened with
 /// [`crate::ast::drain_deep_typed_value`]; shared values are left to their
 /// other owners -- only their `Rc` refcount is decremented, which does not
 /// recurse. L2-1446.
 fn drain_value_stack(stack: &mut IStack<'_>) {
-    while let Some(rc) = stack.pop() {
-        if let Ok(mut v) = Rc::try_unwrap(rc) {
-            crate::ast::drain_deep_typed_value(&mut v);
-        }
+    while let Some(mut rc) = stack.pop() {
+        rc.drain_if_unique();
     }
 }
 
 /// In-place sibling of [`drain_value_stack`] for value stacks that the
 /// caller still observes after the drain runs. Walks the stack twice:
 ///
-/// 1. First pass: every `Rc<TypedValue>` that is *aliased* on the same
+/// 1. First pass: every `RcTypedValue` that is *aliased* on the same
 ///    stack (e.g. via `DUP` on a runtime-built deep value, leaving two
 ///    `Rc::clone` siblings of the same inner tree at refcount ≥ 2) is
-///    replaced in place by a shallow `Rc<TypedValue::Unit>` sentinel.
+///    replaced in place by a shallow `Unit` sentinel.
 ///    Each replacement decrements the original `Rc`'s strong count; once
 ///    only one alias remains on the stack the surviving slot becomes
 ///    uniquely-owned.
-/// 2. Second pass: every now-uniquely-owned `Rc<TypedValue>` is drained
+/// 2. Second pass: every now-uniquely-owned `RcTypedValue` is drained
 ///    in place via [`crate::ast::drain_deep_typed_value`], flattening the
 ///    deep composite spine while preserving the variant tag.
 ///
 /// Atomic variants (`Int`, `Nat`, `Unit`, …) survive both passes
 /// untouched — `drain_deep_typed_value` is a no-op on them, and they are
 /// never aliased deeply enough to trigger the sentinel replacement (the
-/// recursive `Rc<TypedValue>` destructor only overflows on deep
+/// recursive `RcTypedValue` destructor only overflows on deep
 /// composites). The first-pass sentinel replacement loses the original
 /// value at *aliased* slots; this is the documented in-place-drain
 /// contract for error-path teardown: callers on the Err path must not
@@ -783,8 +781,8 @@ fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
     // this layer without a recursive walk.
     for i in 0..stack.len() {
         if let Ok(rc) = stack.get_mut(i) {
-            if Rc::strong_count(rc) > 1 {
-                *rc = Rc::new(TypedValue::Unit);
+            if rc.strong_count() > 1 {
+                *rc = RcTypedValue::default();
             }
         }
     }
@@ -793,23 +791,21 @@ fn drain_value_stack_in_place(stack: &mut IStack<'_>) {
     // own Drop will handle). Drain the composite spine.
     for i in 0..stack.len() {
         if let Ok(rc) = stack.get_mut(i) {
-            if let Some(v) = Rc::get_mut(rc) {
-                crate::ast::drain_deep_typed_value(v);
-            }
+            rc.drain_if_unique();
         }
     }
 }
 
-/// Drain every `Rc<TypedValue>` still held by the control-flow worklist before
+/// Drain every `RcTypedValue` still held by the control-flow worklist before
 /// the frames are dropped, mirroring [`drain_value_stack`]. On the error-unwind
 /// path a frame may carry a deep runtime-built value -- a `DIP`-protected comb,
 /// or the not-yet-consumed elements / accumulator of an `ITER`/`MAP` over a
-/// deep collection -- whose recursive `Rc<TypedValue>` destructor would
+/// deep collection -- whose recursive `RcTypedValue` destructor would
 /// overflow the kernel's ~1 MiB Rust stack. Control-only frames (`NextInstr`,
 /// `LoopBody`, `AfterExec`, `AfterView`, ...) hold no values and are skipped.
 /// L2-1446.
 fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
-    let mut pending: Vec<Rc<TypedValue<'_>>> = Vec::new();
+    let mut pending: Vec<RcTypedValue<'_>> = Vec::new();
     for frame in frames {
         match frame {
             InterpFrame::AfterDip { protected, .. } => pending.extend(protected),
@@ -849,10 +845,8 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
             | InterpFrame::AfterView { .. } => {}
         }
     }
-    for rc in pending {
-        if let Ok(mut v) = Rc::try_unwrap(rc) {
-            crate::ast::drain_deep_typed_value(&mut v);
-        }
+    for mut rc in pending {
+        rc.drain_if_unique();
     }
 }
 
@@ -870,7 +864,7 @@ fn active_stack_mut<'a, 'c>(
 /// Pop a value off a sub stack, turning an empty stack into the structured
 /// `EmptyValueStackPop` invariant (the recursive interpreter relied on
 /// typechecking having ensured the value was present).
-fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<Rc<TypedValue<'a>>, InterpretError<'a>> {
+fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<RcTypedValue<'a>, InterpretError<'a>> {
     stk.pop().ok_or(InterpretError::InternalError(
         InterpretInvariant::EmptyValueStackPop,
     ))
@@ -995,7 +989,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let cond = match TypedValue::unwrap_rc(pop_value(stk)?) {
+                let cond = match pop_value(stk)?.unwrap_or_clone() {
                     TypedValue::Bool(b) => b,
                     _ => {
                         return Err(InterpretError::InternalError(
@@ -1018,7 +1012,7 @@ fn run_interp_driver<'a, 'b>(
             InterpFrame::LoopLeftBody { body } => {
                 let stk = active_stack_mut(stacks)?;
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                let mut or_v = TypedValue::unwrap_rc(pop_value(stk)?);
+                let mut or_v = pop_value(stk)?.unwrap_or_clone();
                 let or = match &mut or_v {
                     TypedValue::Or(or) => std::mem::take(or),
                     _ => {
@@ -1399,7 +1393,7 @@ fn interpret_step<'a, 'b>(
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
             // pattern match (E0509); borrow the field and `take_out` it,
             // leaving the drained value to drop trivially at end of block.
-            let mut v = TypedValue::unwrap_rc(pop_value(stack)?);
+            let mut v = pop_value(stack)?.unwrap_or_clone();
             match &mut v {
                 #[allow(unused_parens)]
                 $p(i) => $crate::ast::TakeOut::take_out(i),
@@ -1451,7 +1445,7 @@ fn interpret_step<'a, 'b>(
             // trie node per level when the list is shared and mutating in
             // place when it is not.
             ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = match Rc::make_mut(stack.get_mut(0)?) {
+            let lst = match stack.get_mut(0)?.make_mut() {
                 V::List(lst) => lst,
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -1620,7 +1614,10 @@ fn interpret_step<'a, 'b>(
                         // re-push), only the gas is brought in line.
                         ctx.gas().consume(interpret_cost::PUSH)?;
                         ctx.gas().consume(interpret_cost::PAIR)?;
-                        arg = Rc::new(V::new_pair_rc(Rc::clone(capture.arg_val()), arg));
+                        arg = RcTypedValue::new(V::new_pair_rc(
+                            capture.arg_val().clone(),
+                            arg,
+                        ));
                         closure = Closure::unwrap_rc(inner);
                     }
                 }
@@ -1713,7 +1710,8 @@ fn interpret_step<'a, 'b>(
                 return Ok(StepResult::Done);
             }
 
-            let initial = stk![TypedValue::new_pair_rc(input, Rc::new(storage))];
+            let initial =
+                stk![TypedValue::new_pair_rc(input, RcTypedValue::new(storage))];
             Ok(StepResult::OpenView {
                 code,
                 initial,
@@ -1758,20 +1756,20 @@ fn interpret_one<'a>(
     use Instruction as I;
     use TypedValue as V;
 
-    // Two macros: `pop_rc!` keeps the `Rc<TypedValue>`, `pop!` calls
-    // `unwrap_rc` on it. Prefer `pop_rc!` for read-only / forwarding
+    // Two macros: `pop_rc!` keeps the `RcTypedValue`, `pop!` calls
+    // `unwrap_or_clone` on it. Prefer `pop_rc!` for read-only / forwarding
     // access (no risk of deep-cloning a shared collection); use `pop!`
     // only when the value is consumed by value.
     //
     // Usage:
     // `pop_rc!()` pops the top element from the stack, propagating
     //   `InterpretError::InternalError(EmptyValueStackPop)` on `?` if empty.
-    // `pop!()` pops and `unwrap_rc`s the top element, propagating the same
+    // `pop!()` pops and `unwrap_or_clone`s the top element, propagating the same
     //   error on `?`.
-    // `pop!(T::Foo)` pops, `unwrap_rc`s, then matches `T::Foo(x)` returning
+    // `pop!(T::Foo)` pops, `unwrap_or_clone`s, then matches `T::Foo(x)` returning
     //   `x`; on type mismatch propagates
     //   `InterpretError::InternalError(TypeMismatchOnPop { expected })`.
-    // `pop!(T::Bar, x, y, z)` pops, `unwrap_rc`s, matches `T::Bar(x, y, z)`
+    // `pop!(T::Bar, x, y, z)` pops, `unwrap_or_clone`s, matches `T::Bar(x, y, z)`
     //   and binds the fields in the surrounding scope (statement form).
     //
     // `top_mut!(T::Foo)` borrows the top of the stack as `&mut Foo`'s inner
@@ -1788,7 +1786,7 @@ fn interpret_one<'a>(
 
     macro_rules! pop {
         () => {{
-            TypedValue::unwrap_rc(pop_rc!())
+            pop_rc!().unwrap_or_clone()
         }};
         ($p:path) => {{
             // `TypedValue`'s iterative `Drop` forbids moving a payload out by
@@ -1826,7 +1824,7 @@ fn interpret_one<'a>(
 
     // `pop_ref!(x, Foo)` pops the stack and binds `x` as a borrow into
     // `V::Foo`'s payload, without cloning. Expands to two `let`s so the
-    // intermediate `Rc<TypedValue>` lives in the caller's scope and `x`
+    // intermediate `RcTypedValue` lives in the caller's scope and `x`
     // stays a valid reference.
     macro_rules! pop_ref {
         ($var:ident, $ctor:tt) => {
@@ -1847,7 +1845,7 @@ fn interpret_one<'a>(
     macro_rules! top_mut {
         ($p:path) => {{
             let top_rc = stack.get_mut(0)?;
-            match Rc::make_mut(top_rc) {
+            match top_rc.make_mut() {
                 #[allow(unused_parens)]
                 $p(i) => i,
                 _ => {
@@ -2702,7 +2700,7 @@ fn interpret_one<'a>(
             let mut cur = pop_rc!();
             let total = *n as usize;
             stack.reserve(total);
-            let mut lefts: Vec<Rc<TypedValue<'a>>> =
+            let mut lefts: Vec<RcTypedValue<'a>> =
                 Vec::with_capacity(total.saturating_sub(1));
             for _ in 0..(n - 1) {
                 let next = match cur.as_ref() {
@@ -3109,7 +3107,7 @@ fn interpret_one<'a>(
         }
         I::TransferTokens => {
             // Forwarded into the operation as-is: `pop_rc!` keeps the
-            // parameter shared instead of `unwrap_rc`-ing a still-`DUP`ed
+            // parameter shared instead of `unwrap_or_clone`-ing a still-`DUP`ed
             // value into a full copy (L2-1831).
             let param = pop_rc!();
             let mutez_amount = pop!(V::Mutez);
@@ -3127,7 +3125,7 @@ fn interpret_one<'a>(
         }
         I::SetDelegate => {
             let opt_keyhash = pop!(V::Option)
-                .map(|kh| match &mut TypedValue::unwrap_rc(kh) {
+                .map(|kh| match &mut kh.unwrap_or_clone() {
                     V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3289,7 +3287,7 @@ fn interpret_one<'a>(
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
             pop!(V::Pair, amount_left, amount_right);
-            let amount_left = match &mut TypedValue::unwrap_rc(amount_left) {
+            let amount_left = match &mut amount_left.unwrap_or_clone() {
                 V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3297,7 +3295,7 @@ fn interpret_one<'a>(
                     ))
                 }
             };
-            let amount_right = match &mut TypedValue::unwrap_rc(amount_right) {
+            let amount_right = match &mut amount_right.unwrap_or_clone() {
                 V::Nat(n) => std::mem::take(n),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3328,7 +3326,7 @@ fn interpret_one<'a>(
         }
         I::JoinTickets => {
             pop!(V::Pair, ticket_left, ticket_right);
-            let mut ticket_left = match &mut TypedValue::unwrap_rc(ticket_left) {
+            let mut ticket_left = match &mut ticket_left.unwrap_or_clone() {
                 V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3338,7 +3336,7 @@ fn interpret_one<'a>(
                     ))
                 }
             };
-            let ticket_right = match &mut TypedValue::unwrap_rc(ticket_right) {
+            let ticket_right = match &mut ticket_right.unwrap_or_clone() {
                 V::Ticket(t) => std::mem::take(t),
                 _ => {
                     return Err(InterpretError::InternalError(
@@ -3528,7 +3526,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter = fresh_operation_counter(ctx)?;
             let opt_keyhash = pop!(V::Option)
-                .map(|keyhash| match &mut TypedValue::unwrap_rc(keyhash) {
+                .map(|keyhash| match &mut keyhash.unwrap_or_clone() {
                     V::KeyHash(k) => Ok(k.take_out()),
                     _ => Err(InterpretError::InternalError(
                         InterpretInvariant::TypeMismatch {
@@ -3585,14 +3583,14 @@ pub fn compute_contract_address(
 
 fn get_nth_field_slot_mut<'a, 'b>(
     mut m: u16,
-    mut slot: &'a mut Rc<TypedValue<'b>>,
-) -> Result<&'a mut Rc<TypedValue<'b>>, InterpretError<'b>> {
+    mut slot: &'a mut RcTypedValue<'b>,
+) -> Result<&'a mut RcTypedValue<'b>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         if m == 0 {
             return Ok(slot);
         }
-        match Rc::make_mut(slot) {
+        match slot.make_mut() {
             V::Pair(l, r) => {
                 if m == 1 {
                     return Ok(l);
@@ -3627,8 +3625,8 @@ fn get_nth_field_slot_mut<'a, 'b>(
 /// hence `m -= 2`.
 fn get_nth_field_rc<'b>(
     mut m: u16,
-    mut val: &Rc<TypedValue<'b>>,
-) -> Result<Rc<TypedValue<'b>>, InterpretError<'b>> {
+    mut val: &RcTypedValue<'b>,
+) -> Result<RcTypedValue<'b>, InterpretError<'b>> {
     use TypedValue as V;
     loop {
         match (m, &**val) {
@@ -3695,20 +3693,20 @@ mod interpreter_tests {
         super::interpret_one(i, ctx, temp, stack)
     }
 
-    fn rc_set<'a, I>(values: I) -> RedBlackTreeSet<Rc<TypedValue<'a>>>
+    fn rc_set<'a, I>(values: I) -> RedBlackTreeSet<RcTypedValue<'a>>
     where
         I: IntoIterator<Item = TypedValue<'a>>,
     {
-        values.into_iter().map(Rc::new).collect()
+        values.into_iter().map(RcTypedValue::new).collect()
     }
 
-    fn rc_map<'a, I>(values: I) -> RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>
+    fn rc_map<'a, I>(values: I) -> RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>
     where
         I: IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
     {
         values
             .into_iter()
-            .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+            .map(|(key, value)| (RcTypedValue::new(key), RcTypedValue::new(value)))
             .collect()
     }
 
@@ -3776,8 +3774,8 @@ mod interpreter_tests {
             // only the interpretation itself is counted.
             let prog = [
                 Dup(None),
-                Push(Rc::new(V::Bool(true))),
-                Push(Rc::new(V::int(0))),
+                Push(RcTypedValue::new(V::Bool(true))),
+                Push(RcTypedValue::new(V::int(0))),
                 Update(overloads::Update::Set),
             ];
             let gas_before = ctx.gas().milligas().unwrap();
@@ -3814,7 +3812,7 @@ mod interpreter_tests {
 
     /// L2-1837: `FAILWITH` on a shared value must embed it behind its `Rc`,
     /// not deep-copy it. A `DUP` leaves the operand shared (refcount 2); pre-
-    /// fix `FAILWITH` popped with `pop!` -> `unwrap_rc`, deep-cloning the
+    /// fix `FAILWITH` popped with `pop!` -> `unwrap_or_clone`, deep-cloning the
     /// whole `~SIZE`-byte value into a second allocation — enough coexisting
     /// copies exceed the 4 GiB wasm heap and trap the kernel. Post-fix
     /// `FAILWITH` pops with `pop_rc!`, so the allocation is O(1) in `SIZE`.
@@ -3925,7 +3923,7 @@ mod interpreter_tests {
     /// would charge a second `INTERPRET_RET` for a synthetic wrapper block.
     #[test]
     fn top_level_seq_matches_block_gas() {
-        let body = vec![Push(Rc::new(V::int(1))), Drop(None)];
+        let body = vec![Push(RcTypedValue::new(V::int(1))), Drop(None)];
 
         // Production shape: `Seq(body).interpret(..)`.
         let arena_a: &Arena<Micheline> = Box::leak(Box::default());
@@ -3984,7 +3982,7 @@ mod interpreter_tests {
 
     /// L2-1446: a deep runtime-built value (e.g. a `LOOP`/`PAIR`-built comb)
     /// left on a value stack at interpreter teardown must be flattened
-    /// iteratively, not recursed through the `Rc<TypedValue>` destructor. This
+    /// iteratively, not recursed through the `RcTypedValue` destructor. This
     /// exercises `drain_value_stack`, which the driver (for EXEC/View
     /// sub-stacks) and `ContractScript::interpret` (for the caller stack) call
     /// on their error paths. Runs on a 1 MiB worker thread matching the kernel
@@ -4027,15 +4025,15 @@ mod interpreter_tests {
                 for _ in 0..DEPTH {
                     deep = V::new_pair(V::int(0), deep);
                 }
-                let shared = Rc::new(deep);
+                let shared = RcTypedValue::new(deep);
                 // Two Rc::clone siblings (refcount=2) plus a shallow marker
                 // on top — matches the runtime shape of `PUSH ; LOOP { PAIR }
                 // ; DUP ; PUSH 1 ; FAILWITH`. FAILWITH pops the marker, the
                 // shared deep value stays on bottom twice.
                 let mut stack: IStack = Stack::new();
-                stack.push(Rc::clone(&shared));
+                stack.push(shared.clone());
                 stack.push(shared);
-                stack.push(Rc::new(V::int(42)));
+                stack.push(RcTypedValue::new(V::int(42)));
                 let outcome =
                     interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
                 assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
@@ -4068,9 +4066,9 @@ mod interpreter_tests {
         // physically impossible (it would never terminate / would OOM), so
         // a passing assertion proves the walk was actually cut short.
         const K: usize = 64;
-        let mut node = Rc::new(V::int(0));
+        let mut node = RcTypedValue::new(V::int(0));
         for _ in 0..K {
-            node = Rc::new(V::new_pair_rc(Rc::clone(&node), Rc::clone(&node)));
+            node = RcTypedValue::new(V::new_pair_rc(node.clone(), node.clone()));
         }
         // O(1) clones of the shared DAG root (two refcount bumps each).
         let value = (*node).clone();
@@ -4079,7 +4077,7 @@ mod interpreter_tests {
         // through the full `ContractInterpretError` Display chain.
         let cie = ContractInterpretError::from(InterpretError::FailedWith(
             Type::Int,
-            Rc::new(value.clone()),
+            RcTypedValue::new(value.clone()),
         ));
         let rendered = display_bounded(&cie, CAP);
         assert!(
@@ -4098,7 +4096,7 @@ mod interpreter_tests {
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
-        let err = InterpretError::FailedWith(Type::Int, Rc::new(value));
+        let err = InterpretError::FailedWith(Type::Int, RcTypedValue::new(value));
         let rendered_dbg = debug_bounded(&err, CAP);
         assert!(
             rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
@@ -4186,7 +4184,7 @@ mod interpreter_tests {
     /// Companion to [`drain_deep_value_stack_does_not_overflow`] for the
     /// control-flow worklist: every `InterpFrame` variant that owns runtime
     /// values is given a deep one, then `drain_value_frames` must flatten them
-    /// all without the recursive `Rc<TypedValue>` destructor overflowing the
+    /// all without the recursive `RcTypedValue` destructor overflowing the
     /// ~1 MiB worker stack. This is the value carried on the error-unwind path
     /// by a `DIP`-protected comb or an in-flight `ITER`/`MAP` (L2-1446).
     #[test]
@@ -4200,7 +4198,7 @@ mod interpreter_tests {
                     for _ in 0..DEPTH {
                         d = V::new_pair(V::int(0), d);
                     }
-                    Rc::new(d)
+                    RcTypedValue::new(d)
                 };
                 let empty: &[Instruction] = &[];
                 let body = || empty;
@@ -4219,7 +4217,8 @@ mod interpreter_tests {
                     },
                     InterpFrame::IterMap {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
+                        remaining: vec![(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter(),
                     },
                     InterpFrame::MapListAccum {
                         body: body(),
@@ -4228,8 +4227,11 @@ mod interpreter_tests {
                     },
                     InterpFrame::MapMapAccum {
                         body: body(),
-                        remaining: vec![(Rc::new(V::int(0)), deep())].into_iter(),
-                        acc: [(Rc::new(V::int(0)), deep())].into_iter().collect(),
+                        remaining: vec![(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter(),
+                        acc: [(RcTypedValue::new(V::int(0)), deep())]
+                            .into_iter()
+                            .collect(),
                         current_key: Some(deep()),
                     },
                 ];
@@ -5320,8 +5322,8 @@ mod interpreter_tests {
             code: vec![Drop(None), Unit].into(),
         }));
         stack.push(lambda);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // argument on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // argument on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[Exec], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -5343,8 +5345,8 @@ mod interpreter_tests {
             entrypoint: Entrypoint::default(),
         });
         stack.push(address);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // input on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // input on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(
             &[IView {
@@ -5370,8 +5372,8 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         let mut ctx = Ctx::default();
         let mut stack = IStack::new();
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(V::new_option_rc(Some(Rc::clone(&operand)))); // option holding a leaf shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(V::new_option_rc(Some(operand.clone()))); // option holding a leaf shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[Map(overloads::Map::Option, vec![])], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -5405,8 +5407,8 @@ mod interpreter_tests {
             entrypoint: Entrypoint::default(),
         });
         stack.push(address);
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
-        stack.push(Rc::clone(&operand)); // view input on top, shared with `operand`
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
+        stack.push(operand.clone()); // view input on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(
             &[IView {
@@ -5432,9 +5434,9 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         let mut ctx = Ctx::default();
         let mut stack = IStack::new();
-        let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
         stack.push(V::new_pair(V::Bytes(vec![]), V::Unit));
-        stack.push(Rc::clone(&operand)); // new field value on top, shared with `operand`
+        stack.push(operand.clone()); // new field value on top, shared with `operand`
         let before = thread_allocated_bytes();
         interpret(&[UpdateN(1)], &mut ctx, &mut stack).unwrap();
         let allocated = thread_allocated_bytes() - before;
@@ -5451,12 +5453,12 @@ mod interpreter_tests {
         const SIZE: usize = 16 * 1024 * 1024;
         // strings: the shared operand is the first (top) operand.
         {
-            let operand = Rc::new(V::String("0".repeat(SIZE)));
+            let operand = RcTypedValue::new(V::String("0".repeat(SIZE)));
             let mut ctx = Ctx::default();
             ctx.gas = Gas::new(1000); // below concat_string_pair(SIZE)
             let mut stack = IStack::new();
             stack.push(V::String(String::new())); // second operand (small)
-            stack.push(Rc::clone(&operand)); // first operand on top, shared
+            stack.push(operand.clone()); // first operand on top, shared
             let before = thread_allocated_bytes();
             let outcome = interpret(
                 &[Concat(overloads::Concat::TwoStrings)],
@@ -5474,11 +5476,11 @@ mod interpreter_tests {
         }
         // bytes: the shared operand is the second operand.
         {
-            let operand = Rc::new(V::Bytes(vec![0u8; SIZE]));
+            let operand = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
             let mut ctx = Ctx::default();
             ctx.gas = Gas::new(1000); // below concat_bytes_pair(SIZE)
             let mut stack = IStack::new();
-            stack.push(Rc::clone(&operand)); // second operand, shared
+            stack.push(operand.clone()); // second operand, shared
             stack.push(V::Bytes(vec![])); // first operand on top (small)
             let before = thread_allocated_bytes();
             let outcome =
@@ -5543,7 +5545,7 @@ mod interpreter_tests {
     fn interpret_does_not_clone_the_returned_storage() {
         use Instruction as I;
         const SIZE: usize = 16 * 1024 * 1024;
-        let value = Rc::new(V::String("0".repeat(SIZE)));
+        let value = RcTypedValue::new(V::String("0".repeat(SIZE)));
         let contract: ContractScript = ContractScript {
             code: Seq(vec![I::Drop(None), I::Push(value.clone()), I::Nil, I::Pair]),
             parameter: Type::Unit,
@@ -5571,7 +5573,7 @@ mod interpreter_tests {
             .unwrap();
         let allocated = thread_allocated_bytes() - before;
         assert!(
-            std::rc::Rc::ptr_eq(&storage, &value),
+            storage.ptr_eq(&value),
             "finalization deep-copied the shared returned storage"
         );
         assert!(
@@ -5713,7 +5715,10 @@ mod interpreter_tests {
         let mut stack = stk![V::nat(20), V::nat(10)];
         let expected_stack = stk![V::nat(20), V::nat(10), V::nat(0)];
         let mut ctx = Ctx::default();
-        assert!(interpret_one(&Push(Rc::new(V::nat(0))), &mut ctx, &mut stack).is_ok());
+        assert!(
+            interpret_one(&Push(RcTypedValue::new(V::nat(0))), &mut ctx, &mut stack)
+                .is_ok()
+        );
         assert_eq!(stack, expected_stack);
     }
 
@@ -5724,9 +5729,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::nat(1))),
+                Push(RcTypedValue::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(Rc::new(V::Bool(false)))
+                Push(RcTypedValue::new(V::Bool(false)))
             ])],
             &mut ctx,
             &mut stack,
@@ -5742,9 +5747,9 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::nat(1))),
+                Push(RcTypedValue::new(V::nat(1))),
                 Add(overloads::Add::NatNat),
-                Push(Rc::new(V::Bool(false)))
+                Push(RcTypedValue::new(V::Bool(false)))
             ])],
             &mut ctx,
             &mut stack,
@@ -5760,7 +5765,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Loop(vec![
-                Push(Rc::new(V::int(-1))),
+                Push(RcTypedValue::new(V::int(-1))),
                 Add(overloads::Add::IntInt),
                 Dup(None),
                 Gt
@@ -5791,7 +5796,7 @@ mod interpreter_tests {
             interpret(
                 &[LoopLeft(vec![
                     Drop(None),
-                    Push(Rc::new(V::new_or(Or::Right(V::int(1)))))
+                    Push(RcTypedValue::new(V::new_or(Or::Right(V::int(1)))))
                 ])],
                 &mut ctx,
                 &mut stack
@@ -6119,7 +6124,10 @@ mod interpreter_tests {
                 &mut Ctx::default(),
                 &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(Type::Nat, Rc::new(V::nat(20))))
+            Err(InterpretError::FailedWith(
+                Type::Nat,
+                RcTypedValue::new(V::nat(20))
+            ))
         );
     }
 
@@ -6128,7 +6136,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         assert_eq!(
             interpret(
-                &[Push(Rc::new(V::String("foo".to_owned())))],
+                &[Push(RcTypedValue::new(V::String("foo".to_owned())))],
                 &mut Ctx::default(),
                 &mut stack
             ),
@@ -6141,7 +6149,11 @@ mod interpreter_tests {
     fn push_unit_value() {
         let mut stack = Stack::new();
         assert_eq!(
-            interpret(&[Push(Rc::new(V::Unit))], &mut Ctx::default(), &mut stack),
+            interpret(
+                &[Push(RcTypedValue::new(V::Unit))],
+                &mut Ctx::default(),
+                &mut stack
+            ),
             Ok(())
         );
         assert_eq!(stack, stk![V::Unit]);
@@ -6166,7 +6178,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(Rc::new(V::new_pair(
+            &[Push(RcTypedValue::new(V::new_pair(
                 V::int(-5),
                 V::new_pair(V::nat(3), V::Bool(false))
             )))],
@@ -6194,7 +6206,7 @@ mod interpreter_tests {
         let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
-            &[Push(Rc::new(V::new_option(Some(V::int(-5)))))],
+            &[Push(RcTypedValue::new(V::new_option(Some(V::int(-5)))))],
             &mut ctx,
             &mut stack
         )
@@ -6214,7 +6226,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(Rc::new(V::new_pair(
+                Push(RcTypedValue::new(V::new_pair(
                     V::int(-5),
                     V::new_pair(V::nat(3), V::Bool(false))
                 ))),
@@ -6240,7 +6252,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
-                Push(Rc::new(V::new_pair(
+                Push(RcTypedValue::new(V::new_pair(
                     V::new_pair(V::nat(3), V::Bool(false)),
                     V::int(-5),
                 ))),
@@ -6385,7 +6397,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_1() {
-        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
+        let code = vec![IfNone(vec![Push(RcTypedValue::new(V::int(5)))], vec![])];
         // with Some
         let mut stack = stk![V::new_option(Some(V::int(42)))];
         let mut ctx = Ctx::default();
@@ -6402,7 +6414,7 @@ mod interpreter_tests {
 
     #[test]
     fn if_none_2() {
-        let code = vec![IfNone(vec![Push(Rc::new(V::int(5)))], vec![])];
+        let code = vec![IfNone(vec![Push(RcTypedValue::new(V::int(5)))], vec![])];
         // with None
         let mut stack = stk![V::new_option(None)];
         let mut ctx = Ctx::default();
@@ -6422,7 +6434,7 @@ mod interpreter_tests {
     fn if_cons_cons() {
         let code = vec![IfCons(
             vec![Swap, Drop(None)],
-            vec![Push(Rc::new(V::int(0)))],
+            vec![Push(RcTypedValue::new(V::int(0)))],
         )];
         let mut stack = stk![V::List(vec![V::int(1), V::int(2)].into())];
         let mut ctx = Ctx::default();
@@ -6443,7 +6455,7 @@ mod interpreter_tests {
     fn if_cons_nil() {
         let code = vec![IfCons(
             vec![Swap, Drop(None)],
-            vec![Push(Rc::new(V::int(0)))],
+            vec![Push(RcTypedValue::new(V::int(0)))],
         )];
         let mut stack = stk![V::List(MichelsonList::new())];
         let mut ctx = Ctx::default();
@@ -6461,7 +6473,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_left() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
+        let code = vec![IfLeft(
+            vec![],
+            vec![Drop(None), Push(RcTypedValue::new(V::int(0)))],
+        )];
         let mut stack = stk![V::new_or(or::Or::Left(V::int(1)))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -6477,7 +6492,10 @@ mod interpreter_tests {
 
     #[test]
     fn if_left_right() {
-        let code = vec![IfLeft(vec![], vec![Drop(None), Push(Rc::new(V::int(0)))])];
+        let code = vec![IfLeft(
+            vec![],
+            vec![Drop(None), Push(RcTypedValue::new(V::int(0)))],
+        )];
         let mut stack = stk![V::new_or(or::Or::Right(V::Unit))];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
@@ -6595,7 +6613,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
-                &[Push(Rc::new(V::List(
+                &[Push(RcTypedValue::new(V::List(
                     vec![V::int(1), V::int(2), V::int(3),].into()
                 )))],
                 &mut ctx,
@@ -6652,7 +6670,11 @@ mod interpreter_tests {
             (V::int(2), V::String("bar".to_owned())),
         ]);
         assert_eq!(
-            interpret(&[Push(Rc::new(V::Map(map.clone())))], &mut ctx, &mut stack),
+            interpret(
+                &[Push(RcTypedValue::new(V::Map(map.clone())))],
+                &mut ctx,
+                &mut stack
+            ),
             Ok(())
         );
         assert_eq!(stack, stk![V::Map(map)]);
@@ -7770,7 +7792,7 @@ mod interpreter_tests {
     /// L2-1838: `PACK` on a shared value must read it through its `Rc`, not
     /// deep-copy it. With a gas budget too small to serialize the value, PACK
     /// must run out of gas *without* first cloning the shared operand. Pre-fix
-    /// `pop!` -> `unwrap_rc` clones the whole `~SIZE`-byte value (an uncharged
+    /// `pop!` -> `unwrap_or_clone` clones the whole `~SIZE`-byte value (an uncharged
     /// allocation that can exhaust the heap) before any serialization gas is
     /// charged; post-fix the borrowed unparse charges before cloning any leaf,
     /// so the out-of-gas fires after only `O(gas)` allocation.
@@ -7778,9 +7800,9 @@ mod interpreter_tests {
     fn pack_shared_value_is_not_deep_copied() {
         const SIZE: usize = 16 * 1024 * 1024;
         // Two `Rc` siblings (refcount 2) — the runtime shape of `DUP ; PACK`.
-        let shared = Rc::new(V::Bytes(vec![0u8; SIZE]));
+        let shared = RcTypedValue::new(V::Bytes(vec![0u8; SIZE]));
         let mut stack: IStack = Stack::new();
-        stack.push(Rc::clone(&shared));
+        stack.push(shared.clone());
         stack.push(shared);
         let mut ctx = Ctx::default();
         ctx.gas = Gas::new(1000); // far too little to serialize 16 MiB
@@ -7816,7 +7838,7 @@ mod interpreter_tests {
     #[test]
     fn transfer_tokens() {
         let tt = super::TransferTokens {
-            param: Rc::new(TypedValue::nat(42)),
+            param: RcTypedValue::new(TypedValue::nat(42)),
             destination_address: addr::Address::try_from(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw",
             )
@@ -8215,7 +8237,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8244,7 +8266,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8318,7 +8340,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8354,7 +8376,7 @@ mod interpreter_tests {
                     vec![
                         Dup(None),
                         Add(overloads::Add::NatNat),
-                        Push(Rc::new(TypedValue::Bool(false))),
+                        Push(RcTypedValue::new(TypedValue::Bool(false))),
                         Pair,
                         Exec,
                     ],
@@ -8411,10 +8433,10 @@ mod interpreter_tests {
             micheline_code: Micheline::Seq(&[]),
             code: vec![Drop(None), Unit].into(),
         });
-        let capture = Rc::new(V::Bytes(vec![0; 4096]));
+        let capture = RcTypedValue::new(V::Bytes(vec![0; 4096]));
         let mut stack = IStack::new();
         stack.push(V::Lambda(lambda));
-        stack.push(Rc::clone(&capture));
+        stack.push(capture.clone());
 
         interpret_one(
             &Apply {
@@ -8429,7 +8451,7 @@ mod interpreter_tests {
             V::Lambda(Closure::Apply {
                 capture: applied_capture,
                 ..
-            }) => assert!(Rc::ptr_eq(applied_capture.arg_val(), &capture)),
+            }) => assert!(applied_capture.arg_val().ptr_eq(&capture)),
             value => panic!("expected applied closure, got {value:?}"),
         }
     }
@@ -8515,7 +8537,7 @@ mod interpreter_tests {
     // The capture-unparse cache is irrelevant to those tests (EXEC and `Rc`
     // sharing ignore it), so a trivial one is used; tests that exercise the
     // cache build it through `APPLY` via `cached_applied_drop_closure`.
-    fn applied_drop_closure(capture: Rc<TypedValue<'static>>) -> TypedValue<'static> {
+    fn applied_drop_closure(capture: RcTypedValue<'static>) -> TypedValue<'static> {
         TypedValue::Lambda(Closure::Apply {
             capture: Rc::new(AppliedCapture::new(
                 Type::Bytes,
@@ -8545,7 +8567,7 @@ mod interpreter_tests {
             &mut stack,
         )
         .unwrap();
-        TypedValue::unwrap_rc(stack.pop().unwrap())
+        stack.pop().unwrap().unwrap_or_clone()
     }
 
     #[test]
@@ -8554,7 +8576,7 @@ mod interpreter_tests {
         //
         // The attack is `APPLY large_capture; loop k { DUP; EXEC }`. Each
         // `EXEC` of a `DUP`'d (refcount >= 2) applied closure has to clone the
-        // closure out of its shared `Rc` (`pop_v!`/`unwrap_rc`). Because
+        // closure out of its shared `Rc` (`pop_v!`/`unwrap_or_clone`). Because
         // `Closure::Apply` now stores its capture in an `Rc`, that clone bumps
         // a refcount (O(1)) instead of deep-copying the whole capture. With the
         // previous `Box`, every `EXEC` deep-copied the capture: O(k * |capture|)
@@ -8564,15 +8586,15 @@ mod interpreter_tests {
 
         // Cloning an applied closure -- exactly what `EXEC` does to a `DUP`'d
         // closure -- must share the capture allocation, not deep-copy it.
-        let capture = Rc::new(V::Bytes(vec![0; 1 << 16]));
+        let capture = RcTypedValue::new(V::Bytes(vec![0; 1 << 16]));
         let arg_val_of = |tv: &TypedValue<'static>| match tv {
             TypedValue::Lambda(Closure::Apply { capture, .. }) => {
-                Rc::clone(capture.arg_val())
+                capture.arg_val().clone()
             }
             value => panic!("expected applied closure, got {value:?}"),
         };
-        let closure = applied_drop_closure(Rc::clone(&capture));
-        assert!(Rc::ptr_eq(&arg_val_of(&closure.clone()), &capture));
+        let closure = applied_drop_closure(capture.clone());
+        assert!(arg_val_of(&closure.clone()).ptr_eq(&capture));
 
         // The closure takes `unit` and returns `unit` (`DROP ; UNIT`), so each
         // loop iteration `DUP`s it, pushes the `unit` argument, `EXEC`s the
@@ -8580,28 +8602,30 @@ mod interpreter_tests {
         // round.
         let mut body = Vec::new();
         for _ in 0..ITERATIONS {
-            body.extend([Dup(None), Push(Rc::new(V::Unit)), Exec, Drop(None)]);
+            body.extend([
+                Dup(None),
+                Push(RcTypedValue::new(V::Unit)),
+                Exec,
+                Drop(None),
+            ]);
         }
 
-        let run = |capture: Rc<TypedValue<'static>>| -> u32 {
+        let run = |capture: RcTypedValue<'static>| -> u32 {
             let mut ctx = Ctx::default();
-            let mut stack = stk![applied_drop_closure(Rc::clone(&capture))];
+            let mut stack = stk![applied_drop_closure(capture.clone())];
             let start_milligas = ctx.gas().milligas().unwrap();
             interpret(&body, &mut ctx, &mut stack).unwrap();
             // The surviving closure still points at the *original* capture
             // allocation: the loop never re-allocated it.
             assert_eq!(stack.len(), 1);
-            assert!(Rc::ptr_eq(
-                &arg_val_of(stack.get(0).unwrap().as_ref()),
-                &capture
-            ));
+            assert!(arg_val_of(stack.get(0).unwrap().as_ref()).ptr_eq(&capture));
             start_milligas - ctx.gas().milligas().unwrap()
         };
 
         // Flat `EXEC` gas is acceptable now precisely because the per-iteration
         // work is O(1): the same flat charge for a 1-byte and a 64-KiB capture.
         let large_gas = run(capture);
-        let small_gas = run(Rc::new(V::Bytes(vec![0; 1])));
+        let small_gas = run(RcTypedValue::new(V::Bytes(vec![0; 1])));
         assert_eq!(large_gas, small_gas);
         assert!(large_gas > 0);
     }
@@ -9455,7 +9479,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: Rc::new(TypedValue::nat(20)),
+                    value: RcTypedValue::new(TypedValue::nat(20)),
                     arg_ty: Left(Type::Nat)
                 }),
                 100
@@ -9490,7 +9514,7 @@ mod interpreter_tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(super::Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: Rc::new(TypedValue::nat(20)),
+                    value: RcTypedValue::new(TypedValue::nat(20)),
                     arg_ty: Or::Right(emit_type_mich)
                 }),
                 100
@@ -10639,7 +10663,7 @@ mod interpreter_tests {
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: Rc::new(TypedValue::Unit),
+                storage: RcTypedValue::new(TypedValue::Unit),
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -10711,7 +10735,7 @@ mod interpreter_tests {
             )
             .unwrap();
 
-        let params: Vec<Rc<TypedValue>> = ops
+        let params: Vec<RcTypedValue> = ops
             .map(|op| match op.operation {
                 Operation::TransferTokens(tt) => tt.param,
                 other => panic!("expected TransferTokens, got {other:?}"),
@@ -10719,7 +10743,7 @@ mod interpreter_tests {
             .collect();
         assert_eq!(params.len(), 2);
         assert!(
-            Rc::ptr_eq(&params[0], &params[1]),
+            params[0].ptr_eq(&params[1]),
             "the duplicated operation's parameter was copied"
         );
     }

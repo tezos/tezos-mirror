@@ -764,13 +764,13 @@ pub enum TypedValue<'a> {
     Bool(bool),
     String(String),
     Unit,
-    Pair(Rc<Self>, Rc<Self>),
-    Option(Option<Rc<Self>>),
-    List(MichelsonList<Rc<Self>>),
-    Set(RedBlackTreeSet<Rc<Self>>),
-    Map(RedBlackTreeMap<Rc<Self>, Rc<Self>>),
+    Pair(RcTypedValue<'a>, RcTypedValue<'a>),
+    Option(Option<RcTypedValue<'a>>),
+    List(MichelsonList<RcTypedValue<'a>>),
+    Set(RedBlackTreeSet<RcTypedValue<'a>>),
+    Map(RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>),
     BigMap(BigMap<'a>),
-    Or(Or<Rc<Self>, Rc<Self>>),
+    Or(Or<RcTypedValue<'a>, RcTypedValue<'a>>),
     Address(Address),
     ChainId(ChainId),
     Contract(Address),
@@ -797,6 +797,169 @@ pub enum TypedValue<'a> {
 impl Default for TypedValue<'_> {
     fn default() -> Self {
         TypedValue::Unit
+    }
+}
+
+/// A [TypedValue] shared behind an [Rc]. This is the type everything outside
+/// this module uses to handle Michelson values: cloning is a reference-count
+/// bump, reading goes through [Deref](std::ops::Deref) (or
+/// [RcTypedValue::as_ref]), and ownership is recovered with
+/// [RcTypedValue::unwrap_or_clone] (move when unique, deep clone otherwise) or
+/// obtained in place with [RcTypedValue::make_mut] (clone-on-write).
+///
+/// The wrapped `Rc` is deliberately private: keeping every sharing decision
+/// behind this one type means the move-when-unique optimizations cannot be
+/// bypassed by accident at call sites.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RcTypedValue<'a>(Rc<TypedValue<'a>>);
+
+impl<'a> RcTypedValue<'a> {
+    /// Wrap a value, making it shareable.
+    pub fn new(v: TypedValue<'a>) -> Self {
+        RcTypedValue(Rc::new(v))
+    }
+
+    /// Mutably borrow the shared value, cloning it first if it is shared
+    /// (clone-on-write, see [Rc::make_mut]). Prefer this over
+    /// [RcTypedValue::unwrap_or_clone] when editing in place: a unique value
+    /// is mutated directly with no move.
+    pub fn make_mut(&mut self) -> &mut TypedValue<'a> {
+        Rc::make_mut(&mut self.0)
+    }
+
+    /// Take ownership of the shared value: moves it out when this is the last
+    /// reference, clones it otherwise. Prefer keeping the `RcTypedValue` when
+    /// the value is only read or forwarded — the clone is a deep copy of every
+    /// inline payload, and those are unbounded.
+    pub fn unwrap_or_clone(self) -> TypedValue<'a> {
+        Rc::unwrap_or_clone(self.0)
+    }
+
+    /// Take ownership of the shared value only when this is the last
+    /// reference, returning the untouched `self` otherwise. Prefer
+    /// [RcTypedValue::unwrap_or_clone] unless the shared case genuinely takes
+    /// a different path (e.g. the iterative drop drain, which leaves shared
+    /// values to their remaining owners).
+    pub fn try_unwrap(self) -> Result<TypedValue<'a>, Self> {
+        Rc::try_unwrap(self.0).map_err(RcTypedValue)
+    }
+
+    /// Whether two handles share the same allocation (see [Rc::ptr_eq]).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// The allocation's address, as a sharing identity (see [Rc::as_ptr]).
+    /// Prefer [RcTypedValue::ptr_eq] for pairwise checks; this exists for
+    /// identity sets keyed by more than two handles.
+    pub fn as_ptr(&self) -> *const TypedValue<'a> {
+        Rc::as_ptr(&self.0)
+    }
+
+    /// Number of handles sharing the value (see [Rc::strong_count]). Useful
+    /// mostly for asserting sharing behavior in tests.
+    pub fn strong_count(&self) -> usize {
+        Rc::strong_count(&self.0)
+    }
+
+    /// Drain the value's (possibly deep) children onto an iterative worklist
+    /// when this is the last reference, leaving the shallow husk to drop
+    /// trivially; a still-shared value is left to its remaining owners. Used
+    /// on teardown paths that release values before they fall out of scope.
+    pub(crate) fn drain_if_unique(&mut self) {
+        if let Some(inner) = Rc::get_mut(&mut self.0) {
+            drain_deep_typed_value(inner);
+        }
+    }
+}
+
+/// Borrow the shared value for reading (typically to match on it).
+impl<'a> AsRef<TypedValue<'a>> for RcTypedValue<'a> {
+    fn as_ref(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+/// Lets collections keyed by [RcTypedValue] (interpreter maps and sets) be
+/// probed with a plain borrowed [TypedValue]. The [Eq]/[Ord] forwarding impls
+/// keep the two views consistent, as [std::borrow::Borrow] requires.
+impl<'a> std::borrow::Borrow<TypedValue<'a>> for RcTypedValue<'a> {
+    fn borrow(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+impl<'a> From<TypedValue<'a>> for RcTypedValue<'a> {
+    fn from(v: TypedValue<'a>) -> Self {
+        RcTypedValue::new(v)
+    }
+}
+
+impl<'a> std::ops::Deref for RcTypedValue<'a> {
+    type Target = TypedValue<'a>;
+
+    fn deref(&self) -> &TypedValue<'a> {
+        &self.0
+    }
+}
+
+/// Shared `Unit` placeholder, mirroring [TypedValue]'s [Default]; used when
+/// moving a value out of a `&mut RcTypedValue` field so the drained-out parent
+/// drops without recursing.
+impl Default for RcTypedValue<'_> {
+    fn default() -> Self {
+        RcTypedValue::new(TypedValue::Unit)
+    }
+}
+
+/// Forwards to the wrapped value's iterative [TypedValue] `Debug`; the `Rc`
+/// indirection is implementation detail and is elided.
+impl std::fmt::Debug for RcTypedValue<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod test_rc_typed_value {
+    use super::*;
+
+    #[test]
+    fn make_mut_unique_edits_in_place() {
+        let mut v = RcTypedValue::new(TypedValue::int(1));
+        *v.make_mut() = TypedValue::int(2);
+        assert_eq!(v.as_ref(), &TypedValue::int(2));
+    }
+
+    #[test]
+    fn make_mut_shared_clones_first() {
+        let mut v = RcTypedValue::new(TypedValue::int(1));
+        let shared = v.clone();
+        *v.make_mut() = TypedValue::int(2);
+        assert_eq!(v.as_ref(), &TypedValue::int(2));
+        assert_eq!(shared.as_ref(), &TypedValue::int(1));
+    }
+
+    #[test]
+    fn unwrap_or_clone_shared_clones() {
+        let v = RcTypedValue::new(TypedValue::int(1));
+        let shared = v.clone();
+        assert_eq!(v.unwrap_or_clone(), TypedValue::int(1));
+        assert_eq!(shared.as_ref(), &TypedValue::int(1));
+    }
+
+    #[test]
+    fn comparisons_and_debug_forward_to_the_value() {
+        let one = RcTypedValue::new(TypedValue::int(1));
+        let two = RcTypedValue::new(TypedValue::int(2));
+        assert_eq!(one, RcTypedValue::new(TypedValue::int(1)));
+        assert!(one < two);
+        assert_eq!(format!("{one:?}"), format!("{:?}", TypedValue::int(1)));
+    }
+
+    #[test]
+    fn default_is_unit() {
+        assert_eq!(RcTypedValue::default().as_ref(), &TypedValue::Unit);
     }
 }
 
@@ -843,14 +1006,11 @@ pub(crate) enum DebugFrame<'b, 'a: 'b> {
     // the container, so the ", " separator is emitted *before* every
     // non-first entry (no trailing comma).
     MapEntries(
-        std::vec::IntoIter<(&'b Rc<TypedValue<'a>>, &'b Rc<TypedValue<'a>>)>,
+        std::vec::IntoIter<(&'b RcTypedValue<'a>, &'b RcTypedValue<'a>)>,
         bool,
     ),
-    SetEntries(std::vec::IntoIter<&'b Rc<TypedValue<'a>>>, bool),
-    ListEntries(
-        crate::ast::michelson_list::Iter<'b, Rc<TypedValue<'a>>>,
-        bool,
-    ),
+    SetEntries(std::vec::IntoIter<&'b RcTypedValue<'a>>, bool),
+    ListEntries(crate::ast::michelson_list::Iter<'b, RcTypedValue<'a>>, bool),
 }
 
 pub(crate) fn debug_fmt_walk<'a, 'b>(
@@ -1261,34 +1421,31 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     // an untyped representation that is the shortest.
                     TV::Pair(l, r) => {
                         frames.push(TvImFrame::BuildPrim2(Prim::Pair));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(r),
-                        )));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(l),
-                        )));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(r).unwrap_or_clone()));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(l).unwrap_or_clone()));
                     }
                     TV::Option(None) => results.push(V::prim0(Prim::None, gas)?),
                     TV::Option(Some(rc)) => {
                         frames.push(TvImFrame::BuildPrim1(Prim::Some));
-                        frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                            std::mem::take(rc),
-                        )));
+                        frames
+                            .push(TvImFrame::Visit(std::mem::take(rc).unwrap_or_clone()));
                     }
                     TV::Or(or) => match std::mem::take(or) {
                         Or::Left(x) => {
                             frames.push(TvImFrame::BuildPrim1(Prim::Left));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                            frames.push(TvImFrame::Visit(x.unwrap_or_clone()));
                         }
                         Or::Right(x) => {
                             frames.push(TvImFrame::BuildPrim1(Prim::Right));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(x)));
+                            frames.push(TvImFrame::Visit(x.unwrap_or_clone()));
                         }
                     },
                     TV::List(l) => {
                         let mut elems: Vec<TypedValue<'a>> = std::mem::take(l)
                             .into_iter()
-                            .map(TypedValue::unwrap_rc)
+                            .map(RcTypedValue::unwrap_or_clone)
                             .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1299,7 +1456,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         let mut elems: Vec<TypedValue<'a>> =
                             rb_set_into_vec(std::mem::take(s))
                                 .into_iter()
-                                .map(TypedValue::unwrap_rc)
+                                .map(RcTypedValue::unwrap_or_clone)
                                 .collect();
                         frames.push(TvImFrame::BuildSeqOf { count: elems.len() });
                         while let Some(elem) = elems.pop() {
@@ -1307,28 +1464,28 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                         }
                     }
                     TV::Map(m) => {
-                        let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
+                        let mut entries: Vec<(RcTypedValue<'a>, RcTypedValue<'a>)> =
                             rb_map_into_vec(std::mem::take(m));
                         frames.push(TvImFrame::BuildSeqOf {
                             count: entries.len(),
                         });
                         while let Some((key, val)) = entries.pop() {
                             frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                            frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                            frames.push(TvImFrame::Visit(val.unwrap_or_clone()));
+                            frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                         }
                     }
                     TV::BigMap(m) => match std::mem::take(&mut m.content) {
                         big_map::BigMapContent::InMemory(m) => {
-                            let mut entries: Vec<(Rc<Self>, Rc<Self>)> =
+                            let mut entries: Vec<(RcTypedValue<'a>, RcTypedValue<'a>)> =
                                 rb_map_into_vec(m);
                             frames.push(TvImFrame::BuildSeqOf {
                                 count: entries.len(),
                             });
                             while let Some((key, val)) = entries.pop() {
                                 frames.push(TvImFrame::BuildPrim2(Prim::Elt));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(val)));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(key)));
+                                frames.push(TvImFrame::Visit(val.unwrap_or_clone()));
+                                frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                             }
                         }
                         big_map::BigMapContent::FromId(m) => {
@@ -1336,8 +1493,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                             if m.overlay.is_empty() {
                                 results.push(id_part);
                             } else {
-                                let mut overlay: Vec<(Rc<Self>, Option<Rc<Self>>)> =
-                                    rb_map_into_vec(m.overlay);
+                                let mut overlay: Vec<(
+                                    RcTypedValue<'a>,
+                                    Option<RcTypedValue<'a>>,
+                                )> = rb_map_into_vec(m.overlay);
                                 frames.push(TvImFrame::BuildBigMapFromId {
                                     id_part,
                                     count: overlay.len(),
@@ -1349,7 +1508,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             frames
                                                 .push(TvImFrame::BuildPrim1(Prim::Some));
                                             frames.push(TvImFrame::Visit(
-                                                TypedValue::unwrap_rc(v),
+                                                v.unwrap_or_clone(),
                                             ));
                                         }
                                         None => {
@@ -1359,9 +1518,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                             )?));
                                         }
                                     }
-                                    frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                        key,
-                                    )));
+                                    frames.push(TvImFrame::Visit(key.unwrap_or_clone()));
                                 }
                             }
                         }
@@ -1380,9 +1537,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                 frames.push(TvImFrame::Visit(TV::Address(
                                     tt.destination_address,
                                 )));
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    tt.param,
-                                )));
+                                frames.push(TvImFrame::Visit(tt.param.unwrap_or_clone()));
                             }
                             Operation::SetDelegate(sd) => {
                                 // Inner value is a leaf (`Some(KeyHash)` or `None`) so this
@@ -1413,9 +1568,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     arg_ty_mich,
                                     tag: em.tag,
                                 });
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    em.value,
-                                )));
+                                frames.push(TvImFrame::Visit(em.value.unwrap_or_clone()));
                             }
                             Operation::CreateContract(cc) => {
                                 let delegate_mich = match cc.delegate {
@@ -1440,9 +1593,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                                     delegate_mich,
                                     mutez_mich,
                                 });
-                                frames.push(TvImFrame::Visit(TypedValue::unwrap_rc(
-                                    cc.storage,
-                                )));
+                                frames
+                                    .push(TvImFrame::Visit(cc.storage.unwrap_or_clone()));
                             }
                         }
                     }
@@ -1589,21 +1741,18 @@ impl<'a> TypedValue<'a> {
 
         enum Frame<'v, 'a> {
             Visit(&'v TypedValue<'a>),
-            ListNext(michelson_list::Iter<'v, Rc<TypedValue<'a>>>),
-            SetNext(std::vec::IntoIter<&'v Rc<TypedValue<'a>>>),
-            MapNext(std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>),
+            ListNext(michelson_list::Iter<'v, RcTypedValue<'a>>),
+            SetNext(std::vec::IntoIter<&'v RcTypedValue<'a>>),
+            MapNext(std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v RcTypedValue<'a>)>),
             /// A big map's in-memory entries. Distinct from [Frame::MapNext]
             /// only in the container it drains; both hold `Rc`-shared entries.
             BigMapEltNext(
-                std::vec::IntoIter<(&'v Rc<TypedValue<'a>>, &'v Rc<TypedValue<'a>>)>,
+                std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v RcTypedValue<'a>)>,
             ),
             /// A `FromId` big map's pending overlay; a `None` value marks a
             /// removal.
             OverlayNext(
-                std::vec::IntoIter<(
-                    &'v Rc<TypedValue<'a>>,
-                    &'v Option<Rc<TypedValue<'a>>>,
-                )>,
+                std::vec::IntoIter<(&'v RcTypedValue<'a>, &'v Option<RcTypedValue<'a>>)>,
             ),
             /// Emit an already-built node (the `None` arm of an overlay entry).
             Leaf(Micheline<'a>),
@@ -1866,7 +2015,7 @@ impl From<OutOfGas> for BorrowedUnparseError {
 
 /// Drain a persistent [RedBlackTreeSet] into a `Vec`. rpds exposes no owning
 /// iterator, so we clone the element handles (cheap `Rc` bumps); when the set
-/// was unique a later [TypedValue::unwrap_rc] then moves rather than clones.
+/// was unique a later [RcTypedValue::unwrap_or_clone] then moves rather than clones.
 pub(crate) fn rb_set_into_vec<T: Ord + Clone>(s: RedBlackTreeSet<T>) -> Vec<T> {
     s.iter().cloned().collect()
 }
@@ -1890,44 +2039,39 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Take ownership of an `Rc`-shared value: moves it out when this is the
-    /// last reference, clones it otherwise. Prefer keeping the `Rc` when the
-    /// value is only read or forwarded — the clone is a deep copy of every
-    /// inline payload, and those are unbounded.
-    pub fn unwrap_rc(rc: Rc<Self>) -> Self {
-        Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
-    }
-
     /// Convenience function to construct a new [Self::Pair].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Rc::new(l), Rc::new(r))
+        Self::Pair(RcTypedValue::new(l), RcTypedValue::new(r))
     }
 
-    /// Convenience function to construct a new [Self::Pair] from Rc values.
-    pub fn new_pair_rc(l: Rc<Self>, r: Rc<Self>) -> Self {
+    /// Convenience function to construct a new [Self::Pair] from already-shared
+    /// values.
+    pub fn new_pair_rc(l: RcTypedValue<'a>, r: RcTypedValue<'a>) -> Self {
         Self::Pair(l, r)
     }
 
     /// Convenience function to construct a new [Self::Option].
     pub fn new_option(x: Option<Self>) -> Self {
-        Self::Option(x.map(Rc::new))
+        Self::Option(x.map(RcTypedValue::new))
     }
 
-    /// Convenience function to construct a new [Self::Option] from Rc values.
-    pub fn new_option_rc(x: Option<Rc<Self>>) -> Self {
+    /// Convenience function to construct a new [Self::Option] from an
+    /// already-shared value.
+    pub fn new_option_rc(x: Option<RcTypedValue<'a>>) -> Self {
         Self::Option(x)
     }
 
     /// Convenience function to construct a new [Self::Or].
     pub fn new_or(x: Or<Self, Self>) -> Self {
         Self::Or(match x {
-            Or::Left(v) => Or::Left(Rc::new(v)),
-            Or::Right(v) => Or::Right(Rc::new(v)),
+            Or::Left(v) => Or::Left(RcTypedValue::new(v)),
+            Or::Right(v) => Or::Right(RcTypedValue::new(v)),
         })
     }
 
-    /// Convenience function to construct a new [Self::Or] from Rc values.
-    pub fn new_or_rc(x: Or<Rc<Self>, Rc<Self>>) -> Self {
+    /// Convenience function to construct a new [Self::Or] from an
+    /// already-shared value.
+    pub fn new_or_rc(x: Or<RcTypedValue<'a>, RcTypedValue<'a>>) -> Self {
         Self::Or(x)
     }
 
@@ -1975,8 +2119,8 @@ impl<'a> TypedValue<'a> {
     }
 }
 
-/// Drains nested `Rc<TypedValue>` children iteratively, so the recursive
-/// `Rc<TypedValue>` destructor chain of a potentially deep value (e.g. a comb
+/// Drains nested `RcTypedValue` children iteratively, so the recursive
+/// `RcTypedValue` destructor chain of a potentially deep value (e.g. a comb
 /// of `Pair (Pair (... (Pair Int Int)))`) does not blow the WASM stack.
 ///
 /// Since L2-1672, [`TypedValue`] has an `impl Drop` that runs exactly this
@@ -1991,7 +2135,7 @@ impl<'a> TypedValue<'a> {
 /// A node on the unified drop worklist. Dropping a [`TypedValue`] and dropping
 /// an [`Instruction`] are mutually recursive across the `TypedValue` <->
 /// `Instruction` boundary: a `Closure::Lambda`'s body is `Rc<[Instruction]>`,
-/// and an `Instruction::Push` carries an `Rc<TypedValue>`. Draining each kind
+/// and an `Instruction::Push` carries an `RcTypedValue`. Draining each kind
 /// on its own worklist still crosses that boundary on the native stack — an
 /// alternating `Pair … (lambda { PUSH (pair … (lambda …)) … ; DROP })` value
 /// (which the iterative typecheck of L2-1663 now accepts up to the 10000-deep
@@ -2127,12 +2271,12 @@ macro_rules! take_out_via_default_generic {
 }
 
 take_out_via_default_generic!(
-    Rc<TypedValue<'a>>,
-    Option<Rc<TypedValue<'a>>>,
-    MichelsonList<Rc<TypedValue<'a>>>,
-    RedBlackTreeSet<Rc<TypedValue<'a>>>,
-    RedBlackTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
-    Or<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>,
+    RcTypedValue<'a>,
+    Option<RcTypedValue<'a>>,
+    MichelsonList<RcTypedValue<'a>>,
+    RedBlackTreeSet<RcTypedValue<'a>>,
+    RedBlackTreeMap<RcTypedValue<'a>, RcTypedValue<'a>>,
+    Or<RcTypedValue<'a>, RcTypedValue<'a>>,
     Closure<'a>,
     Box<Ticket<'a>>,
     Box<OperationInfo<'a>>,
@@ -2141,17 +2285,15 @@ take_out_via_default_generic!(
 fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'a>>) {
     use std::mem::{replace, take};
     use TypedValue as TV;
-    let push_rc = |rc: Rc<TV<'a>>, stack: &mut Vec<DropNode<'a>>| {
-        if let Ok(v) = Rc::try_unwrap(rc) {
+    let push_rc = |rc: RcTypedValue<'a>, stack: &mut Vec<DropNode<'a>>| {
+        if let Ok(v) = rc.try_unwrap() {
             stack.push(DropNode::Value(v));
         }
     };
     match node {
         TV::Pair(l, r) => {
-            let old_l = replace(l, Rc::new(TV::Unit));
-            let old_r = replace(r, Rc::new(TV::Unit));
-            push_rc(old_l, stack);
-            push_rc(old_r, stack);
+            push_rc(take(l), stack);
+            push_rc(take(r), stack);
         }
         TV::Option(opt) => {
             if let Some(rc) = opt.take() {
@@ -2159,8 +2301,7 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             }
         }
         TV::Or(or) => {
-            let old = replace(or, Or::Left(Rc::new(TV::Unit)));
-            let rc = match old {
+            let rc = match take(or) {
                 Or::Left(r) | Or::Right(r) => r,
             };
             push_rc(rc, stack);
@@ -2242,15 +2383,10 @@ fn extract_tv_children<'a>(node: &mut TypedValue<'a>, stack: &mut Vec<DropNode<'
             // Operations carry `TypedValue` payloads (transfer parameter, emit
             // value, originated storage) that may be deep; drain them. They are
             // `Rc`-shared, so only the last owner actually drains one.
-            let unit = || Rc::new(TV::Unit);
             match &mut info.operation {
-                Operation::TransferTokens(tt) => {
-                    push_rc(replace(&mut tt.param, unit()), stack)
-                }
-                Operation::Emit(e) => push_rc(replace(&mut e.value, unit()), stack),
-                Operation::CreateContract(c) => {
-                    push_rc(replace(&mut c.storage, unit()), stack)
-                }
+                Operation::TransferTokens(tt) => push_rc(take(&mut tt.param), stack),
+                Operation::Emit(e) => push_rc(take(&mut e.value), stack),
+                Operation::CreateContract(c) => push_rc(take(&mut c.storage), stack),
                 Operation::SetDelegate(_) => {}
             }
         }
@@ -2317,10 +2453,10 @@ pub enum Instruction<'a> {
     Abs,
     IsNat,
     Loop(Vec<Self>),
-    /// `PUSH ty v`. The literal is wrapped in [`Rc`] so the hot path of the
+    /// `PUSH ty v`. The literal is shared as an [`RcTypedValue`] so the hot path of the
     /// interpreter is a refcount bump rather than a deep clone of the value
     /// (which can be expensive for big-num literals like `PUSH nat 10^18`).
-    Push(Rc<TypedValue<'a>>),
+    Push(RcTypedValue<'a>),
     Swap,
     Failwith(Type),
     Never,
@@ -2461,8 +2597,7 @@ fn extract_instr_children<'a>(node: &mut Instruction<'a>, stack: &mut Vec<DropNo
             // stays on the heap rather than recursing across the boundary one
             // native frame per level (L2-1672). Only owned when the `Rc` is not
             // shared.
-            let old = replace(rc, Rc::new(TypedValue::Unit));
-            if let Ok(tv) = Rc::try_unwrap(old) {
+            if let Ok(tv) = take(rc).try_unwrap() {
                 stack.push(DropNode::Value(tv));
             }
         }
@@ -2671,12 +2806,12 @@ pub mod test_strategies {
             T::List(t) => prop::collection::vec(typed_value_by_type(t), 0..=3)
                 .prop_map(|x| {
                     V::List(MichelsonList::from(
-                        x.into_iter().map(Rc::new).collect::<Vec<_>>(),
+                        x.into_iter().map(RcTypedValue::new).collect::<Vec<_>>(),
                     ))
                 })
                 .boxed(),
             T::Set(elt) => prop::collection::btree_set(typed_value_by_type(elt), 0..=3)
-                .prop_map(|set| V::Set(set.into_iter().map(Rc::new).collect()))
+                .prop_map(|set| V::Set(set.into_iter().map(RcTypedValue::new).collect()))
                 .boxed(),
             T::Map(m) => {
                 let (key_ty, val_ty) = m.as_ref();
@@ -2688,7 +2823,7 @@ pub mod test_strategies {
                 .prop_map(|map| {
                     V::Map(
                         map.into_iter()
-                            .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                            .map(|(k, v)| (RcTypedValue::new(k), RcTypedValue::new(v)))
                             .collect(),
                     )
                 })
@@ -2890,7 +3025,7 @@ mod test_untypers {
         let cost = Gas::default().milligas().unwrap() - gas.milligas().unwrap();
         let capture = Rc::new(AppliedCapture::new(
             Type::Int,
-            Rc::new(TypedValue::int(7)),
+            RcTypedValue::new(TypedValue::int(7)),
             arg_ty_mich,
             arg_val_mich,
             cost,
@@ -2998,7 +3133,7 @@ mod test_untypers {
 
         // Nested under containers, and beside a shared leaf — the shape the
         // fix exists for.
-        let shared = Rc::new(TypedValue::Bytes(vec![0xab; 32]));
+        let shared = RcTypedValue::new(TypedValue::Bytes(vec![0xab; 32]));
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair_rc(
             shared.clone(),
             shared.clone(),
@@ -3006,7 +3141,7 @@ mod test_untypers {
         assert_borrowed_owned_unparse_match(&TypedValue::new_pair(
             in_memory(vec![(TypedValue::nat(1u64), TypedValue::Unit)]),
             TypedValue::List(MichelsonList::from(vec![
-                Rc::new(from_id(vec![])),
+                RcTypedValue::new(from_id(vec![])),
                 shared.clone(),
             ])),
         ));
@@ -3019,7 +3154,7 @@ mod test_untypers {
         let arena = Arena::new();
         let mut gas = Gas::default();
         let mut m = BigMap::empty(Type::Nat, Type::Unit);
-        m.update(Rc::new(TypedValue::Nat(0u32.into())), None);
+        m.update(RcTypedValue::new(TypedValue::Nat(0u32.into())), None);
         TypedValue::BigMap(m)
             .into_micheline_optimized_legacy(&arena, &mut gas)
             .unwrap();
@@ -3037,23 +3172,25 @@ mod test_untypers {
         // where each inner list is shared via Rc.
         // With depth d and width w, this creates w^d virtual entries but only
         // O(w*d) actual allocations due to Rc sharing.
-        let unit_list = Rc::new(TypedValue::List(MichelsonList::from(
-            vec![] as Vec<Rc<TypedValue>>
+        let unit_list = RcTypedValue::new(TypedValue::List(MichelsonList::from(
+            vec![] as Vec<RcTypedValue>
         )));
 
         // Build (list unit) with 1000 shared references to the same empty list
-        let inner_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&unit_list)).collect();
-        let inner_list = Rc::new(TypedValue::List(MichelsonList::from(inner_lists)));
+        let inner_lists: Vec<RcTypedValue> =
+            (0..1000).map(|_| unit_list.clone()).collect();
+        let inner_list =
+            RcTypedValue::new(TypedValue::List(MichelsonList::from(inner_lists)));
 
         // Build (list (list unit)) with 1000 shared references to the same (list unit)
-        let middle_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&inner_list)).collect();
-        let middle_list = Rc::new(TypedValue::List(MichelsonList::from(middle_lists)));
+        let middle_lists: Vec<RcTypedValue> =
+            (0..1000).map(|_| inner_list.clone()).collect();
+        let middle_list =
+            RcTypedValue::new(TypedValue::List(MichelsonList::from(middle_lists)));
 
         // Build (list (list (list unit))) with 1000 shared references
-        let outer_lists: Vec<Rc<TypedValue>> =
-            (0..1000).map(|_| Rc::clone(&middle_list)).collect();
+        let outer_lists: Vec<RcTypedValue> =
+            (0..1000).map(|_| middle_list.clone()).collect();
         let outer_list = TypedValue::List(MichelsonList::from(outer_lists));
 
         // This structure has 1000 * 1000 * 1000 = 1,000,000,000 virtual entries to traverse
@@ -3077,7 +3214,7 @@ mod test_untypers {
             TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag,
-                    value: Rc::new(TypedValue::Unit),
+                    value: RcTypedValue::new(TypedValue::Unit),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3135,7 +3272,7 @@ mod drop_safety {
             });
             let capture = Rc::new(AppliedCapture::new(
                 Type::Unit,
-                Rc::new(TypedValue::Unit),
+                RcTypedValue::new(TypedValue::Unit),
                 Micheline::Seq(&[]),
                 Micheline::Seq(&[]),
                 0,
@@ -3170,7 +3307,7 @@ mod drop_safety {
                 tv = TypedValue::Lambda(Closure::Apply {
                     capture: Rc::new(AppliedCapture::new(
                         Type::new_lambda(Type::Unit, Type::Unit),
-                        Rc::new(tv),
+                        RcTypedValue::new(tv),
                         Micheline::Seq(&[]),
                         Micheline::Seq(&[]),
                         0,
@@ -3200,7 +3337,7 @@ mod drop_safety {
                 tv = TypedValue::Lambda(Closure::Apply {
                     capture: Rc::new(AppliedCapture::new(
                         Type::new_lambda(Type::Unit, Type::Unit),
-                        Rc::new(tv),
+                        RcTypedValue::new(tv),
                         Micheline::Seq(&[]),
                         Micheline::Seq(&[]),
                         0,
@@ -3242,13 +3379,13 @@ mod drop_safety {
     #[test]
     fn drop_deep_push_constant() {
         // Dropping `PUSH <deep constant>` must drain the pushed value rather
-        // than recurse through its `Rc<TypedValue>` spine.
+        // than recurse through its `RcTypedValue` spine.
         on_kernel_stack(|| {
             let mut content = TypedValue::Unit;
             for _ in 0..DEPTH {
                 content = TypedValue::new_pair(TypedValue::Unit, content);
             }
-            let instr = Instruction::Push(Rc::new(content));
+            let instr = Instruction::Push(RcTypedValue::new(content));
             drop(instr);
         });
     }
@@ -3306,7 +3443,7 @@ mod drop_safety {
             let mut tv = TypedValue::Operation(Box::new(OperationInfo {
                 operation: Operation::Emit(Emit {
                     tag: None,
-                    value: Rc::new(deep_pair(DEPTH)),
+                    value: RcTypedValue::new(deep_pair(DEPTH)),
                     arg_ty: Or::Left(Type::Unit),
                 }),
                 counter: 0,
@@ -3320,7 +3457,10 @@ mod drop_safety {
         // A big_map's in-memory values are owned `TypedValue`s that may be deep.
         on_kernel_stack(|| {
             let mut map = RedBlackTreeMap::new();
-            map.insert_mut(Rc::new(TypedValue::Unit), Rc::new(deep_pair(DEPTH)));
+            map.insert_mut(
+                RcTypedValue::new(TypedValue::Unit),
+                RcTypedValue::new(deep_pair(DEPTH)),
+            );
             let mut tv = TypedValue::BigMap(BigMap::new(Type::Unit, Type::Unit, map));
             drain_deep_typed_value(&mut tv);
         });
@@ -3338,7 +3478,7 @@ mod drop_safety {
         on_kernel_stack(|| {
             let capture = Rc::new(AppliedCapture::new(
                 Type::Unit,
-                Rc::new(TypedValue::Unit),
+                RcTypedValue::new(TypedValue::Unit),
                 Micheline::Seq(&[]),
                 Micheline::Seq(&[]),
                 0,
@@ -3523,7 +3663,10 @@ mod debug_tests {
             .spawn(|| {
                 let mut deep: TypedValue<'_> = TypedValue::Unit;
                 for _ in 0..DEPTH {
-                    deep = TypedValue::Pair(Rc::new(TypedValue::Unit), Rc::new(deep));
+                    deep = TypedValue::Pair(
+                        RcTypedValue::new(TypedValue::Unit),
+                        RcTypedValue::new(deep),
+                    );
                 }
                 let formatted = format!("{deep:?}");
                 assert!(formatted.starts_with("Pair("));

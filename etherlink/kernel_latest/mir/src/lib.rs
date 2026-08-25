@@ -487,8 +487,7 @@ mod tests {
                 crate::typechecker::AllowForgedLazyStorageId::No,
             );
         use TypedValue as TV;
-        let result = interp_res.unwrap();
-        match result.1.as_ref() {
+        match interp_res.unwrap().1.as_ref() {
             TV::Map(m) => {
                 assert_eq!(
                     m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
@@ -1045,7 +1044,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
-                    value: Rc::new(TypedValue::nat(10)),
+                    value: RcTypedValue::new(TypedValue::nat(10)),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
                 100
@@ -1066,7 +1065,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: None,
-                    value: Rc::new(TypedValue::nat(10)),
+                    value: RcTypedValue::new(TypedValue::nat(10)),
                     arg_ty: Or::Right(parse("nat").unwrap())
                 }),
                 100
@@ -1087,7 +1086,7 @@ mod tests {
             stk![TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: None,
-                    value: Rc::new(TypedValue::nat(10)),
+                    value: RcTypedValue::new(TypedValue::nat(10)),
                     arg_ty: Or::Left(Type::Nat)
                 }),
                 100
@@ -1177,7 +1176,7 @@ mod tests {
             Operation::CreateContract(CreateContract {
                 delegate: None,
                 amount: 100,
-                storage: Rc::new(TypedValue::Unit),
+                storage: RcTypedValue::new(TypedValue::Unit),
                 code: Rc::new(cs),
                 micheline_code: &cs_mich,
                 address: ContractKt1Hash::try_from(expected_addr).unwrap(),
@@ -1272,7 +1271,6 @@ mod multisig_tests {
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
     use num_bigint::BigUint;
-    use std::rc::Rc;
     use typed_arena::Arena;
     use Type as T;
     use TypedValue as TV;
@@ -1422,13 +1420,13 @@ mod multisig_tests {
                 Ok((
                     vec![OperationInfo {
                         operation: Operation::TransferTokens(TransferTokens {
-                            param: Rc::new(TV::Unit),
+                            param: RcTypedValue::new(TV::Unit),
                             destination_address: transfer_destination.try_into().unwrap(),
                             amount: transfer_amount,
                         }),
                         counter: 0
                     }],
-                    TV::new_pair(
+                    RcTypedValue::new(TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                         TV::new_pair(
                             TV::Nat(threshold),
@@ -1436,7 +1434,7 @@ mod multisig_tests {
                                 PUBLIC_KEY.try_into().unwrap()
                             )]))
                         )
-                    )
+                    ))
                 ))
             );
         })
@@ -1503,7 +1501,7 @@ mod multisig_tests {
                         ))),
                         counter: 0
                     }],
-                    TV::new_pair(
+                    RcTypedValue::new(TV::new_pair(
                         TV::Nat(anti_replay_counter() + BigUint::from(1u32)),
                         TV::new_pair(
                             TV::Nat(threshold),
@@ -1511,7 +1509,7 @@ mod multisig_tests {
                                 PUBLIC_KEY.try_into().unwrap()
                             )]))
                         )
-                    )
+                    ))
                 ))
             );
         })
@@ -1558,7 +1556,7 @@ mod multisig_tests {
             assert_eq!(
                 collect_ops(interp_res),
                 Err(ContractInterpretError::InterpretError(
-                    InterpretError::FailedWith(T::Unit, std::rc::Rc::new(TV::Unit))
+                    InterpretError::FailedWith(T::Unit, RcTypedValue::new(TV::Unit))
                 ))
             );
         })
@@ -1569,15 +1567,12 @@ mod multisig_tests {
     // This function collects the iterator into a vector so we can use `assert_eq!`.
     fn collect_ops<'a>(
         result: Result<
-            (
-                impl Iterator<Item = OperationInfo<'a>>,
-                std::rc::Rc<TypedValue<'a>>,
-            ),
+            (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
             ContractInterpretError<'a>,
         >,
-    ) -> Result<(Vec<OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
+    ) -> Result<(Vec<OperationInfo<'a>>, RcTypedValue<'a>), ContractInterpretError<'a>>
     {
-        result.map(|(ops, val)| (ops.collect(), TypedValue::unwrap_rc(val)))
+        result.map(|(ops, val)| (ops.collect(), val))
     }
 
     // From: https://github.com/murbard/smart-contracts/blob/eb2b7d81aedcfeaea219da8b66cdd86652bf42f7/multisig/michelson/multisig.tz

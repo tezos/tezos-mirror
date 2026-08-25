@@ -4,7 +4,7 @@
 
 use mir::ast::{
     Address, AddressHash, BinWriter, ByteReprTrait, Operation, OperationInfo,
-    TransferTokens, TypedValue,
+    RcTypedValue, TransferTokens, TypedValue,
 };
 use mir::ast::{PublicKeyHash, Type};
 use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
@@ -18,7 +18,6 @@ use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
-use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
@@ -165,16 +164,6 @@ pub fn from_kt1(kt1: &ContractKt1Hash) -> Option<EnshrinedContracts> {
 
 pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
-}
-
-/// Extract the inner [`TypedValue`] from an `Rc`.
-///
-/// [`TypedValue`] wraps recursive positions (e.g. `Pair`, `Option`) in `Rc`
-/// to keep the enum sized. This helper moves the value out without copying
-/// when the reference count is 1 (the common case for freshly typechecked
-/// values), and falls back to cloning if the `Rc` is shared.
-fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
-    Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
 }
 
 /// Destructure an owned [`TypedValue`] by moving its payload(s) out.
@@ -617,7 +606,7 @@ fn dispatch_callback<'a>(
     let counter = ctx.operation_counter();
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
-            param: Rc::new(TypedValue::Bytes(response_body)),
+            param: RcTypedValue::new(TypedValue::Bytes(response_body)),
             destination_address: destination,
             // The callback only delivers the response body.
             // Any value transfers from the EVM side happen as
@@ -639,7 +628,7 @@ fn extract_callback(
         TypedValue::Option(Some(rc)) => {
             let rc = std::mem::take(rc);
             let addr = take_payload!(
-                unwrap_rc(rc),
+                rc.unwrap_or_clone(),
                 TypedValue::Contract(addr),
                 return Err(TransferError::GatewayError(format!(
                     "{entrypoint_name}: expected contract in callback option"
@@ -794,41 +783,41 @@ fn extract_call_params(
         ))
     );
     let dest = take_payload!(
-        unwrap_rc(dest_rc),
+        dest_rc.unwrap_or_clone(),
         TypedValue::String(dest),
         return Err(TransferError::GatewayError(
             "call: expected string for destination".into(),
         ))
     );
     let (sig_rc, inner2_rc) = take_payload!(
-        unwrap_rc(inner_rc),
+        inner_rc.unwrap_or_clone(),
         TypedValue::Pair(sig_rc, inner2_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (method_sig, (abi_params, callback))".into(),
         ))
     );
     let method_sig = take_payload!(
-        unwrap_rc(sig_rc),
+        sig_rc.unwrap_or_clone(),
         TypedValue::String(method_sig),
         return Err(TransferError::GatewayError(
             "call: expected string for method signature".into(),
         ))
     );
     let (params_rc, callback_rc) = take_payload!(
-        unwrap_rc(inner2_rc),
+        inner2_rc.unwrap_or_clone(),
         TypedValue::Pair(params_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "call: expected pair (abi_params, callback)".into(),
         ))
     );
     let abi_params = take_payload!(
-        unwrap_rc(params_rc),
+        params_rc.unwrap_or_clone(),
         TypedValue::Bytes(abi_params),
         return Err(TransferError::GatewayError(
             "call: expected bytes for ABI parameters".into(),
         ))
     );
-    let callback = extract_callback(unwrap_rc(callback_rc), "call_evm")?;
+    let callback = extract_callback(callback_rc.unwrap_or_clone(), "call_evm")?;
     Ok((dest, method_sig, abi_params, callback))
 }
 
@@ -848,21 +837,21 @@ fn extract_http_call_request(
         ))
     );
     let url = take_payload!(
-        unwrap_rc(url_rc),
+        url_rc.unwrap_or_clone(),
         TypedValue::String(url),
         return Err(TransferError::GatewayError(
             "http_call: expected string for URL".into(),
         ))
     );
     let (headers_rc, body_method_rc) = take_payload!(
-        unwrap_rc(inner_rc),
+        inner_rc.unwrap_or_clone(),
         TypedValue::Pair(headers_rc, body_method_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (headers, (body, (method, callback)))".into(),
         ))
     );
     let headers_list = take_payload!(
-        unwrap_rc(headers_rc),
+        headers_rc.unwrap_or_clone(),
         TypedValue::List(headers_list),
         return Err(TransferError::GatewayError(
             "http_call: expected list for headers".into(),
@@ -872,21 +861,21 @@ fn extract_http_call_request(
         .into_iter()
         .map(|item| {
             let (name_rc, val_rc) = take_payload!(
-                unwrap_rc(item),
+                item.unwrap_or_clone(),
                 TypedValue::Pair(name_rc, val_rc),
                 return Err(TransferError::GatewayError(
                     "http_call: expected pair (name, value) in headers list".into(),
                 ))
             );
             let name = take_payload!(
-                unwrap_rc(name_rc),
+                name_rc.unwrap_or_clone(),
                 TypedValue::String(name),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header name".into(),
                 ))
             );
             let val = take_payload!(
-                unwrap_rc(val_rc),
+                val_rc.unwrap_or_clone(),
                 TypedValue::String(val),
                 return Err(TransferError::GatewayError(
                     "http_call: expected string for header value".into(),
@@ -896,34 +885,34 @@ fn extract_http_call_request(
         })
         .collect::<Result<_, _>>()?;
     let (body_rc, method_callback_rc) = take_payload!(
-        unwrap_rc(body_method_rc),
+        body_method_rc.unwrap_or_clone(),
         TypedValue::Pair(body_rc, method_callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (body, (method, callback))".into(),
         ))
     );
     let body = take_payload!(
-        unwrap_rc(body_rc),
+        body_rc.unwrap_or_clone(),
         TypedValue::Bytes(body),
         return Err(TransferError::GatewayError(
             "http_call: expected bytes for body".into(),
         ))
     );
     let (method_rc, callback_rc) = take_payload!(
-        unwrap_rc(method_callback_rc),
+        method_callback_rc.unwrap_or_clone(),
         TypedValue::Pair(method_rc, callback_rc),
         return Err(TransferError::GatewayError(
             "http_call: expected pair (method, callback)".into(),
         ))
     );
     let method = take_payload!(
-        unwrap_rc(method_rc),
+        method_rc.unwrap_or_clone(),
         TypedValue::Nat(method),
         return Err(TransferError::GatewayError(
             "http_call: expected nat for method".into(),
         ))
     );
-    let callback = extract_callback(unwrap_rc(callback_rc), "call")?;
+    let callback = extract_callback(callback_rc.unwrap_or_clone(), "call")?;
     let request = build_http_request(&url, &headers, &body, method)?;
     Ok((request, callback))
 }
@@ -1735,7 +1724,7 @@ fn make_invalid_runtime_id_error<'a>(
 ) -> mir::interpreter::InterpretError<'a> {
     mir::interpreter::InterpretError::FailedWith(
         mir::ast::Type::new_pair(mir::ast::Type::String, mir::ast::Type::Nat),
-        Rc::new(TypedValue::new_pair(
+        RcTypedValue::new(TypedValue::new_pair(
             TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
             TypedValue::Nat(received.clone()),
         )),
