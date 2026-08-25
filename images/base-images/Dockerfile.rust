@@ -42,9 +42,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # install rust toolchains and compilation targets
-# nightly-2025-01-30 is installed separately as it's only used for formatting
+# nightly toolchains are installed separately as they're only used for formatting
 # set the default to the last stable toolchain installed.
-RUN rustup update 1.83.0 1.88.0 && \
+RUN rustup update 1.94.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -52,19 +52,19 @@ RUN rustup update 1.83.0 1.88.0 && \
         rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
         rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
     done && \
-    rustup update nightly-2025-01-30 && \
-    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
-    rustup default 1.88.0
+    rustup update nightly-2026-02-24 && \
+    rustup component add --toolchain=nightly-2026-02-24 rustfmt miri rust-src && \
+    rustup default 1.94.0
 
 ENV PATH=/root/.cargo/bin:$PATH
 
 # Install Taplo
-RUN cargo +1.88.0 install taplo-cli --version 0.9.3 --locked && \
+RUN cargo +1.94.0 install taplo-cli --version 0.9.3 --locked && \
     taplo --version
 
 # Install cargo-audit
-RUN cargo +1.88.0 install --locked cargo-audit --version 0.22.0 && \
+RUN cargo +1.94.0 install --locked cargo-audit --version 0.22.0 && \
     cargo audit --version
 
 # Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
-RUN cargo +1.88.0 install cargo-expand
+RUN cargo +1.94.0 install cargo-expand

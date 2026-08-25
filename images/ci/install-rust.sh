@@ -15,7 +15,7 @@ set -e
 packages_base_url="https://nl-public-area.s3.us-east-1.amazonaws.com/rust"
 
 # These are the packages that we want to install
-packages=("llvm20-libs-20.1.8-r0.apk" "rust-1.88.0-r0.apk" "cargo-1.88.0-r0.apk")
+packages=("llvm22-libs-22.1.1-r0.apk" "rust-1.94.0-r0.apk" "cargo-1.94.0-r0.apk")
 
 # Configuration
 download_dest=$(mktemp -d)
@@ -25,14 +25,14 @@ arch=$(uname -m)
 declare -A checksums
 case "$arch" in
 aarch64)
-  checksums["cargo-1.88.0-r0.apk"]=d54fa563e6d20aa922384006ee8fb62d058659b5c14331c9ea9417823dc945b0
-  checksums["llvm20-libs-20.1.8-r0.apk"]=f0ffae0f10ae7f93b4a0da8951a4ba036dec28cb4952a5b6f23d54c6ee0e0977
-  checksums["rust-1.88.0-r0.apk"]=95391e610a4ea9f15889d65d13eaa9440c881fd1df3fc2f3cf88e0601ed327c4
+  checksums["cargo-1.94.0-r0.apk"]=9852cb6a81c337e60173406d06b22fa4f0a9f6637dd43e1f4e1eb6669570d535
+  checksums["llvm22-libs-22.1.1-r0.apk"]=c23cf327daecb34ddbaa4b351109a1320b0b41d0bf79c06a0d28d6cb41fb4e37
+  checksums["rust-1.94.0-r0.apk"]=611cf4d7c7e6d42be0962ce0f615739aecc90f55dac8da7aa1674838f811e3cb
   ;;
 x86_64)
-  checksums["cargo-1.88.0-r0.apk"]=1096f0eb49707d1955bee5b70c1c05a0a6eb35e1b766c09b03cf2befab0656d1
-  checksums["llvm20-libs-20.1.8-r0.apk"]=14628e2e8650001e5f6d139218a67ee5e02001b8984c995d300240d7b4393c65
-  checksums["rust-1.88.0-r0.apk"]=268f2dd4c98d4c250ecf8daf7b6f9efdb96e059bd354fbe84694a995bc8bd82f
+  checksums["cargo-1.94.0-r0.apk"]=80b6b449436c792fe9ff9ccb30f3145392aa5f2202ed7f73f450d0ed6f8ea87c
+  checksums["llvm22-libs-22.1.1-r0.apk"]=e218643f457216011c7e4df5d1512293ea9045879fe3a84f1f7743b0b44f68d2
+  checksums["rust-1.94.0-r0.apk"]=7e285531649611abdf80e8710937ffe3ce9eb49ab887b1ef32d9276608fa60a2
   ;;
 *)
   echo "Unsupported architecture: $arch"
