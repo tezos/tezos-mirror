@@ -44,12 +44,32 @@ fi
 apk add --update cosign
 cosign version
 
+# Retry [imagetools inspect]: a transient registry error returns an empty
+# digest, which makes cosign fail with "invalid reference format".
+MAX_RETRY_ATTEMPTS=5
+SLEEP_TIME=5
+
 # Usage: verify_image <IMAGE> <TAG>
 verify_image() {
   # Do not pull: per-arch tags are OCI indexes, so pulling one whose platform
   # does not match the host fails with "no matching manifest". [imagetools
   # inspect] resolves the index digest remotely.
-  IMAGE_DIGEST="$1@$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest')"
+  retry_attempt=0
+  IMAGE_DIGEST=''
+  until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+    _digest=$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest') || _digest=''
+    if [ -n "${_digest}" ] && [ "${_digest}" != "null" ]; then
+      IMAGE_DIGEST="$1@${_digest}"
+      break
+    fi
+    retry_attempt="$((retry_attempt + 1))"
+    echo "Empty digest for $1:$2, retrying in ${SLEEP_TIME}s..."
+    sleep "${SLEEP_TIME}"
+  done
+  if [ -z "${IMAGE_DIGEST}" ]; then
+    echo "Fatal: Failed to retrieve digest for $1:$2 after ${MAX_RETRY_ATTEMPTS} attempts."
+    exit 1
+  fi
   echo "Image digest to verify: ${IMAGE_DIGEST}"
 
   # Get the location of image signature as reference
