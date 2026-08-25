@@ -219,10 +219,7 @@ let job_commit_titles =
         "./scripts/ci/check_commit_messages.sh || exit $?";
       ]
 
-(* TODO: Remove [~allow_failure] once existing critical npm
-   vulnerabilities have been fixed in all package-lock.json files.
-
-   In MR pipelines, the script audits only directories whose
+(* In MR pipelines, the script audits only directories whose
    package-lock.json was modified.  In scheduled pipelines, [--all]
    makes it discover and audit every package-lock.json in the tree. *)
 let job_npm_audit =
@@ -231,23 +228,26 @@ let job_npm_audit =
     "npm_audit"
     ~__POS__
     ~description:
-      "Run npm audit on package-lock.json files to detect critical \
+      "Run npm audit on package-lock.json files to detect known \
        vulnerabilities."
     ~image:Tezos_ci.Images.node_alpine
     ~stage:Test
-    ~allow_failure:Yes
+    ~allow_failure:(With_exit_codes [2])
     ~only_if_changed:["**/package-lock.json"; "**/package.json"]
     ~script:
+      (* [|| exit $?] preserves the script's exit code;
+         GitLab otherwise masks any failure as 1,
+         which would defeat the [With_exit_codes [2]] gate above. *)
       (List.flatten
          [
            ["apk add --no-cache git jq"];
            (match mode with
            | `mr ->
                [
-                 "./scripts/ci/npm_audit.sh";
                  "./scripts/ci/npm_stale_lockfile_check.sh";
+                 "./scripts/ci/npm_audit.sh || exit $?";
                ]
-           | `all -> ["./scripts/ci/npm_audit.sh --all"]);
+           | `all -> ["./scripts/ci/npm_audit.sh --all || exit $?"]);
          ])
 
 (* TODO: Remove [~allow_failure] once existing known

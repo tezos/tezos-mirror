@@ -26,10 +26,16 @@ fi
 merge_base=$(./scripts/ci/git_merge_base.sh \
   "${TEZOS_CI_MR_TARGET}" "${TEZOS_CI_MR_HEAD}")
 
-# Directories with changed package-lock.json files.
+# Directories with changed package-lock.json files, as a single
+# space-separated line. The trailing [tr] flattens the newline-separated
+# dirnames into one line so the space-delimited [case] membership test
+# below works when more than one lock file changed (a bare newline
+# separator would make the " ${d} " pattern miss every entry but the
+# first/last).
 lock_dirs=$(git diff --name-only "${merge_base}" "${TEZOS_CI_MR_HEAD}" \
   -- '**/package-lock.json' |
-  while IFS= read -r f; do dirname "$f"; done)
+  while IFS= read -r f; do dirname "$f"; done |
+  tr '\n' ' ')
 
 # Directories where package.json changed but package-lock.json did not,
 # and a package-lock.json already exists (i.e. the project uses lock files).
