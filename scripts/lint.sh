@@ -2,7 +2,7 @@
 
 usage() {
   cat >&2 << EOF
-usage: $0 [<action>] [FILES] [--ignore FILES]
+usage: $0 <action>
 
 Where <action> can be:
 
@@ -12,7 +12,6 @@ Where <action> can be:
 * --format-scripts: format shell scripts inplace using shfmt
 * --check-scripts: shellcheck and check formatting of the .sh files
 * --check-redirects: check docs/_build/_redirects.
-* --check-coq-attributes: check the presence of coq attributes.
 * --check-rust-toolchain: check the contents of rust-toolchain files
 * --check-licenses-git-new: check license headers of added OCaml .ml(i) files.
 * --check-jsonnet-format: checks that the jsonnet files are formatted.
@@ -21,8 +20,6 @@ Where <action> can be:
 * --help: display this and return 0.
 EOF
 }
-
-shopt -s extglob
 
 ## Testing for dependencies
 if ! type find > /dev/null 2>&-; then
@@ -359,7 +356,6 @@ fi
 
 check_clean=false
 commit=
-on_files=false
 
 case "$action" in
 "--update-ocamlformat")
@@ -405,45 +401,12 @@ case "$action" in
   ;;
 esac
 
-if $on_files; then
-  declare -a input_files files ignored_files
-  input_files=()
-  while [ $# -gt 0 ]; do
-    if [ "$1" = "--ignore" ]; then
-      shift
-      break
-    fi
-    input_files+=("$1")
-    shift
-  done
-
-  if [ ${#input_files[@]} -eq 0 ]; then
-    mapfile -t input_files <<< "$(find "${source_directories[@]}" \( -name "*.ml" -o -name "*.mli" -o -name "*.mlt" \) -type f -print)"
-  fi
-
-  ignored_files=("$@")
-
-  # $input_files may contain `*.pp.ml{i}` files which can't be linted. They
-  # are filtered by the following loop.
-  #
-  # Note: another option would be to filter them before calling the script
-  # but it was more convenient to do it here.
-  files=()
-  for file in "${input_files[@]}"; do
-    if [[ "$file" == *.pp.ml?(i) ]]; then continue; fi
-    for ignored_file in "${ignored_files[@]}"; do
-      if [[ "$file" =~ ^(.*/)?"$ignored_file"$ ]]; then continue 2; fi
-    done
-    files+=("$file")
-  done
-  $action "${files[@]}"
-else
-  if [ $# -gt 0 ]; then
-    usage
-    exit 1
-  fi
-  $action
+if [ $# -gt 0 ]; then
+  usage
+  exit 1
 fi
+
+$action
 
 if [ -n "$commit" ]; then
   git commit -m "$commit"
