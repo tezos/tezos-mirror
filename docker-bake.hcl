@@ -27,7 +27,6 @@ variable "IMAGE_VERSION" { default = "latest" }
 # Set by scripts/create_docker_image.sh.
 variable "RUNTIME_IMAGE" { default = "" }    # base of the published variants
 variable "BUILD_DEPS_IMAGE" { default = "" } # build environment (+ stripper stage)
-variable "DOCKER_TARGET" { default = "without-evm-artifacts" }
 variable "OCTEZ_EXECUTABLES" { default = "" }
 variable "GIT_SHORTREF" { default = "" }
 variable "GIT_DATETIME" { default = "" }
@@ -52,7 +51,6 @@ variable "PUSH" { default = "false" }
 target "build" {
   context    = "."
   dockerfile = "build.Dockerfile"
-  target     = DOCKER_TARGET
   args = {
     BUILD_DEPS_IMAGE          = BUILD_DEPS_IMAGE
     OCTEZ_EXECUTABLES         = OCTEZ_EXECUTABLES

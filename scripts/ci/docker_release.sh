@@ -74,7 +74,6 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --build-deps-image "${build_deps_image}" \
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
-  --docker-target "${DOCKER_BUILD_TARGET}" \
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi

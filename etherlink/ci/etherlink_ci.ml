@@ -96,7 +96,6 @@ let job_docker_build =
     ?storage:(if arch = Arm64 then Some Ramfs else None)
     ~variables:
       [
-        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("DOCKER_VERSION", Images.Base_images.docker_version);
         ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
         ("IMAGE_ARCH_PREFIX", arch_string ^ "_");

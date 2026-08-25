@@ -455,7 +455,6 @@ oc.docker:amd64:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
     IMAGE_ARCH_PREFIX: amd64_
@@ -493,7 +492,6 @@ oc.docker:arm64:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/released-executables
     IMAGE_ARCH_PREFIX: arm64_

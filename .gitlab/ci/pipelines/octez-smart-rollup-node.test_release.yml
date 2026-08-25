@@ -142,7 +142,6 @@ octez-smart-rollup-node.docker:amd64:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     IMAGE_ARCH_PREFIX: amd64_
@@ -171,7 +170,6 @@ octez-smart-rollup-node.docker:arm64:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     CI_DOCKER_HUB: "false"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 28.5.1
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
     IMAGE_ARCH_PREFIX: arm64_
