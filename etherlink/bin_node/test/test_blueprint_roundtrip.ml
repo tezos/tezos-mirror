@@ -161,7 +161,6 @@ let protocol_typ =
     (fun fmt protocol ->
       let string_protocol =
         match protocol with
-        | L2_types.Tezos_block.Protocol.S023 -> "S023"
         | L2_types.Tezos_block.Protocol.T024 -> "T024"
         | L2_types.Tezos_block.Protocol.U025 -> "U025"
       in
@@ -289,12 +288,14 @@ module Tezos_block_v0_tool = struct
       (hash = expected.hash)
         block_hash_typ
         ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
+    (* V0 blocks predate the protocol fields; the V0 -> V1 upgrade
+       back-fills them with T024, the oldest still-supported protocol. *)
     Check.(
-      (protocol = L2_types.Tezos_block.Protocol.S023)
+      (protocol = L2_types.Tezos_block.Protocol.T024)
         protocol_typ
         ~error_msg:"Wrong decoded of protocol for block: got %L instead of %R") ;
     Check.(
-      (next_protocol = L2_types.Tezos_block.Protocol.S023)
+      (next_protocol = L2_types.Tezos_block.Protocol.T024)
         protocol_typ
         ~error_msg:
           "Wrong decoded of next-protocol for block: got %L instead of %R") ;
@@ -458,8 +459,8 @@ let () =
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:zero_hash
-       ~protocol:S023
-       ~next_protocol:S023
+       ~protocol:T024
+       ~next_protocol:T024
        ~operations:Bytes.empty
        ~state_root:zero_state_root
        () ;
@@ -469,8 +470,8 @@ let () =
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
-       ~protocol:S023
-       ~next_protocol:S023
+       ~protocol:T024
+       ~next_protocol:T024
        ~operations:Bytes.empty
        ~state_root:zero_state_root
        () ;
@@ -480,30 +481,30 @@ let () =
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
-       ~protocol:S023
-       ~next_protocol:S023
+       ~protocol:T024
+       ~next_protocol:T024
        ~operations:(Bytes.of_string "txntxntxn")
        ~state_root:nonzero_state_root
        () ;
 
-  test_tez_latest_block_roundtrip ~title:"T024 protocol"
+  test_tez_latest_block_roundtrip ~title:"U025 protocol"
+  @@ Tezos_block_latest_tool.make
+       ~level:10l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~protocol:U025
+       ~next_protocol:U025
+       ~operations:Bytes.empty
+       ~state_root:nonzero_state_root
+       () ;
+
+  test_tez_latest_block_roundtrip ~title:"T024 to U025 transition"
   @@ Tezos_block_latest_tool.make
        ~level:10l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
        ~protocol:T024
-       ~next_protocol:T024
-       ~operations:Bytes.empty
-       ~state_root:nonzero_state_root
-       () ;
-
-  test_tez_latest_block_roundtrip ~title:"S023 to T024 transition"
-  @@ Tezos_block_latest_tool.make
-       ~level:10l
-       ~timestamp:Time.Protocol.epoch
-       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
-       ~protocol:S023
-       ~next_protocol:T024
+       ~next_protocol:U025
        ~operations:Bytes.empty
        ~state_root:nonzero_state_root
        () ;

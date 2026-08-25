@@ -12,9 +12,6 @@
   octez-libs.version
   octez-libs.micheline
   lwt-watcher
-  octez-protocol-023-PtSeouLo-libs.plugin
-  tezos-protocol-023-PtSeouLo.parameters
-  octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-protocol-024-PtTALLiN-libs.plugin
   tezos-protocol-024-PtTALLiN.parameters
   octez-protocol-024-PtTALLiN-libs.test-helpers

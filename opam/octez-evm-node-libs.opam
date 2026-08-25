@@ -29,8 +29,6 @@ depends: [
   "uuidm" { >= "0.9.9" }
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
-  "octez-protocol-023-PtSeouLo-libs"
-  "tezos-protocol-023-PtSeouLo"
   "octez-protocol-024-PtTALLiN-libs"
   "tezos-protocol-024-PtTALLiN"
   "octez-protocol-025-PsUshuai-libs"

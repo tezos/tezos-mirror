@@ -585,8 +585,6 @@ let retrieve_block (module Backend : Tezlink_backend_sig.S) chain block =
   Backend.block chain block
 
 let tezlink_protocol_of_protocol = function
-  | L2_types.Tezos_block.Protocol.S023 ->
-      (module Tezlink_SeouLo_protocol : Tezlink_protocol)
   | L2_types.Tezos_block.Protocol.T024 ->
       (module Tezlink_TALLiN_protocol : Tezlink_protocol)
   | L2_types.Tezos_block.Protocol.U025 ->

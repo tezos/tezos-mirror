@@ -310,7 +310,7 @@ mod live_blocks_tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::types::Timestamp;
     use tezos_tezlink::block::TezBlock;
-    use tezos_tezlink::protocol::Protocol;
+    use tezos_tezlink::protocol::{INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
 
     /// Store a Michelson block at `number` and return its hash.
     fn store_tez_block(
@@ -318,9 +318,11 @@ mod live_blocks_tests {
         number: u32,
         maintain_live_blocks: bool,
     ) -> H256 {
+        let previous_protocol = INITIAL_PROTOCOL;
+        let current_protocol = TARGET_TEZOS_PROTOCOL;
         let block = TezBlock::new(
-            Protocol::S023,
-            Protocol::S023,
+            previous_protocol,
+            current_protocol,
             number.into(),
             Timestamp::from(number as i64),
             // Not the genesis hash, so `new` keeps the provided predecessor.

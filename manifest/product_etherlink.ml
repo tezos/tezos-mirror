@@ -293,9 +293,7 @@ let evm_node_lib_dev_tezlink =
     in
     [protocol_plugin; protocol_parameters; Protocol.test_helpers_exn proto]
   in
-  let proto_deps =
-    List.concat_map proto_deps ["PtSeouLo"; "PtTALLiN"; "PsUshuai"]
-  in
+  let proto_deps = List.concat_map proto_deps ["PtTALLiN"; "PsUshuai"] in
   octez_evm_node_lib
     "evm_node_lib_dev_tezlink"
     ~path:"etherlink/bin_node/lib_dev/tezlink"

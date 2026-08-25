@@ -96,7 +96,7 @@ end
 
 module Tezos_block : sig
   module Protocol : sig
-    type t = S023 | T024 | U025
+    type t = T024 | U025
   end
 
   type t = {
