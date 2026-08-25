@@ -538,14 +538,8 @@ let job_alpine_ci =
     ~arch
       (* amd64 builds on a very-high-CPU runner to shorten the build; arm64
          builds on a ramfs (memory-backed) work volume for build I/O. *)
-    ?cpu:
-      (match arch with
-      | Runner.Arch.Amd64 -> Some Runner.CPU.Very_high
-      | _ -> None)
-    ?storage:
-      (match arch with
-    | Runner.Arch.Arm64 -> Some Runner.Storage.Ramfs
-    | _ -> None)
+    ?cpu:(match arch with Amd64 -> Some Runner.CPU.Very_high | _ -> None)
+    ?storage:(match arch with Arm64 -> Some Runner.Storage.Ramfs | _ -> None)
       (* Inherits [dind_retry] from [docker_job], which retries on both
          [Script_failure] and [Runner_system_failure] to recover preemptions. *)
     ~only_if_changed:Files.ci_images
@@ -589,11 +583,7 @@ let job_alpine_ci_merge =
       "Merge the per-arch static alpine-* CI images into multi-arch manifests, \
        tagged both <ref-slug>-<short-sha> and <ref-slug>"
     ~only_if_changed:Files.ci_images
-    ~needs:
-      [
-        (Job, job_alpine_ci Runner.Arch.Amd64);
-        (Job, job_alpine_ci Runner.Arch.Arm64);
-      ]
+    ~needs:[(Job, job_alpine_ci Amd64); (Job, job_alpine_ci Arm64)]
     "images.alpine-ci-all.merge"
 
 (* ── Cacio pipeline registrations ───────────────────────────────────────── *)
@@ -616,8 +606,8 @@ let () =
       (Auto, job_rust_based_images_merge);
       (Auto, job_debian_based_images);
       (Auto, job_ubuntu_based_images);
-      (Auto, job_alpine_ci Runner.Arch.Amd64);
-      (Auto, job_alpine_ci Runner.Arch.Arm64);
+      (Auto, job_alpine_ci Amd64);
+      (Auto, job_alpine_ci Arm64);
       (Auto, job_alpine_ci_merge);
     ]
   in
