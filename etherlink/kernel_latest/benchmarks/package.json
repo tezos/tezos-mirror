@@ -21,5 +21,8 @@
     "optionalDependencies": {
         "chartjs-node-canvas": "^4.1.6",
         "chart.js": "^3.5.1"
+    },
+    "overrides": {
+        "tar": "^7.5.21"
     }
 }
