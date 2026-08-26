@@ -424,7 +424,7 @@ check-opam-linting:
 fmt: fmt-ocaml fmt-python fmt-shell
 
 fmt-shell:
-	scripts/lint.sh --format-shell
+	scripts/lint.sh --format-scripts
 
 fmt-ocaml:
 	@dune build --profile=$(PROFILE) @fmt --auto-promote
