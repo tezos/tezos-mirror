@@ -27,6 +27,7 @@
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
 use std::convert::Infallible;
+use std::ffi::CStr;
 
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
@@ -56,8 +57,8 @@ use octez_riscv_durable_storage_common::registry::RegistryState;
 pub struct InMemoryGcNames;
 
 impl GcNames for InMemoryGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.normal";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.normal";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.normal";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.normal";
 }
 
 /// In-memory durable storage registry, exposed as an OCaml custom block.
@@ -78,8 +79,8 @@ pub type ImmRegistry = ImmutableState<RegistryState<InMemoryKeyValueStore, InMem
 pub struct InMemoryProveGcNames;
 
 impl GcNames for InMemoryProveGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.prove";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.prove";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.prove";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.prove";
 }
 
 /// In-memory prove-mode durable storage registry.
@@ -91,8 +92,8 @@ pub type RegistryProve =
 pub struct InMemoryVerifyGcNames;
 
 impl GcNames for InMemoryVerifyGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.verify";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.verify";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.verify";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.verify";
 }
 
 /// In-memory verify-mode durable storage registry, replaying operations against a proof.
@@ -102,7 +103,11 @@ pub type RegistryVerify = BackgroundRegistry<InMemoryKeyValueStore, InMemoryVeri
 /// Proof produced by prove mode, can be used to construct the verify state.
 #[ocaml::sig]
 pub struct Proof(NdsProof);
-ocaml::custom!(Proof);
+impl ocaml::Custom for Proof {
+    // An explicit name: the derived "rust.Proof" is shared with the Proof of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.in_memory.proof" }
+}
 
 /// Deterministic errors arising from logically invalid arguments.
 ///

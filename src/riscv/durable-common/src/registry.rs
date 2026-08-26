@@ -5,6 +5,7 @@
 //! Generic registry state wrapper for OCaml GC resource tracking.
 
 use std::convert::Infallible;
+use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -53,9 +54,13 @@ pub type DsVerifyRegistry<KV, G> = BackgroundRegistry<KV, G, Verify>;
 /// Marker trait supplying OCaml GC resource names.
 pub trait GcNames: Send + Sync + 'static {
     /// Name used to register the immutable (read-only) OCaml custom block.
-    const IMMUTABLE_NAME: &'static str;
+    ///
+    /// A [`CStr`], so the identifier OCaml `strcmp`s is NUL-terminated by construction.
+    const IMMUTABLE_NAME: &'static CStr;
     /// Name used to register the mutable OCaml custom block.
-    const MUTABLE_NAME: &'static str;
+    ///
+    /// A [`CStr`], as [`Self::IMMUTABLE_NAME`].
+    const MUTABLE_NAME: &'static CStr;
 }
 
 /// Wrapper to enable customizing OCaml GC's resource tracking.
@@ -114,8 +119,8 @@ where
 }
 
 impl<KV: ReadableKeyValueStore, G: GcNames> CustomGcResource for RegistryState<KV, G> {
-    const IMMUTABLE_NAME: &'static str = G::IMMUTABLE_NAME;
-    const MUTABLE_NAME: &'static str = G::MUTABLE_NAME;
+    const IMMUTABLE_NAME: &'static CStr = G::IMMUTABLE_NAME;
+    const MUTABLE_NAME: &'static CStr = G::MUTABLE_NAME;
 }
 
 impl<KV, G> ReadableRegistryApply<KV, Normal> for DsRegistry<KV, G>
@@ -354,24 +359,14 @@ where
     }
 }
 
-impl<KV, G, M> ocaml::Custom for BackgroundRegistry<KV, G, M>
-where
-    KV: WriteableKeyValueStore,
-    G: GcNames,
-    M: Mode,
-{
-    const NAME: &'static str = G::MUTABLE_NAME;
-
-    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = 1;
-    const MAX: usize = 10;
+octez_riscv_api_common::impl_ocaml_custom! {
+    impl [KV, G, M] BackgroundRegistry<KV, G, M>
+    where [KV: WriteableKeyValueStore, G: GcNames, M: Mode]
+    {
+        name: G::MUTABLE_NAME,
+        used: 1,
+        max: 10,
+    }
 }
 
 /// Applies the given function over the registry state kept in the background

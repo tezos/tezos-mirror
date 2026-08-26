@@ -7,6 +7,7 @@
 
 use core::panic;
 use std::collections::LinkedList;
+use std::ffi::CStr;
 use std::fs;
 use std::str;
 
@@ -68,9 +69,9 @@ impl TryClone for NodePvmState {
 }
 
 impl CustomGcResource for NodePvmState {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.node_pvm_state";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.node_pvm_state";
 
-    const MUTABLE_NAME: &'static str = "riscv.mut.node_pvm_state";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.node_pvm_state";
 
     const IMMUTABLE_USED: usize = 1;
 
@@ -93,7 +94,11 @@ pub type MutState = MutableState<NodePvmState>;
 #[ocaml::sig]
 pub struct Id(hash::Hash);
 
-ocaml::custom!(Repo);
+impl ocaml::Custom for Repo {
+    // An explicit name: the derived "rust.Repo" is shared with the Repo of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.pvm.repo" }
+}
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, strum::EnumCount)]
@@ -631,7 +636,11 @@ impl Proof {
     }
 }
 
-ocaml::custom!(Proof);
+impl ocaml::Custom for Proof {
+    // An explicit name: the derived "rust.Proof" is shared with the Proof of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.pvm.proof" }
+}
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]

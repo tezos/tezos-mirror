@@ -215,24 +215,14 @@ where
     }
 }
 
-/// The immutable registry is what OCaml holds, so it is the type that carries the immutable custom
-/// block's name. The [`ImmutableState`]s inside the variants never reach OCaml.
-impl<RO, G> ocaml::Custom for ImmRegistryState<RO, G>
-where
-    RO: ReadOnlyKeyValueStore,
-    G: GcNames,
-{
-    const NAME: &'static str = G::IMMUTABLE_NAME;
-
-    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = <RegistryState<RO, G> as CustomGcResource>::IMMUTABLE_USED;
-
-    const MAX: usize = <RegistryState<RO, G> as CustomGcResource>::IMMUTABLE_MAX;
+// The immutable registry is what OCaml holds, so it is the type that carries the immutable custom
+// block's name. The `ImmutableState`s inside the variants never reach OCaml.
+octez_riscv_api_common::impl_ocaml_custom! {
+    impl [RO, G] ImmRegistryState<RO, G>
+    where [RO: ReadOnlyKeyValueStore, G: GcNames]
+    {
+        name: G::IMMUTABLE_NAME,
+        used: <RegistryState<RO, G> as CustomGcResource>::IMMUTABLE_USED,
+        max: <RegistryState<RO, G> as CustomGcResource>::IMMUTABLE_MAX,
+    }
 }

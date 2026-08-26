@@ -27,6 +27,7 @@
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
 use std::convert::Infallible;
+use std::ffi::CStr;
 use std::path::Path;
 
 use octez_riscv_api_common::OcamlFallible;
@@ -59,8 +60,8 @@ use octez_riscv_durable_storage_common::registry::RegistryState;
 pub struct OnDiskGcNames;
 
 impl GcNames for OnDiskGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk";
 }
 
 /// On-disk durable storage registry, exposed as an OCaml custom block.
@@ -84,14 +85,18 @@ pub type ImmRegistry = ImmRegistryState<ReadOnlyPersistenceLayer, OnDiskGcNames>
 #[derive(derive_more::Deref)]
 #[ocaml::sig]
 pub struct Repo(DirectoryManager);
-ocaml::custom!(Repo);
+impl ocaml::Custom for Repo {
+    // An explicit name: the derived "rust.Repo" is shared with the Repo of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.on_disk.repo" }
+}
 
 /// OCaml GC names for the on-disk registry state (prove).
 pub struct OnDiskProveGcNames;
 
 impl GcNames for OnDiskProveGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk.prove";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk.prove";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk.prove";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk.prove";
 }
 
 /// On-disk prove-mode durable storage registry.
@@ -102,8 +107,8 @@ pub type RegistryProve = BackgroundRegistry<PersistenceLayer, OnDiskProveGcNames
 pub struct OnDiskVerifyGcNames;
 
 impl GcNames for OnDiskVerifyGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk.verify";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk.verify";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk.verify";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk.verify";
 }
 
 /// On-disk verify-mode durable storage registry, replaying operations against a proof.
@@ -113,7 +118,11 @@ pub type RegistryVerify = BackgroundRegistry<PersistenceLayer, OnDiskVerifyGcNam
 /// Proof produced by prove mode, can be used to construct the verify state.
 #[ocaml::sig]
 pub struct Proof(NdsProof);
-ocaml::custom!(Proof);
+impl ocaml::Custom for Proof {
+    // An explicit name: the derived "rust.Proof" is shared with the Proof of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.on_disk.proof" }
+}
 
 /// Deterministic errors arising from logically invalid arguments.
 ///
