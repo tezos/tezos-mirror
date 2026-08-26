@@ -346,10 +346,10 @@ where
                     anyhow::anyhow!("delete_info on TEZOSX_CALLER_ADDRESS failed: {e:?}")
                 })?;
                 // Legacy per-field layout used by very old kernels.
-                let legacy_balance_path = OwnedPath::try_from(format!(
-                    "/evm/world_state/eth_accounts/{TEZOSX_CALLER_ADDRESS:x}/balance"
-                ))?;
-                allow_path_not_found(host.store_delete(&legacy_balance_path))?;
+                const LEGACY_BALANCE_PATH: RefPath = RefPath::assert_from(
+                    b"/evm/world_state/eth_accounts/7e20580000000000000000000000000000000001/balance",
+                );
+                allow_path_not_found(host.store_delete(&LEGACY_BALANCE_PATH))?;
                 Ok(MigrationStatus::Done)
             } else {
                 Ok(MigrationStatus::None)
