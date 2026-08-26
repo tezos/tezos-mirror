@@ -4892,7 +4892,7 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess {
                         storage: None,
                         lazy_storage_diff: None,
@@ -4989,7 +4989,7 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess {
                         storage: None,
                         lazy_storage_diff: None,
@@ -5115,7 +5115,7 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess {
                             storage: Some(
                                 storage
@@ -5150,7 +5150,7 @@ mod tests {
                             },
                             sender: Contract::Originated(desthash.clone()),
                             nonce: 0,
-                            result: ContentResult::Applied(TransferTarget::ToContrat(
+                            result: ContentResult::Applied(TransferTarget::ToContract(
                                 TransferSuccess {
                                     storage: None,
                                     lazy_storage_diff: None,
@@ -5363,7 +5363,7 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess {
                         storage: storage.map(Into::into),
                         lazy_storage_diff: None,
@@ -5577,7 +5577,7 @@ mod tests {
                             },
                         )],
                     }),
-                    result: TransferTarget::ToContrat(TransferSuccess {
+                    result: TransferTarget::ToContract(TransferSuccess {
                         storage: Some(storage_value.into()),
                         lazy_storage_diff: None,
                         balance_updates: vec![
@@ -5676,7 +5676,7 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess {
                         storage: None,
                         lazy_storage_diff: None,
@@ -5795,7 +5795,7 @@ mod tests {
                             },
                         )],
                     }),
-                    result: TransferTarget::ToContrat(TransferSuccess {
+                    result: TransferTarget::ToContract(TransferSuccess {
                         storage: None,
                         lazy_storage_diff: None,
                         balance_updates: vec![
@@ -6183,7 +6183,7 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess {
                             storage: None,
                             lazy_storage_diff: None,
@@ -6229,7 +6229,7 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                     ],
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess {
                             storage: None,
                             lazy_storage_diff: None,
@@ -7055,8 +7055,9 @@ mod tests {
                     ContentResult::BackTracked(BacktrackedResult {
                         errors: None,
                         result:
-                            TransferTarget::ToContrat(TransferSuccess {
-                                balance_updates, ..
+                            TransferTarget::ToContract(TransferSuccess {
+                                balance_updates,
+                                ..
                             }),
                     }),
                 ..
@@ -9803,7 +9804,7 @@ mod tests {
             matches!(
                 &receipts2[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess { .. }
                     )),
                     ..
@@ -9853,7 +9854,7 @@ mod tests {
             matches!(
                 &receipts3[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::BackTracked(BacktrackedResult { result: TransferTarget::ToContrat(TransferSuccess { .. }), .. }),
+                    result: ContentResult::BackTracked(BacktrackedResult { result: TransferTarget::ToContract(TransferSuccess { .. }), .. }),
                     internal_operation_results,
                     ..
                 }) if internal_operation_results.len() == 1 && matches!(
@@ -9911,12 +9912,12 @@ mod tests {
             matches!(
                 &receipts4[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess{ .. })),
+                    result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess{ .. })),
                     internal_operation_results,
                     ..
                 }) if internal_operation_results.len() == 1 && matches!(
                     &internal_operation_results[0],
-                    InternalOperationSum::Transfer(InternalContentWithMetadata {result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess{ .. })), ..})
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess{ .. })), ..})
                 )
             ),
             "Expected Successful Transfer operation result, got {:?}",
@@ -10016,7 +10017,7 @@ mod tests {
             matches!(
                 &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess { .. }
                     )),
                     ..
@@ -10114,7 +10115,7 @@ mod tests {
             matches!(
                 &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess { .. }
                     )),
                     ..
@@ -11446,7 +11447,7 @@ mod tests {
             matches!(
                 &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess { storage: None, .. }
                     )),
                     ..
@@ -11535,7 +11536,7 @@ mod tests {
             matches!(
                 &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess { storage: None, .. }
                     )),
                     ..
@@ -12846,7 +12847,7 @@ mod tests {
         match &first_receipts[0].receipt {
             OperationResultSum::Transfer(OperationResult {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -12909,7 +12910,7 @@ mod tests {
         match &second_receipts[0].receipt {
             OperationResultSum::Transfer(OperationResult {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -13053,7 +13054,7 @@ mod tests {
         let internal_operation_results = match &receipts[0].receipt {
             OperationResultSum::Transfer(OperationResult {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -13073,7 +13074,7 @@ mod tests {
         match &internal_operation_results[0] {
             InternalOperationSum::Transfer(InternalContentWithMetadata {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -13177,7 +13178,7 @@ mod tests {
                 result:
                     ContentResult::BackTracked(BacktrackedResult {
                         result:
-                            TransferTarget::ToContrat(TransferSuccess {
+                            TransferTarget::ToContract(TransferSuccess {
                                 address_registry_diff,
                                 ..
                             }),
@@ -13332,7 +13333,7 @@ mod tests {
         match &receipts[0].receipt {
             OperationResultSum::Transfer(OperationResult {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -13436,7 +13437,7 @@ mod tests {
         match &receipts[0].receipt {
             OperationResultSum::Transfer(OperationResult {
                 result:
-                    ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                    ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                         address_registry_diff,
                         ..
                     })),
@@ -13674,13 +13675,13 @@ mod tests {
                 destination: payer.contract(),
                 parameters: Parameters::default(),
             },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 paid_storage_size_diff: 5_u64.into(),
                 ..Default::default()
             })),
         });
         let mut content: ContentResult<TransferContent> =
-            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 paid_storage_size_diff: 4_u64.into(),
                 ..Default::default()
             }));
@@ -13700,7 +13701,7 @@ mod tests {
         let InternalOperationSum::Transfer(inner) = &internals[0] else {
             panic!("expected internal Transfer");
         };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &inner.result
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &inner.result
         else {
             panic!("expected Applied internal target");
         };
@@ -13730,7 +13731,7 @@ mod tests {
                         destination: payer.contract(),
                         parameters: Parameters::default(),
                     },
-                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                    result: ContentResult::Applied(TransferTarget::ToContract(
                         TransferSuccess {
                             allocated_destination_contract: true,
                             ..Default::default()
@@ -13740,8 +13741,9 @@ mod tests {
                 0,
             )
         };
-        let mut content: ContentResult<TransferContent> =
-            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
+        let mut content: ContentResult<TransferContent> = ContentResult::Applied(
+            TransferTarget::ToContract(TransferSuccess::default()),
+        );
         // Budget fits one slot (257) but not two (514): remainder
         // after internal 0 is `2 * ORIGINATION_SIZE - 1 - 257 == 256`,
         // and internal 1 needs 257.
@@ -13762,7 +13764,7 @@ mod tests {
             let InternalOperationSum::Transfer(inner) = internal else {
                 panic!("expected internal Transfer");
             };
-            let ContentResult::Applied(TransferTarget::ToContrat(success)) =
+            let ContentResult::Applied(TransferTarget::ToContract(success)) =
                 &inner.result
             else {
                 panic!("expected Applied internal target");
@@ -13796,7 +13798,7 @@ mod tests {
                 destination: payer.contract(),
                 parameters: Parameters::default(),
             },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 paid_storage_size_diff: 4_u64.into(),
                 ..Default::default()
             })),
@@ -13809,7 +13811,7 @@ mod tests {
                 destination: payer.contract(),
                 parameters: Parameters::default(),
             },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 // Non-zero diff is the worst case: a buggy burn would
                 // try to charge 7 bytes and consume from the budget.
                 paid_storage_size_diff: 7_u64.into(),
@@ -13820,8 +13822,9 @@ mod tests {
             TaggedInternalOp::own(own_op, 0),
             TaggedInternalOp::from_crac(crac_op),
         ];
-        let mut content: ContentResult<TransferContent> =
-            ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess::default()));
+        let mut content: ContentResult<TransferContent> = ContentResult::Applied(
+            TransferTarget::ToContract(TransferSuccess::default()),
+        );
 
         // Storage limit deliberately tight: 4 bytes is just enough for
         // the Own internal alone. A buggy burn that also charged the
@@ -13850,7 +13853,7 @@ mod tests {
         let InternalOperationSum::Transfer(own_after) = &internals[0] else {
             panic!("expected Own internal at index 0");
         };
-        let ContentResult::Applied(TransferTarget::ToContrat(own_success)) =
+        let ContentResult::Applied(TransferTarget::ToContract(own_success)) =
             &own_after.result
         else {
             panic!("expected Applied Own");
@@ -13861,7 +13864,7 @@ mod tests {
         let InternalOperationSum::Transfer(crac_after) = &internals[1] else {
             panic!("expected Crac internal at index 1");
         };
-        let ContentResult::Applied(TransferTarget::ToContrat(crac_success)) =
+        let ContentResult::Applied(TransferTarget::ToContract(crac_success)) =
             &crac_after.result
         else {
             panic!("expected Applied Crac");

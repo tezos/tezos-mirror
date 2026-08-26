@@ -491,7 +491,7 @@ fn build_failed_crac_receipt(
     let alias_target_result = if deep_failure {
         ContentResult::BackTracked(BacktrackedResult {
             errors: None,
-            result: TransferTarget::ToContrat(TransferSuccess::default()),
+            result: TransferTarget::ToContract(TransferSuccess::default()),
         })
     } else {
         ContentResult::Failed(ApplyOperationErrors::from(ApplyOperationError::Transfer(

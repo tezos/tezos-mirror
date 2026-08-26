@@ -509,19 +509,19 @@ impl OperationKind for EventContent {
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub enum TransferTarget {
-    ToContrat(TransferSuccess),
+    ToContract(TransferSuccess),
 }
 
 impl From<TransferSuccess> for TransferTarget {
     fn from(value: TransferSuccess) -> Self {
-        TransferTarget::ToContrat(value)
+        TransferTarget::ToContract(value)
     }
 }
 
 impl From<TransferTarget> for TransferSuccess {
     fn from(value: TransferTarget) -> Self {
         match value {
-            TransferTarget::ToContrat(success) => success,
+            TransferTarget::ToContract(success) => success,
         }
     }
 }
@@ -649,7 +649,7 @@ impl HasConsumedMilligas for TransferSuccess {
 
 impl HasConsumedMilligas for TransferTarget {
     fn consumed_milligas(&self) -> &Narith {
-        let TransferTarget::ToContrat(success) = self;
+        let TransferTarget::ToContract(success) = self;
         &success.consumed_milligas
     }
 }
@@ -1239,7 +1239,7 @@ mod tests {
                                     ),
                                 ],
                             }),
-                            result: TransferTarget::ToContrat(TransferSuccess {
+                            result: TransferTarget::ToContract(TransferSuccess {
                                 storage: None,
                                 lazy_storage_diff: None,
                                 balance_updates: vec![
@@ -1275,7 +1275,7 @@ mod tests {
                             parameters: Parameters::default(),
                         } }),
                         receipt: OperationResultSum::Transfer(OperationResult { balance_updates: vec![], result: ContentResult::Applied(
-                            TransferTarget::ToContrat(
+                            TransferTarget::ToContract(
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
@@ -1467,7 +1467,7 @@ mod tests {
             sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
                 .unwrap(),
             nonce: 0,
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 storage: None,
                 lazy_storage_diff: None,
                 balance_updates: vec![
@@ -1592,7 +1592,7 @@ mod tests {
             nonce: 0,
             result: ContentResult::BackTracked(BacktrackedResult {
                 errors: None,
-                result: TransferTarget::ToContrat(TransferSuccess {
+                result: TransferTarget::ToContract(TransferSuccess {
                     storage: Some(MichelineExpr(
                         hex::decode("010000000568656c6c6f").unwrap(),
                     )),
@@ -1699,14 +1699,14 @@ mod tests {
                     destination: payer.clone(),
                     parameters: Parameters::default(),
                 },
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess::default(),
                 )),
             });
 
         let mut receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
+            result: ContentResult::Applied(TransferTarget::ToContract(
                 TransferSuccess::default(),
             )),
             internal_operation_results: vec![internal_applied],
@@ -1750,14 +1750,14 @@ mod tests {
                     destination: payer.clone(),
                     parameters: Parameters::default(),
                 },
-                result: ContentResult::Applied(TransferTarget::ToContrat(
+                result: ContentResult::Applied(TransferTarget::ToContract(
                     TransferSuccess::default(),
                 )),
             });
 
         let mut receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Applied(TransferTarget::ToContrat(
+            result: ContentResult::Applied(TransferTarget::ToContract(
                 TransferSuccess::default(),
             )),
             internal_operation_results: vec![internal_applied],

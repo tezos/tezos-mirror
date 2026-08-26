@@ -553,7 +553,7 @@ where
                             ..TransferSuccess::default()
                         };
                         (
-                            ContentResult::Applied(TransferTarget::ToContrat(success)),
+                            ContentResult::Applied(TransferTarget::ToContract(success)),
                             vec![event],
                         )
                     }
@@ -666,7 +666,7 @@ where
     };
 
     let result = match tezlink_deposit(host, amount, receiver) {
-        Ok(success) => ContentResult::Applied(TransferTarget::ToContrat(success)),
+        Ok(success) => ContentResult::Applied(TransferTarget::ToContract(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],
         }),
