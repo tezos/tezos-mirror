@@ -48,12 +48,12 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-let common_needs =
+let common_needs : (Cacio.need * Cacio.job) list =
   [
-    (Cacio.Artifacts, Kernels.job_build_kernels);
-    (Cacio.Artifacts, Build.job_build_released Amd64);
-    (Cacio.Artifacts, Build.job_build_extra_dev Amd64);
-    (Cacio.Artifacts, Build.job_build_exp Amd64);
+    (Artifacts, Kernels.job_build_kernels);
+    (Artifacts, Build.job_build_released Amd64);
+    (Artifacts, Build.job_build_extra_dev Amd64);
+    (Artifacts, Build.job_build_exp Amd64);
   ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.

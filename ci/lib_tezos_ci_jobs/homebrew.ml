@@ -89,12 +89,12 @@ let job_build_homebrew_formula_macosx =
 let () =
   Cacio.register_merge_request_jobs
     [
-      (Cacio.Auto, job_build_homebrew_formula);
-      (Cacio.Auto, job_build_homebrew_formula_macosx);
+      (Auto, job_build_homebrew_formula);
+      (Auto, job_build_homebrew_formula_macosx);
     ] ;
   Cacio.register_jobs
-    Cacio.Homebrew_daily
+    Homebrew_daily
     [
-      (Cacio.Auto, job_build_homebrew_formula);
-      (Cacio.Auto, job_build_homebrew_formula_macosx);
+      (Auto, job_build_homebrew_formula);
+      (Auto, job_build_homebrew_formula_macosx);
     ]
