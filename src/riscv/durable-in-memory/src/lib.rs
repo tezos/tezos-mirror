@@ -27,12 +27,14 @@
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
 use std::convert::Infallible;
+use std::ffi::CStr;
 
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_data::codec::Bincode;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::merkle_proof::proof::Proof as NdsProof;
 use octez_riscv_data::merkle_proof::proof::deserialise_proof;
@@ -55,8 +57,8 @@ use octez_riscv_durable_storage_common::registry::RegistryState;
 pub struct InMemoryGcNames;
 
 impl GcNames for InMemoryGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.normal";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.normal";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.normal";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.normal";
 }
 
 /// In-memory durable storage registry, exposed as an OCaml custom block.
@@ -77,8 +79,8 @@ pub type ImmRegistry = ImmutableState<RegistryState<InMemoryKeyValueStore, InMem
 pub struct InMemoryProveGcNames;
 
 impl GcNames for InMemoryProveGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.prove";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.prove";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.prove";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.prove";
 }
 
 /// In-memory prove-mode durable storage registry.
@@ -90,8 +92,8 @@ pub type RegistryProve =
 pub struct InMemoryVerifyGcNames;
 
 impl GcNames for InMemoryVerifyGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.verify";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.verify";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.verify";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.verify";
 }
 
 /// In-memory verify-mode durable storage registry, replaying operations against a proof.
@@ -101,7 +103,11 @@ pub type RegistryVerify = BackgroundRegistry<InMemoryKeyValueStore, InMemoryVeri
 /// Proof produced by prove mode, can be used to construct the verify state.
 #[ocaml::sig]
 pub struct Proof(NdsProof);
-ocaml::custom!(Proof);
+impl ocaml::Custom for Proof {
+    // An explicit name: the derived "rust.Proof" is shared with the Proof of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.in_memory.proof" }
+}
 
 /// Deterministic errors arising from logically invalid arguments.
 ///
@@ -205,7 +211,7 @@ impl From<Infallible> for InvalidArgumentError {
 #[ocaml::func]
 #[ocaml::sig("unit -> registry")]
 pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer<Registry>> {
-    let registry = RegistryState::new(InMemoryRepo::default())?;
+    let registry = RegistryState::new(InMemoryRepo::default());
 
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
@@ -224,6 +230,72 @@ pub fn octez_riscv_durable_in_memory_registry_from_imm(
     state: SafePointer<ImmRegistry>,
 ) -> SafePointer<Registry> {
     SafePointer::from(state.to_mut_state())
+}
+
+// Normal mode - immutable registry
+//
+// The read half of the registry and database API, over a registry that cannot be written to. The
+// mutating operations have no immutable counterpart: a caller that needs one recovers a live
+// registry with [`octez_riscv_durable_in_memory_registry_from_imm`] first.
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> bytes")]
+pub fn octez_riscv_durable_in_memory_imm_registry_hash(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<BytesWrapper<Hash>> {
+    api_common::registry_hash(&*state)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64")]
+pub fn octez_riscv_durable_in_memory_imm_registry_size(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<u64> {
+    let Ok(size) = api_common::registry_size(&*state)?;
+    Ok(size)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (bool, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_exists(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<bool> {
+    api_common::database_exists(&*state, db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "imm_registry -> int64 -> bytes -> int64 -> int64 -> (bytes, invalid_argument_error) result"
+)]
+pub fn octez_riscv_durable_in_memory_imm_database_read(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+    offset: u64,
+    len: u64,
+) -> SplitDsResult<BytesWrapper<Vec<u8>>> {
+    api_common::database_read(&*state, db_index, key, offset, len)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (int64, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_value_length(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<u64> {
+    api_common::value_length(&*state, db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> (bytes, invalid_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_imm_database_hash(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+) -> SplitDsResult<BytesWrapper<Hash>> {
+    api_common::database_hash(&*state, db_index)
 }
 
 #[ocaml::func]
@@ -698,8 +770,10 @@ pub fn octez_riscv_durable_in_memory_deserialise_proof(
     // We discard the verify state, as it was deserialised with the stream deserialiser -
     // so currently doesn't have support for verify operations directly. (TZX-161)
     let (proof, _state) =
-        deserialise_proof::<DsRegistry<InMemoryKeyValueStore, Verify>, _>(proof.0.iter().copied())
-            .map_err(|err| err.to_string())?;
+        deserialise_proof::<Bincode, DsRegistry<InMemoryKeyValueStore, Verify>, _>(
+            proof.0.iter().copied(),
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(SafePointer::from(Proof(proof)))
 }

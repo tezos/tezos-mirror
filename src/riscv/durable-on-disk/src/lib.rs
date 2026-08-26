@@ -27,13 +27,14 @@
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
 use std::convert::Infallible;
+use std::ffi::CStr;
 use std::path::Path;
 
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
-use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_data::codec::Bincode;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::merkle_proof::proof::Proof as NdsProof;
 use octez_riscv_data::merkle_proof::proof::deserialise_proof;
@@ -44,11 +45,13 @@ use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::commit::CommitId;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::persistence_layer::PersistenceLayer;
+use octez_riscv_durable_storage::persistence_layer::ReadOnlyPersistenceLayer;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::repo::DirectoryManager;
 use octez_riscv_durable_storage_common::BytesParam;
 use octez_riscv_durable_storage_common::KeyParam;
 use octez_riscv_durable_storage_common::api_common;
+use octez_riscv_durable_storage_common::imm_registry::ImmRegistryState;
 use octez_riscv_durable_storage_common::registry::BackgroundRegistry;
 use octez_riscv_durable_storage_common::registry::GcNames;
 use octez_riscv_durable_storage_common::registry::RegistryState;
@@ -57,37 +60,43 @@ use octez_riscv_durable_storage_common::registry::RegistryState;
 pub struct OnDiskGcNames;
 
 impl GcNames for OnDiskGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk";
 }
 
 /// On-disk durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
 pub type Registry = MutableState<RegistryState<PersistenceLayer, OnDiskGcNames>>;
 
-/// Immutable snapshot of an on-disk durable storage registry.
+/// Immutable on-disk durable storage registry, which cannot be written to.
 ///
-/// Obtained from [`octez_riscv_durable_on_disk_registry_to_imm`]; mutations
-/// on the source registry after the conversion are not observable through the
-/// snapshot, and vice versa for registries recovered with
-/// [`octez_riscv_durable_on_disk_registry_from_imm`] (copy-on-write via
-/// [`ImmutableState`] / [`MutableState`]).  Both handles keep sharing the
-/// same underlying repository.
+/// Obtained either from [`octez_riscv_durable_on_disk_registry_to_imm`], as a snapshot of a live
+/// registry - mutations on either side after the conversion are not observable through the other
+/// (copy-on-write via [`ImmutableState`] / [`MutableState`]) - or from
+/// [`octez_riscv_durable_on_disk_registry_checkout_read_only`], as a committed registry read where
+/// it lies. Both serve the same reads and keep sharing the same underlying repository; they part
+/// ways only in what [`octez_riscv_durable_on_disk_registry_from_imm`] has to pay.
+///
+/// [`ImmutableState`]: octez_riscv_api_common::move_semantics::ImmutableState
 #[ocaml::sig]
-pub type ImmRegistry = ImmutableState<RegistryState<PersistenceLayer, OnDiskGcNames>>;
+pub type ImmRegistry = ImmRegistryState<ReadOnlyPersistenceLayer, OnDiskGcNames>;
 
 /// On-disk repository, wrapping a DirectoryManager.
 #[derive(derive_more::Deref)]
 #[ocaml::sig]
 pub struct Repo(DirectoryManager);
-ocaml::custom!(Repo);
+impl ocaml::Custom for Repo {
+    // An explicit name: the derived "rust.Repo" is shared with the Repo of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.on_disk.repo" }
+}
 
 /// OCaml GC names for the on-disk registry state (prove).
 pub struct OnDiskProveGcNames;
 
 impl GcNames for OnDiskProveGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk.prove";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk.prove";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk.prove";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk.prove";
 }
 
 /// On-disk prove-mode durable storage registry.
@@ -98,8 +107,8 @@ pub type RegistryProve = BackgroundRegistry<PersistenceLayer, OnDiskProveGcNames
 pub struct OnDiskVerifyGcNames;
 
 impl GcNames for OnDiskVerifyGcNames {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.on_disk.verify";
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.on_disk.verify";
+    const IMMUTABLE_NAME: &'static CStr = c"riscv.imm.registry_state.on_disk.verify";
+    const MUTABLE_NAME: &'static CStr = c"riscv.mut.registry_state.on_disk.verify";
 }
 
 /// On-disk verify-mode durable storage registry, replaying operations against a proof.
@@ -109,7 +118,11 @@ pub type RegistryVerify = BackgroundRegistry<PersistenceLayer, OnDiskVerifyGcNam
 /// Proof produced by prove mode, can be used to construct the verify state.
 #[ocaml::sig]
 pub struct Proof(NdsProof);
-ocaml::custom!(Proof);
+impl ocaml::Custom for Proof {
+    // An explicit name: the derived "rust.Proof" is shared with the Proof of other
+    // crates, and a custom block's identifier is meant to identify it.
+    ocaml::custom! { name: "riscv.durable.on_disk.proof" }
+}
 
 /// Deterministic errors arising from logically invalid arguments.
 ///
@@ -219,7 +232,7 @@ pub fn octez_riscv_durable_on_disk_registry_new(
     repo: SafePointer<Repo>,
 ) -> OcamlFallible<SafePointer<Registry>> {
     let dir = repo.0.clone();
-    let registry = RegistryState::new(dir)?;
+    let registry = RegistryState::new(dir);
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
 
@@ -228,15 +241,81 @@ pub fn octez_riscv_durable_on_disk_registry_new(
 pub fn octez_riscv_durable_on_disk_registry_to_imm(
     state: SafePointer<Registry>,
 ) -> OcamlFallible<SafePointer<ImmRegistry>> {
-    Ok(SafePointer::from(state.to_imm_state()?))
+    Ok(SafePointer::from(ImmRegistry::snapshot(&state)?))
 }
 
 #[ocaml::func]
 #[ocaml::sig("imm_registry -> registry")]
 pub fn octez_riscv_durable_on_disk_registry_from_imm(
     state: SafePointer<ImmRegistry>,
-) -> SafePointer<Registry> {
-    SafePointer::from(state.to_mut_state())
+) -> OcamlFallible<SafePointer<Registry>> {
+    Ok(SafePointer::from(state.to_mut_state()?))
+}
+
+// Normal mode - immutable registry
+//
+// The read half of the registry and database API, over a registry that cannot be written to. The
+// mutating operations have no immutable counterpart: a caller that needs one recovers a live
+// registry with [`octez_riscv_durable_on_disk_registry_from_imm`] first.
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> bytes")]
+pub fn octez_riscv_durable_on_disk_imm_registry_hash(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<BytesWrapper<Hash>> {
+    state.hash()
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64")]
+pub fn octez_riscv_durable_on_disk_imm_registry_size(
+    state: SafePointer<ImmRegistry>,
+) -> OcamlFallible<u64> {
+    let Ok(size) = state.size()?;
+    Ok(size)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (bool, invalid_argument_error) result")]
+pub fn octez_riscv_durable_on_disk_imm_database_exists(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<bool> {
+    state.database_exists(db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "imm_registry -> int64 -> bytes -> int64 -> int64 -> (bytes, invalid_argument_error) result"
+)]
+pub fn octez_riscv_durable_on_disk_imm_database_read(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+    offset: u64,
+    len: u64,
+) -> SplitDsResult<BytesWrapper<Vec<u8>>> {
+    state.database_read(db_index, key, offset, len)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> bytes -> (int64, invalid_argument_error) result")]
+pub fn octez_riscv_durable_on_disk_imm_database_value_length(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+    key: KeyParam,
+) -> SplitDsResult<u64> {
+    state.value_length(db_index, key)
+}
+
+#[ocaml::func]
+#[ocaml::sig("imm_registry -> int64 -> (bytes, invalid_argument_error) result")]
+pub fn octez_riscv_durable_on_disk_imm_database_hash(
+    state: SafePointer<ImmRegistry>,
+    db_index: u64,
+) -> SplitDsResult<BytesWrapper<Hash>> {
+    state.database_hash(db_index)
 }
 
 #[ocaml::func]
@@ -265,6 +344,21 @@ pub fn octez_riscv_durable_on_disk_registry_checkout(
     let state = RegistryState::from(registry);
 
     Ok(SafePointer::from(MutableState::owned(state)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> bytes -> imm_registry")]
+pub fn octez_riscv_durable_on_disk_registry_checkout_read_only(
+    repo: SafePointer<Repo>,
+    commit_id: BytesParam,
+) -> OcamlFallible<SafePointer<ImmRegistry>> {
+    let hash = <[u8; Hash::DIGEST_SIZE]>::try_from(commit_id.0)?;
+    let commit_id = CommitId::from(Hash::from(hash));
+    let repo = repo.clone();
+
+    let state = ImmRegistry::checkout_read_only(repo, commit_id)?;
+
+    Ok(SafePointer::from(state))
 }
 
 #[ocaml::func]
@@ -733,10 +827,11 @@ pub fn octez_riscv_durable_on_disk_deserialise_proof(
 ) -> Result<SafePointer<Proof>, String> {
     // The stream pass reconstructs the proof tree (and a verify-side state we discard);
     // `start_verify` then runs the proof-tree pass to obtain a verifiable registry.
-    let (proof, _state) = deserialise_proof::<ds_registry::Registry<PersistenceLayer, Verify>, _>(
-        proof.0.iter().copied(),
-    )
-    .map_err(|err| err.to_string())?;
+    let (proof, _state) =
+        deserialise_proof::<Bincode, ds_registry::Registry<PersistenceLayer, Verify>, _>(
+            proof.0.iter().copied(),
+        )
+        .map_err(|err| err.to_string())?;
 
     Ok(SafePointer::from(Proof(proof)))
 }

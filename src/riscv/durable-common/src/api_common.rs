@@ -24,7 +24,9 @@ use octez_riscv_durable_storage::errors::OperationalError;
 use octez_riscv_durable_storage::registry as ds_registry;
 use octez_riscv_durable_storage::registry::Registry;
 use octez_riscv_durable_storage::registry::RegistryMode;
-use octez_riscv_durable_storage::storage::KeyValueStore;
+use octez_riscv_durable_storage::storage::PersistentKeyValueStore;
+use octez_riscv_durable_storage::storage::ReadableKeyValueStore;
+use octez_riscv_durable_storage::storage::WriteableKeyValueStore;
 use trait_set::trait_set;
 
 use crate::BytesParam;
@@ -36,8 +38,16 @@ use crate::registry::GcNames;
 use crate::split_ds_errors;
 
 trait_set! {
-    /// [`KeyValueStore`] that can be used in a background thread
-    pub trait BackgroundKeyValueStore = KeyValueStore + Send + Sync + 'static;
+    /// [`ReadableKeyValueStore`] that can be used in a background thread
+    pub trait BackgroundReadableKeyValueStore = ReadableKeyValueStore + Send + Sync + 'static;
+
+    /// [`WriteableKeyValueStore`] that can be used in a background thread
+    pub trait BackgroundWriteableKeyValueStore =
+        WriteableKeyValueStore + BackgroundReadableKeyValueStore;
+
+    /// [`PersistentKeyValueStore`] that can be used in a background thread
+    pub trait BackgroundPersistentKeyValueStore =
+        PersistentKeyValueStore + BackgroundWriteableKeyValueStore;
 }
 
 /// Trait allowing specialised implementations for the `MutableState<...<Registry>>` pattern by each mode.
@@ -58,7 +68,7 @@ trait_set! {
 /// [`not_found`]: octez_riscv_data::mode::utils::not_found
 /// [`catch_not_found`]: octez_riscv_data::mode::utils::catch_not_found
 /// [`NotFound`]: octez_riscv_data::mode::utils::NotFound
-pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
+pub trait ReadableRegistryApply<KV: ReadableKeyValueStore, M: Mode> {
     /// Deterministic divergence error captured while applying an operation.
     ///
     /// [`Infallible`] for Normal/Prove; [`NotFound`] for Verify.
@@ -66,6 +76,21 @@ pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
     /// [`NotFound`]: octez_riscv_data::mode::utils::NotFound
     type NotFoundError;
 
+    /// Apply a readonly operation over the contained registry.
+    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Self::NotFoundError>, OperationalError>
+    where
+        F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
+        R: Send + 'static;
+}
+
+/// The mutating half of [`ReadableRegistryApply`], available only over a store that can be
+/// written to.
+///
+/// A registry over a [`ReadOnlyKeyValueStore`] implements the readable half alone: its mutating
+/// operations do not exist, so there is nothing for it to apply.
+///
+/// [`ReadOnlyKeyValueStore`]: octez_riscv_durable_storage::storage::ReadOnlyKeyValueStore
+pub trait RegistryApply<KV: WriteableKeyValueStore, M: Mode>: ReadableRegistryApply<KV, M> {
     /// Apply a mutable operation over the contained registry. If the mutable state is 'borrowed', this
     /// will result in the underlying state being cloned, which may fail.
     fn apply<F, R>(&self, fun: F) -> Result<Result<R, Self::NotFoundError>, OperationalError>
@@ -73,12 +98,6 @@ pub trait RegistryApply<KV: KeyValueStore, M: Mode> {
         F: FnOnce(&mut Registry<KV, M>) -> R + Send + 'static,
         R: Send + 'static,
         KV::Repo: Clone;
-
-    /// Apply a readonly operation over the contained registry.
-    fn apply_ro<F, R>(&self, fun: F) -> Result<Result<R, Self::NotFoundError>, OperationalError>
-    where
-        F: FnOnce(&Registry<KV, M>) -> R + Send + 'static,
-        R: Send + 'static;
 }
 
 /// Construct a new Key, returning the correct error variant
@@ -108,13 +127,13 @@ macro_rules! key_from {
 #[inline(always)]
 pub fn registry_hash<KV, M, S>(state: &S) -> OcamlFallible<BytesWrapper<Hash>>
 where
-    KV: BackgroundKeyValueStore,
-    KV::Repo: Clone + Send + Sync,
+    KV: BackgroundReadableKeyValueStore,
+    KV::Repo: Send + Sync,
     M: Mode,
-    S: RegistryApply<KV, M, NotFoundError = Infallible>,
+    S: ReadableRegistryApply<KV, M, NotFoundError = Infallible>,
     ds_registry::Registry<KV, M>: Foldable<HashFold>,
 {
-    let Ok(hash) = state.apply_ro(move |registry| registry.fold(HashFold))?;
+    let Ok(hash) = state.apply_ro(move |registry| registry.fold(HashFold::default()))?;
 
     Ok(BytesWrapper::from(hash))
 }
@@ -123,10 +142,10 @@ where
 #[inline(always)]
 pub fn registry_size<KV, M, S>(state: &S) -> OcamlFallible<Result<u64, S::NotFoundError>>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundReadableKeyValueStore,
     KV::Repo: Send + Sync,
     M: VectorMode + 'static,
-    S: RegistryApply<KV, M>,
+    S: ReadableRegistryApply<KV, M>,
 {
     let res = match state.apply_ro(ds_registry::Registry::len)? {
         Ok(size) => Ok(u64::try_from(size)?),
@@ -140,7 +159,7 @@ where
 #[inline(always)]
 pub fn registry_resize<KV, Err, M, S>(state: &S, size: u64) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
@@ -160,7 +179,7 @@ pub fn registry_copy<KV, Err, M, S>(
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
@@ -182,7 +201,7 @@ pub fn registry_move<KV, Err, M, S>(
     dst_index: u64,
 ) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
@@ -200,7 +219,7 @@ where
 #[inline(always)]
 pub fn registry_clear<KV, Err, M, S>(state: &S, db_index: u64) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: RegistryMode + VectorMode,
@@ -221,11 +240,11 @@ pub fn database_exists<KV, Err, M, S>(
     key: KeyParam,
 ) -> SplitDsResult<bool, Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundReadableKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
-    S: RegistryApply<KV, M>,
+    S: ReadableRegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -248,7 +267,7 @@ pub fn database_set<KV, Err, M, S>(
     value: BytesParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
@@ -279,7 +298,7 @@ pub fn database_write<KV, Err, M, S>(
     value: BytesParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
@@ -310,11 +329,11 @@ pub fn database_read<KV, Err, M, S>(
     len: u64,
 ) -> SplitDsResult<BytesWrapper<Vec<u8>>, Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundReadableKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
-    S: RegistryApply<KV, M>,
+    S: ReadableRegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let offset = usize::try_from(offset)?;
@@ -349,11 +368,11 @@ pub fn value_length<KV, Err, M, S>(
     key: KeyParam,
 ) -> SplitDsResult<u64, Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundReadableKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
-    S: RegistryApply<KV, M>,
+    S: ReadableRegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
     let key = key_from!(key, Err);
@@ -376,7 +395,7 @@ pub fn database_delete<KV, Err, M, S>(
     key: KeyParam,
 ) -> SplitDsResult<(), Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
@@ -401,11 +420,11 @@ pub fn database_hash<KV, Err, M, S>(
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>, Err>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundReadableKeyValueStore,
     KV::Repo: Send + Sync,
     Err: From<ds_errors::InvalidArgumentError> + From<S::NotFoundError>,
     M: VectorMode + DatabaseMode,
-    S: RegistryApply<KV, M>,
+    S: ReadableRegistryApply<KV, M>,
 {
     let db_index = usize::try_from(db_index)?;
 
@@ -424,7 +443,7 @@ pub fn start_proof<KV, GcProve>(
     state: &impl RegistryApply<KV, Normal, NotFoundError = Infallible>,
 ) -> OcamlFallible<DsProveRegistry<KV, GcProve>>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
     KV::Repo: Clone + Send + Sync,
     GcProve: GcNames,
 {
@@ -438,7 +457,7 @@ pub fn produce_proof<KV>(
     state: &impl RegistryApply<KV, Prove<'static>, NotFoundError = Infallible>,
 ) -> OcamlFallible<Proof>
 where
-    KV: BackgroundKeyValueStore,
+    KV: BackgroundWriteableKeyValueStore,
 {
     let Ok(proof) = state.apply_ro(|registry| registry.produce_proof())?;
 

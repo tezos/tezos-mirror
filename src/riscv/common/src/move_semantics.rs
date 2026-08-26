@@ -8,6 +8,7 @@
 //! Mutable and Immutable wrappers over a generic type `T`.
 //! Exposes a mutable & immutable API to an underlying state when interfacing with OCaml
 
+use std::ffi::CStr;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::sync::Arc;
@@ -26,11 +27,15 @@ use crate::try_clone::TryClone;
 /// The resources they refer to are of 'arbitrary unit' - the importance is the
 /// comparison between `USED` and `MAX`.
 pub trait CustomGcResource {
-    /// Custom type name when under immutable semantics
-    const IMMUTABLE_NAME: &'static str;
+    /// Custom type name when under immutable semantics.
+    ///
+    /// A [`CStr`], so the identifier OCaml `strcmp`s is NUL-terminated by construction.
+    const IMMUTABLE_NAME: &'static CStr;
 
-    /// Custom type name when under mutable semantics
-    const MUTABLE_NAME: &'static str;
+    /// Custom type name when under mutable semantics.
+    ///
+    /// A [`CStr`], as [`Self::IMMUTABLE_NAME`].
+    const MUTABLE_NAME: &'static CStr;
 
     /// How many resources an immutable allocation of this type should consume.
     const IMMUTABLE_USED: usize = 0;
@@ -94,19 +99,12 @@ impl<T> ImmutableState<T> {
     }
 }
 
-impl<T: CustomGcResource> ocaml::Custom for ImmutableState<T> {
-    const NAME: &'static str = T::IMMUTABLE_NAME;
-
-    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = T::IMMUTABLE_USED;
-    const MAX: usize = T::IMMUTABLE_MAX;
+crate::impl_ocaml_custom! {
+    impl [T: CustomGcResource] ImmutableState<T> {
+        name: T::IMMUTABLE_NAME,
+        used: T::IMMUTABLE_USED,
+        max: T::IMMUTABLE_MAX,
+    }
 }
 
 /// [`MutableState`] can hold a state of type `T` and have it borrowed or owned.
@@ -207,17 +205,10 @@ impl<T> MutableState<T> {
     }
 }
 
-impl<T: CustomGcResource> ocaml::Custom for MutableState<T> {
-    const NAME: &'static str = T::MUTABLE_NAME;
-
-    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = T::MUTABLE_USED;
-    const MAX: usize = T::MUTABLE_MAX;
+crate::impl_ocaml_custom! {
+    impl [T: CustomGcResource] MutableState<T> {
+        name: T::MUTABLE_NAME,
+        used: T::MUTABLE_USED,
+        max: T::MUTABLE_MAX,
+    }
 }

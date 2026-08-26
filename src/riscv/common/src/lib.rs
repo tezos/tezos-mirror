@@ -7,6 +7,7 @@
 //! New Durable Storage API crates.
 
 pub mod bytes;
+pub mod custom;
 pub mod move_semantics;
 pub mod safe_pointer;
 pub mod try_clone;
