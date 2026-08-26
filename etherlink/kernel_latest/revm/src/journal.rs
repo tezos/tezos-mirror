@@ -815,7 +815,7 @@ impl<
             None => StorageAccount::from_address(&source)
                 .map_err(EvmDbError::from)
                 .and_then(|a| {
-                    Ok(a.info_without_migration(self.database.rk.host())?
+                    Ok(a.info_without_migration(self.database.rk.eth_accounts())?
                         .map(|info| info.origin)
                         .unwrap_or_default()
                         .into())
@@ -914,7 +914,7 @@ impl<
             None => StorageAccount::from_address(&source)
                 .map_err(EvmDbError::from)
                 .and_then(|a| {
-                    Ok(a.info_without_migration(self.database.rk.host())?
+                    Ok(a.info_without_migration(self.database.rk.eth_accounts())?
                         .map(|info| info.origin)
                         .unwrap_or_default()
                         .into())
@@ -1019,7 +1019,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_interfaces::{AliasInfo, Origin};
 
     fn alias_origin(runtime: RuntimeId, native: &[u8]) -> Origin {
@@ -1031,11 +1032,11 @@ mod tests {
 
     // Write `origin` into the account record and read it back the way
     // the routing code does.
-    fn write_origin(host: &mut MockKernelHost, source: &Address, origin: Origin) {
+    fn write_origin(eth_accounts: &mut impl KeySpace, source: &Address, origin: Origin) {
         StorageAccount::from_address(source)
             .unwrap()
             .set_info_without_code(
-                host,
+                eth_accounts,
                 crate::storage::world_state_handler::AccountInfo {
                     origin: origin.into(),
                     ..Default::default()
@@ -1044,10 +1045,10 @@ mod tests {
             .unwrap();
     }
 
-    fn read_origin(host: &MockKernelHost, source: &Address) -> Option<Origin> {
+    fn read_origin(eth_accounts: &impl KeySpace, source: &Address) -> Option<Origin> {
         StorageAccount::from_address(source)
             .unwrap()
-            .info_without_migration(host)
+            .info_without_migration(eth_accounts)
             .unwrap()
             .map(|info| info.origin)
             .unwrap_or_default()
@@ -1056,15 +1057,16 @@ mod tests {
 
     #[test]
     fn routing_returns_round_trip_for_matching_alias() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let source = Address::from_slice(&[0xaa; 20]);
         write_origin(
-            &mut host,
+            eth_accounts,
             &source,
             alias_origin(RuntimeId::Tezos, b"tz1abcdef"),
         );
 
-        let origin = read_origin(&host, &source);
+        let origin = read_origin(eth_accounts, &source);
         match resolve_routing(origin, RuntimeId::Tezos).unwrap() {
             RoutingDecision::RoundTrip(target) => assert_eq!(target, "tz1abcdef"),
             other => panic!(
@@ -1076,11 +1078,12 @@ mod tests {
 
     #[test]
     fn routing_returns_native_for_native_origin() {
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let source = Address::from_slice(&[0xcc; 20]);
-        write_origin(&mut host, &source, Origin::Native);
+        write_origin(eth_accounts, &source, Origin::Native);
 
-        let origin = read_origin(&host, &source);
+        let origin = read_origin(rk.eth_accounts(), &source);
         assert!(matches!(
             resolve_routing(origin, RuntimeId::Tezos).unwrap(),
             RoutingDecision::Native,
@@ -1089,10 +1092,10 @@ mod tests {
 
     #[test]
     fn routing_returns_native_for_unrecorded_source() {
-        let host = MockKernelHost::default();
+        let rk = MockRuntimeKeyspaces::default();
         let source = Address::from_slice(&[0xdd; 20]);
 
-        let origin = read_origin(&host, &source);
+        let origin = read_origin(rk.eth_accounts(), &source);
         assert!(matches!(
             resolve_routing(origin, RuntimeId::Tezos).unwrap(),
             RoutingDecision::Native,
@@ -1103,15 +1106,16 @@ mod tests {
     fn routing_returns_transitive_for_mismatched_runtime() {
         // The recorded info is the basis for derivation toward a third target.
         // Unreachable in two runtime mode.
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
+        let eth_accounts = rk.eth_accounts_mut();
         let source = Address::from_slice(&[0xbb; 20]);
         write_origin(
-            &mut host,
+            eth_accounts,
             &source,
             alias_origin(RuntimeId::Tezos, b"tz1abcdef"),
         );
 
-        let origin = read_origin(&host, &source);
+        let origin = read_origin(eth_accounts, &source);
         match resolve_routing(origin, RuntimeId::Ethereum).unwrap() {
             RoutingDecision::Transitive(info) => {
                 assert_eq!(info.runtime, RuntimeId::Tezos);

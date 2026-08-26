@@ -14,6 +14,7 @@ use revm::{
 };
 use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceWriteError};
 use tezosx_interfaces::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
@@ -24,6 +25,10 @@ pub enum EvmDbError {
     Runtime(#[from] RuntimeError),
     #[error("Path error: {0}")]
     Path(#[from] PathError),
+    #[error(transparent)]
+    Key(#[from] KeyError),
+    #[error(transparent)]
+    KeySpaceWrite(#[from] KeySpaceWriteError),
     #[error("Bytecode at {hash} failed validation: {source}")]
     InvalidBytecode {
         hash: B256,

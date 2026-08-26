@@ -10,6 +10,7 @@ use tezos_crypto_rs::{
 };
 use tezos_evm_logging::Level;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
+use tezos_smart_rollup_keyspace::KeyError;
 use thiserror::Error;
 
 use crate::{
@@ -22,6 +23,8 @@ pub enum PrecompileStateError {
     Runtime(#[from] RuntimeError),
     #[error(transparent)]
     Path(#[from] PathError),
+    #[error(transparent)]
+    Key(#[from] KeyError),
     #[error("UTF-8 decode: {0}")]
     Utf8(#[from] std::str::Utf8Error),
     #[error("Base58Check decode: {0}")]

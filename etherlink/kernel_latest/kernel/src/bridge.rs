@@ -947,7 +947,7 @@ mod tests {
     fn deposit_execution_outcome_contains_event() {
         let mut rk = RuntimeKeyspaces::default();
         let registry = &RegistryImpl::default();
-        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
+        init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
 
         let deposit = dummy_deposit();
 
@@ -1001,7 +1001,7 @@ mod tests {
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut rk = RuntimeKeyspaces::default();
         let registry = &RegistryImpl::default();
-        init_precompile_bytecodes(rk.host_mut(), true).unwrap();
+        init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
 
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
@@ -1079,7 +1079,7 @@ mod tests {
         // on the `Ok`-with-revert arm too, so no value is stranded on
         // FEED_DEPOSIT_ADDR.
         let feed_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
-        let feed_info = feed_account.info(rk.host_mut()).unwrap();
+        let feed_info = feed_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(feed_info.balance, alloy_primitives::U256::ZERO);
     }
 

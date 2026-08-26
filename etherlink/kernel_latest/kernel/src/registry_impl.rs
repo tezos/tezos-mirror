@@ -216,7 +216,7 @@ mod tests {
         let mut account = StorageAccount::from_address(&addr).unwrap();
         account
             .set_info(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 AccountInfo {
                     origin: AccountOrigin::Native,
                     ..AccountInfo::default()
@@ -267,7 +267,7 @@ mod tests {
         let mut account = StorageAccount::from_address(&addr).unwrap();
         account
             .set_info(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 AccountInfo {
                     code_hash,
                     ..AccountInfo::default()

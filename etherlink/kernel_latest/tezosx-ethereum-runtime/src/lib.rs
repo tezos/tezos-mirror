@@ -98,11 +98,11 @@ impl EthereumRuntime {
         // (it should be initialized at kernel startup, but verify it exists)
         let precompile_account =
             StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS)?;
-        let precompile_info = precompile_account.info(rk.host_mut())?;
+        let precompile_info = precompile_account.info(rk.eth_accounts_mut())?;
         if precompile_info.code_hash != ALIAS_FORWARDER_SOL_CONTRACT.code_hash {
             // Initialize the precompile if not already done
             CodeStorage::add(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 ALIAS_FORWARDER_SOL_CONTRACT.code,
                 Some(ALIAS_FORWARDER_SOL_CONTRACT.code_hash),
             )
@@ -667,7 +667,7 @@ impl RuntimeInterface for EthereumRuntime {
         }
         // One info read serves both the classification and the
         // Branch 2 forwarder detection (the code hash).
-        let storage_info = alias_account.info(rk.host_mut())?;
+        let storage_info = alias_account.info(rk.eth_accounts_mut())?;
         match storage_info.origin {
             AccountOrigin::Alias(_) => {
                 return Ok((alias.to_string(), AliasResolution::build(gas_remaining)));
@@ -773,9 +773,11 @@ impl RuntimeInterface for EthereumRuntime {
             return Err(TezosXRuntimeError::OutOfGas);
         }
         let account = StorageAccount::from_address(&address)?;
-        let info = account.info_without_migration(rk.host()).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
-        })?;
+        let info = account
+            .info_without_migration(rk.eth_accounts())
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
+            })?;
         let cls = match info {
             Some(AccountInfo {
                 origin: AccountOrigin::Native,
@@ -821,6 +823,7 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(all(test, feature = "testing"))]
 mod tests {
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
 
     use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
@@ -835,7 +838,6 @@ mod tests {
         },
     };
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezosx_interfaces::testing::UnimplementedRegistry;
     use tezosx_interfaces::RuntimeId;
@@ -920,7 +922,7 @@ mod tests {
 
         // Verify destination received the transfer (5 TEZ in wei)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(rk.host_mut()).unwrap();
+        let info = destination_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(info.balance, five_tez_wei);
     }
 
@@ -945,7 +947,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -955,7 +957,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.eth_accounts_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
@@ -978,7 +980,7 @@ mod tests {
 
         // Verify the contract wrote 0x42 to storage slot 1
         let slot_value = contract_account
-            .get_storage(rk.host(), &revm::primitives::U256::from(1))
+            .get_storage(rk.eth_accounts(), &revm::primitives::U256::from(1))
             .unwrap();
         assert_eq!(slot_value, revm::primitives::U256::from(0x42));
     }
@@ -1007,7 +1009,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -1017,7 +1019,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.eth_accounts_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request(
@@ -1043,7 +1045,7 @@ mod tests {
         let forty_two_tez_wei =
             revm::primitives::U256::from(42_000_000_000_000_000_000u128);
         let stored_value = contract_account
-            .get_storage(rk.host(), &revm::primitives::U256::ZERO)
+            .get_storage(rk.eth_accounts(), &revm::primitives::U256::ZERO)
             .unwrap();
         assert_eq!(
             stored_value, forty_two_tez_wei,
@@ -1051,7 +1053,7 @@ mod tests {
         );
 
         // Contract received the transfer
-        let contract_info = contract_account.info(rk.host_mut()).unwrap();
+        let contract_info = contract_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(
             contract_info.balance, forty_two_tez_wei,
             "Contract should hold the transferred value"
@@ -1059,7 +1061,7 @@ mod tests {
 
         // Sender balance should be 0 after sending 42
         let sender_account = StorageAccount::from_address(&sender).unwrap();
-        let sender_info = sender_account.info(rk.host_mut()).unwrap();
+        let sender_info = sender_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(
             sender_info.balance,
             revm::primitives::U256::ZERO,
@@ -1596,7 +1598,7 @@ mod tests {
 
         // Destination should have 0 balance (no transfer)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(rk.host_mut()).unwrap();
+        let info = destination_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(info.balance, revm::primitives::U256::ZERO);
     }
 
@@ -1634,7 +1636,7 @@ mod tests {
         .unwrap();
 
         let destination_account = StorageAccount::from_address(&destination).unwrap();
-        let info = destination_account.info(rk.host_mut()).unwrap();
+        let info = destination_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(info.balance, half_tez_wei);
     }
 
@@ -1663,7 +1665,7 @@ mod tests {
         let mut contract_account = StorageAccount::from_address(&contract).unwrap();
         contract_account
             .set_info(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -1673,7 +1675,7 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(rk.host_mut(), &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(rk.eth_accounts_mut(), &bytecode_raw, Some(code_hash)).unwrap();
 
         // The cross-runtime call path uses gas_price = 0 and amount = 0,
         // so REVM's pre-flight balance requirement on the caller is 0 — no
@@ -1762,7 +1764,7 @@ mod tests {
         let source = Address::from_slice(&[0x22; 20]); // true originator (an EOA alias)
         let contract = Address::from_slice(&[0x33; 20]);
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &contract,
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
@@ -1781,10 +1783,16 @@ mod tests {
         )
         .unwrap();
 
-        let stored_origin =
-            read_slot(rk.host_mut(), &contract, revm::primitives::U256::ZERO);
-        let stored_caller =
-            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1));
+        let stored_origin = read_slot(
+            rk.eth_accounts_mut(),
+            &contract,
+            revm::primitives::U256::ZERO,
+        );
+        let stored_caller = read_slot(
+            rk.eth_accounts_mut(),
+            &contract,
+            revm::primitives::U256::from(1),
+        );
         assert_eq!(
             stored_origin,
             revm::primitives::U256::from_be_slice(source.as_slice()),
@@ -1914,7 +1922,7 @@ mod tests {
         let eoa = Address::from_slice(&[0x44; 20]);
         let contract = Address::from_slice(&[0x55; 20]);
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &contract,
             Bytes::from_hex(ORIGIN_CALLER_RECORDER).unwrap(),
         );
@@ -1932,10 +1940,16 @@ mod tests {
         )
         .unwrap();
 
-        let stored_origin =
-            read_slot(rk.host_mut(), &contract, revm::primitives::U256::ZERO);
-        let stored_caller =
-            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1));
+        let stored_origin = read_slot(
+            rk.eth_accounts_mut(),
+            &contract,
+            revm::primitives::U256::ZERO,
+        );
+        let stored_caller = read_slot(
+            rk.eth_accounts_mut(),
+            &contract,
+            revm::primitives::U256::from(1),
+        );
         let eoa_word = revm::primitives::U256::from_be_slice(eoa.as_slice());
         assert_eq!(stored_origin, eoa_word);
         assert_eq!(stored_caller, eoa_word);
@@ -1961,7 +1975,7 @@ mod tests {
         let source = Address::from_slice(&[0x22; 20]);
         let guard = Address::from_slice(&[0x33; 20]);
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &guard,
             Bytes::from_hex(EOA_ONLY_GUARD).unwrap(),
         );
@@ -1988,7 +2002,7 @@ mod tests {
         let eoa = Address::from_slice(&[0x44; 20]);
         let guard = Address::from_slice(&[0x55; 20]);
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &guard,
             Bytes::from_hex(EOA_ONLY_GUARD).unwrap(),
         );
@@ -2026,7 +2040,11 @@ mod tests {
         let source = Address::from_slice(&[0x22; 20]);
         let contract = Address::from_slice(&[0x33; 20]);
         // Target with a single STOP — trivial inner call.
-        deploy_at(rk.host_mut(), &contract, Bytes::from_hex("00").unwrap());
+        deploy_at(
+            rk.eth_accounts_mut(),
+            &contract,
+            Bytes::from_hex("00").unwrap(),
+        );
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request =
@@ -2043,14 +2061,14 @@ mod tests {
         .unwrap();
 
         let source_account = StorageAccount::from_address(&source).unwrap();
-        let info = source_account.info(rk.host_mut()).unwrap();
+        let info = source_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(
             info.nonce, 0,
             "inbound CRAC must not leak its pre-execution nonce bump onto the originator"
         );
 
         let sender_account = StorageAccount::from_address(&sender).unwrap();
-        let info = sender_account.info(rk.host_mut()).unwrap();
+        let info = sender_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(
             info.nonce, 0,
             "inbound CRAC must not bump the forwarded sender's nonce either"
@@ -2078,7 +2096,7 @@ mod tests {
         // PUSH1 0 PUSH1 0 CALLDATASIZE PUSH1 0         -- retLen retOff argsLen argsOff
         // PUSH1 0 PUSH20 <gw> GAS CALL POP STOP        -- value to gas call
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &contract,
             Bytes::from_hex(
                 "36600060003760006000366000600073\
@@ -2217,12 +2235,16 @@ mod tests {
     }
 
     /// Deploy a bytecode at `address` (test helper).
-    fn deploy_at(host: &mut MockKernelHost, address: &Address, bytecode_raw: Bytes) {
+    fn deploy_at(
+        eth_accounts: &mut impl KeySpace,
+        address: &Address,
+        bytecode_raw: Bytes,
+    ) {
         let code_hash = bytes_hash(&bytecode_raw);
         let mut account = StorageAccount::from_address(address).unwrap();
         account
             .set_info(
-                host,
+                eth_accounts,
                 AccountInfo {
                     balance: revm::primitives::U256::ZERO,
                     nonce: 0,
@@ -2232,17 +2254,17 @@ mod tests {
                 },
             )
             .unwrap();
-        CodeStorage::add(host, &bytecode_raw, Some(code_hash)).unwrap();
+        CodeStorage::add(eth_accounts, &bytecode_raw, Some(code_hash)).unwrap();
     }
 
     /// Read `slot` from `address`'s storage.
     fn read_slot(
-        host: &mut MockKernelHost,
+        eth_accounts: &mut impl KeySpace,
         address: &Address,
         slot: revm::primitives::U256,
     ) -> revm::primitives::U256 {
         let account = StorageAccount::from_address(address).unwrap();
-        account.get_storage(host, &slot).unwrap_or_default()
+        account.get_storage(eth_accounts, &slot).unwrap_or_default()
     }
 
     /// Regression (L2-1370): an inbound CRAC whose caller is a real
@@ -2268,11 +2290,15 @@ mod tests {
         // Give the caller non-empty, non-EIP-7702 bytecode: this is what
         // EIP-3607 rejects, and what a same-runtime EVM-to-EVM caller now
         // carries.
-        deploy_at(rk.host_mut(), &sender, Bytes::from_hex("6001").unwrap());
+        deploy_at(
+            rk.eth_accounts_mut(),
+            &sender,
+            Bytes::from_hex("6001").unwrap(),
+        );
 
         // Target stores 0x42 at slot 1 (PUSH1 0x42 PUSH1 0x01 SSTORE).
         deploy_at(
-            rk.host_mut(),
+            rk.eth_accounts_mut(),
             &contract,
             Bytes::from_hex("6042600155").unwrap(),
         );
@@ -2303,7 +2329,11 @@ mod tests {
         // The target actually executed (proves the call was not rejected
         // before reaching the EVM frame).
         assert_eq!(
-            read_slot(rk.host_mut(), &contract, revm::primitives::U256::from(1)),
+            read_slot(
+                rk.eth_accounts_mut(),
+                &contract,
+                revm::primitives::U256::from(1)
+            ),
             revm::primitives::U256::from(0x42)
         );
     }
@@ -2381,7 +2411,7 @@ mod tests {
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x33; 20]);
-        deploy_at(rk.host_mut(), &destination, bytecode_raw);
+        deploy_at(rk.eth_accounts_mut(), &destination, bytecode_raw);
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
@@ -2429,11 +2459,15 @@ mod tests {
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x44; 20]);
-        deploy_at(rk.host_mut(), &destination, bytecode_raw);
+        deploy_at(rk.eth_accounts_mut(), &destination, bytecode_raw);
 
         // Pre-condition: slot 0 starts at zero.
         assert_eq!(
-            read_slot(rk.host_mut(), &destination, revm::primitives::U256::ZERO),
+            read_slot(
+                rk.eth_accounts_mut(),
+                &destination,
+                revm::primitives::U256::ZERO
+            ),
             revm::primitives::U256::ZERO,
         );
 
@@ -2462,7 +2496,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            read_slot(rk.host_mut(), &destination, revm::primitives::U256::ZERO),
+            read_slot(
+                rk.eth_accounts_mut(),
+                &destination,
+                revm::primitives::U256::ZERO
+            ),
             revm::primitives::U256::ZERO,
         );
     }
@@ -2484,7 +2522,7 @@ mod tests {
 
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x55; 20]);
-        deploy_at(rk.host_mut(), &destination, bytecode_raw);
+        deploy_at(rk.eth_accounts_mut(), &destination, bytecode_raw);
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
         let request = build_serve_request_with_method(
@@ -2520,13 +2558,13 @@ mod tests {
         // non-empty `code_hash`, so the back-stop's code-presence check
         // fires. The bytecode body itself is not needed by `read_origin`,
         // which only inspects the hash.
-        fn set_account_with_code(host: &mut MockKernelHost, addr: &Address) {
+        fn set_account_with_code(eth_accounts: &mut impl KeySpace, addr: &Address) {
             let bytecode_raw = Bytes::from_static(&[0x60, 0x00]); // PUSH1 0x00
             let code_hash = bytes_hash(&bytecode_raw);
             let mut account = StorageAccount::from_address(addr).unwrap();
             account
                 .set_info(
-                    host,
+                    eth_accounts,
                     AccountInfo {
                         code_hash,
                         ..AccountInfo::default()
@@ -2544,7 +2582,7 @@ mod tests {
             let runtime = EthereumRuntime::default();
             let (addr, addr_str) = evm_addr(0xbb);
 
-            set_account_with_code(rk.host_mut(), &addr);
+            set_account_with_code(rk.eth_accounts_mut(), &addr);
 
             let budget = 100_000;
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
@@ -2564,7 +2602,7 @@ mod tests {
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    rk.host_mut(),
+                    rk.eth_accounts_mut(),
                     AccountInfo {
                         nonce: 5,
                         ..AccountInfo::default()
@@ -2601,7 +2639,7 @@ mod tests {
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    rk.host_mut(),
+                    rk.eth_accounts_mut(),
                     AccountInfo {
                         origin: AccountOrigin::Native,
                         ..AccountInfo::default()
@@ -2630,7 +2668,7 @@ mod tests {
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account
                 .set_info(
-                    rk.host_mut(),
+                    rk.eth_accounts_mut(),
                     AccountInfo {
                         origin: AccountOrigin::Alias(alias_info.clone()),
                         ..AccountInfo::default()
@@ -2776,12 +2814,12 @@ mod tests {
             // no delegation code_hash and no Origin record.
             let alias_account = StorageAccount::from_address(&alias).unwrap();
             assert_ne!(
-                alias_account.info(rk.host_mut()).unwrap().code_hash,
+                alias_account.info(rk.eth_accounts_mut()).unwrap().code_hash,
                 delegation_code_hash,
                 "no delegation code_hash may be written when init fails"
             );
             let classification = alias_account
-                .info_without_migration(rk.host())
+                .info_without_migration(rk.eth_accounts())
                 .unwrap()
                 .map(|info| info.origin)
                 .unwrap_or_default();
@@ -2826,11 +2864,11 @@ mod tests {
     /// Deploy a probe that runs four block-observable opcodes and stores
     /// each result: `BASEFEE`→slot 0, `GASLIMIT`→slot 1, `GASPRICE`→slot
     /// 2, `PREVRANDAO`→slot 3. Each is `<OPCODE> PUSH1 <slot> SSTORE`.
-    fn deploy_observables_probe(host: &mut MockKernelHost, address: &Address) {
+    fn deploy_observables_probe(eth_accounts: &mut impl KeySpace, address: &Address) {
         // 48=BASEFEE 45=GASLIMIT 3a=GASPRICE 44=PREVRANDAO,
         // 60 xx=PUSH1 slot, 55=SSTORE.
         let bytecode_raw = Bytes::from_hex("0x48600055456001553a60025544600355").unwrap();
-        deploy_at(host, address, bytecode_raw);
+        deploy_at(eth_accounts, address, bytecode_raw);
     }
 
     /// An inbound CRAC must expose the originating block's observables to
@@ -2865,7 +2903,7 @@ mod tests {
 
         let sender = Address::from_slice(&[0x11; 20]);
         let contract = Address::from_slice(&[0xBB; 20]);
-        deploy_observables_probe(rk.host_mut(), &contract);
+        deploy_observables_probe(rk.eth_accounts_mut(), &contract);
 
         let mut journal = TezosXJournal::new(
             tezosx_journal::CracId::new(0, 0),
@@ -2905,22 +2943,22 @@ mod tests {
 
         let u256 = revm::primitives::U256::from;
         assert_eq!(
-            read_slot(rk.host_mut(), &contract, u256(0u64)),
+            read_slot(rk.eth_accounts_mut(), &contract, u256(0u64)),
             u256(live_basefee),
             "BASEFEE must reflect the live block basefee"
         );
         assert_eq!(
-            read_slot(rk.host_mut(), &contract, u256(1u64)),
+            read_slot(rk.eth_accounts_mut(), &contract, u256(1u64)),
             u256(block_gas_limit),
             "GASLIMIT must reflect the block gas limit, not the forwarded call gas"
         );
         assert_eq!(
-            read_slot(rk.host_mut(), &contract, u256(2u64)),
+            read_slot(rk.eth_accounts_mut(), &contract, u256(2u64)),
             u256(live_basefee),
             "GASPRICE must reflect the live basefee, not the cross-runtime TxEnv's 0"
         );
         assert_eq!(
-            read_slot(rk.host_mut(), &contract, u256(3u64)),
+            read_slot(rk.eth_accounts_mut(), &contract, u256(3u64)),
             u256(prevrandao),
             "PREVRANDAO must reflect the block's value, not the default 0"
         );

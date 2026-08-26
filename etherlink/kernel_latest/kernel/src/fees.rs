@@ -27,7 +27,9 @@ use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::wei::{ceil_div, gas_from_wei};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 use std::mem::size_of;
 
@@ -176,14 +178,15 @@ impl FeeUpdates {
         outcome.gas_used = self.overall_gas_used.as_u64();
     }
 
-    pub fn apply<Host>(
+    pub fn apply<Host, KS>(
         &self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         caller: H160,
         sequencer_pool_address: Option<H160>,
     ) -> Result<(), anyhow::Error>
     where
         Host: StorageV1,
+        KS: KeySpace,
     {
         tezos_evm_logging::log!(
             tezos_evm_logging::Level::Debug,
@@ -196,19 +199,20 @@ impl FeeUpdates {
                     .burn_amount
                     .saturating_add(self.compensate_sequencer_amount);
 
-                crate::storage::update_burned_fees(host, burned_fee)?;
+                crate::storage::update_burned_fees(rk.host_mut(), burned_fee)?;
                 return Ok(());
             }
             Some(sequencer) => {
-                crate::storage::update_burned_fees(host, self.burn_amount)?;
+                crate::storage::update_burned_fees(rk.host_mut(), self.burn_amount)?;
                 sequencer
             }
         };
 
         let mut account = StorageAccount::from_address(&h160_to_alloy(&sequencer))?;
-        if let Err(e) =
-            account.add_balance(host, u256_to_alloy(&self.compensate_sequencer_amount))
-        {
+        if let Err(e) = account.add_balance(
+            rk.eth_accounts_mut(),
+            u256_to_alloy(&self.compensate_sequencer_amount),
+        ) {
             return Err(anyhow::anyhow!(
                 "Failed to compensate sequencer {sequencer} of {}: {}",
                 self.compensate_sequencer_amount,
@@ -332,7 +336,7 @@ mod tests {
     use revm::context::result::{ExecutionResult, Output, ResultGas};
     use revm_etherlink::helpers::legacy::alloy_to_u256;
     use revm_etherlink::ExecutionOutcome;
-    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
 
     use proptest::prelude::*;
 
@@ -383,11 +387,11 @@ mod tests {
     #[test]
     fn apply_updates_balances_no_sequencer() {
         // Arrange
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, address, balance);
+        set_balance(rk.eth_accounts_mut(), address, balance);
 
         let burn_amount = balance / 3;
         let compensate_sequencer_amount = balance / 4;
@@ -401,15 +405,19 @@ mod tests {
         };
 
         // Act
-        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
-        let result = fee_updates.apply(&mut host, address, None);
+        mock_charge_inclusion_fees(
+            rk.eth_accounts_mut(),
+            address,
+            fee_updates.charge_user_amount,
+        );
+        let result = fee_updates.apply(&mut rk, address, None);
 
         // Assert
         assert!(result.is_ok());
-        let new_balance = get_balance(&mut host, address);
+        let new_balance = get_balance(rk.eth_accounts_mut(), address);
         assert_eq!(balance / 2, new_balance);
 
-        let burned = crate::storage::read_burned_fees(&mut host);
+        let burned = crate::storage::read_burned_fees(rk.host_mut());
 
         // no sequencer reward address set - so everything is burned
         assert_eq!(burn_amount + compensate_sequencer_amount, burned);
@@ -418,16 +426,16 @@ mod tests {
     #[test]
     fn apply_updates_balances_with_sequencer() {
         // Arrange
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
         let sequencer_address =
             address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, address, balance);
+        set_balance(rk.eth_accounts_mut(), address, balance);
 
         let sequencer_balance = U256::from(500);
-        set_balance(&mut host, sequencer_address, sequencer_balance);
+        set_balance(rk.eth_accounts_mut(), sequencer_address, sequencer_balance);
 
         let burn_amount = balance / 3;
         let compensate_sequencer_amount = balance / 4;
@@ -441,18 +449,22 @@ mod tests {
         };
 
         // Act
-        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
-        let result = fee_updates.apply(&mut host, address, Some(sequencer_address));
+        mock_charge_inclusion_fees(
+            rk.eth_accounts_mut(),
+            address,
+            fee_updates.charge_user_amount,
+        );
+        let result = fee_updates.apply(&mut rk, address, Some(sequencer_address));
 
         // Assert
         assert!(result.is_ok());
-        let new_balance = get_balance(&mut host, address);
+        let new_balance = get_balance(rk.eth_accounts_mut(), address);
         assert_eq!(balance / 2, new_balance);
 
-        let burned = crate::storage::read_burned_fees(&mut host);
+        let burned = crate::storage::read_burned_fees(rk.host_mut());
         assert_eq!(burn_amount, burned);
 
-        let sequencer_new_balance = get_balance(&mut host, sequencer_address);
+        let sequencer_new_balance = get_balance(rk.eth_accounts_mut(), sequencer_address);
         assert_eq!(
             sequencer_new_balance,
             sequencer_balance + compensate_sequencer_amount
@@ -464,14 +476,14 @@ mod tests {
     fn charge_inclusion_fees_fails_if_too_large() {
         // The inclusion fee deduction (now in apply.rs) should fail
         // when the charge exceeds the caller's balance.
-        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::default();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, address, balance);
+        set_balance(rk.eth_accounts_mut(), address, balance);
 
         // This panics because sub_balance fails and the helper unwraps
-        mock_charge_inclusion_fees(&mut host, address, balance * 2);
+        mock_charge_inclusion_fees(rk.eth_accounts_mut(), address, balance * 2);
     }
 
     #[test]
@@ -501,30 +513,30 @@ mod tests {
         H160::from_slice(data)
     }
 
-    fn get_balance(host: &mut MockKernelHost, address: H160) -> U256 {
+    fn get_balance(eth_accounts: &mut impl KeySpace, address: H160) -> U256 {
         let account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
-        let info = account.info(host).unwrap();
+        let info = account.info(eth_accounts).unwrap();
         alloy_to_u256(&info.balance)
     }
 
-    fn set_balance(host: &mut MockKernelHost, address: H160, balance: U256) {
+    fn set_balance(eth_accounts: &mut impl KeySpace, address: H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
-        let mut info = account.info(host).unwrap();
+        let mut info = account.info(eth_accounts).unwrap();
         assert!(info.balance.is_zero());
         info.balance = info.balance.saturating_add(u256_to_alloy(&balance));
-        account.set_info(host, info).unwrap();
+        account.set_info(eth_accounts, info).unwrap();
     }
 
     /// Mock the inclusion fee deduction that now happens in apply.rs
     /// before FeeUpdates::apply is called.
     fn mock_charge_inclusion_fees(
-        host: &mut MockKernelHost,
+        eth_accounts: &mut impl KeySpace,
         address: H160,
         charge_amount: U256,
     ) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
         account
-            .sub_balance(host, u256_to_alloy(&charge_amount))
+            .sub_balance(eth_accounts, u256_to_alloy(&charge_amount))
             .unwrap();
     }
 

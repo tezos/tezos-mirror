@@ -353,7 +353,7 @@ where
 
     // Initialize custom precompile
     let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();
-    init_precompile_bytecodes(rk.host_mut(), tezosx_enabled)
+    init_precompile_bytecodes(rk.eth_accounts_mut(), tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
@@ -485,23 +485,6 @@ where
             .unwrap();
     }
 
-    let eth_accounts_subkeys = rk
-        .host()
-        .host
-        .store_count_subkeys(&chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
-        .expect("The kernel failed to read the number of /evm/eth_accounts subkeys");
-
-    if eth_accounts_subkeys == 0 {
-        rk.host_mut()
-            .host
-            .store_write(
-                &chains::EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-                "Un défilé d'isomorphismes".as_bytes(),
-                0,
-            )
-            .unwrap();
-    }
-
     if is_revealed_storage(rk.base()) {
         reveal_storage(
             &mut rk,
@@ -566,15 +549,16 @@ mod tests {
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
-    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
+    fn set_balance(eth_accounts: &mut impl KeySpace, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
-        let mut info = account.info(host).unwrap();
+        let mut info = account.info(eth_accounts).unwrap();
         info.balance = u256_to_alloy(&balance);
-        account.set_info(host, info).unwrap();
+        account.set_info(eth_accounts, info).unwrap();
     }
 
     /// Create ticket with dummy creator and content
@@ -664,7 +648,7 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.host_mut(), &sender, sender_initial_balance);
+        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
         // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
         let data = hex::decode(
@@ -871,7 +855,7 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.host_mut(), &sender, sender_initial_balance);
+        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
         // construct ticket
         let ticket = dummy_ticket();
@@ -884,14 +868,14 @@ mod tests {
         // patch ticket table
         let ticket_balance = system
             .read_ticket_balance(
-                rk.host(),
+                rk.eth_accounts(),
                 &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
                 &h160_to_alloy(&sender),
             )
             .unwrap();
         system
             .write_ticket_balance(
-                rk.host_mut(),
+                rk.eth_accounts_mut(),
                 &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
                 &h160_to_alloy(&sender),
                 ticket_balance + u256_to_alloy(&amount),

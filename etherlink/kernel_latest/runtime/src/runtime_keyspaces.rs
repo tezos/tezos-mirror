@@ -9,7 +9,6 @@
 //! the only keyspace load of a kernel invocation.
 
 use std::borrow::{Borrow, BorrowMut};
-use std::marker::PhantomData;
 
 use tezos_evm_logging::{log, set_global_verbosity, Level};
 use thiserror::Error;
@@ -29,6 +28,10 @@ use crate::snapshot::{PreviousRun, SafeKeyspace, SnapshotError, SnapshottedKeySp
 /// node-interaction values that do not belong to any world state.
 pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
 
+/// Name of the `/evm/eth_accounts` keyspace, holding the EVM runtime's
+/// account state.
+pub const ETH_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static("/evm/eth_accounts");
+
 /// Storage handle threaded through kernel execution.
 pub struct RuntimeKeyspaces<Host, KS> {
     host: Host,
@@ -45,6 +48,16 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
     /// The `/base` keyspace, for the writers.
     pub fn base_mut(&mut self) -> &mut KS {
         &mut self.base
+    }
+
+    /// The `/evm/eth_accounts` keyspace.
+    pub fn eth_accounts(&self) -> &KS {
+        &self.keyspaces.eth_accounts
+    }
+
+    /// The `/evm/eth_accounts` keyspace, for the writers.
+    pub fn eth_accounts_mut(&mut self) -> &mut KS {
+        &mut self.keyspaces.eth_accounts
     }
 
     /// The host, for the durable accesses that have no keyspace yet.
@@ -152,7 +165,9 @@ impl<Host, KS> RuntimeKeyspaces<Host, KS> {
                 world_states,
             },
             base: &mut self.base,
-            keyspaces: Keyspaces::new(),
+            keyspaces: Keyspaces {
+                eth_accounts: &mut self.keyspaces.eth_accounts,
+            },
         }
     }
 }
@@ -203,9 +218,7 @@ where
     /// `start` is what would otherwise adopt an interrupted run's writes.
     pub fn init(host: H) -> Result<Self, SnapshotError> {
         let mut host = KernelHost::init(host);
-        // Unused for now, but the kernel will want to know whether it is
-        // resuming an aborted keyspace.
-        let _previous = if host
+        let previous = if host
             .last_run_aborted()
             .map_err(SnapshotError::PreviousRun)?
         {
@@ -219,35 +232,29 @@ where
         // `/base` belongs to no block: reverting it would drop blueprints from
         // an inbox level that cannot be read twice.
         let base = SnapshottedKeySpace::start(&mut host, base, PreviousRun::Complete)?;
+        let eth_accounts = host.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME)?;
+        let eth_accounts = SnapshottedKeySpace::start(&mut host, eth_accounts, previous)?;
         Ok(Self {
             host,
             base,
-            keyspaces: Keyspaces::new(),
+            keyspaces: Keyspaces { eth_accounts },
         })
     }
 }
 
-/// The keyspaces under transactional control, currently none. `/base` is not
-/// one of them.
+/// The keyspaces under transactional control. `/base` is not one of them.
 ///
 /// A field of its own so that `self.host` and `self.keyspaces` can be
 /// borrowed at the same time.
 struct Keyspaces<KS> {
-    _keyspace: PhantomData<KS>,
+    eth_accounts: KS,
 }
 
 impl<KS> Keyspaces<KS> {
-    /// A handle on no keyspace at all.
-    fn new() -> Self {
-        Self {
-            _keyspace: PhantomData,
-        }
-    }
-
     /// Lends each keyspace in turn. Putting a keyspace under transactional
     /// control means adding an entry here.
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut KS> {
-        [].into_iter()
+        [&mut self.eth_accounts].into_iter()
     }
 }
 
@@ -261,5 +268,40 @@ pub type MockRuntimeKeyspaces = RuntimeKeyspaces<MockKernelHost, MockKeySpace>;
 impl Default for MockRuntimeKeyspaces {
     fn default() -> Self {
         Self::init(MockHost::default()).expect("failed to init the runtime keyspaces")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_host::storage::StorageV1;
+
+    const PROBE: RefPath = RefPath::assert_from(b"/evm/eth_accounts/probe");
+
+    #[test]
+    fn frames_cover_the_eth_accounts_keyspace() {
+        let mut rk = MockRuntimeKeyspaces::default();
+        rk.host_mut().store_write_all(&PROBE, b"before").unwrap();
+
+        rk.checkpoint().unwrap();
+        rk.host_mut().store_write_all(&PROBE, b"inside").unwrap();
+        rk.revert_inner().unwrap();
+
+        assert_eq!(rk.host_mut().store_read_all(&PROBE).unwrap(), b"before");
+    }
+
+    #[test]
+    fn end_kernel_run_restores_the_eth_accounts_bedrock() {
+        let mut rk = MockRuntimeKeyspaces::default();
+        rk.host_mut().store_write_all(&PROBE, b"before").unwrap();
+
+        rk.checkpoint().unwrap();
+        rk.host_mut().store_write_all(&PROBE, b"inside").unwrap();
+        rk.end_kernel_run();
+
+        // The bedrock was taken at `init`, before any write: the whole run's
+        // writes are gone.
+        assert!(rk.host_mut().store_read_all(&PROBE).is_err());
     }
 }

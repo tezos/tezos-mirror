@@ -16,6 +16,7 @@ use revm_etherlink::{
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezosx_journal::{RuntimeId, TezosXJournal};
 use thiserror::Error;
 
@@ -33,7 +34,6 @@ use crate::helpers::{
 };
 use crate::models::{Env, FillerSource, SkipData, SpecName, Test, TestSuite, TestUnit};
 use crate::{write_host, write_out, DiffMap, Opt, ReportMap};
-use tezos_evm_runtime::runtime::MockKernelHost;
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -116,7 +116,7 @@ fn prepare_filler_source(
     }
 }
 
-fn initialize_accounts(host: &mut MockKernelHost, unit: &TestUnit) {
+fn initialize_accounts(eth_accounts: &mut impl KeySpace, unit: &TestUnit) {
     write_host!("\n[START] Accounts initialisation");
 
     for (address, info) in unit.pre.to_owned().iter() {
@@ -130,11 +130,11 @@ fn initialize_accounts(host: &mut MockKernelHost, unit: &TestUnit) {
         write_host!("Balance for {} was added : {}", address, info.balance);
         let code_hash = keccak256(&info.code);
         if !info.code.is_empty() {
-            CodeStorage::add(host, &info.code, Some(code_hash)).unwrap();
+            CodeStorage::add(eth_accounts, &info.code, Some(code_hash)).unwrap();
         }
         account
             .set_info(
-                host,
+                eth_accounts,
                 AccountInfo {
                     nonce: info.nonce,
                     balance: u256_to_alloy(&info.balance),
@@ -150,7 +150,7 @@ fn initialize_accounts(host: &mut MockKernelHost, unit: &TestUnit) {
         for (index, value) in info.storage.iter() {
             account
                 .set_storage(
-                    host,
+                    eth_accounts,
                     &revm::primitives::U256::from_be_bytes(h256_to_alloy(index).0),
                     &revm::primitives::U256::from_be_bytes(h256_to_alloy(value).0),
                 )
@@ -382,7 +382,7 @@ pub fn run_test(
                     continue;
                 }
                 rk = prepare_rk();
-                initialize_accounts(rk.host_mut(), &unit);
+                initialize_accounts(rk.eth_accounts_mut(), &unit);
                 let data_label = info.labels.get(&data);
                 if let Some(data_label) = data_label {
                     if output.log {
@@ -425,7 +425,7 @@ pub fn run_test(
                 match filler_source.clone() {
                     Some(filler_source) => {
                         let result = process(
-                            rk.host_mut(),
+                            rk.eth_accounts_mut(),
                             filler_source,
                             spec_name,
                             report_map,

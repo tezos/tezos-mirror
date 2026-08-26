@@ -196,6 +196,12 @@ impl From<KeySpaceWriteError> for Error {
     }
 }
 
+impl From<KeyError> for Error {
+    fn from(e: KeyError) -> Self {
+        Self::Storage(StorageError::KeySpaceKey(e))
+    }
+}
+
 impl From<TransferError> for Error {
     fn from(e: TransferError) -> Self {
         Self::Transfer(e)

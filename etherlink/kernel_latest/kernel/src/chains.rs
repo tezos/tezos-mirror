@@ -104,11 +104,6 @@ pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
 /// single source of truth.
 pub use tezos_execution::context::TEZOS_ACCOUNTS_ROOT;
 
-/// SafeStorage root for all EVM account state (balances, nonces, code, storage)
-/// and deduplicated bytecode.
-pub const EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
-    RefPath::assert_from(b"/evm/eth_accounts");
-
 /// Choose the SafeStorage roots to snapshot for a single Tezos operation.
 ///
 /// [validate_and_apply_operation] wraps each operation in a transactional
@@ -713,6 +708,7 @@ impl TezosXChainConfig {
     ) -> anyhow::Result<L2Block>
     where
         Host: StorageV1,
+        KS: KeySpace,
     {
         let current_level = block_in_progress.number;
         block_in_progress.finalize_and_store(
@@ -747,15 +743,11 @@ impl TezosXChainConfig {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
                 TEZOS_ACCOUNTS_ROOT,
             ]
         } else {
-            vec![
-                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                EVM_ETH_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
-            ]
+            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
         }
     }
 }

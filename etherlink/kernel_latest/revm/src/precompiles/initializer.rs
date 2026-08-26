@@ -7,7 +7,7 @@ use revm::{
     primitives::{Address, Bytes, KECCAK_EMPTY},
     state::Bytecode,
 };
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 use crate::error::EvmDbError;
 
@@ -23,15 +23,23 @@ use crate::{
 use super::constants::PredeployedContract;
 
 pub fn init_precompile_bytecodes(
-    host: &'_ mut impl StorageV1,
+    eth_accounts: &'_ mut impl KeySpace,
     tezosx_enabled: bool,
 ) -> Result<(), EvmDbError> {
-    init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
-    init_precompile_bytecode(host, &XTZ_BRIDGE_SOL_ADDR, &XTZ_BRIDGE_SOL_CONTRACT)?;
-    init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)?;
+    init_precompile_bytecode(
+        eth_accounts,
+        &Address::ZERO,
+        &INTERNAL_FORWARDER_SOL_CONTRACT,
+    )?;
+    init_precompile_bytecode(
+        eth_accounts,
+        &XTZ_BRIDGE_SOL_ADDR,
+        &XTZ_BRIDGE_SOL_CONTRACT,
+    )?;
+    init_precompile_bytecode(eth_accounts, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)?;
     if tezosx_enabled {
         init_precompile_bytecode(
-            host,
+            eth_accounts,
             &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
             &ALIAS_FORWARDER_SOL_CONTRACT,
         )?;
@@ -40,26 +48,26 @@ pub fn init_precompile_bytecodes(
 }
 
 fn init_precompile_bytecode(
-    host: &'_ mut impl StorageV1,
+    eth_accounts: &'_ mut impl KeySpace,
     addr: &Address,
     predeployed: &'static PredeployedContract,
 ) -> Result<(), EvmDbError> {
     let mut created_account = StorageAccount::from_address(addr)?;
-    let mut account_info = created_account.info(host)?;
+    let mut account_info = created_account.info(eth_accounts)?;
 
     if account_info.code_hash == predeployed.code_hash {
         return Ok(());
     }
 
     if account_info.code_hash != KECCAK_EMPTY {
-        CodeStorage::delete(host, &account_info.code_hash)?;
+        CodeStorage::delete(eth_accounts, &account_info.code_hash)?;
     }
 
     let code = Bytecode::new_legacy(Bytes::from_static(predeployed.code));
     account_info.code_hash = predeployed.code_hash;
-    created_account.set_info(host, account_info)?;
+    created_account.set_info(eth_accounts, account_info)?;
     CodeStorage::add(
-        host,
+        eth_accounts,
         code.original_byte_slice(),
         Some(predeployed.code_hash),
     )?;
