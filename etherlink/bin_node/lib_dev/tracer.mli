@@ -22,10 +22,25 @@ module CallTracerRead : sig
     'a list tzresult Lwt.t
 end
 
+module CallTracerRevertedLogs : sig
+  (** [drop node] removes the [logs] field of every frame in a reverted
+      subtree — geth omits the field rather than emitting an empty list —
+      leaving successful siblings untouched. Exposed for unit testing. *)
+  val drop :
+    ?reverted:bool ->
+    Tracer_types.CallTracer.output ->
+    Tracer_types.CallTracer.output
+end
+
+(** [drop_reverted_logs] below (default [true]) applies
+    {!CallTracerRevertedLogs.drop}; [false] keeps the kernel-faithful trace
+    (debug CLI). *)
+
 (** [trace_transaction (module Executor) ~block_number ~transaction ~config]
     replays the block [block_number] and traces [transaction_hash] in it, with
     the given [config]. *)
 val trace_transaction :
+  ?drop_reverted_logs:bool ->
   (module Evm_execution.S) ->
   block_number:Ethereum_types.quantity ->
   transaction_hash:Ethereum_types.hash ->
@@ -35,6 +50,7 @@ val trace_transaction :
 (** [trace_call (module Executor) ~call ~block ~config] simulates and traces
     call [call] in block [block], with the given [config]. *)
 val trace_call :
+  ?drop_reverted_logs:bool ->
   (module Evm_execution.S) ->
   call:Ethereum_types.call ->
   block:Ethereum_types.Block_parameter.extended ->
@@ -45,6 +61,7 @@ val trace_call :
     replays the block [block_number] and traces all transactions in it, with
     the given [config]. *)
 val trace_block :
+  ?drop_reverted_logs:bool ->
   (module Evm_execution.S) ->
   (module Block_storage_sig.S) ->
   block_number:Ethereum_types.quantity ->

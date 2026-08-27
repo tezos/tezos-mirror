@@ -817,6 +817,124 @@ let test_trace_transaction_call_trace_revert =
     call ;
   unit
 
+(* A child emits a log then reverts; the parent swallows the revert so the
+   outer tx succeeds. The reverted child keeps its frame and [error] but
+   loses its logs (the kernel keeps them; the RPC rendering drops them), so
+   the trace's logs equal [eth_getLogs]. *)
+let test_trace_transaction_call_tracer_reverted_logs_dropped =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "with_logs"; "revert"]
+    ~title:
+      "debug_traceTransaction callTracer drops logs of a reverted sub-frame"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* swallower =
+    Solidity_contracts.call_tracer_revert_logs_swallower evm_version
+  in
+  let* () = Eth_cli.add_abi ~label:swallower.label ~abi:swallower.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:swallower.label
+         ~bin:swallower.bin)
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let value = 777 in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:swallower.label
+         ~address:contract_address
+         ~method_call:(Format.sprintf "run(%d)" value))
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool true)]
+      sequencer
+  in
+  (* The parent frame carries exactly its own Ok log. *)
+  let topic_value log =
+    JSON.(log |-> "topics" |> as_list |> fun l -> List.nth l 1 |> as_string)
+  in
+  let root_logs = JSON.(trace_result |-> "logs" |> as_list) in
+  Check.(
+    (List.length root_logs = 1)
+      int
+      ~error_msg:"Wrong root logs size, expected %R but got %L") ;
+  let ok_log = List.hd root_logs in
+  Check.(
+    (topic_value ok_log = add_0x @@ hex_256_of_int value)
+      string
+      ~error_msg:"Wrong Ok topic, expected %R but got %L") ;
+  let calls = JSON.(trace_result |-> "calls" |> as_list) in
+  Check.(
+    (List.length calls = 1)
+      int
+      ~error_msg:"Wrong number of child calls, expected %R but got %L") ;
+  let child = List.hd calls in
+  Check.(
+    (JSON.(child |-> "error" |> as_string) = "execution reverted")
+      string
+      ~error_msg:"Wrong error for the reverted child, expected %R but got %L") ;
+  Check.(
+    (JSON.(child |-> "revertReason" |> as_string) = "reverting on purpose")
+      string
+      ~error_msg:"Wrong revert reason, expected %R but got %L") ;
+  (* geth omits the reverted frame's [logs] field, it does not empty it. *)
+  Check.(
+    (trace_frame_has_logs_field child = false)
+      bool
+      ~error_msg:"Reverted child's logs field must be absent") ;
+  Check.(
+    (List.length JSON.(child |-> "calls" |> as_list) = 0)
+      int
+      ~error_msg:"The reverted child must have no children, got %L") ;
+  let*@! Transaction.{blockNumber; _} =
+    Rpc.get_transaction_receipt ~tx_hash sequencer
+  in
+  let block_number = Int32.to_int blockNumber in
+  let*@ chain_logs =
+    Rpc.get_logs
+      ~from_block:(Number block_number)
+      ~to_block:(Number block_number)
+      sequencer
+  in
+  Check.(
+    (List.length chain_logs = 1)
+      int
+      ~error_msg:"eth_getLogs must carry only the surviving Ok log, got %L") ;
+  let chain_bodies =
+    List.map
+      (fun l ->
+        let a, t, d = Transaction.extract_log_body l in
+        ( String.lowercase_ascii a,
+          List.map String.lowercase_ascii t,
+          String.lowercase_ascii d ))
+      chain_logs
+  in
+  (* Sorted multisets: the trace carries no execution order. *)
+  Check.(
+    (List.sort compare [trace_log_body ok_log] = List.sort compare chain_bodies)
+      (list (tuple3 string (list string) string))
+      ~error_msg:
+        "Trace log union must equal eth_getLogs on the revert path, expected \
+         %R but got %L") ;
+  unit
+
 (* The test checks that each call is traced separately, not causing an error
    having multiple top calls. *)
 let test_trace_transaction_calltracer_multiple_txs =
@@ -1191,6 +1309,7 @@ let () =
   test_trace_transaction_call_revert protocols ;
   test_trace_transaction_call_trace_certain_depth protocols ;
   test_trace_transaction_call_trace_revert protocols ;
+  test_trace_transaction_call_tracer_reverted_logs_dropped protocols ;
   test_trace_transaction_calltracer_multiple_txs protocols ;
   test_trace_transaction_calltracer_on_simple_transfer protocols ;
   test_trace_transaction_calltracer_precompiles protocols ;

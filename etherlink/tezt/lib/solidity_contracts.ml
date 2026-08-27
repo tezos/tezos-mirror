@@ -394,6 +394,15 @@ let call_revert =
     ~label:"call_revert"
     ~contract:"CallRevert"
 
+(** The info for the "call_tracer_revert_logs.sol" [RevertSwallower] contract,
+    used to check that the node drops a reverted sub-frame's trace logs.
+    See [etherlink/kernel_latest/solidity_examples/call_tracer_revert_logs.sol] *)
+let call_tracer_revert_logs_swallower =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_tracer_revert_logs.sol")
+    ~label:"call_tracer_revert_logs_swallower"
+    ~contract:"RevertSwallower"
+
 let precompiles =
   compile_contract
     ~source:(solidity_contracts_path ^ "/precompiles.sol")

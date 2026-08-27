@@ -971,6 +971,17 @@ let expect_failure msg k =
       Test.fail msg)
     (fun _ -> unit)
 
+let trace_log_body log =
+  let open JSON in
+  ( String.lowercase_ascii (log |-> "address" |> as_string),
+    List.map
+      (fun t -> String.lowercase_ascii (as_string t))
+      (log |-> "topics" |> as_list),
+    String.lowercase_ascii (log |-> "data" |> as_string) )
+
+let trace_frame_has_logs_field frame =
+  List.mem_assoc "logs" (JSON.as_object frame)
+
 module Protocol_no_direct_register = struct
   include Protocol
 

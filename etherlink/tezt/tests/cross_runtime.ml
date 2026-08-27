@@ -4202,16 +4202,6 @@ let crossing_subcalls frame =
 (** The alias-priming frames among a frame's direct sub-calls. *)
 let priming_subcalls frame = List.filter is_priming_frame (trace_subcalls frame)
 
-(* The (address, topics, data) triple of a trace log, lowercased for parity
-   comparison against [eth_getLogs]. *)
-let crac_trace_log_body log =
-  let open JSON in
-  ( String.lowercase_ascii (log |-> "address" |> as_string),
-    List.map
-      (fun t -> String.lowercase_ascii (as_string t))
-      (log |-> "topics" |> as_list),
-    String.lowercase_ascii (log |-> "data" |> as_string) )
-
 (* The logs of a single callTracer frame, [] when absent. *)
 let trace_frame_logs frame =
   match JSON.(frame |-> "logs" |> as_opt) with
@@ -4276,14 +4266,11 @@ let rec http_trace_inner_depth node =
    geth [position] field, so no execution order is available). This is the
    log-parity invariant of the cross-runtime tracing RFC:
    https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1
-   Only meaningful on happy paths: reverted frames KEEP their trace logs
-   (the kernel does no revert-drop), so a trace containing a reverted
-   log-emitting frame intentionally diverges from [eth_getLogs]. *)
+   Valid on revert paths too: the node drops reverted frames' logs from the
+   trace (matching geth), and [eth_getLogs] never carried them. *)
 let assert_crac_trace_log_parity ~sequencer ~prefix ~block_number trace =
   let trace_logs =
-    List.sort
-      compare
-      (List.map crac_trace_log_body (collect_crac_trace_logs trace))
+    List.sort compare (List.map trace_log_body (collect_crac_trace_logs trace))
   in
   let*@ receipt_logs =
     Rpc.get_logs
@@ -5443,14 +5430,22 @@ let test_crac_call_tracer_outgoing_caught_4xx () =
         (prefix
        ^ ": gateway output must carry the raw 4xx failure string, got: "
        ^ gw_output)) ;
-  (* No successful crossing → no re-entrant children. (The frame may still
-     carry its own sentinel log; its presence is deliberately not pinned.) *)
+  (* No successful crossing → no re-entrant children. *)
   Check.(
     (List.length (trace_subcalls gw) = 0)
       int
       ~error_msg:
         (prefix ^ ": failed leaf crossing must have no children, got %L")) ;
-  unit
+  (* The gateway's logs — its error-path sentinel included — are dropped. *)
+  Check.(
+    (trace_frame_has_logs_field gw = false)
+      bool
+      ~error_msg:(prefix ^ ": the reverting gateway frame's logs must be absent")) ;
+  assert_crac_trace_log_parity
+    ~sequencer
+    ~prefix
+    ~block_number:(Int32.to_int block.number)
+    trace
 
 (** The re-entrant EVM leaf of a crossing performs an internal DELEGATECALL
     (resp. STATICCALL); the spliced subtree must preserve the exact frame
@@ -5580,19 +5575,19 @@ let test_crac_call_tracer_reentrant_child_frame_types () =
   unit
 
 (** The re-entrant EVM leaf reverts AFTER an already-closed child emitted a
-    log. The kernel tracer performs no revert-drop: reverted frames and their
-    logs stay in the trace, while the reverted log is rolled back from the
-    receipt — the trace/receipt divergence is expected and intentional. The
-    leaf is reached over an [EVM -> Michelson -> EVM] path (see
+    log. The kernel keeps reverted frames' logs, but the node drops them
+    (matching geth's callTracer): the frames stay in the trace with their
+    [error], their logs are gone, and the trace log union equals the receipt.
+    The leaf is reached over an [EVM -> Michelson -> EVM] path (see
     [test_crac_call_tracer_reentrant_child_frame_types]); the outer EVM caller
     wraps the crossing in try/catch so the top-level tx still commits. *)
-let test_crac_call_tracer_reentrant_child_revert_keeps_logs () =
+let test_crac_call_tracer_reentrant_child_revert_drops_logs () =
   register_crac_runner_test
-    ~title:"CRAC callTracer: reverted re-entrant child keeps frame and logs"
-    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "revert"; "keep_logs"]
+    ~title:"CRAC callTracer: reverted re-entrant child keeps frame, drops logs"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "outgoing"; "revert"; "drop_logs"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
-  let prefix = "CRAC-TRACE-KEEPLOGS" in
+  let prefix = "CRAC-TRACE-DROPLOGS" in
   let evm_version = Kernel.select_evm_version Kernel.Latest in
   let* child_addr =
     EvmContract.deploy_solidity_contract
@@ -5666,9 +5661,8 @@ let test_crac_call_tracer_reentrant_child_revert_keeps_logs () =
           (option json)
           ~error_msg:
             (prefix ^ ": reverted re-entrant leaf must carry an [error]"))) ;
-  (* The already-closed child frame is retained too, and it KEEPS the
-     [Marked(1)] log it emitted before its parent reverted: the kernel
-     tracer performs no revert-drop of trace logs. *)
+  (* The closed child frame is retained; its [Marked(1)] log is gone with
+     the rest of the reverted subtree's. *)
   let child_frame =
     match
       List.find_opt
@@ -5679,48 +5673,24 @@ let test_crac_call_tracer_reentrant_child_revert_keeps_logs () =
     | None ->
         Test.fail "%s: the reverted subtree's child frame must remain" prefix
   in
-  let child_logs = trace_frame_logs child_frame in
   Check.(
-    (List.length child_logs = 1)
-      int
-      ~error_msg:
-        (prefix
-       ^ ": the reverted subtree's child frame must keep its log, got %L")) ;
-  let marked_log = List.hd child_logs in
-  Check.(
-    (trace_log_topic0 marked_log = Some (event_topic "Marked(uint256)"))
-      (option string)
-      ~error_msg:(prefix ^ ": child log topic0 %L, expected Marked(uint256) %R")) ;
-  (* The reverted child's log was rolled back from the receipt: it must NOT
-     appear in [eth_getLogs] — the trace/receipt divergence is expected and
-     intentional (no log-parity assert here). *)
-  let*@ receipt_logs =
-    Rpc.get_logs
-      ~from_block:(Number (Int32.to_int block.number))
-      ~to_block:(Number (Int32.to_int block.number))
-      sequencer
-  in
-  let receipt_bodies =
-    List.map
-      (fun (l : Transaction.tx_log) ->
-        ( String.lowercase_ascii l.address,
-          List.map String.lowercase_ascii l.topics,
-          String.lowercase_ascii l.data ))
-      receipt_logs
-  in
-  Check.(
-    (List.mem (crac_trace_log_body marked_log) receipt_bodies = false)
+    (trace_frame_has_logs_field child_frame = false)
       bool
       ~error_msg:
-        (prefix
-       ^ ": the reverted child's log must NOT appear in eth_getLogs, got \
-          membership %L")) ;
-  unit
+        (prefix ^ ": the reverted subtree's child logs field must be absent")) ;
+  (* With the reverted logs gone, trace/receipt log parity holds on the
+     revert path too. *)
+  assert_crac_trace_log_parity
+    ~sequencer
+    ~prefix
+    ~block_number:(Int32.to_int block.number)
+    trace
 
 (** Contrast to {!test_crac_call_tracer_outgoing_caught_4xx}: an uncaught 4xx
     crossing is NOT wrapped in try/catch, so the whole EVM transaction reverts.
     The trace surfaces a reverting root and the same raw "Cross-runtime call
-    failed with status 400…" gateway [error]. *)
+    failed with status 400…" gateway [error]. The node drops the reverted
+    frames' logs, so trace/receipt log parity holds on this path too. *)
 let test_crac_call_tracer_outgoing_uncaught_4xx () =
   register_crac_runner_test
     ~title:"CRAC callTracer: uncaught 4xx reverts the whole tx"
@@ -5764,10 +5734,12 @@ let test_crac_call_tracer_outgoing_uncaught_4xx () =
       ~error_msg:
         (prefix ^ ": gateway error must report the 4xx failure, got: "
        ^ gw_error)) ;
-  (* Only the error and the structure are asserted: reverted frames keep
-     their trace logs while the reverted tx's receipt is empty, so no
-     trace/receipt log parity is asserted here. *)
-  unit
+  (* The whole tx reverted: parity holds with both sides empty. *)
+  assert_crac_trace_log_parity
+    ~sequencer
+    ~prefix
+    ~block_number:(Int32.to_int block.number)
+    trace
 
 (** debug_traceBlockByNumber on a mixed block containing BOTH a normal
  *  EVM transaction AND a CRAC fake tx.
@@ -19222,7 +19194,7 @@ let () =
   test_crac_call_tracer_outgoing_withlog_off () ;
   test_crac_call_tracer_outgoing_caught_4xx () ;
   test_crac_call_tracer_reentrant_child_frame_types () ;
-  test_crac_call_tracer_reentrant_child_revert_keeps_logs () ;
+  test_crac_call_tracer_reentrant_child_revert_drops_logs () ;
   test_crac_call_tracer_outgoing_uncaught_4xx () ;
   test_crac_call_tracer_incoming_example_f () ;
   test_crac_call_tracer_incoming_only_top_call () ;
