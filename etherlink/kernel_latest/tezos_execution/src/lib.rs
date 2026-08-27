@@ -66,6 +66,7 @@ use tezos_tezlink::{
         RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
+use tezosx_interfaces::Milligas;
 use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TemporaryBigMapIdAllocator;
 use tezosx_journal::TezosXJournal;
@@ -424,7 +425,7 @@ pub(crate) fn consume_storage_write_milligas(
     payload_bytes: u64,
 ) -> Result<(), mir::gas::OutOfGas> {
     let cost = storage_write_cost_milligas(count, payload_bytes);
-    operation_gas.cast_and_consume_milligas(cost)
+    operation_gas.cast_and_consume_milligas(Milligas::new(cost))
 }
 
 /// Cost of a single durable-store read of `payload_bytes`, in
@@ -445,7 +446,7 @@ pub(crate) fn consume_storage_read_milligas(
     payload_bytes: u64,
 ) -> Result<(), mir::gas::OutOfGas> {
     let cost = storage_read_cost_milligas(count, payload_bytes);
-    operation_gas.cast_and_consume_milligas(cost)
+    operation_gas.cast_and_consume_milligas(Milligas::new(cost))
 }
 
 /// Counters are often being read and updated (code size, paid bytes, etc.). When
@@ -12206,8 +12207,9 @@ mod tests {
         // length ("Transfer(" + bare_debug + ")", i.e. bare + 10). The
         // constant +10 wrapper cancels in the delta, so the per-byte charge
         // applies to the rendered length delta.
-        let metering_delta =
-            PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered);
+        let metering_delta = u64::from(
+            PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered),
+        );
         // CHECK_PRINTABLE gas on the pushed FAILWITH string literal, charged at
         // typecheck as 10*len+15; the +15 base cancels in the delta.
         let check_printable_delta = mir::gas::tc_cost::check_printable(N_LONG).unwrap()

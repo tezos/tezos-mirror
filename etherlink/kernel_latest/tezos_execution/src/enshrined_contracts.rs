@@ -30,7 +30,7 @@ use tezos_tezlink::operation_result::{
 use tezosx_interfaces::{
     headers::{format_tez_from_mutez, parse_u64_opt},
     resolve_routing, translate_original_source, AliasInfo, Classification,
-    CrossRuntimeContext, Gas, Registry, RoutingDecision, RuntimeId,
+    CrossRuntimeContext, Gas, Milligas, Registry, RoutingDecision, RuntimeId,
     ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC,
     X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
     X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
@@ -249,8 +249,7 @@ where
                 let num_user_headers = request.headers().len() as u64;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(
-                        num_user_headers
-                            .saturating_mul(HEADER_VALIDATION_PER_HEADER_MILLIGAS),
+                        num_user_headers * HEADER_VALIDATION_PER_HEADER_MILLIGAS,
                     )
                     .map_err(TransferError::OutOfGas)?;
                 let body = dispatch_crac_call(ctx, request)?;
@@ -342,7 +341,7 @@ where
 /// Fixed overhead for all gateway entrypoints (value extraction, HTTP
 /// construction, header injection, gas conversion, response parsing).
 /// Micheline typechecking is metered separately by the MIR typechecker.
-const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
+const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: Milligas = Milligas::new(100_000);
 
 /// Per 32-byte-word surcharge on the flat base cost, charged at
 /// Tezos-as-caller gateway entrypoints (`%call`, `%call_evm`, ...) for the
@@ -354,9 +353,10 @@ const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
 /// converted via `EVM_GAS_TO_MILLIGAS`. Charged over `ceil(bytes / 32)`
 /// words ([`charge_gateway_payload`]) exactly like the EVM precompile, so
 /// the same payload costs the same on either side of the CRAC.
-pub(crate) const TEZOSX_GATEWAY_PER_WORD_MILLIGAS: u64 =
+pub(crate) const TEZOSX_GATEWAY_PER_WORD_MILLIGAS: Milligas = Milligas::new(
     tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST
-        * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+        * tezosx_constants::EVM_GAS_TO_MILLIGAS,
+);
 
 /// Per-byte gas charged on attacker-controlled bytes that are persisted
 /// verbatim into the failed CRAC receipt (BSON sink) — the Debug-rendered
@@ -372,25 +372,26 @@ pub(crate) const TEZOSX_GATEWAY_PER_WORD_MILLIGAS: u64 =
 /// and charged per byte (not per word) to bound every persisted byte.
 ///
 /// TODO(L2-1165): replace with a benchmarked value.
-pub(crate) const PERSISTED_ERROR_PER_BYTE_MILLIGAS: u64 = 300;
+pub(crate) const PERSISTED_ERROR_PER_BYTE_MILLIGAS: Milligas = Milligas::new(300);
 
 /// Surcharge when amount > 0 (balance reset after value transfer).
 /// Tezos milligas mirror of the EVM-side `VALUE_TRANSFER_SURCHARGE`
 /// (an SSTORE non-zero→zero) converted via `EVM_GAS_TO_MILLIGAS`.
-const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 =
-    tezosx_constants::VALUE_TRANSFER_SURCHARGE * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+const VALUE_TRANSFER_SURCHARGE_MILLIGAS: Milligas = Milligas::new(
+    tezosx_constants::VALUE_TRANSFER_SURCHARGE * tezosx_constants::EVM_GAS_TO_MILLIGAS,
+);
 
 /// Per user-supplied header validation in %call: byte-level prefix
 /// check against forbidden X-Tezos-* headers plus the subsequent
 /// `HeaderMap` insertion (hash + bucket insert + potential rehash).
-const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 10_000;
+const HEADER_VALIDATION_PER_HEADER_MILLIGAS: Milligas = Milligas::new(10_000);
 
 /// Keccak256 selector computation in %call_evm.
-const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
+const SELECTOR_COMPUTATION_MILLIGAS: Milligas = Milligas::new(2_000);
 
 /// Callback TRANSFER_TOKENS dispatch (~100 Micheline Bytes assembly
 /// + ~120 operation allocation).
-const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
+const CALLBACK_DISPATCH_MILLIGAS: Milligas = Milligas::new(220);
 
 /// Size-independent portion of the %collect_result triptych:
 /// - `100` mgas — frame-slot store
@@ -416,8 +417,10 @@ const COLLECT_RESULT_SIZE_BASE_MILLIGAS: u64 = 460;
 /// values from `octez-snoop`. The current split is a back-of-envelope
 /// model and may overcharge by a wide factor if the journal-frame
 /// path is closer to a memcpy than to a durable write.
-fn collect_result_size_cost(payload_len: usize) -> u64 {
-    COLLECT_RESULT_SIZE_BASE_MILLIGAS + ((payload_len as u64).saturating_mul(3) >> 1)
+fn collect_result_size_cost(payload_len: usize) -> Milligas {
+    Milligas::new(
+        COLLECT_RESULT_SIZE_BASE_MILLIGAS + ((payload_len as u64).saturating_mul(3) >> 1),
+    )
 }
 
 /// Charge the fixed per-call overhead for gateway entrypoints that
@@ -459,8 +462,8 @@ fn charge_gateway_payload_gas(
     bytes: usize,
 ) -> Result<(), TransferError> {
     let words = (bytes as u64).div_ceil(32);
-    let cost = TEZOSX_GATEWAY_PER_WORD_MILLIGAS.saturating_mul(words);
-    if cost == 0 {
+    let cost = TEZOSX_GATEWAY_PER_WORD_MILLIGAS * words;
+    if cost.is_zero() {
         return Ok(());
     }
     operation_gas
@@ -477,8 +480,8 @@ fn charge_persisted_bytes(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     bytes: usize,
 ) -> Result<(), TransferError> {
-    let cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
-    if cost == 0 {
+    let cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS * bytes as u64;
+    if cost.is_zero() {
         return Ok(());
     }
     operation_gas
@@ -1086,7 +1089,7 @@ where
 
     // --- sender alias ---
     ctx.operation_gas()
-        .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+        .cast_and_consume_milligas(Milligas::new(ALIAS_LOOKUP_MILLIGAS))
         .map_err(TransferError::OutOfGas)?;
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
@@ -1145,7 +1148,7 @@ where
         let sender_milligas =
             Gas::new(sender_target_consumed, target_runtime).as_runtime(RuntimeId::Tezos);
         ctx.operation_gas()
-            .cast_and_consume_milligas(sender_milligas)
+            .cast_and_consume_milligas(Milligas::new(sender_milligas))
             .map_err(TransferError::OutOfGas)?;
         (sender_alias, sender_runtime)
     };
@@ -1158,7 +1161,7 @@ where
         (sender_alias.clone(), sender_runtime)
     } else {
         ctx.operation_gas()
-            .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+            .cast_and_consume_milligas(Milligas::new(ALIAS_LOOKUP_MILLIGAS))
             .map_err(TransferError::OutOfGas)?;
         'source: {
             if target_runtime == RuntimeId::Tezos {
@@ -1203,7 +1206,7 @@ where
             let source_milligas = Gas::new(source_target_consumed, target_runtime)
                 .as_runtime(RuntimeId::Tezos);
             ctx.operation_gas()
-                .cast_and_consume_milligas(source_milligas)
+                .cast_and_consume_milligas(Milligas::new(source_milligas))
                 .map_err(TransferError::OutOfGas)?;
             (source_alias, source_runtime)
         }
@@ -1430,8 +1433,9 @@ where
 /// which side it calls from. Like its EVM peer, conservative against the
 /// actual hashing + encoding work — the value mirrors the EVM-side
 /// category pin rather than measured derivation cost.
-const DERIVE_ALIAS_MILLIGAS: u64 =
-    tezosx_constants::DERIVE_ALIAS_STRING_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+const DERIVE_ALIAS_MILLIGAS: Milligas = Milligas::new(
+    tezosx_constants::DERIVE_ALIAS_STRING_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS,
+);
 
 // ── Resolution constants (Michelson nat encoding) ────────────────────────
 
@@ -1482,7 +1486,7 @@ where
         let consumed_milligas =
             Gas::new(consumed, source_runtime).as_runtime(RuntimeId::Tezos);
         operation_gas
-            .cast_and_consume_milligas(consumed_milligas)
+            .cast_and_consume_milligas(Milligas::new(consumed_milligas))
             .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
     }
 
@@ -1874,7 +1878,7 @@ where
     // so the read always happens (no Tezos short-circuit to skip).
     let lookup = ViewOriginLookup { host: rk.host() };
     operation_gas
-        .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+        .cast_and_consume_milligas(Milligas::new(ALIAS_LOOKUP_MILLIGAS))
         .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
     let (sender_addr_hex, _sender_runtime) = tezosx_resolve_source_alias_readonly(
         &lookup,
@@ -1905,7 +1909,7 @@ where
         ),
         None => {
             operation_gas
-                .cast_and_consume_milligas(ALIAS_LOOKUP_MILLIGAS)
+                .cast_and_consume_milligas(Milligas::new(ALIAS_LOOKUP_MILLIGAS))
                 .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
             tezosx_resolve_source_alias_readonly(
                 &lookup,
@@ -1983,7 +1987,7 @@ where
     // 4xx; mirrors `classify_and_charge_crac_response`.
     if let Ok(consumed_milligas) = extract_gas_consumed(&response, Some("ethereum")) {
         operation_gas
-            .cast_and_consume_milligas(consumed_milligas)
+            .cast_and_consume_milligas(Milligas::new(consumed_milligas))
             .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
     }
 
@@ -2044,7 +2048,7 @@ fn classify_and_charge_crac_response(
 
     if let Some(milligas) = callee_gas {
         ctx.operation_gas()
-            .cast_and_consume_milligas(milligas)
+            .cast_and_consume_milligas(Milligas::new(milligas))
             .map_err(TransferError::OutOfGas)?;
     }
 
@@ -2298,15 +2302,15 @@ pub(crate) mod tests {
         let coeff = tezosx_constants::EVM_GAS_TO_MILLIGAS;
         assert_eq!(
             VALUE_TRANSFER_SURCHARGE_MILLIGAS,
-            tezosx_constants::VALUE_TRANSFER_SURCHARGE * coeff
+            Milligas::new(tezosx_constants::VALUE_TRANSFER_SURCHARGE * coeff)
         );
         assert_eq!(
             DERIVE_ALIAS_MILLIGAS,
-            tezosx_constants::DERIVE_ALIAS_STRING_COST * coeff
+            Milligas::new(tezosx_constants::DERIVE_ALIAS_STRING_COST * coeff)
         );
         assert_eq!(
             TEZOSX_GATEWAY_PER_WORD_MILLIGAS,
-            tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST * coeff
+            Milligas::new(tezosx_constants::RUNTIME_GATEWAY_PER_WORD_COST * coeff)
         );
     }
 
@@ -2569,7 +2573,8 @@ pub(crate) mod tests {
         let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
 
         let second_call_cost = u64::from(gas_after_first - gas_after_second);
-        let expected_max = 2 * ALIAS_LOOKUP_MILLIGAS + VALUE_TRANSFER_SURCHARGE_MILLIGAS;
+        let expected_max =
+            2 * ALIAS_LOOKUP_MILLIGAS + u64::from(VALUE_TRANSFER_SURCHARGE_MILLIGAS);
         assert!(
             second_call_cost <= expected_max,
             "Second call consumed {second_call_cost} milligas, expected at most \
@@ -3247,7 +3252,8 @@ pub(crate) mod tests {
             crate::gas::TezlinkOperationGas::start_milligas(start).unwrap();
         let _ = classify_and_charge_crac_response(response, Some("ethereum"), &mut ctx)
             .unwrap_err();
-        let expected_charge = (body_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS;
+        let expected_charge =
+            u64::from((body_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS);
         let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
@@ -3291,7 +3297,8 @@ pub(crate) mod tests {
         };
         let decoded_len = String::from_utf8_lossy(&body).len();
         assert!(decoded_len > body.len(), "lossy must expand invalid bytes");
-        let expected_charge = (decoded_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS;
+        let expected_charge =
+            u64::from((decoded_len as u64) * PERSISTED_ERROR_PER_BYTE_MILLIGAS);
         let remaining = ctx.operation_gas.remaining.milligas().unwrap() as u64;
         assert_eq!(
             remaining,
@@ -4313,13 +4320,13 @@ pub(crate) mod tests {
     fn test_collect_result_size_cost_edge_cases() {
         assert_eq!(
             collect_result_size_cost(0),
-            COLLECT_RESULT_SIZE_BASE_MILLIGAS
+            Milligas::new(COLLECT_RESULT_SIZE_BASE_MILLIGAS)
         );
         // 256-byte payload: 460 + (256 * 3) / 2 = 460 + 384 = 844.
-        assert_eq!(collect_result_size_cost(256), 844);
+        assert_eq!(collect_result_size_cost(256), Milligas::new(844));
         // Must not panic; result fits in u64.
         let max = collect_result_size_cost(usize::MAX);
-        assert!(max >= COLLECT_RESULT_SIZE_BASE_MILLIGAS);
+        assert!(max >= Milligas::new(COLLECT_RESULT_SIZE_BASE_MILLIGAS));
     }
 
     // The size charge fires before `set_dispatch_result`. If the write
@@ -5915,8 +5922,8 @@ pub(crate) mod tests {
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
         let expected_cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64;
 
-        let ample = expected_cost + 1_000_000;
-        let mut gas = make_operation_gas(ample);
+        let ample = expected_cost + Milligas::new(1_000_000);
+        let mut gas = make_operation_gas(u64::from(ample));
         let result = charge_persisted_error(&mut gas, err.clone());
 
         // Original error is returned on success.
@@ -5927,7 +5934,8 @@ pub(crate) mod tests {
 
         let consumed = u64::from(gas.total_milligas_consumed());
         assert_eq!(
-            consumed, expected_cost,
+            consumed,
+            u64::from(expected_cost),
             "charge should equal PERSISTED_ERROR_PER_BYTE_MILLIGAS * {wrapped_len}"
         );
     }
@@ -5958,11 +5966,11 @@ pub(crate) mod tests {
         let cost_long = u64::from(gas_long.total_milligas_consumed());
         assert_eq!(
             cost_short,
-            PERSISTED_ERROR_PER_BYTE_MILLIGAS * short_len as u64
+            u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * short_len as u64)
         );
         assert_eq!(
             cost_long,
-            PERSISTED_ERROR_PER_BYTE_MILLIGAS * long_len as u64
+            u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * long_len as u64)
         );
         assert!(
             cost_long > cost_short,
@@ -5979,7 +5987,7 @@ pub(crate) mod tests {
         // Wrapped length: "Transfer(" + bare_debug + ")" = bare + 10,
         // persisted once in the receipt (alias→target internal op only).
         let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
-        let cost = PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64;
+        let cost = u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);
 
         // Budget is strictly less than the required cost.
         let mut gas = make_operation_gas(cost - 1);

@@ -15,8 +15,8 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_interfaces::{
     canonicalize_native_address,
     headers::{format_tez_from_wei, parse_u64_opt},
-    translate_original_source, AliasInfo, Classification, Gas as TezosXGas, Origin,
-    Registry, RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER,
+    translate_original_source, AliasInfo, Classification, EvmGas, Gas as TezosXGas,
+    Origin, Registry, RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER,
     ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
     X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
     X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
@@ -115,7 +115,7 @@ fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileErr
     let words = (bytes as u64).div_ceil(32);
     let cost = RUNTIME_GATEWAY_PER_WORD_COST.saturating_mul(words);
     if cost > 0 {
-        charge(gas, cost)?;
+        charge(gas, EvmGas::new(cost))?;
     }
     Ok(())
 }
@@ -131,7 +131,7 @@ fn charge_consumed_gas(
 ) -> Result<(), CustomPrecompileError> {
     let consumed_evm = TezosXGas::new(consumed, from).as_runtime(RuntimeId::Ethereum);
     if consumed_evm > 0 {
-        charge(gas, consumed_evm)?;
+        charge(gas, EvmGas::new(consumed_evm))?;
     }
     Ok(())
 }
@@ -226,7 +226,7 @@ fn build_http_request(
             CustomPrecompileError::Revert("header cost overflow".into(), *gas)
         })?;
     if header_cost > 0 {
-        charge(gas, header_cost)?;
+        charge(gas, EvmGas::new(header_cost))?;
     }
     let method = match method_u8 {
         0 => http::Method::GET,
@@ -282,7 +282,7 @@ fn classify_and_charge_crac_response(
         .get(X_TEZOS_GAS_CONSUMED)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
-        .map(|c| TezosXGas::new(c, target_runtime).as_runtime(RuntimeId::Ethereum));
+        .map(|c| EvmGas::from(TezosXGas::new(c, target_runtime)));
 
     if response.status().is_success() {
         let Some(evm_consumed) = callee_gas else {
@@ -353,7 +353,7 @@ fn charge_delegated_storage_cost(
     }
     let g2 = mutez_to_evm_gas(v, Wei::from(base_fee_per_gas))
         .ok_or(CustomPrecompileError::OutOfGas)?;
-    charge(gas, g2)
+    charge(gas, EvmGas::new(g2))
 }
 
 /// Core logic for the `originOf` selector, extracted for unit-testability.
@@ -792,7 +792,7 @@ where
     >,
 {
     // --- sender alias ---
-    charge(gas, ALIAS_LOOKUP_COST)?;
+    charge(gas, EvmGas::new(ALIAS_LOOKUP_COST))?;
     let (sender_alias, sender_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
@@ -810,7 +810,7 @@ where
         return Ok((sender_alias.clone(), sender_alias));
     }
 
-    charge(gas, ALIAS_LOOKUP_COST)?;
+    charge(gas, EvmGas::new(ALIAS_LOOKUP_COST))?;
     let (source_alias, source_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;

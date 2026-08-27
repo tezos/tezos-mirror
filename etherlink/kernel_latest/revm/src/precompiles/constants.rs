@@ -5,6 +5,7 @@
 
 use revm::primitives::{Address, FixedBytes, B256};
 use revm::state::Bytecode;
+use tezosx_interfaces::EvmGas;
 
 use crate::helpers::storage::bytes_hash;
 
@@ -177,29 +178,29 @@ pub(crate) const DEBUGS: [Address; 1] = [PANIC_PRECOMPILE_ADDRESS];
 //
 // TODO: benchmark to confirm
 // TODO: when integrating BLS (tz4), this value should be significantly increased
-pub(crate) const VERIFY_TEZOS_SIGNATURE_BASE_COST: u64 = 20_000;
+pub(crate) const VERIFY_TEZOS_SIGNATURE_BASE_COST: EvmGas = EvmGas::new(20_000);
 
 // Rationale regarding the cost:
 // A few decoding/encoding functions.
-pub(crate) const SEND_OUTBOX_MESSAGE_BASE_COST: u64 = 500;
+pub(crate) const SEND_OUTBOX_MESSAGE_BASE_COST: EvmGas = EvmGas::new(500);
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
 // In particular, worst case for a cold read 2100 + the worst case for
 // cold write 22100 (inserting a non zero value to a zero value).
-pub(crate) const TICKET_TABLE_BASE_COST: u64 = 24_200;
+pub(crate) const TICKET_TABLE_BASE_COST: EvmGas = EvmGas::new(24_200);
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
 // In particular, worst case for a cold read 2100 + the worst case for
 // cold write 22100 (inserting a non zero value to a zero value).
-pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 24_200;
+pub(crate) const GLOBAL_COUNTER_BASE_COST: EvmGas = EvmGas::new(24_200);
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
 // In particular, worst case for a cold read 2100 + the worst case for
 // cold write 22100 (inserting a non zero value to a zero value).
-pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
+pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: EvmGas = EvmGas::new(24_200);
 
 // Gateway base cost: covers ABI decoding, HTTP request construction,
 // header injection (7 X-Tezos-* headers), gas conversion arithmetic,
@@ -207,7 +208,7 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 // Derived from Ethereum gas schedule: G_log=375, G_logtopic=375,
 // G_logdata=8/byte, G_copy=3/word, G_memory=3/word.
 // See RFC: Gas model for gateways and aliases.
-pub(crate) const RUNTIME_GATEWAY_BASE_COST: u64 = 5_000;
+pub(crate) const RUNTIME_GATEWAY_BASE_COST: EvmGas = EvmGas::new(5_000);
 
 // Per 32-byte word surcharge applied on top of the flat base cost for
 // every gateway entrypoint, proportional to calldata + outgoing body +
@@ -219,8 +220,8 @@ pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 =
 // Surcharge when msg.value > 0 (precompile balance burn after cross-runtime
 // value transfer). Canonical value lives in `tezosx_constants` so the
 // Michelson-side milligas mirror cannot desync (L2-1726).
-pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 =
-    tezosx_constants::VALUE_TRANSFER_SURCHARGE;
+pub(crate) const VALUE_TRANSFER_SURCHARGE: EvmGas =
+    EvmGas::new(tezosx_constants::VALUE_TRANSFER_SURCHARGE);
 
 // Per user-supplied header validation cost for the generic call()
 // function. Covers the byte-level prefix check against forbidden
@@ -235,16 +236,16 @@ pub(crate) const MAX_HTTP_CALL_HEADERS: usize = tezosx_constants::MAX_HTTP_CALL_
 // `resolveAddress` flat base cost — ABI decode + dispatch + runtime
 // validation. 1 500 covers per-call dispatch overhead, consistent with
 // the derive_alias family of costs.
-pub(crate) const RESOLVE_ADDRESS_BASE_COST: u64 = 1_500;
+pub(crate) const RESOLVE_ADDRESS_BASE_COST: EvmGas = EvmGas::new(1_500);
 
 // `originOf` flat base cost.
-pub(crate) const ORIGIN_OF_BASE_COST: u64 = 1_500;
+pub(crate) const ORIGIN_OF_BASE_COST: EvmGas = EvmGas::new(1_500);
 
 // Per-hop cost for deriving an alias string (hashing + b58check or
 // hex encoding). Canonical value lives in `tezosx_constants` so the
 // Michelson-side milligas mirror cannot desync (L2-1726).
-pub(crate) const DERIVE_ALIAS_STRING_COST: u64 =
-    tezosx_constants::DERIVE_ALIAS_STRING_COST;
+pub(crate) const DERIVE_ALIAS_STRING_COST: EvmGas =
+    EvmGas::new(tezosx_constants::DERIVE_ALIAS_STRING_COST);
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
