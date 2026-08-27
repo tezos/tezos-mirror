@@ -171,38 +171,8 @@ where
                 skip_signature_check,
                 skip_fees_check,
                 http_trace_enabled,
-            )
+            )?
         );
-
-        // Invariant: a delayed (forced-inclusion) transaction must NEVER revert
-        // the blueprint. The sequencer cannot drop a delayed transaction, so if
-        // applying one returned an error and we propagated it with `?`, the
-        // whole block computation would abort, the blueprint would be reverted
-        // (see [revert_block]), and the offending transaction would remain in
-        // the delayed inbox to be force-included again on the next reboot --
-        // halting the chain. We therefore demote any application error for a
-        // delayed transaction to `Invalid`: it is skipped and, through
-        // [on_invalid_transaction] -> [register_delayed_transaction], removed
-        // from the delayed inbox when the block is promoted.
-        //
-        // This cannot swallow a legitimate reboot request: reboots are raised
-        // before [apply_transaction] is called (see [can_fit_in_reboot] above
-        // and [Error::Reboot] on the [pop_tx] path), never from within it. In
-        // practice such errors are raised before any state is committed, so
-        // skipping leaves no partial writes behind.
-        let apply_result = match apply_result {
-            Err(err) if is_delayed => {
-                log!(
-                    Error,
-                    "Delayed transaction {} failed to apply with '{:?}'; \
-                     skipping it to keep the blueprint valid.",
-                    hex::encode(tx_hash),
-                    err
-                );
-                ExecutionResult::Invalid
-            }
-            result => result?,
-        };
 
         match apply_result {
             ExecutionResult::Valid(execution_info) => {
@@ -390,6 +360,7 @@ where
 fn revert_block<Host>(
     host: &mut SafeStorage<&mut Host>,
     base: &mut impl KeySpace,
+    config: &mut Configuration,
     block_in_progress_provenance: &BlockInProgressProvenance,
     number: U256,
     error: anyhow::Error,
@@ -412,7 +383,7 @@ where
         error
     );
     host.revert()?;
-    drop_blueprint(base, number)?;
+    drop_invalid_blueprint(host, base, config)?;
     Ok(())
 }
 
@@ -434,57 +405,72 @@ where
             allow_path_not_found(host.store_delete(&TMP_PATH))?;
             allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
 
-            let (number, previous_timestamp, ref previous_chain_header) =
-                get_next_bip_info(base);
-
-            let blueprint = read_blueprint(
-                host,
-                base,
-                config,
-                number,
-                previous_timestamp,
-                previous_chain_header,
-            )?;
-            match blueprint {
-                (Some(blueprint), _) if blueprint.transactions.len() == 1 => {
-                    // Blueprints with one transaction can be treated as certificates that given
-                    // transactions indeed trigger WASM traps. If said transaction is part of the
-                    // delayed inbox, it can never been included in a valid blueprint by
-                    // construction and should be dropped to protect the kernel.
-                    if let ConfigurationMode::Sequencer(SequencerConfig {
-                        ref mut delayed_inbox,
-                        ..
-                    }) = config.mode
-                    {
-                        let potential_culprits: Vec<_> = blueprint
-                            .transactions
-                            .iter()
-                            .filter_map(|txn| match txn {
-                                TezosXTransaction::Ethereum(tx) => match tx.content {
-                                    TransactionContent::TezosDelayed(_)
-                                    | TransactionContent::EthereumDelayed(_) => {
-                                        Some(tx.tx_hash)
-                                    }
-                                    _ => None,
-                                },
-                                _ => None,
-                            })
-                            .collect();
-
-                        for hash in potential_culprits {
-                            delayed_inbox.delete(base, Hash(hash))?;
-                            Event::DroppedDelayedTransaction(hash)
-                                .store(base, &config.common)?;
-                        }
-                    }
-                }
-                _ => (),
-            }
-
-            drop_blueprint(base, number)?;
+            drop_invalid_blueprint(host, base, config)?;
         }
 
         return Ok(());
+    }
+
+    Ok(())
+}
+
+/// Drop the blueprint that just failed. If it is a blueprint containing
+/// one delayed transaction, we treat it as a proof that this transaction
+/// is poisoned and we drop it from the delayed inbox.
+///
+/// Multi-transaction blueprints and non-delayed lone transactions leave the
+/// inbox untouched.
+fn drop_invalid_blueprint<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+    config: &mut Configuration,
+) -> anyhow::Result<()>
+where
+    Host: StorageV1,
+{
+    let (number, previous_timestamp, ref previous_chain_header) = get_next_bip_info(base);
+
+    if let (Some(blueprint), _) = read_blueprint(
+        host,
+        base,
+        config,
+        number,
+        previous_timestamp,
+        previous_chain_header,
+    )? {
+        drop_blueprint(base, number)?;
+
+        if blueprint.transactions.len() != 1 {
+            return Ok(());
+        }
+
+        // A lone transaction in a failing blueprint is a certificate that it
+        // triggers a WASM trap. If it comes from the delayed inbox, it can
+        // never be included in a valid blueprint by construction, so it is
+        // dropped to protect the kernel.
+        if let ConfigurationMode::Sequencer(SequencerConfig {
+            ref mut delayed_inbox,
+            ..
+        }) = config.mode
+        {
+            let potential_culprits: Vec<_> = blueprint
+                .transactions
+                .iter()
+                .filter_map(|txn| match txn {
+                    TezosXTransaction::Ethereum(tx) => match tx.content {
+                        TransactionContent::TezosDelayed(_)
+                        | TransactionContent::EthereumDelayed(_) => Some(tx.tx_hash),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
+
+            for hash in potential_culprits {
+                delayed_inbox.delete(base, Hash(hash))?;
+                Event::DroppedDelayedTransaction(hash).store(base, &config.common)?;
+            }
+        }
     }
 
     Ok(())
@@ -717,6 +703,7 @@ where
             revert_block(
                 rk.host_mut(),
                 &mut base,
+                config,
                 &block_in_progress_provenance,
                 processed_blueprint,
                 err,
