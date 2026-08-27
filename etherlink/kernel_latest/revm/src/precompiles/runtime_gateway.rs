@@ -13,13 +13,13 @@ use revm::{
 use tezos_ethereum::wei::{mutez_to_evm_gas, Wei};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_interfaces::{
-    canonicalize_native_address, gas,
+    canonicalize_native_address,
     headers::{format_tez_from_wei, parse_u64_opt},
-    translate_original_source, AliasInfo, Classification, Origin, Registry, RuntimeId,
-    ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
-    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    translate_original_source, AliasInfo, Classification, Gas as TezosXGas, Origin,
+    Registry, RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER,
+    ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -129,8 +129,7 @@ fn charge_consumed_gas(
     from: RuntimeId,
     consumed: u64,
 ) -> Result<(), CustomPrecompileError> {
-    let consumed_evm =
-        gas::convert_ceil(from, RuntimeId::Ethereum, consumed).unwrap_or(u64::MAX);
+    let consumed_evm = TezosXGas::new(consumed, from).as_runtime(RuntimeId::Ethereum);
     if consumed_evm > 0 {
         charge(gas, consumed_evm)?;
     }
@@ -283,7 +282,7 @@ fn classify_and_charge_crac_response(
         .get(X_TEZOS_GAS_CONSUMED)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
-        .and_then(|c| gas::convert_ceil(target_runtime, RuntimeId::Ethereum, c));
+        .map(|c| TezosXGas::new(c, target_runtime).as_runtime(RuntimeId::Ethereum));
 
     if response.status().is_success() {
         let Some(evm_consumed) = callee_gas else {
@@ -382,14 +381,8 @@ fn dispatch_origin_of<
     let (classification, consumed_source) = match staged_source {
         Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
         None => {
-            let budget =
-                gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "originOf: gas budget overflow".into(),
-                            *gas,
-                        )
-                    })?;
+            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(source_runtime);
             registry
                 .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
@@ -478,14 +471,8 @@ fn dispatch_resolve_address<
     let (source_classification, consumed_source) = match staged_source {
         Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
         None => {
-            let budget =
-                gas::convert(RuntimeId::Ethereum, source_runtime, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "resolveAddress: gas budget overflow".into(),
-                            *gas,
-                        )
-                    })?;
+            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(source_runtime);
             registry
                 .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
@@ -537,14 +524,8 @@ fn dispatch_resolve_address<
 
             // Destination check: is the inverse already materialized on
             // the target side?
-            let dest_budget =
-                gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "resolveAddress: destination gas budget overflow".into(),
-                            *gas,
-                        )
-                    })?;
+            let dest_budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(target_runtime);
             let (inverse_class, consumed_dest) = registry
                 .read_origin(rk, target_runtime, &derived, dest_budget)
                 .map_err(|e| {
@@ -1047,15 +1028,8 @@ where
                 source_addr,
             )?;
 
-            let gas_limit =
-                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "callMichelson: EVM gas limit overflows Tezos milligas"
-                                .into(),
-                            gas,
-                        )
-                    })?;
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(RuntimeId::Tezos);
             let crac_id = context.journal().crac_id();
             emit_crac_sent(context, crac_id, "tezos", destination, amount);
             inject_tezos_headers_from_context(
@@ -1144,13 +1118,8 @@ where
                 )
             })?;
 
-            let gas_limit =
-                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
-                    .ok_or(CustomPrecompileError::Revert(
-                        "callMichelsonView: EVM gas limit overflows Tezos milligas"
-                            .into(),
-                        gas,
-                    ))?;
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(RuntimeId::Tezos);
             // Amount is always zero (checked above), reuse the header
             // injector for uniform context propagation.
             inject_tezos_headers_from_context(
@@ -1273,15 +1242,8 @@ where
                 (sender_alias, source_alias, source.runtime())
             };
 
-            let gas_limit =
-                gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
-                    .ok_or_else(|| {
-                        CustomPrecompileError::Revert(
-                            "httpCall: EVM gas limit overflows target runtime units"
-                                .into(),
-                            gas,
-                        )
-                    })?;
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
+                .as_runtime(target_runtime);
             reject_if_too_many_headers(
                 &request,
                 target_runtime,
@@ -1503,7 +1465,7 @@ mod tests {
     fn classify_4xx_with_op_limit_header_drains_and_reverts() {
         let remaining = 100_000u64;
         let op_limit_milligas =
-            gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, remaining).unwrap();
+            TezosXGas::new(remaining, RuntimeId::Ethereum).as_runtime(RuntimeId::Tezos);
         let response = http::Response::builder()
             .status(http::StatusCode::BAD_REQUEST)
             .header(X_TEZOS_GAS_CONSUMED, op_limit_milligas.to_string())

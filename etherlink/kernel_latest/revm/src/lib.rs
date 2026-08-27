@@ -1483,12 +1483,11 @@ mod test {
         // Verify the CRAC gas was actually charged (mock returns 10_000
         // milligas = 1_000 EVM gas, plus the precompile base cost).
         let gas_used = execution_result.result.gas_used();
-        let mock_evm_gas = tezosx_interfaces::gas::convert(
-            tezosx_interfaces::RuntimeId::Tezos,
-            tezosx_interfaces::RuntimeId::Ethereum,
+        let mock_evm_gas = tezosx_interfaces::Gas::new(
             MOCK_TEZOS_GAS_CONSUMED,
+            tezosx_interfaces::RuntimeId::Tezos,
         )
-        .unwrap();
+        .as_runtime(tezosx_interfaces::RuntimeId::Ethereum);
         assert!(
             gas_used >= mock_evm_gas,
             "Transaction should have consumed at least {mock_evm_gas} EVM gas \

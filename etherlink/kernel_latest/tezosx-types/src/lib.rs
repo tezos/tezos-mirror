@@ -8,7 +8,10 @@
 //! that depend on `tezosx-journal`) so that `tezosx-journal` can use
 //! these types without creating a dependency cycle.
 
+mod gas;
 pub mod headers;
+
+pub use gas::{EvmGas, Gas, Milligas};
 
 use primitive_types::U256;
 use tezos_data_encoding::{enc::BinWriter, encoding::HasEncoding, nom::NomReader};
@@ -372,144 +375,6 @@ pub const ALIAS_LOOKUP_COST: u64 = 2_100;
 /// Milligas equivalent of `ALIAS_LOOKUP_COST` (EVM gas × EVM_GAS_TO_MILLIGAS).
 pub const ALIAS_LOOKUP_MILLIGAS: u64 =
     ALIAS_LOOKUP_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS;
-
-/// Gas conversion utilities for cross-runtime calls.
-///
-/// **Convention**: Both `X-Tezos-Gas-Limit` and `X-Tezos-Gas-Consumed` are
-/// in the **called** runtime's gas units. Gateways convert on the way out
-/// (for the limit) and on the way back (for consumed); receiving runtimes
-/// read/write directly without conversion.
-///
-/// **Ratio**: 1 EVM gas = [`tezosx_constants::EVM_GAS_TO_MILLIGAS`] Tezos
-/// milligas.
-/// **Tezos unit**: milligas (the native unit of the Tezos runtime).
-pub mod gas {
-    use crate::RuntimeId;
-    use tezosx_constants::EVM_GAS_TO_MILLIGAS;
-
-    /// Convert `gas` from `source` runtime units to `target` runtime units.
-    pub fn convert(source: RuntimeId, target: RuntimeId, gas: u64) -> Option<u64> {
-        match (source, target) {
-            (RuntimeId::Ethereum, RuntimeId::Tezos) => {
-                gas.checked_mul(EVM_GAS_TO_MILLIGAS)
-            }
-            (RuntimeId::Tezos, RuntimeId::Ethereum) => Some(gas / EVM_GAS_TO_MILLIGAS),
-            _ => Some(gas),
-        }
-    }
-
-    /// Like [`convert`], but rounds UP. Use on charge-back paths so the
-    /// charged EVM gas never under-covers the consumed milligas. Do **not**
-    /// use for gas-limit forwarding.
-    pub fn convert_ceil(source: RuntimeId, target: RuntimeId, gas: u64) -> Option<u64> {
-        match (source, target) {
-            (RuntimeId::Tezos, RuntimeId::Ethereum) => {
-                Some(gas.div_ceil(EVM_GAS_TO_MILLIGAS))
-            }
-            _ => convert(source, target, gas),
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn ethereum_to_tezos() {
-            assert_eq!(
-                convert(RuntimeId::Ethereum, RuntimeId::Tezos, 100),
-                Some(100 * EVM_GAS_TO_MILLIGAS)
-            );
-            assert_eq!(
-                convert(RuntimeId::Ethereum, RuntimeId::Tezos, 1_000_000),
-                Some(1_000_000 * EVM_GAS_TO_MILLIGAS)
-            );
-        }
-
-        #[test]
-        fn ethereum_to_tezos_overflow() {
-            let large = u64::MAX / EVM_GAS_TO_MILLIGAS + 1;
-            assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, large), None);
-        }
-
-        #[test]
-        fn tezos_to_ethereum() {
-            assert_eq!(
-                convert(
-                    RuntimeId::Tezos,
-                    RuntimeId::Ethereum,
-                    100 * EVM_GAS_TO_MILLIGAS
-                ),
-                Some(100)
-            );
-        }
-
-        #[test]
-        fn tezos_to_ethereum_truncates() {
-            assert_eq!(
-                convert(
-                    RuntimeId::Tezos,
-                    RuntimeId::Ethereum,
-                    EVM_GAS_TO_MILLIGAS + EVM_GAS_TO_MILLIGAS / 2
-                ),
-                Some(1)
-            );
-        }
-
-        #[test]
-        fn identity() {
-            assert_eq!(
-                convert(RuntimeId::Ethereum, RuntimeId::Ethereum, 42),
-                Some(42)
-            );
-            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Tezos, 42), Some(42));
-        }
-
-        #[test]
-        fn zero() {
-            assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, 0), Some(0));
-            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Ethereum, 0), Some(0));
-        }
-
-        #[test]
-        fn tezos_to_ethereum_ceil_rounds_up() {
-            // 944 = 22 * 42 + 20 (the %collect_result witness from L2-1751).
-            assert_eq!(
-                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 944),
-                Some(43)
-            );
-            // Exact multiple: no over-charge.
-            assert_eq!(
-                convert_ceil(
-                    RuntimeId::Tezos,
-                    RuntimeId::Ethereum,
-                    EVM_GAS_TO_MILLIGAS * 42
-                ),
-                Some(42)
-            );
-            assert_eq!(
-                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 1),
-                Some(1)
-            );
-            assert_eq!(
-                convert_ceil(RuntimeId::Tezos, RuntimeId::Ethereum, 0),
-                Some(0)
-            );
-        }
-
-        #[test]
-        fn ceil_other_paths_match_convert() {
-            assert_eq!(
-                convert_ceil(RuntimeId::Ethereum, RuntimeId::Tezos, 100),
-                Some(100 * EVM_GAS_TO_MILLIGAS)
-            );
-            assert_eq!(
-                convert_ceil(RuntimeId::Ethereum, RuntimeId::Ethereum, 42),
-                Some(42)
-            );
-        }
-    }
-}
 
 #[cfg(test)]
 mod from_host_tests {

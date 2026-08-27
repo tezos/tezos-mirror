@@ -28,14 +28,13 @@ use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
 };
 use tezosx_interfaces::{
-    gas::convert as convert_gas,
     headers::{format_tez_from_mutez, parse_u64_opt},
     resolve_routing, translate_original_source, AliasInfo, Classification,
-    CrossRuntimeContext, Registry, RoutingDecision, RuntimeId, ALIAS_LOOKUP_MILLIGAS,
-    ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST,
-    X_TEZOS_TIMESTAMP,
+    CrossRuntimeContext, Gas, Registry, RoutingDecision, RuntimeId,
+    ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
+    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -1119,8 +1118,7 @@ where
         // Convert remaining milligas to target runtime gas: this caps the budget
         // that ensure_alias may spend on alias generation.
         let target_budget =
-            convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-                .ok_or(OutOfGas)?;
+            Gas::new(remaining_milligas, RuntimeId::Tezos).as_runtime(target_runtime);
         let sender_pubkey: Option<&[u8]> = if sender_is_source {
             Some(&source_public_key)
         } else {
@@ -1145,8 +1143,7 @@ where
         }
         let sender_target_consumed = target_budget - sender_resolution.gas_remaining;
         let sender_milligas =
-            convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
-                .ok_or(OutOfGas)?;
+            Gas::new(sender_target_consumed, target_runtime).as_runtime(RuntimeId::Tezos);
         ctx.operation_gas()
             .cast_and_consume_milligas(sender_milligas)
             .map_err(TransferError::OutOfGas)?;
@@ -1184,8 +1181,7 @@ where
             let source_runtime = alias_info.runtime;
             let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
             let target_budget =
-                convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-                    .ok_or(OutOfGas)?;
+                Gas::new(remaining_milligas, RuntimeId::Tezos).as_runtime(target_runtime);
             let (source_alias, source_resolution) = {
                 let (rk, journal, registry) = ctx.cross_runtime_split();
                 registry
@@ -1204,9 +1200,8 @@ where
                 ctx.add_delegated_storage_cost(v);
             }
             let source_target_consumed = target_budget - source_resolution.gas_remaining;
-            let source_milligas =
-                convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
-                    .ok_or(OutOfGas)?;
+            let source_milligas = Gas::new(source_target_consumed, target_runtime)
+                .as_runtime(RuntimeId::Tezos);
             ctx.operation_gas()
                 .cast_and_consume_milligas(source_milligas)
                 .map_err(TransferError::OutOfGas)?;
@@ -1218,12 +1213,7 @@ where
     // forwarded limit reflects gas already consumed by alias resolution.
     let remaining_after_aliases = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
     let gas_limit =
-        convert_gas(RuntimeId::Tezos, target_runtime, remaining_after_aliases)
-            .ok_or_else(|| {
-                TransferError::GatewayError(
-                    "http_call: Tezos gas limit overflows target runtime units".into(),
-                )
-            })?;
+        Gas::new(remaining_after_aliases, RuntimeId::Tezos).as_runtime(target_runtime);
     let crac_depth = ctx.crac_chain_depth().saturating_add(1);
     let crac_id_str = ctx.journal().crac_id().to_string();
     inject_context_headers_raw(
@@ -1479,8 +1469,8 @@ where
         .milligas()
         .ok_or(mir::interpreter::InterpretError::OutOfGas)?
         as u64;
-    let budget = convert_gas(RuntimeId::Tezos, source_runtime, remaining_milligas)
-        .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
+    let budget =
+        Gas::new(remaining_milligas, RuntimeId::Tezos).as_runtime(source_runtime);
 
     let (classification, consumed) = registry
         .read_origin(rk, source_runtime, addr_str, budget)
@@ -1490,8 +1480,7 @@ where
     // Convert consumed back to milligas before charging.
     if consumed > 0 {
         let consumed_milligas =
-            convert_gas(source_runtime, RuntimeId::Tezos, consumed)
-                .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
+            Gas::new(consumed, source_runtime).as_runtime(RuntimeId::Tezos);
         operation_gas
             .cast_and_consume_milligas(consumed_milligas)
             .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;
@@ -1938,12 +1927,8 @@ where
         .milligas()
         .ok_or(mir::interpreter::InterpretError::OutOfGas)?
         as u64;
-    let evm_gas_limit = tezosx_interfaces::gas::convert(
-        RuntimeId::Tezos,
-        RuntimeId::Ethereum,
-        remaining_milligas,
-    )
-    .ok_or(mir::interpreter::EnshrinedViewDispatchError::BudgetOverflow)?;
+    let evm_gas_limit =
+        Gas::new(remaining_milligas, RuntimeId::Tezos).as_runtime(RuntimeId::Ethereum);
 
     // Parse the URI up-front so a caller-supplied bad destination
     // surfaces as `InvalidDestination` (→ 400) rather than getting
@@ -2124,13 +2109,7 @@ fn extract_gas_consumed(
                     .into(),
             )
         })?;
-    convert_gas(target_runtime, RuntimeId::Tezos, consumed_in_target_units).ok_or_else(
-        || {
-            TransferError::GatewayError(
-                "http_call: gas consumed overflows Tezos milligas".into(),
-            )
-        },
-    )
+    Ok(Gas::new(consumed_in_target_units, target_runtime).as_runtime(RuntimeId::Tezos))
 }
 
 pub(crate) fn get_enshrined_contract_entrypoint(

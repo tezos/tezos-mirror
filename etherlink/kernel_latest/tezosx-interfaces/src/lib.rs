@@ -9,13 +9,13 @@
 
 pub use tezosx_types::headers;
 pub use tezosx_types::{
-    canonicalize_native_address, gas, resolve_routing, AliasInfo, Classification,
-    CrossRuntimeContext, KernelStorageError, Origin, OriginalSource, RoutingDecision,
-    RuntimeId, TezosXRuntimeError, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
-    ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, MAX_CRAC_DEPTH, X_TEZOS_AMOUNT,
-    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
-    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    canonicalize_native_address, resolve_routing, AliasInfo, Classification,
+    CrossRuntimeContext, EvmGas, Gas, KernelStorageError, Milligas, Origin,
+    OriginalSource, RoutingDecision, RuntimeId, TezosXRuntimeError, ALIAS_LOOKUP_COST,
+    ALIAS_LOOKUP_MILLIGAS, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC,
+    MAX_CRAC_DEPTH, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 
 #[cfg(feature = "testing")]

@@ -46,7 +46,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     canonicalize_native_address, resolve_routing, AliasInfo, AliasResolution,
-    CrossRuntimeContext, Registry, RoutingDecision, RuntimeId,
+    CrossRuntimeContext, Gas as TezosXGas, Registry, RoutingDecision, RuntimeId,
 };
 
 /// A journal of state changes internal to the EVM
@@ -846,17 +846,8 @@ impl<
         };
         // Convert remaining EVM gas to target runtime units to cap
         // the generation cost.
-        let target_gas_budget = tezosx_interfaces::gas::convert(
-            RuntimeId::Ethereum,
-            target_runtime,
-            remaining_evm_gas,
-        )
-        .ok_or_else(|| {
-            CustomPrecompileError::Revert(
-                "alias generation: EVM gas overflows target runtime units".into(),
-                remaining,
-            )
-        })?;
+        let target_gas_budget = TezosXGas::new(remaining_evm_gas, RuntimeId::Ethereum)
+            .as_runtime(target_runtime);
         let (
             alias_str,
             AliasResolution {
