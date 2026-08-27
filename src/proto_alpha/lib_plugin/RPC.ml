@@ -1926,6 +1926,21 @@ module Scripts = struct
         in
         let contract = Contract.Originated contract_hash in
         let* balance = Contract.get_balance ctxt contract in
+        (* To execute the view and get the result, we use a wrapper
+           contract executing the VIEW instruction and storing the
+           result. Most step constants of the view execution are
+           inherited from the ones of the call to the wrapper script,
+           the notable exception is that the [SENDER] of the view is
+           the [SELF] of the wrapper script. *)
+        let*? sender_hash =
+          match sender_opt with
+          | None -> Result_syntax.return contract_hash
+          | Some (Contract.Originated sender_hash) ->
+              Result_syntax.return sender_hash
+          | Some (Contract.Implicit _ as sender) ->
+              Error_monad.error
+                (View_helpers.View_sender_must_be_originated sender)
+        in
         let ctxt, step_constants =
           compute_step_constants
             ctxt
@@ -1934,7 +1949,7 @@ module Scripts = struct
             ~chain_id
             ~sender_opt
             ~payer_opt
-            ~self:contract_hash
+            ~self:sender_hash
             ~now_opt
             ~level_opt
         in

@@ -46,6 +46,9 @@ type Environment.Error_monad.error += View_not_found of Contract_hash.t * string
 
 type Environment.Error_monad.error += Viewer_unexpected_storage
 
+type Environment.Error_monad.error +=
+  | View_sender_must_be_originated of Contract.t
+
 let () =
   Environment.Error_monad.register_error_kind
     `Permanent
@@ -156,7 +159,23 @@ let () =
       Format.fprintf ppf "The simulated view returned an unexpected value.")
     Data_encoding.unit
     (function Viewer_unexpected_storage -> Some () | _ -> None)
-    (fun () -> Viewer_unexpected_storage)
+    (fun () -> Viewer_unexpected_storage) ;
+  Environment.Error_monad.register_error_kind
+    `Permanent
+    ~id:"viewSenderMustBeOriginated"
+    ~title:"The sender of a view must be an originated contract"
+    ~description:
+      "The sender of a Michelson view must be an originated contract."
+    ~pp:(fun ppf sender ->
+      Format.fprintf
+        ppf
+        "The sender of a Michelson view must be an originated contract, but %a \
+         is an implicit account."
+        Contract.pp
+        sender)
+    Data_encoding.(obj1 (req "sender" Contract.encoding))
+    (function View_sender_must_be_originated c -> Some c | _ -> None)
+    (fun c -> View_sender_must_be_originated c)
 
 (* This script is actually never run, its usage is to ensure a
    contract that has the type `contract <ty>` is originated, which
