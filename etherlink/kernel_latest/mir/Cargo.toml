@@ -7,10 +7,10 @@ edition = "2021"
 lalrpop = "0.22.0"
 
 [dependencies]
-lalrpop-util = "0.22.0"
+lalrpop-util = { version = "0.22.0", optional = true }
 checked = "0.5"
 thiserror = "1.0"
-logos = "0.14.2"
+logos = { version = "0.14.2", optional = true }
 hex = "0.4"
 tezos_data_encoding = { path = "../../../sdk/rust/encoding" }
 tezos_crypto_rs = { path = "../../../sdk/rust/crypto", default-features = false}
@@ -42,7 +42,8 @@ nom = { version = "7.1", default-features = false }
 regex = "1.11.3"
 
 [features]
-default = ["bls", "allow_lazy_storage_transfer", "tickets"]
+default = ["bls", "allow_lazy_storage_transfer", "tickets", "text-parser"]
+text-parser = ["dep:lalrpop-util", "dep:logos"]
 bls = ["dep:blst", "tezos_crypto_rs/bls"]
 allow_lazy_storage_transfer = []
 # Ticket support (the `ticket` type and the TICKET/READ_TICKET/SPLIT_TICKET/
@@ -63,10 +64,24 @@ regex = "1.11.2"
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 
+[[example]]
+name = "call_entrypoints"
+required-features = ["text-parser"]
+
+[[example]]
+name = "lazy_parse"
+required-features = ["text-parser"]
+
+[[example]]
+name = "thread_local_storage"
+required-features = ["text-parser"]
+
 [[bin]]
 name = "tzt_runner"
 path = "tzt_runner/main.rs"
+required-features = ["text-parser"]
 
 [[bin]]
 name = "typecheck_script"
 path = "typecheck_script/main.rs"
+required-features = ["text-parser"]

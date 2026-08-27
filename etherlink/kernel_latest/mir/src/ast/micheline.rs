@@ -348,6 +348,7 @@ impl<'a> Micheline<'a> {
     /// Same as [seq_arr] but does not consume any gas. Use this only in
     /// places which cannot be called from the kernel such as the text
     /// parser, macro expansion, and tests
+    #[cfg(feature = "text-parser")]
     pub(crate) fn seq_arr_uncarbonated<const N: usize>(
         arena: &'a Arena<Micheline<'a>>,
         args: [Micheline<'a>; N],

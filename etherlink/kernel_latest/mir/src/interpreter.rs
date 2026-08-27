@@ -4244,6 +4244,7 @@ mod interpreter_tests {
 
     /// Nested control flow inside an `EXEC`'d lambda executes correctly
     /// with the body borrowed from the keep-alive arena (L2-1790).
+    #[cfg(feature = "text-parser")]
     #[test]
     fn exec_lambda_with_nested_control_flow() {
         use crate::parser::test_helpers::parse;
@@ -9235,6 +9236,7 @@ mod interpreter_tests {
     /// mismatch. Before the fix MIR discarded the caller argument type and
     /// never compared the requested return type, so it executed the target
     /// view anyway and returned `Some(value)` where L1 returns `None`.
+    #[cfg(feature = "text-parser")]
     #[test]
     fn view_replays_l1_caller_callee_type_checks() {
         use crate::ast::View;
@@ -9456,6 +9458,7 @@ mod interpreter_tests {
         );
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn emit() {
         use crate::ast::annotations::FieldAnnotation;
@@ -10592,6 +10595,7 @@ mod interpreter_tests {
         assert_eq!(stack, stk![V::new_option(Some(V::int(12345)))]);
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn unpack_oversized_annotation() {
         // Regression for L2-1376: UNPACK of a packed lambda
@@ -10645,6 +10649,7 @@ mod interpreter_tests {
         assert_eq!(stack, stk![V::new_option(None)]);
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn create_contract() {
         use crate::parser::test_helpers::parse;
@@ -10706,6 +10711,7 @@ mod interpreter_tests {
     /// the kernel's `wasm32` heap, aborting it (L2-1831).
     ///
     /// Asserted on pointer identity — a deep copy still compares equal.
+    #[cfg(feature = "text-parser")]
     #[test]
     fn duplicated_outgoing_operations_share_their_parameter() {
         use crate::parser::test_helpers::{parse, parse_contract_script};
@@ -10750,6 +10756,7 @@ mod interpreter_tests {
         );
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn create_contract_in_parameter_validates_child_views() {
         // L2-1635: a CREATE_CONTRACT reached at runtime through a parameter
@@ -10803,6 +10810,7 @@ mod interpreter_tests {
             .is_ok());
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn three_layered_balanced_entrypoints() {
         use crate::parser::test_helpers::parse;
@@ -10914,6 +10922,7 @@ mod interpreter_tests {
         }
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn seven_layered_left_pivoted_entrypoint() {
         use crate::parser::test_helpers::parse;
@@ -11063,6 +11072,7 @@ mod interpreter_tests {
         }
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn seven_layered_right_pivoted_entrypoint() {
         use crate::parser::test_helpers::parse;
@@ -11212,6 +11222,7 @@ mod interpreter_tests {
         }
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn explicit_default_entrypoint() {
         use crate::parser::test_helpers::parse;

@@ -8,12 +8,16 @@
 
 use std::borrow::Cow;
 
+#[cfg(feature = "text-parser")]
 use logos::Logos;
 pub mod errors;
+#[cfg(feature = "text-parser")]
 pub mod macros;
 
 pub use errors::*;
+#[cfg(feature = "text-parser")]
 use macros::*;
+#[cfg(feature = "text-parser")]
 use num_bigint::BigInt;
 use strum_macros::EnumCount;
 
@@ -163,6 +167,7 @@ defprim! {
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.
+#[cfg(feature = "text-parser")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Noun {
     /// Micheline primitive.
@@ -187,6 +192,7 @@ pub(crate) fn ann_from_str(value: &str) -> Result<Annotation<'_>, LexerError> {
 }
 
 /// Tokens representing Michelson lexemes.
+#[cfg(feature = "text-parser")]
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(error = LexerError, skip r"[ \t\r\n\v\f]+|#[^\n]*\n")]
 pub enum Tok<'a> {
@@ -229,6 +235,7 @@ pub enum Tok<'a> {
     Semi,
 }
 
+#[cfg(feature = "text-parser")]
 impl std::fmt::Display for Noun {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
@@ -239,6 +246,7 @@ impl std::fmt::Display for Noun {
     }
 }
 
+#[cfg(feature = "text-parser")]
 impl std::fmt::Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
@@ -256,8 +264,10 @@ impl std::fmt::Display for Tok<'_> {
     }
 }
 
+#[cfg(feature = "text-parser")]
 type Lexer<'a> = logos::Lexer<'a, Tok<'a>>;
 
+#[cfg(feature = "text-parser")]
 fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
     let slice = lex.slice();
     let mut inner = Macro::lexer(slice);
@@ -269,6 +279,7 @@ fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
     next.map_err(|_| PrimError(slice.to_string()))
 }
 
+#[cfg(feature = "text-parser")]
 fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
     lex.slice()
         .parse()
@@ -278,6 +289,7 @@ fn lex_noun(lex: &mut Lexer) -> Result<Noun, LexerError> {
         .map_err(LexerError::PrimError)
 }
 
+#[cfg(feature = "text-parser")]
 fn lex_number(lex: &mut Lexer) -> Result<BigInt, LexerError> {
     lex.slice()
         .parse()
@@ -287,6 +299,7 @@ fn lex_number(lex: &mut Lexer) -> Result<BigInt, LexerError> {
 /// Takes a string _with_ the sourrounding quotes, strips the quotes, checks the
 /// string is valid (i.e. contains only printable ASCII characters) and replaces
 /// escapes with corresponding characters.
+#[cfg(feature = "text-parser")]
 fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
     let s = lex.slice();
     // strip the quotes
@@ -328,10 +341,12 @@ fn lex_string(lex: &mut Lexer) -> Result<String, LexerError> {
 
 /// Takes a lexed slice of hexadecimal digits prefixed by `0x`, removes the
 /// prefix and converts the digits pairwise to `u8`.
+#[cfg(feature = "text-parser")]
 fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
     Ok(hex::decode(&lex.slice()[2..])?)
 }
 
+#[cfg(feature = "text-parser")]
 fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Result<Annotation<'a>, LexerError> {
     let lex_slice = lex.slice();
     // L1's text parser rejects annotation tokens longer than 255 bytes
@@ -347,7 +362,7 @@ fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Result<Annotation<'a>, LexerError>
     ann_from_str(lex_slice)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 mod tests {
     use super::*;
 

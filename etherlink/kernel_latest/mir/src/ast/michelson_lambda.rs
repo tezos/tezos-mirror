@@ -229,13 +229,13 @@ mod tests {
 
     use typed_arena::Arena;
 
+    use crate::ast::TypedValue;
+
+    #[cfg(feature = "text-parser")]
     use crate::{
-        ast::{
-            micheline::{
-                test_helpers::{app, seq},
-                IntoMicheline,
-            },
-            TypedValue,
+        ast::micheline::{
+            test_helpers::{app, seq},
+            IntoMicheline,
         },
         context::Ctx,
         gas::Gas,
@@ -364,6 +364,7 @@ mod tests {
             .expect("worker thread completes");
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn apply_micheline() {
         let parser = Parser::new();
@@ -402,6 +403,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn apply_micheline_rec() {
         let parser = Parser::new();
@@ -447,6 +449,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "text-parser")]
     #[test]
     fn apply_micheline_rec_pair_linearization() {
         // PACK always encodes pair values as right-combs, and always encodes

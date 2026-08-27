@@ -45,6 +45,7 @@ tezosx-journal.workspace = true
 pretty_assertions = "1.4.0"
 http.workspace = true
 tezosx-interfaces = { workspace = true, features = ["testing"] }
+mir = { workspace = true, features = ["text-parser"] }
 # Fork carrying `drain_owned`, which the iterative `Drop` needs to release a
 # container without walking elements it does not own.
 #

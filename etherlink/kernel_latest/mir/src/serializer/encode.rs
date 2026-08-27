@@ -523,6 +523,7 @@ mod test_encoding {
         }
     }
 
+    #[cfg(feature = "text-parser")]
     mod annotations {
         use crate::parser::test_helpers::*;
 

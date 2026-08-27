@@ -4,17 +4,24 @@
 
 //! Michelson parser.
 
+#[cfg(feature = "text-parser")]
 pub mod macros;
 
 use crate::ast::*;
+#[cfg(feature = "text-parser")]
 use crate::lexer::{LexerError, Tok};
+#[cfg(feature = "text-parser")]
 use crate::syntax;
+#[cfg(feature = "text-parser")]
 use lalrpop_util::ParseError;
+#[cfg(feature = "text-parser")]
 use logos::Logos;
+#[cfg(feature = "text-parser")]
 use macros::MacroError;
 use typed_arena::Arena;
 
 /// Errors that can happen during parsing, aside from parser-specific ones.
+#[cfg(feature = "text-parser")]
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ParserError {
     /// An error happened at the lexer stage.
@@ -45,7 +52,10 @@ impl<'a> Parser<'a> {
             arena: Arena::new(),
         }
     }
+}
 
+#[cfg(feature = "text-parser")]
+impl<'a> Parser<'a> {
     /// Parse Michelson code or value into [Micheline].
     pub fn parse(
         &'a self,
@@ -67,6 +77,7 @@ impl<'a> Parser<'a> {
 
 /// Given a Michelson string, create an iterator over lexemes in that string,
 /// with location information attached.
+#[cfg(feature = "text-parser")]
 pub(crate) fn spanned_lexer(
     src: &str,
 ) -> impl Iterator<Item = Result<(usize, Tok<'_>, usize), ParserError>> + '_ {
@@ -78,7 +89,7 @@ pub(crate) fn spanned_lexer(
         })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 #[allow(missing_docs)]
 pub mod test_helpers {
     use super::*;
@@ -98,7 +109,7 @@ pub mod test_helpers {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 mod tests {
     use super::test_helpers::*;
     use crate::ast::micheline::test_helpers::{app, seq};

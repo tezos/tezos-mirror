@@ -91,6 +91,7 @@ typed-arena.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-panic-hook.workspace = true
 proptest.workspace = true
+mir = { workspace = true, features = ["text-parser"] }
 tezosx-interfaces = { workspace = true, features = ["testing"] }
 tezosx-ethereum-runtime = { workspace = true, features = ["testing"] }
 tezosx-tezos-runtime = { workspace = true, features = ["testing"] }
