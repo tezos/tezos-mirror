@@ -7703,6 +7703,218 @@ let test_run_script_view_unsupported_fields () =
        ~extra_big_maps:{|{Big_map 0 nat nat {}}|}
        client)
 
+(* Regression test for BB-35: a delayed cross-runtime abort must not
+   promote unbacked Michelson credit.
+
+   One delayed (force-included, TransactionOrigin::UserInput) EVM tx makes two
+   cross-runtime calls through the gateway precompile, inside a single harness
+   contract:
+
+     1. callMichelson{value} -> credits an implicit Tezos account. The credit is
+        written to durable storage during the CRAC.
+     2. callMichelson{gas: low} -> a contract whose `originOf` view is starved of
+        gas. read_origin returns OutOfGas; classify_origin_for_view maps every
+        registry error to AliasResolution -> CracError::BlockAbort -> HTTP 500,
+        a *fatal* cross-runtime abort (not a 4xx revert).
+
+   run_transaction builds a recovery checkpoint only for CrossRuntime credits,
+   never for UserInput, so the abort tears down the EVM frame but leaves the
+   step-1 Michelson credit committed. block.rs then demotes the delayed-tx error
+   to `Invalid` and skips it -- yet the block, carrying the credit, is promoted.
+
+        delayed EVM tx (UserInput)
+          |
+          +-- CRAC #1  callMichelson{value}  --> credit tz1  (SafeStorage write)
+          |
+          +-- CRAC #2  callMichelson{gas:lo} --> originOf OOG --> 500 BlockAbort
+                                                     |
+                            run_transaction Err (no UserInput checkpoint to undo #1)
+                                                     |
+                            block.rs: delayed error -> Invalid, tx dropped
+                                                     |
+                            block promoted with the step-1 credit still present
+
+   Bug present  => EVM tx has no receipt, sender/harness balances unchanged, but
+                   the credited tz1 gains the full amount: unbacked XTZ.
+   Bug fixed    => the step-1 credit is rolled back with the aborted tx.
+
+   The abort-call gas (30_000) is tuned to land read_origin's budget below
+   ALIAS_LOOKUP_MILLIGAS; adjust if gas accounting shifts. *)
+
+(* Harness init code: creditThenAbort(string,string,uint256) -- two GATEWAY
+   (0xff..07) callMichelson calls, the 1st value-bearing, the 2nd gas-limited. *)
+let credit_then_abort_init_code =
+  "6080604052348015600e575f80fd5b506103d98061001c5f395ff3fe60806040526004361061001d575f3560e01c806398f4e29f14610021575b5f80fd5b61003461002f3660046102a8565b610036565b005b5f600760ff60981b016001600160a01b0316348560405160240161005a9190610315565b60408051601f198184030181529181526020820180516001600160e01b031663a1544fc360e01b1790525161008f919061038d565b5f6040518083038185875af1925050503d805f81146100c9576040519150601f19603f3d011682016040523d82523d5f602084013e6100ce565b606091505b50509050806101195760405162461bcd60e51b815260206004820152601260248201527118dc99591a5d0818d85b1b0819985a5b195960721b60448201526064015b60405180910390fd5b5f600760ff60981b016001600160a01b0316838560405160240161013d9190610315565b60408051601f198184030181529181526020820180516001600160e01b031663a1544fc360e01b17905251610172919061038d565b5f604051808303815f8787f1925050503d805f81146101ac576040519150601f19603f3d011682016040523d82523d5f602084013e6101b1565b606091505b50509050806102025760405162461bcd60e51b815260206004820181905260248201527f61626f72742063616c6c20756e65787065637465646c792072657475726e65646044820152606401610110565b5050505050565b634e487b7160e01b5f52604160045260245ffd5b5f82601f83011261022c575f80fd5b813567ffffffffffffffff81111561024657610246610209565b604051601f8201601f19908116603f0116810167ffffffffffffffff8111828210171561027557610275610209565b60405281815283820160200185101561028c575f80fd5b816020850160208301375f918101602001919091529392505050565b5f805f606084860312156102ba575f80fd5b833567ffffffffffffffff8111156102d0575f80fd5b6102dc8682870161021d565b935050602084013567ffffffffffffffff8111156102f8575f80fd5b6103048682870161021d565b925050604084013590509250925092565b606081525f82518060608401528060208501608085015e5f60808285010152601f19601f820116830190506080838203018060208501526007608083015266191959985d5b1d60ca1b60a083015260408101604085015250600260c082015261030b60f01b60e0820152610100810191505092915050565b5f82518060208501845e5f92019182525091905056fea26469706673582212208e35e334c9312da6a3452e2eb4eab407d1871d76ddf62c98d60e85aaf97f150c64736f6c634300081a0033"
+
+(* originOf-view contract with a `unit` parameter (matches the harness's `030b`
+   Unit payload). Its body views `originOf` on the enshrined gateway; with a
+   starved gas budget read_origin returns OutOfGas and the CRAC aborts. *)
+let origin_of_abort_script =
+  {|parameter unit ; storage unit ; code { UNPAIR ; DROP ; PUSH (pair string nat) (Pair "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT" 0) ; PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ; SWAP ; VIEW "originOf" (or unit (or nat (pair nat string))) ; IF_NONE { PUSH string "originOf view dispatch failed" ; FAILWITH } {} ; DROP ; NIL operation ; PAIR }|}
+
+let test_delayed_crac_abort_promotes_unbacked_credit =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Delayed cross-runtime abort must not promote unbacked Michelson credit"
+    ~tags:["cross_runtime"; "delayed_inbox"; "crac"; "abort"; "collateral"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* tez_client = tezlink_client sequencer in
+  (* A fresh, non-delegate destination: unlike a bootstrap/baker account, its
+     tezlink balance does not drift with L1 baking, so the credit delta is an
+     unambiguous signal. Fund it 1 XTZ so its balance is well-defined whether or
+     not the credit lands. *)
+  let* credit_dest = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:credit_dest.public_key_hash
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Deploy the credit-then-abort harness (ordinary EVM tx, not delayed). *)
+  let* harness =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~init_code:credit_then_abort_init_code
+      ()
+  in
+  (* Originate the gas-starvable originOf-view contract that the 2nd CRAC hits. *)
+  let* abort_kt1 =
+    Client.originate_contract
+      ~alias:"origin_of_abort"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:origin_of_abort_script
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Snapshot the balances the bug would corrupt. *)
+  let*@ sender_balance_before =
+    Rpc.get_balance ~address:sender.address sequencer
+  in
+  let*@ harness_balance_before = Rpc.get_balance ~address:harness sequencer in
+  let* credit_balance_before =
+    Client.get_balance_for ~account:credit_dest.public_key_hash tez_client
+  in
+  (* Craft the delayed EVM tx: creditThenAbort(credit_dest, abort_kt1, gas). The
+     harness forwards `value` to the credit call and `abort_gas` to the abort
+     call. *)
+  let mint = Tez.of_int 10 in
+  let mint_wei = Wei.of_eth_int 10 in
+  let abort_gas = 30_000 in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:mint_wei
+      ~address:harness
+      ~signature:"creditThenAbort(string,string,uint256)"
+      ~arguments:
+        [credit_dest.public_key_hash; abort_kt1; string_of_int abort_gas]
+      ()
+  in
+  let delayed_hash =
+    `Hex raw_tx |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let tx_hash = "0x" ^ delayed_hash in
+  (* Force-include it through the L1 delayed-transaction bridge: this makes it a
+     TransactionOrigin::UserInput delayed tx -- the case with no recovery
+     checkpoint. The tezosx delayed inbox tags each message by source runtime
+     (RuntimeId::Ethereum = 0x01, RuntimeId::Tezos = 0x00). Prefix the raw EVM
+     tx with 0x01 so the kernel routes it to the EVM runtime; the delayed-inbox
+     key remains the bare EVM tx hash [delayed_hash]. *)
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x01%s" sc_rollup_address raw_tx)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  (* Bake an L1 block and advance the rollup node so the bridge message reaches
+     the delayed inbox. *)
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  (* Confirm admission: the delayed inbox holds the tagged tx (its internal key
+     is not the bare EVM tx hash, so gate on size rather than the exact hash). *)
+  let* admitted = Delayed_inbox.size (Sc_rollup_node sc_rollup_node) in
+  Check.(
+    (admitted >= 1)
+      int
+      ~error_msg:
+        "Delayed EVM tx was not admitted to the delayed inbox (size %L)") ;
+  (* Drive blocks until the sequencer force-includes the delayed tx (it leaves
+     the delayed inbox). *)
+  let rec drive n =
+    if n = 0 then Test.fail "Delayed tx was never force-included"
+    else
+      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+      let*@ _ = Rpc.produce_block sequencer in
+      let* size = Delayed_inbox.size (Sc_rollup_node sc_rollup_node) in
+      if size <= 0 then unit else drive (n - 1)
+  in
+  let* () = drive 30 in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* The aborted delayed tx is demoted to Invalid: no receipt, and neither EVM
+     balance moved. *)
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let*@ sender_balance_after =
+    Rpc.get_balance ~address:sender.address sequencer
+  in
+  let*@ harness_balance_after = Rpc.get_balance ~address:harness sequencer in
+  (match receipt with
+  | None -> ()
+  | Some _ ->
+      Test.fail
+        "The aborted delayed tx must be dropped (Invalid), but it produced a \
+         receipt for %s"
+        tx_hash) ;
+  Check.(
+    (sender_balance_after < sender_balance_before)
+      Wei.typ
+      ~error_msg:
+        "The sender should have paid gas for its txn, but after >= before \
+         (after %L vs before %R") ;
+  Check.(
+    (harness_balance_after = harness_balance_before)
+      Wei.typ
+      ~error_msg:"The dropped EVM tx must not leave value in the harness") ;
+  (* The invariant the bug breaks: with no equivalent committed EVM debit, the
+     Michelson account must NOT have been credited. If it gained [mint], the
+     block promoted unbacked XTZ. *)
+  let* credit_balance_after =
+    Client.get_balance_for ~account:credit_dest.public_key_hash tez_client
+  in
+  Check.(
+    (Tez.to_mutez credit_balance_after = Tez.to_mutez credit_balance_before)
+      int
+      ~error_msg:
+        (sf
+           "Unbacked-credit invariant violated: the credited account gained \
+            unbacked XTZ (after %%L mutez vs before %%R mutez, minted %d \
+            mutez). The step-1 Michelson credit survived the aborted, dropped \
+            delayed EVM tx."
+           (Tez.to_mutez mint))) ;
+  unit
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -7710,6 +7922,7 @@ let () =
   test_native_branch_foreign_rejected () ;
   test_bootstrap_kernel_config () ;
   test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
+  test_delayed_crac_abort_promotes_unbacked_credit [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
   test_reveal_in_funding_block () ;
