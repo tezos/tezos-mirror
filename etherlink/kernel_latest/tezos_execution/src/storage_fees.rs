@@ -393,7 +393,7 @@ impl OperationStorageFees for TransferContent {
     where
         F: FnMut(&Zarith) -> Result<StorageFee, E>,
     {
-        let TransferTarget::ToContrat(success) = success;
+        let TransferTarget::ToContract(success) = success;
         let content = build_storage_fee(&success.paid_storage_size_diff)?;
         let slot = if success.allocated_destination_contract {
             Some(build_storage_fee(&ORIGINATION_SIZE.into())?)
@@ -411,7 +411,7 @@ impl OperationStorageFees for TransferContent {
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
     {
-        let TransferTarget::ToContrat(success) = success;
+        let TransferTarget::ToContract(success) = success;
         let mut updates = fee_to_updates(storage_fees.content)?;
         updates.extend(success.balance_updates.iter().cloned());
         if let Some(slot) = storage_fees.slot {
@@ -425,7 +425,7 @@ impl OperationStorageFees for TransferContent {
         success: &mut TransferTarget,
         pair: Vec<BalanceUpdate>,
     ) {
-        let TransferTarget::ToContrat(success) = success;
+        let TransferTarget::ToContract(success) = success;
         success.balance_updates.extend(pair);
     }
 }
@@ -690,7 +690,7 @@ mod tests {
     }
 
     fn applied_transfer(success: TransferSuccess) -> ContentResult<TransferContent> {
-        ContentResult::Applied(TransferTarget::ToContrat(success))
+        ContentResult::Applied(TransferTarget::ToContract(success))
     }
 
     /// A successful Reveal allocates no storage and leaves the payer
@@ -728,7 +728,7 @@ mod tests {
             (100_000 - burn).into(),
             "payer must drop by the burn amount"
         );
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -758,7 +758,7 @@ mod tests {
         let mut content = applied_transfer(TransferSuccess::default());
         burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
         assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
         assert!(success.balance_updates.is_empty());
@@ -816,7 +816,7 @@ mod tests {
                 destination: payer.contract(),
                 parameters: Parameters::default(),
             },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 paid_storage_size_diff: 4_u64.into(),
                 ..Default::default()
             })),
@@ -830,7 +830,7 @@ mod tests {
         let InternalOperationSum::Transfer(inner) = &op else {
             panic!("expected internal Transfer");
         };
-        let ContentResult::Applied(TransferTarget::ToContrat(s)) = &inner.result else {
+        let ContentResult::Applied(TransferTarget::ToContract(s)) = &inner.result else {
             panic!("expected Applied internal target");
         };
 
@@ -1053,7 +1053,7 @@ mod tests {
             payer.balance(&host).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -1092,7 +1092,7 @@ mod tests {
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -1153,7 +1153,7 @@ mod tests {
             }),
         );
 
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &content else {
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
 
@@ -1181,7 +1181,7 @@ mod tests {
                 destination: payer.contract(),
                 parameters: Parameters::default(),
             },
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContract(TransferSuccess {
                 allocated_destination_contract: true,
                 ..Default::default()
             })),
@@ -1196,7 +1196,7 @@ mod tests {
         let InternalOperationSum::Transfer(inner) = &op else {
             panic!("expected internal Transfer");
         };
-        let ContentResult::Applied(TransferTarget::ToContrat(success)) = &inner.result
+        let ContentResult::Applied(TransferTarget::ToContract(success)) = &inner.result
         else {
             panic!("expected Applied internal target");
         };
