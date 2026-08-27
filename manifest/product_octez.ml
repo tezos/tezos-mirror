@@ -1828,6 +1828,15 @@ let _octez_micheline_tests =
     ~modules:["test_diff"]
     ~deps:[octez_micheline |> open_]
 
+let _octez_micheline_tests =
+  private_lib
+    "test_encoding_depth"
+    ~path:"src/lib_micheline/test"
+    ~opam:"octez-libs"
+    ~inline_tests:ppx_expect
+    ~modules:["test_encoding_depth"]
+    ~deps:[octez_micheline |> open_; data_encoding |> open_]
+
 let octez_version_parser =
   octez_lib
     "version.parser"

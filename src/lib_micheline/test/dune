@@ -26,3 +26,18 @@
   (:standard)
   -open Tezos_micheline)
  (modules test_diff))
+
+(library
+ (name test_encoding_depth)
+ (package octez-libs)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.micheline
+  octez-libs.data-encoding)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
+ (flags
+  (:standard)
+  -open Tezos_micheline
+  -open Data_encoding)
+ (modules test_encoding_depth))
