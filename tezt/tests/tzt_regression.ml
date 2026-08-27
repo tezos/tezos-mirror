@@ -42,9 +42,11 @@ let test_tzt protocols =
     ~__FILE__
     ~title:(sf "Run TZT")
     ~tags:["client"; "michelson"; "tzt"]
+    ~uses:(fun _protocol -> [Constant.tzt_reference_test_suite])
     ~uses_node:false
     ~supports:(Protocol.From_protocol 019)
     (fun protocol ->
+      let _ = Uses.path Constant.tzt_reference_test_suite in
       let tests =
         List.map
           Michelson_script.path

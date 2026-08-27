@@ -61,3 +61,4 @@ alpha_json: tezt/tests/weeklynet_configs/alpha.json
 last_snapshotted_protocol_json: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm
+tzt_reference_test_suite: tzt_reference_test_suite
