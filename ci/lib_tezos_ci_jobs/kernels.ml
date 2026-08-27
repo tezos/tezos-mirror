@@ -22,10 +22,10 @@ end
 module CI = Cacio.Shared
 
 (* Common configuration for kernel jobs. *)
-let job_kernel ?(variables = []) ?(sccache = Cacio.sccache ()) =
+let job_kernel ?(variables = []) ?sccache_policy =
   CI.job
     ~cargo_cache:true
-    ~sccache
+    ~sccache:(Cacio.sccache ?policy:sccache_policy ())
     ~variables:
       (("CC", "clang")
       :: ("NATIVE_TARGET", "x86_64-unknown-linux-musl")
@@ -114,7 +114,7 @@ let job_build_kernels =
            "riscv-echo";
            "riscv-echo.checksum";
          ])
-    ~sccache:(Cacio.sccache ~policy:Pull_push ())
+    ~sccache_policy:Pull_push
     ~variables:[("EVM_KERNEL_SKIP_BYTECODE", "yes")]
     ~script:["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
