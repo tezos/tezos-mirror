@@ -7,7 +7,7 @@
 //! Each runtime re-uses these low-level extractors when building its own
 //! typed `parse_request_headers` function.
 
-use crate::{TezosXRuntimeError, MAX_CRAC_DEPTH};
+use crate::{Gas, TezosXRuntimeError, MAX_CRAC_DEPTH};
 use primitive_types::U256;
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -47,6 +47,19 @@ pub fn require_u64(
     s.parse::<u64>().map_err(|_| {
         TezosXRuntimeError::HeaderError(format!(
             "Invalid {name} header value: expected u64, got {s:?}"
+        ))
+    })
+}
+
+/// Extract a required `Gas` header.
+pub fn require_gas(
+    headers: &http::HeaderMap,
+    name: &str,
+) -> Result<Gas, TezosXRuntimeError> {
+    let s = require_str(headers, name)?;
+    s.parse::<Gas>().map_err(|_| {
+        TezosXRuntimeError::HeaderError(format!(
+            "Invalid {name} header value: expected Gas, got {s:?}"
         ))
     })
 }

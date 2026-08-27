@@ -39,7 +39,7 @@ impl Registry for RegistryImpl {
         native_public_key: Option<&[u8]>,
         target_runtime: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
-        gas_remaining: u64,
+        gas_remaining: tezosx_interfaces::Gas,
     ) -> Result<
         (String, tezosx_interfaces::AliasResolution),
         tezosx_interfaces::TezosXRuntimeError,
@@ -104,9 +104,9 @@ impl Registry for RegistryImpl {
         rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: tezosx_interfaces::RuntimeId,
         addr: &str,
-        budget: u64,
+        budget: tezosx_interfaces::Gas,
     ) -> Result<
-        (tezosx_interfaces::Classification, u64),
+        (tezosx_interfaces::Classification, tezosx_interfaces::Gas),
         tezosx_interfaces::TezosXRuntimeError,
     >
     where
@@ -163,9 +163,7 @@ mod tests {
         AccountInfo, AccountOrigin, StorageAccount,
     };
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-    use tezosx_interfaces::{
-        Classification, RuntimeId, ALIAS_LOOKUP_COST, ALIAS_LOOKUP_MILLIGAS,
-    };
+    use tezosx_interfaces::{Classification, Gas, RuntimeId, ALIAS_LOOKUP_COST};
     use tezosx_journal::TezosXJournal;
 
     #[test]
@@ -224,7 +222,7 @@ mod tests {
             )
             .unwrap();
 
-        let budget = 100_000;
+        let budget = Gas::new(100_000, RuntimeId::Ethereum);
         let (class, consumed) = registry
             .read_origin(&rk, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
@@ -238,7 +236,7 @@ mod tests {
         let registry = RegistryImpl::default();
 
         // An implicit tz1 is Native by construction — no seeding needed.
-        let budget = 1_000_000;
+        let budget = Gas::new(1_000_000, RuntimeId::Tezos);
         let (class, consumed) = registry
             .read_origin(
                 &rk,
@@ -248,7 +246,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS); // Tezos: charges milligas
+        // Tezos charges the same lookup, expressed in milligas.
+        assert_eq!(consumed, ALIAS_LOOKUP_COST);
     }
 
     #[test]
@@ -275,7 +274,7 @@ mod tests {
             )
             .unwrap();
 
-        let budget = 100_000;
+        let budget = Gas::new(100_000, RuntimeId::Ethereum);
         let (class, consumed) = registry
             .read_origin(&rk, RuntimeId::Ethereum, &addr_str, budget)
             .unwrap();
@@ -288,7 +287,7 @@ mod tests {
         let rk = RuntimeKeyspaces::default();
         let registry = RegistryImpl::default();
 
-        let budget = 1_000_000;
+        let budget = Gas::new(1_000_000, RuntimeId::Tezos);
         // An implicit tz1 with no durable state: it is Tezos-native by
         // construction (a public-key hash can never be a cross-runtime
         // alias), so it classifies Native without a durable read. Unlike the
@@ -303,6 +302,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(class, Classification::Native);
-        assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
+        assert_eq!(consumed, ALIAS_LOOKUP_COST);
     }
 }

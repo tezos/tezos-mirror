@@ -16,7 +16,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
 
 use crate::{
-    AliasInfo, Classification, CrossRuntimeContext, Registry, RuntimeId,
+    AliasInfo, Classification, CrossRuntimeContext, Gas, Registry, RuntimeId,
     TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
 
@@ -35,7 +35,7 @@ impl Registry for UnimplementedRegistry {
         _native_public_key: Option<&[u8]>,
         _target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
-        _gas_remaining: u64,
+        _gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
@@ -63,8 +63,8 @@ impl Registry for UnimplementedRegistry {
         _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
-        _gas: u64,
-    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+        _gas: Gas,
+    ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
@@ -102,7 +102,7 @@ impl Registry for NotWiredRegistry {
         _native_public_key: Option<&[u8]>,
         target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
-        _gas_remaining: u64,
+        _gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
@@ -127,8 +127,8 @@ impl Registry for NotWiredRegistry {
         _rk: &RuntimeKeyspaces<Host, KS>,
         addr_runtime: RuntimeId,
         _addr: &str,
-        _gas: u64,
-    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+        _gas: Gas,
+    ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
@@ -228,7 +228,7 @@ impl Registry for MockRegistry {
         _native_public_key: Option<&[u8]>,
         target_runtime: RuntimeId,
         _context: CrossRuntimeContext,
-        gas_remaining: u64,
+        gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: StorageV1,
@@ -267,13 +267,13 @@ impl Registry for MockRegistry {
         _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
-        _budget: u64,
-    ) -> Result<(crate::Classification, u64), TezosXRuntimeError>
+        _budget: Gas,
+    ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
     {
-        Ok((crate::Classification::Unknown, 0))
+        Ok((crate::Classification::Unknown, Gas::ZERO))
     }
 
     fn serve<Host, KS>(
@@ -371,7 +371,7 @@ impl Registry for StubRegistry {
         native_public_key: Option<&[u8]>,
         target_runtime: RuntimeId,
         context: CrossRuntimeContext,
-        gas_remaining: u64,
+        gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
         Host: KeyspaceHost<KS>,
@@ -429,8 +429,8 @@ impl Registry for StubRegistry {
         _rk: &RuntimeKeyspaces<Host, KS>,
         _addr_runtime: RuntimeId,
         _addr: &str,
-        _budget: u64,
-    ) -> Result<(Classification, u64), TezosXRuntimeError>
+        _budget: Gas,
+    ) -> Result<(Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
@@ -444,7 +444,7 @@ impl Registry for StubRegistry {
                 .clone()
                 .unwrap_or_else(|| self.classification.clone())
         };
-        Ok((classification, 0))
+        Ok((classification, Gas::ZERO))
     }
 
     fn serve<Host, KS>(

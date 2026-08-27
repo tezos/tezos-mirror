@@ -30,8 +30,9 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
-    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
-    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_COST, X_TEZOS_GAS_CONSUMED,
+    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Gas, Origin,
+    Registry, RuntimeId, RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_COST,
+    X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -198,7 +199,7 @@ fn build_response(
         Ok(outcome) => {
             // X-Tezos-Gas-Consumed is in the called runtime's units (EVM here).
             // The caller is responsible for converting to its own units.
-            let gas = outcome.result.gas_used().to_string();
+            let gas = outcome.result.gas_used();
             match outcome.result {
                 ExecutionResult::Success { output, .. } => {
                     let body = match output {
@@ -258,32 +259,31 @@ fn build_response(
             }
         }
         Err(TezosXRuntimeError::BadRequest(msg)) => {
-            (StatusCode::BAD_REQUEST, msg.into_bytes(), "0".to_string())
+            (StatusCode::BAD_REQUEST, msg.into_bytes(), 0)
         }
         Err(TezosXRuntimeError::NotFound(msg)) => {
-            (StatusCode::NOT_FOUND, msg.into_bytes(), "0".to_string())
+            (StatusCode::NOT_FOUND, msg.into_bytes(), 0)
         }
-        Err(TezosXRuntimeError::MethodNotAllowed(msg)) => (
-            StatusCode::METHOD_NOT_ALLOWED,
-            msg.into_bytes(),
-            "0".to_string(),
-        ),
-        Err(TezosXRuntimeError::OutOfGas) => (
-            StatusCode::TOO_MANY_REQUESTS,
-            b"OOG".to_vec(),
-            "0".to_string(),
-        ),
+        Err(TezosXRuntimeError::MethodNotAllowed(msg)) => {
+            (StatusCode::METHOD_NOT_ALLOWED, msg.into_bytes(), 0)
+        }
+        Err(TezosXRuntimeError::OutOfGas) => {
+            (StatusCode::TOO_MANY_REQUESTS, b"OOG".to_vec(), 0)
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("{e:?}").into_bytes(),
-            "0".to_string(),
+            0,
         ),
     };
     // Safe to unwrap: status is a predefined constant, header name is a
     // static ASCII string, and the value is a decimal u64.
     http::Response::builder()
         .status(status)
-        .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
+        .header(
+            X_TEZOS_GAS_CONSUMED,
+            Gas::new(gas_consumed, RuntimeId::Ethereum).to_string(),
+        )
         .body(body)
         .unwrap()
 }
@@ -419,13 +419,16 @@ where
     journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
-        gas_limit: hdrs.gas_limit,
         timestamp: hdrs.timestamp,
         block_number: hdrs.block_number,
     };
 
     let block_constants = runtime.create_block_constants(rk.host(), journal, &context);
-    let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
+    let gas_data = GasData::new(
+        hdrs.gas_limit.as_runtime(RuntimeId::Ethereum),
+        0,
+        hdrs.gas_limit.as_runtime(RuntimeId::Ethereum),
+    );
     let crac_log = Log {
         address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
         data: CrossRuntimeCallReceived {
@@ -563,13 +566,16 @@ where
     journal.evm.set_crac_chain_depth(hdrs.crac_depth);
 
     let context = CrossRuntimeContext {
-        gas_limit: hdrs.gas_limit,
         timestamp: hdrs.timestamp,
         block_number: hdrs.block_number,
     };
 
     let block_constants = runtime.create_block_constants(rk.host(), journal, &context);
-    let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
+    let gas_data = GasData::new(
+        hdrs.gas_limit.as_runtime(RuntimeId::Ethereum),
+        0,
+        hdrs.gas_limit.as_runtime(RuntimeId::Ethereum),
+    );
 
     // Intentionally no `CrossRuntimeCallReceived` log on the static path.
 
@@ -624,7 +630,7 @@ impl RuntimeInterface for EthereumRuntime {
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
-        gas_remaining: u64,
+        gas_remaining: Gas,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: KeyspaceHost<KS>,
@@ -699,6 +705,7 @@ impl RuntimeInterface for EthereumRuntime {
             .layered_state
             .create_alias(alias, Origin::Alias(alias_info.clone()));
 
+        // Everything below the trait boundary meters in EVM gas.
         let (alias_str, remaining_after) = self.materialize_alias(
             registry,
             rk,
@@ -707,9 +714,12 @@ impl RuntimeInterface for EthereumRuntime {
             native_address,
             native_public_key,
             &context,
-            gas_remaining,
+            gas_remaining.as_runtime(RuntimeId::Ethereum),
         )?;
-        Ok((alias_str, AliasResolution::build(remaining_after)))
+        Ok((
+            alias_str,
+            AliasResolution::build(Gas::new(remaining_after, RuntimeId::Ethereum)),
+        ))
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
@@ -752,8 +762,8 @@ impl RuntimeInterface for EthereumRuntime {
         &self,
         rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
-        budget: u64,
-    ) -> Result<(Classification, u64), TezosXRuntimeError>
+        budget: Gas,
+    ) -> Result<(Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
@@ -761,7 +771,7 @@ impl RuntimeInterface for EthereumRuntime {
         // Malformed → Unknown, no charge.
         let address = match Address::from_hex(addr) {
             Ok(a) => a,
-            Err(_) => return Ok((Classification::Unknown, 0)),
+            Err(_) => return Ok((Classification::Unknown, Gas::ZERO)),
         };
 
         // Single durable read: the info record carries the whole
@@ -1306,7 +1316,7 @@ mod tests {
             ExecutionResult, HaltReason, Output, ResultGas, SuccessReason,
         };
         use revm_etherlink::ExecutionOutcome;
-        use tezosx_interfaces::X_TEZOS_GAS_CONSUMED;
+        use tezosx_interfaces::{Gas, RuntimeId, X_TEZOS_GAS_CONSUMED};
 
         fn make_success(output: Vec<u8>) -> ExecutionOutcome {
             ExecutionOutcome {
@@ -1435,7 +1445,9 @@ mod tests {
         }
 
         // Gas header tests: make_success uses ResultGas::new(u64::MAX, 21000, 0, 0, 0)
-        // so gas_used() = 21000. X-Tezos-Gas-Consumed is in EVM units (the called runtime).
+        // so gas_used() = 21000 EVM gas. `X-Tezos-Gas-Consumed` carries the
+        // canonical wire unit, so the header reads 21000 EVM gas expressed
+        // in milligas.
 
         #[test]
         fn success_has_gas_consumed_header() {
@@ -1444,7 +1456,7 @@ mod tests {
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
                     .and_then(|v| v.to_str().ok()),
-                Some("21000")
+                Some(Gas::new(21000, RuntimeId::Ethereum).to_string().as_str())
             );
         }
 
@@ -1463,7 +1475,7 @@ mod tests {
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
                     .and_then(|v| v.to_str().ok()),
-                Some("21000")
+                Some(Gas::new(21000, RuntimeId::Ethereum).to_string().as_str())
             );
         }
 
@@ -1484,7 +1496,7 @@ mod tests {
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
                     .and_then(|v| v.to_str().ok()),
-                Some("21000")
+                Some(Gas::new(21000, RuntimeId::Ethereum).to_string().as_str())
             );
         }
 
@@ -2137,11 +2149,10 @@ mod tests {
             BlockConstants::dummy(),
         );
         // Inbound CRAC: source = A (originator), sender = B (caller).
-        // Use a finite gas limit: gas::convert(Ethereum, Tezos, gas) =
-        // gas * EVM_GAS_TO_MILLIGAS (22), so u64::MAX overflows and the
-        // alias generation returns an error before ensure_alias is called.
-        // 30_000_000 (30 M) is large enough for the bytecode + precompile but
-        // small enough not to overflow the milligas conversion.
+        // Use a realistic finite gas limit rather than u64::MAX: converting
+        // to milligas multiplies by EVM_GAS_TO_MILLIGAS (22), and a
+        // saturated budget would exercise a path no real block reaches.
+        // 30 M is large enough for the bytecode plus the precompile.
         let gas_limit: u64 = 30_000_000;
         let request = {
             let url = format!(
@@ -2545,7 +2556,8 @@ mod tests {
             storage::world_state_handler::{AccountInfo, AccountOrigin, StorageAccount},
         };
         use tezosx_interfaces::{
-            AliasInfo, Classification, RuntimeId, RuntimeInterface, ALIAS_LOOKUP_COST,
+            AliasInfo, Classification, Gas, RuntimeId, RuntimeInterface,
+            ALIAS_LOOKUP_COST,
         };
 
         fn evm_addr(byte: u8) -> (Address, String) {
@@ -2584,7 +2596,7 @@ mod tests {
 
             set_account_with_code(rk.eth_accounts_mut(), &addr);
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -2610,7 +2622,7 @@ mod tests {
                 )
                 .unwrap();
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -2623,7 +2635,7 @@ mod tests {
             let runtime = EthereumRuntime::default();
             let (_, addr_str) = evm_addr(0xdd);
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -2647,7 +2659,7 @@ mod tests {
                 )
                 .unwrap();
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -2676,7 +2688,7 @@ mod tests {
                 )
                 .unwrap();
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Alias(alias_info));
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
@@ -2688,10 +2700,10 @@ mod tests {
             let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime.read_origin(&rk, "not-hex", budget).unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(consumed, 0); // malformed → no charge
+            assert_eq!(consumed, Gas::ZERO); // malformed → no charge
         }
 
         // (g) Wrong-length hex address → Unknown, no charge
@@ -2700,12 +2712,12 @@ mod tests {
             let rk = RuntimeKeyspaces::default();
             let runtime = EthereumRuntime::default();
 
-            let budget = 100_000;
+            let budget = Gas::new(100_000, RuntimeId::Ethereum);
             let (class, consumed) = runtime
                 .read_origin(&rk, "0x00112233445566778899aabbccddeeff0011", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(consumed, 0); // malformed → no charge
+            assert_eq!(consumed, Gas::ZERO); // malformed → no charge
         }
 
         // (h) Insufficient budget for the read → OutOfGas
@@ -2716,7 +2728,7 @@ mod tests {
             let (_, addr_str) = evm_addr(0x11);
 
             // Budget below ALIAS_LOOKUP_COST: fails at the read
-            let budget = ALIAS_LOOKUP_COST - 1;
+            let budget = ALIAS_LOOKUP_COST - Gas::new(1, RuntimeId::Ethereum);
             let err = runtime.read_origin(&rk, &addr_str, budget).unwrap_err();
             assert_eq!(err, tezosx_interfaces::TezosXRuntimeError::OutOfGas);
         }
@@ -2742,7 +2754,7 @@ mod tests {
         use primitive_types::U256;
         use revm::state::Bytecode;
         use revm_etherlink::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
-        use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, RuntimeId};
+        use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Gas, RuntimeId};
 
         // Native address whose alias we materialize. The bytes are the
         // UTF-8 form of the address string, exactly as ensure_alias hashes.
@@ -2755,7 +2767,6 @@ mod tests {
 
         fn context() -> CrossRuntimeContext {
             CrossRuntimeContext {
-                gas_limit: 30_000_000,
                 timestamp: U256::from(1u64),
                 block_number: U256::from(1u64),
             }
@@ -2800,7 +2811,7 @@ mod tests {
                 info.clone(),
                 Some(pubkey.as_slice()),
                 context(),
-                0,
+                Gas::ZERO,
             );
             // A budget below intrinsic gas is a pre-execution validation
             // failure: it must surface as a catchable BadRequest, never a
@@ -2850,7 +2861,7 @@ mod tests {
                 info,
                 Some(pubkey.as_slice()),
                 context(),
-                0,
+                Gas::ZERO,
             );
             assert!(
                 retried.is_err(),

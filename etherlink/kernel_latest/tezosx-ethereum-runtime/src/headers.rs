@@ -19,10 +19,10 @@ pub use tezosx_interfaces::{
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
 use primitive_types::U256;
 use tezosx_interfaces::headers::{
-    check_crac_depth, parse_str, parse_tez_to_wei, parse_u32_default, require_str,
-    require_u32, require_u64,
+    check_crac_depth, parse_str, parse_tez_to_wei, parse_u32_default, require_gas,
+    require_str, require_u32, require_u64,
 };
-use tezosx_interfaces::{RuntimeId, TezosXRuntimeError};
+use tezosx_interfaces::{Gas, RuntimeId, TezosXRuntimeError};
 
 /// Values contained in the `X-Tezos-*` request headers, in their Ethereum
 /// runtime types.
@@ -33,7 +33,7 @@ pub struct EthereumHeaders {
     /// Transfer amount (for `msg.value`).
     pub amount: AlloyU256,
     /// Gas limit in gas units.
-    pub gas_limit: u64,
+    pub gas_limit: Gas,
     /// Block timestamp.
     pub timestamp: U256,
     /// Block level.
@@ -97,7 +97,7 @@ pub fn parse_request_headers(
     Ok(EthereumHeaders {
         sender: require_address(headers, X_TEZOS_SENDER)?,
         amount: amount_wei,
-        gas_limit: require_u64(headers, X_TEZOS_GAS_LIMIT)?,
+        gas_limit: require_gas(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: U256::from(require_u64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: U256::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         crac_id,
@@ -134,8 +134,8 @@ fn require_address(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezosx_interfaces::headers::headers_from;
     use tezosx_interfaces::MAX_CRAC_DEPTH;
+    use tezosx_interfaces::{headers::headers_from, Gas};
 
     const ADDR: &str = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
 
@@ -156,7 +156,7 @@ mod tests {
         let parsed = parse_request_headers(&headers).unwrap();
         assert_eq!(parsed.sender, Address::from_hex(ADDR).unwrap());
         assert_eq!(parsed.amount, AlloyU256::ZERO);
-        assert_eq!(parsed.gas_limit, 1_000_000);
+        assert_eq!(parsed.gas_limit, Gas::new(1_000_000, RuntimeId::Tezos));
         assert_eq!(parsed.timestamp, U256::from(1_000_000));
         assert_eq!(parsed.block_number, U256::from(1));
         // Absent X-Tezos-Source-Runtime defaults to Tezos.
@@ -311,7 +311,7 @@ mod tests {
             .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
             .unwrap() = (X_TEZOS_GAS_LIMIT, "0");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.gas_limit, 0);
+        assert_eq!(parsed.gas_limit, Gas::new(0, RuntimeId::Ethereum));
     }
 
     #[test]
@@ -322,7 +322,7 @@ mod tests {
             .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
             .unwrap() = (X_TEZOS_GAS_LIMIT, "18446744073709551615");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.gas_limit, u64::MAX);
+        assert_eq!(parsed.gas_limit, Gas::new(u64::MAX, RuntimeId::Ethereum));
     }
 
     // --- Block number edge cases ---

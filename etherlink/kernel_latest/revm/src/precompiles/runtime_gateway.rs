@@ -120,18 +120,13 @@ fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileErr
     Ok(())
 }
 
-/// Charge the EVM caller for `consumed` gas reported in `from` runtime
-/// units. The conversion is rounded UP (L2-1751) so the charge always
-/// covers the consumed amount instead of leaking the sub-`EVM_GAS_TO_MILLIGAS`
-/// remainder; a conversion overflow charges the full budget (OOG).
 fn charge_consumed_gas(
     gas: &mut Gas,
-    from: RuntimeId,
-    consumed: u64,
+    consumed: TezosXGas,
 ) -> Result<(), CustomPrecompileError> {
-    let consumed_evm = TezosXGas::new(consumed, from).as_runtime(RuntimeId::Ethereum);
-    if consumed_evm > 0 {
-        charge(gas, EvmGas::new(consumed_evm))?;
+    let consumed_evm = EvmGas::from(consumed);
+    if !consumed_evm.is_zero() {
+        charge(gas, consumed_evm)?;
     }
     Ok(())
 }
@@ -163,16 +158,10 @@ fn charge_gateway_request(
 /// [`classify_and_charge_crac_response`] directly instead.
 fn charge_and_encode_crac_response(
     response: http::Response<Vec<u8>>,
-    target_runtime: RuntimeId,
     gas: &mut Gas,
     base_fee_per_gas: u64,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
-    let body = classify_and_charge_crac_response(
-        response,
-        target_runtime,
-        gas,
-        base_fee_per_gas,
-    )?;
+    let body = classify_and_charge_crac_response(response, gas, base_fee_per_gas)?;
     charge_payload(gas, body.len())?;
     Ok((body,).abi_encode_params())
 }
@@ -181,7 +170,6 @@ fn charge_and_encode_crac_response(
 // the panicking HeaderMap::insert. Mirrors the Michelson %call gateway cap.
 fn reject_if_too_many_headers(
     request: &http::Request<Vec<u8>>,
-    target_runtime: RuntimeId,
     gas: &mut Gas,
     base_fee_per_gas: u64,
 ) -> Result<(), CustomPrecompileError> {
@@ -195,12 +183,7 @@ fn reject_if_too_many_headers(
             format!("too many headers ({count} > {MAX_HTTP_CALL_HEADERS})").into_bytes(),
         )
         .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
-    match classify_and_charge_crac_response(
-        response,
-        target_runtime,
-        gas,
-        base_fee_per_gas,
-    ) {
+    match classify_and_charge_crac_response(response, gas, base_fee_per_gas) {
         Err(revert) => Err(revert),
         Ok(_) => Err(CustomPrecompileError::Revert(
             format!("too many headers ({count} > {MAX_HTTP_CALL_HEADERS})"),
@@ -273,7 +256,6 @@ fn build_http_request(
 /// - anything else: block abort.
 fn classify_and_charge_crac_response(
     response: http::Response<Vec<u8>>,
-    target_runtime: RuntimeId,
     gas: &mut Gas,
     base_fee_per_gas: u64,
 ) -> Result<Vec<u8>, CustomPrecompileError> {
@@ -281,8 +263,8 @@ fn classify_and_charge_crac_response(
         .headers()
         .get(X_TEZOS_GAS_CONSUMED)
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.parse::<u64>().ok())
-        .map(|c| EvmGas::from(TezosXGas::new(c, target_runtime)));
+        .and_then(|s| s.parse::<TezosXGas>().ok())
+        .map(EvmGas::from);
 
     if response.status().is_success() {
         let Some(evm_consumed) = callee_gas else {
@@ -381,8 +363,7 @@ fn dispatch_origin_of<
     let (classification, consumed_source) = match staged_source {
         Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
         None => {
-            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(source_runtime);
+            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             registry
                 .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
@@ -391,7 +372,7 @@ fn dispatch_origin_of<
         }
     };
     // Convert consumed back to EVM gas and charge.
-    charge_consumed_gas(gas, source_runtime, consumed_source)?;
+    charge_consumed_gas(gas, consumed_source)?;
 
     let output: Vec<u8> = match classification {
         Classification::Unknown => {
@@ -471,8 +452,7 @@ fn dispatch_resolve_address<
     let (source_classification, consumed_source) = match staged_source {
         Some(origin) => (Classification::from(origin), ALIAS_LOOKUP_COST),
         None => {
-            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(source_runtime);
+            let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             registry
                 .read_origin(rk, source_runtime, &addr_str, budget)
                 .map_err(|e| {
@@ -480,7 +460,7 @@ fn dispatch_resolve_address<
                 })?
         }
     };
-    charge_consumed_gas(gas, source_runtime, consumed_source)?;
+    charge_consumed_gas(gas, consumed_source)?;
 
     let output: Vec<u8> = match source_classification {
         Classification::Unknown => {
@@ -524,8 +504,7 @@ fn dispatch_resolve_address<
 
             // Destination check: is the inverse already materialized on
             // the target side?
-            let dest_budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(target_runtime);
+            let dest_budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             let (inverse_class, consumed_dest) = registry
                 .read_origin(rk, target_runtime, &derived, dest_budget)
                 .map_err(|e| {
@@ -534,7 +513,7 @@ fn dispatch_resolve_address<
                         *gas,
                     )
                 })?;
-            charge_consumed_gas(gas, target_runtime, consumed_dest)?;
+            charge_consumed_gas(gas, consumed_dest)?;
 
             let resolution = match inverse_class {
                 Classification::Alias(info_back)
@@ -792,11 +771,11 @@ where
     >,
 {
     // --- sender alias ---
-    charge(gas, EvmGas::new(ALIAS_LOOKUP_COST))?;
+    charge(gas, ALIAS_LOOKUP_COST)?;
     let (sender_alias, sender_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
-    charge_consumed_gas(gas, target_runtime, sender_resolution.consumed_gas)?;
+    charge_consumed_gas(gas, sender_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
         sender_resolution.delegated_storage_cost,
@@ -810,11 +789,11 @@ where
         return Ok((sender_alias.clone(), sender_alias));
     }
 
-    charge(gas, EvmGas::new(ALIAS_LOOKUP_COST))?;
+    charge(gas, ALIAS_LOOKUP_COST)?;
     let (source_alias, source_resolution) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
-    charge_consumed_gas(gas, target_runtime, source_resolution.consumed_gas)?;
+    charge_consumed_gas(gas, source_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
         source_resolution.delegated_storage_cost,
@@ -844,7 +823,7 @@ fn inject_tezos_headers(
     source_alias: &str,
     source_runtime: RuntimeId,
     amount: U256,
-    gas_limit: u64,
+    gas_limit: TezosXGas,
     timestamp: U256,
     block_number: U256,
     crac_id: &str,
@@ -870,7 +849,7 @@ fn inject_tezos_headers(
         X_TEZOS_AMOUNT,
         parse_value(&format_tez_from_wei(alloy_to_u256(&amount)))?,
     );
-    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&gas_limit.to_string())?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
     headers.insert(
         X_TEZOS_BLOCK_NUMBER,
@@ -894,7 +873,7 @@ fn inject_tezos_headers_from_context<'j, CTX, Host, KS, R>(
     source_alias: &str,
     source_runtime: RuntimeId,
     amount: U256,
-    gas_limit: u64,
+    gas_limit: TezosXGas,
     gas: Gas,
 ) -> Result<(), CustomPrecompileError>
 where
@@ -1028,8 +1007,7 @@ where
                 source_addr,
             )?;
 
-            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(RuntimeId::Tezos);
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             let crac_id = context.journal().crac_id();
             emit_crac_sent(context, crac_id, "tezos", destination, amount);
             inject_tezos_headers_from_context(
@@ -1046,7 +1024,6 @@ where
             let response = context.journal_mut().tezosx_call_http(request);
             let _body = classify_and_charge_crac_response(
                 response,
-                RuntimeId::Tezos,
                 &mut gas,
                 context.block().basefee(),
             )?;
@@ -1118,8 +1095,7 @@ where
                 )
             })?;
 
-            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(RuntimeId::Tezos);
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             // Amount is always zero (checked above), reuse the header
             // injector for uniform context propagation.
             inject_tezos_headers_from_context(
@@ -1136,7 +1112,6 @@ where
             let response = context.journal_mut().tezosx_call_http(request);
             let output = charge_and_encode_crac_response(
                 response,
-                RuntimeId::Tezos,
                 &mut gas,
                 context.block().basefee(),
             )?;
@@ -1242,14 +1217,8 @@ where
                 (sender_alias, source_alias, source.runtime())
             };
 
-            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum)
-                .as_runtime(target_runtime);
-            reject_if_too_many_headers(
-                &request,
-                target_runtime,
-                &mut gas,
-                context.block().basefee(),
-            )?;
+            let gas_limit = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
+            reject_if_too_many_headers(&request, &mut gas, context.block().basefee())?;
 
             let crac_id = context.journal().crac_id();
             // Inject X-Tezos-* headers with trusted execution context.
@@ -1293,7 +1262,6 @@ where
             let response = context.journal_mut().tezosx_call_http(request);
             let output = charge_and_encode_crac_response(
                 response,
-                target_runtime,
                 &mut gas,
                 context.block().basefee(),
             )?;
@@ -1453,8 +1421,7 @@ mod tests {
             .body(b"revert reason".to_vec())
             .unwrap();
         let mut gas = Gas::new(100_000);
-        let result =
-            classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas, 1);
+        let result = classify_and_charge_crac_response(response, &mut gas, 1);
         assert!(matches!(result, Err(CustomPrecompileError::Revert(_, _))));
     }
 
@@ -1472,8 +1439,7 @@ mod tests {
             .body(b"revert reason".to_vec())
             .unwrap();
         let mut gas = Gas::new(remaining);
-        let result =
-            classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas, 1);
+        let result = classify_and_charge_crac_response(response, &mut gas, 1);
         assert!(matches!(result, Err(CustomPrecompileError::Revert(_, _))));
         assert_eq!(gas.remaining(), 0, "the op limit must drain the budget");
     }
@@ -1870,7 +1836,32 @@ mod tests {
         .unwrap();
         assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
         assert_eq!(output[63], RuntimeId::Tezos as u8);
-        assert_eq!(gas.spent(), ALIAS_LOOKUP_COST);
+        assert_eq!(gas.spent(), u64::from(EvmGas::from(ALIAS_LOOKUP_COST)));
+    }
+
+    #[test]
+    fn dispatch_origin_of_staged_overlay_charges_tezos_source_in_its_unit() {
+        // The staged fast path reports its cost in the source runtime's
+        // unit, so a Tezos source must bill the same 2100 EVM gas the
+        // durable `read_origin` path bills — not 2100 milligas, which
+        // converts to a 22x-too-cheap 96 EVM gas.
+        let rk = RuntimeKeyspaces::default();
+        let registry = StubRegistry::with_classification(Classification::Unknown);
+        let staged = Origin::Alias(AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: b"0xstaged".to_vec(),
+        });
+        let mut gas = Gas::new(GAS_LIMIT);
+        dispatch_origin_of(
+            &rk,
+            &registry,
+            "KT1Staged".to_string(),
+            RuntimeId::Tezos,
+            Some(staged),
+            &mut gas,
+        )
+        .unwrap();
+        assert_eq!(gas.spent(), u64::from(EvmGas::from(ALIAS_LOOKUP_COST)));
     }
 
     // ── ABI selector decode/encode round-trips ───────────────────────────────
@@ -2073,7 +2064,7 @@ mod tests {
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
             amount,
-            gas_limit,
+            TezosXGas::new(gas_limit, RuntimeId::Ethereum),
             timestamp,
             block_number,
             "test-crac-id",
@@ -2125,7 +2116,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "100000"
+            TezosXGas::new(gas_limit, RuntimeId::Ethereum).to_string()
         );
         assert_eq!(
             request
@@ -2187,7 +2178,7 @@ mod tests {
             alias,
             RuntimeId::Tezos,
             U256::ZERO,
-            0,
+            TezosXGas::new(0, RuntimeId::Tezos),
             U256::ZERO,
             U256::ZERO,
             "test-crac-id",
@@ -2252,7 +2243,7 @@ mod tests {
         )
         .expect("under-physical-limit request builds");
         let mut gas = Gas::new(u64::MAX);
-        let err = reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+        let err = reject_if_too_many_headers(&request, &mut gas, 1)
             .expect_err("over-cap header count must be rejected");
         assert!(
             matches!(
@@ -2281,7 +2272,7 @@ mod tests {
         )
         .expect("at-cap request builds");
         let mut gas = Gas::new(u64::MAX);
-        reject_if_too_many_headers(&request, RuntimeId::Tezos, &mut gas, 1)
+        reject_if_too_many_headers(&request, &mut gas, 1)
             .expect("exactly MAX headers must be accepted");
     }
 
@@ -2309,7 +2300,7 @@ mod tests {
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
             U256::ZERO,
-            100_000,
+            TezosXGas::new(100_000, RuntimeId::Ethereum),
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
@@ -2353,7 +2344,7 @@ mod tests {
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
             amount,
-            100_000,
+            TezosXGas::new(100_000, RuntimeId::Ethereum),
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
@@ -2395,7 +2386,7 @@ mod tests {
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
             U256::ZERO,
-            0,
+            TezosXGas::new(0, RuntimeId::Ethereum),
             U256::ZERO,
             U256::ZERO,
             "test-crac-id",
@@ -2575,7 +2566,7 @@ mod tests {
             RuntimeId::Tezos,
             // 1 TEZ in wei
             U256::from(10u64).pow(U256::from(18u64)),
-            50_000,
+            TezosXGas::new(50_000, RuntimeId::Ethereum),
             U256::from(100u64),
             U256::from(42u64),
             "test-crac-id",
@@ -2619,7 +2610,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "50000"
+            TezosXGas::new(50_000, RuntimeId::Ethereum).to_string()
         );
         assert_eq!(
             request
@@ -2806,21 +2797,11 @@ mod tests {
         };
 
         let mut gas_with = Gas::new(gas_limit);
-        classify_and_charge_crac_response(
-            build(true),
-            RuntimeId::Tezos,
-            &mut gas_with,
-            base_fee,
-        )
-        .expect("should succeed");
+        classify_and_charge_crac_response(build(true), &mut gas_with, base_fee)
+            .expect("should succeed");
         let mut gas_without = Gas::new(gas_limit);
-        classify_and_charge_crac_response(
-            build(false),
-            RuntimeId::Tezos,
-            &mut gas_without,
-            base_fee,
-        )
-        .expect("should succeed");
+        classify_and_charge_crac_response(build(false), &mut gas_without, base_fee)
+            .expect("should succeed");
 
         assert_eq!(
             gas_without.remaining() - gas_with.remaining(),
@@ -2840,13 +2821,8 @@ mod tests {
             .unwrap();
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        )
-        .expect("should succeed");
+        classify_and_charge_crac_response(response, &mut gas, 1_000_000_000)
+            .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit - 46,
@@ -2865,13 +2841,8 @@ mod tests {
             .unwrap();
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        )
-        .expect("should succeed");
+        classify_and_charge_crac_response(response, &mut gas, 1_000_000_000)
+            .expect("should succeed");
         assert_eq!(gas.remaining(), gas_limit - 43);
     }
 
@@ -2881,7 +2852,8 @@ mod tests {
         // and originOf/resolveAddress paths rounds up. 944 milligas =
         // 22 * 42 + 20 must charge ceil = 43 EVM gas, not the floored 42.
         let mut gas = Gas::new(1_000_000);
-        charge_consumed_gas(&mut gas, RuntimeId::Tezos, 944).expect("affordable");
+        charge_consumed_gas(&mut gas, TezosXGas::new(944, RuntimeId::Tezos))
+            .expect("affordable");
         assert_eq!(gas.spent(), 43);
     }
 
@@ -2889,7 +2861,7 @@ mod tests {
     fn charge_consumed_gas_zero_no_charge() {
         // A cache hit / round-trip reports 0 consumed gas: no charge.
         let mut gas = Gas::new(1_000_000);
-        charge_consumed_gas(&mut gas, RuntimeId::Tezos, 0).expect("affordable");
+        charge_consumed_gas(&mut gas, TezosXGas::ZERO).expect("affordable");
         assert_eq!(gas.spent(), 0);
     }
 
@@ -2904,12 +2876,7 @@ mod tests {
             .body(vec![])
             .unwrap();
         let mut gas = Gas::new(500);
-        let result = classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        );
+        let result = classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
         assert!(
             matches!(result, Err(CustomPrecompileError::OutOfGas)),
             "insufficient gas to cover the storage cost must fail with OutOfGas, got: {result:?}"
@@ -2926,12 +2893,7 @@ mod tests {
             .body(vec![])
             .unwrap();
         let mut gas = Gas::new(1_000_000);
-        let result = classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        );
+        let result = classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
         assert!(
             matches!(
                 result,
@@ -2953,12 +2915,7 @@ mod tests {
             .body(b"boom".to_vec())
             .unwrap();
         let mut gas = Gas::new(1_000_000);
-        let result = classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        );
+        let result = classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
         assert!(
             matches!(
                 result,
@@ -2988,12 +2945,8 @@ mod tests {
 
         let budget = expected_charge + 1_000_000;
         let mut gas = Gas::new(budget);
-        let result = super::classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        );
+        let result =
+            super::classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
 
         // Must be a catchable Revert, not a block abort.
         assert!(
@@ -3023,12 +2976,8 @@ mod tests {
 
         // Very tight budget — insufficient for the per-word body charge.
         let mut gas = Gas::new(1);
-        let result = super::classify_and_charge_crac_response(
-            response,
-            RuntimeId::Tezos,
-            &mut gas,
-            1_000_000_000,
-        );
+        let result =
+            super::classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
 
         // Must remain a Revert, not a block-abort Abort.
         assert!(

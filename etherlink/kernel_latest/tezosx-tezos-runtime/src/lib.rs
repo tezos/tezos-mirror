@@ -47,9 +47,9 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{
-    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Origin, Registry,
-    RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_MILLIGAS, X_TEZOS_GAS_CONSUMED,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_STORAGE_COST,
+    AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Gas as TezosXGas,
+    Milligas, Origin, Registry, RuntimeId, RuntimeInterface, TezosXRuntimeError,
+    ALIAS_LOOKUP_COST, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_STORAGE_COST,
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
@@ -120,7 +120,10 @@ fn build_response(
     };
     let mut builder = http::Response::builder();
     if let Some(gas) = consumed_milligas {
-        builder = builder.header(X_TEZOS_GAS_CONSUMED, gas.to_string());
+        builder = builder.header(
+            X_TEZOS_GAS_CONSUMED,
+            TezosXGas::new(gas, RuntimeId::Tezos).to_string(),
+        );
     }
     let (status, body) = match result {
         Ok(outcome) => {
@@ -715,8 +718,11 @@ where
 
     // Start the op-gas counter early so the Unit fallback below can be
     // metered against the user's actual budget.
-    let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
-        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
+    let mut gas =
+        TezlinkOperationGas::start_milligas(u64::from(Milligas::from(hdrs.gas_limit)))
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}"))
+            })?;
 
     let body = request.into_body();
     // An empty body means "no parameters" which defaults to Micheline Unit.
@@ -1133,7 +1139,7 @@ impl RuntimeInterface for TezosRuntime {
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
         _context: CrossRuntimeContext,
-        gas_remaining: u64,
+        gas_remaining: TezosXGas,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
         Host: KeyspaceHost<KS>,
@@ -1155,7 +1161,8 @@ impl RuntimeInterface for TezosRuntime {
         // free function lets the borrow last only for the duration of
         // each call so we can also pass `remaining` to
         // `TezlinkOperationGas::start_milligas` below.
-        let mut remaining = gas_remaining;
+        let mut remaining = gas_remaining.as_runtime(RuntimeId::Tezos);
+        let as_gas = |milligas: u64| TezosXGas::new(milligas, RuntimeId::Tezos);
         fn consume(remaining: &mut u64, cost: u64) -> Result<(), TezosXRuntimeError> {
             *remaining = remaining.checked_sub(cost).ok_or_else(|| {
                 TezosXRuntimeError::Custom(
@@ -1179,7 +1186,7 @@ impl RuntimeInterface for TezosRuntime {
         // preserves the gas budget and performs no durable writes.
         match account.origin(rk.host())? {
             Some(Origin::Alias(_)) => {
-                return Ok((kt1_str, AliasResolution::build(remaining)));
+                return Ok((kt1_str, AliasResolution::build(as_gas(remaining))));
             }
             Some(Origin::Native) => {
                 return Err(TezosXRuntimeError::Custom(format!(
@@ -1208,7 +1215,7 @@ impl RuntimeInterface for TezosRuntime {
             consume(&mut remaining, STORAGE_WRITE_BASE_MILLIGAS)?;
             let new_origin = Origin::Alias(alias_info);
             account.set_origin(rk.host_mut(), &new_origin)?;
-            return Ok((kt1_str, AliasResolution::build(remaining)));
+            return Ok((kt1_str, AliasResolution::build(as_gas(remaining))));
         }
 
         // Branch 3: full materialization. Deploy the forwarder via the
@@ -1346,7 +1353,7 @@ impl RuntimeInterface for TezosRuntime {
         Ok((
             kt1_str,
             AliasResolution::build_with_delegated_storage_cost(
-                remaining,
+                as_gas(remaining),
                 alias_storage_cost,
             ),
         ))
@@ -1415,8 +1422,8 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         rk: &RuntimeKeyspaces<Host, KS>,
         addr: &str,
-        budget: u64,
-    ) -> Result<(Classification, u64), TezosXRuntimeError>
+        budget: TezosXGas,
+    ) -> Result<(Classification, TezosXGas), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: SafeKeyspace,
@@ -1425,10 +1432,10 @@ impl RuntimeInterface for TezosRuntime {
         // Malformed → Unknown, no charge.
         let contract = match Contract::from_b58check(addr) {
             Ok(c) => c,
-            Err(_) => return Ok((Classification::Unknown, 0)),
+            Err(_) => return Ok((Classification::Unknown, TezosXGas::ZERO)),
         };
 
-        let consumed = ALIAS_LOOKUP_MILLIGAS;
+        let consumed = ALIAS_LOOKUP_COST;
         if budget < consumed {
             return Err(TezosXRuntimeError::OutOfGas);
         }
@@ -1805,7 +1812,6 @@ mod tests {
 
     fn test_context() -> CrossRuntimeContext {
         CrossRuntimeContext {
-            gas_limit: 5_000_000,
             timestamp: U256::from(0),
             block_number: U256::from(0),
         }
@@ -1846,7 +1852,7 @@ mod tests {
                 evm_alias_info("0x1234567890abcdef1234567890abcdef12345678"),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .expect("ensure_alias should succeed");
 
@@ -1873,7 +1879,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .expect("ensure_alias should succeed");
 
@@ -1936,7 +1942,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .expect("ensure_alias should succeed");
 
@@ -1966,7 +1972,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .expect("ensure_alias should succeed");
 
@@ -1992,7 +1998,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
         let alias2 = runtime
@@ -2003,7 +2009,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2024,7 +2030,7 @@ mod tests {
                 evm_alias_info("0x1111111111111111111111111111111111111111"),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
         let alias2 = runtime
@@ -2035,7 +2041,7 @@ mod tests {
                 evm_alias_info("0x2222222222222222222222222222222222222222"),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2061,7 +2067,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2073,7 +2079,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                500_000,
+                TezosXGas::new(500_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2082,10 +2088,13 @@ mod tests {
         // cost is zero — only the first call pays for the storage init
         // (via the `originate_contract` receipt) and the classification
         // write.
-        let first_consumed = 5_000_000 - first.1.gas_remaining;
-        let second_consumed = 500_000 - second.1.gas_remaining;
+        let first_consumed =
+            TezosXGas::new(5_000_000, RuntimeId::Tezos) - first.1.gas_remaining;
+        let second_consumed =
+            TezosXGas::new(500_000, RuntimeId::Tezos) - second.1.gas_remaining;
         assert!(
-            second_consumed < first_consumed / 10,
+            second_consumed.as_runtime(RuntimeId::Tezos)
+                < first_consumed.as_runtime(RuntimeId::Tezos) / 10,
             "second call must be vastly cheaper than the first (first {first_consumed}, second {second_consumed})"
         );
     }
@@ -2114,7 +2123,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2135,7 +2144,7 @@ mod tests {
                 evm_alias_info(evm_address),
                 None,
                 test_context(),
-                5_000_000,
+                TezosXGas::new(5_000_000, RuntimeId::Tezos),
             )
             .unwrap();
 
@@ -2169,7 +2178,7 @@ mod tests {
             evm_alias_info(evm_address),
             None,
             test_context(),
-            5_000_000,
+            TezosXGas::new(5_000_000, RuntimeId::Tezos),
         );
         assert!(res.is_err());
     }
@@ -3529,7 +3538,7 @@ mod tests {
         use super::*;
         use tezos_crypto_rs::hash::ChainId;
         use tezosx_interfaces::{
-            Classification, Origin, RuntimeInterface, ALIAS_LOOKUP_MILLIGAS,
+            Classification, Gas as TezosXGas, Origin, RuntimeInterface, ALIAS_LOOKUP_COST,
         };
 
         fn test_runtime() -> TezosRuntime {
@@ -3537,18 +3546,18 @@ mod tests {
         }
 
         // (a) Implicit address (tz1) → Native by construction (no durable read,
-        //     no stored `/origin`), even when unrecorded. Charges ALIAS_LOOKUP_MILLIGAS.
+        //     no stored `/origin`), even when unrecorded. Charges ALIAS_LOOKUP_COST.
         #[test]
         fn read_origin_implicit_returns_native() {
             let rk = MockRuntimeKeyspaces::default();
             let runtime = test_runtime();
 
-            let budget = 1_000_000;
+            let budget = TezosXGas::new(1_000_000, RuntimeId::Tezos);
             let (class, consumed) = runtime
                 .read_origin(&rk, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", budget)
                 .unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
+            assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
 
         // (d) Malformed address → Unknown, no charge
@@ -3557,12 +3566,12 @@ mod tests {
             let rk = MockRuntimeKeyspaces::default();
             let runtime = test_runtime();
 
-            let budget = 1_000_000;
+            let budget = TezosXGas::new(1_000_000, RuntimeId::Tezos);
             let (class, consumed) = runtime
                 .read_origin(&rk, "not-a-tezos-address", budget)
                 .unwrap();
             assert_eq!(class, Classification::Unknown);
-            assert_eq!(consumed, 0); // malformed → no charge
+            assert_eq!(consumed, TezosXGas::ZERO); // malformed → no charge
         }
 
         // (e) KT1 address with recorded classification
@@ -3581,10 +3590,10 @@ mod tests {
             let account = context::originated_from_kt1(&kt1).unwrap();
             account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
 
-            let budget = 1_000_000;
+            let budget = TezosXGas::new(1_000_000, RuntimeId::Tezos);
             let (class, consumed) = runtime.read_origin(&rk, &kt1_b58, budget).unwrap();
             assert_eq!(class, Classification::Native);
-            assert_eq!(consumed, ALIAS_LOOKUP_MILLIGAS);
+            assert_eq!(consumed, ALIAS_LOOKUP_COST);
         }
     }
 }

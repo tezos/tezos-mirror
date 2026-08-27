@@ -87,7 +87,6 @@ pub const ERR_SAME_RUNTIME_NAC: &str = "same-runtime native atomic call is not s
 /// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
 pub struct CrossRuntimeContext {
-    pub gas_limit: u64,
     pub timestamp: U256,
     pub block_number: U256,
 }
@@ -370,11 +369,10 @@ impl RuntimeId {
 /// Cost of a single `/origin` durable-storage read. Equivalent to a cold
 /// SLOAD (EIP-2929). Charged inside `read_origin` for every storage-
 /// consulting path (skipped on malformed-addr short-circuits).
-pub const ALIAS_LOOKUP_COST: u64 = 2_100;
-
-/// Milligas equivalent of `ALIAS_LOOKUP_COST` (EVM gas × EVM_GAS_TO_MILLIGAS).
-pub const ALIAS_LOOKUP_MILLIGAS: u64 =
-    ALIAS_LOOKUP_COST * tezosx_constants::EVM_GAS_TO_MILLIGAS;
+///
+/// Carries its own unit, so the Tezos side no longer needs a separate
+/// milligas twin: the Michelson side asks for `Milligas::from(..)`.
+pub const ALIAS_LOOKUP_COST: Gas = Gas::new(2_100, RuntimeId::Ethereum);
 
 #[cfg(test)]
 mod from_host_tests {

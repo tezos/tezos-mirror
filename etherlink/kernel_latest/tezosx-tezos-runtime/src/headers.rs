@@ -18,10 +18,10 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::headers::{
-    check_crac_depth, parse_str, parse_tez_to_mutez, parse_u32_default, require_i64,
-    require_str, require_u32, require_u64,
+    check_crac_depth, parse_str, parse_tez_to_mutez, parse_u32_default, require_gas,
+    require_i64, require_str, require_u32,
 };
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{Gas, TezosXRuntimeError};
 
 /// Values contained in the `X-Tezos-*` request headers, in their Tezos runtime
 /// types. Used in parsing and inserting.
@@ -29,8 +29,8 @@ use tezosx_interfaces::TezosXRuntimeError;
 pub struct MichelsonHeaders {
     /// Transfer amount in mutez.
     pub amount: Narith,
-    /// Gas limit in milligas.
-    pub gas_limit: u64,
+    /// Gas limit, carrying the unit it was sent in.
+    pub gas_limit: Gas,
     /// Block timestamp.
     pub timestamp: Timestamp,
     /// Block level.
@@ -85,7 +85,7 @@ pub fn parse_request_headers(
         amount: Narith(
             parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?.into(),
         ),
-        gas_limit: require_u64(headers, X_TEZOS_GAS_LIMIT)?,
+        gas_limit: require_gas(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         sender: require_contract(headers, X_TEZOS_SENDER)?,
@@ -116,7 +116,7 @@ fn require_contract(
 mod tests {
     use super::*;
     use tezosx_interfaces::headers::headers_from;
-    use tezosx_interfaces::MAX_CRAC_DEPTH;
+    use tezosx_interfaces::{RuntimeId, MAX_CRAC_DEPTH};
 
     const KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
     const TZ1: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
@@ -137,7 +137,7 @@ mod tests {
         let headers = headers_from(&required_headers());
         let parsed = parse_request_headers(&headers).unwrap();
         assert_eq!(parsed.amount, Narith(0u64.into()));
-        assert_eq!(parsed.gas_limit, 1_000_000u64);
+        assert_eq!(parsed.gas_limit, Gas::new(1_000_000, RuntimeId::Tezos));
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
         assert_eq!(parsed.sender, Contract::from_b58check(KT1).unwrap());
@@ -345,7 +345,7 @@ mod tests {
             .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
             .unwrap() = (X_TEZOS_GAS_LIMIT, "0");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.gas_limit, 0);
+        assert_eq!(parsed.gas_limit, Gas::ZERO);
     }
 
     #[test]
@@ -356,7 +356,7 @@ mod tests {
             .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
             .unwrap() = (X_TEZOS_GAS_LIMIT, "18446744073709551615");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.gas_limit, u64::MAX);
+        assert_eq!(parsed.gas_limit, Gas::new(u64::MAX, RuntimeId::Tezos));
     }
 
     #[test]

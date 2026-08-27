@@ -672,9 +672,9 @@ impl<
 /// `gas_remaining` is the gas *remaining*): here the gas figure is what
 /// the resolution *consumed*, ready to be charged to the caller.
 pub struct ResolvedAliasCost {
-    /// Gas consumed by the resolution, in the target runtime's units
-    /// (milligas for Tezos, EVM gas for Ethereum); 0 on cache hit.
-    pub consumed_gas: u64,
+    /// Gas consumed by the resolution, carrying the unit of the runtime
+    /// that reported it; zero on cache hit.
+    pub consumed_gas: TezosXGas,
     /// Storage cost the target runtime delegates to the caller, in mutez
     /// (`None` when it makes no claim). Forwarded verbatim from
     /// `AliasResolution.delegated_storage_cost`.
@@ -796,13 +796,12 @@ impl<
             return Ok((
                 source.to_string(),
                 ResolvedAliasCost {
-                    consumed_gas: 0,
+                    consumed_gas: TezosXGas::ZERO,
                     delegated_storage_cost: None,
                 },
             ));
         }
         let context = CrossRuntimeContext {
-            gas_limit: self.database.block.gas_limit,
             timestamp: self.database.block.timestamp,
             block_number: self.database.block.number,
         };
@@ -829,7 +828,7 @@ impl<
                 return Ok((
                     target,
                     ResolvedAliasCost {
-                        consumed_gas: 0,
+                        consumed_gas: TezosXGas::ZERO,
                         delegated_storage_cost: None,
                     },
                 ))
@@ -844,10 +843,9 @@ impl<
                 .into_bytes(),
             },
         };
-        // Convert remaining EVM gas to target runtime units to cap
-        // the generation cost.
-        let target_gas_budget = TezosXGas::new(remaining_evm_gas, RuntimeId::Ethereum)
-            .as_runtime(target_runtime);
+        // Caps what alias generation may spend. `Gas` carries the unit, so
+        // the target runtime converts it itself.
+        let target_gas_budget = TezosXGas::new(remaining_evm_gas, RuntimeId::Ethereum);
         let (
             alias_str,
             AliasResolution {
