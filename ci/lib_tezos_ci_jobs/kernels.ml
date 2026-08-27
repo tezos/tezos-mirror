@@ -26,10 +26,7 @@ let job_kernel ?(variables = []) ?sccache_policy =
   CI.job
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ?policy:sccache_policy ())
-    ~variables:
-      (("CC", "clang")
-      :: ("NATIVE_TARGET", "x86_64-unknown-linux-musl")
-      :: variables)
+    ~variables:(("CC", "clang") :: variables)
 
 let job_check_riscv_kernels =
   job_kernel
@@ -115,7 +112,11 @@ let job_build_kernels =
            "riscv-echo.checksum";
          ])
     ~sccache_policy:Pull_push
-    ~variables:[("EVM_KERNEL_SKIP_BYTECODE", "yes")]
+    ~variables:
+      [
+        ("EVM_KERNEL_SKIP_BYTECODE", "yes");
+        ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
+      ]
     ~script:["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =

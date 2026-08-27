@@ -379,7 +379,7 @@ let job_mir_no_tickets =
        (L2-1680)."
     ~image:Images.Base_images.debian_rust_trixie
     ~only_if_changed:Files.mir
-    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~variables:[("CC", "clang")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
