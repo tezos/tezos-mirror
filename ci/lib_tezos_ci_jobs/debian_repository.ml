@@ -251,7 +251,7 @@ let job_reproducibility_debian =
        to the first build (reproducible builds)."
     ~image:build_dependency_image
     ~stage:Test_publication
-    ~tag:Dynamic
+    ~cpu:Very_high
     ~needs:
       [
         (Artifacts, job_build Debian pipeline_type);
@@ -262,7 +262,6 @@ let job_reproducibility_debian =
       [
         ("DISTRIBUTION", "debian");
         ("RELEASE", "trixie");
-        ("TAGS", tag_amd64);
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
       (* The rebuild includes the keyring package, whose build sources
