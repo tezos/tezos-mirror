@@ -104,11 +104,11 @@ let make_debian_variables distribution image_kind version =
    for more info. *)
 let cargo_network_hack = "export CARGO_NET_OFFLINE=false"
 
-let make_package_build_job ~target =
+let make_package_build_job ?tag ~target =
   CI.job
     ~image:build_dependency_image
     ~stage:Build
-    ~tag:Dynamic
+    ?tag
     ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     ~script:
       [cargo_network_hack; "./scripts/ci/build-debian-packages.sh " ^ target]
@@ -119,8 +119,7 @@ let job_build_data_packages =
     "oc.build-data_packages"
     ~__POS__
     ~description:"Build the Debian packages that contain Tezos data."
-    ~variables:
-      [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
+    ~variables:[("DISTRIBUTION", "debian"); ("RELEASE", "trixie")]
     ~target:"zcash"
 
 (* keyring package. Architecture: all, built once. *)
@@ -129,8 +128,7 @@ let job_build_keyring_package =
     "oc.build-keyring_package"
     ~__POS__
     ~description:"Build the octez-archive-keyring Debian package."
-    ~variables:
-      [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
+    ~variables:[("DISTRIBUTION", "debian"); ("RELEASE", "trixie")]
       (* The build sources repository-keys.sh, which fetches the production
          public signing key(s) from GCP on protected branches. That fetch
          authenticates to GCP via Workload Identity Federation, which needs the
@@ -169,6 +167,7 @@ let job_build =
     ~parallel:(Matrix matrix)
     ~sccache:(Cacio.sccache ())
     ~target:"binaries"
+    ~tag:Dynamic
 
 let job_apt_repo =
   Cacio.parameterize @@ fun (distro : Distro.name) ->

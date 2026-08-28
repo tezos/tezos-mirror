@@ -217,7 +217,7 @@ oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
   stage: build
   tags:
-  - $TAGS
+  - gcp
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -235,7 +235,6 @@ oc.build-data_packages:
   variables:
     DISTRIBUTION: debian
     RELEASE: trixie
-    TAGS: gcp
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
@@ -285,7 +284,7 @@ oc.build-keyring_package:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
   stage: build
   tags:
-  - $TAGS
+  - gcp
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -303,7 +302,6 @@ oc.build-keyring_package:
   variables:
     DISTRIBUTION: debian
     RELEASE: trixie
-    TAGS: gcp
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
