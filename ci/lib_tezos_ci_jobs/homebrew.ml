@@ -77,6 +77,9 @@ let job_build_homebrew_formula_macosx =
     ~only_if_changed
     ~parallel:
       (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
+      (* Would be better to define a MacOS runner in Tezos_ci.Runner,
+         instead of using Dynamic + the TAGS variable.
+         But it's unclear if homebrew will stay anyway. *)
     ~tag:Dynamic
     ~variables:[("TAGS", "saas-macos-large-m2pro")]
     ~script:
