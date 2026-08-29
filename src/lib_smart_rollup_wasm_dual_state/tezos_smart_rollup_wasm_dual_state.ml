@@ -20,6 +20,8 @@ module type NDS_BACKEND = sig
   val copy : Octez_riscv_nds_common.Nds.t -> Octez_riscv_nds_common.Nds.t
 end
 
+exception Marker_handle_mismatch of string
+
 (* Documented in the .mli.  Hardcoded as a literal — rather than
    computed from an in-memory registry — so this library need not link
    the in-memory NDS FFI.  The value is the content hash of a fresh
@@ -144,7 +146,11 @@ struct
           {!Octez_riscv_nds_common.Nds.registry_hash} of the [Active]
           handle).  The value check is a no-op on a coherently-built pair;
           it guards on-disk, where marker (Irmin repo) and handle (separate
-          NDS store) come from two stores that can drift apart. *)
+          NDS store) come from two stores that can drift apart.
+
+          Disagreements raise {!Marker_handle_mismatch}, which
+          {!verify_proof} turns into a rejected proof — there the marker
+          comes from an untrusted tree.  Elsewhere it propagates. *)
       let reconstruct_pvm_storage_of_marker durable marker nds_state =
         match (marker, nds_state) with
         | None, Inactive ->
@@ -160,21 +166,24 @@ struct
             then
               Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.Dual {durable; nds}
             else
-              invalid_arg
-                "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
-                 the nds_hash marker does not match the registry hash of the \
-                 live Nds.t handle — the marker and the handle were sourced \
-                 from stores that have drifted apart"
+              raise
+                (Marker_handle_mismatch
+                   "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
+                    the nds_hash marker does not match the registry hash of \
+                    the live Nds.t handle — the marker and the handle were \
+                    sourced from stores that have drifted apart")
         | None, Active _ ->
-            invalid_arg
-              "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
-               nds_state is Active but the state carries no nds_hash marker — \
-               the producer broke the marker / tag invariant"
+            raise
+              (Marker_handle_mismatch
+                 "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
+                  nds_state is Active but the state carries no nds_hash marker \
+                  — the producer broke the marker / tag invariant")
         | Some _, Inactive ->
-            invalid_arg
-              "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
-               the state carries an nds_hash marker but nds_state is Inactive \
-               — no Nds.t handle available to reattach"
+            raise
+              (Marker_handle_mismatch
+                 "Dual_state.Encoding_runner.reconstruct_pvm_storage_of_marker: \
+                  the state carries an nds_hash marker but nds_state is \
+                  Inactive — no Nds.t handle available to reattach")
 
       (* Stamp the active registry's hash into the state via
          {!write_nds_hash_marker}, after the base encoder has written the
@@ -480,11 +489,22 @@ struct
 
     (** Proof-verification entry point, mirror of {!produce_proof}:
         dispatch on the proof variant — [Irmin_only] to
-        {!verify_irmin_only_proof}, [Dual] to {!verify_dual_proof}. *)
+        {!verify_irmin_only_proof}, [Dual] to {!verify_dual_proof}.
+
+        The proof is untrusted, so a marker / handle disagreement while
+        replaying it is a property of the proof, not a bug, and becomes a
+        rejection.  Both arms need the guard: [Dual] replays [Active], so a
+        proof whose tree carries no matching marker hits the mismatch
+        before the endpoint check, and [Irmin_only] replays [Inactive], so
+        one whose tree does carry a marker hits it too. *)
     let verify_proof p step =
-      match p with
-      | Irmin_only irmin_p -> verify_irmin_only_proof irmin_p step
-      | Dual dual -> verify_dual_proof dual step
+      Lwt.catch
+        (fun () ->
+          match p with
+          | Irmin_only irmin_p -> verify_irmin_only_proof irmin_p step
+          | Dual dual -> verify_dual_proof dual step)
+        (function
+          | Marker_handle_mismatch _ -> Lwt.return_none | exn -> Lwt.reraise exn)
 
     (* Mutable counterpart of [state], for in-place PVM evaluation.
        The [irmin] slot is replaced whole (the tree is persistent); the

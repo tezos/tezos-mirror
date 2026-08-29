@@ -1017,6 +1017,158 @@ struct
            different transition than the step replays"
 
   (* -------------------------------------------------------------------- *)
+  (* Crafted proofs: marker / handle disagreements                        *)
+  (* -------------------------------------------------------------------- *)
+
+  (* These craft proofs whose Irmin half disagrees with the [nds_state]
+     the verifier replays under, driving each rejection branch of
+     [reconstruct_pvm_storage_of_marker].  They assert [verify_proof]
+     *rejects* rather than *raises*: the protocol calls it with no handler,
+     so an escaping exception aborts on-chain verification. *)
+
+  (** The step a crafted proof is replayed against: decode the storage, as
+      a [compute_step] does before running the kernel.  This is what brings
+      the marker / handle agreement check onto the verification path — a
+      step that never decodes cannot reach it. *)
+  let decoding_step (state : Dual.state) =
+    let open Lwt.Syntax in
+    let+ _storage = Dual.Encoding_runner.decode_storage state in
+    (state, ())
+
+  (** Touches exactly the paths {!decoding_step} reads, so a proof
+      produced over it replays there rather than failing as a malformed
+      Irmin proof.  It stops short of reconstructing the storage, so it can
+      run over the incoherent states these tests build. *)
+  let irmin_probe irmin_state =
+    let open Lwt.Syntax in
+    let* _durable = Irmin.Encoding_runner.decode_durable_storage irmin_state in
+    let+ _marker = Dual.Internal_for_tests.read_nds_hash irmin_state in
+    (irmin_state, ())
+
+  (** An Irmin half attesting the paths of [irmin_state], via
+      {!irmin_probe}. *)
+  let irmin_half_of ~loc context irmin_state =
+    let open Lwt.Syntax in
+    let+ proof_opt = Irmin.produce_proof context irmin_state irmin_probe in
+    match proof_opt with
+    | Some (irmin_proof, ()) -> irmin_proof
+    | None ->
+        Test.fail
+          ~__LOC__:loc
+          "Irmin.produce_proof failed to attest the probe's paths"
+
+  (** The NDS half of an honest no-op [Dual] proof over [nds]. *)
+  let honest_nds_half ~loc context nds =
+    let open Lwt.Syntax in
+    let* irmin = make_seeded_inactive_state () in
+    let* irmin = stamp_nds_marker irmin nds in
+    let+ proof_opt =
+      Dual.produce_proof context (dual irmin (Dual.Active nds)) decoding_step
+    in
+    match proof_opt with
+    | Some (Dual.Dual {nds_proof; _}, ()) -> nds_proof
+    | _ ->
+        Test.fail
+          ~__LOC__:loc
+          "produce_proof did not emit a Dual proof for an Active no-op step"
+
+  (** Assert [proof] is rejected by [verify_proof] without an exception
+      escaping. *)
+  let check_rejected_cleanly ~loc ~what proof =
+    let open Lwt_result_syntax in
+    let*! verify_opt =
+      Lwt.catch
+        (fun () -> Dual.verify_proof proof decoding_step)
+        (fun exn ->
+          Test.fail
+            ~__LOC__:loc
+            "verify_proof raised %s on %s; a crafted proof must be rejected, \
+             not raise — the protocol calls verify_proof with no handler"
+            (Printexc.to_string exn)
+            what)
+    in
+    match verify_opt with
+    | None -> return_unit
+    | Some _ -> Test.fail ~__LOC__:loc "verify_proof accepted %s" what
+
+  (** A [Dual] proof whose Irmin half attests a tree carrying no
+      [/pvm/nds_hash] is rejected cleanly: the verifier replays with the
+      proof's [Active] handle, so the decode hits marker-absent /
+      handle-present. *)
+  let test_dual_proof_without_marker_rejected_cleanly () =
+    let open Lwt_result_syntax in
+    let context = make_empty_context () in
+    let*! nds_proof =
+      honest_nds_half ~loc:__LOC__ context (make_empty_nds ())
+    in
+    let*! irmin_bare = make_seeded_inactive_state () in
+    let*! irmin_proof = irmin_half_of ~loc:__LOC__ context irmin_bare in
+    let crafted =
+      Dual.Internal_for_tests.make_dual_proof ~irmin_proof ~nds_proof
+    in
+    check_rejected_cleanly
+      ~loc:__LOC__
+      ~what:"a Dual proof whose Irmin half attests no /pvm/nds_hash marker"
+      crafted
+
+  (** A [Dual] proof whose Irmin half attests a [/pvm/nds_hash] that is
+      not the replayed handle's registry hash is rejected cleanly: the
+      decode hits the marker-value disagreement. *)
+  let test_dual_proof_with_wrong_marker_rejected_cleanly () =
+    let open Lwt_result_syntax in
+    let context = make_empty_context () in
+    let*! nds_proof =
+      honest_nds_half ~loc:__LOC__ context (make_empty_nds ())
+    in
+    let*! irmin_bogus =
+      let open Lwt.Syntax in
+      let* seeded = make_seeded_inactive_state () in
+      Dual.Internal_for_tests.write_nds_hash seeded (Bytes.make 32 '\xff')
+    in
+    let*! irmin_proof = irmin_half_of ~loc:__LOC__ context irmin_bogus in
+    let crafted =
+      Dual.Internal_for_tests.make_dual_proof ~irmin_proof ~nds_proof
+    in
+    check_rejected_cleanly
+      ~loc:__LOC__
+      ~what:
+        "a Dual proof whose Irmin half attests a /pvm/nds_hash that is not the \
+         replayed handle's registry hash"
+      crafted
+
+  (** An [Irmin_only] proof whose tree carries a [/pvm/nds_hash] is
+      rejected cleanly: the verifier replays [Inactive], so the decode
+      hits marker-present / handle-absent.
+
+      [Irmin_only] is a private constructor, so the proof is built the way
+      an opponent would — from bare Irmin proof bytes, which
+      [Dual.proof_encoding] decodes as [Irmin_only] by byte-identity. *)
+  let test_irmin_only_proof_with_marker_rejected_cleanly () =
+    let open Lwt_result_syntax in
+    let context = make_empty_context () in
+    let*! irmin_marked =
+      let open Lwt.Syntax in
+      let* seeded = make_seeded_inactive_state () in
+      stamp_nds_marker seeded (make_empty_nds ())
+    in
+    let*! irmin_proof = irmin_half_of ~loc:__LOC__ context irmin_marked in
+    let crafted =
+      Data_encoding.Binary.to_bytes_exn Irmin.proof_encoding irmin_proof
+      |> Data_encoding.Binary.of_bytes_exn Dual.proof_encoding
+    in
+    (match crafted with
+    | Dual.Irmin_only _ -> ()
+    | Dual.Dual _ ->
+        Test.fail
+          ~__LOC__
+          "bare Irmin proof bytes decoded as Dual, breaking the byte-identity \
+           the Irmin_only tag relies on") ;
+    check_rejected_cleanly
+      ~loc:__LOC__
+      ~what:"an Irmin_only proof whose tree carries a /pvm/nds_hash marker"
+      crafted
+
+  (* -------------------------------------------------------------------- *)
   (* Public dispatcher surface                                            *)
   (* -------------------------------------------------------------------- *)
 
@@ -1492,8 +1644,9 @@ struct
       snapshot.  Under the old [to_imm = (!)] the snapshot shared the
       live handle, whose registry hash no longer matched the
       snapshot's [/pvm/nds_hash] marker —
-      [reconstruct_pvm_storage_of_marker] raised [Invalid_argument]
-      and the refutation game lost its cached state. *)
+      [reconstruct_pvm_storage_of_marker] raised
+      [Marker_handle_mismatch] and the refutation game lost its cached
+      state. *)
   let test_snapshot_decodes_after_live_mutation () =
     let open Lwt_result_syntax in
     let nds = make_empty_nds () in
@@ -1507,7 +1660,10 @@ struct
         (fun () ->
           let*! s = Dual.Encoding_runner.decode_storage snapshot in
           Lwt.return_some s)
-        (function Invalid_argument _ -> Lwt.return_none | e -> Lwt.reraise e)
+        (function
+          | Tezos_smart_rollup_wasm_dual_state.Marker_handle_mismatch _ ->
+              Lwt.return_none
+          | e -> Lwt.reraise e)
     in
     match storage with
     | Some (Wasm_pvm_state.Internal_state.Dual _) -> return_unit
@@ -1516,8 +1672,9 @@ struct
     | None ->
         Test.fail
           ~__LOC__
-          "decoding the snapshot raised Invalid_argument — the live handle's \
-           mutation reached the snapshot (the dissection-cache aliasing bug)"
+          "decoding the snapshot raised Marker_handle_mismatch — the live \
+           handle's mutation reached the snapshot (the dissection-cache \
+           aliasing bug)"
 
   (** {!NDS_BACKEND.copy} is [Normal]-mode only: a transient
       [Prove]-mode session handle cannot be copied — a snapshot of a
@@ -1628,6 +1785,19 @@ struct
         "plumbing: Dual proof with swapped Irmin half rejected by verify_proof"
         `Quick
         test_dual_proof_with_swapped_irmin_half_rejected;
+      (* Crafted proofs: marker / handle disagreements *)
+      tztest
+        "crafted: Dual proof without an nds_hash marker rejected, not raised"
+        `Quick
+        test_dual_proof_without_marker_rejected_cleanly;
+      tztest
+        "crafted: Dual proof with a wrong nds_hash marker rejected, not raised"
+        `Quick
+        test_dual_proof_with_wrong_marker_rejected_cleanly;
+      tztest
+        "crafted: Irmin_only proof with an nds_hash marker rejected, not raised"
+        `Quick
+        test_irmin_only_proof_with_marker_rejected_cleanly;
       (* Public dispatcher surface *)
       tztest
         "dispatcher: proof_start/stop_state match state_hash on Irmin_only"
