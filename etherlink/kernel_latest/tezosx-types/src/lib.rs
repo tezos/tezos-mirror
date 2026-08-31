@@ -10,8 +10,10 @@
 
 mod gas;
 pub mod headers;
+mod mutez;
 
 pub use gas::{EvmGas, Gas, Milligas};
+pub use mutez::{Mutez, MutezError};
 
 use primitive_types::U256;
 use tezos_data_encoding::{enc::BinWriter, encoding::HasEncoding, nom::NomReader};

@@ -3767,6 +3767,7 @@ version = "0.1.0"
 dependencies = [
  "http",
  "nom",
+ "num-bigint",
  "primitive-types",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-keyspace",
