@@ -2667,6 +2667,7 @@ dependencies = [
  "tezosx-ethereum-runtime",
  "tezosx-interfaces",
  "tezosx-journal",
+ "tezosx-types",
  "thiserror 1.0.69",
  "tracing",
 ]

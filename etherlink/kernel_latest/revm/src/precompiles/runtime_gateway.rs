@@ -21,6 +21,7 @@ use tezosx_interfaces::{
     X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
     X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
+use tezosx_types::Mutez;
 
 use crate::{
     database::EtherlinkVMDB,
@@ -279,7 +280,8 @@ fn classify_and_charge_crac_response(
                 .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
         charge_delegated_storage_cost(
             gas,
-            delegated_storage_cost_mutez,
+            narrow_delegated_storage_cost(gas, delegated_storage_cost_mutez)?
+                .map(Mutez::as_u64),
             base_fee_per_gas,
         )?;
         Ok(response.into_body())
@@ -306,6 +308,25 @@ fn classify_and_charge_crac_response(
             ),
         )))
     }
+}
+
+/// Narrow a raw mutez-denominated storage-delegation cost to the mutez
+/// domain, wherever it originates (the `X-Tezos-Storage-Cost` header, or an
+/// `AliasResolution`'s `delegated_storage_cost`).
+///
+/// Out-of-domain values are economically unreachable (storage costs are far
+/// below `i64::MAX` mutez); surfaced as a catchable revert rather than
+/// silently truncated.
+fn narrow_delegated_storage_cost(
+    gas: &Gas,
+    cost_mutez: Option<u64>,
+) -> Result<Option<Mutez>, CustomPrecompileError> {
+    cost_mutez.map(Mutez::try_from).transpose().map_err(|_| {
+        CustomPrecompileError::Revert(
+            "delegated storage cost out of the mutez domain".into(),
+            *gas,
+        )
+    })
 }
 
 /// Charge the EVM caller, in gas, for the storage-fee cost (in mutez)
@@ -773,7 +794,8 @@ where
     charge_consumed_gas(gas, sender_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
-        sender_resolution.delegated_storage_cost,
+        narrow_delegated_storage_cost(gas, sender_resolution.delegated_storage_cost)?
+            .map(Mutez::as_u64),
         context.block().basefee(),
     )?;
 
@@ -791,7 +813,8 @@ where
     charge_consumed_gas(gas, source_resolution.consumed_gas)?;
     charge_delegated_storage_cost(
         gas,
-        source_resolution.delegated_storage_cost,
+        narrow_delegated_storage_cost(gas, source_resolution.delegated_storage_cost)?
+            .map(Mutez::as_u64),
         context.block().basefee(),
     )?;
 
@@ -2640,6 +2663,31 @@ mod tests {
                 .unwrap(),
             "42"
         );
+    }
+
+    #[test]
+    fn test_narrow_delegated_storage_cost_reverts_out_of_domain() {
+        // A cost past the mutez domain (i64::MAX) must revert rather than
+        // silently truncate.
+        let gas = Gas::new(1_000_000);
+        let result = narrow_delegated_storage_cost(&gas, Some(u64::MAX));
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                if msg.contains("delegated storage cost out of the mutez domain")
+            ),
+            "expected a Revert naming the out-of-domain cost, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_narrow_delegated_storage_cost_accepts_none() {
+        let gas = Gas::new(1_000_000);
+        assert!(matches!(
+            narrow_delegated_storage_cost(&gas, None),
+            Ok(None)
+        ));
     }
 
     #[test]
