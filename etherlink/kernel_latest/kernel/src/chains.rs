@@ -42,11 +42,10 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
-    wei::mutez_from_wei,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
-use tezosx_types::{michelson_gas_to_mutez, Mutez};
+use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
@@ -476,8 +475,10 @@ impl TezosXChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<TezosXBlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
-        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
-            .map_err(|_| crate::Error::InvalidConversion)?;
+        let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
+            .to_mutez_exact()
+            .map_err(|_| crate::Error::InvalidConversion)?
+            .as_u64();
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(host);
         let safe_roots = self.world_states(level.into());

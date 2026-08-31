@@ -46,6 +46,7 @@ use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
+use tezosx_types::Wei;
 
 // Key to the single-transaction execution input, inside the `/base` keyspace.
 // Resolves to the durable path `/base/instant_confirmation/input_tx`.
@@ -158,8 +159,10 @@ where
     let base_fee_per_gas = base_fee_per_gas(host, timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
-    let da_fee_per_byte_mutez = tezos_ethereum::wei::mutez_from_wei(da_fee_per_byte)
-        .map_err(|_| Error::InvalidConversion)?;
+    let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
+        .to_mutez_exact()
+        .map_err(|_| Error::InvalidConversion)?
+        .as_u64();
     let michelson_to_evm_gas_multiplier = read_michelson_to_evm_gas_multiplier(host)
         .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
     let safe_roots = config.world_states(number);
