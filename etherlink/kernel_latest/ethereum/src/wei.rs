@@ -73,6 +73,11 @@ pub fn mutez_to_evm_gas(cost_mutez: u64, base_fee_per_gas: U256) -> Option<u64> 
 /// L2-1004 (round-down at runtime boundaries). Use
 /// [`tezosx_interfaces::headers::parse_tez_to_mutez`] for
 /// CRAC paths instead.
+///
+/// The upper bound is `i64::MAX`, matching the actual mutez domain (L1's
+/// `Tez_repr` is int64; MIR's mutez is `Mutez(i64)`) rather than the wider
+/// `u64::MAX`. Confirmed unreachable for legitimate flows: L1 ticket
+/// amounts are int64-bounded.
 pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
     // Wei is 10^18, Mutez is 10^6
     let amount: U256 = wei / U256::exp10(12);
@@ -82,7 +87,7 @@ pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
 
     if !remainder.is_zero() {
         Err(ErrorMutezFromWei::NonNullRemainder)
-    } else if amount >= U256::from(u64::MAX) {
+    } else if amount > U256::from(i64::MAX) {
         Err(ErrorMutezFromWei::AmountTooLarge)
     } else {
         Ok(amount.as_u64())
@@ -180,5 +185,23 @@ mod tests {
     #[test]
     fn mutez_to_evm_gas_zero_base_fee_is_none() {
         assert_eq!(mutez_to_evm_gas(1, U256::zero()), None);
+    }
+
+    #[test]
+    fn mutez_from_wei_accepts_i64_max() {
+        let wei = U256::from(i64::MAX as u64) * U256::exp10(12);
+        assert!(matches!(mutez_from_wei(wei), Ok(amount) if amount == i64::MAX as u64));
+    }
+
+    #[test]
+    fn mutez_from_wei_rejects_past_i64_max() {
+        // i64::MAX + 1 mutez, previously accepted (u64::MAX bound), now
+        // rejected: the mutez domain is bounded at i64::MAX, matching L1's
+        // `Tez_repr` and MIR's `Mutez(i64)`.
+        let wei = (U256::from(i64::MAX as u64) + U256::one()) * U256::exp10(12);
+        assert!(matches!(
+            mutez_from_wei(wei),
+            Err(ErrorMutezFromWei::AmountTooLarge)
+        ));
     }
 }
