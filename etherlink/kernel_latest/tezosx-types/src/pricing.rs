@@ -8,7 +8,7 @@
 
 use primitive_types::U256;
 
-use crate::{Mutez, Wei, WeiToMutezError};
+use crate::{EvmGas, Mutez, Wei, WeiToMutezError};
 
 /// Convert Michelson gas to mutez using the current base fee.
 ///
@@ -31,6 +31,33 @@ pub fn michelson_gas_to_mutez(
         })
         .ok_or(WeiToMutezError::AmountTooLarge)?;
     Wei::from_u256(wei).to_mutez_floor()
+}
+
+/// Ceiling division of `a` by `b` on `U256`.
+///
+/// The caller must ensure `b != 0`.
+fn ceil_div(a: U256, b: U256) -> U256 {
+    match a.div_mod(b) {
+        (quotient, remainder) if remainder.is_zero() => quotient,
+        (quotient, _) => quotient.saturating_add(U256::one()),
+    }
+}
+
+/// Convert a mutez cost to EVM gas at the given base fee, with ceiling
+/// division.
+///
+/// Units: `cost` (mutez) * 10^12 (wei/mutez) / `base_fee_per_gas`
+/// (wei/evm_gas) = evm_gas, with ceiling division.
+///
+/// Returns `None` when `base_fee_per_gas` is zero or the gas amount
+/// overflows `u64`.
+pub fn mutez_to_evm_gas(cost: Mutez, base_fee_per_gas: U256) -> Option<EvmGas> {
+    if base_fee_per_gas.is_zero() {
+        return None;
+    }
+    u64::try_from(ceil_div(cost.to_wei().as_u256(), base_fee_per_gas))
+        .ok()
+        .map(EvmGas::new)
 }
 
 #[cfg(test)]
@@ -72,5 +99,64 @@ mod tests {
             michelson_gas_to_mutez(U256::MAX, 1, 2),
             Err(WeiToMutezError::AmountTooLarge)
         );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_normalizes_mutez_to_wei() {
+        // 1 mutez = 10^12 wei; base_fee = 1 GWei = 10^9 wei/gas.
+        // ceil(10^12 / 10^9) = 1000. Guards against the mutez-as-wei unit
+        // bug, which would yield 1 / 10^9 = 0.
+        let cost = Mutez::try_from(1u64).unwrap();
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::exp10(9)),
+            Some(EvmGas::new(1000))
+        );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_exact_division() {
+        let cost = Mutez::try_from(1u64).unwrap();
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::exp10(12)),
+            Some(EvmGas::new(1))
+        );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_rounds_up() {
+        let cost = Mutez::try_from(3u64).unwrap();
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(2u64)),
+            Some(EvmGas::new(2))
+        );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_sub_base_fee_rounds_up_to_one() {
+        let cost = Mutez::try_from(1u64).unwrap();
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(3u64)),
+            Some(EvmGas::new(1))
+        );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_zero_mutez_is_zero() {
+        assert_eq!(
+            mutez_to_evm_gas(Mutez::ZERO, U256::one()),
+            Some(EvmGas::new(0))
+        );
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_zero_base_fee_is_none() {
+        let cost = Mutez::try_from(1u64).unwrap();
+        assert_eq!(mutez_to_evm_gas(cost, U256::zero()), None);
+    }
+
+    #[test]
+    fn mutez_to_evm_gas_overflow_is_none() {
+        // Mutez::MAX wei / 1 overflows u64.
+        assert_eq!(mutez_to_evm_gas(Mutez::MAX, U256::one()), None);
     }
 }

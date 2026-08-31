@@ -24,7 +24,7 @@ mod wei;
 
 pub use gas::{EvmGas, Gas, Milligas};
 pub use mutez::{Mutez, MutezError};
-pub use pricing::michelson_gas_to_mutez;
+pub use pricing::{michelson_gas_to_mutez, mutez_to_evm_gas};
 pub use wei::{Wei, WeiToMutezError, ONE_MUTEZ_WEI};
 
 use primitive_types::U256;
