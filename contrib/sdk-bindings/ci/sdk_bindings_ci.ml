@@ -99,6 +99,8 @@ module Release = struct
       ~stage:Build
       ~image:Images.macosx_15
       ~variables:macos_variables
+        (* Would be better to define a MacOS runner in Tezos_ci.Runner,
+           instead of using Dynamic + the TAGS variable. *)
       ~tag:Dynamic
       ~artifacts
       ~cargo_cache:true
@@ -125,6 +127,8 @@ module Release = struct
       ~description:"Build Python SDK on Windows"
       ~stage:Build
       ~variables:windows_variables
+        (* Would be better to define a Windows runner in Tezos_ci.Runner,
+           instead of using Dynamic + the TAGS variable. *)
       ~tag:Dynamic
       ~disable_datadog:true
       ~artifacts
