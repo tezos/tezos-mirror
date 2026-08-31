@@ -21,6 +21,15 @@ In particular, this includes scripts for:
 * setting user-activated upgrades (`user_activated_upgrade.sh`)
 * generating commitments (initial accounts) for test networks (`create_genesis/create_genesis_info.py`)
 * patch the protocols to add profiling (`patch-profiler-proto.sh`)
+* estimating when the next protocol activation will occur, in the best case and
+  under block-time drift assumptions (`next_protocol_activation.py`)
+* listing the bakers assigned to rounds [0; n] of a block with their name and the
+  Octez version each currently runs (`baker_round_versions.py`)
+* measuring the per-round block distribution over a recent window (from tzkt) and
+  emitting a `--drift` list for `next_protocol_activation.py` (`round_distribution.py`)
+* estimating the next protocol activation using the round distribution measured over
+  the last N blocks (N = blocks-to-activation), combining the two tools above
+  (`activation_empirical_drift.py`)
 
 This directory also includes an example docker-compose file to run a
 node with a baker and an accuser (`docker/docker-compose-generic.yml`)
@@ -39,6 +48,21 @@ Information about using some of the scripts above can be found as follows:
 * `version.sh`: see <https://tezos.gitlab.io/introduction/howtoget.html> and <https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-dependency.html>
 * `yes-wallet/`: see <http://tezos.gitlab.io/developer/proposal_testing.html>
 * `user_activated_upgrade.sh`: see <http://tezos.gitlab.io/developer/proposal_testing.html>
+* `next_protocol_activation.py`: run `python3 scripts/next_protocol_activation.py --help`;
+  it queries a node (default `http://localhost:8732`, read-only) and prints the best-case
+  and drift-adjusted activation date/time.
+* `baker_round_versions.py`: run `python3 scripts/baker_round_versions.py --help`;
+  it queries a node (read-only) for the bakers assigned to rounds [0; n] of a block and
+  annotates each with its name and Octez version from tzkt (network auto-detected).
+* `round_distribution.py`: run `python3 scripts/round_distribution.py --help`; it measures
+  the per-round block distribution over a window (default last two weeks) from tzkt and
+  prints a `--drift` list for `next_protocol_activation.py`. Network auto-detected from a
+  node's chain id; `--list-only` is pipeable.
+* `activation_empirical_drift.py`: run `python3 scripts/activation_empirical_drift.py --help`;
+  it combines the two scripts above — measuring the round distribution over the last
+  blocks-to-activation blocks and feeding it as the drift for the activation estimate.
+  By default it reports both the head-anchored and previous-activation-anchored empirical
+  results (`--anchor` restricts to one).
 
 ## Profiler patches for the protocols
 
