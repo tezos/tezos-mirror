@@ -1295,6 +1295,7 @@ dependencies = [
  "tezosx-interfaces",
  "tezosx-journal",
  "tezosx-tezos-runtime",
+ "tezosx-types",
  "thiserror 1.0.69",
  "tracing",
  "typed-arena",

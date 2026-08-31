@@ -51,6 +51,7 @@ ethbloom.workspace = true
 
 revm.workspace = true
 revm-etherlink.workspace = true
+tezosx-types.workspace = true
 tezosx-constants.workspace = true
 evm-inspectors.workspace = true
 tezosx-journal.workspace = true
