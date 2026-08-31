@@ -291,11 +291,16 @@ impl Deposit {
     ) -> Result<(Self, Option<U256>), BridgeError> {
         // Amount
         let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
-        // We use the `U256::from_little_endian` as it takes arbitrary long
-        // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
-        // obviously safe as we deposit CTEZ and the amount is limited by
-        // the XTZ quantity.
-        let amount_mutez: u64 = U256::from_little_endian(&amount_bytes).as_u64();
+        // `U256::from_little_endian` takes arbitrary-length bytes, so a
+        // ticket amount past `u64` (let alone the mutez domain) is parsed
+        // without panicking; bounded below to `i64::MAX`, matching the
+        // mutez domain (L1's `Tez_repr`, MIR's `Mutez(i64)`) rather than
+        // trusting the ticket amount to already be XTZ-supply-bounded.
+        let amount_u256 = U256::from_little_endian(&amount_bytes);
+        let amount_mutez = u64::try_from(amount_u256)
+            .ok()
+            .filter(|&mutez| mutez <= i64::MAX as u64)
+            .ok_or(BridgeError::InvalidAmount(amount_u256))?;
         let amount: U256 = eth_from_mutez(amount_mutez);
 
         // EVM address of the receiver and chain id both come from the
@@ -710,7 +715,7 @@ mod tests {
     use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
     use revm_etherlink::storage::world_state_handler::StorageAccount;
 
-    use super::{apply_tezosx_xtz_deposit, Deposit};
+    use super::{apply_tezosx_xtz_deposit, BridgeError, Deposit};
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     mod xtz_events {
@@ -751,6 +756,40 @@ mod tests {
     #[test]
     fn deposit_event_topic() {
         assert_eq!(xtz_events::Deposit::SIGNATURE_HASH.0, DEPOSIT_EVENT_TOPIC);
+    }
+
+    #[test]
+    fn deposit_parsing_rejects_amount_above_u64_max() {
+        // Pre-fix, this panicked inside `U256::as_u64()` instead of
+        // failing gracefully.
+        let huge_amount = BigInt::from(u64::MAX) * BigInt::from(4);
+        let ticket = create_fa_ticket(
+            "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+            0,
+            &[0u8],
+            huge_amount,
+        );
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let result = Deposit::try_parse(ticket, receiver, 0, 0);
+        assert!(
+            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
+        );
+    }
+
+    #[test]
+    fn deposit_parsing_rejects_amount_above_i64_max() {
+        // Within u64 but past the mutez domain (i64::MAX): pre-fix, this
+        // was accepted via `U256::as_u64()` without complaint.
+        let amount = BigInt::from(i64::MAX as u64) + BigInt::from(1);
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], amount);
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let result = Deposit::try_parse(ticket, receiver, 0, 0);
+        assert!(
+            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
+        );
     }
 
     #[test]
