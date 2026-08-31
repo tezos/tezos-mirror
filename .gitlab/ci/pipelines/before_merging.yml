@@ -104,8 +104,6 @@ audit_riscv_deps:
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
     CC: clang
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_GCS_RW_MODE: READ_ONLY
@@ -342,8 +340,6 @@ check_riscv_kernels:
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
     CC: clang
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_GCS_RW_MODE: READ_ONLY
@@ -1164,7 +1160,6 @@ etherlink.mir_no_tickets:
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
     CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_GCS_RW_MODE: READ_ONLY
@@ -5863,8 +5858,6 @@ test_kernels:
     CARGO_INCREMENTAL: "0"
     CARGO_NET_OFFLINE: "false"
     CC: clang
-    EVM_KERNEL_SKIP_BYTECODE: "yes"
-    NATIVE_TARGET: x86_64-unknown-linux-musl
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_GCS_RW_MODE: READ_ONLY
