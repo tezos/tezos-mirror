@@ -429,41 +429,48 @@ struct
         the two canonical transitions and reject the rest. *)
     let verify_irmin_only_proof irmin_p step =
       let open Lwt.Syntax in
-      (* Read [/pvm/nds_hash] inside [irmin_step] so the verifier
-         traces the same path as the prover's
-         [produce_irmin_only_proof]. *)
+      (* Read [/pvm/nds_hash] only on an activation tick.
+
+         A tick that left NDS inactive can come from a single-state
+         prover, which has no notion of the marker and never reads that
+         path. On a real state, where [/pvm] exists, its absence is not
+         provable from the nodes such a proof carries, so reading it here
+         would fail the verification. The step's tag already reports NDS
+         stayed inactive, and only the encoder writes the marker, solely
+         when promoting to [Active].
+
+         An activation tick can only come from a prover that ran the
+         boundary, which read the marker itself. *)
       let irmin_step irmin_state =
         let* {irmin = irmin'; nds = nds_state'}, v =
           step {irmin = irmin_state; nds = Inactive}
         in
-        let+ post_nds_hash = read_nds_hash_marker irmin' in
-        (irmin', (nds_state', post_nds_hash, v))
+        match nds_state' with
+        | Inactive -> Lwt.return (irmin', (`Stayed_inactive, v))
+        | Active nds ->
+            let+ post_nds_hash = read_nds_hash_marker irmin' in
+            (irmin', (`Activated (nds, post_nds_hash), v))
       in
       let* result = Irmin.verify_proof irmin_p irmin_step in
       match result with
       | None -> Lwt.return_none
-      | Some (irmin', (Inactive, None, v)) ->
-          (* Pre-activation tick that stayed pre-activation: step's
-             tag and the durable agree on [Inactive].  Accept. *)
+      | Some (irmin', (`Stayed_inactive, v)) ->
+          (* Pre-activation tick that stayed pre-activation: the step's
+             tag reports [Inactive], so no marker was read.  Accept. *)
           Lwt.return_some ({irmin = irmin'; nds = Inactive}, v)
-      | Some (irmin', ((Active _ as nds_state'), Some post_nds_hash, v))
+      | Some (irmin', (`Activated (nds, Some post_nds_hash), v))
         when Bytes.equal post_nds_hash empty_registry_hash ->
           (* Activation tick: step minted a fresh [Active] handle via
              the verifier-configured factory and the encoder wrote
              the canonical empty-registry hash to [/pvm/nds_hash].
              Reuse the step's handle. *)
-          Lwt.return_some ({irmin = irmin'; nds = nds_state'}, v)
-      | Some (_, (Inactive, Some _, _)) ->
-          (* Step says [Inactive] but the durable carries
-             [/pvm/nds_hash] — the encoder wrote a marker without a
-             handle to back it.  Broken invariant. *)
-          Lwt.return_none
-      | Some (_, (Active _, None, _)) ->
+          Lwt.return_some ({irmin = irmin'; nds = Active nds}, v)
+      | Some (_, (`Activated (_, None), _)) ->
           (* Step says [Active] but the tree carries no marker —
              a step cannot unilaterally promote to [Active] without
              the encoder committing the cryptographic marker. *)
           Lwt.return_none
-      | Some (_, (Active _, Some _, _)) ->
+      | Some (_, (`Activated (_, Some _), _)) ->
           (* Step's tag and marker agree on [Active] but the marker
              is not the canonical [empty_registry_hash] — the kernel
              mutated the registry within this tick (impossible for a

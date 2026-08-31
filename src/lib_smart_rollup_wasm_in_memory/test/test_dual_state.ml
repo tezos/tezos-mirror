@@ -658,6 +658,79 @@ struct
     let+ irmin', () = irmin_cross_step irmin_state in
     (dual irmin' nds_state, ())
 
+  (** {!make_seeded_inactive_state} with a [/pvm] subtree, as every real
+      WASM PVM state has.  Without [/pvm], the marker's absence is provable
+      from the root node that every proof carries, so reading it costs
+      nothing; once it exists, a proof that did not descend into it carries
+      only its hash. *)
+  let make_pvm_shaped_inactive_state () =
+    let open Lwt.Syntax in
+    let* irmin = make_seeded_inactive_state () in
+    Irmin.set_value irmin ["pvm"; "status"] (Bytes.of_string "1")
+
+  (** Pre-activation interop, legacy -> dual, on a realistic tree shape.
+      Differs from {!test_cross_single_state_proof_verified_by_dual} only in
+      that shape, which is the whole point: [verify_irmin_only_proof] reads
+      [/pvm/nds_hash], a legacy single-state prover never does, and once
+      [/pvm] exists that read hits a blinded node.
+
+      The unit form of an on-chain failure: output proofs — every outbox
+      message execution — are produced over a narrow read set, so a dual
+      verifier rejected all of them. *)
+  let test_cross_single_state_narrow_proof_verified_by_dual () =
+    let open Lwt_result_syntax in
+    let context = make_empty_context () in
+    let*! irmin = make_pvm_shaped_inactive_state () in
+    let*! proof_opt = Irmin.produce_proof context irmin irmin_cross_step in
+    match proof_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "single-state produce_proof returned None for an honest step"
+    | Some (irmin_proof, ()) -> (
+        let bare =
+          Data_encoding.Binary.to_bytes_exn Irmin.proof_encoding irmin_proof
+        in
+        let proof =
+          match Data_encoding.Binary.of_bytes_opt Dual.proof_encoding bare with
+          | Some (Dual.Irmin_only _ as p) -> p
+          | Some (Dual.Dual _) ->
+              Test.fail
+                ~__LOC__
+                "bare single-state proof bytes mis-decoded as Dual"
+          | None ->
+              Test.fail
+                ~__LOC__
+                "bare single-state proof bytes failed to decode as a dual \
+                 machine proof"
+        in
+        let*! verify_res =
+          Lwt.catch
+            (fun () ->
+              let open Lwt.Syntax in
+              let+ r = Dual.verify_proof proof dual_cross_step in
+              `Returned r)
+            (fun exn -> Lwt.return (`Raised exn))
+        in
+        match verify_res with
+        | `Returned (Some ({Dual.nds = Dual.Inactive; _}, ())) -> return_unit
+        | `Returned (Some ({Dual.nds = Dual.Active _; _}, ())) ->
+            Test.fail
+              ~__LOC__
+              "dual verify_proof promoted a pre-activation single-state proof \
+               to Active"
+        | `Returned None ->
+            Test.fail
+              ~__LOC__
+              "dual verify_proof rejected an honest proof produced by the \
+               single-state machine over a narrow read set"
+        | `Raised exn ->
+            Test.fail
+              ~__LOC__
+              "dual verify_proof raised on an honest single-state proof over a \
+               narrow read set: %s"
+              (Printexc.to_string exn))
+
   (** Pre-activation interop, legacy -> dual: a single-state proof's
       bare bytes decode as-is with [Dual.proof_encoding] and pass the
       dual machine's [verify_proof] — a dual node ingesting a legacy
@@ -1531,6 +1604,10 @@ struct
         "cross: single-state machine proof verified by the dual machine"
         `Quick
         test_cross_single_state_proof_verified_by_dual;
+      tztest
+        "cross: single-state narrow proof verified by the dual machine"
+        `Quick
+        test_cross_single_state_narrow_proof_verified_by_dual;
       tztest
         "cross: dual machine Irmin_only proof verified by the single-state \
          machine"
