@@ -45,12 +45,14 @@ let runtime_tags = List.map Tezosx_runtime.tag
 
 module Setup = struct
   let register_sandbox_test ?uses_client ~title ~tags ~with_runtimes
-      ?tez_bootstrap_accounts ?chain_id ?enable_michelson_gas_refund =
+      ?tez_bootstrap_accounts ?chain_id ?enable_michelson_gas_refund
+      ?minimum_base_fee_per_gas =
     Test_helpers.register_sandbox
       ~__FILE__
       ?uses_client
       ?tez_bootstrap_accounts
       ?chain_id
+      ?minimum_base_fee_per_gas
       ~kernel:Latest
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
@@ -562,6 +564,89 @@ let test_reveal () =
     JSON.(manager_key |> as_string_opt = Some receiver_account.public_key)
       (option string)
       ~error_msg:"Expected %R but got %L") ;
+  unit
+
+(** A fresh account is funded and reveals in the same blueprint, so the reveal
+    is validated against a state where the account does not exist yet and its
+    counter reads as absent. The kernel reads a missing counter as 0 ([counter]
+    in tezos_execution/src/account_storage.rs) and so expects counter 1; the
+    blueprint validator must agree, or it drops an operation the kernel would
+    apply. The second account reveals at counter 2 — what the old default
+    expected — and must be rejected.
+
+    The zero fee and [minimum_base_fee_per_gas:0] are what make the counter
+    check reachable at all: the account's balance is read from that same state,
+    so any fee it cannot cover is rejected first. *)
+let test_reveal_in_funding_block () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~minimum_base_fee_per_gas:Wei.zero
+    ~title:"Reveal tezos native account in its funding block"
+    ~tags:["reveal"; "counter"; "fresh"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let* tez_client = tezlink_client sandbox in
+  (* Both land in the blueprint produced below. The reveal is forged by hand:
+     the client will not estimate fees for a source that does not exist yet.
+     Distinct funders, so the funding transfers do not share a counter. *)
+  let fund_and_reveal ~funder ~counter =
+    let* account = Client.gen_and_show_keys tez_client in
+    let* () =
+      Client.transfer
+        ~giver:funder.Account.alias
+        ~receiver:account.Account.public_key_hash
+        ~amount:(Tez.of_int 1000)
+        ~burn_cap:Tez.one
+        tez_client
+    in
+    let* branch = Client.RPC.call tez_client @@ RPC.get_chain_block_hash () in
+    let* reveal_op =
+      Operation.Manager.(
+        operation
+          ~branch
+          [
+            make
+              ~source:account
+              ~counter
+              ~fee:0
+              ~gas_limit:10000
+              ~storage_limit:0
+              (reveal account ());
+          ])
+        tez_client
+    in
+    let* (`OpHash _) = Operation.inject ~dont_wait:true reveal_op tez_client in
+    return account
+  in
+  let* expected_counter_account =
+    fund_and_reveal ~funder:Constant.bootstrap5 ~counter:1
+  in
+  let* future_counter_account =
+    fund_and_reveal ~funder:Constant.bootstrap4 ~counter:2
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  let* manager_key =
+    account_rpc sandbox expected_counter_account "manager_key"
+  in
+  Check.(
+    JSON.(
+      manager_key |> as_string_opt = Some expected_counter_account.public_key)
+      (option string)
+      ~error_msg:
+        "The reveal at counter 1 should have been included: expected manager \
+         key %R, got %L") ;
+  let* counter = account_rpc sandbox expected_counter_account "counter" in
+  Check.(
+    JSON.(counter |> as_string_opt = Some "1")
+      (option string)
+      ~error_msg:"Expected counter %R after the reveal but got %L") ;
+  let* manager_key = account_rpc sandbox future_counter_account "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = None)
+      (option string)
+      ~error_msg:
+        "The reveal at counter 2 should have been rejected: expected manager \
+         key %R, got %L") ;
   unit
 
 let test_delayed_inbox_transfer () =
@@ -7384,6 +7469,7 @@ let () =
   test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
+  test_reveal_in_funding_block () ;
   test_delayed_inbox_transfer () ;
   test_cross_runtime_transfer_from_evm_to_tz () ;
   test_cross_runtime_transfer_to_evm_via_call () ;
