@@ -30,6 +30,7 @@ let shell_fail err : 'a Environment.Error_monad.shell_tzresult Lwt.t =
 
 type Environment.Error_monad.error +=
   | Sc_rollup_proof_on_multi_tick_section_during_dissecting of Z.t
+  | Sc_rollup_proof_on_missing_start_state_during_dissecting of Z.t
   | Sc_rollup_multiple_operations_for_game_in_block of {
       rollup : Sr.Address.t;
       stakers : Game.Index.t;
@@ -62,6 +63,26 @@ let () =
       | _ -> None)
     (fun distance ->
       Sc_rollup_proof_on_multi_tick_section_during_dissecting distance) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "block_validation_plugin.sc_rollup_proof_on_missing_start_state_during_dissecting"
+    ~title:"Proof submitted on a section with no start state during dissecting"
+    ~description:
+      "A refutation game player submitted a Proof move during the Dissecting \
+       phase on a section whose agreed start state is absent."
+    ~pp:(fun ppf tick ->
+      Format.fprintf
+        ppf
+        "Proof submitted during dissecting on a section starting at tick %s \
+         whose agreed start state is absent"
+        (Z.to_string tick))
+    Data_encoding.(obj1 (req "tick" (conv Z.to_string Z.of_string string)))
+    (function
+      | Sc_rollup_proof_on_missing_start_state_during_dissecting tick ->
+          Some tick
+      | _ -> None)
+    (fun tick -> Sc_rollup_proof_on_missing_start_state_during_dissecting tick) ;
   register_error_kind
     `Permanent
     ~id:
@@ -207,7 +228,7 @@ let check_refute_proof context rollup stakers choice
       | Game.Dissecting {dissection; _} -> (
           match find_section_around_choice dissection choice with
           | Error `Choice_not_found -> return_unit
-          | Ok (start_chunk, stop_chunk) ->
+          | Ok (start_chunk, stop_chunk) -> (
               let dist =
                 Sr.Tick.distance
                   start_chunk.Sr.Dissection_chunk.tick
@@ -216,7 +237,19 @@ let check_refute_proof context rollup stakers choice
               if Z.compare dist Z.one > 0 then
                 shell_fail
                   (Sc_rollup_proof_on_multi_tick_section_during_dissecting dist)
-              else return_unit)
+              else
+                (* Even on a single-tick section, a proof whose agreed start
+                   state is absent ([None]) is indefensible: no PVM proof can
+                   start from [None], so both players fail the start-state
+                   check, the protocol stores a [Final_move] on the [None]
+                   chunk and the game resolves as a [Draw] that burns the
+                   honest staker's bond. Reject it like a multi-tick proof. *)
+                match start_chunk.Sr.Dissection_chunk.state_hash with
+                | None ->
+                    shell_fail
+                      (Sc_rollup_proof_on_missing_start_state_during_dissecting
+                         (Sr.Tick.to_z start_chunk.Sr.Dissection_chunk.tick))
+                | Some _ -> return_unit))
       | Game.Final_move _ -> return_unit)
 
 let check_block_operation {context; seen_games}

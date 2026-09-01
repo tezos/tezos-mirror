@@ -15,6 +15,15 @@ type Environment.Error_monad.error +=
       proven_level : Protocol.Alpha_context.Raw_level.t;
     }
 
+(** Raised by {!check_block_operation} when a refutation [Proof] move is played,
+    during the [Dissecting] phase, on a distance-one section whose agreed start
+    state is absent ([None]): no PVM proof can start from [None], so the move
+    traps the game in an indefensible [Final_move] that resolves as a [Draw] and
+    burns the honest player's bond. Exposed so the rejection can be asserted
+    precisely in tests. Carries the tick of the section's start chunk. *)
+type Environment.Error_monad.error +=
+  | Sc_rollup_proof_on_missing_start_state_during_dissecting of Z.t
+
 (** Fast shell-side state threaded through block validation. *)
 type block_validation_state
 
