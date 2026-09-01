@@ -1212,7 +1212,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         (* The following variables are only used in the YAML.
            We can inline them later but for now the diff with the old Tezt.job function
            is easier to review with them. *)
-        ("TESTS", Tezt_core.TSL.show test_selection);
         ("TEZT_RETRY", string_of_int retry_tests);
         ("TEZT_PARALLEL", string_of_int parallel_tests);
         (* The following variable must be an environment variable
@@ -1223,7 +1222,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     let variables_to_echo =
       (* Later this could be computed from [variables], but for now we try to reduce
          the diff as much as possible to ease reviewing. *)
-      ["TESTS"; "CI_NODE_INDEX"; "CI_NODE_TOTAL"; "TEZT_PARALLEL"]
+      ["CI_NODE_INDEX"; "CI_NODE_TOTAL"; "TEZT_PARALLEL"]
     in
     let cmd_echo_variables =
       let message =
@@ -1250,7 +1249,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
              else "--without-select-tezts");
           ];
           ["--"];
-          ["\"${TESTS}\""];
+          ["'" ^ Tezt_core.TSL.show test_selection ^ "'"];
           [
             "--from-record";
             (* Ideally we woud use SH.quote here.
@@ -1297,7 +1296,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
              else "--without-select-tezts");
           ];
           ["--"];
-          ["\"${TESTS}\""];
+          ["'" ^ Tezt_core.TSL.show test_selection ^ "'"];
           ["--color"];
           ["--log-buffer-size"; "5000"];
           ["--log-file"; "tezt.log"];
