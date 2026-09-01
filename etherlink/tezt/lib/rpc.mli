@@ -87,6 +87,7 @@ module Request : sig
     | Syncing
     | NewIncludedTransactions
     | NewPreconfirmedReceipts
+    | L1L2Levels of int option
 
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 
