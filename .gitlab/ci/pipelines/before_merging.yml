@@ -1460,7 +1460,7 @@ etherlink.tezt:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --with-select-tezts
     -- "${TESTS}" --from-record tezt/records/etherlink --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -1484,7 +1484,6 @@ etherlink.tezt:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "3"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -1550,7 +1549,7 @@ etherlink.tezt-extra:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --with-select-tezts
     -- "${TESTS}" --from-record tezt/records/etherlink/extra --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -1574,7 +1573,6 @@ etherlink.tezt-extra:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "6"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -extra
   artifacts:
     expire_in: 7 days
     paths:
@@ -1641,7 +1639,7 @@ etherlink.tezt-flaky:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --with-select-tezts
     -- "${TESTS}" --from-record tezt/records/etherlink/flaky --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -1665,7 +1663,6 @@ etherlink.tezt-flaky:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
     TEZT_RETRY: "3"
-    TEZT_VARIANT: -flaky
   artifacts:
     expire_in: 7 days
     paths:
@@ -1731,7 +1728,7 @@ etherlink.tezt-slow:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'etherlink/tezt/tests/main.exe' --with-select-tezts
     -- "${TESTS}" --from-record tezt/records/etherlink/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -1755,7 +1752,6 @@ etherlink.tezt-slow:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "3"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -slow
   artifacts:
     expire_in: 7 days
     paths:
@@ -5595,7 +5591,7 @@ release_site.tezt:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --tezt-exe 'release_site/tezt/main.exe' --without-select-tezts
     -- "${TESTS}" --from-record tezt/records/release_site --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -5619,7 +5615,6 @@ release_site.tezt:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
     TEZT_RETRY: "0"
-    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -5960,7 +5955,7 @@ tezt:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -5982,7 +5977,6 @@ tezt:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "6"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: ""
   artifacts:
     expire_in: 7 days
     paths:
@@ -6048,7 +6042,7 @@ tezt-extra:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/extra
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6070,7 +6064,6 @@ tezt-extra:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "6"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -extra
   artifacts:
     expire_in: 7 days
     paths:
@@ -6136,7 +6129,7 @@ tezt-flaky:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/flaky
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6158,7 +6151,6 @@ tezt-flaky:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
     TEZT_RETRY: "3"
-    TEZT_VARIANT: -flaky
   artifacts:
     expire_in: 7 days
     paths:
@@ -6224,7 +6216,7 @@ tezt-riscv-slow:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/riscv-slow
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6246,7 +6238,6 @@ tezt-riscv-slow:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "2"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -riscv-slow
   artifacts:
     expire_in: 7 days
     paths:
@@ -6311,7 +6302,7 @@ tezt-slow:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/slow
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6333,7 +6324,6 @@ tezt-slow:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "3"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -slow
   artifacts:
     expire_in: 7 days
     paths:
@@ -6400,7 +6390,7 @@ tezt-static-binaries:
   - mv octez-binaries/x86_64/octez-* .
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/static-binaries
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6423,7 +6413,6 @@ tezt-static-binaries:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "3"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -static-binaries
   artifacts:
     expire_in: 7 days
     paths:
@@ -6487,7 +6476,7 @@ tezt-time-sensitive:
   script:
   - . ./scripts/version.sh
   - echo "TESTS=\"${TESTS}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\"
-    TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+    TEZT_PARALLEL=\"${TEZT_PARALLEL}\""
   - ./scripts/ci/tezt.sh --with-select-tezts -- "${TESTS}" --from-record tezt/records/time-sensitive
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
@@ -6509,7 +6498,6 @@ tezt-time-sensitive:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
     TEZT_RETRY: "1"
-    TEZT_VARIANT: -time-sensitive
   artifacts:
     expire_in: 7 days
     paths:
