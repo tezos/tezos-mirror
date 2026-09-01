@@ -289,7 +289,7 @@ tezt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
-  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\""
+  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_NO_NPX=\"${TEZT_NO_NPX}\""
   - ./scripts/ci/tezt.sh --without-select-tezts -- '/ci_disabled && /time_sensitive
     && /slow && /extra && /cloud && /flaky' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -347,7 +347,7 @@ tezt-extra:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
-  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\""
+  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_NO_NPX=\"${TEZT_NO_NPX}\""
   - ./scripts/ci/tezt.sh --without-select-tezts -- 'extra && /ci_disabled && /time_sensitive
     && /slow && /cloud && /flaky' --from-record tezt/records/extra --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -405,7 +405,7 @@ tezt-flaky:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
-  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\""
+  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_NO_NPX=\"${TEZT_NO_NPX}\""
   - ./scripts/ci/tezt.sh --without-select-tezts -- '/ci_disabled && /time_sensitive
     && /slow && /extra && /cloud && flaky' --from-record tezt/records/flaky --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
@@ -463,7 +463,7 @@ tezt-slow:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
-  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\""
+  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_NO_NPX=\"${TEZT_NO_NPX}\""
   - ./scripts/ci/tezt.sh --without-select-tezts -- 'slow && /ci_disabled && /time_sensitive
     && /extra && /cloud' --from-record tezt/records/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --list-tsv > selected_tezts.tsv
@@ -520,7 +520,7 @@ tezt-time-sensitive:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/version.sh
-  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\""
+  - echo "CI_NODE_INDEX=\"${CI_NODE_INDEX}\" CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_NO_NPX=\"${TEZT_NO_NPX}\""
   - ./scripts/ci/tezt.sh --without-select-tezts -- 'time_sensitive && /ci_disabled
     && /slow && /extra && /cloud' --from-record tezt/records/time-sensitive --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
