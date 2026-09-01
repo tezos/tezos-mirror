@@ -1302,6 +1302,22 @@ module Scripts = struct
         | _ -> None)
       (fun () -> Run_operation_does_not_support_consensus_operations)
 
+  let check_increase_paid_storage
+      ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+    let open Environment.Error_monad.Result_syntax in
+    List.iter_e
+      (fun op ->
+        match op with
+        | Contents
+            (Manager_operation
+               {operation = Increase_paid_storage {amount_in_bytes; _}; _})
+          when not (Z.fits_int64 amount_in_bytes) ->
+            tzfail
+              (Block_validation.Increase_paid_storage_amount_overflow
+                 amount_in_bytes)
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
+
   (** Validate and apply the operation but skip signature checks; do
       not support consensus operations.
 
@@ -1319,6 +1335,7 @@ module Scripts = struct
             Run_operation_does_not_support_consensus_operations
       | _ -> Result_syntax.return_unit
     in
+    let*? () = check_increase_paid_storage packed_operation in
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
     let* _validate_operation_state =

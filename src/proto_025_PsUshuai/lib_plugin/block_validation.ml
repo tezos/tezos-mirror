@@ -286,6 +286,7 @@ type Environment.Error_monad.error +=
       published_level : Raw_level.t;
       level : Raw_level.t;
     }
+  | Increase_paid_storage_amount_overflow of Z.t
 
 let () =
   let open Environment.Error_monad in
@@ -317,7 +318,23 @@ let () =
           Some (published_level, level)
       | _ -> None)
     (fun (published_level, level) ->
-      Sc_rollup_refute_dal_proof_future_published_level {published_level; level})
+      Sc_rollup_refute_dal_proof_future_published_level {published_level; level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.increase_paid_storage_amount_overflow"
+    ~title:"increase paid storage amount overflow"
+    ~description:
+      "The storage amount for the operation Increase_paid_storage does not fit \
+       in an int64."
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Increase_paid_storage operation error: amount %s does not fit an int64"
+        (Z.to_string amount))
+    Data_encoding.(obj1 (req "amount" (conv Z.to_string Z.of_string string)))
+    (function
+      | Increase_paid_storage_amount_overflow amount -> Some amount | _ -> None)
+    (fun amount -> Increase_paid_storage_amount_overflow amount)
 
 (* The DAL page [published_level] targeted by a refutation [Proof] move, if the
    move carries a DAL page proof. *)
@@ -384,6 +401,12 @@ let check_double_baking_evidence (bh1 : Block_header.t) (bh2 : Block_header.t) =
   | None, _ | _, None ->
       Error (Invalid_double_baking_evidence {level = bh1.shell.level})
 
+let check_increase_paid_storage_amount amount_in_bytes :
+    unit Environment.Error_monad.shell_tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  if Z.fits_int64 amount_in_bytes then return_unit
+  else shell_fail (Increase_paid_storage_amount_overflow amount_in_bytes)
+
 let check_block_operation {context; seen_games}
     ({protocol_data = Operation_data {contents; _}; _} as packed_op :
       packed_operation) :
@@ -426,6 +449,16 @@ let check_block_operation {context; seen_games}
             match check_double_baking_evidence bh1 bh2 with
             | Ok () -> return seen_games
             | Error err -> shell_fail err)
+        | Contents
+            (Manager_operation
+               {
+                 source = _;
+                 operation =
+                   Increase_paid_storage {amount_in_bytes; destination = _};
+                 _;
+               }) ->
+            let* () = check_increase_paid_storage_amount amount_in_bytes in
+            return seen_games
         | _ -> return seen_games)
       seen_games
       (Operation.to_list (Contents_list contents))

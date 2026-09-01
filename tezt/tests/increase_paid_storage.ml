@@ -52,9 +52,43 @@ let test_increase_paid_storage =
   let* () = Client.bake_for_and_wait client in
   let payer = Constant.bootstrap2.alias in
   let* result =
-    Client.increase_paid_storage ~contract ~amount:1000 ~payer client
+    Client.increase_paid_storage ~contract ~amount:(Z.of_int 1000) ~payer client
   in
   Regression.capture result ;
   unit
 
-let register ~protocols = test_increase_paid_storage protocols
+let test_increase_paid_storage_z =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Test increase paid storage amount overflow is rejected"
+    ~tags:[team; "client"; "increase_paid_storage"]
+  @@ fun protocol ->
+  let* _node, client = Client.init_with_protocol ~protocol `Client () in
+  let* _alias, contract =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:(Account.Bootstrap.alias 1)
+      ~init:"Unit"
+      ~burn_cap:(Tez.of_int 1)
+      client
+      ["opcodes"; "noop"]
+      protocol
+  in
+  let* () = Client.bake_for_and_wait client in
+  let amount = Z.(succ (of_int64 Int64.max_int)) in
+  let err =
+    rexf
+      "Increase_paid_storage operation error: amount %s does not fit an int64"
+      (Z.to_string amount)
+  in
+  Client.spawn_increase_paid_storage
+    ~amount
+    ~payer:(Account.Bootstrap.alias 2)
+    ~contract
+    client
+  |> Process.check_error ~msg:err
+
+let register ~protocols =
+  test_increase_paid_storage protocols ;
+  test_increase_paid_storage_z
+    (List.filter (fun p -> p = Protocol.Alpha || p = Protocol.U025) protocols)
