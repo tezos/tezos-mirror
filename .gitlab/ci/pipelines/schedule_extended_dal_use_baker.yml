@@ -299,8 +299,8 @@ tezt:
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     tezt-junit.xml --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${TEZT_PARALLEL} --retry 1 --record-mem-peak --mem-warn 5_000_000_000 --keep-going
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -311,7 +311,6 @@ tezt:
   variables:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "6"
-    TEZT_RETRY: "1"
   artifacts:
     expire_in: 7 days
     paths:
@@ -359,8 +358,8 @@ tezt-extra:
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     tezt-junit.xml --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/extra
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${TEZT_PARALLEL} --retry 1 --record-mem-peak --mem-warn 5_000_000_000 --keep-going
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -371,7 +370,6 @@ tezt-extra:
   variables:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "6"
-    TEZT_RETRY: "1"
   artifacts:
     expire_in: 7 days
     paths:
@@ -419,8 +417,8 @@ tezt-flaky:
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     tezt-junit.xml --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/flaky
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${TEZT_PARALLEL} --retry 3 --record-mem-peak --mem-warn 5_000_000_000 --keep-going
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -431,7 +429,6 @@ tezt-flaky:
   variables:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
-    TEZT_RETRY: "3"
   artifacts:
     expire_in: 7 days
     paths:
@@ -478,8 +475,8 @@ tezt-slow:
     && /extra && /cloud' --color --log-buffer-size 5000 --log-file tezt.log --global-timeout
     1800 --on-unknown-regression-files fail --junit tezt-junit.xml --junit-mem-peak
     'dd_tags[memory.peak]' --from-record tezt/records/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results.json --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
-    --record-mem-peak --mem-warn 5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky'
+    --record tezt-results.json --job-count ${TEZT_PARALLEL} --retry 1 --record-mem-peak
+    --mem-warn 5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky'
     --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
     --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
     --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
@@ -490,7 +487,6 @@ tezt-slow:
   variables:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "3"
-    TEZT_RETRY: "1"
   artifacts:
     expire_in: 7 days
     paths:
@@ -538,8 +534,8 @@ tezt-time-sensitive:
     1800 --test-timeout 540 --on-unknown-regression-files fail --junit tezt-junit.xml
     --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/time-sensitive
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
-    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
-    --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${TEZT_PARALLEL} --retry 1 --record-mem-peak --mem-warn 5_000_000_000 --keep-going
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -550,7 +546,6 @@ tezt-time-sensitive:
   variables:
     TEZT_NO_NPX: "true"
     TEZT_PARALLEL: "1"
-    TEZT_RETRY: "1"
   artifacts:
     expire_in: 7 days
     paths:

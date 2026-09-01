@@ -1212,7 +1212,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         (* The following variables are only used in the YAML.
            We can inline them later but for now the diff with the old Tezt.job function
            is easier to review with them. *)
-        ("TEZT_RETRY", string_of_int retry_tests);
         ("TEZT_PARALLEL", string_of_int parallel_tests);
         (* The following variable must be an environment variable
            because it is not only used in the YAML. *)
@@ -1318,7 +1317,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           ["--job"; "${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}"];
           ["--record"; "tezt-results.json"];
           ["--job-count"; "${TEZT_PARALLEL}"];
-          ["--retry"; "${TEZT_RETRY}"];
+          ["--retry"; string_of_int retry_tests];
           ["--record-mem-peak"];
           ["--mem-warn"; "5_000_000_000"];
           (match pipeline with
