@@ -1206,12 +1206,12 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       in
       if variant = "" then dir else dir // variant
     in
+    let junit_xml = "tezt-junit.xml" in
     let variables =
       [
         (* The following variables are only used in the YAML.
            We can inline them later but for now the diff with the old Tezt.job function
            is easier to review with them. *)
-        ("JUNIT", "tezt-junit.xml");
         ("TEZT_VARIANT", if variant = "" then "" else "-" ^ variant);
         ("TESTS", Tezt_core.TSL.show test_selection);
         ("TEZT_RETRY", string_of_int retry_tests);
@@ -1226,7 +1226,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
          the diff as much as possible to ease reviewing. *)
       [
         "TESTS";
-        "JUNIT";
         "CI_NODE_INDEX";
         "CI_NODE_TOTAL";
         "TEZT_PARALLEL";
@@ -1293,7 +1292,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       SH.command
         "./scripts/ci/tezt.sh"
         [
-          ["--send-junit"; "${JUNIT}"];
+          ["--send-junit"; junit_xml];
           (match Component.name with
           | None -> []
           | Some name -> ["--datadog-service"; name]);
@@ -1316,7 +1315,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           | No_timeout -> []
           | Minutes m -> ["--test-timeout"; string_of_int (60 * m)]);
           ["--on-unknown-regression-files"; "fail"];
-          ["--junit"; "${JUNIT}"];
+          ["--junit"; junit_xml];
           ["--junit-mem-peak"; SH.quote "dd_tags[memory.peak]"];
           [
             "--from-record";
@@ -1386,13 +1385,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ~variables
       ~artifacts:
         (Gitlab_ci.Util.artifacts
-           ~reports:(Gitlab_ci.Util.reports ~junit:"$JUNIT" ())
+           ~reports:(Gitlab_ci.Util.reports ~junit:junit_xml ())
            [
              "selected_tezts.tsv";
              "tezt.log";
              "tezt-*.log";
              "tezt-results.json";
-             "$JUNIT";
+             junit_xml;
            ]
            ~expire_in:(Duration (Days 7))
            ~when_:Always)
