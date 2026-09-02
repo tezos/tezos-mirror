@@ -42,3 +42,25 @@ val find_future_dal_refute :
   level:Protocol.Alpha_context.Raw_level.t ->
   Protocol.Alpha_context.packed_operation ->
   Protocol.Alpha_context.Raw_level.t option
+
+(** [check_execute_outbox_message context ~rollup ~output_proof] checks the
+    validity of a given [output_proof] against the rollup. Returns an error if
+    not the case. *)
+val check_execute_outbox_message :
+  Protocol.Alpha_context.t ->
+  rollup:Protocol.Alpha_context.Sc_rollup.t ->
+  output_proof:string ->
+  unit Environment.Error_monad.tzresult Lwt.t
+
+(** [check_refute_proof context ~rollup ~stakers ~choice ~proof] checks the
+    validity of a given refutation [proof] at tick [choice] for the game between
+    [stakers]. Returns an error if not the case. *)
+val check_refute_proof :
+  Protocol.Alpha_context.t ->
+  rollup:Protocol.Alpha_context.Sc_rollup.t ->
+  stakers:Protocol.Alpha_context.Sc_rollup.Game.Index.t ->
+  choice:Protocol.Alpha_context.Sc_rollup.Tick.t ->
+  proof:
+    Protocol.Alpha_context.Sc_rollup.Proof.serialized
+    Protocol.Alpha_context.Sc_rollup.Proof.t ->
+  unit Environment.Error_monad.tzresult Lwt.t

@@ -187,7 +187,7 @@ let find_section_around_choice dissection choice =
    level. The proven level is read from the inclusion proof's target (last)
    cell. *)
 let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
-  let open Lwt_result_syntax in
+  let open Environment.Error_monad.Lwt_result_syntax in
   match proof.Proof.input_proof with
   | Some (Proof.Inbox_proof {level = claimed_level; proof = serialized; _}) -> (
       match Inbox.of_serialized_proof serialized with
@@ -217,25 +217,100 @@ let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
               in
               if Raw_level.equal proven_level claimed_level then return_unit
               else
-                shell_fail
+                tzfail
                   (Sc_rollup_inbox_proof_claimed_level_mismatch
                      {claimed_level; proven_level})))
   | _ ->
       (* Not an inbox proof (reveal / first inbox message / no input proof). *)
       return_unit
 
-let check_refute_proof context rollup stakers choice
-    (proof : Proof.serialized Proof.t) :
-    unit Environment.Error_monad.shell_tzresult Lwt.t =
-  let open Lwt_result_syntax in
+let protect_use_wasm_pvm ?config context rollup k =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  let* _ctxt, kind = Sr.kind context rollup in
+  match kind with
+  | Wasm_2_0_0 ->
+      Lwt.catch
+        (fun () ->
+          let* config =
+            match config with
+            | None ->
+                let+ signals = Sr.Internal_for_tests.signals context in
+                List.map
+                  (fun (name, level) -> (name, Raw_level.to_int32 level))
+                  signals
+            | Some config -> return config
+          in
+          k (Sr.Wasm_2_0_0PVM.protocol_implementation ~config))
+        (function
+          | (Stack_overflow | Out_of_memory | Lwt.Canceled) as exn ->
+              Lwt.reraise exn
+          | _exn -> tzfail (Proof.Sc_rollup_proof_check "Invalid proof"))
+  | _ -> return_unit
+
+(* Replay, in the plugin, the PVM verification the protocol will perform when
+   applying the operation, and reject the operation if it raises an exception
+   (typically from the Irmin proof-replay layer) instead of returning an error:
+   such an exception escapes [lib_protocol] and aborts block application. *)
+let check_proof context rollup game (proof : Proof.serialized Proof.t) =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  protect_use_wasm_pvm context rollup @@ fun (module PVM) ->
+  match
+    Data_encoding.Binary.of_string_opt
+      PVM.proof_encoding
+      (proof.Proof.pvm_step :> string)
+  with
+  | None ->
+      tzfail (Proof.Sc_rollup_proof_check "Cannot decode refutation PVM proof")
+  | Some pvm_step ->
+      let reveal_activation_level =
+        Constants.sc_rollup_reveal_activation_level context
+      in
+      let is_reveal_enabled =
+        Sr.is_reveal_enabled_predicate reveal_activation_level
+      in
+      let dal_activation_level =
+        if (Constants.parametric context).dal.feature_enable then
+          Some reveal_activation_level.dal_parameters
+        else None
+      in
+      let dal_attested_slots_validity_lag =
+        reveal_activation_level.dal_attested_slots_validity_lag
+      in
+      let* _ctxt, genesis_info = Sr.genesis_info context rollup in
+      let metadata =
+        Sr.Metadata.{address = rollup; origination_level = genesis_info.level}
+      in
+      (* As long as we don't raise an exception, we are happy.
+         Proof correctness is asserted by the protocol. *)
+      let*! (_ :
+              (Sr.input option * Sr.input_request)
+              Environment.Error_monad.tzresult) =
+        Proof.valid
+          ~pvm:(module PVM)
+          ~metadata
+          game.Game.inbox_snapshot
+          game.Game.inbox_level
+          game.Game.dal_snapshot
+          ~find_dal_parameters:(Dal.Past_parameters.parameters context)
+          ~dal_activation_level
+          ~is_reveal_enabled
+          ~dal_attested_slots_validity_lag
+          {proof with Proof.pvm_step}
+      in
+      return_unit
+
+let check_refute_proof context ~rollup ~stakers ~choice
+    ~(proof : Proof.serialized Proof.t) :
+    unit Environment.Error_monad.tzresult Lwt.t =
+  let open Environment.Error_monad.Lwt_result_syntax in
   let* _ctxt, game_opt =
     Sr.Refutation_storage.find_game context rollup stakers
-    |> Lwt.map Environment.wrap_tzresult
   in
   match game_opt with
   | None -> return_unit
   | Some game -> (
       let* () = check_inbox_proof_level proof in
+      let* () = check_proof context rollup game proof in
       match game.Game.game_state with
       | Game.Dissecting {dissection; _} -> (
           match find_section_around_choice dissection choice with
@@ -247,7 +322,7 @@ let check_refute_proof context rollup stakers choice
                   stop_chunk.Sr.Dissection_chunk.tick
               in
               if Z.compare dist Z.one > 0 then
-                shell_fail
+                tzfail
                   (Sc_rollup_proof_on_multi_tick_section_during_dissecting dist)
               else
                 (* Even on a single-tick section, a proof whose agreed start
@@ -258,7 +333,7 @@ let check_refute_proof context rollup stakers choice
                    honest staker's bond. Reject it like a multi-tick proof. *)
                 match start_chunk.Sr.Dissection_chunk.state_hash with
                 | None ->
-                    shell_fail
+                    tzfail
                       (Sc_rollup_proof_on_missing_start_state_during_dissecting
                          (Sr.Tick.to_z start_chunk.Sr.Dissection_chunk.tick))
                 | Some _ -> return_unit))
@@ -407,6 +482,16 @@ let check_increase_paid_storage_amount amount_in_bytes :
   if Z.fits_int64 amount_in_bytes then return_unit
   else shell_fail (Increase_paid_storage_amount_overflow amount_in_bytes)
 
+let check_execute_outbox_message context ~rollup ~output_proof =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  (* [config] is empty for outbox proof verification per protocol semantics *)
+  protect_use_wasm_pvm ~config:[] context rollup @@ fun (module PVM) ->
+  let output_proof =
+    Data_encoding.Binary.of_string_exn PVM.output_proof_encoding output_proof
+  in
+  let*! _ = PVM.verify_output_proof output_proof in
+  return_unit
+
 let check_block_operation {context; seen_games}
     ({protocol_data = Operation_data {contents; _}; _} as packed_op :
       packed_operation) :
@@ -422,6 +507,24 @@ let check_block_operation {context; seen_games}
           (Sc_rollup_refute_dal_proof_future_published_level
              {published_level; level = current_level})
     | None -> return_unit
+  in
+  let* () =
+    List.iter_es
+      (function
+        | Contents
+            (Manager_operation
+               {
+                 operation =
+                   Sc_rollup_execute_outbox_message {rollup; output_proof; _};
+                 _;
+               }) ->
+            let* () =
+              check_execute_outbox_message context ~rollup ~output_proof
+              |> Lwt.map Environment.wrap_tzresult
+            in
+            return_unit
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
   in
   let* seen_games =
     List.fold_left_es
@@ -439,7 +542,8 @@ let check_block_operation {context; seen_games}
             let* () =
               match refutation with
               | Game.Move {step = Game.Proof proof; choice} ->
-                  check_refute_proof context rollup stakers choice proof
+                  check_refute_proof context ~rollup ~stakers ~choice ~proof
+                  |> Lwt.map Environment.wrap_tzresult
               | _ -> return_unit
             in
             return seen_games
