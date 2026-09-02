@@ -1,4 +1,4 @@
-Version 25.1
+Version 25.2
 ============
 
 Changes
@@ -14,6 +14,23 @@ Version 25 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v25 can be found :ref:`here <v25_breaking_changes>`.
+
+Octez v25.2
+~~~~~~~~~~~
+
+Octez version 25.2 hardens the Octez node against security threats and improves
+its robustness by:
+- introducing stricter validation that rejects ill-formed operations before they are applied
+- strengthening Micheline parsing to early reject too deeply nested values
+- improving DAL node robustness and resilience
+
+  - The DAL node now bounds the memory and processing resources used to handle
+    peer-to-peer traffic, keeping it robust under heavy or abnormal traffic.
+  - An unresponsive DAL node no longer blocks baker proposing and attesting, and
+    bakers now detect when their DAL node is down.
+  - A crash that could occur when restarting a DAL node is now fixed
+
+This release also includes several minor improvements to the robustness of the L1 node.
 
 Octez v25.1
 ~~~~~~~~~~~
@@ -143,6 +160,7 @@ If you are using Docker instead, use the ``octez-v25.1`` Docker images of Octez.
 Changelog
 ---------
 
+- `Version 25.2 <../CHANGES.html#version-25-2>`_
 - `Version 25.1 <../CHANGES.html#version-25-1>`_
 - `Version 25.0 <../CHANGES.html#version-25-0>`_
 - `Version 25.0~rc1 <../CHANGES.html#version-25-0-rc1>`_
