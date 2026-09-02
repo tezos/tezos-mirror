@@ -546,29 +546,28 @@ let job_alpine_ci =
     ("images.alpine-ci-all:" ^ arch_str)
 
 let job_alpine_ci_merge =
+  (* Branch-only tag, as for the other base images: it lets a test branch
+     pin [base_images_tag] to its slug once instead of at every commit. *)
+  let tag_generic = "${CI_COMMIT_REF_SLUG}" in
+  let tag = tag_generic ^ "-${CI_COMMIT_SHORT_SHA}" in
+  let registry = "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos" in
   docker_job
-    ~extra_variables:
-      [
-        ("REGISTRY", "${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos");
-        ("TAG", "${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}");
-        (* Branch-only tag, as for the other base images: it lets a test branch
-           pin [base_images_tag] to its slug once instead of at every commit. *)
-        ("TAG_GENERIC", "${CI_COMMIT_REF_SLUG}");
-      ]
     ~script:
       ("docker buildx create --driver docker-container --use --name tezos"
       :: List.map
            (fun image_short_name ->
-             Format.sprintf
-               "docker buildx imagetools create --tag \
-                \"${REGISTRY}/alpine-%s:${TAG}\" --tag \
-                \"${REGISTRY}/alpine-%s:${TAG_GENERIC}\" \
-                \"${REGISTRY}/alpine-%s:${TAG}-amd64\" \
-                \"${REGISTRY}/alpine-%s:${TAG}-arm64\""
-               image_short_name
-               image_short_name
-               image_short_name
-               image_short_name)
+             let image_name = registry ^ "/alpine-" ^ image_short_name in
+             String.concat
+               " "
+               [
+                 "docker buildx imagetools create";
+                 (* Output tags *)
+                 "--tag " ^ image_name ^ ":" ^ tag;
+                 "--tag " ^ image_name ^ ":" ^ tag_generic;
+                 (* Input tags *)
+                 image_name ^ ":" ^ tag ^ "-amd64";
+                 image_name ^ ":" ^ tag ^ "-arm64";
+               ])
            [
              "runtime";
              "monitoring";

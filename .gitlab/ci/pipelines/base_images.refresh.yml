@@ -45,26 +45,34 @@ images.alpine-ci-all.merge:
   script:
   - ./scripts/ci/docker_initialize.sh
   - docker buildx create --driver docker-container --use --name tezos
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-runtime:${TAG}" --tag
-    "${REGISTRY}/alpine-runtime:${TAG_GENERIC}" "${REGISTRY}/alpine-runtime:${TAG}-amd64"
-    "${REGISTRY}/alpine-runtime:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-monitoring:${TAG}" --tag
-    "${REGISTRY}/alpine-monitoring:${TAG_GENERIC}" "${REGISTRY}/alpine-monitoring:${TAG}-amd64"
-    "${REGISTRY}/alpine-monitoring:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-prebuild:${TAG}" --tag
-    "${REGISTRY}/alpine-prebuild:${TAG_GENERIC}" "${REGISTRY}/alpine-prebuild:${TAG}-amd64"
-    "${REGISTRY}/alpine-prebuild:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-build:${TAG}" --tag
-    "${REGISTRY}/alpine-build:${TAG_GENERIC}" "${REGISTRY}/alpine-build:${TAG}-amd64"
-    "${REGISTRY}/alpine-build:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-release-page:${TAG}"
-    --tag "${REGISTRY}/alpine-release-page:${TAG_GENERIC}" "${REGISTRY}/alpine-release-page:${TAG}-amd64"
-    "${REGISTRY}/alpine-release-page:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-test:${TAG}" --tag "${REGISTRY}/alpine-test:${TAG_GENERIC}"
-    "${REGISTRY}/alpine-test:${TAG}-amd64" "${REGISTRY}/alpine-test:${TAG}-arm64"
-  - docker buildx imagetools create --tag "${REGISTRY}/alpine-e2etest:${TAG}" --tag
-    "${REGISTRY}/alpine-e2etest:${TAG_GENERIC}" "${REGISTRY}/alpine-e2etest:${TAG}-amd64"
-    "${REGISTRY}/alpine-e2etest:${TAG}-arm64"
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-runtime:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-runtime:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-runtime:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-runtime:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-monitoring:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-monitoring:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-monitoring:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-monitoring:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-prebuild:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-prebuild:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-prebuild:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-prebuild:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-build:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-build:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-build:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-build:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-release-page:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-release-page:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-release-page:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-release-page:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-test:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-test:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-test:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-test:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
+  - docker buildx imagetools create --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-e2etest:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+    --tag ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-e2etest:${CI_COMMIT_REF_SLUG}
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-e2etest:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-amd64
+    ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/alpine-e2etest:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-arm64
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -72,9 +80,6 @@ images.alpine-ci-all.merge:
   - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
   variables:
     DOCKER_VERSION: 28.5.1
-    REGISTRY: ${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos
-    TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
-    TAG_GENERIC: ${CI_COMMIT_REF_SLUG}
   retry:
     max: 2
     when:
