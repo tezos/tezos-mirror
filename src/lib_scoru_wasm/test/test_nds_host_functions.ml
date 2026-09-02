@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -407,12 +408,28 @@ let test_nds_store_write_extends () =
 (* P2 — Registry operations                                             *)
 (* -------------------------------------------------------------------- *)
 
+(* [nds_registry_resize] is now both a query (diff=0) and a mutation
+   (diff != 0); on success it returns the new size as i32. *)
 let test_nds_registry_resize_grow () =
   let open Lwt.Syntax in
   let module_reg, module_key, host_funcs_registry, nds =
     make_nds_module_inst [] 100l
   in
-  (* Default registry has 1 database (index 0). Grow to 2. *)
+  let assert_size =
+   fun expected_size ->
+    let+ size =
+      invoke_nds
+        ~module_reg
+        ~module_key
+        ~host_funcs_registry
+        ~nds
+        Host_funcs.Internal_for_tests.nds_registry_resize
+        Values.[Num (I64 0L)]
+    in
+    assert (size = Values.[Num (I32 expected_size)])
+  in
+  (* Default registry has 1 database (index 0). Grow by +1 to 2. *)
+  let* () = assert_size 1l in
   let* result =
     invoke_nds
       ~module_reg
@@ -420,9 +437,10 @@ let test_nds_registry_resize_grow () =
       ~host_funcs_registry
       ~nds
       Host_funcs.Internal_for_tests.nds_registry_resize
-      Values.[Num (I64 2L)]
+      Values.[Num (I64 1L)]
   in
-  assert (result = Values.[Num (I32 0l)]) ;
+  assert (result = Values.[Num (I32 2l)]) ;
+  let* () = assert_size 2l in
   (* Verify database 1 is accessible by writing to it *)
   let key = "k" in
   let key_offset = 100l in
@@ -454,17 +472,21 @@ let test_nds_registry_resize_shrink () =
   let module_reg, module_key, host_funcs_registry, nds =
     make_nds_module_inst [] 100l
   in
-  (* Grow to 2, then shrink back to 1 *)
-  let* _result =
-    invoke_nds
-      ~module_reg
-      ~module_key
-      ~host_funcs_registry
-      ~nds
-      Host_funcs.Internal_for_tests.nds_registry_resize
-      Values.[Num (I64 2L)]
+  let assert_size =
+   fun expected_size ->
+    let+ size =
+      invoke_nds
+        ~module_reg
+        ~module_key
+        ~host_funcs_registry
+        ~nds
+        Host_funcs.Internal_for_tests.nds_registry_resize
+        Values.[Num (I64 0L)]
+    in
+    assert (size = Values.[Num (I32 expected_size)])
   in
-  let* result =
+  (* Grow by +1 to 2, then shrink by -1 back to 1 *)
+  let* _result =
     invoke_nds
       ~module_reg
       ~module_key
@@ -473,7 +495,18 @@ let test_nds_registry_resize_shrink () =
       Host_funcs.Internal_for_tests.nds_registry_resize
       Values.[Num (I64 1L)]
   in
-  assert (result = Values.[Num (I32 0l)]) ;
+  let* () = assert_size 2l in
+  let* result =
+    invoke_nds
+      ~module_reg
+      ~module_key
+      ~host_funcs_registry
+      ~nds
+      Host_funcs.Internal_for_tests.nds_registry_resize
+      Values.[Num (I64 (-1L))]
+  in
+  assert (result = Values.[Num (I32 1l)]) ;
+  let* () = assert_size 1l in
   (* Database 1 should now be out of bounds *)
   let key = "k" in
   let key_offset = 100l in
@@ -501,7 +534,7 @@ let test_nds_registry_copy () =
   let key_len = Int32.of_int (String.length key) in
   let db_index = 0L in
   populate_nds nds ~db_index [(Bytes.of_string key, Bytes.of_string "cpval")] ;
-  (* Grow to 2 databases *)
+  (* Grow by +1 (registry now has 2 databases) *)
   let* _result =
     invoke_nds
       ~module_reg
@@ -509,7 +542,7 @@ let test_nds_registry_copy () =
       ~host_funcs_registry
       ~nds
       Host_funcs.Internal_for_tests.nds_registry_resize
-      Values.[Num (I64 2L)]
+      Values.[Num (I64 1L)]
   in
   (* Copy db 0 -> db 1 *)
   let* result =
@@ -545,7 +578,7 @@ let test_nds_registry_move () =
   let key_len = Int32.of_int (String.length key) in
   let db_index = 0L in
   populate_nds nds ~db_index [(Bytes.of_string key, Bytes.of_string "mvval")] ;
-  (* Grow to 2 databases *)
+  (* Grow by +1 (registry now has 2 databases) *)
   let* _result =
     invoke_nds
       ~module_reg
@@ -553,7 +586,7 @@ let test_nds_registry_move () =
       ~host_funcs_registry
       ~nds
       Host_funcs.Internal_for_tests.nds_registry_resize
-      Values.[Num (I64 2L)]
+      Values.[Num (I64 1L)]
   in
   (* Move db 0 -> db 1 *)
   let* result =
@@ -760,12 +793,12 @@ let test_nds_store_exists_bad_db_index () =
   assert (result = Values.[Num (I32 (-14l))]) ;
   Lwt.return_ok ()
 
-let test_nds_registry_resize_too_large () =
+let test_nds_registry_resize_invalid () =
   let open Lwt.Syntax in
   let module_reg, module_key, host_funcs_registry, nds =
     make_nds_module_inst [] 100l
   in
-  (* Attempt to resize from 1 to 100 (delta > 1 is not allowed) *)
+  (* Diff > 1 is rejected by the Rust backend. *)
   let* result =
     invoke_nds
       ~module_reg
@@ -773,9 +806,21 @@ let test_nds_registry_resize_too_large () =
       ~host_funcs_registry
       ~nds
       Host_funcs.Internal_for_tests.nds_registry_resize
-      Values.[Num (I64 100L)]
+      Values.[Num (I64 99L)]
   in
-  (* -15 = Nds_resize_too_large *)
+  (* -15 = Nds_resize_invalid *)
+  assert (result = Values.[Num (I32 (-15l))]) ;
+  (* Shrinking below zero (cur=1, diff=-2) is also invalid; the OCaml
+     bound check rejects it before reaching the Rust backend. *)
+  let* result =
+    invoke_nds
+      ~module_reg
+      ~module_key
+      ~host_funcs_registry
+      ~nds
+      Host_funcs.Internal_for_tests.nds_registry_resize
+      Values.[Num (I64 (-2L))]
+  in
   assert (result = Values.[Num (I32 (-15l))]) ;
   Lwt.return_ok ()
 
@@ -1292,9 +1337,9 @@ let tests =
       `Quick
       test_nds_store_exists_bad_db_index;
     tztest
-      "nds_registry_resize too large -> -15"
+      "nds_registry_resize invalid -> -15"
       `Quick
-      test_nds_registry_resize_too_large;
+      test_nds_registry_resize_invalid;
     tztest "nds_registry_copy oob -> -14" `Quick test_nds_registry_copy_oob;
     tztest "nds_registry_clear oob -> -14" `Quick test_nds_registry_clear_oob;
     tztest

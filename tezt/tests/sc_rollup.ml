@@ -146,15 +146,20 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
   let* _ = Client.bake_for_and_wait client in
   return keys
 
+(* Declared at module level so the dependency is registered with the Tezt
+   [Uses] system when this module is loaded, not only when an outbox test that
+   actually consumes the kernel runs - which causes flakiness in the
+   runtime dependencies check. *)
+let riscv_echo_kernel = Uses.make ~tag:"riscv" ~path:"riscv-echo" ()
+
+let riscv_echo_kernel_checksum =
+  Uses.make ~tag:"riscv" ~path:"riscv-echo.checksum" ()
+
 let make_read_outbox_echo_kernel kind () =
   match kind with
   | "wasm_2_0_0" -> read_kernel "echo"
   | "riscv" -> (
-      let kernel = "riscv-echo" in
-      try
-        read_riscv_kernel
-          (Uses.make ~tag:"riscv" ~path:kernel ())
-          (Uses.make ~tag:"riscv" ~path:(kernel ^ ".checksum") ())
+      try read_riscv_kernel riscv_echo_kernel riscv_echo_kernel_checksum
       with Sys_error e ->
         Test.fail
           ~__LOC__
@@ -9463,6 +9468,429 @@ let test_refute_apply_assertion_halts_baking_2nodes =
          on a proposal carrying the un-appliable op (a consensus halt)."
         level_before
 
+(* ------------------------------------------------------------------------ *)
+(* Refutation proof whose replay raises an Irmin exception                   *)
+(* ------------------------------------------------------------------------ *)
+
+(* A serialized WASM-PVM proof -- a [Context_binary.Proof.tree Proof.t] in the
+   [Merkle_proof_encoding.V2.Tree2] encoding -- whose Merkle state is
+
+     Extender {length = 1; segment = [0]; proof = Blinded_inode h}
+
+   for an arbitrary [h]. Loading that state materialises the extender, which
+   dereferences the blinded inode pointer and makes [irmin-pack] raise
+   [Dangling_hash]. This happens in Irmin's [load_proof], i.e. before the
+   [before]-hash consistency check, so [before], [after] and [h] are all
+   arbitrary (all zeros here). The [version] field must have its second bit set:
+   the WASM PVM only accepts binary (non-stream) proofs.
+
+   [Dangling_hash] is not one of the cases Irmin turns into a [`Proof_mismatch]
+   error, so it escapes [Sc_rollup_proof_repr.valid] -- hence [lib_protocol] --
+   as an exception rather than a tzresult, aborting whatever was applying the
+   operation.
+
+   [input_proof] is omitted below ([None]), so [valid] goes straight to the PVM
+   proof replay.
+
+   Recorded as a hex literal because it cannot be produced through the
+   client/RPC. To regenerate: build the [Proof_types.t] described above and
+   print [Data_encoding.Binary.to_string_exn
+   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+   .tree_proof_encoding] of it as hex. *)
+let malicious_dangling_hash_pvm_step =
+  "03000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d8010140c00000000000000000000000000000000000000000000000000000000000000000"
+
+let malicious_dangling_hash_step : Ezjsonm.value =
+  `O [("pvm_step", `String malicious_dangling_hash_pvm_step)]
+
+(* Build [p1]'s malicious proof [Move] WITHOUT injecting. The gas limit is
+   generous so that the proof replay is reached before any gas exhaustion. *)
+let build_dangling_hash_refute ~sc_rollup client =
+  let p1 = Constant.bootstrap1 in
+  let p2 = Constant.bootstrap2 in
+  let malicious_op =
+    Operation.Manager.(
+      make ~source:p1 ~gas_limit:200_000 ~fee:1_000_000
+      @@ sc_rollup_refute
+           ~sc_rollup
+           ~opponent:p2.public_key_hash
+           ~refutation:
+             (Move
+                {
+                  choice_tick = 0;
+                  refutation_step = Proof malicious_dangling_hash_step;
+                })
+           ())
+  in
+  Operation.Manager.operation [malicious_op] client
+
+(* End-to-end check of the plugin gate on refutation proofs whose replay raises
+   instead of returning an error ([check_proof] in
+   [proto_025_PsUshuai/lib_plugin/block_validation.ml]).
+
+   Operation validation does not verify PVM proofs, so the malicious refute op
+   is [validated] in the mempool and is a candidate at forging; there the
+   plugin's [check_block_operation] gates it BEFORE the apply simulation.
+
+   The gate is the ONLY thing that stops the op here, so the test fails without
+   it. Two configuration choices are what make that so, and both are the ones a
+   real baker uses:
+
+   - the baker builds the block on the node's context ([--context], i.e. the
+     baker's "local node" mode) instead of delegating construction to the
+     [preapply] RPC. The RPC path would drop the op on its own, since
+     [Block_validation.preapply_operation] APPLIES each operation and is
+     [protect]ed, turning the Irmin exception into an [Exn _] error;
+   - forging does not apply operations ("force apply: false", the default), so
+     [Baking_simulator.add_operation] only VALIDATES them -- and operation
+     validation does not verify PVM proofs.
+
+   Without the gate the op is therefore included in the block; the baker's own
+   node then aborts applying that block in [proto_apply_operations], which is
+   NOT [protect]ed: the Irmin exception surfaces as a critical context error and
+   the node shuts itself down. Injecting one operation to kill every baker's
+   node is the impact this gate prevents.
+
+   We forge with [Client.bake_for] rather than a baker daemon: it runs the same
+   [operation_selection] path synchronously, so there is no daemon scheduling
+   and no concurrent mempool flush to race against. The op is handed to it in an
+   external operations pool ([--operations-pool] with [--ignore-node-mempool]):
+   feeding it through the node mempool instead is racy, as [bake for] forges a
+   few milliseconds after subscribing to the mempool and usually never sees the
+   op at all.
+
+   Steps (2) and (3) establish that the recorded proof is a live reproducer:
+   applied outside the plugin -- [helpers/preapply/operations] and
+   [run_operation] both apply operations with the protocol directly -- it
+   aborts. Without them the test could pass vacuously if the literal ever
+   stopped decoding, since the plugin rejects undecodable proofs too. They also
+   pin that those two RPCs answer the failure instead of taking the node down
+   with them, which is what makes the exception harmless outside block
+   application.
+
+   [wasm_2_0_0] because the plugin's [check_proof] only replays WASM proofs.
+   Registered on protocol 025 only: that is where this plugin gate lives. *)
+(* Shared driver for the two tests below. Both build an operation whose
+   APPLICATION aborts with an Irmin exception, and both check the same four
+   things: the mempool validates it (operation validation does not replay
+   proofs), it is still a live reproducer through the protocol alone, the RPCs
+   that do replay it ([preapply/operations] and [run_operation]) report the
+   failure and keep serving, and the plugin gate keeps it out of blocks -- so
+   the baker's node survives.
+
+   [what] names the operation kind in failure messages. *)
+let check_un_appliable_op_kept_out_of_blocks ~protocol ~node ~client ~keys ~what
+    op =
+  (* (1) Operation validation does not verify the proof, so the mempool accepts
+     the op: it is [validated], hence a forging candidate. *)
+  let* (`OpHash oph) = Operation.inject op client in
+  let* mempool = Mempool.get_mempool client in
+  if not (List.mem oph mempool.validated) then
+    Test.fail
+      "Expected the malicious %s operation %s to be 'validated' (operation \
+       validation does not verify PVM proofs). validated=[%s] \
+       branch_delayed=[%s] refused=[%s]"
+      what
+      oph
+      (String.concat "," mempool.validated)
+      (String.concat "," mempool.branch_delayed)
+      (String.concat "," mempool.refused) ;
+  Log.info "OK (1): the operation %s passed mempool validation." oph ;
+  (* (2) The proof really does abort application: replayed by the protocol
+     outside the plugin, the Irmin exception escapes and the RPC fails. *)
+  let* signature = Operation.sign ~protocol op client in
+  let preapply_input =
+    Operation.make_preapply_operation_input ~protocol ~signature op
+  in
+  let* response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_preapply_operations
+           ~data:(Data (`A [preapply_input]))
+           ()))
+  in
+  let body = JSON.encode response.body in
+  if response.code = 200 then
+    Test.fail
+      "Expected applying the operation outside the plugin to abort, but \
+       preapply returned HTTP 200 with body: %s. The recorded proof is no \
+       longer a reproducer, so this test would no longer exercise anything."
+      body ;
+  Log.info
+    "OK (2): applying the operation outside the plugin aborts (HTTP %d): %s"
+    response.code
+    body ;
+  (* (3) [run_operation] is the other RPC that applies the operation with the
+     protocol and without the plugin, so it aborts on the same exception. What
+     matters here is that it aborts as an RPC failure and NOTHING MORE: the
+     exception must surface to the caller as a 500, not be routed through the
+     shell's critical-context-error path the way a failed block application is.
+     Anyone can call this RPC on a public node, so the day that changes, one
+     unsigned operation takes any node down without ever being baked. *)
+  let* run_input = Operation.make_run_operation_input op client in
+  let* run_response =
+    Node.RPC.(
+      call_json
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data run_input)))
+  in
+  let run_body = JSON.encode run_response.body in
+  if run_response.code = 200 then
+    Test.fail
+      "Expected run_operation on the malicious %s operation to abort, but it \
+       returned HTTP 200 with body: %s."
+      what
+      run_body ;
+  if run_response.code <> 500 && run_body =~! rex "Invalid proof" then
+    Test.fail
+      "Expected run_operation to return \"Invalid proof\" but it failed with \
+       (HTTP %d): %s."
+      run_response.code
+      run_body ;
+  (* The node answered the failure rather than dying on it -- and this call
+     also proves it is still alive after both RPCs above. *)
+  let* (_ : JSON.t) = Node.RPC.call node @@ RPC.get_chain_block_header () in
+  Log.info
+    "OK (3): run_operation aborts (HTTP %d) and the node is still serving RPCs."
+    run_response.code ;
+  (* (4) Hand the baker an external operations pool holding exactly the
+     malicious op and nothing else, and forge one block on the node's context
+     (see the configuration discussion above the test). *)
+  let pool_file = Temp.file "operations_pool.json" in
+  let* pending =
+    Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
+  let pool =
+    JSON.(pending |-> "validated" |> as_list)
+    |> List.map (fun o ->
+           let field name = (name, JSON.(o |-> name |> unannotate)) in
+           `O [field "branch"; field "contents"; field "signature"])
+  in
+  Check.((List.length pool = 1) int)
+    ~error_msg:
+      "Expected the mempool to hold exactly the malicious operation, got %L \
+       validated operations." ;
+  write_file
+    pool_file
+    ~contents:(JSON.encode (JSON.annotate ~origin:"operations_pool" (`A pool))) ;
+  let* level_before = Node.get_level node in
+  let* () =
+    Client.bake_for
+      ~keys
+      ~ignore_node_mempool:true
+      ~mempool:pool_file
+      ~context_path:(Node.data_dir node)
+      client
+  in
+  (* The baker's own node must accept the block it just injected. Without the
+     gate it does not: applying the block aborts on the Irmin exception, which
+     the node reports as a critical context error and shuts itself down on --
+     so this wait fails on a terminated node. *)
+  let* level_after =
+    Lwt.catch
+      (fun () -> Node.wait_for_level node (level_before + 1))
+      (fun exn ->
+        Test.fail
+          "The node did not switch to the block the baker just injected (%s). \
+           The un-appliable %s operation %s was included in that block -- \
+           forging only validates operations, it does not apply them -- so \
+           applying the block aborts (see steps 2 and 3) and takes the node \
+           down with it."
+          (Printexc.to_string exn)
+          what
+          oph)
+  in
+  Check.((level_after = level_before + 1) int)
+    ~error_msg:"Expected the baker to forge a block at level %R, got %L." ;
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let manager_ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if List.exists (fun o -> JSON.(o |-> "hash" |> as_string) = oph) manager_ops
+  then
+    Test.fail
+      "The un-appliable operation %s was included in the forged block at level \
+       %d; it must be dropped at forging, since applying it aborts (see steps \
+       2 and 3), which would make the block un-appliable for every other node."
+      oph
+      level_after ;
+  Log.info
+    "OK (4): the operation %s was dropped at forging and the block at level %d \
+     was produced cleanly."
+    oph
+    level_after ;
+  unit
+
+let test_refute_dangling_hash_proof_dropped_at_forging =
+  let commitment_period = 5 in
+  register_test
+    ~__FILE__
+    ~kind:"wasm_2_0_0"
+    ~tags:["refutation"; "game"; "proof"; "irmin"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dangling_hash proof: baker drops un-appliable refute op at \
+       forging (plugin)"
+  @@ fun protocol ->
+  let* node, client =
+    setup_l1 ~commitment_period ~challenge_window:100 protocol
+  in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"wasm_2_0_0"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* Generic single-tick game setup, shared with the DAL-overflow tests: two
+     conflicting single-tick commitments, then [p1] starts the dispute, so the
+     next expected move is a proof move. *)
+  let* () =
+    setup_dal_overflow_game ~keys ~commitment_period ~sc_rollup client
+  in
+  let* op = build_dangling_hash_refute ~sc_rollup client in
+  check_un_appliable_op_kept_out_of_blocks
+    ~protocol
+    ~node
+    ~client
+    ~keys
+    ~what:"refute"
+    op
+
+(* ------------------------------------------------------------------------ *)
+(* Outbox execution whose proof replay raises an Irmin exception             *)
+(* ------------------------------------------------------------------------ *)
+
+let hex_of_string s =
+  String.concat
+    ""
+    (List.map
+       (fun c -> sf "%02x" (Char.code c))
+       (List.of_seq (String.to_seq s)))
+
+(* A serialized WASM-PVM output proof whose Merkle state is the same poisoned
+   shape as [malicious_dangling_hash_pvm_step] -- one extender over a blinded
+   inode, which makes [irmin-pack] raise [Dangling_hash] while Irmin LOADS the
+   proof, before any of its hashes is checked.
+
+   [Sc_rollup_wasm.V2_0_0]'s [output_proof_encoding] is
+
+     obj2 (req "output_proof" <Tree2 tree proof>)
+          (req "output_proof_output" <outbox_level, message_index, message>)
+
+   so the bytes are that tree proof followed by a minimal well-formed output.
+
+   Unlike the refutation case the [before] hash cannot be arbitrary:
+   [Sc_rollup_operations.validate_and_decode_output_proof] checks
+   [state_of_output_proof proof = compressed_state] of the cemented commitment
+   BEFORE calling [verify_output_proof], and [state_of_output_proof] is exactly
+   the proof's [before] hash. So the proof is assembled here, around the
+   rollup's own cemented state, rather than recorded as a literal. *)
+let malicious_dangling_hash_output_proof ~compressed_state =
+  let zero_hash = String.concat "" (List.init 32 (fun _ -> "00")) in
+  let before =
+    Tezos_crypto.Hashed.Smart_rollup_state_hash.(
+      of_b58check_exn compressed_state |> to_string)
+    |> hex_of_string
+  in
+  String.concat
+    ""
+    [
+      (* The tree proof is a [Data_encoding.Compact] encoding with a one-byte
+         tag: the tag byte first, then the payloads. The shapes are those of
+         [malicious_dangling_hash_pvm_step], hence the same tag byte. *)
+      "03";
+      (* version 2: the second bit must be set, the WASM PVM only accepts
+         binary (non-stream) proofs. *)
+      "0002";
+      before;
+      (* [after] is never reached: loading the state raises first. *)
+      zero_hash;
+      (* Extender {length = 1; segment = [0]; proof = Blinded_inode _} *)
+      "d8010140c0";
+      zero_hash;
+      (* output_proof_output: outbox level 0, message index 0, and an empty
+         [Atomic_transaction_batch] (tag 0, then a 4-byte list length). Only
+         its decoding matters -- the exception fires before the output is
+         looked at. *)
+      "00000000";
+      "00";
+      "00";
+      "00000000";
+    ]
+
+(* Same gate, same configuration and same impact as
+   [test_refute_dangling_hash_proof_dropped_at_forging] above, on the other
+   operation the plugin guards: [Sc_rollup_execute_outbox_message]. No
+   refutation game is needed -- a freshly originated rollup already has a
+   cemented commitment, its genesis one, which is all the protocol checks the
+   proof against before replaying it. *)
+let test_execute_outbox_dangling_hash_proof_dropped_at_forging =
+  register_test
+    ~__FILE__
+    ~kind:"wasm_2_0_0"
+    ~tags:["outbox"; "proof"; "irmin"; "baker"; "plugin"]
+    ~title:
+      "Sc_rollup, dangling_hash output proof: baker drops un-appliable outbox \
+       op at forging (plugin)"
+  @@ fun protocol ->
+  let* node, client = setup_l1 protocol in
+  let keys =
+    Account.Bootstrap.keys
+    |> Array.map (fun k -> k.Account.alias)
+    |> Array.to_list
+  in
+  let* sc_rollup =
+    originate_sc_rollup
+      ~keys
+      ~kind:"wasm_2_0_0"
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  (* A fresh rollup's last cemented commitment is its genesis commitment. *)
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let cemented_commitment =
+    JSON.(genesis_info |-> "commitment_hash" |> as_string)
+  in
+  let* commitment =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
+         ~sc_rollup
+         ~hash:cemented_commitment
+         ()
+  in
+  let output_proof =
+    malicious_dangling_hash_output_proof
+      ~compressed_state:commitment.compressed_state
+  in
+  let* op =
+    Operation.Manager.(
+      operation
+        [
+          make ~source:Constant.bootstrap1
+          @@ sc_rollup_execute_outbox_message
+               ~sc_rollup
+               ~cemented_commitment
+               ~output_proof
+               ();
+        ]
+        client)
+  in
+  check_un_appliable_op_kept_out_of_blocks
+    ~protocol
+    ~node
+    ~client
+    ~keys
+    ~what:"outbox execution"
+    op
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -9586,6 +10014,12 @@ let register ~protocols =
   test_refute_apply_assertion_gossiped_op_refused before_v ;
   test_refute_apply_assertion_baker_excludes_op before_v ;
   test_refute_apply_assertion_halts_baking_2nodes protocols ;
+  (* The plugin gate on proofs raising an Irmin exception only exists in the
+     protocol 025 plugin. *)
+  test_refute_dangling_hash_proof_dropped_at_forging
+    (List.filter (fun p -> Protocol.number p = 025) protocols) ;
+  test_execute_outbox_dangling_hash_proof_dropped_at_forging
+    (List.filter (fun p -> Protocol.number p = 025) protocols) ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
   (* Specific Arith PVM tezts *)

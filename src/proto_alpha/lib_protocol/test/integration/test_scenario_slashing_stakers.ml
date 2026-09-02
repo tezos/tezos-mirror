@@ -158,7 +158,95 @@ let test_simple_slash =
                (make_denunciations ())
          --> check_snapshot_balances "before slash")
 
-let tests = tests_of_scenarios @@ [("Test simple slashing", test_simple_slash)]
+let test_stake_with_slashed_unstake_requests =
+  init_constants ~blocks_per_cycle:8l ()
+  --> begin_test ["baker"; "denouncer"; "faucet"]
+  --> set_delegate_params
+        "baker"
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.one;
+        }
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 400_000_000_000L))
+  --> set_delegate "staker" (Some "baker")
+  --> wait_delegate_parameters_activation
+  (* The baker stakes on top of its initial 200_000ꜩ stake, then the
+     staker stakes towards the baker. *)
+  --> stake "baker" (Amount (Tez.of_mutez 100_000_000_000L))
+  --> stake "staker" (Amount (Tez.of_mutez 200_000_000_000L))
+  --> check_balance_field "baker" `Staked (Tez.of_mutez 300_000_000_000L)
+  --> check_balance_field "staker" `Staked (Tez.of_mutez 200_000_000_000L)
+  (* Wait until both stakes are taken into account in the rights of the
+     misbehaviour below, hence in the amount that gets slashed. *)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay + 1)
+  --> double_bake "baker"
+  --> (Tag "denounce in the misbehaviour cycle" --> Empty
+      |+ Tag "denounce in the next cycle" --> next_cycle)
+  (* The baker unstakes a third of its stake: it keeps way more than the
+     minimal frozen stake required to bake. Its staker unstakes
+     everything. *)
+  --> unstake "baker" (Amount (Tez.of_mutez 100_000_000_000L))
+  --> unstake "staker" All --> set_baker "denouncer" --> make_denunciations ()
+  (* Wait until the cycle right before the unstake requests become
+     finalizable. Meanwhile, the double baking has been slashed: 5% of the
+     500_000ꜩ that were staked when the rights of the misbehaviour were
+     computed, taken from the stake the baker has left, and 5% of each of
+     the two unstake requests. *)
+  --> wait_n_cycles_f (fun (_, state) -> State.unstake_wait state - 1)
+  --> check_balance_field "baker" `Staked (Tez.of_mutez 175_000_000_000L)
+  --> check_balance_field "staker" `Staked Tez.zero
+  --> check_balance_field "baker" `Unstaked_finalizable Tez.zero
+  --> check_balance_field
+        "baker"
+        `Unstaked_frozen_total
+        (Tez.of_mutez 95_000_000_000L)
+  --> check_balance_field
+        "staker"
+        `Unstaked_frozen_total
+        (Tez.of_mutez 190_000_000_000L)
+  --> check_balance_field "baker" `Liquid (Tez.of_mutez 3_700_000_000_000L)
+  --> snapshot_balances "before restaking" ["baker"]
+  --> stake "baker" (Amount (Tez.of_mutez 40_000_000_000L))
+  (* The unstake requests of the baker have been slashed, so it cannot
+     stake from them: they are left untouched, and the stake is taken from
+     the liquid balance instead. *)
+  --> check_snapshot_balances
+        ~f:
+          (assert_balance_evolution
+             ~loc:__LOC__
+             ~for_accounts:["baker"]
+             ~part:`unstaked_frozen
+             Q.equal)
+        "before restaking"
+  --> check_balance_field "baker" `Liquid (Tez.of_mutez 3_660_000_000_000L)
+  (* Both unstake requests are now finalizable. *)
+  --> next_cycle
+  --> check_balance_field
+        "baker"
+        `Unstaked_finalizable
+        (Tez.of_mutez 95_000_000_000L)
+  --> check_balance_field
+        "staker"
+        `Unstaked_finalizable
+        (Tez.of_mutez 190_000_000_000L)
+  --> finalize_unstake "baker" --> finalize_unstake "staker"
+  --> check_balance_field "baker" `Unstaked_finalizable Tez.zero
+  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+  --> check_balance_field "baker" `Liquid (Tez.of_mutez 3_755_000_000_000L)
+  --> check_balance_field "staker" `Liquid (Tez.of_mutez 390_000_000_000L)
+  --> next_cycle
+
+let tests =
+  tests_of_scenarios
+  @@ [
+       ("Test simple slashing", test_simple_slash);
+       ( "Test stake with slashed unstake requests",
+         test_stake_with_slashed_unstake_requests );
+     ]
 
 let () =
   register_tests

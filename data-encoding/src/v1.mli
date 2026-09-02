@@ -2117,6 +2117,8 @@ module Binary : sig
     | User_invariant_guard of string
         (** A user-provided guard returned an [Error _]. E.g., in a
             {!conv_with_guard}.*)
+    | Too_many_recursive_calls
+        (** Decoding requires more than 100_000 non-tail recursive calls. *)
 
   (** [Read_error e] is an exception wrapping the {!read_error} [e]. It is used
       only by function suffixed by [_exn] where the suffix-less function would

@@ -120,7 +120,7 @@ let test_increase_paid_storage =
 
   (* 3. Increase the paid storage space. *)
   let increase = 100 in
-  let amount = increase in
+  let amount = Z.of_int increase in
   let payer = Constant.bootstrap1.alias in
   let* _ = Client.increase_paid_storage ~contract ~amount ~payer client in
   let* () = Client.bake_for_and_wait client in

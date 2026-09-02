@@ -2047,6 +2047,41 @@ let commands_rw () =
         let contract = Contract.Implicit source in
         let arg = None in
         let entrypoint = Some Entrypoint.stake in
+        (* Show the stake that would actually be credited *)
+        let show_credited_stake () =
+          let open Lwt_syntax in
+          let* credited_res =
+            simulated_staked_amount
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~source
+              ~amount
+          in
+          match credited_res with
+          | Ok (Some credited) ->
+              let diff_mutez =
+                Int64.sub (Tez.to_mutez amount) (Tez.to_mutez credited)
+              in
+              cctxt#message
+                "At the delegate's current conversion rate, staking %a will \
+                 credit %a of stake to the staker%t."
+                Tez.pp
+                amount
+                Tez.pp
+                credited
+                (fun ppf ->
+                  if Int64.compare diff_mutez 0L > 0 then
+                    Format.fprintf
+                      ppf
+                      " (%a lost to rounding)"
+                      Tez.pp
+                      (Tez.of_mutez_exn diff_mutez)
+                  else Format.fprintf ppf "")
+          | Ok None | Error _ -> Lwt.return_unit
+        in
+        let open Lwt_result_syntax in
+        let*! () = show_credited_stake () in
         (* TODO #6162
            (unless --force)
               - check contract is delegated

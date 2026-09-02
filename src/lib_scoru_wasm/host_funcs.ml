@@ -41,7 +41,7 @@ module Error = struct
     | Store_invalid_subkey_index
     | Store_value_already_exists
     | Nds_database_out_of_bounds
-    | Nds_resize_too_large
+    | Nds_resize_invalid
     | Nds_not_enabled
 
   (** [code error] returns the error code associated to the error. *)
@@ -60,7 +60,7 @@ module Error = struct
     | Store_invalid_subkey_index -> -12l
     | Store_value_already_exists -> -13l
     | Nds_database_out_of_bounds -> -14l
-    | Nds_resize_too_large -> -15l
+    | Nds_resize_invalid -> -15l
     | Nds_not_enabled -> -16l
 end
 
@@ -789,6 +789,8 @@ module Tick_model = struct
 
   let nds_clear = one
 
+  let nds_size = one
+
   let nds_resize = one
 
   let nds_hash = one
@@ -1481,7 +1483,7 @@ module Nds_aux = struct
     | Nds_errors.Database_index_out_of_bounds ->
         Error.code Error.Nds_database_out_of_bounds
     | Nds_errors.Registry_resize_too_large ->
-        Error.code Error.Nds_resize_too_large
+        Error.code Error.Nds_resize_invalid
 
   let extract_nds_error_code = function
     | Error code -> Lwt.return code
@@ -1489,10 +1491,35 @@ module Nds_aux = struct
 
   let map_nds r = Result.map_error nds_error_code r
 
-  let registry_resize ~nds ~n =
-    map_nds (Nds.resize nds n)
-    |> Result.map (fun () -> 0l)
-    |> extract_nds_error_code
+  (** [registry_resize ~nds ~diff] queries the current registry size and
+      then, if [diff] is non-zero, adjusts the registry by [diff]
+      databases. Returns the new size as [int32].
+
+      - [diff = 0] is a pure size query (no [Nds.resize] call).
+      - [new_size < 0] returns [Nds_resize_invalid] without touching
+        the registry.
+      - [new_size > Int32.max_int] returns [Nds_resize_invalid] without
+        touching the registry.
+      - The Rust backend additionally enforces "delta of at most one"
+        and reports out-of-range deltas as
+        [Nds_errors.Registry_resize_too_large], which maps to
+        [Nds_resize_invalid] (also [-15]).
+  *)
+  let registry_resize ~nds ~diff =
+    let open Lwt_result_syntax in
+    let*! res =
+      let*? size = map_nds (Nds.size nds) in
+      let new_size = Int64.add size diff in
+      if
+        Int64.compare new_size 0L < 0
+        || Int64.compare new_size max_int32_as_int64 > 0
+      then fail (Error.code Error.Nds_resize_invalid)
+      else if Int64.equal diff 0L then return (Int64.to_int32 new_size)
+      else
+        let*? () = map_nds (Nds.resize nds new_size) in
+        return (Int64.to_int32 new_size)
+    in
+    extract_nds_error_code res
 
   let registry_copy ~nds ~src ~dst =
     map_nds (Nds.copy_database nds ~src ~dst)
@@ -1614,68 +1641,68 @@ module Nds_aux = struct
     extract_nds_error_code res
 end
 
-(** [nds_handler body] wraps [body] as an {!Host_funcs.Nds_host_func}.
-    [body] receives the [nds], the memory vector, and the input list,
-    and returns an [(i32 code, ticks)] pair. The helper re-threads
-    [nds] through the result and wraps the return code as an [I32]
-    WASM value. Input-arity mismatches raise {!Bad_input} from within
-    [body]. *)
-let nds_handler body =
-  Host_funcs.Nds_host_func
-    (fun _input _output nds memories inputs ->
-      let open Lwt.Syntax in
-      let+ code, ticks = body nds memories inputs in
-      (nds, [Values.(Num (I32 code))], ticks))
-
 let nds_disabled_code = Error.code Error.Nds_not_enabled
 
+let nds_implem ~nds_host_functions_enabled ~extract_inputs ~ticks_from_input
+    body =
+  let open Lwt_syntax in
+  let apply body inputs =
+    let inputs = extract_inputs inputs in
+    let ticks = ticks_from_input inputs in
+    let* code = body inputs in
+    return ([Values.(Num (I32 code))], ticks)
+  in
+  if not nds_host_functions_enabled then
+    Host_funcs.Host_func
+      (fun _input _output durable _memories inputs ->
+        let* returned_value, ticks =
+          apply (fun _ -> return nds_disabled_code) inputs
+        in
+        return (durable, returned_value, ticks))
+  else
+    Host_funcs.Nds_host_func
+      (fun _input _output nds memories inputs ->
+        let* returned_value, ticks = apply (body nds memories) inputs in
+        return (nds, returned_value, ticks))
+
 let nds_registry_resize ~nds_host_functions_enabled =
-  nds_handler @@ fun nds _memories -> function
-  | [Values.(Num (I64 n))] ->
-      let open Lwt.Syntax in
-      let ticks = Tick_model.(to_z nds_resize) in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, ticks)
-      else
-        let+ code = Nds_aux.registry_resize ~nds ~n in
-        (code, ticks)
-  | _ -> raise Bad_input
+  (* Worst-case: one [Nds.size] plus one [Nds.resize] backend call.
+     Charge unconditionally so the tick cost does not branch on the
+     runtime [diff] value. *)
+  let ticks_from_input = Fun.const Tick_model.(to_z (nds_size + nds_resize)) in
+  let extract_inputs = function
+    | [Values.Num (I64 diff)] -> diff
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds _memories diff -> Nds_aux.registry_resize ~nds ~diff
 
 let nds_registry_copy ~nds_host_functions_enabled =
-  nds_handler @@ fun nds _memories -> function
-  | [Values.(Num (I64 src)); Values.(Num (I64 dst))] ->
-      let open Lwt.Syntax in
-      let ticks = Tick_model.(to_z nds_copy) in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, ticks)
-      else
-        let+ code = Nds_aux.registry_copy ~nds ~src ~dst in
-        (code, ticks)
-  | _ -> raise Bad_input
+  let ticks_from_input = Fun.const Tick_model.(to_z nds_copy) in
+  let extract_inputs = function
+    | [Values.Num (I64 src); Values.Num (I64 dst)] -> (src, dst)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds _memories (src, dst) -> Nds_aux.registry_copy ~nds ~src ~dst
 
 let nds_registry_move ~nds_host_functions_enabled =
-  nds_handler @@ fun nds _memories -> function
-  | [Values.(Num (I64 src)); Values.(Num (I64 dst))] ->
-      let open Lwt.Syntax in
-      let ticks = Tick_model.(to_z nds_move) in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, ticks)
-      else
-        let+ code = Nds_aux.registry_move ~nds ~src ~dst in
-        (code, ticks)
-  | _ -> raise Bad_input
+  let ticks_from_input = Fun.const Tick_model.(to_z nds_move) in
+  let extract_inputs = function
+    | [Values.Num (I64 src); Values.Num (I64 dst)] -> (src, dst)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds _memories (src, dst) -> Nds_aux.registry_move ~nds ~src ~dst
 
 let nds_registry_clear ~nds_host_functions_enabled =
-  nds_handler @@ fun nds _memories -> function
-  | [Values.(Num (I64 db_index))] ->
-      let open Lwt.Syntax in
-      let ticks = Tick_model.(to_z nds_clear) in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, ticks)
-      else
-        let+ code = Nds_aux.registry_clear ~nds ~db_index in
-        (code, ticks)
-  | _ -> raise Bad_input
+  let ticks_from_input = Fun.const Tick_model.(to_z nds_clear) in
+  let extract_inputs = function
+    | [Values.Num (I64 db_index)] -> db_index
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds _memories db_index -> Nds_aux.registry_clear ~nds ~db_index
 
 let nds_hash_ticks result =
   Tick_model.(
@@ -1689,22 +1716,21 @@ let nds_store_exists_ticks key_size result =
     |> to_z)
 
 let nds_store_exists ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_exists_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_exists ~nds ~memory ~db_index ~key_offset ~key_len
-        in
-        (code, nds_store_exists_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len) = nds_store_exists_ticks key_len 0l in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+      ] ->
+        (db_index, key_offset, key_len)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_exists ~nds ~memory ~db_index ~key_offset ~key_len
 
 let nds_store_read_ticks key_size result =
   Tick_model.(
@@ -1713,33 +1739,34 @@ let nds_store_read_ticks key_size result =
     |> to_z)
 
 let nds_store_read ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-      Values.(Num (I64 offset));
-      Values.(Num (I32 dst));
-      Values.(Num (I32 max_bytes));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_read_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_read
-            ~nds
-            ~memory
-            ~db_index
-            ~key_offset
-            ~key_len
-            ~offset
-            ~dst
-            ~max_bytes
-        in
-        (code, nds_store_read_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len, _, _, _) =
+    nds_store_read_ticks key_len 0l
+  in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+        Values.Num (I64 offset);
+        Values.Num (I32 dst);
+        Values.Num (I32 max_bytes);
+      ] ->
+        (db_index, key_offset, key_len, offset, dst, max_bytes)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len, offset, dst, max_bytes) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_read
+    ~nds
+    ~memory
+    ~db_index
+    ~key_offset
+    ~key_len
+    ~offset
+    ~dst
+    ~max_bytes
 
 let nds_store_write_ticks key_size result =
   Tick_model.(
@@ -1748,33 +1775,34 @@ let nds_store_write_ticks key_size result =
     |> to_z)
 
 let nds_store_write ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-      Values.(Num (I64 offset));
-      Values.(Num (I32 src));
-      Values.(Num (I32 num_bytes));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_write_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_write
-            ~nds
-            ~memory
-            ~db_index
-            ~key_offset
-            ~key_len
-            ~offset
-            ~src
-            ~num_bytes
-        in
-        (code, nds_store_write_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len, _, _, _) =
+    nds_store_write_ticks key_len 0l
+  in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+        Values.Num (I64 offset);
+        Values.Num (I32 src);
+        Values.Num (I32 num_bytes);
+      ] ->
+        (db_index, key_offset, key_len, offset, src, num_bytes)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len, offset, src, num_bytes) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_write
+    ~nds
+    ~memory
+    ~db_index
+    ~key_offset
+    ~key_len
+    ~offset
+    ~src
+    ~num_bytes
 
 let nds_store_set_ticks key_size result =
   Tick_model.(
@@ -1783,31 +1811,23 @@ let nds_store_set_ticks key_size result =
     |> to_z)
 
 let nds_store_set ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-      Values.(Num (I32 src));
-      Values.(Num (I32 num_bytes));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_set_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_set
-            ~nds
-            ~memory
-            ~db_index
-            ~key_offset
-            ~key_len
-            ~src
-            ~num_bytes
-        in
-        (code, nds_store_set_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len, _, _) = nds_store_set_ticks key_len 0l in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+        Values.Num (I32 src);
+        Values.Num (I32 num_bytes);
+      ] ->
+        (db_index, key_offset, key_len, src, num_bytes)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len, src, num_bytes) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_set ~nds ~memory ~db_index ~key_offset ~key_len ~src ~num_bytes
 
 let nds_store_delete_ticks key_size result =
   Tick_model.(
@@ -1815,62 +1835,61 @@ let nds_store_delete_ticks key_size result =
     |> to_z)
 
 let nds_store_delete ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_delete_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_delete ~nds ~memory ~db_index ~key_offset ~key_len
-        in
-        (code, nds_store_delete_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len) = nds_store_delete_ticks key_len 0l in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+      ] ->
+        (db_index, key_offset, key_len)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_delete ~nds ~memory ~db_index ~key_offset ~key_len
 
 let nds_store_value_size_ticks key_size result =
   Tick_model.(
     with_error result (fun () -> read_key_in_memory key_size + nds_read) |> to_z)
 
 let nds_store_value_size ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 key_offset));
-      Values.(Num (I32 key_len));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_store_value_size_ticks key_len 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.store_value_size ~nds ~memory ~db_index ~key_offset ~key_len
-        in
-        (code, nds_store_value_size_ticks key_len code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input (_, _, key_len) =
+    nds_store_value_size_ticks key_len 0l
+  in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 key_offset);
+        Values.Num (I32 key_len);
+      ] ->
+        (db_index, key_offset, key_len)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, key_offset, key_len) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.store_value_size ~nds ~memory ~db_index ~key_offset ~key_len
 
 let nds_database_get_hash ~nds_host_functions_enabled =
-  nds_handler @@ fun nds memories -> function
-  | [
-      Values.(Num (I64 db_index));
-      Values.(Num (I32 dst));
-      Values.(Num (I32 max_bytes));
-    ] ->
-      let open Lwt.Syntax in
-      if not nds_host_functions_enabled then
-        Lwt.return (nds_disabled_code, nds_hash_ticks 0l)
-      else
-        let* memory = retrieve_memory memories in
-        let+ code =
-          Nds_aux.database_get_hash ~nds ~memory ~db_index ~dst ~max_bytes
-        in
-        (code, nds_hash_ticks code)
-  | _ -> raise Bad_input
+  let open Lwt.Syntax in
+  let ticks_from_input = Fun.const (nds_hash_ticks 0l) in
+  let extract_inputs = function
+    | [
+        Values.Num (I64 db_index);
+        Values.Num (I32 dst);
+        Values.Num (I32 max_bytes);
+      ] ->
+        (db_index, dst, max_bytes)
+    | _ -> raise Bad_input
+  in
+  nds_implem ~nds_host_functions_enabled ~ticks_from_input ~extract_inputs
+  @@ fun nds memories (db_index, dst, max_bytes) ->
+  let* memory = retrieve_memory memories in
+  Nds_aux.database_get_hash ~nds ~memory ~db_index ~dst ~max_bytes
 
 let nds_registry_resize_name = "nds_registry_resize"
 

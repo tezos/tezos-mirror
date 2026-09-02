@@ -231,6 +231,7 @@ let test_single_valid_game_move () =
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
 
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+module Arith_pvm_eval = Sc_rollup_helpers.Arith_pvm_eval
 
 (** Test that sending a invalid serialized inbox proof to
     {Sc_rollup_proof_repr.valid} is rejected. *)
@@ -452,12 +453,16 @@ let test_first_move_with_invalid_ancestor () =
        (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
           (player_commitment_hash, player, opponent_commitment_hash, opponent)))
 
-(* Build a [Proof] step whose PVM part is genuine (so the proof verifier does
-   not raise — that would be a separate failure mode) while the inbox proof is
-   intentionally bogus. The block-validation plugin never inspects the proof's
-   contents — only the chosen section's tick distance — so any well-typed proof
-   value works here. Shared by the plugin tests. *)
-let build_adversarial_proof () =
+(* Build a repr-level [Sc_rollup_proof_repr.t] whose PVM part is a genuine Arith
+   PVM step (so the proof verifier does not raise on the PVM side — that would be
+   a separate failure mode) and whose input proof is [input_proof].
+
+   [Alpha_context.Sc_rollup.Proof] and [Sc_rollup_proof_repr] are the same module
+   underneath (see [alpha_context.ml]); only the .mli seals the types apart.
+   Carry the value across that seal through the byte-identical wire encoding so
+   it can feed the repr-level [G.Proof] consumed by [R.game_move] and by the
+   block-validation plugin. *)
+let build_repr_proof input_proof =
   let open Lwt_result_wrap_syntax in
   let pvm_ctxt = Arith_pvm.make_empty_context () in
   let empty = Arith_pvm.make_empty_state () in
@@ -474,6 +479,19 @@ let build_adversarial_proof () =
          ~pvm:(module Arith_pvm)
          pvm_step
   in
+  let alpha_proof = Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof} in
+  return
+    (Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn
+         Alpha_context.Sc_rollup.Proof.encoding
+         alpha_proof)
+
+(* Build a [Proof] step whose PVM part is genuine (so the proof verifier does
+   not raise — that would be a separate failure mode) while the inbox proof is
+   intentionally bogus. The block-validation plugin's multi-tick check never
+   inspects the proof's contents — only the chosen section's tick distance — so
+   any well-typed proof value works here. Shared by the plugin tests. *)
+let build_adversarial_proof () =
   let inbox_proof =
     Alpha_context.Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string
       "I am the big bad wolf"
@@ -486,14 +504,56 @@ let build_adversarial_proof () =
         proof = inbox_proof;
       }
   in
-  let alpha_proof =
-    Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof = Some input_proof}
+  build_repr_proof (Some input_proof)
+
+(* Build a [Proof] step with no defect of its own: the PVM step is genuine and
+   [input_proof = None] matches the [No_input_required] request of its start
+   state, so [Sc_rollup_proof_repr.valid] returns [Ok]. Unlike
+   [build_adversarial_proof], it lets
+   [test_proof_on_missing_start_state_forces_indefensible_final_move] exercise a
+   single defect: the [None] agreed start state of the section played on.
+
+   Reaching [No_input_required]: [initial_state] is [Halted], the first [eval]
+   boots the PVM into [Waiting_for_input_message], [set_input] hands it a
+   message, and the second [eval] moves it to [Parsing] — a tick consuming no
+   input. *)
+let build_well_formed_proof () =
+  let open Lwt_result_wrap_syntax in
+  let pvm_ctxt = Arith_pvm.make_empty_context () in
+  let empty = Arith_pvm.make_empty_state () in
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  let*! state = Arith_pvm.initial_state ~empty in
+  let*! state = Arith_pvm.eval state in
+  let*! state =
+    Arith_pvm.set_input (Sc_rollup_helpers.make_external_input "1") state
   in
-  (* [Alpha_context.Sc_rollup.Proof] and [Sc_rollup_proof_repr] are the same
-     module underneath (see [alpha_context.ml]); only the .mli seals the types
-     apart. Carry the value across that seal through the byte-identical wire
-     encoding so it can feed the repr-level [G.Proof] consumed by
-     [R.game_move]. *)
+  let*! state = Arith_pvm.eval state in
+  (* Guard the construction above: were the arith PVM to stop being input-free
+     at this tick, [input_proof = None] would no longer be well-formed and this
+     helper would silently reintroduce a second defect. *)
+  let*! input_request = Arith_pvm.is_input_state ~is_reveal_enabled state in
+  let* () =
+    match input_request with
+    | Alpha_context.Sc_rollup.No_input_required -> return_unit
+    | _ ->
+        Test.fail
+          "build_well_formed_proof: expected the arith PVM to require no input \
+           here, so that a proof with [input_proof = None] is well-formed"
+  in
+  let*! pvm_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled None state
+  in
+  let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ pvm_step in
+  let pvm_step =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Alpha_context.Sc_rollup.Proof.serialize_pvm_step
+         ~pvm:(module Arith_pvm)
+         pvm_step
+  in
+  let alpha_proof =
+    Alpha_context.Sc_rollup.Proof.{pvm_step; input_proof = None}
+  in
+  (* Same .mli-seal crossing as in [build_adversarial_proof]. *)
   return
     (Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
     @@ Data_encoding.Binary.to_bytes_exn
@@ -847,6 +907,488 @@ let test_at_most_one_operation_per_game_per_block () =
       Stdlib.failwith
         "one-op-per-game: operation on a distinct game was wrongly rejected"
 
+(* End-to-end reproduction of the inbox level-confusion soundness bug showing
+   that an attacker genuinely WINS a refutation game (not merely that the move
+   is accepted).
+
+   [Sc_rollup_inbox_repr.verify_proof] (hence [Sc_rollup_proof_repr.valid])
+   never binds the level actually PROVEN by an inbox inclusion proof to the
+   [level] CLAIMED in the [Inbox_proof]. An attacker can therefore submit a
+   genuine, unmodified inclusion proof for a real message at [attacker_level]
+   while CLAIMING [victim_level] — the reconstructed input keeps the claimed
+   level but carries the attacker level's payload. Fed to a single disputed
+   PVM tick, this produces a stop state that differs from the honest defender's
+   commitment, so the refutation succeeds and the honest defender loses.
+
+   Construction (no dissection-narrowing loop needed: the disputed commitment
+   covers exactly ONE PVM tick, so the opening dissection's first section
+   [0; 1] is already distance-one):
+     1. install a genuine multi-level inbox as the on-chain inbox;
+     2. run the real Arith PVM over that inbox up to a state [s0] requesting
+        [First_after (victim_level, 2)] (i.e. right after consuming the victim
+        level's first external message);
+     3. publish a parent commitment whose state is [s0], and, sharing it as
+        predecessor, an HONEST defender commitment of exactly one tick whose
+        state is the honest result of consuming the victim level's next message
+        [(victim_level, 3)], plus a differing refuter commitment;
+     4. open the game and build that [Proof] — a genuine inclusion proof of
+        the ATTACKER level's message [(attacker_level, 3)] wrapped in an
+        [Inbox_proof] CLAIMING [victim_level];
+     5. assert the protocol consensus is STILL unsound: fed this proof
+        directly, [R.game_move] accepts it and declares the honest defender
+        [Loser] — the expected, unfixed protocol behaviour;
+     6. assert the block-validation plugin REJECTS the same operation with
+        [Sc_rollup_inbox_proof_claimed_level_mismatch] carrying
+        [claimed_level = victim_level] and [proven_level = attacker_level],
+        showing the filter blocks the attack consensus alone lets win. *)
+let test_inbox_proof_level_confusion () =
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let* ctxt, rollup, genesis_hash, refuter, defender, _staker3 =
+    T.originate_rollup_and_deposit_with_three_stakers ()
+  in
+  (* The rollup's genuine metadata. The disputed inbox levels must lie strictly
+     above the origination level, otherwise [cut_at_level] drops the input. *)
+  let*@ ctxt, metadata_repr = Sc_rollup_storage.get_metadata ctxt rollup in
+  let origination_level_i =
+    Int32.to_int
+      (Raw_level_repr.to_int32
+         metadata_repr.Sc_rollup_metadata_repr.origination_level)
+  in
+  let victim_level_i = origination_level_i + 2 in
+  let attacker_level_i = origination_level_i + 3 in
+  let victim_level = Raw_level.of_int32_exn (Int32.of_int victim_level_i) in
+  let attacker_level = Raw_level.of_int32_exn (Int32.of_int attacker_level_i) in
+  let metadata =
+    Sc_rollup.Metadata.
+      {
+        address = rollup;
+        origination_level =
+          Raw_level.of_int32_exn (Int32.of_int origination_level_i);
+      }
+  in
+  (* Build a genuine multi-level inbox: levels [1 .. attacker_level], two
+     external messages each. [inbox_creation_level] must be [root] so that the
+     [first_block] flag lines up between the PVM inputs and the inbox
+     merkelisation (only absolute level 1 is a first block). All disputed levels
+     are [>= 2], hence regular levels whose external messages sit at indices 2
+     and 3. *)
+  let payloads_for_levels =
+    Stdlib.List.init attacker_level_i (fun i ->
+        let k = i + 1 in
+        Sc_rollup_helpers.wrap_messages
+          (Raw_level.of_int32_exn (Int32.of_int k))
+          [Printf.sprintf "l%d-m0" k; Printf.sprintf "l%d-m1" k])
+  in
+  let*? node_inbox, proto_inbox =
+    Sc_rollup_helpers.construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
+  in
+  let inputs_per_levels =
+    List.map (fun p -> p.Sc_rollup_helpers.inputs) payloads_for_levels
+  in
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  (* [s0]: the first PVM state requesting [First_after (victim_level, 2)]. We
+     locate it by evaluating the real Arith PVM with increasing fuel until the
+     input request matches — the honest agreed prestate of the disputed tick. *)
+  let victim_counter = Z.of_int 2 in
+  let state_is_s0 state =
+    let open Lwt_syntax in
+    let* req = Arith_pvm.is_input_state ~is_reveal_enabled state in
+    match req with
+    | Sc_rollup.First_after (l, n) ->
+        return (Raw_level.equal l victim_level && Z.equal n victim_counter)
+    | _ -> return false
+  in
+  let rec find_s0 fuel =
+    if fuel > 2000 then failwith "level-confusion: [s0] not reached"
+    else
+      let*! r =
+        Arith_pvm_eval.eval_inputs_from_initial_state
+          ~metadata
+          ~fuel
+          inputs_per_levels
+      in
+      match r with
+      | Error _ -> find_s0 (fuel + 1)
+      | Ok (state, _tick, _states) ->
+          let*! is_s0 = state_is_s0 state in
+          if is_s0 then return state else find_s0 (fuel + 1)
+  in
+  let* s0 = find_s0 1 in
+  let Sc_rollup_helpers.Node_inbox.{inbox = local_inbox; _} = node_inbox in
+  let snapshot = Sc_rollup.Inbox.take_snapshot local_inbox in
+  (* Genuine inbox proof + input for the attacker's message at
+     [(attacker_level, 3)]. [valid] reconstructs the input by verifying this
+     proof at index [succ 2 = 3]: the inclusion proof genuinely proves
+     [attacker_level], but the returned message is (unsoundly) tagged with the
+     claimed [victim_level]. *)
+  let* attacker_inbox_proof, attacker_input =
+    Sc_rollup_helpers.Node_inbox.produce_proof
+      node_inbox
+      snapshot
+      (attacker_level, Z.of_int 3)
+  in
+  (* The honest next input at [(victim_level, 3)] an honest defender consumed. *)
+  let* _honest_inbox_proof, honest_input =
+    Sc_rollup_helpers.Node_inbox.produce_proof
+      node_inbox
+      snapshot
+      (victim_level, Z.of_int 3)
+  in
+  let honest_input =
+    match honest_input with
+    | Some m -> Sc_rollup.Inbox_message m
+    | None -> assert false
+  in
+  (* Re-tag the genuine attacker-level message as [victim_level]: this is
+     exactly what [valid] reconstructs from the level-confused [Inbox_proof]. *)
+  let confused_input =
+    match attacker_input with
+    | Some {Sc_rollup.message_counter; payload; _} ->
+        Sc_rollup.Inbox_message
+          {inbox_level = victim_level; message_counter; payload}
+    | None -> assert false
+  in
+  let pvm_ctxt = Arith_pvm.make_empty_context () in
+  (* Honest single-tick step from [s0]: its stop state is what an honest
+     defender commits. *)
+  let*! honest_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled (Some honest_input) s0
+  in
+  let honest_step = WithExceptions.Result.get_ok ~loc:__LOC__ honest_step in
+  let honest_stop = Arith_pvm.proof_stop_state honest_step in
+  (* Attacker single-tick step from [s0] consuming the wrong-level payload. *)
+  let*! attacker_step =
+    Arith_pvm.produce_proof pvm_ctxt ~is_reveal_enabled (Some confused_input) s0
+  in
+  let attacker_step = WithExceptions.Result.get_ok ~loc:__LOC__ attacker_step in
+  let s0_hash = Arith_pvm.proof_start_state attacker_step in
+  let attacker_stop = Arith_pvm.proof_stop_state attacker_step in
+  (* The attack genuinely refutes: feeding the wrong-level payload yields a
+     different stop state than the honest one. *)
+  let* () =
+    Assert.equal_bool
+      ~loc:__LOC__
+      (Sc_rollup.State_hash.equal attacker_stop honest_stop)
+      false
+  in
+  (* Publish the commitments carrying these REAL PVM state hashes. The disputed
+     defender commitment covers exactly one tick, so the game opens directly on
+     a distance-one section. *)
+  let level_of = T.valid_inbox_level ctxt in
+  let parent_commit =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level_of 1l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = s0_hash;
+      }
+  in
+  let*@ parent_hash, _, ctxt =
+    T.advance_level_n_refine_stake ctxt rollup defender parent_commit
+  in
+  let defender_commit =
+    Commitment_repr.
+      {
+        predecessor = parent_hash;
+        inbox_level = level_of 2l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = honest_stop;
+      }
+  in
+  let refuter_commit =
+    Commitment_repr.
+      {
+        predecessor = parent_hash;
+        inbox_level = level_of 2l;
+        number_of_ticks = T.number_of_ticks_exn 1L;
+        compressed_state = hash_string "refuter-genuine-attack";
+      }
+  in
+  let ctxt = T.advance_level_for_commitment ctxt defender_commit in
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      defender
+      defender_commit
+  in
+  let*@ _, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      refuter
+      refuter_commit
+  in
+  let defender_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated defender_commit
+  in
+  let refuter_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated refuter_commit
+  in
+  (* Install the genuine multi-level inbox as the on-chain inbox so that the
+     game's [inbox_snapshot] is a real multi-level inbox (the precondition for
+     an inbox inclusion proof to verify). Carry [proto_inbox] across the .mli
+     seal through the wire encoding. *)
+  let inbox_repr =
+    Data_encoding.Binary.of_bytes_exn Sc_rollup_inbox_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn Sc_rollup.Inbox.encoding proto_inbox
+  in
+  let*! ctxt = Storage.Sc_rollup.Inbox.add ctxt inbox_repr in
+  (* Open the game. Its opening dissection is
+     [(s0, 0); (honest_stop, 1); (None, 2)], so [choice = tick 0] selects the
+     already distance-one section [0; 1]. *)
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  (* The level-confused [Inbox_proof]: a genuine inclusion proof of the message
+     at [attacker_level] wrapped as if it were at [victim_level]. *)
+  let input_proof =
+    Sc_rollup.Proof.Inbox_proof
+      {
+        level = victim_level;
+        message_counter = victim_counter;
+        proof = Sc_rollup.Inbox.to_serialized_proof attacker_inbox_proof;
+      }
+  in
+  let pvm_step =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) attacker_step
+  in
+  let alpha_proof =
+    Sc_rollup.Proof.{pvm_step; input_proof = Some input_proof}
+  in
+  (* Carry the proof across the [Alpha_context.Sc_rollup.Proof] / repr seal. *)
+  let proof =
+    Data_encoding.Binary.of_bytes_exn Sc_rollup_proof_repr.encoding
+    @@ Data_encoding.Binary.to_bytes_exn Sc_rollup.Proof.encoding alpha_proof
+  in
+  (* Consensus is still unsound: fed this proof directly, [R.game_move]
+     accepts it and the honest defender LOSES the game. This is the expected
+     (unfixed) protocol behaviour the plugin filter below shields against. We
+     run it on [ctxt] and discard the resulting context so the plugin check
+     replays the same pre-move state. *)
+  let*@ game_result, _ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:(G.Proof proof)
+  in
+  let* () =
+    match game_result with
+    | Some (G.Loser {loser; _}) ->
+        Assert.equal_bool
+          ~loc:__LOC__
+          (Sc_rollup_repr.Staker.equal loser defender)
+          true
+    | Some G.Draw ->
+        Test.fail
+          "level-confusion: the attack resolved to a Draw instead of a win"
+    | None ->
+        Test.fail
+          "level-confusion: the wrong-level proof did not win the game \
+           (game_move returned None instead of Loser defender)"
+  in
+  (* The plugin must reject the operation: the proof proves level 3
+     but claims level 2. *)
+  let*! plugin_res =
+    run_block_validation_plugin
+      ~ctxt_before:ctxt
+      ~source:refuter
+      ~opponent:defender
+      ~rollup
+      ~choice:Sc_rollup_tick_repr.initial
+      ~proof
+  in
+  match plugin_res with
+  | Ok _ ->
+      Test.fail
+        "level-confusion: the plugin accepted an inbox proof whose proven \
+         level (3) does not match the claimed level (2)"
+  | Error trace ->
+      if
+        List.exists
+          (function
+            | Environment.Ecoproto_error
+                (Block_validation.Sc_rollup_inbox_proof_claimed_level_mismatch
+                   {claimed_level; proven_level}) ->
+                Raw_level.equal claimed_level victim_level
+                && Raw_level.equal proven_level attacker_level
+            | _ -> false)
+          trace
+      then return_unit
+      else
+        Test.fail
+          "level-confusion: the plugin rejected the operation but not with \
+           Sc_rollup_inbox_proof_claimed_level_mismatch {claimed = 2; proven = \
+           3}"
+
+(* Companion to [test_multitick_proof_forces_indefensible_final_move] for the
+   OTHER indefensible-[Final_move] shape: a [Proof] played on a distance-one
+   section whose agreed START state is absent ([None]).
+
+   [Sc_rollup_dissection_chunk_repr.default_check] only forbids a [None] chunk
+   followed by a [Some] one, so a dishonest player may publish a dissection with
+   two consecutive [None] chunks one tick apart: the section between them passes
+   the multi-tick check, yet no PVM proof can start from [None]. Both players
+   fail [validity_first_final_move], the protocol anchors a [Final_move] on the
+   [None] chunk, and the game can only resolve as a [Draw] — burning the honest
+   player's bond.
+
+   Through the real on-chain entry points:
+     1. start a game (opening dissection [foo@0; child@10000; None@10001]);
+     2. the refuter dissects [0; 10000] validly, with ticks 0, 1, 2 and [None]
+        states from tick 1 on, making [1; 2] a distance-one section with a
+        [None] start state;
+     3. assert the protocol ACCEPTS the defender's [Proof] there and traps the
+        game in a [Final_move] on the [None] chunk;
+     4. assert the block-validation plugin REJECTS the same operation with
+        [Sc_rollup_proof_on_missing_start_state_during_dissecting 1]. *)
+let test_proof_on_missing_start_state_forces_indefensible_final_move () =
+  let open Lwt_result_wrap_syntax in
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  (* The refuter's dissection of the opening section [0; 10000]: its head carries
+     the agreed start state ([hash_string "foo"]), every other chunk is [None] (a
+     valid trailing run, its last element differing from the disputed stop
+     state). Ticks 0, 1, 2 then an even spread, so no section exceeds the maximum
+     size ([distance / 2]). *)
+  let size =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+  let stop_tick = 10_000 in
+  let tick_step = (stop_tick - 2) / (size - 2) in
+  let dissection =
+    Stdlib.List.init (size + 1) (fun i ->
+        mk_dissection_chunk
+        @@
+        if i = 0 then (Some (hash_string "foo"), tick_of_int_exn 0)
+        else if i = size then (None, tick_of_int_exn stop_tick)
+        else if i <= 2 then (None, tick_of_int_exn i)
+        else (None, tick_of_int_exn (2 + ((i - 2) * tick_step))))
+  in
+  let*@ game_result, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:(G.Dissection dissection)
+  in
+  (* [None] means the move was applied and the game CONTINUES. *)
+  let* () = Assert.is_none ~loc:__LOC__ ~pp:G.pp_game_result game_result in
+  (* The honest defender must now answer on the distance-one section [1; 2],
+     where the game rules demand a [Proof]. *)
+  let* proof = build_well_formed_proof () in
+  let choice = tick_of_int_exn 1 in
+  (* What a baker sees before including the [Proof]: the game still
+     [Dissecting]. *)
+  let ctxt_before_move = ctxt in
+  (* PROTOCOL STEP: consensus ACCEPTS the move — nothing in the protocol forbids
+     a [Proof] on a section whose agreed start state is [None], so only the
+     plugin keeps it out of blocks. *)
+  let*@ game_result, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:defender
+      ~opponent:refuter
+      ~choice
+      ~step:(G.Proof proof)
+  in
+  let* () =
+    (* Accepted, yet it resolves NOTHING: the proof cannot even be checked (no
+       PVM proof starts from [None]), so instead of losing, the defender is
+       trapped in a game that can only end in a [Draw]. *)
+    Assert.is_none ~loc:__LOC__ ~pp:G.pp_game_result game_result
+  in
+  let index = G.Index.make refuter defender in
+  let*@ _ctxt, game_opt = R.find_game ctxt rollup index in
+  let* () =
+    match game_opt with
+    | Some {game_state = G.Final_move {agreed_start_chunk; _}; _} ->
+        (* The BUGGY behaviour this test documents: the [Final_move] is anchored
+           on the [None] chunk, so the refuter's answer fails the same
+           start-state check. Neither player can prove anything, the game can
+           only end in a [Draw], and both bonds are slashed — the honest
+           defender is punished for the refuter's dissection. *)
+        Assert.equal_bool
+          ~loc:__LOC__
+          (Option.is_none agreed_start_chunk.D.state_hash)
+          true
+    | Some {game_state = G.Dissecting _; _} ->
+        (* The behaviour consensus SHOULD have: refuse the move (as it already
+           does for a [Proof] whose [choice] names no section) instead of
+           storing a [Final_move] nobody can answer. Reaching this branch means
+           the protocol was fixed — a WELCOME failure: update the test, not the
+           protocol. *)
+        Test.fail
+          "missing-start-state: the accepted Proof no longer moves the game to \
+           Final_move (still Dissecting): consensus behaviour changed for the \
+           better, so this test's premise is stale and needs revisiting"
+    | None -> Test.fail "missing-start-state: game disappeared after the move"
+  in
+  (* PLUGIN CHECK: the same operation, against the start-of-block context, must
+     be rejected with the tick of the [None] start chunk. *)
+  let*! plugin_res =
+    run_block_validation_plugin
+      ~ctxt_before:ctxt_before_move
+      ~source:defender
+      ~opponent:refuter
+      ~rollup
+      ~choice
+      ~proof
+  in
+  match plugin_res with
+  | Ok _ ->
+      Test.fail
+        "missing-start-state: the plugin accepted a Proof on a distance-one \
+         section whose start state is None"
+  | Error trace ->
+      if
+        List.exists
+          (function
+            | Environment.Ecoproto_error
+                (Block_validation
+                 .Sc_rollup_proof_on_missing_start_state_during_dissecting
+                   tick) ->
+                (* The tick tells the baker WHICH chunk is at fault; here the
+                   chosen section is [1; 2], so it must be 1 — not, say, the
+                   stop chunk at tick 2. *)
+                Z.equal tick Z.one
+            | _ -> false)
+          trace
+      then return_unit
+      else
+        Test.fail
+          "missing-start-state: the plugin rejected the operation but not with \
+           Sc_rollup_proof_on_missing_start_state_during_dissecting 1"
+
 let tests =
   [
     Tztest.tztest
@@ -891,6 +1433,16 @@ let tests =
       "The plugin allows at most one operation per refutation game per block."
       `Quick
       test_at_most_one_operation_per_game_per_block;
+    Tztest.tztest
+      "An inbox proof whose proven level does not match the claimed level lets \
+       the attacker win the refutation game (level-confusion soundness bug)."
+      `Quick
+      test_inbox_proof_level_confusion;
+    Tztest.tztest
+      "A Proof on a distance-one section whose agreed start state is absent \
+       forces an indefensible Final_move."
+      `Quick
+      test_proof_on_missing_start_state_forces_indefensible_final_move;
   ]
 
 let () =

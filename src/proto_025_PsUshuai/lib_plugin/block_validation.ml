@@ -9,6 +9,8 @@ open Protocol
 open Alpha_context
 module Sr = Sc_rollup
 module Game = Sr.Game
+module Proof = Sr.Proof
+module Inbox = Sr.Inbox
 
 (* [context] is the context at the START of the block: it is not updated as
    operations are applied. The proof check below is therefore only sound if no
@@ -28,11 +30,16 @@ let shell_fail err : 'a Environment.Error_monad.shell_tzresult Lwt.t =
 
 type Environment.Error_monad.error +=
   | Sc_rollup_proof_on_multi_tick_section_during_dissecting of Z.t
+  | Sc_rollup_proof_on_missing_start_state_during_dissecting of Z.t
   | Sc_rollup_multiple_operations_for_game_in_block of {
       rollup : Sr.Address.t;
       stakers : Game.Index.t;
     }
   | Invalid_double_baking_evidence of {level : Int32.t}
+  | Sc_rollup_inbox_proof_claimed_level_mismatch of {
+      claimed_level : Raw_level.t;
+      proven_level : Raw_level.t;
+    }
 
 let () =
   let open Environment.Error_monad in
@@ -57,6 +64,26 @@ let () =
       | _ -> None)
     (fun distance ->
       Sc_rollup_proof_on_multi_tick_section_during_dissecting distance) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "block_validation_plugin.sc_rollup_proof_on_missing_start_state_during_dissecting"
+    ~title:"Proof submitted on a section with no start state during dissecting"
+    ~description:
+      "A refutation game player submitted a Proof move during the Dissecting \
+       phase on a section whose agreed start state is absent."
+    ~pp:(fun ppf tick ->
+      Format.fprintf
+        ppf
+        "Proof submitted during dissecting on a section starting at tick %s \
+         whose agreed start state is absent"
+        (Z.to_string tick))
+    Data_encoding.(obj1 (req "tick" (conv Z.to_string Z.of_string string)))
+    (function
+      | Sc_rollup_proof_on_missing_start_state_during_dissecting tick ->
+          Some tick
+      | _ -> None)
+    (fun tick -> Sc_rollup_proof_on_missing_start_state_during_dissecting tick) ;
   register_error_kind
     `Permanent
     ~id:
@@ -98,7 +125,35 @@ let () =
     Data_encoding.(obj1 (req "level" int32))
     (function
       | Invalid_double_baking_evidence {level} -> Some level | _ -> None)
-    (fun level -> Invalid_double_baking_evidence {level})
+    (fun level -> Invalid_double_baking_evidence {level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.sc_rollup_inbox_proof_claimed_level_mismatch"
+    ~title:"Inbox proof claims a level different from the one it proves"
+    ~description:
+      "A refutation Proof move carries an inbox proof whose claimed level does \
+       not match the inbox level actually proven by its inclusion proof. Such \
+       a proof lets a message from one inbox level be passed off as belonging \
+       to another level, so the operation is rejected."
+    ~pp:(fun ppf (claimed_level, proven_level) ->
+      Format.fprintf
+        ppf
+        "Inbox proof claims level %a but its inclusion proof proves level %a"
+        Raw_level.pp
+        claimed_level
+        Raw_level.pp
+        proven_level)
+    Data_encoding.(
+      obj2
+        (req "claimed_level" Raw_level.encoding)
+        (req "proven_level" Raw_level.encoding))
+    (function
+      | Sc_rollup_inbox_proof_claimed_level_mismatch
+          {claimed_level; proven_level} ->
+          Some (claimed_level, proven_level)
+      | _ -> None)
+    (fun (claimed_level, proven_level) ->
+      Sc_rollup_inbox_proof_claimed_level_mismatch {claimed_level; proven_level})
 
 let game_key_equal (rollup1, stakers1) (rollup2, stakers2) =
   Sr.Address.equal rollup1 rollup2
@@ -125,30 +180,163 @@ let find_section_around_choice dissection choice =
   in
   traverse dissection
 
-let check_refute_proof context rollup stakers choice :
-    unit Environment.Error_monad.shell_tzresult Lwt.t =
-  let open Lwt_result_syntax in
+(* Reject an inbox proof whose claimed [level] disagrees with the level
+   actually proven by its inclusion proof, closing the inbox level-confusion
+   soundness bug: [Sc_rollup_inbox_repr.verify_proof] never binds the two, so a
+   dishonest player could otherwise feed the PVM a real message at the wrong
+   level. The proven level is read from the inclusion proof's target (last)
+   cell. *)
+let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  match proof.Proof.input_proof with
+  | Some (Proof.Inbox_proof {level = claimed_level; proof = serialized; _}) -> (
+      match Inbox.of_serialized_proof serialized with
+      | None ->
+          (* Malformed proof: leave rejection to the protocol. *)
+          return_unit
+      | Some inbox_proof -> (
+          let inclusion_proof, _payloads_proof =
+            Inbox.Internal_for_tests.expose_proof inbox_proof
+          in
+          match List.last_opt inclusion_proof with
+          | None ->
+              (* Empty inclusion proof: leave rejection to the protocol. *)
+              return_unit
+          | Some target_cell ->
+              let proven_level =
+                (* [level_proof_of_history_proof] is re-exported through
+                   [Alpha_context] (unlike [get_level_of_history_proof], which
+                   stays behind the repr seal), so we read the level directly
+                   from the target cell without an encoding round trip. It still
+                   leaks [Raw_level_repr.t] rather than the abstract
+                   [Alpha_context.Raw_level.t], so we bridge through [int32]. *)
+                Raw_level.of_int32_exn @@ Raw_level_repr.to_int32
+                @@ (Inbox.Internal_for_tests.level_proof_of_history_proof
+                      target_cell)
+                     .level
+              in
+              if Raw_level.equal proven_level claimed_level then return_unit
+              else
+                tzfail
+                  (Sc_rollup_inbox_proof_claimed_level_mismatch
+                     {claimed_level; proven_level})))
+  | _ ->
+      (* Not an inbox proof (reveal / first inbox message / no input proof). *)
+      return_unit
+
+let protect_use_wasm_pvm ?config context rollup k =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  let* _ctxt, kind = Sr.kind context rollup in
+  match kind with
+  | Wasm_2_0_0 ->
+      Lwt.catch
+        (fun () ->
+          let* config =
+            match config with
+            | None ->
+                let+ signals = Sr.Internal_for_tests.signals context in
+                List.map
+                  (fun (name, level) -> (name, Raw_level.to_int32 level))
+                  signals
+            | Some config -> return config
+          in
+          k (Sr.Wasm_2_0_0PVM.protocol_implementation ~config))
+        (function
+          | (Stack_overflow | Out_of_memory | Lwt.Canceled) as exn ->
+              Lwt.reraise exn
+          | _exn -> tzfail (Proof.Sc_rollup_proof_check "Invalid proof"))
+  | _ -> return_unit
+
+(* Replay, in the plugin, the PVM verification the protocol will perform when
+   applying the operation, and reject the operation if it raises an exception
+   (typically from the Irmin proof-replay layer) instead of returning an error:
+   such an exception escapes [lib_protocol] and aborts block application. *)
+let check_proof context rollup game (proof : Proof.serialized Proof.t) =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  protect_use_wasm_pvm context rollup @@ fun (module PVM) ->
+  match
+    Data_encoding.Binary.of_string_opt
+      PVM.proof_encoding
+      (proof.Proof.pvm_step :> string)
+  with
+  | None ->
+      tzfail (Proof.Sc_rollup_proof_check "Cannot decode refutation PVM proof")
+  | Some pvm_step ->
+      let reveal_activation_level =
+        Constants.sc_rollup_reveal_activation_level context
+      in
+      let is_reveal_enabled =
+        Sr.is_reveal_enabled_predicate reveal_activation_level
+      in
+      let dal_activation_level =
+        if (Constants.parametric context).dal.feature_enable then
+          Some reveal_activation_level.dal_parameters
+        else None
+      in
+      let dal_attested_slots_validity_lag =
+        reveal_activation_level.dal_attested_slots_validity_lag
+      in
+      let* _ctxt, genesis_info = Sr.genesis_info context rollup in
+      let metadata =
+        Sr.Metadata.{address = rollup; origination_level = genesis_info.level}
+      in
+      (* As long as we don't raise an exception, we are happy.
+         Proof correctness is asserted by the protocol. *)
+      let*! (_ :
+              (Sr.input option * Sr.input_request)
+              Environment.Error_monad.tzresult) =
+        Proof.valid
+          ~pvm:(module PVM)
+          ~metadata
+          game.Game.inbox_snapshot
+          game.Game.inbox_level
+          game.Game.dal_snapshot
+          ~find_dal_parameters:(Dal.Past_parameters.parameters context)
+          ~dal_activation_level
+          ~is_reveal_enabled
+          ~dal_attested_slots_validity_lag
+          {proof with Proof.pvm_step}
+      in
+      return_unit
+
+let check_refute_proof context ~rollup ~stakers ~choice
+    ~(proof : Proof.serialized Proof.t) :
+    unit Environment.Error_monad.tzresult Lwt.t =
+  let open Environment.Error_monad.Lwt_result_syntax in
   let* _ctxt, game_opt =
     Sr.Refutation_storage.find_game context rollup stakers
-    |> Lwt.map Environment.wrap_tzresult
   in
   match game_opt with
   | None -> return_unit
   | Some game -> (
+      let* () = check_inbox_proof_level proof in
+      let* () = check_proof context rollup game proof in
       match game.Game.game_state with
       | Game.Dissecting {dissection; _} -> (
           match find_section_around_choice dissection choice with
           | Error `Choice_not_found -> return_unit
-          | Ok (start_chunk, stop_chunk) ->
+          | Ok (start_chunk, stop_chunk) -> (
               let dist =
                 Sr.Tick.distance
                   start_chunk.Sr.Dissection_chunk.tick
                   stop_chunk.Sr.Dissection_chunk.tick
               in
               if Z.compare dist Z.one > 0 then
-                shell_fail
+                tzfail
                   (Sc_rollup_proof_on_multi_tick_section_during_dissecting dist)
-              else return_unit)
+              else
+                (* Even on a single-tick section, a proof whose agreed start
+                   state is absent ([None]) is indefensible: no PVM proof can
+                   start from [None], so both players fail the start-state
+                   check, the protocol stores a [Final_move] on the [None]
+                   chunk and the game resolves as a [Draw] that burns the
+                   honest staker's bond. Reject it like a multi-tick proof. *)
+                match start_chunk.Sr.Dissection_chunk.state_hash with
+                | None ->
+                    tzfail
+                      (Sc_rollup_proof_on_missing_start_state_during_dissecting
+                         (Sr.Tick.to_z start_chunk.Sr.Dissection_chunk.tick))
+                | Some _ -> return_unit))
       | Game.Final_move _ -> return_unit)
 
 (* A smart-rollup refutation [Proof] move whose DAL page proof references a
@@ -173,6 +361,7 @@ type Environment.Error_monad.error +=
       published_level : Raw_level.t;
       level : Raw_level.t;
     }
+  | Increase_paid_storage_amount_overflow of Z.t
 
 let () =
   let open Environment.Error_monad in
@@ -204,7 +393,23 @@ let () =
           Some (published_level, level)
       | _ -> None)
     (fun (published_level, level) ->
-      Sc_rollup_refute_dal_proof_future_published_level {published_level; level})
+      Sc_rollup_refute_dal_proof_future_published_level {published_level; level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.increase_paid_storage_amount_overflow"
+    ~title:"increase paid storage amount overflow"
+    ~description:
+      "The storage amount for the operation Increase_paid_storage does not fit \
+       in an int64."
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Increase_paid_storage operation error: amount %s does not fit an int64"
+        (Z.to_string amount))
+    Data_encoding.(obj1 (req "amount" (conv Z.to_string Z.of_string string)))
+    (function
+      | Increase_paid_storage_amount_overflow amount -> Some amount | _ -> None)
+    (fun amount -> Increase_paid_storage_amount_overflow amount)
 
 (* The DAL page [published_level] targeted by a refutation [Proof] move, if the
    move carries a DAL page proof. *)
@@ -271,6 +476,146 @@ let check_double_baking_evidence (bh1 : Block_header.t) (bh2 : Block_header.t) =
   | None, _ | _, None ->
       Error (Invalid_double_baking_evidence {level = bh1.shell.level})
 
+let check_increase_paid_storage_amount amount_in_bytes :
+    unit Environment.Error_monad.shell_tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  if Z.fits_int64 amount_in_bytes then return_unit
+  else shell_fail (Increase_paid_storage_amount_overflow amount_in_bytes)
+
+type Environment.Error_monad.error +=
+  | Stake_amount_too_small of Tez.t
+  | Delegate_cannot_stake_during_finalization_of_slashed_period
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.stake_amount_too_small"
+    ~title:"Stake amount too small"
+    ~description:"The staked amount is too small"
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Stake operation error: the amount %a is too small, the staker would \
+         not receive any stake from this operation."
+        Tez.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez.encoding))
+    (function Stake_amount_too_small amount -> Some amount | _ -> None)
+    (fun amount -> Stake_amount_too_small amount)
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Permanent
+    ~id:
+      "block_validation_plugin.delegate_cannot_stake_during_finalization_of_slashed_period"
+    ~title:"Delegate cannot stake until finalization of slashed period"
+    ~description:
+      "A delegate cannot stake while it has been slashed and related unstake \
+       requests cannot be finalized."
+    ~pp:(fun ppf _ ->
+      Format.fprintf
+        ppf
+        "A delegate cannot stake while it has been slashed and related unstake \
+         requests cannot be finalized.")
+    Data_encoding.unit
+    (function
+      | Delegate_cannot_stake_during_finalization_of_slashed_period -> Some ()
+      | _ -> None)
+    (fun () -> Delegate_cannot_stake_during_finalization_of_slashed_period)
+
+(* [stake_mints_no_pseudotoken context ~staker ~amount] returns [true] when a
+   [`stake`] of [amount] by [staker] would mint no staking pseudotoken. *)
+let stake_mints_no_pseudotoken context ~staker ~amount :
+    bool Environment.Error_monad.tzresult Lwt.t =
+  let open Environment.Error_monad in
+  let open Lwt_result_syntax in
+  if Tez.(amount <= zero) then return false
+  else
+    let* delegate_opt =
+      Contract.Delegate.find context (Contract.Implicit staker)
+    in
+    match delegate_opt with
+    | None -> return false
+    | Some delegate ->
+        if Signature.Public_key_hash.(staker = delegate) then return false
+        else
+          let* frozen_deposits_pseudotokens =
+            Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+              context
+              ~delegate
+          in
+          let pseudotokens =
+            Staking_pseudotoken.Internal_for_tests.to_z
+              frozen_deposits_pseudotokens
+          in
+          if Z.(equal pseudotokens zero) then
+            (* Uninitialized: rate = 1 *)
+            return false
+          else
+            let* frozen_deposits_staked_tez =
+              Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+                context
+                ~delegate
+            in
+            if Tez.(frozen_deposits_staked_tez = zero) then
+              (* Pseudotokens != 0, but total stake = 0
+                 => fully slashed delegate, op rejected elsewhere *)
+              return false
+            else
+              (* rate = total_pseudotokens / frozen_deposits_staked_tez.
+                 Issued pseudotokens = floor (amount * rate).
+                 reject iff amount * rate < 1 *)
+              return
+                Z.(
+                  lt
+                    (mul pseudotokens (of_int64 (Tez.to_mutez amount)))
+                    (of_int64 (Tez.to_mutez frozen_deposits_staked_tez)))
+
+let delegate_stake_while_slashed_in_current_finalization_delay context ~delegate
+    =
+  let open Environment.Error_monad in
+  let open Lwt_result_syntax in
+  let* is_delegate = Contract.is_delegate context delegate in
+  if is_delegate then
+    (* Slashing history is available only at raw context *)
+    let raw_context = Alpha_context.Internal_for_tests.to_raw context in
+    let delay = Constants.unstake_finalization_delay context + 1 in
+    let current_cycle = Cycle_storage.current raw_context in
+    let slashed_cycle_horizon =
+      Cycle_repr.sub current_cycle delay
+      |> Option.value ~default:Cycle_repr.root
+    in
+    let* slashing_history =
+      Storage.Slashed_deposits.find raw_context delegate
+    in
+    match slashing_history with
+    | None -> return_false
+    | Some slashing_history ->
+        (* Check if there is a cycle between `current_cycle -
+         unstake_finalization_delay - 1` and `current_cycle` where the
+         delegate has been slashed. If so, the stake operation is rejected.
+         Note that the history is sorted in ascendent order of the cycles, so
+         we need to go through the whole list before finding a potential culprit. *)
+        let slashed_during_unstake_delay =
+          List.exists
+            (fun (cycle, _) -> Cycle_repr.(cycle >= slashed_cycle_horizon))
+            slashing_history
+        in
+        return slashed_during_unstake_delay
+  else return_false
+
+let check_execute_outbox_message context ~rollup ~output_proof =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  (* [config] is empty for outbox proof verification per protocol semantics *)
+  protect_use_wasm_pvm ~config:[] context rollup @@ fun (module PVM) ->
+  let output_proof =
+    Data_encoding.Binary.of_string_exn PVM.output_proof_encoding output_proof
+  in
+  let*! _ = PVM.verify_output_proof output_proof in
+  return_unit
+
 let check_block_operation {context; seen_games}
     ({protocol_data = Operation_data {contents; _}; _} as packed_op :
       packed_operation) :
@@ -287,6 +632,24 @@ let check_block_operation {context; seen_games}
              {published_level; level = current_level})
     | None -> return_unit
   in
+  let* () =
+    List.iter_es
+      (function
+        | Contents
+            (Manager_operation
+               {
+                 operation =
+                   Sc_rollup_execute_outbox_message {rollup; output_proof; _};
+                 _;
+               }) ->
+            let* () =
+              check_execute_outbox_message context ~rollup ~output_proof
+              |> Lwt.map Environment.wrap_tzresult
+            in
+            return_unit
+        | _ -> return_unit)
+      (Operation.to_list (Contents_list contents))
+  in
   let* seen_games =
     List.fold_left_es
       (fun seen_games op ->
@@ -302,8 +665,9 @@ let check_block_operation {context; seen_games}
             let* seen_games = check_game_not_seen seen_games rollup stakers in
             let* () =
               match refutation with
-              | Game.Move {step = Game.Proof _; choice} ->
-                  check_refute_proof context rollup stakers choice
+              | Game.Move {step = Game.Proof proof; choice} ->
+                  check_refute_proof context ~rollup ~stakers ~choice ~proof
+                  |> Lwt.map Environment.wrap_tzresult
               | _ -> return_unit
             in
             return seen_games
@@ -313,6 +677,44 @@ let check_block_operation {context; seen_games}
             match check_double_baking_evidence bh1 bh2 with
             | Ok () -> return seen_games
             | Error err -> shell_fail err)
+        | Contents
+            (Manager_operation
+               {
+                 source = _;
+                 operation =
+                   Increase_paid_storage {amount_in_bytes; destination = _};
+                 _;
+               }) ->
+            let* () = check_increase_paid_storage_amount amount_in_bytes in
+            return seen_games
+        | Contents
+            (Manager_operation
+               {
+                 source;
+                 operation =
+                   Transaction
+                     {amount; destination = Implicit staker; entrypoint; _};
+                 _;
+               })
+          when Entrypoint.(entrypoint = stake)
+               && Signature.Public_key_hash.(source = staker) ->
+            let* mints_no_pseudotoken =
+              stake_mints_no_pseudotoken context ~staker ~amount
+              |> Lwt.map Environment.wrap_tzresult
+            in
+            if mints_no_pseudotoken then
+              shell_fail (Stake_amount_too_small amount)
+            else
+              let* delegate_stake_from_slashed_unstake =
+                delegate_stake_while_slashed_in_current_finalization_delay
+                  context
+                  ~delegate:staker
+                |> Lwt.map Environment.wrap_tzresult
+              in
+              if delegate_stake_from_slashed_unstake then
+                shell_fail
+                  Delegate_cannot_stake_during_finalization_of_slashed_period
+              else return seen_games
         | _ -> return seen_games)
       seen_games
       (Operation.to_list (Contents_list contents))
