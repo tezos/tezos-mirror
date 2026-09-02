@@ -10,6 +10,12 @@ use primitive_types::U256;
 ///
 /// Units: base_fee_per_gas (wei/evm_gas) * multiplier (evm_gas/michelson_gas)
 ///        * gas (michelson_gas) = wei, then / 10^12 (wei/mutez) = mutez.
+///
+/// Note that this wraps on `u64` overflow (`low_u64`), unlike its typed
+/// `tezosx_types` counterpart, which errors on the mutez domain bound.
+// TODO: https://linear.app/tezos/issue/L2-2021
+//   Port the last caller (`tezos_execution`) to the typed
+//   `tezosx_types::michelson_gas_to_mutez`, then delete this helper.
 pub fn michelson_gas_to_mutez(base_fee_per_gas: U256, multiplier: u64, gas: u64) -> u64 {
     let wei = base_fee_per_gas * U256::from(multiplier) * U256::from(gas);
     // NB: Convert back to mutez with a floor division.
