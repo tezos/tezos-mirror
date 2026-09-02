@@ -53,24 +53,23 @@ fn init_precompile_bytecode(
     predeployed: &'static PredeployedContract,
 ) -> Result<(), EvmDbError> {
     let mut created_account = StorageAccount::from_address(addr)?;
-    let mut account_info = created_account.info(eth_accounts)?;
+    let update = created_account.info_update(eth_accounts)?;
+    let previous_code_hash = update.code_hash();
 
-    if account_info.code_hash == predeployed.code_hash {
+    if previous_code_hash == predeployed.code_hash {
         return Ok(());
     }
 
-    if account_info.code_hash != KECCAK_EMPTY {
-        CodeStorage::delete(eth_accounts, &account_info.code_hash)?;
-    }
+    update
+        .with_code(
+            Bytecode::new_legacy(Bytes::from_static(predeployed.code)),
+            predeployed.code_hash,
+        )
+        .apply()?;
 
-    let code = Bytecode::new_legacy(Bytes::from_static(predeployed.code));
-    account_info.code_hash = predeployed.code_hash;
-    created_account.set_info(eth_accounts, account_info)?;
-    CodeStorage::add(
-        eth_accounts,
-        code.original_byte_slice(),
-        Some(predeployed.code_hash),
-    )?;
+    if previous_code_hash != KECCAK_EMPTY {
+        CodeStorage::delete(eth_accounts, &previous_code_hash)?;
+    }
 
     Ok(())
 }

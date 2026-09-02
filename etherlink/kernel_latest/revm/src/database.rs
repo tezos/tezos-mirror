@@ -538,7 +538,8 @@ fn write_alias_origin(
     alias_info: AliasInfo,
 ) -> Result<(), EvmDbError> {
     let mut storage_account = StorageAccount::from_address(address)?;
-    let mut info = storage_account.info(eth_accounts)?;
-    info.origin = AccountOrigin::Alias(alias_info);
-    storage_account.set_info_without_code(eth_accounts, info)
+    storage_account
+        .info_update(eth_accounts)?
+        .with_origin(AccountOrigin::Alias(alias_info))
+        .apply()
 }

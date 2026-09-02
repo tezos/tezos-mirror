@@ -224,8 +224,9 @@ impl Default for AccountInfo {
 impl AccountInfo {
     // Upper bound used for optimizing reads in the durable storage.
     // The fixed fields take 77 bytes and the origin field is bounded
-    // by the longest canonical native address; `set_info` enforces the
-    // bound at write time so a bounded read can never truncate.
+    // by the longest canonical native address; `rlp_bytes_checked`
+    // enforces the bound as it encodes, so a bounded read can never
+    // truncate.
     //
     // The record can only grow: the fixed fields (balance, nonce, code
     // hash) are constant-size and the origin moves from `Unclassified`
@@ -267,6 +268,55 @@ impl AccountInfo {
             });
         }
         Ok(bytes)
+    }
+}
+
+/// A pending write of an account's info record that cannot change the
+/// stored balance. It borrows the account and the accounts keyspace
+/// until [`Self::apply`] writes it back; dropping it writes nothing.
+pub struct AccountInfoUpdate<'a, K: KeySpace> {
+    account: &'a mut StorageAccount,
+    eth_accounts: &'a mut K,
+    info: AccountInfo,
+}
+
+impl<K: KeySpace> AccountInfoUpdate<'_, K> {
+    /// The code hash of the record.
+    pub fn code_hash(&self) -> B256 {
+        self.info.code_hash
+    }
+
+    /// Set the account's nonce.
+    pub fn with_nonce(mut self, nonce: u64) -> Self {
+        self.info.nonce = nonce;
+        self
+    }
+
+    /// Set the account's origin classification.
+    pub fn with_origin(mut self, origin: AccountOrigin) -> Self {
+        self.info.origin = origin;
+        self
+    }
+
+    /// Replace the account's code with `code` and its code hash with
+    /// `code_hash`, which must be the hash of `code`.
+    pub fn with_code(mut self, code: Bytecode, code_hash: B256) -> Self {
+        debug_assert_eq!(code.hash_slow(), code_hash);
+        self.info.code = Some(code);
+        self.info.code_hash = code_hash;
+        self
+    }
+
+    /// Write the record back to the account it was read from, with the
+    /// balance it was read with. Bytecode set by [`Self::with_code`] is
+    /// stored under its hash.
+    pub fn apply(self) -> Result<(), EvmDbError> {
+        let Self {
+            account,
+            eth_accounts,
+            info,
+        } = self;
+        account.write_info(eth_accounts, info)
     }
 }
 
@@ -423,6 +473,21 @@ impl StorageAccount {
         }
     }
 
+    /// Read this account's record and open it for a balance-preserving
+    /// update, migrating a legacy split-field record on the way like
+    /// [`Self::info`] does.
+    pub fn info_update<'a, K: KeySpace>(
+        &'a mut self,
+        eth_accounts: &'a mut K,
+    ) -> Result<AccountInfoUpdate<'a, K>, EvmDbError> {
+        let info = self.info(eth_accounts)?;
+        Ok(AccountInfoUpdate {
+            account: self,
+            eth_accounts,
+            info,
+        })
+    }
+
     /// Persist an already-encoded info record at this account's
     /// `/info`.
     ///
@@ -452,17 +517,9 @@ impl StorageAccount {
     pub fn set_info(
         &mut self,
         eth_accounts: &mut impl KeySpace,
-        mut new_infos: AccountInfo,
+        new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
-        if let Some(code) = new_infos.code.take() {
-            CodeStorage::add(
-                eth_accounts,
-                code.original_byte_slice(),
-                Some(new_infos.code_hash),
-            )?;
-        }
-        let value = new_infos.rlp_bytes_checked()?;
-        self.write_info_record(eth_accounts, &value)
+        self.write_info(eth_accounts, new_infos)
     }
 
     /// Same as [`Self::set_info`] but ignores the in-memory bytecode
@@ -472,6 +529,24 @@ impl StorageAccount {
         eth_accounts: &mut impl KeySpace,
         new_infos: AccountInfo,
     ) -> Result<(), EvmDbError> {
+        let value = new_infos.rlp_bytes_checked()?;
+        self.write_info_record(eth_accounts, &value)
+    }
+
+    /// Encode `new_infos` at this account's `/info`, moving its
+    /// in-memory bytecode to the code storage first.
+    fn write_info(
+        &mut self,
+        eth_accounts: &mut impl KeySpace,
+        mut new_infos: AccountInfo,
+    ) -> Result<(), EvmDbError> {
+        if let Some(code) = new_infos.code.take() {
+            CodeStorage::add(
+                eth_accounts,
+                code.original_byte_slice(),
+                Some(new_infos.code_hash),
+            )?;
+        }
         let value = new_infos.rlp_bytes_checked()?;
         self.write_info_record(eth_accounts, &value)
     }
@@ -487,7 +562,7 @@ impl StorageAccount {
         info.balance = current
             .checked_add(amount)
             .ok_or(EvmDbError::BalanceOverflow { current, amount })?;
-        self.set_info(eth_accounts, info)
+        self.write_info(eth_accounts, info)
     }
 
     // In the future we might want to optimize reading to not use `info`.
@@ -501,7 +576,7 @@ impl StorageAccount {
         info.balance = current
             .checked_sub(amount)
             .ok_or(EvmDbError::BalanceUnderflow { current, amount })?;
-        self.set_info(eth_accounts, info)
+        self.write_info(eth_accounts, info)
     }
 
     pub fn storage_key(&self, index: &U256) -> Result<Key, KeyError> {
@@ -1056,5 +1131,120 @@ mod test {
             durable(&account.deposit_key(&index).unwrap()),
             format!("{prefix}/deposits_table/1").into_bytes()
         );
+    }
+
+    #[test]
+    fn update_info_preserves_the_balance() {
+        use tezosx_interfaces::RuntimeId;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let addr = Address::from_slice(&[0x11; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+
+        let balance = U256::from(4_242u64);
+        account
+            .set_info_without_code(
+                eth_accounts,
+                AccountInfo {
+                    balance,
+                    nonce: 7,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+
+        account
+            .info_update(eth_accounts)
+            .unwrap()
+            .with_nonce(9)
+            .with_code(Bytecode::new(), KECCAK_EMPTY)
+            .with_origin(AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: "tz1abcdef".to_string(),
+            }))
+            .apply()
+            .unwrap();
+
+        let read_back = account.info(eth_accounts).unwrap();
+        assert_eq!(read_back.balance, balance);
+        assert_eq!(read_back.nonce, 9);
+        assert_eq!(read_back.code_hash, KECCAK_EMPTY);
+        assert_eq!(
+            read_back.origin,
+            AccountOrigin::Alias(AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: "tz1abcdef".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn info_update_stands_in_a_default() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let addr = Address::from_slice(&[0x44; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+
+        // No record: the update carries a zero balance, and writing it
+        // back creates the record with one.
+        account.info_update(eth_accounts).unwrap().apply().unwrap();
+        assert_eq!(account.info(eth_accounts).unwrap().balance, U256::ZERO);
+
+        account
+            .set_info_without_code(
+                eth_accounts,
+                AccountInfo {
+                    balance: U256::from(9u64),
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+
+        // A record that exists: writing its update back leaves the
+        // stored balance alone.
+        account.info_update(eth_accounts).unwrap().apply().unwrap();
+        assert_eq!(
+            account.info(eth_accounts).unwrap().balance,
+            U256::from(9u64)
+        );
+    }
+
+    #[test]
+    fn update_info_persists_the_code() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let addr = Address::from_slice(&[0x33; 20]);
+        let mut account = StorageAccount::from_address(&addr).unwrap();
+
+        let balance = U256::from(1_000u64);
+        account
+            .set_info_without_code(
+                eth_accounts,
+                AccountInfo {
+                    balance,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+
+        // Not a predeployed contract: `get_code` serves those from a
+        // static table, so their code reads back with or without a write.
+        let code = Bytecode::new_legacy(Bytes::from_static(&[0x60, 0x00, 0x60, 0x00]));
+        let code_hash = code.hash_slow();
+        account
+            .info_update(eth_accounts)
+            .unwrap()
+            .with_code(code.clone(), code_hash)
+            .apply()
+            .unwrap();
+
+        let read_back = account.info(eth_accounts).unwrap();
+        assert_eq!(read_back.balance, balance);
+        assert_eq!(read_back.code_hash, code_hash);
+        check_account_code_info_fetching(eth_accounts, code, code_hash);
     }
 }
