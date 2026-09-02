@@ -144,6 +144,26 @@ let () =
     (function Cannot_stake_on_fully_slashed_delegate -> Some () | _ -> None)
     (fun () -> Cannot_stake_on_fully_slashed_delegate)
 
+(* See description in mli. *)
+type error += Stake_amount_too_small of Tez_repr.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"operations.stake_amount_too_small"
+    ~title:"Stake amount too small"
+    ~description:"The staked amount is too small"
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Stake operation error: the amount %a is too small, the staker would \
+         not receive any stake from this operation."
+        Tez_repr.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez_repr.encoding))
+    (function Stake_amount_too_small amount -> Some amount | _ -> None)
+    (fun amount -> Stake_amount_too_small amount)
+
 (** These two types are not exported, they are views to the portions
     of the storage which are relevant in this module when a delegate
     or a staker are considered. *)
@@ -417,7 +437,17 @@ let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
        slashing. We forbid this case to avoid having to iterate over
        all stakers to reset their pseudotoken balances. *)
     tzfail Cannot_stake_on_fully_slashed_delegate
-  else pseudotokens_of ~rounding:`Down delegate_balances tez_amount
+  else
+    (* Rounding disadvantages the newcomer, and for an amount that is small
+       relative to the current pseudotoken value it rounds down to zero. We
+       reject that case instead of transferring the tez into the delegate's
+       frozen deposits while minting no pseudotoken for the staker. *)
+    let* pseudotokens =
+      pseudotokens_of ~rounding:`Down delegate_balances tez_amount
+    in
+    if Staking_pseudotoken_repr.(pseudotokens = zero) then
+      tzfail (Stake_amount_too_small tez_amount)
+    else return pseudotokens
 
 let stake ctxt ~delegator ~delegate tez_amount =
   let open Lwt_result_syntax in

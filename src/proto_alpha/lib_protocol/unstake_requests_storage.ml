@@ -286,11 +286,11 @@ let can_stake_from_unstake ctxt ~delegate =
   let slashing_history = slashing_history @ slashing_history_o in
 
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let slashable_deposits_period =
-    Constants_storage.slashable_deposits_period ctxt
-  in
   let oldest_slashable_cycle =
-    Cycle_repr.sub current_cycle (slashable_deposits_period + 1)
+    Cycle_repr.sub
+      current_cycle
+      (Constants_storage.unstake_finalization_delay ctxt
+      + Constants_repr.slashing_delay)
     |> Option.value ~default:Cycle_repr.root
   in
   let*! is_denounced =

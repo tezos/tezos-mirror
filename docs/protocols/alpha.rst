@@ -77,6 +77,11 @@ Bug Fixes
   payload but baked at different rounds obtain distinct nonces. (MR
   :gl:`!22462`)
 
+- Rejected ``stake`` operations from an external staker whose amount is too
+  small to mint any staking pseudotoken at the delegate's current
+  tez/pseudotoken rate, with a new ``stake_amount_too_small`` error. (MR
+  :gl:`!XXXXX`)
+
 Minor Changes
 -------------
 

@@ -105,6 +105,57 @@ let ticket_balances_encoding = Plugin.RPC.Contract.ticket_balances_encoding
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
+let simulated_staked_amount (rpc : #rpc_context) ~chain ~block ~source ~amount =
+  let open Lwt_result_syntax in
+  let* delegate_opt =
+    Alpha_services.Contract.delegate_opt
+      rpc
+      (chain, block)
+      (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh source))
+  in
+  match delegate_opt with
+  | None -> return_none
+  | Some delegate ->
+      if
+        Signature.Public_key_hash.equal
+          source
+          (Implicit_account_repr.Forbidden.to_pkh delegate)
+      then
+        (* Self-stake: the delegate holds no pseudotokens. *)
+        return_none
+      else
+        let* denominator =
+          Alpha_services.Delegate.staking_denominator
+            rpc
+            (chain, block)
+            delegate
+        in
+        let pseudotokens =
+          Staking_pseudotoken.Internal_for_tests.to_z denominator
+        in
+        if Z.equal pseudotokens Z.zero then
+          (* Uninitialized pool: the conversion rate is 1. *)
+          return_some amount
+        else
+          let* staked_tez =
+            Alpha_services.Delegate.total_delegated_stake
+              rpc
+              (chain, block)
+              delegate
+          in
+          let staked_tez_mutez = Tez.to_mutez staked_tez in
+          if Int64.equal staked_tez_mutez 0L then
+            (* Fully-slashed pool: the stake operation would fail. *)
+            return_none
+          else
+            let staked_tez_z = Z.of_int64 staked_tez_mutez in
+            let amount_z = Z.of_int64 (Tez.to_mutez amount) in
+            (* Mirror the protocol's [~rounding:`Down] on both conversions:
+               [pseudotokens_of] then [tez_of] in [Staking_pseudotokens_storage]. *)
+            let minted = Z.div (Z.mul pseudotokens amount_z) staked_tez_z in
+            let credited = Z.div (Z.mul staked_tez_z minted) pseudotokens in
+            return_some (Tez.of_mutez_exn (Z.to_int64 credited))
+
 let get_pending_staking_parameters (cctxt : #full) ?chain ?block delegate =
   let chain = match chain with None -> cctxt#chain | Some chain -> chain in
   let block = match block with None -> cctxt#block | Some block -> block in

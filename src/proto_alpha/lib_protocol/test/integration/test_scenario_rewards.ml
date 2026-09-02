@@ -505,9 +505,23 @@ let test_overstake =
         ~staker_diff:(Q.of_int32 17_612l)
         ~delegate_diff:(Q.of_int32 232_934l)
 
+(* Once the delegate's staked pool has appreciated through rewards (its staked
+   tez exceeds its staking pseudotokens), an external staker staking a tiny
+   amount would, at the pool's conversion rate, mint zero pseudotokens. Such a
+   stake must be rejected rather than transferred into the frozen deposits with
+   no pseudotoken minted in exchange. *)
+let test_stake_amount_too_small =
+  begin_test_with_rewards_checks ~init_limit:5.
+  --> wait_n_cycles 8
+  --> Test_scenario_stake.fail_to_stake_amount_too_small
+        ~loc:__LOC__
+        "staker"
+        ~amount:(Amount (Tez.of_mutez 1L))
+
 let tests =
   tests_of_scenarios
   @@ [
+       ("Test stake amount too small", test_stake_amount_too_small);
        ("Test wait rewards with stakers and edge", test_wait_rewards);
        ( "Test wait rewards with stake variation events",
          test_wait_rewards_staker_variation );

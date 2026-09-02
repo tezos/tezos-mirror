@@ -34,6 +34,13 @@
     {!stake} in this case. *)
 type error += Cannot_stake_on_fully_slashed_delegate
 
+(** Raised when an external staker's stake amount is too small to mint any
+    staking pseudotoken at the delegate's current conversion rate (the
+    down-rounded pseudotoken credit would be zero). Without this check the tez
+    would be transferred into the delegate's frozen deposits while the staker
+    receives no pseudotoken in exchange. *)
+type error += Stake_amount_too_small of Tez_repr.t
+
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s
