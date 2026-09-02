@@ -202,6 +202,7 @@ fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P, report: &mut Report) -> Fi
     fixtures
 }
 
+// Test harness: writes the balances an Ethereum-spec fixture declares.
 fn fill_state(eth_accounts: &mut impl KeySpace, state: HashMap<Address, Account>) {
     for (address, info) in state {
         let mut storage_account = StorageAccount::from_address(&address).unwrap();
@@ -210,6 +211,7 @@ fn fill_state(eth_accounts: &mut impl KeySpace, state: HashMap<Address, Account>
                 .set_storage(eth_accounts, index, value)
                 .unwrap();
         }
+        #[allow(clippy::disallowed_methods)]
         storage_account
             .set_info(
                 eth_accounts,

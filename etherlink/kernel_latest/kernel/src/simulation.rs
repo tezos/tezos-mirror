@@ -497,12 +497,18 @@ impl Evaluation {
             if let Some(value) = self.value {
                 let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
                 info.balance = u256_to_alloy(&value.saturating_add(max_gas_to_pay));
+                // A fictional balance: the storage of a simulation is
+                // discarded when it ends, so this moves no value.
+                #[allow(clippy::disallowed_methods)]
                 simulation_caller.set_info_without_code(rk.eth_accounts_mut(), info)?;
             }
         }
 
         let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
+        // A fictional balance: the storage of a simulation is discarded
+        // when it ends, so this moves no value.
+        #[allow(clippy::disallowed_methods)]
         simulation_caller.set_info_without_code(rk.eth_accounts_mut(), info)?;
 
         // Simulation only: an inbound CREATE_CONTRACT reached from a
@@ -743,6 +749,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use crate::load_base;
     use alloy_primitives::hex::FromHex;
     use primitive_types::H256;

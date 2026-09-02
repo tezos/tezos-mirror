@@ -224,6 +224,7 @@ impl Registry for RegistryImpl {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use super::*;
     use alloy_primitives::{hex::FromHex, Address, Bytes};
     use pretty_assertions::assert_eq;

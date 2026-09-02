@@ -1372,6 +1372,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #![allow(clippy::disallowed_methods)]
 
     use crate::{
         apply::{is_valid_ethereum_transaction_common, Validity},

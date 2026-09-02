@@ -756,6 +756,7 @@ where
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::disallowed_methods)]
     use crate::EvmRunError;
     use alloy_sol_types::{
         sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,

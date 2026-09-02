@@ -329,6 +329,7 @@ pub(crate) fn da_fee(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use super::*;
     use alloy_primitives::Bytes;
     use primitive_types::{H160, U256};

@@ -719,6 +719,7 @@ impl StorageAccount {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::disallowed_methods)]
     use super::*;
     use crate::error::EvmDbError;
     use crate::{
