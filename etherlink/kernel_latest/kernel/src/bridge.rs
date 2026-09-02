@@ -431,6 +431,8 @@ fn build_deposit_event(
     // and the event itself reports `consumed_milligas: 0` in the
     // receipt. `Gas::default()` acts as an OOG safety cap on the two
     // small bounded encodes below (pair of two nats).
+    // Fixed-size array; see Note: alloc_extend.
+    #[allow(clippy::disallowed_methods)]
     let payload = Micheline::App(
         Prim::Pair,
         arena.alloc_extend([
@@ -452,6 +454,8 @@ fn build_deposit_event(
     let msg_id_annots: Annotations =
         Annotations::from([Annotation::Field(Cow::Borrowed("inbox_msg_id"))]);
 
+    // Fixed-size array; see Note: alloc_extend.
+    #[allow(clippy::disallowed_methods)]
     let ty = Micheline::App(
         Prim::pair,
         arena.alloc_extend([

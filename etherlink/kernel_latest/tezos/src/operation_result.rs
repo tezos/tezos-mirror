@@ -1968,6 +1968,8 @@ mod tests {
         let source_annots: Annotations =
             Annotations::from([Annotation::Field(Cow::Borrowed("source"))]);
 
+        // Fixed-size array; see Note: alloc_extend.
+        #[allow(clippy::disallowed_methods)]
         let ty = Micheline::App(
             Prim::pair,
             arena.alloc_extend([
