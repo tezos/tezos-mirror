@@ -1518,7 +1518,97 @@ let test_delegate_parameter_UX =
   let* () = check_parameters ~operation_cycle ~limit:9 ~edge_pct:4 in
   unit
 
+(* Once a delegate's staked pool has appreciated through rewards (its staked tez
+   exceeds its staking pseudotoken supply), an external staker staking a tiny
+   amount would, at the pool's conversion rate, mint zero pseudotokens: the tez
+   would be transferred into the delegate's frozen deposits with no pseudotoken
+   minted in exchange. This operation must be rejected. *)
+let test_stake_too_small_to_mint_pseudotokens =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Staking - dust stake that mints no pseudotoken is rejected"
+    ~tags:["adaptive_issuance"; "staking"; "pseudotoken"; "stake"]
+  @@ fun protocol ->
+  (* Adaptive issuance (and hence staking) is always active in these protocols,
+     so no activation vote is needed. *)
+  let* _proto_hash, endpoint, client, _node = init protocol in
+  let bake = Helpers.bake ~endpoint ~protocol in
+  let delegate = "bootstrap2" in
+  (* Create and fund an external staker delegating to [delegate]. *)
+  let* staker = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 1_000_000)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:staker.alias
+      client
+  in
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  let* () = Client.set_delegate ~src:staker.alias ~delegate client in
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  (* The delegate accepts external staking and shares rewards with its stakers
+     (edge < 1), so the staked pool appreciates over time. *)
+  let set_delegate_parameters =
+    Client.spawn_set_delegate_parameters ~delegate ~limit:"5" ~edge:"0.5" client
+  in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+  let* () = set_delegate_parameters |> Process.check in
+  (* Wait for the delegate parameters to activate (staking acceptance). *)
+  let* () = Helpers.bake_n_cycles bake 3 client in
+  (* Stake a sizeable amount, initializing the staker's pseudotokens at rate 1. *)
+  let stake =
+    Client.spawn_stake (Tez.of_int 1000) ~staker:staker.alias client
+  in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+  let* () = Process.check ~expect_failure:false stake in
+  (* Let the pool appreciate: staking rewards increase the delegate's staked tez
+     while the pseudotoken supply stays constant, so the tez value of one
+     pseudotoken grows above 1 mutez. *)
+  let* () = Helpers.bake_n_cycles bake 4 client in
+  (* Sanity check that the pool has appreciated: the staker's staked tez (the tez
+     value of its pseudotokens) now exceeds its pseudotoken count. *)
+  let* staked_balance =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_staked_balance
+         staker.public_key_hash
+  in
+  let* pseudotokens =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_staking_numerator
+         staker.public_key_hash
+  in
+  Log.info
+    "staker staked_balance (mutez) = %#d, pseudotokens = %#d"
+    staked_balance
+    pseudotokens ;
+  Check.((staked_balance > pseudotokens) int)
+    ~error_msg:
+      "expected the staked pool to have appreciated (staked_balance %L > \
+       pseudotokens %R)" ;
+  (* The stake command reports the amount that would actually be credited. *)
+  let* stake_stdout =
+    Client.spawn_stake (Tez.of_int 100) ~staker:staker.alias client
+    |> Process.check_and_read_stdout
+  in
+  if not (stake_stdout =~ rex "staking .* will credit .* of stake to the staker")
+  then
+    Test.fail
+      "Expected the stake command to report the credited stake. Got:\n%s"
+      stake_stdout ;
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  (* A 1-mutez stake now maps to zero pseudotokens and must be rejected. *)
+  let dust_stake =
+    Client.spawn_stake (Tez.of_mutez_int 1) ~staker:staker.alias client
+  in
+  Process.check_error
+    ~msg:(rex "Stake operation error: the amount .* is too small")
+    dust_stake
+
 let register ~protocols =
   test_staking protocols ;
   test_fix_delegated_balance protocols ;
-  test_delegate_parameter_UX protocols
+  test_delegate_parameter_UX protocols ;
+  (* The fix lives in the Ushuaia (025) plugin. *)
+  test_stake_too_small_to_mint_pseudotokens
+    (List.filter (fun p -> p = Protocol.U025) protocols)

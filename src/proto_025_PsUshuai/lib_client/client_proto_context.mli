@@ -172,6 +172,21 @@ val get_frozen_deposits_limit :
   Signature.Public_key_hash.t ->
   Tez.t option tzresult Lwt.t
 
+(** [simulated_staked_amount rpc ~chain ~block ~source ~amount] returns the tez
+    amount that a ["stake"] of [amount] by [source] would actually credit, given
+    the delegate's current staking pseudotoken rate. Since minting rounds down,
+    the credited amount is at most [amount]. Returns [None] when the notion does
+    not apply or the operation would fail anyway: [source] has no delegate,
+    [source] is its own delegate (self-stake, no pseudotokens), or the
+    delegate's staked pool is empty (fully slashed). *)
+val simulated_staked_amount :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  source:Signature.Public_key_hash.t ->
+  amount:Tez.t ->
+  Tez.t option tzresult Lwt.t
+
 (** Calls {!Injection.prepare_manager_operation}
     with {!Alpha_context.Delegation} [delegate_opt] as operation. *)
 val build_delegate_operation :

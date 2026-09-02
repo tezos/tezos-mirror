@@ -482,6 +482,74 @@ let check_increase_paid_storage_amount amount_in_bytes :
   if Z.fits_int64 amount_in_bytes then return_unit
   else shell_fail (Increase_paid_storage_amount_overflow amount_in_bytes)
 
+type Environment.Error_monad.error += Stake_amount_too_small of Tez.t
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.stake_amount_too_small"
+    ~title:"Stake amount too small"
+    ~description:"The staked amount is too small"
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Stake operation error: the amount %a is too small, the staker would \
+         not receive any stake from this operation."
+        Tez.pp
+        amount)
+    Data_encoding.(obj1 (req "amount" Tez.encoding))
+    (function Stake_amount_too_small amount -> Some amount | _ -> None)
+    (fun amount -> Stake_amount_too_small amount)
+
+(* [stake_mints_no_pseudotoken context ~staker ~amount] returns [true] when a
+   [`stake`] of [amount] by [staker] would mint no staking pseudotoken. *)
+let stake_mints_no_pseudotoken context ~staker ~amount :
+    bool Environment.Error_monad.tzresult Lwt.t =
+  let open Environment.Error_monad in
+  let open Lwt_result_syntax in
+  if Tez.(amount <= zero) then return false
+  else
+    let* delegate_opt =
+      Contract.Delegate.find context (Contract.Implicit staker)
+    in
+    match delegate_opt with
+    | None -> return false
+    | Some delegate ->
+        if Signature.Public_key_hash.(staker = delegate) then return false
+        else
+          let* frozen_deposits_pseudotokens =
+            Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+              context
+              ~delegate
+          in
+          let pseudotokens =
+            Staking_pseudotoken.Internal_for_tests.to_z
+              frozen_deposits_pseudotokens
+          in
+          if Z.(equal pseudotokens zero) then
+            (* Uninitialized: rate = 1 *)
+            return false
+          else
+            let* frozen_deposits_staked_tez =
+              Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+                context
+                ~delegate
+            in
+            if Tez.(frozen_deposits_staked_tez = zero) then
+              (* Pseudotokens != 0, but total stake = 0
+                 => fully slashed delegate, op rejected elsewhere *)
+              return false
+            else
+              (* rate = total_pseudotokens / frozen_deposits_staked_tez.
+                 Issued pseudotokens = floor (amount * rate).
+                 reject iff amount * rate < 1 *)
+              return
+                Z.(
+                  lt
+                    (mul pseudotokens (of_int64 (Tez.to_mutez amount)))
+                    (of_int64 (Tez.to_mutez frozen_deposits_staked_tez)))
+
 let check_execute_outbox_message context ~rollup ~output_proof =
   let open Environment.Error_monad.Lwt_result_syntax in
   (* [config] is empty for outbox proof verification per protocol semantics *)
@@ -563,6 +631,24 @@ let check_block_operation {context; seen_games}
                }) ->
             let* () = check_increase_paid_storage_amount amount_in_bytes in
             return seen_games
+        | Contents
+            (Manager_operation
+               {
+                 source;
+                 operation =
+                   Transaction
+                     {amount; destination = Implicit staker; entrypoint; _};
+                 _;
+               })
+          when Entrypoint.(entrypoint = stake)
+               && Signature.Public_key_hash.(source = staker) ->
+            let* mints_no_pseudotoken =
+              stake_mints_no_pseudotoken context ~staker ~amount
+              |> Lwt.map Environment.wrap_tzresult
+            in
+            if mints_no_pseudotoken then
+              shell_fail (Stake_amount_too_small amount)
+            else return seen_games
         | _ -> return seen_games)
       seen_games
       (Operation.to_list (Contents_list contents))
