@@ -50,6 +50,11 @@ General
   error instead of recursing on the native OCaml stack. The bound is above the
   maximum nesting any protocol accepts, so no valid value is affected.
 
+- Building the smart rollup node from source now requires ``clang``
+  (``libclang``), which RocksDB's ``bindgen`` needs at build time.
+  ``make build-deps`` installs it through the ``conf-clang`` opam package.
+  (MR :gl:`!22818`)
+
 Node
 ----
 
