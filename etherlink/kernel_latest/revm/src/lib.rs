@@ -848,14 +848,11 @@ mod test {
         };
         use tezosx_journal::TezosXJournal;
 
-        use crate::{
-            storage::world_state_handler::{AccountInfo, StorageAccount},
-            test::GAS_LIMIT,
-        };
+        use crate::storage::world_state_handler::{AccountInfo, StorageAccount};
 
-        /// Milligas consumed by the mock Tezos runtime for every CRAC call.
-        /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
-        pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
+        /// Gas consumed by the mock Tezos runtime for every CRAC call.
+        pub(crate) const MOCK_TEZOS_GAS_CONSUMED: tezosx_interfaces::Gas =
+            tezosx_interfaces::Gas::new(10_000, RuntimeId::Tezos);
 
         /// Compiled deploy bytecode for `contracts/tests/static_caller.sol`,
         /// shared across the test submodules that probe precompile
@@ -919,7 +916,7 @@ mod test {
                 native_public_key: Option<&[u8]>,
                 target_runtime: RuntimeId,
                 context: CrossRuntimeContext,
-                gas_remaining: u64,
+                gas_remaining: tezosx_interfaces::Gas,
             ) -> Result<(String, tezosx_interfaces::AliasResolution), TezosXRuntimeError>
             where
                 Host: KeyspaceHost<KS>,
@@ -979,8 +976,11 @@ mod test {
                 rk: &RuntimeKeyspaces<Host, KS>,
                 addr_runtime: RuntimeId,
                 addr: &str,
-                budget: u64,
-            ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
+                budget: tezosx_interfaces::Gas,
+            ) -> Result<
+                (tezosx_interfaces::Classification, tezosx_interfaces::Gas),
+                TezosXRuntimeError,
+            >
             where
                 Host: StorageV1,
                 KS: SafeKeyspace,
@@ -1051,7 +1051,6 @@ mod test {
 
         pub(crate) fn test_alias_creation_context() -> CrossRuntimeContext {
             CrossRuntimeContext {
-                gas_limit: GAS_LIMIT,
                 timestamp: PU256::from(1),
                 block_number: PU256::from(1),
             }
@@ -1070,7 +1069,7 @@ mod test {
                 alias_info: AliasInfo,
                 _native_public_key: Option<&[u8]>,
                 _context: CrossRuntimeContext,
-                gas_remaining: u64,
+                gas_remaining: tezosx_interfaces::Gas,
             ) -> Result<(String, tezosx_interfaces::AliasResolution), TezosXRuntimeError>
             where
                 Host: StorageV1,
@@ -1206,14 +1205,20 @@ mod test {
                 &self,
                 _rk: &RuntimeKeyspaces<Host, KS>,
                 _addr: &str,
-                _budget: u64,
-            ) -> Result<(tezosx_interfaces::Classification, u64), TezosXRuntimeError>
+                _budget: tezosx_interfaces::Gas,
+            ) -> Result<
+                (tezosx_interfaces::Classification, tezosx_interfaces::Gas),
+                TezosXRuntimeError,
+            >
             where
                 Host: StorageV1,
                 KS: SafeKeyspace,
             {
                 // Mock: always return Unknown with no consumption.
-                Ok((tezosx_interfaces::Classification::Unknown, 0))
+                Ok((
+                    tezosx_interfaces::Classification::Unknown,
+                    tezosx_interfaces::Gas::ZERO,
+                ))
             }
 
             fn string_from_address(
@@ -1424,7 +1429,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .unwrap();
         let value_sent = U256::from(5000000000000u64);
@@ -1480,15 +1485,11 @@ mod test {
             "Transfer to implicit address should have succeeded"
         );
 
-        // Verify the CRAC gas was actually charged (mock returns 10_000
-        // milligas = 1_000 EVM gas, plus the precompile base cost).
+        // Verify the CRAC gas was actually charged (the mock's consumed
+        // gas, plus the precompile base cost).
         let gas_used = execution_result.result.gas_used();
-        let mock_evm_gas = tezosx_interfaces::gas::convert(
-            tezosx_interfaces::RuntimeId::Tezos,
-            tezosx_interfaces::RuntimeId::Ethereum,
-            MOCK_TEZOS_GAS_CONSUMED,
-        )
-        .unwrap();
+        let mock_evm_gas =
+            u64::from(tezosx_interfaces::EvmGas::from(MOCK_TEZOS_GAS_CONSUMED));
         assert!(
             gas_used >= mock_evm_gas,
             "Transaction should have consumed at least {mock_evm_gas} EVM gas \
@@ -5189,7 +5190,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .expect("Failed to generate alias");
         let alias_bytes = alias_bytes.0;
@@ -5276,7 +5277,7 @@ mod test {
             None,
             tezosx_interfaces::RuntimeId::Ethereum,
             test_alias_creation_context(),
-            1_000_000,
+            tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
         );
         assert!(
             result.is_err(),
@@ -5336,7 +5337,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .expect("Branch 2 ensure_alias should succeed");
 
@@ -5463,7 +5464,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .expect("Branch 3 ensure_alias should succeed");
 
@@ -5751,7 +5752,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .expect("Failed to generate alias");
         let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
@@ -5864,7 +5865,7 @@ mod test {
                 None,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
-                1_000_000,
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .expect("Failed to generate alias");
         let alias_bytes = alias_bytes.0;

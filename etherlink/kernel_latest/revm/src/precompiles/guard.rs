@@ -8,6 +8,7 @@ use revm::{
     interpreter::{CallInputs, Gas},
     primitives::Address,
 };
+use tezosx_interfaces::EvmGas;
 
 pub(crate) fn guard(
     current: Address,
@@ -42,8 +43,11 @@ pub(crate) fn guard(
     Ok(())
 }
 
-pub(crate) fn charge(gas: &mut Gas, cost: u64) -> Result<(), CustomPrecompileError> {
-    if gas.record_cost(cost) {
+pub(crate) fn charge(
+    gas: &mut Gas,
+    cost: impl Into<EvmGas>,
+) -> Result<(), CustomPrecompileError> {
+    if gas.record_cost(u64::from(cost.into())) {
         Ok(())
     } else {
         Err(CustomPrecompileError::OutOfGas)

@@ -12,6 +12,7 @@ use mir::gas;
 use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::PublicKey;
+use tezosx_interfaces::Milligas;
 use thiserror::Error;
 
 /// Per-write fixed overhead for a single durable-store write
@@ -250,13 +251,20 @@ impl TezlinkOperationGas {
         self.remaining.consume(cost.0)
     }
 
-    /// Consumes a raw milligas amount from the operation gas tracker.
+    /// Consumes a milligas amount from the operation gas tracker.
+    ///
+    /// Takes `impl Into<Milligas>` so a cross-runtime
+    /// [`tezosx_interfaces::Gas`] converts itself at the call site instead
+    /// of the caller naming `RuntimeId::Tezos`.
+    ///
     /// L2-1044: Avoid unnecessary cast by using a better suited type for gas in MIR
     pub fn cast_and_consume_milligas(
         &mut self,
-        milligas: u64,
+        milligas: impl Into<Milligas>,
     ) -> Result<(), gas::OutOfGas> {
-        let milligas: u32 = milligas.try_into().map_err(|_| gas::OutOfGas)?;
+        let milligas: u32 = u64::from(milligas.into())
+            .try_into()
+            .map_err(|_| gas::OutOfGas)?;
         self.remaining.consume(milligas)
     }
 }

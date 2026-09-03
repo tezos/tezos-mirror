@@ -36,7 +36,7 @@ use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcC
 use tezos_execution::TezlinkOperationGas;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{Milligas, TezosXRuntimeError};
 use tezosx_journal::TezosXJournal;
 
 use crate::{headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH};
@@ -232,8 +232,9 @@ where
     // mistake — surface it as a catchable 400 rather than a 500
     // `Custom`, and propagate the original error's message through its
     // `Display` impl.
-    let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
-        .map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))?;
+    let mut gas =
+        TezlinkOperationGas::start_milligas(u64::from(Milligas::from(hdrs.gas_limit)))
+            .map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))?;
     let mut tc_ctx = TcCtx {
         rk,
         operation_gas: &mut gas,
