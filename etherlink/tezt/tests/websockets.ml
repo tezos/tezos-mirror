@@ -855,6 +855,70 @@ let test_websocket_tez_newPreconfirmedReceipts_event =
   let* _ = produce_block_and_wait_for_sync ~sequencer observer in
   unit
 
+let bake_l1_until_finalized ~sc_rollup_node ~sequencer ~client ~level =
+  let l1_finality_lag = 2 in
+  let bake () =
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let* current = Client.level client in
+  let* () = repeat (max 0 (level - current + l1_finality_lag)) bake
+  and* _ =
+    Evm_node.wait_for_processed_l1_level ~timeout:300. ~level sequencer
+  in
+  unit
+
+let drain_l1_l2_levels ?(silence = 3.) websocket =
+  Lwt_stream.from @@ fun () ->
+  Lwt.catch
+    (fun () ->
+      let* json = Websocket.recv ~timeout:silence websocket in
+      let level =
+        JSON.(json |-> "params" |-> "result" |-> "l1Level" |> as_int)
+      in
+      return (Some level))
+    (function Websocket.Timeout _ -> return None | exn -> Lwt.reraise exn)
+
+let test_websocket_tez_l1L2Levels_min_level =
+  register_test
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~kernel:Latest
+    ~enable_dal:false
+    ~websockets:true
+    ~tags:["evm"; "rpc"; "websocket"; "tez_l1_l2_levels"]
+    ~title:
+      "Check that websocket event `tez_l1L2Levels` terminates on a minimal \
+       fromL1Level"
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
+  let first_l1_level = 5 in
+  let last_l1_level = 10 in
+  let* () =
+    bake_l1_until_finalized
+      ~sc_rollup_node
+      ~sequencer
+      ~client
+      ~level:last_l1_level
+  in
+  let* websocket = Evm_node.open_websocket sequencer in
+  let* _id =
+    Evm_node.resolve_or_timeout
+      ~timeout:120.
+      sequencer
+      ~name:"tez_l1L2Levels subscription"
+      (Rpc.subscribe
+         ~websocket
+         ~kind:(L1L2Levels (Some (Int32.to_int Int32.min_int)))
+         sequencer)
+  in
+  let* levels = Lwt_stream.to_list (drain_l1_l2_levels websocket) in
+  let expected_levels =
+    List.init (last_l1_level - first_l1_level + 1) (fun i -> first_l1_level + i)
+  in
+  Check.((levels = expected_levels) (list int))
+    ~error_msg:"Replayed L1 levels %L, expected %R" ;
+  unit
+
 let protocols = [Protocol.Alpha]
 
 let () =
@@ -872,4 +936,5 @@ let () =
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
   test_websocket_tez_newIncludedTransactions_event [Protocol.Alpha] ;
-  test_websocket_tez_newPreconfirmedReceipts_event [Protocol.Alpha]
+  test_websocket_tez_newPreconfirmedReceipts_event [Protocol.Alpha] ;
+  test_websocket_tez_l1L2Levels_min_level [Protocol.Alpha]

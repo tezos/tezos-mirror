@@ -328,6 +328,7 @@ module Request = struct
     | Syncing
     | NewIncludedTransactions
     | NewPreconfirmedReceipts
+    | L1L2Levels of int option
 
   let param_of_sub_kind = function
     | NewHeads -> `A [`String "newHeads"]
@@ -341,6 +342,13 @@ module Request = struct
     | Syncing -> `A [`String "syncing"]
     | NewIncludedTransactions -> `A [`String "tez_newIncludedTransactions"]
     | NewPreconfirmedReceipts -> `A [`String "tez_newPreconfirmedReceipts"]
+    | L1L2Levels None -> `A [`String "tez_l1L2Levels"]
+    | L1L2Levels (Some from_l1_level) ->
+        `A
+          [
+            `String "tez_l1L2Levels";
+            `O [("fromL1Level", `Float (float_of_int from_l1_level))];
+          ]
 
   let eth_subscribe ~kind =
     {method_ = "eth_subscribe"; parameters = param_of_sub_kind kind}

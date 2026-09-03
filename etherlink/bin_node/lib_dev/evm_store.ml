@@ -1460,13 +1460,15 @@ module L1_l2_finalized_levels = struct
   let max_blocks = 10_000
 
   let make_l1_bounds x y =
-    let max = Int32.of_int (max_blocks - 1) in
-    let rec aux acc x y =
-      let prev_x = Int32.sub y max in
-      if prev_x <= x then (x, y) :: acc
-      else aux ((prev_x, y) :: acc) x (Int32.pred prev_x)
+    let max = Z.of_int (max_blocks - 1) in
+    let x_z = Z.of_int32 x in
+    let y_z = Z.of_int32 y in
+    let rec aux acc y =
+      let prev_x = Z.sub y max in
+      if Z.Compare.(prev_x <= x_z) then (x, Z.to_int32 y) :: acc
+      else aux ((Z.to_int32 prev_x, Z.to_int32 y) :: acc) (Z.pred prev_x)
     in
-    aux [] x y
+    aux [] y_z
 
   let make_l2_bounds x y =
     let max = Z.of_int (max_blocks - 1) in

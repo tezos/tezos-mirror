@@ -10,6 +10,8 @@ exception Could_not_connect
 
 exception Connection_closed
 
+exception Timeout of {timeout : float; origin : string}
+
 (** Type of a websocket client  *)
 type t
 
