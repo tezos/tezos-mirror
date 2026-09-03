@@ -167,9 +167,9 @@ pub struct OperationCtx<'operation> {
     /// as the outbound `X-Tezos-Source` so `tx.origin` stays invariant
     /// across an `EVM -> Michelson -> EVM` round-trip (L2-1363).
     pub crac_origin: Option<Contract>,
-    /// Accumulator (in mutez) of storage costs delegated to this
-    /// frame by the CRACs it called.
-    pub delegated_storage_cost: u64,
+    /// Accumulator of storage costs delegated to this frame by the
+    /// CRACs it called.
+    pub delegated_storage_cost: Mutez,
 }
 
 pub struct ExecCtx {
@@ -935,10 +935,14 @@ pub trait HasCracChainDepth {
 /// delegated *to* this frame by its sub-executions. See
 /// [`OperationCtx::delegated_storage_cost`] for the semantics.
 pub trait HasDelegatedStorageCost {
-    fn delegated_storage_cost(&self) -> u64;
+    fn delegated_storage_cost(&self) -> Mutez;
 
-    /// Increment the accumulator by `v` mutez.
-    fn add_delegated_storage_cost(&mut self, v: u64);
+    /// Increment the accumulator by `v`. Errs, without mutating the
+    /// accumulator, if the sum overflows the mutez domain.
+    fn add_delegated_storage_cost(
+        &mut self,
+        v: Mutez,
+    ) -> Result<(), tezosx_types::MutezError>;
 }
 
 /// Read the runtime classification record for an address.
@@ -1083,15 +1087,17 @@ impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasCracChainDepth
 impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasDelegatedStorageCost
     for Ctx<'_, '_, '_, Host, R>
 {
-    fn delegated_storage_cost(&self) -> u64 {
+    fn delegated_storage_cost(&self) -> Mutez {
         self.operation_ctx.delegated_storage_cost
     }
 
-    fn add_delegated_storage_cost(&mut self, v: u64) {
-        // Saturating is safe: exceeding `HARD_STORAGE_LIMIT_PER_OPERATION`
-        // makes the operation fail with `OperationQuotaExceeded`.
+    fn add_delegated_storage_cost(
+        &mut self,
+        v: Mutez,
+    ) -> Result<(), tezosx_types::MutezError> {
         self.operation_ctx.delegated_storage_cost =
-            self.operation_ctx.delegated_storage_cost.saturating_add(v);
+            self.operation_ctx.delegated_storage_cost.checked_add(v)?;
+        Ok(())
     }
 }
 
@@ -2449,7 +2455,7 @@ pub mod tests {
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
         };
 
         let exec_ctx = ExecCtx {
@@ -3133,7 +3139,7 @@ pub mod tests {
             source_public_key: &source_public_key,
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
         };
 
         let exec_ctx = ExecCtx {
@@ -3514,7 +3520,7 @@ pub(crate) mod mock {
         pub operation_counter: u128,
         pub crac_chain_depth: u32,
         pub crac_origin: Option<Contract>,
-        pub delegated_storage_cost: u64,
+        pub delegated_storage_cost: Mutez,
         /// In-memory registry mirroring the standalone [`super::Ctx`].
         pub address_registry: HashMap<AddressHash, BigUint>,
     }
@@ -3546,7 +3552,7 @@ pub(crate) mod mock {
                 .unwrap(),
                 crac_chain_depth: 0,
                 crac_origin: None,
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
                 // Null address pre-registered at index 0, as in `Ctx`.
                 address_registry: HashMap::from([(
                     AddressHash::default(),
@@ -3571,12 +3577,16 @@ pub(crate) mod mock {
     impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
         HasDelegatedStorageCost for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
-        fn delegated_storage_cost(&self) -> u64 {
+        fn delegated_storage_cost(&self) -> Mutez {
             self.delegated_storage_cost
         }
 
-        fn add_delegated_storage_cost(&mut self, v: u64) {
-            self.delegated_storage_cost = self.delegated_storage_cost.saturating_add(v);
+        fn add_delegated_storage_cost(
+            &mut self,
+            v: Mutez,
+        ) -> Result<(), tezosx_types::MutezError> {
+            self.delegated_storage_cost = self.delegated_storage_cost.checked_add(v)?;
+            Ok(())
         }
     }
 

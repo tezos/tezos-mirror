@@ -333,9 +333,8 @@ fn classify_and_charge_crac_response(
     }
 }
 
-/// Narrow a raw mutez-denominated storage-delegation cost to the mutez
-/// domain, wherever it originates (the `X-Tezos-Storage-Cost` header, or an
-/// `AliasResolution`'s `delegated_storage_cost`).
+/// Narrow a raw mutez-denominated storage-delegation cost read off the
+/// `X-Tezos-Storage-Cost` header to the mutez domain.
 ///
 /// Out-of-domain values are economically unreachable (storage costs are far
 /// below `i64::MAX` mutez); surfaced as a catchable revert rather than
@@ -834,9 +833,11 @@ where
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
     charge_consumed_gas(gas, sender_resolution.consumed_gas)?;
-    let sender_storage_cost =
-        narrow_delegated_storage_cost(gas, sender_resolution.delegated_storage_cost)?;
-    charge_delegated_storage_cost(gas, sender_storage_cost, context.block().basefee())?;
+    charge_delegated_storage_cost(
+        gas,
+        sender_resolution.delegated_storage_cost,
+        context.block().basefee(),
+    )?;
 
     // --- source alias ---
     // Fast path: if sender == source, reuse the resolved alias and skip
@@ -850,9 +851,11 @@ where
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
     charge_consumed_gas(gas, source_resolution.consumed_gas)?;
-    let source_storage_cost =
-        narrow_delegated_storage_cost(gas, source_resolution.delegated_storage_cost)?;
-    charge_delegated_storage_cost(gas, source_storage_cost, context.block().basefee())?;
+    charge_delegated_storage_cost(
+        gas,
+        source_resolution.delegated_storage_cost,
+        context.block().basefee(),
+    )?;
 
     Ok((sender_alias, source_alias))
 }
@@ -1429,11 +1432,9 @@ where
                 )
             })?;
             if let Some(delegated_storage_cost) = created {
-                let storage_cost =
-                    narrow_delegated_storage_cost(&gas, delegated_storage_cost)?;
                 charge_delegated_storage_cost(
                     &mut gas,
-                    storage_cost,
+                    delegated_storage_cost,
                     context.block().basefee(),
                 )?;
                 emit_alias_materialized(

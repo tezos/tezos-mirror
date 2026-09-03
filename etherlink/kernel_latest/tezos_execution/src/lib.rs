@@ -192,7 +192,7 @@ enum InternalOpOrigin {
     /// Operation directly emitted by the current frame.
     Own {
         /// Storage cost delegated to the operation.
-        delegated_storage_cost: u64,
+        delegated_storage_cost: Mutez,
     },
     /// Operation surfaced by the CRAC drain mechanism.
     Crac,
@@ -207,7 +207,7 @@ struct TaggedInternalOp {
 }
 
 impl TaggedInternalOp {
-    fn own(op: InternalOperationSum, delegated_storage_cost: u64) -> Self {
+    fn own(op: InternalOperationSum, delegated_storage_cost: Mutez) -> Self {
         Self {
             op,
             origin: InternalOpOrigin::Own {
@@ -329,21 +329,13 @@ where
         .map(|tagged_op| match tagged_op.origin {
             InternalOpOrigin::Own {
                 delegated_storage_cost,
-            } => {
-                let delegated_storage_cost = Mutez::try_from(delegated_storage_cost)
-                    .map_err(|e| {
-                        ApplyOperationError::Transfer(
-                            TransferError::StorageFeesConversion(e.to_string()),
-                        )
-                    })?;
-                storage_fees::charge_internal_op_storage_fees(
-                    tez_accounts,
-                    payer,
-                    storage_limit_remaining,
-                    &tagged_op.op,
-                    delegated_storage_cost,
-                )
-            }
+            } => storage_fees::charge_internal_op_storage_fees(
+                tez_accounts,
+                payer,
+                storage_limit_remaining,
+                &tagged_op.op,
+                delegated_storage_cost,
+            ),
             InternalOpOrigin::Crac => Ok(None),
         })
         .collect::<Result<Vec<_>, _>>();
@@ -371,8 +363,8 @@ fn finalize_and_burn<M, A>(
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
-    delegated_storage_cost: u64,
-    top_level_delegated_delta: u64,
+    delegated_storage_cost: Mutez,
+    top_level_delegated_delta: Mutez,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
     internals: SubtreeStatus,
@@ -392,18 +384,6 @@ where
         internal_operation_results,
     );
     let burn_outcome = burn_outcome.and_then(|()| {
-        let delegated_storage_cost =
-            Mutez::try_from(delegated_storage_cost).map_err(|e| {
-                ApplyOperationError::Transfer(TransferError::StorageFeesConversion(
-                    e.to_string(),
-                ))
-            })?;
-        let top_level_delegated_delta = Mutez::try_from(top_level_delegated_delta)
-            .map_err(|e| {
-                ApplyOperationError::Transfer(TransferError::StorageFeesConversion(
-                    e.to_string(),
-                ))
-            })?;
         storage_fees::burn_storage_cost(
             tez_accounts,
             payer,
@@ -708,7 +688,7 @@ struct PendingParent {
     /// and has to place these receipts differently.
     receipt_at: usize,
     /// Storage cost the transfer delegated, dropped if the subtree raises.
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     /// `(pending, failed, backtracked)` CRAC list lengths, and the number of
     /// pending alias originations, captured before the subtree ran; see
     /// [`splice_reentrant_crac_ops`].
@@ -829,7 +809,7 @@ fn settle_parent_transfer(
             // The transfer's own `TransferSuccess` and delegated storage cost
             // are dropped on this path, exactly as they were when the error
             // travelled out of `transfer` instead.
-            (false, 0)
+            (false, Mutez::ZERO)
         }
     };
     if !applied {
@@ -1049,12 +1029,12 @@ where
                     },
                 };
                 let (result, delegated_storage_cost_delta, subtree) = match disposition {
-                    Disposition::Skip => (ContentResult::Skipped, 0, None),
+                    Disposition::Skip => (ContentResult::Skipped, Mutez::ZERO, None),
                     Disposition::Replay => (
                         ContentResult::Failed(
                             ApplyOperationError::InternalOperationReplay.into(),
                         ),
-                        0,
+                        Mutez::ZERO,
                         None,
                     ),
                     Disposition::Apply => {
@@ -1103,7 +1083,7 @@ where
                                     ContentResult::Failed(
                                         ApplyOperationError::from(err).into(),
                                     ),
-                                    0,
+                                    Mutez::ZERO,
                                     None,
                                 )
                             }
@@ -1212,7 +1192,7 @@ where
                         nonce,
                         result,
                     }),
-                    0,
+                    Mutez::ZERO,
                 ));
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
@@ -1298,7 +1278,7 @@ where
                         nonce,
                         result,
                     }),
-                    0,
+                    Mutez::ZERO,
                 ));
             }
         }
@@ -1326,7 +1306,7 @@ type Subtree<'a> = Option<(
 /// execute.
 struct TransferStep<'a> {
     success: TransferSuccess,
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     emitted: Subtree<'a>,
 }
 
@@ -1335,7 +1315,7 @@ struct TransferStep<'a> {
 /// the enclosing operation's status, see [`SubtreeStatus`].
 struct TransferOutcome {
     success: TransferSuccess,
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     subtree: SubtreeStatus,
 }
 
@@ -1532,7 +1512,7 @@ where
                         .map_err(TransferError::OutOfGas)?,
                     ..receipt
                 },
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
                 // No code runs for an implicit destination, so there is
                 // nothing to emit.
                 emitted: None,
@@ -1621,8 +1601,10 @@ where
                 let address_registry_diff = ctx.address_registry_diff;
                 (internal_operations, new_storage, address_registry_diff)
             };
-            let delegated_storage_cost =
-                operation_ctx.delegated_storage_cost - delegated_storage_cost_before;
+            let delegated_storage_cost = operation_ctx
+                .delegated_storage_cost
+                .checked_sub(delegated_storage_cost_before)
+                .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
 
             // `interpret_context` holds this operation's lazy-storage size
             // delta, accumulated by the `LazyStorage` hooks during execution.
@@ -2168,7 +2150,7 @@ where
         source_public_key: &[],
         crac_chain_depth: 0,
         crac_origin: None,
-        delegated_storage_cost: 0,
+        delegated_storage_cost: Mutez::ZERO,
     };
     let mut ctx = Ctx {
         tc_ctx: &mut tc_ctx,
@@ -2244,7 +2226,7 @@ fn transfer_external<'a, Host>(
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
-) -> Result<(TransferTarget, u64, SubtreeStatus), CracError>
+) -> Result<(TransferTarget, Mutez, SubtreeStatus), CracError>
 where
     Host: KeySpaceLoader + StorageV1,
 {
@@ -3249,8 +3231,8 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
-                0,
-                0,
+                Mutez::ZERO,
+                Mutez::ZERO,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
                 // A reveal emits no internal operation.
@@ -3272,7 +3254,7 @@ where
                 source_public_key,
                 crac_chain_depth: 0,
                 crac_origin: None,
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
             };
             let (transfer_result, top_level_delegated_delta, internals) =
                 match Mutez::try_from(amount) {
@@ -3291,13 +3273,13 @@ where
                         Ok((target, delta, internals)) => (Ok(target), delta, internals),
                         // The verdict is unused on this path: a failed transfer
                         // backtracks every internal receipt regardless.
-                        Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
+                        Err(e) => (Err(e), Mutez::ZERO, SubtreeStatus::AllApplied),
                     },
                     Err(e) => (
                         Err(CracError::Operation(
                             TransferError::FailedToComputeBalanceUpdate(e.to_string()),
                         )),
-                        0,
+                        Mutez::ZERO,
                         SubtreeStatus::AllApplied,
                     ),
                 };
@@ -3365,8 +3347,8 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
-                0,
-                0,
+                Mutez::ZERO,
+                Mutez::ZERO,
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
                 // An origination emits no internal operation.
@@ -12251,7 +12233,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::new(
@@ -13080,7 +13062,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -13747,7 +13729,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -13897,7 +13879,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -15338,7 +15320,7 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![TaggedInternalOp::own(internal, 0)],
+            vec![TaggedInternalOp::own(internal, Mutez::ZERO)],
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
@@ -15384,7 +15366,7 @@ mod tests {
                         },
                     )),
                 }),
-                0,
+                Mutez::ZERO,
             )
         };
         let mut content: ContentResult<TransferContent> = ContentResult::Applied(
@@ -15466,7 +15448,7 @@ mod tests {
             })),
         });
         let tagged = vec![
-            TaggedInternalOp::own(own_op, 0),
+            TaggedInternalOp::own(own_op, Mutez::ZERO),
             TaggedInternalOp::from_crac(crac_op),
         ];
         let mut content: ContentResult<TransferContent> = ContentResult::Applied(
@@ -15593,7 +15575,7 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![TaggedInternalOp::own(internal(), 0)],
+            vec![TaggedInternalOp::own(internal(), Mutez::ZERO)],
         );
 
         assert_eq!(
@@ -15649,7 +15631,7 @@ mod tests {
             &mut content,
             internals_in()
                 .into_iter()
-                .map(|op| TaggedInternalOp::own(op, 0))
+                .map(|op| TaggedInternalOp::own(op, Mutez::ZERO))
                 .collect(),
         );
 
@@ -15724,9 +15706,9 @@ mod tests {
             &mut content,
             vec![
                 TaggedInternalOp::from_crac(crac()),
-                TaggedInternalOp::own(failed(), 5),
-                TaggedInternalOp::own(own(vec![]), 3),
-                TaggedInternalOp::own(event(), 2),
+                TaggedInternalOp::own(failed(), Mutez::try_from(5_u64).unwrap()),
+                TaggedInternalOp::own(own(vec![]), Mutez::try_from(3_u64).unwrap()),
+                TaggedInternalOp::own(event(), Mutez::try_from(2_u64).unwrap()),
             ],
         );
 

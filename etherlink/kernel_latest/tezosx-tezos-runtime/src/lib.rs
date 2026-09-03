@@ -134,7 +134,7 @@ fn build_response(
         Ok(outcome) => {
             builder =
                 builder.header(http::header::CONTENT_TYPE, "application/octet-stream");
-            if outcome.delegated_storage_cost > 0 {
+            if outcome.delegated_storage_cost > Mutez::ZERO {
                 builder = builder.header(
                     X_TEZOS_STORAGE_COST,
                     outcome.delegated_storage_cost.to_string(),
@@ -596,7 +596,7 @@ fn build_alias_origination_internal(
 
 #[derive(Default)]
 pub(crate) struct ExecuteRequestOutcome {
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     /// Milligas metered by this request, reported back to the caller.
     consumed_milligas: u64,
 }
@@ -813,7 +813,7 @@ where
         // (EVM alias) or `Implicit(pkh)` (native Michelson origin). `None`
         // only for a top-level Michelson tx (absent `X-Tezos-Source`).
         crac_origin: hdrs.crac_origin_contract.clone(),
-        delegated_storage_cost: 0,
+        delegated_storage_cost: Mutez::ZERO,
     };
     let parser = mir::parser::Parser::new();
 
@@ -1025,12 +1025,6 @@ where
     };
     let consumed_milligas = gas.total_milligas_consumed().into();
 
-    let received_delegated_storage_cost =
-        Mutez::try_from(received_delegated_storage_cost).map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Delegated storage cost does not fit in the mutez domain: {e}"
-            ))
-        })?;
     let delegated_storage_cost = result
         .own_storage_cost
         .checked_add(received_delegated_storage_cost)
@@ -1038,8 +1032,7 @@ where
             TezosXRuntimeError::ConversionError(format!(
                 "Delegated storage cost overflow: {e}"
             ))
-        })?
-        .as_u64();
+        })?;
 
     Ok(ExecuteRequestOutcome {
         delegated_storage_cost,
@@ -1286,8 +1279,6 @@ impl RuntimeInterface for TezosRuntime {
                     "Failed to compute storage fees for the alias forwarder origination: {e:?}"
                 ))
             })?;
-
-        let alias_storage_cost = alias_storage_cost.as_u64();
 
         journal
             .michelson
@@ -1700,7 +1691,7 @@ mod tests {
         // 5000 milligas → reported as 5000
         let resp = build_response(
             Ok(ExecuteRequestOutcome {
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
                 consumed_milligas: 5000,
             }),
             None,
@@ -1766,7 +1757,7 @@ mod tests {
     fn build_response_emits_storage_cost_header_on_2xx() {
         let resp = build_response(
             Ok(ExecuteRequestOutcome {
-                delegated_storage_cost: 12345,
+                delegated_storage_cost: Mutez::try_from(12345u64).unwrap(),
                 consumed_milligas: 0,
             }),
             None,

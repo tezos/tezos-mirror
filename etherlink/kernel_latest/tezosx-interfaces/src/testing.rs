@@ -14,6 +14,7 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Mutez;
 
 use crate::{
     AliasInfo, Classification, CrossRuntimeContext, Gas, Registry, RuntimeId,
@@ -245,7 +246,7 @@ pub struct MockRegistry {
     /// `AliasResolution::build_with_delegated_storage_cost(remaining, v)`
     /// so tests can exercise the caller-side accumulation of
     /// `delegated_storage_cost`. Default `None` (no delegation).
-    pub alias_delegated_storage_cost: Option<u64>,
+    pub alias_delegated_storage_cost: Option<Mutez>,
     /// When `Some(cost)`, `check_is_native_address` consumes `cost` and
     /// rejects the address as not provably native. Default `None` (every
     /// address is native, for free).
@@ -322,7 +323,7 @@ impl MockRegistry {
     /// on every materialization, so tests can drive the caller-side
     /// accumulation path that activates only when the target runtime
     /// delegates a non-zero cost.
-    pub fn with_alias_delegated_storage_cost(mut self, v: u64) -> Self {
+    pub fn with_alias_delegated_storage_cost(mut self, v: Mutez) -> Self {
         self.alias_delegated_storage_cost = Some(v);
         self
     }

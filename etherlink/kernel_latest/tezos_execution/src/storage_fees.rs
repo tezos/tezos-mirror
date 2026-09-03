@@ -1635,7 +1635,10 @@ mod tests {
             payer,
             storage_limit_remaining,
             &mut parent,
-            vec![crate::TaggedInternalOp::own(op, delegated_storage_cost)],
+            vec![crate::TaggedInternalOp::own(
+                op,
+                Mutez::try_from(delegated_storage_cost).unwrap(),
+            )],
         );
         assert_eq!(internals.len(), 1);
         (internals.pop().unwrap(), outcome)
