@@ -23,6 +23,9 @@ pub enum MutezError {
     /// `u64::MAX` mutez.
     #[error("Narith amount {} does not fit in u64", .0.0)]
     NarithTooLarge(Narith),
+    /// A signed amount (e.g. a MIR `Mutez(i64)`) is negative.
+    #[error("amount {0} is negative")]
+    Negative(i64),
     /// Checked addition/subtraction over- or under-flowed the domain.
     #[error("mutez arithmetic overflow")]
     Overflow,
@@ -94,6 +97,27 @@ impl TryFrom<&Narith> for Mutez {
         let raw = u64::try_from(&value.0)
             .map_err(|_| MutezError::NarithTooLarge(value.clone()))?;
         Mutez::try_from(raw)
+    }
+}
+
+impl TryFrom<i64> for Mutez {
+    type Error = MutezError;
+
+    /// Narrows a signed amount (e.g. a MIR `Mutez(i64)`) to the mutez
+    /// domain: a negative value is a hard error, never a panic or a
+    /// silent absolute value.
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        u64::try_from(value)
+            .map_err(|_| MutezError::Negative(value))
+            .and_then(Mutez::try_from)
+    }
+}
+
+impl From<Mutez> for i64 {
+    /// Exact embedding into `i64`: every `Mutez` is representable, since
+    /// the domain is bounded at `i64::MAX`.
+    fn from(value: Mutez) -> Self {
+        value.0 as i64
     }
 }
 
@@ -188,5 +212,31 @@ mod tests {
     fn display_matches_raw_digits() {
         let m = Mutez::try_from(12345u64).unwrap();
         assert_eq!(m.to_string(), "12345");
+    }
+
+    #[test]
+    fn try_from_i64_accepts_non_negative() {
+        assert_eq!(Mutez::try_from(42i64), Ok(Mutez::try_from(42u64).unwrap()));
+    }
+
+    #[test]
+    fn try_from_i64_rejects_negative() {
+        assert_eq!(Mutez::try_from(-1i64), Err(MutezError::Negative(-1)));
+    }
+
+    #[test]
+    fn try_from_i64_accepts_max() {
+        assert_eq!(Mutez::try_from(i64::MAX), Ok(Mutez::MAX));
+    }
+
+    #[test]
+    fn i64_round_trip_from_mutez() {
+        let m = Mutez::try_from(42u64).unwrap();
+        assert_eq!(i64::from(m), 42i64);
+    }
+
+    #[test]
+    fn i64_from_mutez_max_matches_i64_max() {
+        assert_eq!(i64::from(Mutez::MAX), i64::MAX);
     }
 }
