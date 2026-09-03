@@ -154,6 +154,11 @@ module Prove = struct
     let clear t db_index =
       Api.octez_riscv_durable_in_memory_prove_registry_clear t db_index
       |> wrap_error
+
+    let duplicate _ =
+      invalid_arg
+        "Octez_riscv_nds_memory.Prove.Registry.duplicate: only a Normal-mode \
+         registry can be duplicated"
   end
 
   module Database = struct
@@ -271,6 +276,11 @@ module Verify = struct
     let clear t db_index =
       Api.octez_riscv_durable_in_memory_verify_registry_clear t db_index
       |> raise_on_verification_argument
+
+    let duplicate _ =
+      invalid_arg
+        "Octez_riscv_nds_memory.Verify.Registry.duplicate: only a Normal-mode \
+         registry can be duplicated"
   end
 
   module Database = struct

@@ -99,6 +99,14 @@ module type REGISTRY = sig
       a fresh empty database. Returns an error if [db_index] is out of
       bounds. *)
   val clear : t -> int64 -> (unit, Nds_errors.invalid_argument_error) result
+
+  (** [duplicate registry] is an independent registry with the same
+      contents: mutations to either are invisible to the other, and both
+      stay backed by the same store.  If [registry] holds unshared state,
+      [duplicate] copies it at once.  Otherwise the next mutation on either
+      side pays for the copy.  [Prove] and [Verify] registries are
+      transient in-step sessions and raise [Invalid_argument]. *)
+  val duplicate : t -> t
 end
 
 (** Common signature for database key-value operations.

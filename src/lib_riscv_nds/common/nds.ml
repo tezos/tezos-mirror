@@ -44,6 +44,9 @@ let clear (T {impl = (module M); value; _}) db_index =
 
 let registry_hash (T {impl = (module M); value; _}) = M.Registry.hash value
 
+let copy (T {tag; impl = (module M) as impl; value}) =
+  T {tag; impl; value = M.Registry.duplicate value}
+
 let exists (T {impl = (module M); value; _}) ~db_index ~key =
   M.Database.exists value ~db_index ~key
 

@@ -1367,6 +1367,132 @@ let register_with_backend (backend : (module BACKEND)) =
     (register_pbt ~long:true ~long_factor:5 backend)
     [test_sequence_hash_determinism; test_independent_ops_commute]
 
+(** {!Nds.copy} over the erased handle: a copy of a [Normal]-mode handle
+    is independent of its source, a [Prove]- or [Verify]-mode handle is
+    refused.  The fast engine's interpreter fallback replays from such a
+    copy. *)
+module Make_nds_copy_tests (B : sig
+  include VERIFY_LIFECYCLE_BACKEND
+
+  val normal_tag : Normal.Registry.t Nds.tag
+
+  val prove_tag : Prove.Registry.t Nds.tag
+
+  val verify_tag : Verify.Registry.t Nds.tag
+end) =
+struct
+  let key = Bytes.of_string "key"
+
+  let set_exn ~__LOC__ nds value =
+    match Nds.set nds ~db_index:0L ~key ~value:(Bytes.of_string value) with
+    | Ok () -> ()
+    | Error _ -> Test.fail ~__LOC__ "Nds.set failed"
+
+  let hex nds = Hex.show (Hex.of_bytes (Nds.registry_hash nds))
+
+  let test_copy_is_independent () =
+    let source =
+      Nds.wrap B.normal_tag (module B.Normal) (B.create_normal_with_dbs 1)
+    in
+    set_exn ~__LOC__ source "before" ;
+    let source_hash = hex source in
+    let copy = Nds.copy source in
+    Check.(
+      (hex copy = source_hash)
+        string
+        ~error_msg:"the copy hashes %L, its source %R") ;
+    set_exn ~__LOC__ copy "after" ;
+    Check.(
+      (hex source = source_hash)
+        string
+        ~error_msg:"mutating the copy changed the source hash to %L from %R") ;
+    Check.(
+      (hex copy <> source_hash)
+        string
+        ~error_msg:"the copy did not observe its own mutation (hash %L)") ;
+    let copy_hash = hex copy in
+    set_exn ~__LOC__ source "again" ;
+    Check.(
+      (hex copy = copy_hash)
+        string
+        ~error_msg:"mutating the source changed the copy hash to %L from %R") ;
+    unit
+
+  let expect_invalid_argument ~__LOC__ what nds =
+    match Nds.copy nds with
+    | exception Invalid_argument _ -> ()
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Nds.copy accepted a %s-mode handle; it should raise Invalid_argument"
+          what
+
+  let test_copy_rejects_transient_handles () =
+    let prove = B.Prove.start_proof (B.create_normal_with_dbs 1) in
+    expect_invalid_argument
+      ~__LOC__
+      "Prove"
+      (Nds.wrap B.prove_tag (module B.Prove) prove) ;
+    let verify = B.Verify.start_verify (B.Prove.produce_proof prove) in
+    expect_invalid_argument
+      ~__LOC__
+      "Verify"
+      (Nds.wrap B.verify_tag (module B.Verify) verify) ;
+    unit
+
+  let register () =
+    let is_disk = String.starts_with ~prefix:"disk" B.name in
+    let register title body =
+      let body = if is_disk then with_disk_gc body else body in
+      Test.register
+        ~__FILE__
+        ~title:(B.name ^ ": " ^ title)
+        ~tags:["unit"; "nds"; "copy"; B.name]
+        body
+    in
+    register "Nds.copy is independent of its source" test_copy_is_independent ;
+    register
+      "Nds.copy rejects Prove and Verify handles"
+      test_copy_rejects_transient_handles
+end
+
+module Memory_nds_copy_tests = Make_nds_copy_tests (struct
+  include Memory_verify_lifecycle
+  module Normal = Octez_riscv_nds_memory.Normal
+  module Prove = Octez_riscv_nds_memory.Prove
+  module Verify = Octez_riscv_nds_memory.Verify
+
+  let create_normal_with_dbs n =
+    let r = Normal.Registry.create () in
+    grow_registry Normal.Registry.resize r n ;
+    r
+
+  let normal_tag = Octez_riscv_nds_memory.Normal_tag
+
+  let prove_tag = Octez_riscv_nds_memory.Prove_tag
+
+  let verify_tag = Octez_riscv_nds_memory.Verify_tag
+end)
+
+module Disk_nds_copy_tests = Make_nds_copy_tests (struct
+  include Disk_verify_lifecycle
+  module Normal = Octez_riscv_nds_disk.Normal
+  module Prove = Octez_riscv_nds_disk.Prove
+  module Verify = Octez_riscv_nds_disk.Verify
+
+  let create_normal_with_dbs n =
+    let repo = get_disk_repo () in
+    let r = Normal.Registry.create repo in
+    grow_registry Normal.Registry.resize r n ;
+    r
+
+  let normal_tag = Octez_riscv_nds_disk.Normal_tag
+
+  let prove_tag = Octez_riscv_nds_disk.Prove_tag
+
+  let verify_tag = Octez_riscv_nds_disk.Verify_tag
+end)
+
 let () =
   register_with_backend (module Memory_backend) ;
   register_with_backend (module Memory_prove_backend) ;
@@ -1435,4 +1561,6 @@ let () =
   register_verify_tests (module Memory_verify_lifecycle) ;
   register_verify_tests (module Disk_verify_lifecycle) ;
   register_verify_lifecycle_pbt ~long_factor:50 (module Memory_verify_lifecycle) ;
-  register_verify_lifecycle_pbt ~long_factor:10 (module Disk_verify_lifecycle)
+  register_verify_lifecycle_pbt ~long_factor:10 (module Disk_verify_lifecycle) ;
+  Memory_nds_copy_tests.register () ;
+  Disk_nds_copy_tests.register ()

@@ -88,6 +88,14 @@ val clear : t -> int64 -> (unit, Nds_errors.invalid_argument_error) result
 (** [registry_hash t] returns the Merkle root hash of the registry. *)
 val registry_hash : t -> bytes
 
+(** [copy t] is an independent handle over a duplicate of [t]'s registry
+    ({!Intf.REGISTRY.duplicate}): mutations to either are invisible to the
+    other, and both stay backed by the same store.  A live handle usually
+    holds unshared state, so the copy happens at once: on disk, it writes a
+    RocksDB checkpoint of every database.  Raises [Invalid_argument] on a
+    [Prove]- or [Verify]-mode handle. *)
+val copy : t -> t
+
 (** [exists t ~db_index ~key] checks whether [key] exists in database
     [db_index]. *)
 val exists :
