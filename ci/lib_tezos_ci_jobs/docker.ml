@@ -12,16 +12,6 @@ module CI = Cacio.Shared
    During the migration to Cacio however, those other instances will continue to exist. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
-(* The references are the alpine CI images, built by the [images.alpine-ci-all]
-   jobs (see [base_images.ml]) in a previously-run base-images pipeline. *)
-let docker_release_script =
-  Format.asprintf
-    "./scripts/ci/docker_release.sh --runtime-image %a --build-deps-image %a"
-    Tezos_ci.Image.pp
-    Tezos_ci.Images.Base_images.alpine_runtime
-    Tezos_ci.Image.pp
-    Tezos_ci.Images.Base_images.alpine_build
-
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
   CI.job
@@ -84,7 +74,7 @@ let job_docker_snapshot =
         (* Override the image tag computed by [docker_initialize.sh --image-names]
            (which defaults to the branch name) with a dated master tag. *)
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
-        docker_release_script;
+        Tezos_ci.docker_release_script;
       ]
     contents
     `real
@@ -101,7 +91,10 @@ let job_docker =
       "Build the Docker image for Octez for the specified architecture, with \
        experimental executables."
     ~scripts:
-      ["./scripts/ci/docker_initialize.sh --image-names"; docker_release_script]
+      [
+        "./scripts/ci/docker_initialize.sh --image-names";
+        Tezos_ci.docker_release_script;
+      ]
     contents
     mode
     arch
