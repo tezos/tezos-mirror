@@ -9008,10 +9008,11 @@ let test_slow_vm_fallback ~kind =
   in
   unit
 
-(* Test that a kernel calling an NDS host function crashes the rollup
-   node.  The fast execution engine (Wasmer) does not know about NDS
-   imports, so it panics with [Unsatisfied_import]. *)
-let test_nds_host_func_crashes_node ~kind =
+(* The kernel calls an NDS host function on the fast execution engine,
+   without [--slow-vm-fallback].  No canonical rollup has enabled the
+   feature on this chain, so the call answers [Nds_not_enabled] ([-16]),
+   which the kernel records in its durable storage. *)
+let test_nds_host_func_runs_on_fast_vm ~kind =
   let boot_sector () =
     Sc_rollup_helpers.read_kernel
       ~base:"tezt/tests/kernels"
@@ -9022,31 +9023,31 @@ let test_nds_host_func_crashes_node ~kind =
     ~boot_sector
     {
       variant = None;
-      tags = ["nds"; "crash"];
+      tags = ["nds"; "fast_vm"];
       description =
-        "rollup node crashes when kernel calls NDS host function without NDS \
-         storage";
+        "rollup node runs a kernel calling an NDS host function on the fast VM";
     }
-  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
-  let node =
-    Sc_rollup_node.create
-      Operator
-      tezos_node
-      ~base_dir:(Client.base_dir tezos_client)
-      ~kind
-      ~default_operator:Constant.bootstrap2.public_key_hash
-      ~name:"nds_crash"
+  @@ fun _protocol rollup_node sc_rollup tezos_node tezos_client ->
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  (* Each block evaluates a [kernel_run] on the fast VM. *)
+  let* () = bake_levels 3 tezos_client in
+  let* level = Node.get_level tezos_node in
+  let* _level = Sc_rollup_node.wait_for_level ~timeout:30. rollup_node level in
+  let* value =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/nds_result"
+         ()
   in
-  let* () = Sc_rollup_node.run node sc_rollup [] in
-  let crash =
-    Sc_rollup_node.check_error
-      ~exit_code:1
-      ~msg:(rex "Unsatisfied_import.*nds_store_exists")
-      node
-  in
-  (* Bake a block to trigger PVM evaluation of kernel_run *)
-  let* () = Client.bake_for_and_wait tezos_client in
-  crash
+  (* [Nds_not_enabled] is [-16], stored by the kernel as a little-endian
+     [i32]. *)
+  Check.(
+    (value = Some "f0ffffff")
+      (option string)
+      ~error_msg:"the kernel recorded %L for nds_store_exists, expected %R") ;
+  unit
 
 (* ------------------------------------------------------------------------ *)
 (* Manager-operation apply-time assertion failure                            *)
@@ -10412,4 +10413,4 @@ let register_protocol_independent () =
   test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:false ~kind protocols ;
   test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols ;
-  test_nds_host_func_crashes_node ~kind:"wasm_2_0_0" protocols
+  test_nds_host_func_runs_on_fast_vm ~kind:"wasm_2_0_0" protocols

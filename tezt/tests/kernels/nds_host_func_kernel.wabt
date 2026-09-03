@@ -1,9 +1,17 @@
 (module
   (import "smart_rollup_core" "nds_store_exists"
     (func $nds_store_exists (param i64 i32 i32) (result i32)))
+  (import "smart_rollup_core" "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
   (memory 1)
   (export "memory" (memory 0))
+  (data (i32.const 100) "/nds_result")
   (func (export "kernel_run")
-    (drop (call $nds_store_exists (i64.const 0) (i32.const 0) (i32.const 0)))
+    ;; Record the i32 the NDS host function answers (little-endian) at
+    ;; /nds_result, so the test can read it back through the durable RPC.
+    (i32.store (i32.const 0)
+      (call $nds_store_exists (i64.const 0) (i32.const 0) (i32.const 0)))
+    (drop (call $store_write
+      (i32.const 100) (i32.const 11) (i32.const 0) (i32.const 0) (i32.const 4)))
   )
 )
