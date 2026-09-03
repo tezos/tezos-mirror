@@ -104,6 +104,8 @@ let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" V.True ~opam:""
 let compiler_libs_toplevel =
   external_lib "compiler-libs.toplevel" V.True ~opam:""
 
+let conf_clang = opam_only "conf-clang" V.True
+
 let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True

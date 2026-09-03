@@ -195,6 +195,15 @@ command instead:
      on. On most systems, it is able to suggest a call to the system
      package manager but it currently does not handle version checking.
 
+   * Building the smart rollup node compiles RocksDB, whose build script
+     generates its bindings with ``bindgen`` and therefore needs
+     ``libclang``. ``make build-deps`` declares it through the
+     ``conf-clang`` opam package, so it is installed with the other system
+     dependencies where opam knows the system package manager. If the build
+     still fails with ``Unable to find libclang``, install ``clang`` and
+     ``libclang-dev`` (or your distribution's equivalent) and, if needed,
+     set ``LIBCLANG_PATH`` to the directory containing ``libclang.so``.
+
    * As a last resort, removing the ``_opam`` folder (as part of a ``git
      clean -dxf`` for example) allows to restart in a fresh environment.
 

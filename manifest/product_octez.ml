@@ -3931,6 +3931,7 @@ let lib_rollup_node_rust_deps =
        "octez-rollup-node-rust-deps"
        ~path:"src/rollup_node_rust_deps"
        ~synopsis:"Rust dependencies for the smart rollup node"
+       ~opam_only_deps:[conf_clang]
        ~foreign_archives:["octez_rollup_node_rust_deps"]
        ~with_cpp_stdlib:true
        ~dune:

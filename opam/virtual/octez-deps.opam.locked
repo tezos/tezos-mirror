@@ -59,6 +59,7 @@ depends: [
   "conduit" {= "8.0.0"}
   "conduit-lwt" {= "8.0.0"}
   "conduit-lwt-unix" {= "8.0.0"}
+  "conf-clang" {= "2"}
   "conf-cmake" {= "1"}
   "conf-g++" {= "1.0"}
   "conf-gmp" {= "5"}
