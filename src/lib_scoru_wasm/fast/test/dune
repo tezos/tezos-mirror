@@ -16,6 +16,9 @@
   octez-libs.test-helpers
   octez-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
+  octez-l2-libs.scoru-wasm-helpers-functor
+  octez-libs.smart-rollup-wasm-in-memory-dual
+  octez-libs.riscv-nds-memory
   qcheck-alcotest
   octez-alcotezt)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
@@ -36,6 +39,7 @@
   qcheck_helpers
   test_fast_cache
   test_fast
+  test_fast_nds
   test_memory_access))
 
 (executable

@@ -6392,6 +6392,7 @@ let _octez_scoru_wasm_fast_tests =
       "qcheck_helpers";
       "test_fast_cache";
       "test_fast";
+      "test_fast_nds";
       "test_memory_access";
     ]
     ~path:"src/lib_scoru_wasm/fast/test"
@@ -6407,6 +6408,9 @@ let _octez_scoru_wasm_fast_tests =
         octez_test_helpers |> open_;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
+        octez_scoru_wasm_helpers_functor;
+        octez_smart_rollup_wasm_in_memory_dual;
+        octez_riscv_nds_memory;
         qcheck_alcotest;
         alcotezt;
       ]
