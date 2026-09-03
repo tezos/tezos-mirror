@@ -996,11 +996,8 @@ where
                 destination_address,
                 amount,
             }) => {
-                let amount = Narith(amount.try_into().map_err(
-                    |err: num_bigint::TryFromBigIntError<()>| {
-                        TransferError::MirAmountToNarithError(err.to_string())
-                    },
-                )?);
+                let amount_mutez = Mutez::try_from(amount)
+                    .map_err(|e| TransferError::MirAmountToNarithError(e.to_string()))?;
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 // Unparsed through the borrowed walk, which reads through the
                 // `Rc` and clones only leaf payloads, charging before it
@@ -1023,7 +1020,7 @@ where
                     TransferError::MichelineSerializationError(e.to_string())
                 })?;
                 let content = TransferContent {
-                    amount,
+                    amount: amount_mutez.to_narith(),
                     destination: dest_contract,
                     parameters: Parameters {
                         entrypoint: destination_address.entrypoint,
@@ -1048,30 +1045,20 @@ where
                         // `transfer_step`, not `transfer`: the callee's own
                         // internal operations come back to the driver as a
                         // new frame instead of recursing through here.
-                        let step = Mutez::try_from(&content.amount)
-                            .map_err(|e| {
-                                CracError::Operation(
-                                    TransferError::FailedToComputeBalanceUpdate(
-                                        e.to_string(),
-                                    ),
-                                )
-                            })
-                            .and_then(|amount_mutez| {
-                                transfer_step(
-                                    tc_ctx,
-                                    operation_ctx,
-                                    registry,
-                                    journal,
-                                    &frame.sender,
-                                    amount_mutez,
-                                    &content.destination,
-                                    &content.parameters.entrypoint,
-                                    value,
-                                    parser,
-                                    false,
-                                    allow_forged_lazy_storage_id,
-                                )
-                            });
+                        let step = transfer_step(
+                            tc_ctx,
+                            operation_ctx,
+                            registry,
+                            journal,
+                            &frame.sender,
+                            amount_mutez,
+                            &content.destination,
+                            &content.parameters.entrypoint,
+                            value,
+                            parser,
+                            false,
+                            allow_forged_lazy_storage_id,
+                        );
                         match step {
                             Ok(TransferStep {
                                 success,
@@ -1139,7 +1126,7 @@ where
                 micheline_code,
                 address,
             }) => {
-                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let amount_mutez = Mutez::try_from(amount).unwrap_or(Mutez::ZERO);
                 let encode_err = |e: tezos_data_encoding::enc::BinError| {
                     ApplyOperationError::Origination(
                         OriginationError::MichelineSerializationError(e.to_string()),
@@ -1167,28 +1154,20 @@ where
                         ApplyOperationError::InternalOperationReplay.into(),
                     ),
                     Disposition::Apply => {
-                        let receipt = Mutez::try_from(&amount)
-                            .map_err(|e| {
-                                OriginationError::FailedToComputeBalanceUpdate(
-                                    e.to_string(),
-                                )
-                            })
-                            .and_then(|amount_mutez| {
-                                originate_contract(
-                                    tc_ctx,
-                                    address,
-                                    &frame.sender,
-                                    amount_mutez,
-                                    Some(&script.code),
-                                    // Shared, not unwrapped: the other occurrences
-                                    // of a `DUP`ed operation hold the same
-                                    // payload, so `unwrap_or_clone` here would
-                                    // deep-copy it, unmetered and before anything
-                                    // charges for it (L2-1836).
-                                    storage,
-                                    &Origin::Native,
-                                )
-                            });
+                        let receipt = originate_contract(
+                            tc_ctx,
+                            address,
+                            &frame.sender,
+                            amount_mutez,
+                            Some(&script.code),
+                            // Shared, not unwrapped: the other occurrences
+                            // of a `DUP`ed operation hold the same
+                            // payload, so `unwrap_or_clone` here would
+                            // deep-copy it, unmetered and before anything
+                            // charges for it (L2-1836).
+                            storage,
+                            &Origin::Native,
+                        );
                         match receipt {
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
@@ -1204,7 +1183,7 @@ where
                 all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
-                            balance: amount,
+                            balance: amount_mutez.to_narith(),
                             delegate,
                             script,
                         },
@@ -1580,7 +1559,7 @@ where
                 tc_ctx.rk.tez_accounts_mut(),
                 sender_account,
                 &dest_account,
-                &amount.to_narith(),
+                amount,
             )?;
 
             let delegated_storage_cost_before = operation_ctx.delegated_storage_cost;
@@ -1999,10 +1978,10 @@ pub struct RunCodeParams {
     /// all-zero `tz1`, L1's `Implicit_account_repr.zero`).
     pub payer: Option<PublicKeyHash>,
     /// Value of `AMOUNT`, in mutez.
-    pub amount: u64,
+    pub amount: Mutez,
     /// Value of `BALANCE`, in mutez. Defaults to `self_address`'s own
     /// balance, which is zero if that account does not exist.
-    pub balance: Option<u64>,
+    pub balance: Option<Mutez>,
     /// Gas budget, in milligas.
     pub milligas: u64,
     /// Value of `CHAIN_ID`.
@@ -2121,25 +2100,12 @@ where
     let mut operation_gas = TezlinkOperationGas::start_milligas(params.milligas)
         .map_err(|e| RunCodeError::Execution(e.to_string()))?;
 
-    let balance = match params.balance {
+    let balance: Mutez = match params.balance {
         Some(balance) => balance,
-        None => account
-            .balance(rk.tez_accounts())
-            .map_err(host_err)?
-            .to_narith()
-            .0
-            .try_into()
-            .map_err(|_| {
-                RunCodeError::Execution("Contract balance overflows u64".to_string())
-            })?,
+        None => account.balance(rk.tez_accounts()).map_err(host_err)?,
     };
-    let balance: i64 = balance
-        .try_into()
-        .map_err(|_| RunCodeError::Execution("Balance overflows i64".to_string()))?;
-    let amount: i64 = params
-        .amount
-        .try_into()
-        .map_err(|_| RunCodeError::Execution("Amount overflows i64".to_string()))?;
+    let balance: i64 = balance.into();
+    let amount: i64 = params.amount.into();
 
     // L1 defaults `SOURCE` to `Implicit_account_repr.zero` — the all-zero
     // `tz1`, which is what `ContractTz1Hash::default()` yields.
@@ -3533,6 +3499,7 @@ mod tests {
         use tezosx_interfaces::testing::NotWiredRegistry;
         use tezosx_interfaces::RuntimeId;
         use tezosx_journal::TezosXJournal;
+        use tezosx_types::Mutez;
 
         const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
         const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
@@ -3564,8 +3531,8 @@ mod tests {
                 self_address: ContractKt1Hash::from_b58check(KT1).expect("valid KT1"),
                 sender,
                 payer,
-                amount: 0,
-                balance: Some(0),
+                amount: Mutez::ZERO,
+                balance: Some(Mutez::ZERO),
                 milligas: TezlinkOperationGas::MAX_LIMIT,
                 chain_id: ChainId::from([0u8; 4]),
                 level: BlockNumber { block_number: 1 },

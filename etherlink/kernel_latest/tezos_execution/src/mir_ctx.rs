@@ -48,6 +48,7 @@ use tezos_tezlink::lazy_storage_diff::{
 };
 use tezos_tezlink::operation_result::{AddressRegistry, TransferError};
 use tezosx_journal::TemporaryBigMapIdAllocator;
+use tezosx_types::Mutez;
 use typed_arena::Arena;
 
 /// The cross-runtime [`tezosx_interfaces::Registry`] specialized to the
@@ -221,21 +222,13 @@ impl ExecCtx {
         tez_accounts: &mut impl KeySpace,
         sender_account: &impl TezosAccount,
         dest_account: &TezosOriginatedAccount,
-        amount: &Narith,
+        amount: Mutez,
     ) -> Result<Self, TransferError> {
         let sender = address_from_contract(sender_account.contract());
-        let amount = amount.0.clone().try_into().map_err(
-            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                TransferError::MirAmountToNarithError(err.to_string())
-            },
-        )?;
+        let amount: i64 = amount.into();
         let self_address = address_from_contract(dest_account.contract());
-        let balance = dest_account.balance(tez_accounts)?.to_narith();
-        let balance = balance.0.try_into().map_err(
-            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                TransferError::MirAmountToNarithError(err.to_string())
-            },
-        )?;
+        let balance = dest_account.balance(tez_accounts)?;
+        let balance: i64 = balance.into();
         let contract_account = dest_account.clone();
         Ok(Self {
             sender,
@@ -528,12 +521,8 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     .map_err(metered_read_to_lookup_view)?;
                 let balance = account
                     .balance(self.tc_ctx.rk.tez_accounts())
-                    .map_err(|e| LookupViewError::HostError(e.to_string()))?
-                    .to_narith();
-                let balance: i64 = balance
-                    .0
-                    .try_into()
-                    .map_err(|_| LookupViewError::BalanceOverflow)?;
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                let balance: i64 = balance.into();
                 Ok(Some((owned_view, storage_ty.clone(), storage, balance)))
             }
             Code::Enshrined(_) => {
