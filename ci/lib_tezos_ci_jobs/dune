@@ -8,7 +8,8 @@
   tezos_ci
   cacio
   sdk_bindings_ci
-  tezt.core)
+  tezt.core
+  rollup_node_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base))
