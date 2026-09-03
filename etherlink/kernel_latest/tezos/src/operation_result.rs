@@ -75,8 +75,8 @@ pub enum ValidityError {
     CounterInTheFuture(CounterError),
     #[error("The manager key for {0} has not been revealed yet.")]
     UnrevealedManagerKey(PublicKeyHash),
-    #[error("Cannot pay {0:?} in fees.")]
-    CantPayFees(Narith),
+    #[error("Cannot pay {0} in fees.")]
+    CantPayFees(Mutez),
     #[error("Empty implicit contract.")]
     EmptyImplicitContract,
     #[error("Storage limit is too high.")]
@@ -92,8 +92,6 @@ pub enum ValidityError {
     /// The public key of the source does not encode.
     #[error("the public key does not encode: {0}")]
     PublicKeyEncoding(tezos_enc::BinError),
-    #[error("Failed to compute fee balance update")]
-    FailedToComputeFeeBalanceUpdate,
     #[error("Batch is empty.")]
     EmptyBatch,
     #[error("Batch contains operations from multiple sources.")]

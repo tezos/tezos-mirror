@@ -54,7 +54,8 @@ use tezos_evm_runtime::{
     },
 };
 use tezos_execution::{
-    get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
+    get_required_da_fees, mir_ctx::BlockCtx, DaFeesError, FeeRefundConfig,
+    ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
@@ -942,10 +943,10 @@ enum CreditDaFees {
 }
 
 impl CreditDaFees {
-    fn da_fees(&self) -> u64 {
+    fn da_fees(&self) -> Mutez {
         match self {
-            CreditDaFees::Skip => 0,
-            CreditDaFees::Execute { da_fees_mutez, .. } => da_fees_mutez.as_u64(),
+            CreditDaFees::Skip => Mutez::ZERO,
+            CreditDaFees::Execute { da_fees_mutez, .. } => *da_fees_mutez,
         }
     }
 
@@ -971,7 +972,7 @@ impl CreditDaFees {
 struct FeesData {
     /// Total required fees (DA + gas) to check against declared fees,
     /// or `None` in simulation (skip_fees_check).
-    required_fees: Option<u64>,
+    required_fees: Option<Mutez>,
     /// Action to credit the sequencer pool with DA fees after execution.
     /// Also carries the DA fees amount (via `da_fees()`).
     credit_da_fees: CreditDaFees,
@@ -1060,15 +1061,16 @@ fn get_fees_data(
             credit_da_fees: CreditDaFees::Skip,
         }))
     } else {
-        let required_da_fees = if enable_da_fees {
-            get_required_da_fees(operation, da_fee_per_byte_mutez)?
-        } else {
-            0
-        };
         // Narrowed once, at construction: the DA fee is credited to the
         // sequencer pool later purely in mutez, never as a raw u64.
-        let Ok(da_fees_mutez) = Mutez::try_from(required_da_fees) else {
-            return Ok(FeesOutcome::Unpayable);
+        let da_fees_mutez = if enable_da_fees {
+            match get_required_da_fees(operation, da_fee_per_byte_mutez) {
+                Ok(da_fees) => da_fees,
+                Err(DaFeesError::OutOfDomain(_)) => return Ok(FeesOutcome::Unpayable),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            Mutez::ZERO
         };
 
         let total_gas_limit: u64 = operation
@@ -1095,7 +1097,7 @@ fn get_fees_data(
         };
 
         Ok(FeesOutcome::Payable(FeesData {
-            required_fees: Some(required_fees.as_u64()),
+            required_fees: Some(required_fees),
             credit_da_fees: CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez,

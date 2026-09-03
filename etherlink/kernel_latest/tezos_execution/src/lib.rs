@@ -32,7 +32,7 @@ use mir::{
 };
 use mir_ctx::clear_temporary_big_maps;
 use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::Zero;
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tezos_crypto_rs::{
@@ -40,7 +40,6 @@ use tezos_crypto_rs::{
     PublicKeyWithHash,
 };
 use tezos_data_encoding::types::Narith;
-use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::safe_storage::SafeStorage;
@@ -127,7 +126,7 @@ impl ProcessedOperation {
 /// Fee pricing parameters for computing refunds inside
 /// `validate_and_apply_operation`.
 pub struct FeeRefundConfig {
-    pub da_fees: u64,
+    pub da_fees: Mutez,
     pub base_fee_per_gas: U256,
     pub michelson_to_evm_gas_multiplier: u64,
 }
@@ -137,24 +136,37 @@ pub struct FeeRefundConfig {
 /// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
 /// where consumed_gas_fees = michelson_gas_to_mutez(base_fee, multiplier, consumed_gas)
 /// and consumed_gas = ceil(total_consumed_milligas / 1000).
+///
+/// A consumed cost past the mutez domain (or a `da_fees + consumed_gas_fees`
+/// sum past it) yields a zero refund rather than propagating the error: the
+/// declared `total_operation_fees` is itself mutez-domain-bounded, so the
+/// surplus is zero by construction whenever the cost side cannot even be
+/// represented.
 fn compute_fee_refund(
-    total_operation_fees: u64,
+    total_operation_fees: Mutez,
     processed_operations: &[ProcessedOperation],
     config: &FeeRefundConfig,
-) -> u64 {
+) -> Mutez {
     let consumed_milligas =
         ProcessedOperation::total_consumed_milligas(processed_operations);
     // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
     let consumed_gas = consumed_milligas.div_ceil(1000);
-    let consumed_gas_fees = michelson_gas_to_mutez(
+    let Ok(consumed_gas_fees) = tezosx_types::michelson_gas_to_mutez(
         config.base_fee_per_gas,
         config.michelson_to_evm_gas_multiplier,
         consumed_gas,
-    );
+    ) else {
+        return Mutez::ZERO;
+    };
+    let Ok(costs) = config.da_fees.checked_add(consumed_gas_fees) else {
+        return Mutez::ZERO;
+    };
 
-    // saturating_sub ensures the refund is non-negative and smaller than the fees
+    // saturating ensures the refund is non-negative and smaller than the fees
     // paid by the source account at the beginning of the application.
-    total_operation_fees.saturating_sub(config.da_fees.saturating_add(consumed_gas_fees))
+    total_operation_fees
+        .checked_sub(costs)
+        .unwrap_or(Mutez::ZERO)
 }
 
 extern crate alloc;
@@ -2887,20 +2899,33 @@ fn interpret_encoded_script<'a>(
     Ok((internal_operations, new_storage))
 }
 
+/// Why the DA fee of an operation cannot be computed.
+#[derive(Debug, thiserror::Error)]
+pub enum DaFeesError {
+    /// The operation cannot be encoded to measure its size.
+    #[error("cannot map the operation to its raw size: {0}")]
+    Unserializable(tezos_data_encoding::enc::BinError),
+    /// The DA fee lies outside the mutez domain.
+    #[error("DA fee outside the mutez domain: {0}")]
+    OutOfDomain(tezosx_types::MutezError),
+}
+
 pub fn get_required_da_fees(
     operation: &Operation,
     da_fee_per_byte_mutez: u64,
-) -> anyhow::Result<u64> {
+) -> Result<Mutez, DaFeesError> {
     let op_raw_size = operation
         .to_bytes()
         .map(|bytes| bytes.len())
-        .map_err(|_| anyhow::anyhow!("Cannot map operation to its raw size"))?;
+        .map_err(DaFeesError::Unserializable)?;
     // TODO: See: L2-939.
     // It is needed for the fees to be updated but without
     // a proper gas system 'à-la-Ethereum' we can't use for `FeeUpdates`
     // for now.
-    Ok(da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64))
+    let raw_fee = da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64);
+    Mutez::try_from(raw_fee).map_err(DaFeesError::OutOfDomain)
 }
+
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
@@ -2909,32 +2934,13 @@ pub fn validate_and_apply_operation<Host>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
-    required_fees: Option<u64>,
+    required_fees: Option<Mutez>,
     fee_refund_config: Option<FeeRefundConfig>,
     safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    // Sum declared fees (mutez) from all operation contents before
-    // `operation` is moved into validation.
-    // Saturating is safe: validation debits every fee from the source
-    // balance with exact arithmetic, so a batch whose total does not fit in
-    // u64 is rejected as invalid and the saturated value is never used.
-    // Failing here instead would abort the block on an unvalidated operation.
-    let fee_refund_config = if let Some(config) = fee_refund_config {
-        let total_fees: u64 = operation
-            .content
-            .iter()
-            .map(|c| &c.fee().0)
-            .sum::<BigUint>()
-            .to_u64()
-            .unwrap_or(u64::MAX);
-        Some((config, total_fees))
-    } else {
-        None
-    };
-
     let mut safe_host = SafeStorage {
         host: rk.host_mut(),
         world_states: safe_roots.to_vec(),
@@ -2963,6 +2969,9 @@ where
             return Err(OperationError::Validation(validity_err));
         }
     };
+
+    let fee_refund_config =
+        fee_refund_config.map(|config| (config, validation_info.total_fees));
 
     log!(Debug, "Batch is valid!");
 
@@ -3043,6 +3052,10 @@ where
     // keeps the refund. A rollback of the storage under `rk` drops the refund too.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
+        // The refund credit is a `BlockAbort` on failure: it runs after
+        // application, outside any operation's frame, and a refund cannot
+        // push the source's balance past the domain the fee was debited
+        // from earlier in this same batch.
         apply_fee_refund(rk.tez_accounts_mut(), &mut processed_ops, fee_refund)
             .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
@@ -3056,14 +3069,13 @@ where
 fn apply_fee_refund(
     tez_accounts: &mut impl KeySpace,
     processed_operations: &mut [ProcessedOperation],
-    fee_refund: u64,
+    fee_refund: Mutez,
 ) -> Result<(), anyhow::Error> {
-    if fee_refund == 0 {
+    if fee_refund == Mutez::ZERO {
         return Ok(());
     }
 
-    // Validate conversions before any storage mutation.
-    let source_delta: i64 = i64::try_from(fee_refund)?;
+    let source_delta: i64 = fee_refund.into();
     let block_fees_delta: i64 = -source_delta;
 
     // Safe: validate_and_apply_operation rejects empty batches (ValidityError::EmptyBatch).
@@ -3073,13 +3085,10 @@ fn apply_fee_refund(
 
     let source_pkh = first_op.operation_with_metadata.content.source()?.clone();
 
-    // Credit source account with the refund.
+    // Credit source account with the refund. Fallible (a checked add), but
+    // classified as a block abort by the caller — see the comment there.
     let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
-    account_storage::add_balance(
-        &source_account,
-        tez_accounts,
-        Mutez::try_from(fee_refund)?,
-    )?;
+    account_storage::add_balance(&source_account, tez_accounts, fee_refund)?;
 
     log!(
         Debug,
@@ -3121,6 +3130,9 @@ where
         source_account,
         source_public_key,
         validated_operations,
+        // Read by the caller, off `execute_validation`'s result, before
+        // `validation_info` is moved in here.
+        total_fees: _,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
     let mut processed_ops = Vec::with_capacity(validated_operations.len());
@@ -4489,8 +4501,9 @@ mod tests {
             &test_safe_roots(),
         );
 
-        let expected_error =
-            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
+        let expected_error = OperationError::Validation(ValidityError::CantPayFees(
+            Mutez::try_from(100_u64).unwrap(),
+        ));
 
         assert_eq!(
             src_account.counter(rk.tez_accounts()).unwrap(),
@@ -6762,8 +6775,9 @@ mod tests {
             &test_safe_roots(),
         );
 
-        let expected_error =
-            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
+        let expected_error = OperationError::Validation(ValidityError::CantPayFees(
+            Mutez::try_from(100_u64).unwrap(),
+        ));
 
         assert_eq!(receipts, Err(expected_error));
 
@@ -11877,6 +11891,119 @@ mod tests {
         );
     }
 
+    // A crafted batch whose fees are each individually within the mutez
+    // domain, but whose sum is not, must be rejected as an invalid batch
+    // — never a reason to abort the block.
+    #[test]
+    fn batch_fee_sum_out_of_domain_is_invalid_not_aborted() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let source = bootstrap1();
+        // Enough to pay the first operation's fee (2^62), so the second
+        // operation's fee-sum check — not a solvency check — is what
+        // rejects the batch.
+        let _src_account =
+            init_account(rk.tez_accounts_mut(), &source.pkh, i64::MAX as u64);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        // Two fees of 2^62 mutez each: individually within the mutez
+        // domain (< i64::MAX), but their sum (2^63) is not.
+        let fee: u64 = 1u64 << 62;
+        let transfer_content = || {
+            OperationContent::Transfer(TransferContent {
+                amount: 10_u64.into(),
+                destination: Contract::Implicit(bootstrap2().pkh),
+                parameters: Parameters::default(),
+            })
+        };
+        let batch = make_operation(
+            fee,
+            1,     // counter
+            21000, // gas_limit
+            0,     // storage_limit
+            source,
+            vec![transfer_content(), transfer_content()],
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            batch,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        assert!(
+            matches!(
+                result,
+                Err(OperationError::Validation(
+                    ValidityError::AmountOutOfDomain(_)
+                ))
+            ),
+            "a batch whose fee sum overflows the mutez domain must be rejected \
+             as invalid, not abort the block: {result:?}"
+        );
+    }
+
+    #[test]
+    fn batch_fee_sum_past_u64_with_fee_refund_is_invalid_not_aborted() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let source = bootstrap1();
+        let _src_account =
+            init_account(rk.tez_accounts_mut(), &source.pkh, i64::MAX as u64);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let fee = i64::MAX as u64;
+        let transfer_content = || {
+            OperationContent::Transfer(TransferContent {
+                amount: 10_u64.into(),
+                destination: Contract::Implicit(bootstrap2().pkh),
+                parameters: Parameters::default(),
+            })
+        };
+        let batch = make_operation(
+            fee,
+            1,
+            21000,
+            0,
+            source,
+            vec![transfer_content(), transfer_content(), transfer_content()],
+        );
+        let fee_refund_config = FeeRefundConfig {
+            da_fees: Mutez::ZERO,
+            base_fee_per_gas: Default::default(),
+            michelson_to_evm_gas_multiplier: 1,
+        };
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            batch,
+            &block_ctx!(),
+            false,
+            None,
+            Some(fee_refund_config),
+            &test_safe_roots(),
+        );
+
+        assert!(
+            matches!(
+                result,
+                Err(OperationError::Validation(
+                    ValidityError::AmountOutOfDomain(_)
+                ))
+            ),
+            "a batch whose fee sum exceeds u64 must be rejected as invalid, \
+             not abort the block: {result:?}"
+        );
+    }
+
     /// Calling the gateway with the generic %call entrypoint (plain tez
     /// transfer to an EVM address) produces an Applied receipt whose storage
     /// field is None.
@@ -14206,11 +14333,13 @@ mod tests {
         /// Compute the expected refund: fee - da_fees - michelson_gas_to_mutez(consumed).
         fn expected_refund(&self, fee: u64, da_fees: u64) -> u64 {
             let consumed_gas = self.total_consumed_milligas.div_ceil(1000);
-            let consumed_gas_fees = (U256::from(TEST_BASE_FEE_PER_GAS)
-                * U256::from(TEST_GAS_MULTIPLIER)
-                * U256::from(consumed_gas)
-                / U256::exp10(12))
-            .low_u64();
+            let consumed_gas_fees = tezosx_types::michelson_gas_to_mutez(
+                U256::from(TEST_BASE_FEE_PER_GAS),
+                TEST_GAS_MULTIPLIER,
+                consumed_gas,
+            )
+            .unwrap()
+            .as_u64();
             fee.saturating_sub(da_fees.saturating_add(consumed_gas_fees))
         }
     }
@@ -14225,6 +14354,27 @@ mod tests {
         amount: u64,
         initial_src_balance: u64,
         da_fees: Option<u64>,
+    ) -> RefundTestCtx<'_> {
+        run_refund_transfer_with_base_fee(
+            host,
+            fee,
+            amount,
+            initial_src_balance,
+            da_fees,
+            U256::from(TEST_BASE_FEE_PER_GAS),
+        )
+    }
+
+    /// Like [`run_refund_transfer`], but with a caller-chosen
+    /// `base_fee_per_gas` — used to drive the execution-cost side of the
+    /// refund computation past the mutez domain.
+    fn run_refund_transfer_with_base_fee(
+        host: &mut MockKernelHost,
+        fee: u64,
+        amount: u64,
+        initial_src_balance: u64,
+        da_fees: Option<u64>,
+        base_fee_per_gas: U256,
     ) -> RefundTestCtx<'_> {
         let mut rk = RuntimeKeyspaces::init(host).unwrap();
 
@@ -14247,8 +14397,8 @@ mod tests {
         );
 
         let refund_config = da_fees.map(|da| FeeRefundConfig {
-            da_fees: da,
-            base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
+            da_fees: Mutez::try_from(da).unwrap(),
+            base_fee_per_gas,
             michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
         });
 
@@ -14355,6 +14505,101 @@ mod tests {
         );
     }
 
+    #[test]
+    fn fee_refund_credit_past_mutez_domain_fails() {
+        let fee: u64 = 15;
+
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let dst = bootstrap2();
+
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &dst.pkh, 50);
+
+        let operation = make_transfer_operation(
+            fee,
+            1,
+            21040,
+            5,
+            src.clone(),
+            1_u64.into(),
+            Contract::Implicit(dst.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let mut processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect("validate_and_apply_operation should succeed");
+
+        source
+            .set_balance(rk.tez_accounts_mut(), &Mutez::MAX)
+            .unwrap();
+
+        let result = crate::apply_fee_refund(
+            rk.tez_accounts_mut(),
+            &mut processed,
+            Mutez::try_from(1u64).unwrap(),
+        );
+
+        assert!(result.is_err());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), Mutez::MAX);
+        match &processed[0].operation_with_metadata.receipt {
+            OperationResultSum::Transfer(op_result) => assert_eq!(
+                op_result.balance_updates,
+                vec![bu_fee_debit(&src.pkh, fee), bu_fee_credit(fee)]
+            ),
+            other => panic!("Expected Transfer receipt, got {other:?}"),
+        }
+    }
+
+    // An execution cost past the mutez domain yields a zero refund.
+    // `base_fee_per_gas` is chosen so `base_fee * multiplier *
+    // consumed_gas` is a multiple of 2^64 mutez: past the mutez domain,
+    // which the checked conversion rejects outright, where a conversion
+    // wrapping mod 2^64 would read a zero cost and refund the whole fee.
+    #[test]
+    fn apply_transfer_refund_is_zero_when_execution_cost_overflows_mutez_domain() {
+        let fee: u64 = 1000;
+        let amount: u64 = 5;
+        let initial_balance: u64 = 2000;
+        let huge_base_fee_per_gas = (U256::one() << 64) * U256::exp10(12);
+
+        let mut host = test_host();
+        let ctx = run_refund_transfer_with_base_fee(
+            &mut host,
+            fee,
+            amount,
+            initial_balance,
+            Some(0),
+            huge_base_fee_per_gas,
+        );
+        let bus = ctx.balance_updates();
+
+        // Zero refund: only 2 entries (fee debit/credit), no refund entries.
+        assert_eq!(bus.len(), 2, "Expected 2 balance_updates, got {:?}", bus);
+
+        // Source balance = initial - fee - amount (no refund).
+        assert_eq!(
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            (initial_balance - fee - amount).into(),
+        );
+    }
+
     // Transfer without fee refund config (None): no refund entries.
     #[test]
     fn apply_transfer_without_fee_refund_config() {
@@ -14379,8 +14624,9 @@ mod tests {
         );
     }
 
-    // A batch whose total declared fees overflow u64 must be rejected by
-    // validation instead of aborting the block when fee refund is enabled.
+    // A batch whose total declared fees overflow the mutez domain must be
+    // rejected by validation instead of aborting the block when fee refund
+    // is enabled.
     #[test]
     fn apply_batch_with_overflowing_total_fees_and_fee_refund() {
         let mut host = test_host();
@@ -14399,12 +14645,18 @@ mod tests {
                 parameters: Parameters::default(),
             })
         };
-        // Each fee fits in u64 but their sum does not.
-        let operation =
-            make_operation(u64::MAX, 1, 21040, 5, src, vec![transfer(), transfer()]);
+        // Each fee fits in the mutez domain but their sum does not.
+        let operation = make_operation(
+            i64::MAX as u64,
+            1,
+            21040,
+            5,
+            src,
+            vec![transfer(), transfer()],
+        );
 
         let refund_config = FeeRefundConfig {
-            da_fees: 50,
+            da_fees: Mutez::try_from(50_u64).unwrap(),
             base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
             michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
         };
@@ -14424,7 +14676,7 @@ mod tests {
         assert_eq!(
             result,
             Err(OperationError::Validation(ValidityError::CantPayFees(
-                u64::MAX.into()
+                Mutez::MAX
             )))
         );
         assert_eq!(
