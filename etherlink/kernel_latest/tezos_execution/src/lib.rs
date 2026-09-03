@@ -329,13 +329,21 @@ where
         .map(|tagged_op| match tagged_op.origin {
             InternalOpOrigin::Own {
                 delegated_storage_cost,
-            } => storage_fees::charge_internal_op_storage_fees(
-                tez_accounts,
-                payer,
-                storage_limit_remaining,
-                &tagged_op.op,
-                delegated_storage_cost,
-            ),
+            } => {
+                let delegated_storage_cost = Mutez::try_from(delegated_storage_cost)
+                    .map_err(|e| {
+                        ApplyOperationError::Transfer(
+                            TransferError::StorageFeesConversion(e.to_string()),
+                        )
+                    })?;
+                storage_fees::charge_internal_op_storage_fees(
+                    tez_accounts,
+                    payer,
+                    storage_limit_remaining,
+                    &tagged_op.op,
+                    delegated_storage_cost,
+                )
+            }
             InternalOpOrigin::Crac => Ok(None),
         })
         .collect::<Result<Vec<_>, _>>();
@@ -384,6 +392,18 @@ where
         internal_operation_results,
     );
     let burn_outcome = burn_outcome.and_then(|()| {
+        let delegated_storage_cost =
+            Mutez::try_from(delegated_storage_cost).map_err(|e| {
+                ApplyOperationError::Transfer(TransferError::StorageFeesConversion(
+                    e.to_string(),
+                ))
+            })?;
+        let top_level_delegated_delta = Mutez::try_from(top_level_delegated_delta)
+            .map_err(|e| {
+                ApplyOperationError::Transfer(TransferError::StorageFeesConversion(
+                    e.to_string(),
+                ))
+            })?;
         storage_fees::burn_storage_cost(
             tez_accounts,
             payer,
@@ -394,7 +414,8 @@ where
             payer,
             &mut content,
             top_level_delegated_delta,
-        )
+        );
+        Ok(())
     });
     if let Err(errors) = burn_outcome {
         log!(Debug, "Storage burn failed: {errors:?}");
@@ -2278,7 +2299,7 @@ pub struct CrossRuntimeTransferResult {
     /// cost is reported upward by those sub-executions through
     /// their own `X-Tezos-Storage-Cost` header, accumulated on the
     /// caller frame's [`OperationCtx::delegated_storage_cost`]).
-    pub own_storage_cost: BigUint,
+    pub own_storage_cost: Mutez,
 }
 
 /// Error from [`cross_runtime_transfer`], carrying both the transfer
@@ -2391,12 +2412,14 @@ where
                 let target: TransferTarget = success.into();
                 let own_storage_cost =
                     storage_fees::compute_storage_fees::<TransferContent>(&target)?;
-                let own_storage_cost: BigUint = internal_receipts
+                let own_storage_cost: Mutez = internal_receipts
                     .iter()
                     .filter(|t| t.is_own())
                     .try_fold(own_storage_cost, |acc, t| {
                         let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
-                        Ok::<BigUint, TransferError>(acc + fee)
+                        acc.checked_add(fee).map_err(|e| {
+                            TransferError::StorageFeesConversion(e.to_string())
+                        })
                     })?;
 
                 Ok(CrossRuntimeTransferResult {

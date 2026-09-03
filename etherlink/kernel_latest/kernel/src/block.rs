@@ -2277,8 +2277,7 @@ mod tests {
                 &transfer.internal_operation_results[0],
             )
             .unwrap()
-            .try_into()
-            .unwrap();
+            .into();
         assert!(storage_cost > 0);
         let ContentResult::Applied(TransferTarget::ToContract(success)) =
             &transfer.result

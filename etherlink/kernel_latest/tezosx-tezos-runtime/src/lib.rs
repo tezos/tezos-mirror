@@ -1025,14 +1025,21 @@ where
     };
     let consumed_milligas = gas.total_milligas_consumed().into();
 
-    let delegated_storage_cost =
-        result.own_storage_cost + received_delegated_storage_cost;
-
-    let delegated_storage_cost = u64::try_from(delegated_storage_cost).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!(
-            "Delegated storage cost does not fit in u64: {e}"
-        ))
-    })?;
+    let received_delegated_storage_cost =
+        Mutez::try_from(received_delegated_storage_cost).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Delegated storage cost does not fit in the mutez domain: {e}"
+            ))
+        })?;
+    let delegated_storage_cost = result
+        .own_storage_cost
+        .checked_add(received_delegated_storage_cost)
+        .map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Delegated storage cost overflow: {e}"
+            ))
+        })?
+        .as_u64();
 
     Ok(ExecuteRequestOutcome {
         delegated_storage_cost,
@@ -1280,11 +1287,7 @@ impl RuntimeInterface for TezosRuntime {
                 ))
             })?;
 
-        let alias_storage_cost = u64::try_from(alias_storage_cost).map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Alias storage cost does not fit in u64: {e}"
-            ))
-        })?;
+        let alias_storage_cost = alias_storage_cost.as_u64();
 
         journal
             .michelson
