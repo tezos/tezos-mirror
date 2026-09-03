@@ -5259,6 +5259,13 @@ pub(crate) mod tests {
             TransferError::NoSuchEntrypoint(mir::ast::Entrypoint::default()),
             TransferError::BadContractParameter(Contract::Originated(kt1.clone())),
             TransferError::MirAddressUnsupportedError,
+            TransferError::BalanceOverflow(
+                tezos_tezlink::operation_result::BalanceOverflow {
+                    contract: Contract::Originated(kt1.clone()),
+                    balance: Mutez::ZERO,
+                    amount: Mutez::ZERO,
+                },
+            ),
             TransferError::ContractDoesNotExist(Contract::Originated(kt1)),
         ];
         for variant in user_facing {

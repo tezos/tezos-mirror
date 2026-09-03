@@ -31,8 +31,7 @@ use mir::{
     },
 };
 use mir_ctx::clear_temporary_big_maps;
-use num_bigint::{BigInt, BigUint};
-use num_traits::ops::checked::CheckedSub;
+use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -63,9 +62,9 @@ use tezos_tezlink::operation_result::{
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
-        ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, EventContent,
-        EventSuccess, OperationError, OperationResultSum, OriginationError, RevealError,
-        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
+        ApplyOperationError, Balance, BalanceOverflow, BalanceTooLow, BalanceUpdate,
+        EventContent, EventSuccess, OperationError, OperationResultSum, OriginationError,
+        RevealError, RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 use tezosx_interfaces::Milligas;
@@ -522,14 +521,13 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
 fn transfer_tez(
     tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
     let balance_updates =
-        compute_balance_updates(giver_account, receiver_account, amount)
-            .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
+        compute_balance_updates(giver_account, receiver_account, amount);
 
-    apply_balance_changes(tez_accounts, giver_account, receiver_account, &amount.0)?;
+    apply_balance_changes(tez_accounts, giver_account, receiver_account, amount)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -552,10 +550,10 @@ fn transfer_tez(
 /// and the sender was already debited in that runtime.
 fn credit_destination_without_debiting_sender(
     tez_accounts: &mut impl KeySpace,
-    amount: &Narith,
+    amount: Mutez,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    if amount.eq(&0_u64.into()) {
+    if amount == Mutez::ZERO {
         return Ok(TransferSuccess {
             storage: None,
             lazy_storage_diff: None,
@@ -569,23 +567,22 @@ fn credit_destination_without_debiting_sender(
             address_registry_diff: vec![],
         });
     }
-    let receiver_balance = receiver_account.balance(tez_accounts)?.to_narith().0;
-    let new_receiver_balance: Narith = (&receiver_balance + &amount.0).into();
-    let new_receiver_balance_mutez = Mutez::try_from(&new_receiver_balance)
-        .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
-    receiver_account.set_balance(tez_accounts, &new_receiver_balance_mutez)?;
-    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+    let receiver_balance = receiver_account.balance(tez_accounts)?;
+    let new_receiver_balance = receiver_balance.checked_add(amount).map_err(|_| {
+        TransferError::BalanceOverflow(BalanceOverflow {
+            contract: receiver_account.contract(),
+            balance: receiver_balance,
+            amount,
+        })
+    })?;
+    receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
         // TODO: L2-882 design CRAC receipts
         balance_updates: vec![BalanceUpdate {
             balance: Balance::Account(receiver_account.contract()),
-            changes: receiver_delta.try_into().map_err(
-                |e: num_bigint::TryFromBigIntError<num_bigint::BigInt>| {
-                    TransferError::FailedToComputeBalanceUpdate(e.to_string())
-                },
-            )?,
+            changes: amount.into(),
             update_origin: UpdateOrigin::BlockApplication,
         }],
         ticket_receipt: vec![],
@@ -601,22 +598,17 @@ fn credit_destination_without_debiting_sender(
 fn burn_tez(
     tez_accounts: &mut impl KeySpace,
     account: &impl TezosAccount,
-    amount: &num_bigint::BigUint,
-) -> Result<Narith, TransferError> {
-    let balance = account.balance(tez_accounts)?.to_narith();
-    let new_balance: Narith = match balance.0.checked_sub(amount) {
-        None => {
-            return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: account.contract(),
-                balance: balance.clone(),
-                amount: amount.into(),
-            }));
-        }
-        Some(new_balance) => new_balance.into(),
-    };
-    let new_balance_mutez = Mutez::try_from(&new_balance)
-        .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
-    account.set_balance(tez_accounts, &new_balance_mutez)?;
+    amount: Mutez,
+) -> Result<Mutez, TransferError> {
+    let balance = account.balance(tez_accounts)?;
+    let new_balance = balance.checked_sub(amount).map_err(|_| {
+        TransferError::BalanceTooLow(BalanceTooLow {
+            contract: account.contract(),
+            balance,
+            amount,
+        })
+    })?;
+    account.set_balance(tez_accounts, &new_balance)?;
     Ok(new_balance)
 }
 
@@ -1498,17 +1490,20 @@ where
             let dest_account = context::implicit_from_public_key_hash(pkh)?;
             let already_allocated =
                 dest_account.allocate(tc_ctx.rk.tez_accounts_mut())?;
+            let amount_mutez = Mutez::try_from(amount).map_err(|e| {
+                TransferError::FailedToComputeBalanceUpdate(e.to_string())
+            })?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.tez_accounts_mut(),
-                    amount,
+                    amount_mutez,
                     &dest_account,
                 )?
             } else {
                 transfer_tez(
                     tc_ctx.rk.tez_accounts_mut(),
                     sender_account,
-                    amount,
+                    amount_mutez,
                     &dest_account,
                 )?
             };
@@ -1537,17 +1532,20 @@ where
                 ))
                 .into());
             }
+            let amount_mutez = Mutez::try_from(amount).map_err(|e| {
+                TransferError::FailedToComputeBalanceUpdate(e.to_string())
+            })?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.tez_accounts_mut(),
-                    amount,
+                    amount_mutez,
                     &dest_account,
                 )?
             } else {
                 transfer_tez(
                     tc_ctx.rk.tez_accounts_mut(),
                     sender_account,
-                    amount,
+                    amount_mutez,
                     &dest_account,
                 )?
             };
@@ -2712,9 +2710,10 @@ where
     }
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
+    let initial_balance_mutez = Mutez::try_from(initial_balance)
+        .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
     let balance_updates =
-        compute_balance_updates(sender_account, &smart_contract, initial_balance)
-            .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
+        compute_balance_updates(sender_account, &smart_contract, initial_balance_mutez);
 
     // `apply_balance_changes` writes and reads the giver and receiver balances,
     // two reads and writes each for an amount, so 4 reads and 4 writes in total.
@@ -2728,7 +2727,7 @@ where
         ctx.rk.tez_accounts_mut(),
         sender_account,
         &smart_contract,
-        &initial_balance.0,
+        initial_balance_mutez,
     )
     .map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
@@ -2754,59 +2753,45 @@ where
 }
 
 /// Prepares balance updates in the format expected by the Tezos operation.
+/// No updates on a zero amount.
 fn compute_balance_updates(
     giver: &impl TezosAccount,
     receiver: &impl TezosAccount,
-    amount: &Narith,
-) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
-    if amount.eq(&0_u64.into()) {
-        return Ok(vec![]);
-    };
-
-    let giver_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
-
-    let giver_update = BalanceUpdate {
-        balance: Balance::Account(giver.contract()),
-        changes: giver_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    let receiver_update = BalanceUpdate {
-        balance: Balance::Account(receiver.contract()),
-        changes: receiver_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    Ok(vec![giver_update, receiver_update])
+    amount: Mutez,
+) -> Vec<BalanceUpdate> {
+    if amount == Mutez::ZERO {
+        return vec![];
+    }
+    BalanceUpdate::transfer(giver.contract(), receiver.contract(), amount)
 }
 
 /// Applies balance changes by updating both source and destination accounts.
+/// Checked: an underflow on the giver or an overflow on the receiver is an
+/// error rather than an unbounded update.
 fn apply_balance_changes(
     tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     receiver_account: &impl TezosAccount,
-    amount: &num_bigint::BigUint,
+    amount: Mutez,
 ) -> Result<(), TransferError> {
-    let giver_balance = giver_account.balance(tez_accounts)?.to_narith();
-    let new_giver_balance: Narith = match giver_balance.0.checked_sub(amount) {
-        None => {
-            return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: giver_account.contract(),
-                balance: giver_balance,
-                amount: amount.into(),
-            }));
-        }
-        Some(new_source_balance) => new_source_balance.into(),
-    };
-    let new_giver_balance_mutez = Mutez::try_from(&new_giver_balance)
-        .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
-    giver_account.set_balance(tez_accounts, &new_giver_balance_mutez)?;
-    let receiver_balance = receiver_account.balance(tez_accounts)?.to_narith().0;
-    let new_receiver_balance: Narith = (&receiver_balance + amount).into();
-    let new_receiver_balance_mutez = Mutez::try_from(&new_receiver_balance)
-        .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
-    receiver_account.set_balance(tez_accounts, &new_receiver_balance_mutez)?;
+    let giver_balance = giver_account.balance(tez_accounts)?;
+    let new_giver_balance = giver_balance.checked_sub(amount).map_err(|_| {
+        TransferError::BalanceTooLow(BalanceTooLow {
+            contract: giver_account.contract(),
+            balance: giver_balance,
+            amount,
+        })
+    })?;
+    giver_account.set_balance(tez_accounts, &new_giver_balance)?;
+    let receiver_balance = receiver_account.balance(tez_accounts)?;
+    let new_receiver_balance = receiver_balance.checked_add(amount).map_err(|_| {
+        TransferError::BalanceOverflow(BalanceOverflow {
+            contract: receiver_account.contract(),
+            balance: receiver_balance,
+            amount,
+        })
+    })?;
+    receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
 
     log!(Debug,
         "Transfer: OK - the new balance of the giver is {new_giver_balance:?} and the new balance of the receiver is {new_receiver_balance:?}"
@@ -4985,8 +4970,8 @@ mod tests {
                 result: ContentResult::Failed(
                     vec![TransferError::BalanceTooLow(BalanceTooLow {
                         contract: Contract::Implicit(source.pkh),
-                        balance: 35_u64.into(),
-                        amount: 100_u64.into(),
+                        balance: Mutez::try_from(35_u64).unwrap(),
+                        amount: Mutez::try_from(100_u64).unwrap(),
                     })
                     .into()]
                     .into(),
@@ -5017,6 +5002,93 @@ mod tests {
             source_account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
+        );
+    }
+
+    #[test]
+    fn apply_transfer_to_full_balance_fails_with_balance_overflow() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+
+        let dest = bootstrap2();
+
+        let source_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let destination_account =
+            init_account(rk.tez_accounts_mut(), &dest.pkh, Mutez::MAX.as_u64());
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21040,
+            5,
+            source.clone(),
+            1_u64.into(),
+            Contract::Implicit(dest.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation.clone(),
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        let receipt = ProcessedOperation::into_receipts(processed);
+
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![TransferError::BalanceOverflow(
+                        tezos_tezlink::operation_result::BalanceOverflow {
+                            contract: Contract::Implicit(dest.pkh),
+                            balance: Mutez::MAX,
+                            amount: Mutez::try_from(1u64).unwrap(),
+                        },
+                    )
+                    .into()]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipt, expected_receipt);
+
+        assert_eq!(
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            35.into()
+        );
+        assert_eq!(
+            destination_account.balance(rk.tez_accounts()).unwrap(),
+            Mutez::MAX
         );
     }
 
@@ -5778,8 +5850,8 @@ mod tests {
                         errors: vec![ApplyOperationError::CannotPayStorageFee(
                             BalanceTooLow {
                                 contract: source.contract(),
-                                balance: 3_u64.into(), // 48 - 15 fee - 30 transfer
-                                amount: (4 * COST_PER_BYTES).into(), // 4
+                                balance: Mutez::try_from(3_u64).unwrap(), // 48 - 15 fee - 30 transfer
+                                amount: Mutez::try_from(4 * COST_PER_BYTES).unwrap(), // 4
                             },
                         )],
                     }),
@@ -6006,9 +6078,9 @@ mod tests {
                             BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
                                 // 50 - 15 fee - 30 transfer = 5
-                                balance: 5_u64.into(),
+                                balance: Mutez::try_from(5_u64).unwrap(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 257_u64.into(),
+                                amount: Mutez::try_from(257_u64).unwrap(),
                             },
                         )],
                     }),
@@ -8674,9 +8746,9 @@ mod tests {
                             BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
                                 // 283 - 15 fee - 30 transfer - 38 variable burn = 200
-                                balance: 200_u64.into(),
+                                balance: Mutez::try_from(200_u64).unwrap(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 257_u64.into(),
+                                amount: Mutez::try_from(257_u64).unwrap(),
                             },
                         )],
                     }),
@@ -9698,8 +9770,8 @@ mod tests {
                         ApplyOperationError::Origination(
                             OriginationError::BalanceTooLow(BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
-                                balance: 399_366_u64.into(),
-                                amount: 999_999_u64.into(),
+                                balance: Mutez::try_from(399_366_u64).unwrap(),
+                                amount: Mutez::try_from(999_999_u64).unwrap(),
                             }),
                         )
                         .into(),
@@ -13609,6 +13681,89 @@ mod tests {
         );
     }
 
+    /// A CRAC credit that would push the destination's balance past the
+    /// mutez domain fails the call (`CracError::Operation`), not the block
+    /// (`CracError::BlockAbort`): the destination already holds `Mutez::MAX`,
+    /// and the credit routed through `credit_destination_without_debiting_sender`
+    /// (the CRAC path — the sender was already debited by the calling
+    /// runtime) cannot add even one more mutez.
+    #[test]
+    fn cross_runtime_transfer_balance_overflow_is_operation_level() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
+
+        let dst = bootstrap2();
+        init_account(rk.tez_accounts_mut(), &dst.pkh, i64::MAX as u64);
+        let dest = Contract::Implicit(dst.pkh);
+
+        let parameters = Parameters {
+            entrypoint: mir::ast::Entrypoint::default(),
+            value: Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+        };
+
+        let parser = Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(10_000_000)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            rk: &mut rk,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            temporary_big_map_id_allocator:
+                tezosx_journal::TemporaryBigMapIdAllocator::new(),
+        };
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut nonce_counter: u16 = 0;
+
+        let result = cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            &NotWiredRegistry,
+            &mut journal,
+            &sender_account,
+            &Narith(1u64.into()),
+            &dest,
+            &parameters,
+            &parser,
+            &mut nonce_counter,
+        );
+
+        let err = match result {
+            Ok(_) => panic!("credit past the mutez domain must fail the call"),
+            Err(e) => e,
+        };
+        assert!(
+            matches!(
+                err.error,
+                CracError::Operation(TransferError::BalanceOverflow(_))
+            ),
+            "expected an operation-level BalanceOverflow, got: {:?}",
+            err.error
+        );
+    }
+
     /// When the gas budget is too tight to meter the FAILWITH body,
     /// `cross_runtime_transfer` returns `OutOfGas` AND still records the
     /// failed CRAC receipt (small — no bloated body), preserving the
@@ -15429,8 +15584,8 @@ mod tests {
             outcome,
             Err(ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: c.clone(),
-                balance: 5_u64.into(),
-                amount: (10 * COST_PER_BYTES).into(),
+                balance: Mutez::try_from(5_u64).unwrap(),
+                amount: Mutez::try_from(10 * COST_PER_BYTES).unwrap(),
             }))
         );
         assert_eq!(content, ContentResult::Applied(transfer_target(10, vec![])));

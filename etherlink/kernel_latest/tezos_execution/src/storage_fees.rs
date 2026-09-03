@@ -8,7 +8,7 @@
 
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{ops::checked::CheckedSub, Zero};
-use tezos_data_encoding::types::Zarith;
+use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
@@ -16,6 +16,7 @@ use tezos_tezlink::operation_result::{
     InternalContentWithMetadata, InternalOperationSum, OperationKind, OriginationSuccess,
     TransferError, TransferTarget, UpdateOrigin,
 };
+use tezosx_types::Mutez;
 
 use crate::account_storage::TezosAccount;
 use crate::burn_tez;
@@ -63,7 +64,10 @@ fn burn_storage_fee(
     if to_burn.is_zero() {
         return Ok(StorageFee::default());
     }
-    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
+    let to_burn_mutez = Mutez::try_from(&Narith::from(&to_burn)).map_err(|e| {
+        ApplyOperationError::Transfer(TransferError::StorageFeesConversion(e.to_string()))
+    })?;
+    burn_tez(tez_accounts, payer, to_burn_mutez).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -173,8 +177,10 @@ pub fn burn_storage_cost(
         .checked_sub(&nb_consumed_bytes)
         .ok_or(ApplyOperationError::OperationQuotaExceeded)?;
 
-    let to_burn = BigUint::from(mutez_cost);
-    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
+    let to_burn = Mutez::try_from(mutez_cost).map_err(|e| {
+        ApplyOperationError::Transfer(TransferError::StorageFeesConversion(e.to_string()))
+    })?;
+    burn_tez(tez_accounts, payer, to_burn).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -562,7 +568,6 @@ mod tests {
         EventSuccess, InternalContentWithMetadata, Originated, RevealSuccess,
         TransferSuccess, UpdateOrigin,
     };
-    use tezosx_types::Mutez;
 
     use crate::account_storage::TezosImplicitAccount;
     use crate::context;
@@ -749,8 +754,11 @@ mod tests {
         match err {
             ApplyOperationError::CannotPayStorageFee(b) => {
                 assert_eq!(b.contract, payer.contract());
-                assert_eq!(b.balance, initial_balance.into());
-                assert_eq!(b.amount, (nb_consumed_bytes * COST_PER_BYTES).into());
+                assert_eq!(b.balance, Mutez::try_from(initial_balance).unwrap());
+                assert_eq!(
+                    b.amount,
+                    Mutez::try_from(nb_consumed_bytes * COST_PER_BYTES).unwrap()
+                );
             }
             other => panic!("expected CannotPayStorageFee(_), got {other:?}"),
         }
@@ -876,8 +884,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 5_u64.into(),
-                amount: (10 * COST_PER_BYTES).into(),
+                balance: Mutez::try_from(5_u64).unwrap(),
+                amount: Mutez::try_from(10 * COST_PER_BYTES).unwrap(),
             }),
         );
     }
@@ -1045,8 +1053,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 62_u64.into(),
-                amount: SLOT_BURN.into(),
+                balance: Mutez::try_from(62_u64).unwrap(),
+                amount: Mutez::try_from(SLOT_BURN).unwrap(),
             }),
         );
 
@@ -1249,8 +1257,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 90_u64.into(),
-                amount: SLOT_BURN.into(),
+                balance: Mutez::try_from(90_u64).unwrap(),
+                amount: Mutez::try_from(SLOT_BURN).unwrap(),
             }),
         );
 

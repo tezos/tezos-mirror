@@ -169,11 +169,21 @@ impl From<KeySpaceError> for RevealError {
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq)]
-#[error("Balance of contract {contract} too low ({}) to spend {}", .balance.0, .amount.0)]
+#[error("Balance of contract {contract} too low ({balance}) to spend {amount}")]
 pub struct BalanceTooLow {
     pub contract: Contract,
-    pub balance: Narith,
-    pub amount: Narith,
+    pub balance: Mutez,
+    pub amount: Mutez,
+}
+
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq)]
+#[error(
+    "crediting {amount} mutez to {contract} would overflow its balance ({balance} mutez)"
+)]
+pub struct BalanceOverflow {
+    pub contract: Contract,
+    pub balance: Mutez,
+    pub amount: Mutez,
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -244,6 +254,12 @@ pub enum TransferError {
     /// `CracError::BlockAbort` like the `FailedTo*` variants.
     #[error("Address registry reported a storage I/O failure: {0}")]
     AddressRegistryAbort(String),
+    /// A credit would push the destination's balance past the mutez domain.
+    /// User-triggerable (the destination's existing balance plus the
+    /// transferred amount), so this is an operation-level failure, not a
+    /// storage I/O fault like `FailedToUpdateDestinationBalance`.
+    #[error(transparent)]
+    BalanceOverflow(BalanceOverflow),
 }
 
 impl From<KeySpaceError> for TransferError {
@@ -600,8 +616,8 @@ impl L1Error {
             "contract.balance_too_low",
             vec![
                 ("contract", error.contract.to_string()),
-                ("balance", error.balance.0.to_string()),
-                ("amount", error.amount.0.to_string()),
+                ("balance", error.balance.to_string()),
+                ("amount", error.amount.to_string()),
             ],
         )
     }
@@ -716,6 +732,9 @@ impl TransferError {
                 ErrorKind::Temporary,
                 "transfer.failed_to_compute_balance_update",
             ),
+            TransferError::BalanceOverflow(_) => {
+                fallback(ErrorKind::Temporary, "transfer.balance_overflow")
+            }
             TransferError::MirAddressUnsupportedError => fallback(
                 ErrorKind::Permanent,
                 "transfer.mir_address_unsupported_error",
@@ -1673,8 +1692,8 @@ mod tests {
                                                         TransferError::BalanceTooLow(
                                                             BalanceTooLow {
                                                                 contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                                                balance: 10_u64.into(),
-                                                                amount: 21_u64.into()
+                                                                balance: Mutez::try_from(10_u64).unwrap(),
+                                                                amount: Mutez::try_from(21_u64).unwrap()
                                                             }
                                                         )
                                                     ),
@@ -1682,8 +1701,8 @@ mod tests {
                                                         TransferError::BalanceTooLow(
                                                             BalanceTooLow {
                                                                 contract: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                                                                balance: 55_u64.into(),
-                                                                amount: 1111_u64.into()
+                                                                balance: Mutez::try_from(55_u64).unwrap(),
+                                                                amount: Mutez::try_from(1111_u64).unwrap()
                                                             }
                                                         )
                                                     )
@@ -1728,8 +1747,8 @@ mod tests {
                                     ApplyOperationError::CannotPayStorageFee(
                                         BalanceTooLow {
                                             contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                            balance: 10_u64.into(),
-                                            amount: 21_u64.into(),
+                                            balance: Mutez::try_from(10_u64).unwrap(),
+                                            amount: Mutez::try_from(21_u64).unwrap(),
                                         }
                                     ),
                                 ],
@@ -2169,8 +2188,8 @@ mod tests {
         let error =
             ApplyOperationError::Transfer(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: tz1("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
-                balance: 10_u64.into(),
-                amount: 21_u64.into(),
+                balance: Mutez::try_from(10_u64).unwrap(),
+                amount: Mutez::try_from(21_u64).unwrap(),
             }));
         let encoded = encode_error(&error);
         assert_eq!(
@@ -2192,8 +2211,8 @@ mod tests {
     fn cannot_pay_storage_fee_is_encoded_with_its_cause() {
         let error = ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
             contract: tz1("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
-            balance: 10_u64.into(),
-            amount: 21_u64.into(),
+            balance: Mutez::try_from(10_u64).unwrap(),
+            amount: Mutez::try_from(21_u64).unwrap(),
         });
         let encoded = encode_error(&error);
         let mut expected =
@@ -2326,8 +2345,8 @@ mod tests {
             (
                 OriginationError::BalanceTooLow(BalanceTooLow {
                     contract: source.clone(),
-                    balance: 1_u64.into(),
-                    amount: 2_u64.into(),
+                    balance: Mutez::try_from(1_u64).unwrap(),
+                    amount: Mutez::try_from(2_u64).unwrap(),
                 })
                 .into(),
                 "temporary",
@@ -2557,8 +2576,8 @@ mod tests {
             ApplyOperationError::Transfer(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                balance: 10_u64.into(),
-                amount: 21_u64.into(),
+                balance: Mutez::try_from(10_u64).unwrap(),
+                amount: Mutez::try_from(21_u64).unwrap(),
             }));
         let mut output = vec![];
         operation_error
@@ -2678,8 +2697,8 @@ mod tests {
             errors: vec![ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                balance: 10_u64.into(),
-                amount: 21_u64.into(),
+                balance: Mutez::try_from(10_u64).unwrap(),
+                amount: Mutez::try_from(21_u64).unwrap(),
             })],
         };
         receipt.transform_applied_into_backtracked_with_errors(errors);
