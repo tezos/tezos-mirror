@@ -522,7 +522,9 @@ struct
        with {!Backend.copy} — otherwise a "snapshot" would keep
        mutating under later evaluation of the source (or vice versa).
        The eval loop itself goes through {!read} / {!write}, which
-       alias, so per-step evaluation never pays a copy. *)
+       alias, so per-step evaluation pays no copy here.  With
+       [--slow-vm-fallback], the fast engine copies the handle once per
+       [kernel_run] to replay from ([Tezos_scoru_wasm_fast.Vm]). *)
     let to_imm (m : mut_state) : state = {irmin = m.irmin; nds = copy_nds m.nds}
 
     let from_imm (s : state) : mut_state =

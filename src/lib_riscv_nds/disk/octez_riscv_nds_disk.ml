@@ -82,9 +82,14 @@ module Normal = struct
 
     let from_imm imm = Api.octez_riscv_durable_on_disk_registry_from_imm imm
 
-    (* [to_imm] then [from_imm] copies unshared state up to twice (once
-       now, once on the duplicate's first mutation); fine off the hot
-       path. *)
+    (* [to_imm] then [from_imm] copies unshared state up to twice: once now,
+       and once at the first mutation of the duplicate.  The interpreter
+       fallback of the fast engine ([--slow-vm-fallback]) duplicates the live
+       registry once per [kernel_run], so this copy can slow down that
+       fallback.  On disk, a copy writes a RocksDB checkpoint per database. *)
+    (* TODO: https://linear.app/tezos/issue/L2-2190
+       Make the snapshot of the interpreter fallback cheap.
+    *)
     let duplicate registry = from_imm (to_imm registry)
   end
 

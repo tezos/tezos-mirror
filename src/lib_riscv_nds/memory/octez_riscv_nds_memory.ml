@@ -72,9 +72,11 @@ module Normal = struct
 
     let from_imm imm = Api.octez_riscv_durable_in_memory_registry_from_imm imm
 
-    (* [to_imm] then [from_imm] copies unshared state up to twice (once
-       now, once on the duplicate's first mutation); fine off the hot
-       path. *)
+    (* [to_imm] then [from_imm] copies unshared state up to twice: once now,
+       and once at the first mutation of the duplicate.  The interpreter
+       fallback of the fast engine ([--slow-vm-fallback]) duplicates the live
+       registry once per [kernel_run], so this copy can slow down that
+       fallback. *)
     let duplicate registry = from_imm (to_imm registry)
   end
 
