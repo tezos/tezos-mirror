@@ -110,6 +110,10 @@ pub enum ValidityError {
     InsufficientFee,
     #[error("The public key hash {0} is inconsistent with the public key provided.")]
     InconsistentPublicKey(PublicKeyHash),
+    /// A `fee`, `amount` (Transaction) or `balance` (Origination) quantity
+    /// exceeds the mutez domain (`i64::MAX`).
+    #[error("Amount {0:?} is out of the mutez domain.")]
+    AmountOutOfDomain(Narith),
 }
 
 impl From<KeySpaceError> for ValidityError {
@@ -215,8 +219,6 @@ pub enum TransferError {
     /// kind of contract.
     #[error(transparent)]
     Context(#[from] ContextError),
-    #[error("Failed to compute balance update: {0}")]
-    FailedToComputeBalanceUpdate(String),
     #[error("Apply operation failed because of an unsupported address error")]
     MirAddressUnsupportedError,
     #[error("Failed to execute internal operation: {0}")]
@@ -280,8 +282,6 @@ pub enum OriginationError {
     FailedToFetchSourceAccount,
     #[error("Failed to fetch originated smart contract")]
     FailedToFetchOriginated,
-    #[error("Failed to compute balance update: {0}")]
-    FailedToComputeBalanceUpdate(String),
     #[error("Failed to applied balance update")]
     FailedToApplyBalanceUpdate,
     #[error(transparent)]
@@ -728,10 +728,6 @@ impl TransferError {
             }
             TransferError::KeySpace(error) => L1Error::key_space("transfer", error),
             TransferError::Context(error) => L1Error::context("transfer", error),
-            TransferError::FailedToComputeBalanceUpdate(_) => fallback(
-                ErrorKind::Temporary,
-                "transfer.failed_to_compute_balance_update",
-            ),
             TransferError::BalanceOverflow(_) => {
                 fallback(ErrorKind::Temporary, "transfer.balance_overflow")
             }
@@ -788,10 +784,6 @@ impl OriginationError {
             OriginationError::FailedToFetchOriginated => fallback(
                 ErrorKind::Temporary,
                 "origination.failed_to_fetch_originated",
-            ),
-            OriginationError::FailedToComputeBalanceUpdate(_) => fallback(
-                ErrorKind::Temporary,
-                "origination.failed_to_compute_balance_update",
             ),
             OriginationError::FailedToApplyBalanceUpdate => fallback(
                 ErrorKind::Temporary,

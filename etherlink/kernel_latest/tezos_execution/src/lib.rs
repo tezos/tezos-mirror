@@ -3240,7 +3240,9 @@ where
             ))
         }
         OperationContent::Transfer(TransferContent {
-            amount,
+            // Already validated into `validated_operation.amount`
+            // (mutez-domain-checked); the wire `Narith` is unused here.
+            amount: _,
             destination,
             parameters,
         }) => {
@@ -3257,31 +3259,22 @@ where
                 delegated_storage_cost: Mutez::ZERO,
             };
             let (transfer_result, top_level_delegated_delta, internals) =
-                match Mutez::try_from(amount) {
-                    Ok(amount_mutez) => match transfer_external(
-                        &mut tc_ctx,
-                        &mut operation_ctx,
-                        registry,
-                        journal,
-                        amount_mutez,
-                        destination,
-                        parameters,
-                        &mut internal_operations_receipts,
-                        &parser,
-                        nonce_counter,
-                    ) {
-                        Ok((target, delta, internals)) => (Ok(target), delta, internals),
-                        // The verdict is unused on this path: a failed transfer
-                        // backtracks every internal receipt regardless.
-                        Err(e) => (Err(e), Mutez::ZERO, SubtreeStatus::AllApplied),
-                    },
-                    Err(e) => (
-                        Err(CracError::Operation(
-                            TransferError::FailedToComputeBalanceUpdate(e.to_string()),
-                        )),
-                        Mutez::ZERO,
-                        SubtreeStatus::AllApplied,
-                    ),
+                match transfer_external(
+                    &mut tc_ctx,
+                    &mut operation_ctx,
+                    registry,
+                    journal,
+                    validated_operation.amount,
+                    destination,
+                    parameters,
+                    &mut internal_operations_receipts,
+                    &parser,
+                    nonce_counter,
+                ) {
+                    Ok((target, delta, internals)) => (Ok(target), delta, internals),
+                    // The verdict is unused on this path: a failed transfer
+                    // backtracks every internal receipt regardless.
+                    Err(e) => (Err(e), Mutez::ZERO, SubtreeStatus::AllApplied),
                 };
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
@@ -3310,7 +3303,9 @@ where
             ))
         }
         OperationContent::Origination(OriginationContent {
-            ref balance,
+            // Already validated into `validated_operation.amount`
+            // (mutez-domain-checked); the wire `Narith` is unused here.
+            balance: _,
             delegate: _,
             ref script,
         }) => {
@@ -3324,21 +3319,15 @@ where
             let typechecked_storage =
                 typecheck_code_and_storage(&mut tc_ctx, &parser, script);
             let origination_result = match typechecked_storage {
-                Ok(storage) => Mutez::try_from(balance)
-                    .map_err(|e| {
-                        OriginationError::FailedToComputeBalanceUpdate(e.to_string())
-                    })
-                    .and_then(|balance_mutez| {
-                        originate_contract(
-                            &mut tc_ctx,
-                            address,
-                            source_account,
-                            balance_mutez,
-                            Some(&script.code),
-                            RcTypedValue::new(storage),
-                            &Origin::Native,
-                        )
-                    }),
+                Ok(storage) => originate_contract(
+                    &mut tc_ctx,
+                    address,
+                    source_account,
+                    validated_operation.amount,
+                    Some(&script.code),
+                    RcTypedValue::new(storage),
+                    &Origin::Native,
+                ),
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
@@ -4542,6 +4531,142 @@ mod tests {
                 expected: 1_u64.into(),
                 found: 15_u64.into(),
             }));
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    // A crafted transfer amount above the mutez domain (i64::MAX) is
+    // rejected at validation, before it can reach the apply path and
+    // fail there as a BalanceTooLow.
+    #[test]
+    fn apply_operation_amount_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let dest = bootstrap2();
+
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1000,
+            5,
+            source,
+            above_domain.into(),
+            Contract::Implicit(dest.pkh),
+            Parameters::default(),
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    // A crafted fee above the mutez domain is rejected the same way.
+    #[test]
+    fn apply_operation_fee_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_reveal_operation(above_domain, 1, 1000, 5, source);
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    #[test]
+    fn apply_operation_origination_balance_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_origination_operation(
+            15,
+            1,
+            5000,
+            500,
+            source,
+            above_domain,
+            Script {
+                code: vec![],
+                storage: vec![],
+            },
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
 
         assert_eq!(
             src_account.counter(rk.tez_accounts()).unwrap(),

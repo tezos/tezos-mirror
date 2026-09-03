@@ -186,6 +186,23 @@ fn validate_individual_operation(
         HARD_STORAGE_LIMIT_PER_OPERATION
     );
 
+    // A crafted `fee`, `amount` (Transaction) or `balance` (Origination)
+    // outside the mutez domain is invalid here, rather than surfacing
+    // later as a downstream conversion failure deep in the apply path
+    // (`CantPayFees`, `BalanceTooLow`).
+    Mutez::try_from(&content.fee)
+        .map_err(|_| ValidityError::AmountOutOfDomain(content.fee.clone()))?;
+    let amount = match &content.operation {
+        OperationContent::Transfer(transfer) => Mutez::try_from(&transfer.amount)
+            .map_err(|_| ValidityError::AmountOutOfDomain(transfer.amount.clone()))?,
+        OperationContent::Origination(origination) => {
+            Mutez::try_from(&origination.balance).map_err(|_| {
+                ValidityError::AmountOutOfDomain(origination.balance.clone())
+            })?
+        }
+        OperationContent::Reveal(_) => Mutez::ZERO,
+    };
+
     // The manager account must be solvent to pay the announced fees.
     *account_balance = account_balance
         .0
@@ -206,6 +223,7 @@ fn validate_individual_operation(
         balance_updates,
         gas,
         content,
+        amount,
     })
 }
 
@@ -217,6 +235,10 @@ pub struct ValidatedOperation {
     /// during validation.
     pub gas: TezlinkOperationGas,
     pub content: ManagerOperation<OperationContent>,
+    /// The operation's amount (Transaction) or initial balance
+    /// (Origination), already validated to lie in the mutez domain.
+    /// `Mutez::ZERO` for Reveal, which carries neither.
+    pub amount: Mutez,
 }
 
 pub struct ValidatedBatch {
