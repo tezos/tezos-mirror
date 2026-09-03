@@ -34,7 +34,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{
     ErrorKind as KeySpaceErrorKind, KeyError, KeySpaceError, KeySpaceLoaderError,
 };
-use tezosx_types::StorageReadErrorKind;
+use tezosx_types::{Mutez, StorageReadErrorKind};
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1339,18 +1339,22 @@ pub enum InternalOperationSum {
 }
 
 impl BalanceUpdate {
-    pub fn transfer(sender: Contract, destination: Contract, amount: u64) -> Vec<Self> {
+    /// Builds the `Debited(sender) / Credited(destination)` pair for a
+    /// transfer of `amount`. `changes` is `i64`-encoded on the wire; the
+    /// mutez domain embeds exactly, so both signs are infallible.
+    pub fn transfer(sender: Contract, destination: Contract, amount: Mutez) -> Vec<Self> {
         let sender = Balance::Account(sender);
         let destination = Balance::Account(destination);
+        let amount: i64 = amount.into();
 
         let sender_update = Self {
             balance: sender,
-            changes: -(amount as i64),
+            changes: -amount,
             update_origin: UpdateOrigin::BlockApplication,
         };
         let destination_update = Self {
             balance: destination,
-            changes: amount as i64,
+            changes: amount,
             update_origin: UpdateOrigin::BlockApplication,
         };
         vec![sender_update, destination_update]

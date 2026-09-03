@@ -14,7 +14,9 @@ use mir::{
     gas::OutOfGas,
 };
 use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::ToPrimitive;
+#[cfg(test)]
+use num_traits::Zero;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -40,6 +42,7 @@ use tezosx_interfaces::{
     X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Mutez;
 
 use crate::account_storage::TezosAccount;
 use crate::mir_ctx::{
@@ -1644,12 +1647,12 @@ where
         let (rk, _, _) = ctx.cross_runtime_split();
         account.balance(rk.tez_accounts())?
     };
-    if !current.0.is_zero() {
+    if current != Mutez::ZERO {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
         let (rk, _, _) = ctx.cross_runtime_split();
-        account.set_balance(rk.tez_accounts_mut(), &0u64.into())?;
+        account.set_balance(rk.tez_accounts_mut(), &Mutez::ZERO)?;
     }
     Ok(response_body)
 }

@@ -230,7 +230,7 @@ impl ExecCtx {
             },
         )?;
         let self_address = address_from_contract(dest_account.contract());
-        let balance = dest_account.balance(tez_accounts)?;
+        let balance = dest_account.balance(tez_accounts)?.to_narith();
         let balance = balance.0.try_into().map_err(
             |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                 TransferError::MirAmountToNarithError(err.to_string())
@@ -528,7 +528,8 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     .map_err(metered_read_to_lookup_view)?;
                 let balance = account
                     .balance(self.tc_ctx.rk.tez_accounts())
-                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                    .map_err(|e| LookupViewError::HostError(e.to_string()))?
+                    .to_narith();
                 let balance: i64 = balance
                     .0
                     .try_into()

@@ -793,6 +793,7 @@ mod tests {
     use tezos_tezlink::operation::RevealContent;
     use tezos_tezlink::operation::Script;
     use tezos_tezlink::operation::TransferContent;
+    use tezosx_types::Mutez;
 
     #[derive(Clone)]
     struct Bootstrap {
@@ -1393,7 +1394,7 @@ mod tests {
             // Initialize the Tezos account in the TezosX storage path
             // (read by the Michelson runtime in apply.rs for TezosDelayed operations)
             let account_info = TezosAccountInfo {
-                balance: U256::from(10),
+                balance: Mutez::try_from(10u64).unwrap(),
                 nonce: 0,
                 pub_key: None,
             };
@@ -1459,7 +1460,7 @@ mod tests {
                 .expect("Contract initialization should have succeed");
 
             let account_info = TezosAccountInfo {
-                balance: U256::from(100),
+                balance: Mutez::try_from(100u64).unwrap(),
                 nonce: 0,
                 pub_key: None,
             };
@@ -1654,7 +1655,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &pkh,
                 TezosAccountInfo {
-                    balance: U256::from(10000),
+                    balance: Mutez::try_from(10000u64).unwrap(),
                     nonce: 0,
                     pub_key: None,
                 },
@@ -1745,7 +1746,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &src_pkh,
                 TezosAccountInfo {
-                    balance: U256::from(initial_balance),
+                    balance: Mutez::try_from(initial_balance).unwrap(),
                     nonce: 0,
                     pub_key: None,
                 },
@@ -1757,7 +1758,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &dst_pkh,
                 TezosAccountInfo {
-                    balance: U256::zero(),
+                    balance: Mutez::ZERO,
                     nonce: 0,
                     pub_key: None,
                 },
@@ -1826,7 +1827,7 @@ mod tests {
             initial_balance - reveal_fee - transfer_fee - transfer_amount;
         assert_eq!(
             src_info.balance,
-            U256::from(expected_src_balance),
+            Mutez::try_from(expected_src_balance).unwrap(),
             "bootstrap1 balance must reflect fees and the transferred amount"
         );
 
@@ -1836,7 +1837,7 @@ mod tests {
             .expect("bootstrap2 should be allocated");
         assert_eq!(
             dst_info.balance,
-            U256::from(transfer_amount),
+            Mutez::try_from(transfer_amount).unwrap(),
             "bootstrap2 balance must equal the transferred amount"
         );
     }
@@ -1872,7 +1873,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &src_pkh,
                 TezosAccountInfo {
-                    balance: U256::from(initial_balance),
+                    balance: Mutez::try_from(initial_balance).unwrap(),
                     nonce: 0,
                     pub_key: None,
                 },
@@ -1882,7 +1883,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &dst_pkh,
                 TezosAccountInfo {
-                    balance: U256::zero(),
+                    balance: Mutez::ZERO,
                     nonce: 0,
                     pub_key: None,
                 },
@@ -1938,7 +1939,7 @@ mod tests {
             .expect("bootstrap2 should be allocated");
         assert_eq!(
             dst_info.balance,
-            U256::from(transfer_amount),
+            Mutez::try_from(transfer_amount).unwrap(),
             "delayed foreign-branch transfer must be applied at inclusion"
         );
     }
@@ -1978,7 +1979,7 @@ mod tests {
                 rk.tez_accounts_mut(),
                 &src_pkh,
                 TezosAccountInfo {
-                    balance: U256::from(500_000u64),
+                    balance: Mutez::try_from(500_000u64).unwrap(),
                     nonce: 0,
                     pub_key: Some(bootstrap1.pk.clone()),
                 },
@@ -2140,7 +2141,7 @@ mod tests {
             rk.tez_accounts_mut(),
             &bootstrap.pkh,
             TezosAccountInfo {
-                balance: U256::from(500_000u64),
+                balance: Mutez::try_from(500_000u64).unwrap(),
                 nonce: 0,
                 pub_key: Some(bootstrap.pk.clone()),
             },
@@ -2304,7 +2305,7 @@ mod tests {
             get_tezos_account_info(rk.tez_accounts(), &bootstrap.pkh)
                 .unwrap()
                 .map(|info| info.balance),
-            Some(U256::from(500_000 - 1 - storage_cost))
+            Some(Mutez::try_from(500_000 - 1 - storage_cost).unwrap())
         );
 
         // No snapshot of the accounts is left behind.
@@ -2357,7 +2358,7 @@ mod tests {
                     rk.tez_accounts_mut(),
                     &bootstrap.pkh,
                     TezosAccountInfo {
-                        balance: U256::from(500_000u64),
+                        balance: Mutez::try_from(500_000u64).unwrap(),
                         nonce: 0,
                         pub_key: Some(bootstrap.pk.clone()),
                     },
@@ -3046,7 +3047,7 @@ mod tests {
             rk.tez_accounts_mut(),
             &bootstrap.pkh,
             TezosAccountInfo {
-                balance: U256::from(1_000_000),
+                balance: Mutez::try_from(1_000_000u64).unwrap(),
                 nonce: 0,
                 pub_key: None,
             },

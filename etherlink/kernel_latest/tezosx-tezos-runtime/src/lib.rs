@@ -5,6 +5,7 @@
 use http::StatusCode;
 use mir::ast::{AddressHash, ByteReprTrait};
 use mir::gas::{interpret_cost, Gas, OutOfGas};
+#[cfg(feature = "testing")]
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
@@ -64,9 +65,10 @@ use tezos_smart_rollup_host::path::OwnedPath;
 pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
-    get_tezos_account_info_or_init_at, key_to_tezos_account, narith_to_u256,
-    set_tezos_account_info_at, TezosOriginatedAccount,
+    get_tezos_account_info_or_init_at, key_to_tezos_account, set_tezos_account_info_at,
+    TezosOriginatedAccount,
 };
+use tezosx_types::Mutez;
 
 pub struct TezosRuntime(pub ChainId);
 
@@ -1515,14 +1517,14 @@ impl TezosRuntime {
     pub fn add_balance(
         tez_accounts: &mut impl KeySpace,
         pub_key_hash: &PublicKeyHash,
-        amount: U256,
+        amount: Mutez,
     ) -> Result<(), TezosXRuntimeError> {
         let key = key_to_tezos_account(pub_key_hash)?;
         let mut info = get_tezos_account_info_or_init_at(tez_accounts, &key)?;
         info.balance = info
             .balance
             .checked_add(amount)
-            .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
         Ok(set_tezos_account_info_at(tez_accounts, &key, info)?)
     }
 
@@ -1530,10 +1532,9 @@ impl TezosRuntime {
     pub fn get_originated_account_balance(
         tez_accounts: &impl KeySpace,
         kt1: &ContractKt1Hash,
-    ) -> Result<U256, TezosXRuntimeError> {
+    ) -> Result<Mutez, TezosXRuntimeError> {
         let originated_account = TezosOriginatedAccount::from_kt1(kt1)?;
-        let balance = originated_account.balance(tez_accounts)?;
-        narith_to_u256(&balance)
+        Ok(originated_account.balance(tez_accounts)?)
     }
 }
 
@@ -1560,6 +1561,32 @@ mod tests {
         fn is_failed(&self) -> bool {
             matches!(self, ContentResult::Failed(_))
         }
+    }
+
+    /// A credit that would push a Tezos-runtime account's balance past the
+    /// mutez domain (`Mutez::MAX`) is an error, not an unbounded add.
+    #[test]
+    fn tezos_runtime_add_balance_past_domain_errors() {
+        use tezos_evm_runtime::runtime::MockKernelHost;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pkh = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash base58 conversion should succeed");
+
+        TezosRuntime::add_balance(rk.tez_accounts_mut(), &pkh, Mutez::MAX)
+            .expect("crediting up to Mutez::MAX should succeed");
+
+        let result = TezosRuntime::add_balance(
+            rk.tez_accounts_mut(),
+            &pkh,
+            Mutez::try_from(1u64).unwrap(),
+        );
+
+        assert!(
+            result.is_err(),
+            "crediting past Mutez::MAX must error instead of wrapping"
+        );
     }
 
     #[test]
@@ -2082,7 +2109,7 @@ mod tests {
         let balance =
             TezosRuntime::get_originated_account_balance(rk.tez_accounts(), &kt1)
                 .expect("should read balance");
-        assert_eq!(balance, U256::zero());
+        assert_eq!(balance, Mutez::ZERO);
     }
 
     #[test]

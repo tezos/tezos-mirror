@@ -26,6 +26,7 @@ use crate::{
     storage_fees::HARD_STORAGE_LIMIT_PER_OPERATION,
     BalanceUpdate,
 };
+use tezosx_types::Mutez;
 
 /// Inspired from `contract_storage.ml` in the Tezos protocol
 /// This function verifies that the counter given in argument is the
@@ -291,7 +292,7 @@ pub fn execute_validation(
         .map(<ManagerOperation<OperationContent>>::try_from_manager_operation_content)
         .collect::<Result<_, _>>()?;
 
-    let mut source_balance = source_account.balance(tez_accounts)?;
+    let mut source_balance = source_account.balance(tez_accounts)?.to_narith();
     let mut source_counter = source_account.counter(tez_accounts)?;
 
     let mut validated_operations = Vec::new();
@@ -338,7 +339,9 @@ pub fn execute_validation(
         }
     }
 
-    source_account.set_balance(tez_accounts, &source_balance)?;
+    let source_balance_mutez = Mutez::try_from(&source_balance)
+        .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
+    source_account.set_balance(tez_accounts, &source_balance_mutez)?;
 
     source_account.increment_counter(tez_accounts, validated_operations.len())?;
 

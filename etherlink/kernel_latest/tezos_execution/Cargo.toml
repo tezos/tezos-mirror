@@ -38,6 +38,7 @@ sha3.workspace = true
 
 tezosx-constants.workspace = true
 tezosx-interfaces.workspace = true
+tezosx-types.workspace = true
 http.workspace = true
 tezosx-journal.workspace = true
 

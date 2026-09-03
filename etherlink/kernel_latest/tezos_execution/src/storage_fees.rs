@@ -562,6 +562,7 @@ mod tests {
         EventSuccess, InternalContentWithMetadata, Originated, RevealSuccess,
         TransferSuccess, UpdateOrigin,
     };
+    use tezosx_types::Mutez;
 
     use crate::account_storage::TezosImplicitAccount;
     use crate::context;
@@ -596,7 +597,9 @@ mod tests {
         let pkh = PublicKeyHash::from_b58check(SOURCE_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&pkh).unwrap();
         account.allocate(tez_accounts).unwrap();
-        account.set_balance(tez_accounts, &balance.into()).unwrap();
+        account
+            .set_balance(tez_accounts, &Mutez::try_from(balance).unwrap())
+            .unwrap();
         account
     }
 
@@ -678,7 +681,10 @@ mod tests {
 
         assert!(updates.is_empty(), "zero-byte burn must emit no updates");
         assert_eq!(
-            payer.balance(rk.tez_accounts()).expect("read balance"),
+            payer
+                .balance(rk.tez_accounts())
+                .expect("read balance")
+                .to_narith(),
             initial_balance.into(),
             "payer balance must be unchanged",
         );
@@ -710,7 +716,10 @@ mod tests {
         assert_eq!(updates[1].balance, Balance::StorageFees);
         assert_eq!(updates[1].changes, expected_to_burn as i64);
         assert_eq!(
-            payer.balance(rk.tez_accounts()).expect("read balance"),
+            payer
+                .balance(rk.tez_accounts())
+                .expect("read balance")
+                .to_narith(),
             (initial_balance - expected_to_burn).into(),
             "payer balance must drop by the burn amount",
         );
@@ -763,7 +772,10 @@ mod tests {
                 consumed_milligas: 0_u64.into(),
             });
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
     }
 
     /// A Transfer with `paid_storage_size_diff > 0` debits the payer
@@ -784,7 +796,7 @@ mod tests {
 
         let burn = 10 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (100_000 - burn).into(),
             "payer must drop by the burn amount"
         );
@@ -818,7 +830,10 @@ mod tests {
         let payer = init_payer(rk.tez_accounts_mut(), 1_000);
         let mut content = applied_transfer(TransferSuccess::default());
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
@@ -835,7 +850,10 @@ mod tests {
         let mut content: ContentResult<TransferContent> =
             ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
     }
 
     /// Insolvent payer for the top-level burn: returns a single
@@ -890,7 +908,7 @@ mod tests {
 
         let burn = 4 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (100_000 - burn).into()
         );
 
@@ -934,7 +952,7 @@ mod tests {
         let variable = 38 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
         let ContentResult::Applied(success) = &content else {
@@ -981,7 +999,7 @@ mod tests {
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(success) = &content else {
@@ -1071,7 +1089,7 @@ mod tests {
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
 
@@ -1128,7 +1146,7 @@ mod tests {
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
@@ -1171,7 +1189,7 @@ mod tests {
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
@@ -1274,7 +1292,7 @@ mod tests {
         burn_internal_op(rk.tez_accounts_mut(), &payer, u64::MAX, &mut op).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let InternalOperationSum::Transfer(inner) = &op else {
@@ -1321,7 +1339,7 @@ mod tests {
 
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into(),
             "payer balance must be untouched on quota failure",
         );
@@ -1485,7 +1503,7 @@ mod tests {
         .unwrap();
         assert_eq!(storage_limit_remaining, BigUint::from(100u64));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into()
         );
     }
@@ -1507,7 +1525,7 @@ mod tests {
         .expect("absorption must succeed when limit and balance suffice");
         assert_eq!(storage_limit_remaining, BigUint::from(90u64));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000_u64 - mutez_cost).into()
         );
     }
@@ -1529,7 +1547,7 @@ mod tests {
         .expect_err("overshoot must surface OperationQuotaExceeded");
         assert!(matches!(err, ApplyOperationError::OperationQuotaExceeded));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into(),
             "payer balance must be untouched when the limit check rejects the burn"
         );
@@ -1669,7 +1687,10 @@ mod tests {
             assert_eq!(op, internal_transfer(&payer.contract(), 0, status()));
         }
 
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            Mutez::try_from(1_000_u64).unwrap()
+        );
         assert_eq!(storage_limit_remaining, BigUint::from(100_u64));
     }
 
@@ -1724,7 +1745,7 @@ mod tests {
         assert!(storage_limit_remaining.is_zero());
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (10_000 - 4 * COST_PER_BYTES - SLOT_BURN).into()
+            Mutez::try_from(10_000 - 4 * COST_PER_BYTES - SLOT_BURN).unwrap()
         );
 
         let mut storage_limit_remaining = BigUint::ZERO;
@@ -1823,7 +1844,7 @@ mod tests {
 
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (10_000 - (4 + 10) * COST_PER_BYTES - 2 * SLOT_BURN).into()
+            Mutez::try_from(10_000 - (4 + 10) * COST_PER_BYTES - 2 * SLOT_BURN).unwrap()
         );
     }
 }
