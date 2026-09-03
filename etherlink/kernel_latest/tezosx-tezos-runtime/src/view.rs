@@ -28,7 +28,6 @@ use mir::typechecker::type_props::TypeProperty;
 use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
-use tezos_data_encoding::types::Narith;
 use tezos_execution::account_storage::{TezosAccount, TezosOriginatedAccount};
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
@@ -39,6 +38,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{Milligas, TezosXRuntimeError};
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Mutez;
 
 use crate::{headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH};
 
@@ -154,7 +154,7 @@ where
     let hdrs = headers::parse_request_headers(request.headers())?;
 
     // Views do not accept value transfer.
-    if hdrs.amount != Narith(0u64.into()) {
+    if hdrs.amount != Mutez::ZERO {
         return Err(TezosXRuntimeError::BadRequest(
             "views cannot receive value (X-Tezos-Amount must be 0)".into(),
         )

@@ -1313,9 +1313,7 @@ where
         Some(Contract::Implicit(pkh)) => AddressHash::Implicit(pkh),
         None => AddressHash::from(ctx.source()),
     };
-    let amount_mutez: u64 = ctx
-        .amount()
-        .try_into()
+    let amount_mutez = Mutez::try_from(ctx.amount())
         .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
     let block_number = ctx.level();
     let timestamp = ctx.now();
@@ -1476,7 +1474,7 @@ where
         &sender_alias,
         &source_alias,
         source_runtime,
-        amount_mutez,
+        amount_mutez.as_u64(),
         gas_limit,
         timestamp_u64,
         block_number_u32,

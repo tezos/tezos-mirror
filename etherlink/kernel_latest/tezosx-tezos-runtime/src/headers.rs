@@ -13,7 +13,6 @@ pub use tezosx_interfaces::{
     X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
-use tezos_data_encoding::types::Narith;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
@@ -22,13 +21,14 @@ use tezosx_interfaces::headers::{
     require_i64, require_str, require_u32,
 };
 use tezosx_interfaces::{Gas, TezosXRuntimeError};
+use tezosx_types::Mutez;
 
 /// Values contained in the `X-Tezos-*` request headers, in their Tezos runtime
 /// types. Used in parsing and inserting.
 #[derive(Debug)]
 pub struct MichelsonHeaders {
     /// Transfer amount in mutez.
-    pub amount: Narith,
+    pub amount: Mutez,
     /// Gas limit, carrying the unit it was sent in.
     pub gas_limit: Gas,
     /// Block timestamp.
@@ -82,9 +82,11 @@ pub fn parse_request_headers(
     check_crac_depth(crac_depth)?;
 
     Ok(MichelsonHeaders {
-        amount: Narith(
-            parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?.into(),
-        ),
+        amount: Mutez::try_from(parse_tez_to_mutez(&require_str(
+            headers,
+            X_TEZOS_AMOUNT,
+        )?)?)
+        .map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))?,
         gas_limit: require_gas(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
@@ -136,7 +138,7 @@ mod tests {
     fn all_required_present_no_source() {
         let headers = headers_from(&required_headers());
         let parsed = parse_request_headers(&headers).unwrap();
-        assert_eq!(parsed.amount, Narith(0u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(0u64).unwrap());
         assert_eq!(parsed.gas_limit, Gas::new(1_000_000, RuntimeId::Tezos));
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
@@ -186,7 +188,7 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "1");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, Narith(1_000_000u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(1_000_000u64).unwrap());
         assert!(parsed.crac_origin_contract.is_none());
         assert!(parsed.crac_id.is_none());
     }
@@ -198,7 +200,7 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "1.5");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, Narith(1_500_000u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(1_500_000u64).unwrap());
         assert!(parsed.crac_origin_contract.is_none());
         assert!(parsed.crac_id.is_none());
     }
@@ -210,7 +212,7 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.0000001");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, Narith(0u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(0u64).unwrap());
     }
 
     #[test]
@@ -304,7 +306,7 @@ mod tests {
     fn amount_zero_parsed_correctly() {
         let hdrs = required_headers(); // default amount is "0"
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, Narith(0u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(0u64).unwrap());
     }
 
     #[test]
@@ -314,7 +316,27 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.000001");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, Narith(1u64.into()));
+        assert_eq!(parsed.amount, Mutez::try_from(1u64).unwrap());
+    }
+
+    /// An amount in `(i64::MAX, u64::MAX]` mutez parses as a valid `u64`
+    /// (`parse_tez_to_mutez`'s own cap) but is outside the mutez domain: a
+    /// caller-supplied value the header parse rejects directly as a
+    /// `BadRequest` (400, catchable — not a `HeaderError`/500 gateway-bug
+    /// signal).
+    #[test]
+    fn amount_above_mutez_domain_returns_bad_request() {
+        let mut hdrs = required_headers();
+        let above_domain_mutez = i64::MAX as u64 + 1;
+        let tez = format!(
+            "{}.{:06}",
+            above_domain_mutez / 1_000_000,
+            above_domain_mutez % 1_000_000
+        );
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, tez.as_str());
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::BadRequest(_)));
     }
 
     #[test]

@@ -1048,20 +1048,30 @@ where
                         // `transfer_step`, not `transfer`: the callee's own
                         // internal operations come back to the driver as a
                         // new frame instead of recursing through here.
-                        let step = transfer_step(
-                            tc_ctx,
-                            operation_ctx,
-                            registry,
-                            journal,
-                            &frame.sender,
-                            &content.amount,
-                            &content.destination,
-                            &content.parameters.entrypoint,
-                            value,
-                            parser,
-                            false,
-                            allow_forged_lazy_storage_id,
-                        );
+                        let step = Mutez::try_from(&content.amount)
+                            .map_err(|e| {
+                                CracError::Operation(
+                                    TransferError::FailedToComputeBalanceUpdate(
+                                        e.to_string(),
+                                    ),
+                                )
+                            })
+                            .and_then(|amount_mutez| {
+                                transfer_step(
+                                    tc_ctx,
+                                    operation_ctx,
+                                    registry,
+                                    journal,
+                                    &frame.sender,
+                                    amount_mutez,
+                                    &content.destination,
+                                    &content.parameters.entrypoint,
+                                    value,
+                                    parser,
+                                    false,
+                                    allow_forged_lazy_storage_id,
+                                )
+                            });
                         match step {
                             Ok(TransferStep {
                                 success,
@@ -1157,19 +1167,28 @@ where
                         ApplyOperationError::InternalOperationReplay.into(),
                     ),
                     Disposition::Apply => {
-                        let receipt = originate_contract(
-                            tc_ctx,
-                            address,
-                            &frame.sender,
-                            &amount,
-                            Some(&script.code),
-                            // Shared, not unwrapped: the other occurrences of
-                            // a `DUP`ed operation hold the same payload, so
-                            // `unwrap_or_clone` here would deep-copy it, unmetered
-                            // and before anything charges for it (L2-1836).
-                            storage,
-                            &Origin::Native,
-                        );
+                        let receipt = Mutez::try_from(&amount)
+                            .map_err(|e| {
+                                OriginationError::FailedToComputeBalanceUpdate(
+                                    e.to_string(),
+                                )
+                            })
+                            .and_then(|amount_mutez| {
+                                originate_contract(
+                                    tc_ctx,
+                                    address,
+                                    &frame.sender,
+                                    amount_mutez,
+                                    Some(&script.code),
+                                    // Shared, not unwrapped: the other occurrences
+                                    // of a `DUP`ed operation hold the same
+                                    // payload, so `unwrap_or_clone` here would
+                                    // deep-copy it, unmetered and before anything
+                                    // charges for it (L2-1836).
+                                    storage,
+                                    &Origin::Native,
+                                )
+                            });
                         match receipt {
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
@@ -1334,7 +1353,7 @@ fn transfer<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
@@ -1444,7 +1463,7 @@ fn transfer_step<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
@@ -1481,7 +1500,7 @@ where
                 .into());
             }
             // Transfers of 0 tez to an implicit contract are rejected.
-            if amount.eq(&0_u64.into()) {
+            if amount == Mutez::ZERO {
                 return Err(
                     TransferError::EmptyImplicitTransfer(dest_contract.clone()).into()
                 );
@@ -1490,20 +1509,17 @@ where
             let dest_account = context::implicit_from_public_key_hash(pkh)?;
             let already_allocated =
                 dest_account.allocate(tc_ctx.rk.tez_accounts_mut())?;
-            let amount_mutez = Mutez::try_from(amount).map_err(|e| {
-                TransferError::FailedToComputeBalanceUpdate(e.to_string())
-            })?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.tez_accounts_mut(),
-                    amount_mutez,
+                    amount,
                     &dest_account,
                 )?
             } else {
                 transfer_tez(
                     tc_ctx.rk.tez_accounts_mut(),
                     sender_account,
-                    amount_mutez,
+                    amount,
                     &dest_account,
                 )?
             };
@@ -1532,20 +1548,17 @@ where
                 ))
                 .into());
             }
-            let amount_mutez = Mutez::try_from(amount).map_err(|e| {
-                TransferError::FailedToComputeBalanceUpdate(e.to_string())
-            })?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.tez_accounts_mut(),
-                    amount_mutez,
+                    amount,
                     &dest_account,
                 )?
             } else {
                 transfer_tez(
                     tc_ctx.rk.tez_accounts_mut(),
                     sender_account,
-                    amount_mutez,
+                    amount,
                     &dest_account,
                 )?
             };
@@ -1567,7 +1580,7 @@ where
                 tc_ctx.rk.tez_accounts_mut(),
                 sender_account,
                 &dest_account,
-                amount,
+                &amount.to_narith(),
             )?;
 
             let delegated_storage_cost_before = operation_ctx.delegated_storage_cost;
@@ -2238,7 +2251,7 @@ fn transfer_external<'a, Host>(
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
-    amount: &Narith,
+    amount: Mutez,
     dest: &Contract,
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
@@ -2249,7 +2262,7 @@ where
     Host: KeySpaceLoader + StorageV1,
 {
     log!(Debug,
-        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
+        "Applying an external transfer operation from {} to {dest:?} of {amount} mutez with parameters {parameters:?}",
         operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
@@ -2349,7 +2362,7 @@ pub fn cross_runtime_transfer<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest: &Contract,
     parameters: &Parameters,
     parser: &'a Parser<'a>,
@@ -2626,7 +2639,7 @@ pub fn originate_contract<'a, Host>(
     ctx: &mut TcCtx<'a, '_, Host>,
     contract: ContractKt1Hash,
     sender_account: &impl TezosAccount,
-    initial_balance: &Narith,
+    initial_balance: Mutez,
     script_code: Option<&[u8]>,
     script_storage: RcTypedValue<'a>,
     origin: &Origin,
@@ -2710,10 +2723,8 @@ where
     }
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
-    let initial_balance_mutez = Mutez::try_from(initial_balance)
-        .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
     let balance_updates =
-        compute_balance_updates(sender_account, &smart_contract, initial_balance_mutez);
+        compute_balance_updates(sender_account, &smart_contract, initial_balance);
 
     // `apply_balance_changes` writes and reads the giver and receiver balances,
     // two reads and writes each for an amount, so 4 reads and 4 writes in total.
@@ -2727,7 +2738,7 @@ where
         ctx.rk.tez_accounts_mut(),
         sender_account,
         &smart_contract,
-        initial_balance_mutez,
+        initial_balance,
     )
     .map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
@@ -3275,22 +3286,31 @@ where
                 delegated_storage_cost: 0,
             };
             let (transfer_result, top_level_delegated_delta, internals) =
-                match transfer_external(
-                    &mut tc_ctx,
-                    &mut operation_ctx,
-                    registry,
-                    journal,
-                    amount,
-                    destination,
-                    parameters,
-                    &mut internal_operations_receipts,
-                    &parser,
-                    nonce_counter,
-                ) {
-                    Ok((target, delta, internals)) => (Ok(target), delta, internals),
-                    // The verdict is unused on this path: a failed transfer
-                    // backtracks every internal receipt regardless.
-                    Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
+                match Mutez::try_from(amount) {
+                    Ok(amount_mutez) => match transfer_external(
+                        &mut tc_ctx,
+                        &mut operation_ctx,
+                        registry,
+                        journal,
+                        amount_mutez,
+                        destination,
+                        parameters,
+                        &mut internal_operations_receipts,
+                        &parser,
+                        nonce_counter,
+                    ) {
+                        Ok((target, delta, internals)) => (Ok(target), delta, internals),
+                        // The verdict is unused on this path: a failed transfer
+                        // backtracks every internal receipt regardless.
+                        Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
+                    },
+                    Err(e) => (
+                        Err(CracError::Operation(
+                            TransferError::FailedToComputeBalanceUpdate(e.to_string()),
+                        )),
+                        0,
+                        SubtreeStatus::AllApplied,
+                    ),
                 };
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
@@ -3333,15 +3353,21 @@ where
             let typechecked_storage =
                 typecheck_code_and_storage(&mut tc_ctx, &parser, script);
             let origination_result = match typechecked_storage {
-                Ok(storage) => originate_contract(
-                    &mut tc_ctx,
-                    address,
-                    source_account,
-                    balance,
-                    Some(&script.code),
-                    RcTypedValue::new(storage),
-                    &Origin::Native,
-                ),
+                Ok(storage) => Mutez::try_from(balance)
+                    .map_err(|e| {
+                        OriginationError::FailedToComputeBalanceUpdate(e.to_string())
+                    })
+                    .and_then(|balance_mutez| {
+                        originate_contract(
+                            &mut tc_ctx,
+                            address,
+                            source_account,
+                            balance_mutez,
+                            Some(&script.code),
+                            RcTypedValue::new(storage),
+                            &Origin::Native,
+                        )
+                    }),
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
@@ -12250,7 +12276,7 @@ mod tests {
             registry,
             &mut journal,
             &sender_account,
-            &Narith::from(1u64),
+            Mutez::try_from(1u64).unwrap(),
             dest,
             parameters,
             &parser,
@@ -13076,7 +13102,7 @@ mod tests {
             &NotWiredRegistry,
             &mut journal,
             &sender_account,
-            &Narith::from(0u64),
+            Mutez::ZERO,
             &dest,
             &parameters,
             &parser,
@@ -13743,7 +13769,7 @@ mod tests {
             &NotWiredRegistry,
             &mut journal,
             &sender_account,
-            &Narith(1u64.into()),
+            Mutez::try_from(1u64).unwrap(),
             &dest,
             &parameters,
             &parser,
@@ -13894,7 +13920,7 @@ mod tests {
             &NotWiredRegistry,
             &mut journal,
             &sender_account,
-            &Narith::from(0u64),
+            Mutez::ZERO,
             &dest,
             &parameters,
             &parser,
