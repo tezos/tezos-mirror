@@ -726,9 +726,13 @@ let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
     get_
       (fun c ->
         let* counter_opt = state.michelson_config.get_counter c in
-        (* FIXME: #7960
-           This default should be the global counter *)
-        return (Option.value ~default:Z.one counter_opt))
+        (* No counter key means the account was never allocated, and the
+           kernel reads its counter as 0, hence expects counter 1. Match
+           that, like the queue validator's [validate_first_counter].
+
+           TODO: https://gitlab.com/tezos/tezos/-/issues/7960
+           Read the global counter once it is available. *)
+        return (Option.value ~default:Z.zero counter_opt))
       state.addr_nonce
       operation.source
   in
