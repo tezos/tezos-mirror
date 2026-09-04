@@ -16,10 +16,11 @@ use tezosx_interfaces::{
     canonicalize_native_address,
     headers::{format_tez_from_wei, parse_u64_opt},
     translate_original_source, AliasInfo, Classification, EvmGas, Gas as TezosXGas,
-    Origin, Registry, RuntimeId, ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER,
-    ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH,
-    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
+    Origin, Registry, RuntimeId, TezosXRuntimeError, ALIAS_LOOKUP_COST,
+    ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_DEPTH, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
+    X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
 use tezosx_types::{mutez_to_evm_gas, Mutez};
 
@@ -388,8 +389,9 @@ fn dispatch_origin_of<
             let budget = TezosXGas::new(gas.remaining(), RuntimeId::Ethereum);
             registry
                 .read_origin(rk, source_runtime, &addr_str, budget)
-                .map_err(|e| {
-                    CustomPrecompileError::Revert(format!("originOf: {e}"), *gas)
+                .map_err(|e| match e {
+                    TezosXRuntimeError::OutOfGas => CustomPrecompileError::OutOfGas,
+                    _ => CustomPrecompileError::Revert(format!("originOf: {e}"), *gas),
                 })?
         }
     };

@@ -27,6 +27,7 @@ use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
 };
+use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_interfaces::{
     canonicalize_native_address,
     headers::{format_tez_from_mutez, parse_u64_opt},
@@ -1141,7 +1142,10 @@ where
                     context.clone(),
                     target_budget,
                 )
-                .map_err(|e| TransferError::GatewayError(e.to_string()))?
+                .map_err(|e| match e {
+                    TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(OutOfGas),
+                    _ => TransferError::GatewayError(e.to_string()),
+                })?
         };
         if let Some(v) = sender_resolution.delegated_storage_cost {
             ctx.add_delegated_storage_cost(v);
@@ -1462,7 +1466,22 @@ where
 
     let (classification, consumed) = registry
         .read_origin(rk, source_runtime, addr_str, budget)
-        .map_err(|_| mir::interpreter::EnshrinedViewDispatchError::AliasResolution)?;
+        .map_err(|err| match err {
+            TezosXRuntimeError::OutOfGas => mir::interpreter::InterpretError::OutOfGas,
+            TezosXRuntimeError::RuntimeNotFound(_)
+            | TezosXRuntimeError::ConversionError(_)
+            | TezosXRuntimeError::Runtime(_)
+            | TezosXRuntimeError::Storage(_)
+            | TezosXRuntimeError::Path(_)
+            | TezosXRuntimeError::Custom(_)
+            | TezosXRuntimeError::BadRequest(_)
+            | TezosXRuntimeError::NotFound(_)
+            | TezosXRuntimeError::MethodNotAllowed(_)
+            | TezosXRuntimeError::HeaderError(_)
+            | TezosXRuntimeError::Key(_) => {
+                mir::interpreter::EnshrinedViewDispatchError::AliasResolution.into()
+            }
+        })?;
 
     // Charge what read_origin consumed (alias lookup + back-stop when it fired).
     let consumed_milligas = Milligas::from(consumed);
