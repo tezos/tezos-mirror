@@ -116,7 +116,7 @@ let job_docker_build =
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
-        Tezos_ci_jobs.Docker.docker_release_script;
+        Tezos_ci.docker_release_script;
       ]
 
 let job_build_evm_node_static =

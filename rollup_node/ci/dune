@@ -6,8 +6,7 @@
  (libraries
   gitlab_ci
   tezos_ci
-  cacio
-  tezos_ci_jobs)
+  cacio)
  (flags
   (:standard)
   -open Gitlab_ci.Base))

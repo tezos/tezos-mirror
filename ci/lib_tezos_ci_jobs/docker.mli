@@ -8,12 +8,6 @@
 (** The version of Docker to use. *)
 val version : string
 
-(** [docker_release.sh] invocation stating the CI images the Docker
-    distribution jobs build FROM, passed explicitly as full references: the
-    static [Images.Base_images.alpine_runtime] / [Images.Base_images.alpine_build]
-    images. *)
-val docker_release_script : string
-
 (** Jobs [oc.docker:$ARCH]. *)
 val job_docker :
   [`released | `experimental] ->
