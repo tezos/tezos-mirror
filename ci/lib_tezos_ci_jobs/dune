@@ -9,6 +9,9 @@
   cacio
   sdk_bindings_ci
   tezt.core
+  release_site_ci
+  grafazos_ci
+  teztale_ci
   rollup_node_ci)
  (flags
   (:standard)

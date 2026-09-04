@@ -73,8 +73,7 @@ let release_site_variables = function
         ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
       ]
 
-let job_render =
-  Cacio.parameterize @@ fun pipeline_type ->
+let job_render ?(needs = []) pipeline_type =
   CI.job
     "render"
     ~__POS__
@@ -84,8 +83,9 @@ let job_render =
     ~description:
       "Render the whole release site: regenerate every component's page from \
        its published versions.json and upload the site. Reflects what has been \
-       deployed by the per-component [deploy-assets] jobs, so it neither \
-       deploys assets nor depends on any build job."
+       deployed by the [deploy-assets] jobs, so it neither deploys assets nor \
+       depends on any build job."
+    ~needs
     ~variables:(release_site_variables pipeline_type)
     ~script:
       ["eval $(opam env)"; "./release_site/scripts/render_release_site.sh"]

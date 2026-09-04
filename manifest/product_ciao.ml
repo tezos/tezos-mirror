@@ -72,7 +72,8 @@ let ci_grafazos =
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci; ci_lib_cacio]
+    ~deps:
+      [ci_lib_gitlab_ci_main; ci_lib_tezos_ci; ci_lib_cacio; ci_release_site]
     ~release_status:Unreleased
 
 let ci_teztale =
@@ -82,7 +83,12 @@ let ci_teztale =
     ~path:"teztale/ci"
     ~bisect_ppx:No
     ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_release_site;
+      ]
     ~release_status:Unreleased
 
 let ci_rollup_node =
@@ -108,6 +114,9 @@ let ci_lib_tezos_ci_jobs =
         ci_lib_cacio;
         ci_sdk_bindings;
         tezt_core_lib;
+        ci_release_site;
+        ci_grafazos;
+        ci_teztale;
         ci_rollup_node;
       ]
     ~release_status:Unreleased

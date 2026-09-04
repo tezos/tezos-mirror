@@ -28,6 +28,34 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
+release_site.render:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - teztale.release-page-deploy-assets
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - ./release_site/scripts/render_release_site.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    S3_BUCKET: release-page-test.nomadic-labs.com
+  environment:
+    name: release-page
+    action: access
+  retry: 0
+
 teztale.build-arm64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build

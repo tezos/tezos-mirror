@@ -158,11 +158,20 @@ let register () =
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_release_page `real `wait_for_deploy);
+      (* Re-render the whole site once Grafazos's assets are deployed. *)
+      ( Auto,
+        Release_site_ci.job_render
+          `real
+          ~needs:[(Job, job_deploy_release_page_assets `real)] );
     ] ;
   CI.register_dedicated_test_release_pipeline
     [
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_release_page `test `wait_for_deploy);
+      ( Auto,
+        Release_site_ci.job_render
+          `test
+          ~needs:[(Job, job_deploy_release_page_assets `test)] );
     ] ;
   ()
