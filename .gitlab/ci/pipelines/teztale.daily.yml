@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 teztale.build-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: test
   tags:
   - gcp_arm64
@@ -76,7 +76,7 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: test
   tags:
   - gcp_very_high_cpu

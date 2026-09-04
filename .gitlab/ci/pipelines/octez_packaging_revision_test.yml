@@ -7,7 +7,7 @@ stages:
 - publish
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
   stage: publish
   tags:
   - gcp
@@ -42,7 +42,7 @@ apt_repo_debian:
   retry: 0
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-18884dda
   stage: publish
   tags:
   - gcp
@@ -99,7 +99,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: publish
   tags:
   - gcp
@@ -127,7 +127,7 @@ docker:merge_manifests:
   retry: 0
 
 gitlab:create_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -158,7 +158,7 @@ gitlab:create_package:
   retry: 0
 
 gitlab:update_release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -182,7 +182,7 @@ gitlab:update_release:
   retry: 0
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-18884dda
   stage: build
   tags:
   - gcp
@@ -211,7 +211,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-18884dda
   stage: build
   tags:
   - $TAGS
@@ -255,7 +255,7 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-keyring_package:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-18884dda
   stage: build
   tags:
   - gcp
@@ -284,7 +284,7 @@ oc.build-keyring_package:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-18884dda
   stage: build
   tags:
   - $TAGS
@@ -330,7 +330,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_arm64
@@ -379,7 +379,7 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -428,7 +428,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -446,8 +446,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d26a8bef
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -466,7 +466,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_arm64
@@ -484,8 +484,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d26a8bef
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -504,7 +504,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.docker:promote_revision_to_version:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: publish
   tags:
   - gcp
@@ -535,7 +535,7 @@ oc.docker:promote_revision_to_version:
   retry: 0
 
 release_page.deploy-assets-packaging-revision:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp
@@ -569,7 +569,7 @@ release_page.deploy-assets-packaging-revision:
   retry: 0
 
 release_page.publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp

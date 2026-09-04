@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 images.alpine-ci-all.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -87,7 +87,7 @@ images.alpine-ci-all.merge:
     - runner_system_failure
 
 images.alpine-ci-all:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -121,7 +121,7 @@ images.alpine-ci-all:amd64:
     - runner_system_failure
 
 images.alpine-ci-all:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_arm64
@@ -195,7 +195,7 @@ images.alpine-docker-ci:
     - runner_system_failure
 
 images.ci-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -232,7 +232,7 @@ images.ci-release:
       - trixie
 
 images.debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -268,7 +268,7 @@ images.debian:
       - trixie
 
 images.debian-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - $TAGS
@@ -308,7 +308,7 @@ images.debian-build:
       - gcp_arm64
 
 images.debian-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -343,7 +343,7 @@ images.debian-build.merge:
       - trixie
 
 images.debian-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -380,7 +380,7 @@ images.debian-homebrew:
       - trixie
 
 images.debian-jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -417,7 +417,7 @@ images.debian-jsonnet:
       - trixie
 
 images.debian-rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - $TAGS
@@ -457,7 +457,7 @@ images.debian-rust:
       - gcp_arm64
 
 images.debian-rust-sdk-bindings:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -494,7 +494,7 @@ images.debian-rust-sdk-bindings:
       - trixie
 
 images.debian-rust.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -526,7 +526,7 @@ images.debian-rust.merge:
     - runner_system_failure
 
 images.debian-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -563,7 +563,7 @@ images.debian-systemd:
       - trixie
 
 images.ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -601,7 +601,7 @@ images.ubuntu:
       - "26.04"
 
 images.ubuntu-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - $TAGS
@@ -643,7 +643,7 @@ images.ubuntu-build:
       - gcp_arm64
 
 images.ubuntu-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -680,7 +680,7 @@ images.ubuntu-build.merge:
       - "26.04"
 
 images.ubuntu-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu

@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -82,7 +82,7 @@ oc.build_kernels:
     when: on_success
 
 tezos_x.build_released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu

@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -63,7 +63,7 @@ grafazos.release-page-publish:
   retry: 0
 
 octez-smart-rollup-node.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -98,7 +98,7 @@ octez-smart-rollup-node.release-page-publish:
   retry: 0
 
 release_page.publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -135,7 +135,7 @@ release_page.publish:
   retry: 0
 
 release_site.render:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -165,7 +165,7 @@ release_site.render:
   retry: 0
 
 teztale.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible

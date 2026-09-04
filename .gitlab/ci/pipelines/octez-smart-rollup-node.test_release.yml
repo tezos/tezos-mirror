@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 octez-smart-rollup-node.build:static-arm64-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_arm64
@@ -74,7 +74,7 @@ octez-smart-rollup-node.build:static-arm64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.build:static-x86_64-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -119,7 +119,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
     - octez-binaries/$ARCH/*
 
 octez-smart-rollup-node.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp
@@ -133,8 +133,8 @@ octez-smart-rollup-node.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d26a8bef
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -148,7 +148,7 @@ octez-smart-rollup-node.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
 
 octez-smart-rollup-node.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: build
   tags:
   - gcp_arm64
@@ -162,8 +162,8 @@ octez-smart-rollup-node.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d26a8bef
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -177,7 +177,7 @@ octez-smart-rollup-node.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
 
 octez-smart-rollup-node.docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -205,7 +205,7 @@ octez-smart-rollup-node.docker:merge_manifests:
   retry: 0
 
 octez-smart-rollup-node.gitlab:octez-smart-rollup-node-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -229,7 +229,7 @@ octez-smart-rollup-node.gitlab:octez-smart-rollup-node-release:
   retry: 0
 
 octez-smart-rollup-node.release-page-deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -263,7 +263,7 @@ octez-smart-rollup-node.release-page-deploy-assets:
   retry: 0
 
 octez-smart-rollup-node.release-page-publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
   - gcp_not_interruptible
