@@ -117,7 +117,7 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   let ress = Bytes.sub_string res (i + 1) (res_len - i - 1) in
   String.make zeros zero ^ ress
 
-let raw_decode ?(alphabet = Alphabet.default) s =
+let raw_decode_unbounded ~alphabet s =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
   let slen = String.length s in
   let rec decode acc index =
@@ -138,6 +138,9 @@ let raw_decode ?(alphabet = Alphabet.default) s =
     String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1])
   in
   return v
+
+let raw_decode ?(alphabet = Alphabet.default) s =
+  raw_decode_unbounded ~alphabet s
 
 let checksum s =
   let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
