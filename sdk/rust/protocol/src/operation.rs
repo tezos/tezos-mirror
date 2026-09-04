@@ -138,7 +138,7 @@ mod internal {
     }
 
     impl NomReader<'_> for TransactionContent {
-        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<'_, Self> {
             nom::combinator::map(
                 EncodedTransactionContent::nom_read,
                 TransactionContent::from,

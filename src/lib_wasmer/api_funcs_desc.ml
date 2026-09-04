@@ -82,7 +82,7 @@ module Functions (S : FOREIGN) = struct
     module Compiler = struct
       let is_available =
         foreign
-          "wasmer_is_compiler_available"
+          "wasmer_is_backend_available"
           (Types.Wasmer.Compiler.t @-> returning bool)
     end
 
@@ -95,6 +95,16 @@ module Functions (S : FOREIGN) = struct
       let bulk_memory =
         foreign
           "wasmer_features_bulk_memory"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let exceptions =
+        foreign
+          "wasmer_features_exceptions"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let extended_const =
+        foreign
+          "wasmer_features_extended_const"
           (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
 
       let memory64 =
@@ -122,6 +132,11 @@ module Functions (S : FOREIGN) = struct
           "wasmer_features_reference_types"
           (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
 
+      let relaxed_simd =
+        foreign
+          "wasmer_features_relaxed_simd"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
       let simd =
         foreign
           "wasmer_features_simd"
@@ -135,6 +150,11 @@ module Functions (S : FOREIGN) = struct
       let threads =
         foreign
           "wasmer_features_threads"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let wide_arithmetic =
+        foreign
+          "wasmer_features_wide_arithmetic"
           (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
     end
 
@@ -152,7 +172,7 @@ module Functions (S : FOREIGN) = struct
 
     let set_compiler =
       foreign
-        "wasm_config_set_compiler"
+        "wasm_config_set_backend"
         (ptr Types.Config.t @-> Types.Wasmer.Compiler.t @-> returning void)
 
     let set_features =

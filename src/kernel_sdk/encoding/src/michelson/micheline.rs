@@ -90,7 +90,7 @@ pub(crate) mod annots {
     }
 
     impl NomReader<'_> for Annotations {
-        fn nom_read(input: &[u8]) -> NomResult<Self> {
+        fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
             // TODO: #6665
             // this does two passes over the input buffer (up to `dynamic` size)
             // could be done in a single pass instead, but for future work
@@ -426,25 +426,25 @@ where
 // NOM_READER
 // ----------
 impl NomReader<'_> for MichelineInt {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_int, MichelineInt)(input)
     }
 }
 
 impl NomReader<'_> for MichelineString {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_string, MichelineString)(input)
     }
 }
 
 impl NomReader<'_> for MichelineBytes {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_bytes(nom_read::bytes), MichelineBytes)(input)
     }
 }
 
 impl<const PRIM_TAG: u8> NomReader<'_> for MichelinePrimNoArgsNoAnnots<PRIM_TAG> {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(
             tag([MICHELINE_PRIM_NO_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
             |_prim| MichelinePrimNoArgsNoAnnots {},
@@ -453,7 +453,7 @@ impl<const PRIM_TAG: u8> NomReader<'_> for MichelinePrimNoArgsNoAnnots<PRIM_TAG>
 }
 
 impl<const PRIM_TAG: u8> NomReader<'_> for MichelinePrimNoArgsSomeAnnots<PRIM_TAG> {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_NO_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
             Annotations::nom_read,
@@ -634,7 +634,7 @@ impl Node {
 }
 
 impl NomReader<'_> for Node {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         nom::branch::alt((
             map(nom_read_micheline_int, Node::Int),
             map(nom_read_micheline_string, Node::String),

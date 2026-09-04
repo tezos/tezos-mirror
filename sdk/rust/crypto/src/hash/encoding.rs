@@ -58,7 +58,7 @@ macro_rules! hash_nom_reader {
     ($hash_name:ident) => {
         impl<'a> NomReader<'a> for $hash_name {
             #[inline(always)]
-            fn nom_read(input: &[u8]) -> NomResult<Self> {
+            fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
                 use nom::{bytes::complete::take, combinator::map};
 
                 map(take(Self::SIZE), |bytes| {

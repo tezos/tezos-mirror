@@ -151,7 +151,7 @@ impl RefPath<'_> {
     /// # use tezos_smart_rollup_host::path::RefPath;
     /// let path = RefPath::assert_from("!&(*(".as_bytes());
     /// ```
-    pub const fn assert_from(path: &[u8]) -> RefPath {
+    pub const fn assert_from(path: &[u8]) -> RefPath<'_> {
         assert_ok(validate_path(path));
 
         RefPath {
@@ -163,7 +163,7 @@ impl RefPath<'_> {
     /// is writable, i.e. not prefixed with `/readonly`. This function
     /// is to be used only internally to create [`RefPath`] for the
     /// `readonly` part of the storage. See `runtime.rs` for example.
-    pub(crate) const fn assert_from_readonly(path: &[u8]) -> RefPath {
+    pub(crate) const fn assert_from_readonly(path: &[u8]) -> RefPath<'_> {
         assert_ok(validate_path_internal(path));
 
         RefPath {

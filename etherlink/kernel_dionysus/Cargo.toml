@@ -109,7 +109,7 @@ alloy-primitives = { version = "0.7.7", default-features = false }
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates
 # within the dependency graph.
-lto = true
+lto = "off"
 
 [profile.release-with-debug]
 inherits = "release"

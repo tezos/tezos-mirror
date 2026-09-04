@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -83,7 +83,7 @@ oc.build_kernels:
     when: on_success
 
 oc.build_x86_64-exp:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -146,7 +146,7 @@ oc.build_x86_64-exp:
     when: on_success
 
 oc.build_x86_64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -210,7 +210,7 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -267,7 +267,7 @@ oc.build_x86_64-released:
     when: on_success
 
 tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
   stage: test
   tags:
   - gcp_tezt
@@ -325,7 +325,7 @@ tezt:
   parallel: 34
 
 tezt-extra:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
   stage: test
   tags:
   - gcp_tezt
@@ -382,7 +382,7 @@ tezt-extra:
   retry: 2
 
 tezt-flaky:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
   stage: test
   tags:
   - gcp_tezt
@@ -441,7 +441,7 @@ tezt-flaky:
   parallel: 2
 
 tezt-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
   stage: test
   tags:
   - gcp_tezt
@@ -498,7 +498,7 @@ tezt-slow:
   parallel: 12
 
 tezt-time-sensitive:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d26a8bef
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
   stage: test
   tags:
   - gcp_tezt

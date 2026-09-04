@@ -23,7 +23,7 @@ EXTRA_FLAGS ?=
 SANDBOX_ENABLE_FEATURES ?=
 
 # The version of nightly that we use for anything that requires it
-NIGHTLY_VERSION = nightly-2025-01-30
+NIGHTLY_VERSION = nightly-2026-02-24
 
 # Prefix for downloading assets from the riscv-pvm repo
 RISCV_PVM_REPO = "https://raw.githubusercontent.com/tezos/riscv-pvm/$(shell cat 'assets/riscv-pvm.commit')"

@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
 /// with location information attached.
 pub(crate) fn spanned_lexer(
     src: &str,
-) -> impl Iterator<Item = Result<(usize, Tok, usize), ParserError>> + '_ {
+) -> impl Iterator<Item = Result<(usize, Tok<'_>, usize), ParserError>> + '_ {
     Tok::lexer(src)
         .spanned()
         .map(|(tok_or_err, span)| match tok_or_err {
@@ -83,14 +83,16 @@ pub(crate) fn spanned_lexer(
 pub mod test_helpers {
     use super::*;
 
-    pub fn parse(s: &str) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    pub fn parse(
+        s: &str,
+    ) -> Result<Micheline<'_>, ParseError<usize, Tok<'_>, ParserError>> {
         let parser = Box::leak(Box::new(Parser::new()));
         parser.parse(s)
     }
 
     pub fn parse_contract_script(
         s: &str,
-    ) -> Result<Micheline, ParseError<usize, Tok, ParserError>> {
+    ) -> Result<Micheline<'_>, ParseError<usize, Tok<'_>, ParserError>> {
         let parser = Box::leak(Box::new(Parser::new()));
         parser.parse_top_level(s)
     }

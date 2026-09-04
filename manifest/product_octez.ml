@@ -562,7 +562,7 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "file"; S "../../rust-toolchain"];
                 [S "source_tree"; S ".cargo"];
                 [S "source_tree"; S "../rustzcash_deps"];
-                [S "source_tree"; S "wasmer-3.3.0"];
+                [S "source_tree"; S "wasmer-7.2.1"];
                 [S "source_tree"; S "rust_igd_next"];
                 [S "source_tree"; S "rust_tezos_context"];
                 [S "source_tree"; S "src"];
@@ -3115,7 +3115,7 @@ let octez_wasmer =
     ~synopsis:"Wasmer bindings for SCORU WASM"
     ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix]
     ~link_deps:lib_wasmer_riscv
-    ~dep_globs_rec:["../rust_deps/wasmer-3.3.0/*"]
+    ~dep_globs_rec:["../rust_deps/wasmer-7.2.1/*"]
     ~preprocess:(pps ppx_deriving_show)
     ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
     ~ctypes:
@@ -3123,7 +3123,7 @@ let octez_wasmer =
         {
           external_library_name = "octez_rust_deps";
           include_header = "wasmer.h";
-          extra_search_dir = "../rust_deps/wasmer-3.3.0/lib/c-api";
+          extra_search_dir = "../rust_deps/wasmer-7.2.1/lib/c-api";
           type_description = {instance = "Types"; functor_ = "Api_types_desc"};
           function_description =
             {instance = "Functions"; functor_ = "Api_funcs_desc"};
@@ -3133,8 +3133,8 @@ let octez_wasmer =
           c_library_flags = [];
           deps =
             [
-              "../rust_deps/wasmer-3.3.0/lib/c-api/wasmer.h";
-              "../rust_deps/wasmer-3.3.0/lib/c-api/wasm.h";
+              "../rust_deps/wasmer-7.2.1/lib/c-api/wasmer.h";
+              "../rust_deps/wasmer-7.2.1/lib/c-api/wasm.h";
             ];
         }
 
@@ -3961,7 +3961,7 @@ let lib_rollup_node_rust_deps =
                  [S "source_tree"; S "src"];
                  [S "source_tree"; S "../riscv"];
                  [S "source_tree"; S "../rustzcash_deps"];
-                 [S "source_tree"; S "../rust_deps/wasmer-3.3.0"];
+                 [S "source_tree"; S "../rust_deps/wasmer-7.2.1"];
                  [S "source_tree"; S "../rust_deps/rust_igd_next"];
                  [S "source_tree"; S "../rust_deps/rust_tezos_context"];
                  [S "source_tree"; S "../kernel_sdk"];

@@ -89,7 +89,7 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../kernel_farfadet_r5_su"];
                  [S "source_tree"; S "../kernel_farfadet_r6_su"];
                  [S "source_tree"; S "../../src/rustzcash_deps"];
-                 [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+                 [S "source_tree"; S "../../src/rust_deps/wasmer-7.2.1"];
                  [S "source_tree"; S "../../src/riscv"];
                  [S "source_tree"; S "../../src/kernel_sdk"];
                  [S "source_tree"; S "../../sdk/rust"];

@@ -739,7 +739,7 @@ impl TezosXChainConfig {
             .collect()
     }
 
-    pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {
+    pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath<'_>> {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,

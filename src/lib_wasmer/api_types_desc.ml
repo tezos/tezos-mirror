@@ -120,7 +120,7 @@ module Types (S : Ctypes.TYPE) = struct
   end
 
   module Wasmer = struct
-    (** [wasmer_compiler_t] *)
+    (** [wasmer_backend_t] *)
     module Compiler = struct
       type s
 
@@ -128,7 +128,7 @@ module Types (S : Ctypes.TYPE) = struct
 
       let t : t typ =
         enum
-          "wasmer_compiler_t"
+          "wasmer_backend_t"
           [
             (CRANELIFT, constant "CRANELIFT" int64_t);
             (LLVM, constant "LLVM" int64_t);
@@ -215,7 +215,7 @@ module Types (S : Ctypes.TYPE) = struct
 
     let f64 = constant "WASM_F64" uint8_t
 
-    let anyref = constant "WASM_ANYREF" uint8_t
+    let anyref = constant "WASM_EXTERNREF" uint8_t
 
     let funcref = constant "WASM_FUNCREF" uint8_t
 

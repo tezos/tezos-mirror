@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib"]
 # to use rust_deps, which does not pull in RocksDB.
 
 [dependencies.wasmer-c-api]
-path = "../rust_deps/wasmer-3.3.0/lib/c-api"
+path = "../rust_deps/wasmer-7.2.1/lib/c-api"
 default-features = false
 features = ["singlepass", "cranelift", "wat", "middlewares"]
 

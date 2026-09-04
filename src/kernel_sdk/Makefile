@@ -23,7 +23,7 @@ endif
 
 RISCV_OPTS = --target riscv64gc-unknown-linux-musl --no-default-features
 RISCV_OPTS_ALPHA = $(RISCV_OPTS) --features proto-alpha
-RISCV_RUSTC_VERSION = 1.88.0
+RISCV_RUSTC_VERSION = 1.94.0
 
 SDK_VERSION := "0.2.2"
 

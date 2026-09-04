@@ -132,6 +132,11 @@ Packaging
 Smart Rollup node
 -----------------
 
+- The vendored Wasmer runtime used for fast execution was upgraded from 3.3.0
+  to 7.2.1. This fixes a misaligned ``ucontext_t`` dereference that made the
+  previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set
+  of WebAssembly proposals accepted by fast execution is unchanged.
+
 - Fixed the public ``secure`` RPC ACL, which did not deny the mutating
   ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
   ``POST /local/dal/slot/indices`` and ``POST /local/dal/injection/<id>/forget``).
@@ -233,6 +238,8 @@ DAL node
 
 Miscellaneous
 -------------
+
+- The recommended Rust version was bumped from 1.88.0 to 1.94.0.
 
 - Teztale archiver: ``--backup-dir`` now backs up **every** failed POST,
   including ``/rights`` and ``/dal_shards`` which were previously dropped

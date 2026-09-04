@@ -167,7 +167,7 @@ impl<'a> Annotations<'a> {
     }
 
     /// Returns an iterator over the list of annotaions.
-    pub fn iter(&self) -> impl Iterator<Item = &Annotation> {
+    pub fn iter(&self) -> impl Iterator<Item = &Annotation<'_>> {
         self.0.iter()
     }
 

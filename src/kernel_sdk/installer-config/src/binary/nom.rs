@@ -67,7 +67,7 @@ fn bounded_u8_size(max: usize) -> impl FnMut(NomInput) -> NomResult<u8> {
     }
 }
 
-fn nom_read_ref_path(input: &[u8]) -> NomResult<RefPath> {
+fn nom_read_ref_path(input: &[u8]) -> NomResult<'_, RefPath<'_>> {
     map_res(
         complete(nom::multi::length_data(bounded_u8_size(PATH_MAX_SIZE))),
         |bytes| Ok::<RefPath<'_>, NomError<'_>>(RefPath::assert_from(bytes)),

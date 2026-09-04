@@ -137,7 +137,7 @@ macro_rules! impl_outbox_message_encodable {
             }
 
             impl<$( [<Expr $idx>]: Michelson ),+> NomReader<'_> for $s<$( [<Expr $idx>] ),+> {
-                fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+                fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<'_, Self> {
                     use tezos_data_encoding::nom::dynamic;
                     use nom::sequence::tuple;
                     use nom::combinator::map;

@@ -47,7 +47,7 @@ mod encoding {
     }
 
     impl NomReader<'_> for Timestamp {
-        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<'_, Self> {
             nom::combinator::map(
                 nom::number::complete::i64(nom::number::Endianness::Big),
                 Timestamp,

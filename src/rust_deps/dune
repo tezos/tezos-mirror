@@ -18,7 +18,7 @@
   (file ../../rust-toolchain)
   (source_tree .cargo)
   (source_tree ../rustzcash_deps)
-  (source_tree wasmer-3.3.0)
+  (source_tree wasmer-7.2.1)
   (source_tree rust_igd_next)
   (source_tree rust_tezos_context)
   (source_tree src)

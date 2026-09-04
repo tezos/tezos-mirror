@@ -73,6 +73,7 @@ mod test_utils {
     const MASK: u8 = Self::WIDTH - 1;
 
     /// The maximum number of this type that can be held in a `BitVec`.
+    #[expect(unused)]
     const MAX_ELT: usize = usize::MAX >> Self::BITS;
 
     /// Set a specific bit in an element to a given value.
@@ -113,6 +114,7 @@ mod test_utils {
     /// runtime, so this constant holds the typename of the primitive for
     /// printing by Debug.
     #[doc(hidden)]
+    #[expect(unused)]
     const TY: &'static str;
 }
 

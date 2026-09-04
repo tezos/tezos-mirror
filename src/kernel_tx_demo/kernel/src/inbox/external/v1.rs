@@ -91,7 +91,7 @@ impl HasEncoding for TicketAmount {
 }
 
 impl NomReader<'_> for TicketAmount {
-    fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<'_, Self> {
         nom::combinator::map(nom::number::complete::le_u64, |amount| Self { amount })(input)
     }
 }
@@ -110,7 +110,7 @@ impl HasEncoding for TicketIndex {
 }
 
 impl NomReader<'_> for TicketIndex {
-    fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<'_, Self> {
         nom::combinator::map(nom::number::complete::le_u64, |index| Self { index })(input)
     }
 }

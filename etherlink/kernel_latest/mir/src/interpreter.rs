@@ -3671,7 +3671,7 @@ mod interpreter_tests {
     use TypedValue as V;
 
     #[track_caller]
-    fn mk_0x(hex: &str) -> TypedValue {
+    fn mk_0x(hex: &str) -> TypedValue<'_> {
         V::Bytes(hex::decode(hex).unwrap_or_else(|e| panic!("Invalid hex: {e}")))
     }
 
@@ -7925,7 +7925,9 @@ mod interpreter_tests {
         // Last nonce within the limit: succeeds.
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(MAX_INTERNAL_OPERATIONS - 1);
-        assert!(interpret(&[emit.clone()], ctx, &mut stk![V::nat(0)]).is_ok());
+        assert!(
+            interpret(std::slice::from_ref(&emit), ctx, &mut stk![V::nat(0)]).is_ok()
+        );
         // Next allocation is over the limit: fails like L1.
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(MAX_INTERNAL_OPERATIONS);

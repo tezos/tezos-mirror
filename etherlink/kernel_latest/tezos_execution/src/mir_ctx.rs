@@ -1939,8 +1939,12 @@ pub mod tests {
 
         // Removal runs last: S, no longer owned by the returned storage, is
         // dropped from durable storage.
-        remove_unreferenced_big_maps(&mut storage, &[s.clone()], &seen_in_storage)
-            .unwrap();
+        remove_unreferenced_big_maps(
+            &mut storage,
+            std::slice::from_ref(&s),
+            &seen_in_storage,
+        )
+        .unwrap();
         assert!(
             storage
                 .big_map_get_type(&s)

@@ -21,7 +21,7 @@
   (source_tree src)
   (source_tree ../riscv)
   (source_tree ../rustzcash_deps)
-  (source_tree ../rust_deps/wasmer-3.3.0)
+  (source_tree ../rust_deps/wasmer-7.2.1)
   (source_tree ../rust_deps/rust_igd_next)
   (source_tree ../rust_deps/rust_tezos_context)
   (source_tree ../kernel_sdk)
