@@ -61,6 +61,11 @@ Node
   upgraded before bakers**: a node that does not publish this index proof can
   no longer make ``Proof`` moves, and loses its games by timeout.
 
+- Added the RPC ``GET /chains/<chain>/blocks/<block>/context/smart_rollups/all/signals``
+  for protocols Ushuaia (025) and Alpha, returning the signals recorded by the
+  protocol, each with the level of the block that recorded it.
+  (MR :gl:`!22838`)
+
 Client
 ------
 
