@@ -126,6 +126,44 @@ let test_load_bytes =
         (fun mem -> Memory_access_slow.load_bytes mem address size)
         (fun mem -> Memory_access_fast.load_bytes mem address size))
 
+(* [test_load_bytes] draws its size from [0 -- max_buffer_size], so it
+   effectively never samples an empty read and never a negative one, yet
+   [Host_funcs.Aux.load_raw_bytes] hands both straight to the memory
+   layer. *)
+let test_load_bytes_degenerate_sizes =
+  let content =
+    Stdlib.List.init (2 * Gen.page_size) (fun _ -> Unsigned.UInt8.zero)
+  in
+  let addresses =
+    Stdlib.List.map
+      (fun pages -> Int32.of_int (pages * Gen.page_size))
+      [0; 1; 2; 3]
+  in
+  Alcotest_lwt.test_case_sync
+    "load_bytes behaves the same on both memory implementations for empty and \
+     negative lengths"
+    `Quick
+    (fun () ->
+      Stdlib.List.iter
+        (fun address ->
+          Stdlib.List.iter
+            (fun size ->
+              if
+                not
+                  (are_equivalent
+                     content
+                     (fun mem -> Memory_access_slow.load_bytes mem address size)
+                     (fun mem -> Memory_access_fast.load_bytes mem address size))
+              then
+                Stdlib.failwith
+                  (Printf.sprintf
+                     "load_bytes of size %d at address %ld differs between the \
+                      two memory implementations"
+                     size
+                     address))
+            [0; -1; -4096])
+        addresses)
+
 let test_store_num =
   let open Gen in
   let open QCheck2.Gen in
@@ -140,14 +178,15 @@ let test_store_num =
         (fun mem -> Memory_access_fast.store_num mem address offset num))
 
 let tests : unit Alcotest_lwt.test_case list =
-  List.map
-    Qcheck_helpers.to_alcotest_lwt
-    [
-      test_store_bytes;
-      test_store_bytes_from_bytes;
-      test_load_bytes;
-      test_store_num;
-    ]
+  test_load_bytes_degenerate_sizes
+  :: List.map
+       Qcheck_helpers.to_alcotest_lwt
+       [
+         test_store_bytes;
+         test_store_bytes_from_bytes;
+         test_load_bytes;
+         test_store_num;
+       ]
 
 let () =
   Alcotest_lwt.run

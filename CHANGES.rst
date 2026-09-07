@@ -137,6 +137,12 @@ Smart Rollup node
   previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set
   of WebAssembly proposals accepted by fast execution is unchanged.
 
+- Fixed the WASM PVM fast execution engine (Wasmer) answering a different
+  error code than the interpreter when a kernel reads an empty, or a
+  negative, number of bytes from an address outside its memory. A kernel
+  making such a call computed a different state under the fast engine than
+  under the interpreter. (MR :gl:`!22837`)
+
 - Fixed the public ``secure`` RPC ACL, which did not deny the mutating
   ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
   ``POST /local/dal/slot/indices`` and ``POST /local/dal/injection/<id>/forget``).
