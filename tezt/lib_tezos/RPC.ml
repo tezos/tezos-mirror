@@ -1240,6 +1240,26 @@ let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
     ]
     smart_rollup_inbox_from_json
 
+let get_chain_block_context_smart_rollups_all_signals ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "all";
+      "signals";
+    ]
+    (fun json ->
+      JSON.as_list json
+      |> List.map (fun signal ->
+             ( JSON.(signal |-> "name" |> as_string),
+               JSON.(signal |-> "level" |> as_int) )))
+
 let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
     ?(chain = "main") ?(block = "head") sc_rollup =
   make

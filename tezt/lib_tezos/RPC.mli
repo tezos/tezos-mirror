@@ -1069,6 +1069,12 @@ val smart_rollup_inbox_from_json : JSON.t -> smart_rollup_inbox
 val get_chain_block_context_smart_rollups_all_inbox :
   ?chain:string -> ?block:string -> unit -> smart_rollup_inbox t
 
+(** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/all/signals]
+
+    The list is not ordered: look signals up by name. *)
+val get_chain_block_context_smart_rollups_all_signals :
+  ?chain:string -> ?block:string -> unit -> (string * int) list t
+
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/genesis_info] *)
 val get_chain_block_context_smart_rollups_smart_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t

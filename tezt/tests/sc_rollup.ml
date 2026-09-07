@@ -1633,6 +1633,30 @@ let test_rollup_list ~kind =
       ~error_msg:"%L %R") ;
   unit
 
+(* The signals set is empty until the canonical rollup records one.
+   ----------------------------------------------------------------
+*)
+
+let test_signals_empty =
+  register_test
+    ~supports:(Protocol.From_protocol 025)
+    ~__FILE__
+    ~tags:["signals"; "rpc"]
+    ~title:"smart_rollups/all/signals is empty on a fresh chain"
+  @@ fun protocol ->
+  let* _node, client = setup_l1 protocol in
+  let* signals =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_all_signals ()
+  in
+  match signals with
+  | [] -> unit
+  | (name, level) :: _ ->
+      Test.fail
+        "Expected no recorded signal, got %S recorded at level %d"
+        name
+        level
+
 let test_client_wallet ~kind =
   register_test
     ~kind
@@ -10000,6 +10024,7 @@ let register ~protocols =
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific features. *)
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
+  test_signals_empty protocols ;
   test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_multitick_proof_rejected_by_plugin
