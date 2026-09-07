@@ -90,16 +90,20 @@ let kernel =
     (drop (call $store_write
       (i32.const 20000) (i32.const 4) (i32.const 0) (i32.const 20200) (i32.const 4))))
 
+  ;; Publish the [n] bytes at [addr] under /r/<cmd>d (store_write
+  ;; overwrites in place, hence the delete first).
+  (func $publish (param $addr i32) (param $n i32)
+    (i32.store8 (i32.const 20003) (call $cmd))
+    (i32.store8 (i32.const 20004) (i32.const 100))
+    (drop (call $store_delete (i32.const 20000) (i32.const 5)))
+    (drop (call $store_write
+      (i32.const 20000) (i32.const 5) (i32.const 0) (local.get $addr) (local.get $n))))
+
   ;; Record exactly the [n] bytes received at 8000 under /r/<cmd>d, when
-  ;; n >= 0 (store_write overwrites in place, hence the delete first).
+  ;; n >= 0.
   (func $record_data (param $n i32)
     (if (i32.ge_s (local.get $n) (i32.const 0))
-      (then
-        (i32.store8 (i32.const 20003) (call $cmd))
-        (i32.store8 (i32.const 20004) (i32.const 100))
-        (drop (call $store_delete (i32.const 20000) (i32.const 5)))
-        (drop (call $store_write
-          (i32.const 20000) (i32.const 5) (i32.const 0) (i32.const 8000) (local.get $n))))))
+      (then (call $publish (i32.const 8000) (local.get $n)))))
 
   (func $handle
     (local $code i32)
@@ -166,6 +170,20 @@ let kernel =
     (if (i32.eq (local.get $c) (i32.const 118))
       (then
         (call $record (call $nds_store_value_size (call $db) (i32.const 1010) (call $key_len)))
+        (return)))
+    ;; N: database_get_hash with a negative max_bytes
+    (if (i32.eq (local.get $c) (i32.const 78))
+      (then
+        (call $record (call $nds_database_get_hash
+          (call $db) (i32.const 8000) (i32.const -1)))
+        (return)))
+    ;; Q: store_read into the last two bytes of the memory, then publish
+    ;; the tail of the memory so a partial write shows up in the state
+    (if (i32.eq (local.get $c) (i32.const 81))
+      (then
+        (call $record (call $nds_store_read
+          (call $db) (i32.const 1010) (call $key_len) (call $offset) (i32.const 65534) (call $len)))
+        (call $publish (i32.const 65530) (i32.const 6))
         (return)))
     ;; O: store_set with a zero key length and a key offset past the end
     ;; of the memory
@@ -234,6 +252,14 @@ let move ~src ~dst = message ~db:src ~db2:dst 'm'
 let clear db = message ~db 'x'
 
 let db_hash ?(db = 0) ~len () = message ~db ~len 'h'
+
+(* A negative [max_bytes] is neither a truncation request nor a valid
+   destination size. *)
+let db_hash_negative_max_bytes () = message 'N'
+
+(* [store_read] into the last two bytes of the memory: a value longer
+   than that does not fit, so the write must not happen at all. *)
+let read_into_last_bytes ~len key = message ~key ~len 'Q'
 
 (* An empty key whose offset lies past the end of the memory: the read
    accesses no byte, so the address is all the two memory implementations
@@ -598,7 +624,7 @@ let test_engines_agree ~fallback () =
   let*! () = check_code slow 'd' 0l in
   let*! () = check_code slow 'z' (error Nds_resize_invalid) in
   (* Level 5: the empty key, including one read from out of bounds. *)
-  let* slow, _fast =
+  let* slow, fast =
     run
       ~level:5l
       [resize 1; set_empty_key_out_of_bounds "v"; exists ""; value_size ""]
@@ -608,6 +634,17 @@ let test_engines_agree ~fallback () =
   let*! () = check_code slow 'O' 0l in
   let*! () = check_code slow 'e' 1l in
   let*! () = check_code slow 'v' 1l in
+  (* Level 6: a destination the value does not fit in, on its own level
+     so that a mismatch is reported against this command. *)
+  let* slow, fast =
+    run ~level:6l [set "k2" "hello"; read_into_last_bytes ~len:5 "k2"] slow fast
+  in
+  let*! () = check_code slow 'Q' (error Memory_invalid_access) in
+  let*! () = check_data slow 'Q' (String.make 6 '\000') in
+  (* Level 7: a negative destination size, which must be answered and
+     not raised. *)
+  let* slow, _fast = run ~level:7l [db_hash_negative_max_bytes ()] slow fast in
+  let*! () = check_code slow 'N' (error Memory_invalid_access) in
   return_unit
 
 (** When NDS is not activated on chain, both engines answer

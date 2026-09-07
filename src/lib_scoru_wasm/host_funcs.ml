@@ -1577,6 +1577,22 @@ module Nds_aux = struct
 
     module Aux = Aux.Make (Memory_access)
 
+    (* The two memory implementations write differently past the end of
+       the memory: the interpreter's [Partial_memory] stores byte by byte
+       and commits the in-bounds prefix before the out-of-bounds byte
+       raises, while Wasmer's [Memory.set_string] checks the range and
+       writes nothing.  Rejecting the write up front is what makes them
+       agree.  An empty write accesses no byte, so it checks no bound. *)
+    let check_write memory ~addr ~size =
+      let open Result_syntax in
+      if Compare.Int.(size = 0) then return_unit
+      else
+        let bound = Memory_access.bound memory in
+        let addr = I64_convert.extend_i32_u addr in
+        if Int64.compare (Int64.add addr (Int64.of_int size)) bound <= 0 then
+          return_unit
+        else fail (Error.code Error.Memory_invalid_access)
+
     (** [registry_resize ~nds ~diff] queries the current registry size and
       then, if [diff] is non-zero, adjusts the registry by [diff]
       databases. Returns the new size as [int32].
@@ -1637,8 +1653,12 @@ module Nds_aux = struct
       let*! res =
         (* Mirror [Aux.load_bytes]: reject oversized [max_bytes] before
          paying the NDS read cost, rather than letting [store_bytes]
-         reject after the fact. *)
-        if Int32.compare max_bytes (Int32.of_int Aux.input_output_max_size) > 0
+         reject after the fact.  A negative one never reaches the backend
+         as a huge unsigned length. *)
+        if Int32.compare max_bytes 0l < 0 then
+          fail (Error.code Error.Memory_invalid_access)
+        else if
+          Int32.compare max_bytes (Int32.of_int Aux.input_output_max_size) > 0
         then fail (Error.code Error.Input_output_too_large)
         else
           let* key =
@@ -1647,6 +1667,10 @@ module Nds_aux = struct
           let len = Int64.of_int32 max_bytes in
           let*? data = map_nds (Nds.read nds ~db_index ~key ~offset ~len) in
           let bytes_read = Int32.of_int (Bytes.length data) in
+          (* Against the length of the value, not [max_bytes]: a kernel
+             may ask for more bytes than it has room for at [dst], as
+             long as what it reads fits. *)
+          let*? () = check_write memory ~addr:dst ~size:(Bytes.length data) in
           let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
           return bytes_read
       in
@@ -1715,16 +1739,24 @@ module Nds_aux = struct
     let database_get_hash ~nds ~memory ~db_index ~dst ~max_bytes =
       let open Lwt_result_syntax in
       let*! res =
-        let*? hash = map_nds (Nds.hash nds ~db_index) in
-        let hash_len = Bytes.length hash in
-        let max_bytes = Int32.to_int max_bytes in
-        let written = Int.min hash_len max_bytes in
-        let data =
-          if Int.compare max_bytes hash_len < 0 then Bytes.sub hash 0 max_bytes
-          else hash
-        in
-        let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
-        return (Int32.of_int written)
+        (* A negative [max_bytes] is not a truncation request: rejected
+           before [Bytes.sub], which raises [Invalid_argument] on a
+           negative length. *)
+        if Int32.compare max_bytes 0l < 0 then
+          fail (Error.code Error.Memory_invalid_access)
+        else
+          let*? hash = map_nds (Nds.hash nds ~db_index) in
+          let hash_len = Bytes.length hash in
+          let max_bytes = Int32.to_int max_bytes in
+          let written = Int.min hash_len max_bytes in
+          let data =
+            if Int.compare max_bytes hash_len < 0 then
+              Bytes.sub hash 0 max_bytes
+            else hash
+          in
+          let*? () = check_write memory ~addr:dst ~size:written in
+          let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
+          return (Int32.of_int written)
       in
       extract_nds_error_code res
   end
