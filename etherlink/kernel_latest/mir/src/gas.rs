@@ -694,7 +694,8 @@ pub mod interpret_cost {
         // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
         // the larger of the two due to result allocation
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
-        (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
+        let time = (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
     pub fn sub_num(
@@ -702,7 +703,8 @@ pub mod interpret_cost {
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
-        (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()
+        let time = (65 + (sz >> 3) + (sz >> 7)).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
     // corresponds to cost_N_IAnd_int_nat in the Tezos protocol
@@ -735,8 +737,9 @@ pub mod interpret_cost {
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65)
-            .as_gas_cost()
+        let time = ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 65)
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(w)?))
     }
 
     // corresponds to cost_N_IOr_bytes in the Tezos protocol
@@ -748,8 +751,9 @@ pub mod interpret_cost {
     // corresponds to cost_N_IXor_nat in the Tezos protocol
     pub fn xor_nat(i1: &BigUint, i2: &BigUint) -> Result<u32, CostOverflow> {
         let w = Checked::from(Ord::max(i1.byte_size(), i2.byte_size()));
-        ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70)
-            .as_gas_cost()
+        let time = ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + (w >> 9) + 70)
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(w)?))
     }
 
     // corresponds to cost_N_IXor_bytes in the Tezos protocol
@@ -777,14 +781,20 @@ pub mod interpret_cost {
     // corresponds to cost_N_ILsl_nat in the Tezos protocol
     pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let sz = Checked::from(i1.byte_size());
-        ((sz >> 3) + (sz >> 6) + (sz >> 8) + 85).as_gas_cost()
+        let time = ((sz >> 3) + (sz >> 6) + (sz >> 8) + 85).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
     // corresponds to cost_N_ILsl_bytes in the Tezos protocol
-    pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, CostOverflow> {
-        let s1 = Checked::from(i1.len());
+    pub fn lsl_bytes(
+        i1: &[u8],
+        i2: &u64,
+        byte_shifts: &u64,
+    ) -> Result<u32, CostOverflow> {
+        let s1 = Checked::from(i1.len() as u64);
         let w1 = Checked::from(i2.saturating_sub(1));
-        ((w1 >> 8)
+        let alloc = s1 + *byte_shifts;
+        let time = ((w1 >> 8)
             + (w1 >> 10)
             + (w1 >> 12)
             + (w1 >> 13)
@@ -792,13 +802,15 @@ pub mod interpret_cost {
             + (s1 >> 5)
             + s1
             + 120)
-            .as_gas_cost()
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(alloc)?))
     }
 
     // corresponds to cost_N_ILsr_nat in the Tezos protocol
     pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let sz = Checked::from(i1.byte_size());
-        ((sz >> 3) + (sz >> 7) + 85).as_gas_cost()
+        let time = ((sz >> 3) + (sz >> 7) + 85).as_gas_cost()?;
+        Ok(time.max(alloc_cost(sz)?))
     }
 
     // corresponds to cost_N_ILsr_bytes in the Tezos protocol
@@ -821,7 +833,9 @@ pub mod interpret_cost {
     // machine.
     fn mul_cost(s1: u64, s2: u64) -> Result<u32, CostOverflow> {
         let p = Checked::from(s1) * Checked::from(s2);
-        ((p >> 6) + (p >> 8) + (p >> 10) + 85).as_gas_cost()
+        let alloc = Checked::from(s1) + Checked::from(s2);
+        let time = ((p >> 6) + (p >> 8) + (p >> 10) + 85).as_gas_cost()?;
+        Ok(time.max(alloc_cost(alloc)?))
     }
 
     pub fn mul_int(
@@ -1344,12 +1358,16 @@ pub mod interpret_cost {
     // corresponds to cost_N_INeg in the Tezos protocol
     pub fn neg_int(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        ((size >> 4) + (size >> 6) + (size >> 7) + (size >> 8) + 55).as_gas_cost()
+        let time =
+            ((size >> 4) + (size >> 6) + (size >> 7) + (size >> 8) + 55).as_gas_cost()?;
+        Ok(time.max(alloc_cost(size)?))
     }
 
     pub fn abs(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()
+        let time =
+            (50 + (size >> 4) + (size >> 6) + (size >> 8) + (size >> 9)).as_gas_cost()?;
+        Ok(time.max(alloc_cost(size)?))
     }
 
     // `ISNAT` deep-clones a DUP-shared operand's magnitude in `pop!` -- the same
@@ -1359,24 +1377,26 @@ pub mod interpret_cost {
     // (L2-1794). Diverges from L1's flat cost, as MIR's `MUL` pricing does.
     pub fn isnat(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (Checked::from(u64::from(ISNAT))
+        let time = (Checked::from(u64::from(ISNAT))
             + (size >> 4)
             + (size >> 6)
             + (size >> 8)
             + (size >> 9))
-            .as_gas_cost()
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(size)?))
     }
 
     // `INT(nat)` clones a DUP-shared magnitude in `pop!` like `ISNAT`, so its
     // cost is the flat coercion base (`INT_NAT`) plus `abs`'s size term.
     pub fn int_nat(int: &impl BigIntByteSize) -> Result<u32, CostOverflow> {
         let size = Checked::from(int.byte_size());
-        (Checked::from(u64::from(INT_NAT))
+        let time = (Checked::from(u64::from(INT_NAT))
             + (size >> 4)
             + (size >> 6)
             + (size >> 8)
             + (size >> 9))
-            .as_gas_cost()
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(size)?))
     }
 
     // corresponds to cost_N_IInt_bytes in the Tezos protocol

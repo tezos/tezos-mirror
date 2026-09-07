@@ -2319,16 +2319,18 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
+                let o2 = o2.to_u64().ok_or(InterpretError::Overflow)?;
+                let byte_shifts = o2 / 8;
+                let bit_shifts = o2 % 8;
                 ctx.gas()
-                    .consume(interpret_cost::lsl_bytes(o1, &o2_usize)?)?;
-
-                let byte_shifts = o2_usize / 8;
-                let bit_shifts = o2_usize % 8;
+                    .consume(interpret_cost::lsl_bytes(o1, &o2, &byte_shifts)?)?;
 
                 let left_pad = bit_shifts > 0;
                 let mut result: Vec<u8> =
-                    vec![0; o1.len() + byte_shifts + if left_pad { 1 } else { 0 }];
+                    vec![
+                        0;
+                        o1.len() + byte_shifts as usize + if left_pad { 1 } else { 0 }
+                    ];
                 let mut carry = 0u8;
 
                 for (i, &byte) in o1.iter().enumerate().rev() {
