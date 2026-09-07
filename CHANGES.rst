@@ -66,6 +66,11 @@ Node
   DAL nodes. Setups scraping ``/metrics`` on the RPC port must now run the
   node with ``--metrics-addr``.
 
+- Added the RPC ``GET /chains/<chain>/blocks/<block>/context/smart_rollups/all/signals``
+  for protocols Ushuaia (025) and Alpha, returning the signals recorded by the
+  protocol, each with the level of the block that recorded it.
+  (MR :gl:`!22838`)
+
 Client
 ------
 
