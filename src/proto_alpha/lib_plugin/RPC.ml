@@ -3051,6 +3051,22 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.(list int31)
         RPC_path.(path_sc_rollup / "consumed_outputs" /: Raw_level.rpc_arg)
+
+    let signals =
+      RPC_service.get_service
+        ~description:
+          "Signals recorded by the protocol when the canonical smart rollup \
+           executed a canonical_rollup_signal outbox message, each with the \
+           level of the block that recorded it. The list is not ordered: look \
+           signals up by name."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "name" (string Plain))
+                 (req "level" Raw_level.encoding)))
+        RPC_path.(path_sc_rollups / "signals")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -3088,6 +3104,10 @@ module Sc_rollup = struct
       Sc_rollup.Outbox.consumed_outputs ~level:outbox_level ctxt address
     in
     return consumed_outputs
+
+  let register_signals () =
+    Registration.register0 ~chunked:false S.signals (fun ctxt () () ->
+        Sc_rollup.signals ctxt)
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -3273,6 +3293,7 @@ module Sc_rollup = struct
     register_whitelist () ;
     register_last_whitelist_update () ;
     register_consumed_outputs () ;
+    register_signals () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -3292,6 +3313,8 @@ module Sc_rollup = struct
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
   let inbox ctxt block = RPC_context.make_call0 S.inbox ctxt block () ()
+
+  let signals ctxt block = RPC_context.make_call0 S.signals ctxt block () ()
 
   let whitelist ctxt block sc_rollup_address =
     RPC_context.make_call1 S.whitelist ctxt block sc_rollup_address () ()
