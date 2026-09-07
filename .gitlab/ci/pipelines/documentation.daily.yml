@@ -183,7 +183,7 @@ oc.build_x86_64-released:
     when: on_success
 
 documentation.rst-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-73a6a3d6
   stage: test
   tags:
   - gcp

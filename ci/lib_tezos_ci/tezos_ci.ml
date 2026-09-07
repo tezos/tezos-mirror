@@ -1759,11 +1759,16 @@ module Images = struct
         ~image_path
         ()
 
-    (* To use static images from the protected registry. *)
+    (* To use static images from the protected
+       registry. [prebuild,build,test-master] are now deprecated in
+       [master] and not available so we use the new
+       [alpine-<name>:<base_images_tag>] images. These images were
+       merged on [master] after [v25-release] branch was cut. *)
     let mk_ci_image_master name =
       Image.mk_external
         ~image_path:
-          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/" ^ name ^ ":amd64--master")
+          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-" ^ name ^ ":"
+         ^ Base_images.base_images_tag)
 
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
