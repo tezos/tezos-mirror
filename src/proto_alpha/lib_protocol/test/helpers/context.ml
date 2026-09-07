@@ -686,6 +686,14 @@ module Sc_rollup = struct
       ()
       ()
 
+  let signals ctxt =
+    Environment.RPC_context.make_call0
+      Plugin.RPC.Sc_rollup.S.signals
+      rpc_ctxt
+      ctxt
+      ()
+      ()
+
   let whitelist ctxt rollup =
     Environment.RPC_context.make_call1
       Plugin.RPC.Sc_rollup.S.whitelist

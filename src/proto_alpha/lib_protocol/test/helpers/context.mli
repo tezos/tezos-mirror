@@ -361,6 +361,9 @@ end
 module Sc_rollup : sig
   val inbox : t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
+  (** Calls the [smart_rollups/all/signals] RPC. *)
+  val signals : t -> (string * Raw_level.t) list tzresult Lwt.t
+
   val whitelist :
     t -> Sc_rollup.t -> Sc_rollup.Whitelist.t option tzresult Lwt.t
 
