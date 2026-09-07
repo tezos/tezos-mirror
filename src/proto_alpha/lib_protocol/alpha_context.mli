@@ -4611,14 +4611,17 @@ module Sc_rollup : sig
   val genesis_info :
     context -> rollup -> (context * Commitment.genesis_info) tzresult Lwt.t
 
+  (** [signals ctxt] returns the signals enabled by the canonical smart
+      rollup, each paired with the level of the block that enabled it. The
+      list is not ordered: look signals up by name. *)
+  val signals : context -> (string * Raw_level.t) list tzresult Lwt.t
+
   (** This module discloses definitions that are only useful for tests and
     must not be used otherwise. *)
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
 
     val is_signal_enable : context -> string -> bool tzresult Lwt.t
-
-    val signals : context -> (string * Raw_level.t) list tzresult Lwt.t
   end
 end
 

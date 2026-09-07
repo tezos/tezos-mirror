@@ -61,8 +61,6 @@ module Sc_rollup = struct
     include Internal_for_tests
 
     let is_signal_enable = Sc_rollup_storage.is_signal_enable
-
-    let signals = Sc_rollup_storage.signals
   end
 
   module Whitelist = struct

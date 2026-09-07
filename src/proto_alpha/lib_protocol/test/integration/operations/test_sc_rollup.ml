@@ -3787,9 +3787,7 @@ let test_duplicate_signal_preserves_activation_level () =
   in
   (* Record the signals after the first execution. *)
   let* incr = Incremental.begin_construction block in
-  let*@ signals_after_first =
-    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
-  in
+  let*@ signals_after_first = Sc_rollup.signals (Incremental.alpha_ctxt incr) in
   (* Send the same signal a second time, in a new block. *)
   let output =
     make_canonical_rollup_signal_output
@@ -3807,7 +3805,7 @@ let test_duplicate_signal_preserves_activation_level () =
   (* Verify the signals are unchanged. *)
   let* incr = Incremental.begin_construction block in
   let*@ signals_after_second =
-    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+    Sc_rollup.signals (Incremental.alpha_ctxt incr)
   in
   assert (signals_after_first = signals_after_second) ;
   return_unit
