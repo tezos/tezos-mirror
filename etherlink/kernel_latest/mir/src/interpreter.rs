@@ -2837,12 +2837,15 @@ fn interpret_one<'a>(
                             ))
                         }
                     };
-                    total_len += s.len()
+                    total_len += s.len() as u64
                 }
                 ctx.gas()
                     .consume(interpret_cost::concat_string_list(total_len)?)?;
 
-                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let total_len: usize = total_len
+                    .ok_or(InterpretError::Overflow)?
+                    .try_into()
+                    .map_err(|_| InterpretError::Overflow)?;
                 let mut result = String::new();
                 result
                     .try_reserve_exact(total_len)
@@ -2879,12 +2882,15 @@ fn interpret_one<'a>(
                             ))
                         }
                     };
-                    total_len += bs.len()
+                    total_len += bs.len() as u64
                 }
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
-                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let total_len: usize = total_len
+                    .ok_or(InterpretError::Overflow)?
+                    .try_into()
+                    .map_err(|_| InterpretError::Overflow)?;
                 let mut result = Vec::new();
                 result
                     .try_reserve_exact(total_len)

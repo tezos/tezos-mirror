@@ -761,7 +761,7 @@ pub mod interpret_cost {
     // corresponds to cost_N_INot_int in the Tezos protocol, floored by the
     // allocation gas
     pub fn not_num<T: BigIntByteSize>(n: &T) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(n.byte_size() as usize);
+        let sz = Checked::from(n.byte_size());
         let time = ((sz >> 4) + (sz >> 6) + (sz >> 7) + (sz >> 8) + 90).as_gas_cost()?;
         Ok(time.max(alloc_cost(sz)?))
     }
@@ -769,7 +769,7 @@ pub mod interpret_cost {
     // corresponds to cost_N_INot_bytes in the Tezos protocol, floored by the
     // allocation gas
     pub fn not_bytes(b: &[u8]) -> Result<u32, CostOverflow> {
-        let sz = Checked::from(b.len());
+        let sz = Checked::from(b.len() as u64);
         let time = ((sz >> 4) + (sz >> 5) + (sz >> 7) + (sz >> 9) + 40).as_gas_cost()?;
         Ok(time.max(alloc_cost(sz)?))
     }
@@ -1022,34 +1022,34 @@ pub mod interpret_cost {
     /// This bounds the *total* an operation allocates, not the length of any
     /// single value: a `Bytes`/`String` is a `Vec<u8>`, itself capped at
     /// `isize::MAX` (~2 GiB on wasm32); exceeding that is a separate concern.
-    fn alloc_cost(bytes: Checked<usize>) -> Result<u32, CostOverflow> {
+    fn alloc_cost(bytes: Checked<u64>) -> Result<u32, CostOverflow> {
         ((bytes >> 3) + (bytes >> 5)).as_gas_cost()
     }
 
     // corresponds to cost_N_IConcat_string in the Tezos protocol (the model's
     // list-length coefficient is 0; the per-element precheck above stays as a
     // MIR-specific protection)
-    pub fn concat_string_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
+    pub fn concat_string_list(total_len: Checked<u64>) -> Result<u32, CostOverflow> {
         let time = ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()?;
         Ok(time.max(alloc_cost(total_len)?))
     }
 
     // corresponds to cost_N_IConcat_bytes in the Tezos protocol
-    pub fn concat_bytes_list(total_len: Checked<usize>) -> Result<u32, CostOverflow> {
+    pub fn concat_bytes_list(total_len: Checked<u64>) -> Result<u32, CostOverflow> {
         let time = ((total_len >> 4) + (total_len >> 6) + 55).as_gas_cost()?;
         Ok(time.max(alloc_cost(total_len)?))
     }
 
     // corresponds to cost_N_IConcat_string_pair in the Tezos protocol
     pub fn concat_string_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        let w = Checked::from(len1) + Checked::from(len2);
+        let w = Checked::from(len1 as u64) + Checked::from(len2 as u64);
         let time = ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 8) + 55).as_gas_cost()?;
         Ok(time.max(alloc_cost(w)?))
     }
 
     // corresponds to cost_N_IConcat_bytes_pair in the Tezos protocol
     pub fn concat_bytes_pair(len1: usize, len2: usize) -> Result<u32, CostOverflow> {
-        let w = Checked::from(len1) + Checked::from(len2);
+        let w = Checked::from(len1 as u64) + Checked::from(len2 as u64);
         let time =
             ((w >> 4) + (w >> 5) + (w >> 6) + (w >> 7) + (w >> 8) + 65).as_gas_cost()?;
         Ok(time.max(alloc_cost(w)?))
@@ -1284,14 +1284,14 @@ pub mod interpret_cost {
 
     // corresponds to cost_N_ISlice_string in the Tezos protocol
     pub fn slice_string(length: usize) -> Result<u32, CostOverflow> {
-        let s = Checked::from(length);
+        let s = Checked::from(length as u64);
         let time = ((s >> 4) + (s >> 5) + (s >> 6) + 75).as_gas_cost()?;
         Ok(time.max(alloc_cost(s)?))
     }
 
     // corresponds to cost_N_ISlice_bytes in the Tezos protocol
     pub fn slice_bytes(length: usize) -> Result<u32, CostOverflow> {
-        let s = Checked::from(length);
+        let s = Checked::from(length as u64);
         let time = ((s >> 4) + (s >> 5) + (s >> 6) + (s >> 9) + 80).as_gas_cost()?;
         Ok(time.max(alloc_cost(s)?))
     }
