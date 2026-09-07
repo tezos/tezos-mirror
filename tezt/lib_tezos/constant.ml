@@ -232,6 +232,12 @@ module WASM = struct
         "etherlink/kernel_latest/kernel/tests/resources/failed_migration.wasm"
       ()
 
+  let sink =
+    Uses.make
+      ~tag:"sink"
+      ~path:"etherlink/kernel_latest/kernel/tests/resources/sink_kernel.wasm"
+      ()
+
   let mainnet_kernel =
     Uses.make
       ~tag:"mainnet_kernel"

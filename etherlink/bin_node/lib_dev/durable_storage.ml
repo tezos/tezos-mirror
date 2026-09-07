@@ -241,6 +241,7 @@ type ('a, 'cap) path =
   | Multichain_flag : (unit, ro) path
   | Sequencer_key : (Signature.Public_key.t, ro) path
   | Sequencer_change_counter : (Ethereum_types.quantity, ro) path
+  | Kernel_upgrade : (Evm_events.Upgrade.t, rw) path
   | Chain_config_family :
       L2_types.chain_id
       -> (L2_types.ex_chain_family, ro) path
@@ -546,6 +547,19 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                 ~storage_version
                 cid;
             decode = L2_types.Chain_family.of_bytes;
+          })
+  | Kernel_upgrade ->
+      versioned_rw (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_upgrade ~storage_version;
+            decode =
+              (fun bytes ->
+                match Evm_events.Upgrade.of_bytes bytes with
+                | Some upgrade -> Ok upgrade
+                | None -> error_with "Invalid kernel upgrade payload");
+            encode =
+              (fun upgrade ->
+                Bytes.to_string (Evm_events.Upgrade.to_bytes upgrade));
           })
   | Tezosx_feature_flag runtime ->
       static_ro (unit_flag_ro_codec ~path:(Tezosx.feature_flag runtime))

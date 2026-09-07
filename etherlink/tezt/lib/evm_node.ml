@@ -559,6 +559,18 @@ let wait_for_predownload_kernel_failed ?timeout evm_node ~root_hash =
   let event_root_hash = JSON.(json |-> "version" |> as_string) in
   if root_hash = event_root_hash then Some () else None
 
+let wait_for_kernel_activation_dry_run ?timeout evm_node ~root_hash =
+  wait_for_event ?timeout evm_node ~event:"kernel_activation_dry_run.v0"
+  @@ fun json ->
+  json |> JSON.as_string |> fun hash ->
+  if root_hash = hash then Some () else None
+
+let wait_for_kernel_activation_dry_run_failed ?timeout evm_node ~root_hash =
+  wait_for_event ?timeout evm_node ~event:"kernel_activation_dry_run_failed.v0"
+  @@ fun json ->
+  json |> JSON.as_string |> fun hash ->
+  if root_hash = hash then Some () else None
+
 let wait_for_pending_upgrade ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"pending_upgrade.v0"
   @@ JSON.(

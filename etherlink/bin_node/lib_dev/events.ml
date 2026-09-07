@@ -510,6 +510,22 @@ let predownload_kernel_failed =
     ("version", Data_encoding.string)
     ("error", trace_encoding)
 
+let kernel_activation_dry_run =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~name:"kernel_activation_dry_run"
+    ~msg:"dry run activation for kernel {version} successfully applied"
+    ("version", Data_encoding.string)
+
+let kernel_activation_dry_run_failed =
+  Internal_event.Simple.declare_1
+    ~level:Error
+    ~section
+    ~name:"kernel_activation_dry_run_failed"
+    ~msg:"failed dry run activation for kernel {version}"
+    ("version", Data_encoding.string)
+
 let sandbox_started =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -728,6 +744,12 @@ let cleared_shadownet_pending_confirmations () =
 
 let predownload_kernel_failed root_hash error =
   emit predownload_kernel_failed (Hex.show root_hash, error)
+
+let kernel_activation_dry_run_failed Ethereum_types.(Hash (Hex root_hash)) =
+  emit kernel_activation_dry_run_failed (Hex.show (`Hex root_hash))
+
+let kernel_activation_dry_run Ethereum_types.(Hash (Hex root_hash)) =
+  emit kernel_activation_dry_run (Hex.show (`Hex root_hash))
 
 let predownload_kernel root_hash = emit predownload_kernel (Hex.show root_hash)
 

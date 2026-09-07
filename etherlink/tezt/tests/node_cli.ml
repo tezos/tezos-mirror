@@ -184,6 +184,162 @@ let test_make_l2_kernel_installer_config chain_family =
 
 module Protocol = Test_helpers.Protocol_no_direct_register
 
+let test_kernel_activation_dry_run_success =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp_notation = "2020-01-01T00:00:00Z" in
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn genesis_timestamp_notation))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~__FILE__
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"]
+    ~title:"Kernel activation dry-run success is advertised"
+    ~kernels:[Mainnet]
+    ~additional_uses:[Constant.WASM.evm_kernel]
+    ~genesis_timestamp
+  @@
+  fun {
+        sc_rollup_node;
+        l1_contracts;
+        sc_rollup_address;
+        client;
+        sequencer;
+        observer = _;
+        _;
+      }
+      _protocol
+    ->
+  let provider_port = Port.fresh () in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+  @@ fun () ->
+  let preimages_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.evm_kernel
+      ~activation_timestamp
+  in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      sequencer
+  in
+  let success =
+    Evm_node.wait_for_kernel_activation_dry_run sequencer ~root_hash
+  in
+  let failure =
+    Evm_node.wait_for_kernel_activation_dry_run_failed sequencer ~root_hash
+  in
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  in
+  let* () =
+    Lwt.pick
+      [
+        success;
+        (let* () = failure in
+         Test.fail "Should not have reported a failure");
+      ]
+  in
+  (* Demonstrate the sequencer can still progress (i.e., the dry-run state is
+     correctly thrown away) *)
+  let* _ = Evm_node.wait_for_blueprint_applied sequencer 1
+  and* _ = produce_block ~timestamp:genesis_timestamp_notation sequencer in
+  unit
+
+let test_kernel_activation_dry_run_failure =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp_notation = "2020-01-01T00:00:00Z" in
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn genesis_timestamp_notation))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~__FILE__
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"]
+    ~title:"Kernel activation dry-run failure is advertised"
+    ~kernels:[Latest]
+    ~additional_uses:[Constant.WASM.sink]
+    ~genesis_timestamp
+  @@
+  fun {
+        sc_rollup_node;
+        l1_contracts;
+        sc_rollup_address;
+        client;
+        sequencer;
+        observer = _;
+        _;
+      }
+      _protocol
+    ->
+  let provider_port = Port.fresh () in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+  @@ fun () ->
+  let preimages_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.sink
+      ~activation_timestamp
+  in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      sequencer
+  in
+  let success =
+    Evm_node.wait_for_kernel_activation_dry_run sequencer ~root_hash
+  in
+  let failure =
+    Evm_node.wait_for_kernel_activation_dry_run_failed sequencer ~root_hash
+  in
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  in
+  let* () =
+    Lwt.pick
+      [
+        failure;
+        (let* () = success in
+         Test.fail "Should not have reported a success");
+      ]
+  in
+  (* Demonstrate the sequencer can still progress (i.e., the dry-run state is
+     correctly thrown away) *)
+  let* _ = Evm_node.wait_for_blueprint_applied sequencer 1
+  and* _ = produce_block ~timestamp:genesis_timestamp_notation sequencer in
+  unit
+
 let test_preimages_endpoint =
   (* Add a delay between first block and activation timestamp. *)
   let genesis_timestamp =
@@ -641,4 +797,6 @@ let () =
   test_describe_config () ;
   test_configuration_service [Protocol.Alpha] ;
   test_init_config_network "mainnet" ;
-  test_init_config_network "testnet"
+  test_init_config_network "testnet" ;
+  test_kernel_activation_dry_run_success [Alpha] ;
+  test_kernel_activation_dry_run_failure [Alpha]

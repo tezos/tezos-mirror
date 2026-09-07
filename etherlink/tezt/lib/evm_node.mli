@@ -341,6 +341,18 @@ val wait_for_observer_finalized_level : ?timeout:float -> t -> int -> unit Lwt.t
 val wait_for_predownload_kernel :
   ?timeout:float -> t -> root_hash:string -> unit Lwt.t
 
+(** [wait_for_kernel_activation_dry_run ?timeout evm_node ~root_hash] waits
+    until [evm_node] has completed a dry-run activation of a kernel with
+    [root_hash]. *)
+val wait_for_kernel_activation_dry_run :
+  ?timeout:float -> t -> root_hash:string -> unit Lwt.t
+
+(** [wait_for_kernel_activation_dry_run_failed ?timeout evm_node ~root_hash]
+    waits until [evm_node] has advertized a dry-run activation failure for a
+    kernel with [root_hash]. *)
+val wait_for_kernel_activation_dry_run_failed :
+  ?timeout:float -> t -> root_hash:string -> unit Lwt.t
+
 val wait_for_predownload_kernel_failed :
   ?timeout:float -> t -> root_hash:string -> unit Lwt.t
 
