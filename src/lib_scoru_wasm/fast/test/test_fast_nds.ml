@@ -167,6 +167,13 @@ let kernel =
       (then
         (call $record (call $nds_store_value_size (call $db) (i32.const 1010) (call $key_len)))
         (return)))
+    ;; O: store_set with a zero key length and a key offset past the end
+    ;; of the memory
+    (if (i32.eq (local.get $c) (i32.const 79))
+      (then
+        (call $record (call $nds_store_set
+          (call $db) (i32.const 70000) (i32.const 0) (i32.const 1300) (call $len)))
+        (return)))
     ;; h: database_get_hash db -> 8000, max_bytes = len
     (if (i32.eq (local.get $c) (i32.const 104))
       (then
@@ -227,6 +234,12 @@ let move ~src ~dst = message ~db:src ~db2:dst 'm'
 let clear db = message ~db 'x'
 
 let db_hash ?(db = 0) ~len () = message ~db ~len 'h'
+
+(* An empty key whose offset lies past the end of the memory: the read
+   accesses no byte, so the address is all the two memory implementations
+   can disagree on. *)
+let set_empty_key_out_of_bounds value =
+  message ~len:(String.length value) ~value 'O'
 
 let grow_then_panic = message 'P'
 
@@ -554,7 +567,7 @@ let test_engines_agree ~fallback () =
   if String.equal cleared_hash hash then
     Stdlib.failwith "clearing the database did not change its hash" ;
   (* Level 4: the error paths, then shrinking the registry away. *)
-  let* slow, _fast =
+  let* slow, fast =
     run
       ~level:4l
       [
@@ -584,6 +597,17 @@ let test_engines_agree ~fallback () =
   let*! () = check_code slow 'x' (error Nds_database_out_of_bounds) in
   let*! () = check_code slow 'd' 0l in
   let*! () = check_code slow 'z' (error Nds_resize_invalid) in
+  (* Level 5: the empty key, including one read from out of bounds. *)
+  let* slow, _fast =
+    run
+      ~level:5l
+      [resize 1; set_empty_key_out_of_bounds "v"; exists ""; value_size ""]
+      slow
+      fast
+  in
+  let*! () = check_code slow 'O' 0l in
+  let*! () = check_code slow 'e' 1l in
+  let*! () = check_code slow 'v' 1l in
   return_unit
 
 (** When NDS is not activated on chain, both engines answer
