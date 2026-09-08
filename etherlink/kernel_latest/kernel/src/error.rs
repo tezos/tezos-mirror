@@ -70,6 +70,17 @@ impl From<KeySpaceError> for StorageError {
     }
 }
 
+/// Failure of a chunked transaction accessor.
+#[derive(Error, Debug)]
+pub enum ChunkedTransactionError {
+    /// A key of the chunked transaction is not valid.
+    #[error(transparent)]
+    Key(#[from] KeyError),
+    /// A read or a write in `/base` failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
+}
+
 #[derive(Error, Debug)]
 pub enum UpgradeProcessError {
     #[error("Internal upgrade error: {0}")]
