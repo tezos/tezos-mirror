@@ -16,6 +16,7 @@
   octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
+  octez-libs.crypto
   octez-libs.octez-profiler
   octez-libs.octez-profiler.backends
   octez-libs.stdlib-unix

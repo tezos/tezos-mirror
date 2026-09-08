@@ -124,6 +124,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Baker_operations_cli_options.register ~protocols ;
   Baking.register ~protocols ;
   Baking.register_operations_pool ~protocols ;
+  Base58_decode_bound.register ~protocols ;
   Basic.register ~protocols ;
   Big_map_all.register ~protocols ;
   Big_map_arity.register ~protocols ;
