@@ -102,6 +102,7 @@ let () =
       Data_encoding.data_encoding;
       octez_base;
       octez_base_unix;
+      octez_crypto;
       octez_profiler;
       octez_profiler_backends;
       octez_stdlib_unix;
