@@ -447,10 +447,8 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
-  (* Debian packaging pipelines *)
-  | Debian_daily
-  (* Homebrew packaging pipelines *)
-  | Homebrew_daily
+(* Debian packaging pipelines *)
+(* Homebrew packaging pipelines *)
 (* Security scan pipelines *)
 (* Base images pipelines *)
 (* TODO: consider migrating base images to a [Cacio.Make] component instead,

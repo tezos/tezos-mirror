@@ -361,19 +361,7 @@ let () =
        pipelines, daily on the 'master_branch'. Regular 'before_merging' \
        pipelines run only subset of all jobs depending on files modified by \
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
-       daily." ;
-  register
-    "debian.daily"
-    debian_daily
-    ~jobs:(Cacio.get_jobs Debian_daily)
-    ~description:
-      "Daily pipeline containing all Debian jobs (build and extended tests)." ;
-  register
-    "homebrew.daily"
-    homebrew_daily
-    ~jobs:(Cacio.get_jobs Homebrew_daily)
-    ~description:
-      "Daily pipeline containing all Homebrew jobs (build and extended tests)."
+       daily."
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)

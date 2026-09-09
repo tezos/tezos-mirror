@@ -10,6 +10,12 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Daily pipeline containing all Debian jobs (build and extended tests). *)
+val debian_daily : Cacio.global_pipeline
+
+(** Daily pipeline containing all Homebrew jobs (build and extended tests). *)
+val homebrew_daily : Cacio.global_pipeline
+
 (** Refresh pipeline: rebuild the base images from scratch. *)
 val base_images_refresh : Cacio.global_pipeline
 

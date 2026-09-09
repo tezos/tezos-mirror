@@ -235,7 +235,7 @@ let job_lintian =
    [job_build_keyring_package] (pulled in as artifacts). Reusing the existing
    builds as the reference means we only pay for one extra build.
 
-   This job only ever runs in the scheduled [Debian_daily] pipeline (registered
+   This job only ever runs in the scheduled [Tezos_ci_pipelines.debian_daily] pipeline (registered
    with [Full] below). It checks a single distribution/architecture pair, pinned
    by the DISTRIBUTION and RELEASE variables (debian/trixie) and the amd64 tag;
    reproducibility of that pair is taken as representative of the other
@@ -380,8 +380,10 @@ let () =
   Cacio.register_merge_request_jobs (jobs Partial) ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
-  Cacio.register_jobs Debian_daily (jobs Full) ;
-  Cacio.register_jobs Debian_daily [(Auto, job_reproducibility_debian Full)] ;
+  Cacio.register_jobs Tezos_ci_pipelines.debian_daily (jobs Full) ;
+  Cacio.register_jobs
+    Tezos_ci_pipelines.debian_daily
+    [(Auto, job_reproducibility_debian Full)] ;
   ()
 
 (* Jobs exported outside this module.

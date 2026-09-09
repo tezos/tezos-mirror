@@ -33,6 +33,21 @@ open Tezos_ci
    to testing the special options, and there is no reason why at least some tests
    could be run with special options in dedicated jobs in [before_merging] pipelines. *)
 
+let debian_daily =
+  Cacio.new_global_pipeline
+    "debian.daily"
+    Rules.debian_daily
+    ~description:
+      "Daily pipeline containing all Debian jobs (build and extended tests)."
+
+let homebrew_daily =
+  Cacio.new_global_pipeline
+    "homebrew.daily"
+    Rules.homebrew_daily
+    ~interruptible_pipeline:false
+    ~description:
+      "Daily pipeline containing all Homebrew jobs (build and extended tests)."
+
 (* Rebuilds the base images on the [master-ci-images] branch.
    [DOCKER_FORCE_BUILD] disables the Docker layer cache, so the images are
    rebuilt fresh. This periodic refresh is necessary to avoid image deletion

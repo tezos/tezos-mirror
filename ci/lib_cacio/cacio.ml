@@ -911,10 +911,8 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
-  (* Debian packaging pipelines *)
-  | Debian_daily
-  (* Homebrew packaging pipelines *)
-  | Homebrew_daily
+(* Debian packaging pipelines *)
+(* Homebrew packaging pipelines *)
 (* Security scan pipelines *)
 (* Base images pipelines *)
 (* TODO: consider migrating base images to a [Cacio.Make] component instead,
@@ -1054,7 +1052,7 @@ let get_jobs pipeline =
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
       | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-      | Schedule_extended_test | Homebrew_daily ->
+      | Schedule_extended_test ->
           (* Scheduled pipelines. *)
           convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)
