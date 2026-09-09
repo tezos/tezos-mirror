@@ -38,6 +38,236 @@ open Tezos_ci
    Instead of modifying the definition of each job, we override the value
    by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
 
+(* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
+let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/"
+
+(* Matches Octez minor release tags, e.g. [octez-v1.2]. *)
+let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/"
+
+(* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
+let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/"
+
+(* Matches Octez packaging revision tags, e.g. [octez-v1.0-2]. *)
+let octez_packaging_revision_tag_re = "/^octez-v\\d+\\.\\d+\\-\\d+$/"
+
+(* Matches either Octez release tags or Octez beta release tags,
+   e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
+let octez_release_tags =
+  [
+    octez_major_release_tag_re;
+    octez_minor_release_tag_re;
+    octez_beta_release_tag_re;
+  ]
+
+let has_any_tag tags =
+  match List.map Rules.has_tag_match tags with
+  | [] ->
+      (* We could return [Rules.never], but this looks like a programming mistake. *)
+      invalid_arg "has_any_tag: empty list"
+  | [tag] -> tag
+  | head :: tail -> List.fold_left If.( || ) head tail
+
+(* Lazy: [Cacio.get_release_tag_rexes] only knows all release tags once every
+   component has declared its release pipelines. *)
+let has_non_release_tag =
+  lazy
+    (let release_tags =
+       octez_release_tags
+       @ [octez_packaging_revision_tag_re]
+       @ Cacio.get_release_tag_rexes ()
+     in
+     If.(
+       Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags)))
+
+let release_description =
+  "\n\n\
+   For more information on Octez' release system, see: \
+   https://octez.tezos.com/docs/releases/releases.html"
+
+(* TODO: rename 'octez_docker_latest_release' ?? *)
+let octez_latest_release =
+  Cacio.new_global_pipeline
+    "octez_latest_release"
+    (lazy Rules.(If.(on_tezos_namespace && push && on_branch "latest-release")))
+    ~description:
+      ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
+        This pipeline is created on each push to the 'latest-release' branch \
+        of 'tezos/tezos', typically performed by the release manager. On each \
+        release, the 'latest-release' branch is updated to point to the git \
+        tag of the release. This resulting pipeline then updates the Docker \
+        tag 'latest' of the Octez Docker distribution published to Docker hub \
+        (https://hub.docker.com/r/tezos/tezos) to point to the Docker release \
+        associated with the git tag pushed to the 'latest-release' branch."
+     ^ release_description)
+
+let octez_latest_release_test =
+  Cacio.new_global_pipeline
+    "octez_latest_release_test"
+    (lazy
+      Rules.(
+        If.(not_on_tezos_namespace && push && on_branch "latest-release-test")))
+    ~description:
+      "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
+       This pipeline is used to dry run the 'octez_latest_release' pipeline, \
+       checking that it works as intended, without updating any Docker tags. \
+       Developers or release managers trigger it manually by pushing to the \
+       branch 'latest-release-test' of a fork of 'tezos/tezos', e.g. to the \
+       'nomadic-labs/tezos' project."
+
+(* TODO: simplify dry run pipelines by having them all be on tezos/tezos? *)
+let octez_major_release_tag =
+  Cacio.new_global_pipeline
+    "octez_major_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for major Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.0(-rcN).\n\
+        Publishes release assets for all the components of Octez."
+     ^ release_description)
+
+let octez_minor_release_tag =
+  Cacio.new_global_pipeline
+    "octez_minor_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for minor Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.Y.\n\
+        Publishes release assets for Octez L1 only." ^ release_description)
+
+let octez_beta_release_tag =
+  Cacio.new_global_pipeline
+    "octez_beta_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)))
+    ~description:
+      ("Beta release tag pipelines for Octez.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.Y(-betaN). It is as Octez release tag pipelines, but \
+        does not publish to opam." ^ release_description)
+
+let octez_major_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_major_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_major_release_tag_re)))
+    ~description:
+      "Dry-run pipeline for 'octez_major_release_tag'.\n\n\
+       This pipeline checks that 'octez_major_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_minor_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_minor_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_minor_release_tag_re)))
+    ~description:
+      "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
+       This pipeline checks that 'octez_minor_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_beta_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_beta_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_beta_release_tag_re)))
+    ~description:
+      "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
+       This pipeline checks that 'octez_beta_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_packaging_revision =
+  Cacio.new_global_pipeline
+    "octez_packaging_revision"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push
+          && Rules.has_tag_match octez_packaging_revision_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Packaging revision pipeline for Octez.\n\n\
+       This pipeline is created when a packaging revision tag in the format \
+       octez-vX.Y-N is pushed to tezos/tezos."
+
+let octez_packaging_revision_test =
+  Cacio.new_global_pipeline
+    "octez_packaging_revision_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && Rules.has_tag_match octez_packaging_revision_tag_re)))
+    ~interruptible_publish:true
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Dry run pipeline for 'octez_packaging_revision_tag'.\n\n\
+       This pipeline checks that 'octez_packaging_revision_tag' pipelines work \
+       as intended, without publishing any assets. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let non_release_tag =
+  Cacio.new_global_pipeline
+    "non_release_tag"
+    (lazy
+      Rules.(If.(on_tezos_namespace && push && Lazy.force has_non_release_tag)))
+    ~description:
+      ("Tag pipeline for non-release tags.\n\n\
+        Created on each push of a tag that does not match e.g. \
+        octez(-evm-node)-vX.Y(-rcN). This pipeline creates a release on GitLab \
+        and associated artifacts, like 'octez_release_tag' pipelines, but does \
+        not publish it." ^ release_description)
+
+let non_release_tag_test =
+  Cacio.new_global_pipeline
+    "non_release_tag_test"
+    (lazy
+      Rules.(
+        If.(not_on_tezos_namespace && push && Lazy.force has_non_release_tag)))
+    ~description:
+      "Dry-run pipeline for 'non_release_tag'.\n\n\
+       This pipeline checks that 'non_release_tag' pipelines work as intended, \
+       without publishing any release. Developers, or release managers, can \
+       create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
+       to the 'nomadic-labs/tezos' project."
+
+(* Add jobs to the release pipelines of all components. *)
+let register_release_jobs jobs =
+  Cacio.register_jobs octez_major_release_tag jobs ;
+  Cacio.register_jobs octez_beta_release_tag jobs
+
+(* Add jobs to the test release pipelines of all components. *)
+let register_test_release_jobs jobs =
+  Cacio.register_jobs octez_major_release_tag_test jobs ;
+  Cacio.register_jobs octez_beta_release_tag_test jobs
+
 let schedule_extended_test =
   Cacio.new_global_pipeline
     "schedule_extended_test"

@@ -57,7 +57,7 @@ let job_docker_container_scanning =
           vuln_predicate;
       ]
 
-(* This job normally runs in the {!Octez_latest_release} pipeline
+(* This job normally runs in the {!Tezos_ci_pipelines.octez_latest_release} pipeline
    that is triggered manually after a release is made.
    However, to make release testing easier, we include it in other test release pipelines.
    Thus, release testers are not required to trigger two separate pipelines
@@ -285,7 +285,7 @@ let () =
      scanning job is validated in test pipelines. Same for
      octez_latest_release.ml. *)
   Cacio.register_jobs
-    Major_release_tag
+    Tezos_ci_pipelines.octez_major_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
@@ -296,7 +296,7 @@ let () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
-    Major_release_tag_test
+    Tezos_ci_pipelines.octez_major_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
@@ -309,7 +309,7 @@ let () =
     ] ;
   (* Minor *)
   Cacio.register_jobs
-    Minor_release_tag
+    Tezos_ci_pipelines.octez_minor_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
@@ -320,7 +320,7 @@ let () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
-    Minor_release_tag_test
+    Tezos_ci_pipelines.octez_minor_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
@@ -333,7 +333,7 @@ let () =
     ] ;
   (* Beta *)
   Cacio.register_jobs
-    Beta_release_tag
+    Tezos_ci_pipelines.octez_beta_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
@@ -344,7 +344,7 @@ let () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
-    Beta_release_tag_test
+    Tezos_ci_pipelines.octez_beta_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
@@ -356,7 +356,7 @@ let () =
     ] ;
   (* Non-release *)
   Cacio.register_jobs
-    Non_release_tag
+    Tezos_ci_pipelines.non_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_publish `non_release_tag);
@@ -364,7 +364,7 @@ let () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
-    Non_release_tag_test
+    Tezos_ci_pipelines.non_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);
@@ -384,10 +384,10 @@ let () =
     ] ;
   (* Octez Latest Release *)
   Cacio.register_jobs
-    Octez_latest_release
+    Tezos_ci_pipelines.octez_latest_release
     [(Auto, job_docker_promote_to_latest `real)] ;
   Cacio.register_jobs
-    Octez_latest_release_test
+    Tezos_ci_pipelines.octez_latest_release_test
     [(Auto, job_docker_promote_to_latest `test)] ;
   ()
 
@@ -462,7 +462,7 @@ let job_update_gitlab_release =
 
 let register () =
   Cacio.register_jobs
-    Packaging_revision
+    Tezos_ci_pipelines.octez_packaging_revision
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
@@ -483,7 +483,7 @@ let register () =
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
-    Packaging_revision_test
+    Tezos_ci_pipelines.octez_packaging_revision_test
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);

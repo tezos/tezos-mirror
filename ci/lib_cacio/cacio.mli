@@ -433,19 +433,7 @@ type global_pipeline =
   | Before_merging
   | Merge_train
   | Master
-  (* Release tag pipelines *)
-  | Major_release_tag
-  | Major_release_tag_test
-  | Minor_release_tag
-  | Minor_release_tag_test
-  | Beta_release_tag
-  | Beta_release_tag_test
-  | Non_release_tag
-  | Non_release_tag_test
-  | Packaging_revision
-  | Packaging_revision_test
-  | Octez_latest_release
-  | Octez_latest_release_test
+(* Release tag pipelines *)
 (* Debian packaging pipelines *)
 (* Homebrew packaging pipelines *)
 (* Security scan pipelines *)
@@ -518,22 +506,6 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
 
     If a job is [Manual], this function only registers it into [Before_merging]. *)
 val register_merge_request_jobs : (trigger * job) list -> unit
-
-(** Register jobs to be included in release pipelines.
-
-    This registers jobs into:
-    - [Major_release_tag]
-    - [Beta_release_tag]
-    - [Non_release_tag] *)
-val register_release_jobs : (trigger * job) list -> unit
-
-(** Register jobs to be included in test release pipelines.
-
-    This registers jobs into:
-    - [Major_release_tag_test]
-    - [Beta_release_tag_test]
-    - [Non_release_tag_test] *)
-val register_test_release_jobs : (trigger * job) list -> unit
 
 (** {2 Listing registered jobs and more} *)
 
