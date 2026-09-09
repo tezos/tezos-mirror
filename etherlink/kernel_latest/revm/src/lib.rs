@@ -1495,6 +1495,81 @@ mod test {
         assert_eq!(destination_origin, AccountOrigin::Unclassified);
     }
 
+    /// Calls `precompile` from an EOA with `calldata` and returns the gas
+    /// used by the whole transaction.
+    fn precompile_call_gas_used(precompile: Address, calldata: Bytes) -> u64 {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            origin: AccountOrigin::Unclassified,
+            code: None,
+        };
+        StorageAccount::from_address(&caller)
+            .unwrap()
+            .set_info_without_code(rk.eth_accounts_mut(), caller_info)
+            .unwrap();
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let execution_result = run_transaction(
+            &mut rk,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            caller,
+            Some(precompile),
+            calldata,
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::UserInput {
+                access_list: AccessList::default(),
+            },
+        )
+        .unwrap();
+
+        assert!(
+            execution_result.result.is_success(),
+            "call to {precompile} failed: {:?}",
+            execution_result.result
+        );
+        execution_result.result.tx_gas_used()
+    }
+
+    #[test]
+    fn test_ecrecover_call_charges_repriced_gas() {
+        use crate::precompiles::reprice::{ECRECOVER_ADDRESS, ECRECOVER_GAS};
+
+        // Empty calldata: the intrinsic 21000 plus the flat ecrecover gas.
+        assert_eq!(
+            precompile_call_gas_used(ECRECOVER_ADDRESS, Bytes::new()),
+            21_000 + ECRECOVER_GAS
+        );
+    }
+
+    #[test]
+    fn test_pairing_call_charges_repriced_gas() {
+        use crate::precompiles::reprice::{PAIRING_ADDRESS, PAIR_PER_POINT};
+        use revm::precompile::bn254::pair::ISTANBUL_PAIR_BASE;
+
+        // One pair of points at infinity (all zeros), which is a valid
+        // pairing input. Zero calldata bytes cost 4 gas each.
+        let calldata = Bytes::from(vec![0u8; 192]);
+        assert_eq!(
+            precompile_call_gas_used(PAIRING_ADDRESS, calldata),
+            21_000 + 192 * 4 + ISTANBUL_PAIR_BASE + PAIR_PER_POINT
+        );
+    }
+
     #[test]
     fn test_tezosx_simple_transfer_to_mapped_address() {
         let mut host = MockKernelHost::default();

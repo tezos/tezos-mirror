@@ -2680,6 +2680,7 @@ dependencies = [
  "evm-types",
  "hex",
  "http",
+ "libsecp256k1",
  "michelson-types",
  "nom",
  "num-bigint",

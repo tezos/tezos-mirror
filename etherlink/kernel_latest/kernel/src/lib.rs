@@ -446,6 +446,16 @@ where
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
+    // Install EtherlinkCrypto (libsecp256k1 ecrecover) once, before any
+    // precompile runs. Warn if another crypto() user pinned the default backend
+    // first — ecrecover then falls back to k256 (a slowdown, not a wrong result).
+    if !revm_etherlink::precompiles::crypto::ensure_etherlink_crypto_installed() {
+        log!(
+            Error,
+            "EtherlinkCrypto could not be installed: a crypto provider was already set; ecrecover falls back to the default backend"
+        );
+    }
+
     let reboot_counter = kernel_host
         .reboot_left()
         .expect("The kernel failed to get the number of reboot left");
