@@ -464,6 +464,12 @@ type global_pipeline =
     add jobs to it with {!register_jobs}, and {!close} registers it with CIAO
     once all jobs have been added.
 
+    [rule] is lazy because it is only forced by {!close}, i.e. once all
+    components have been initialized. Some rules need this: the rule of the
+    [non_release_tag] pipelines is defined from the release tags of all
+    components (see {!get_release_tag_rexes}), which are only all known once
+    every component has declared its release pipelines.
+
     [description] is printed by [ci/bin/main.exe --list-pipelines].
     Its first sentence should be short (<= 80 characters) and be followed by
     two new-lines. The remainder should detail what the pipeline does, why we
@@ -499,7 +505,7 @@ val new_global_pipeline :
   ?allow_manual_jobs:bool ->
   description:string ->
   string ->
-  Gitlab_ci.If.t ->
+  Gitlab_ci.If.t Lazy.t ->
   global_pipeline
 
 (** Add jobs to a given global pipeline. *)

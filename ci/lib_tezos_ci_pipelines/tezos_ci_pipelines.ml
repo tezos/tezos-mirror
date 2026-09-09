@@ -41,7 +41,7 @@ open Tezos_ci
 let schedule_extended_test =
   Cacio.new_global_pipeline
     "schedule_extended_test"
-    Rules.schedule_extended_tests
+    (lazy Rules.schedule_extended_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
@@ -54,14 +54,14 @@ let schedule_extended_test =
 let debian_daily =
   Cacio.new_global_pipeline
     "debian.daily"
-    Rules.debian_daily
+    (lazy Rules.debian_daily)
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)."
 
 let homebrew_daily =
   Cacio.new_global_pipeline
     "homebrew.daily"
-    Rules.homebrew_daily
+    (lazy Rules.homebrew_daily)
     ~interruptible_pipeline:false
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)."
@@ -77,7 +77,7 @@ let homebrew_daily =
 let base_images_refresh =
   Cacio.new_global_pipeline
     "base_images.refresh"
-    Rules.base_images_refresh
+    (lazy Rules.base_images_refresh)
     ~interruptible_pipeline:false
     ~variables:
       [("CI_COMMIT_REF_SLUG", "master"); ("DOCKER_FORCE_BUILD", "true")]
@@ -88,7 +88,7 @@ let base_images_refresh =
 let base_images_daily =
   Cacio.new_global_pipeline
     "base_images.daily"
-    Rules.base_images_daily
+    (lazy Rules.base_images_daily)
     ~interruptible_pipeline:false
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)."
@@ -96,7 +96,7 @@ let base_images_daily =
 let schedule_extended_rpc_test =
   Cacio.new_global_pipeline
     "schedule_extended_rpc_test"
-    Rules.schedule_extended_rpc_tests
+    (lazy Rules.schedule_extended_rpc_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
@@ -107,7 +107,7 @@ let schedule_extended_rpc_test =
 let schedule_extended_validation_test =
   Cacio.new_global_pipeline
     "schedule_extended_validation_test"
-    Rules.schedule_extended_validation_tests
+    (lazy Rules.schedule_extended_validation_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
@@ -118,7 +118,7 @@ let schedule_extended_validation_test =
 let schedule_extended_baker_remote_mode_test =
   Cacio.new_global_pipeline
     "schedule_extended_baker_remote_mode_test"
-    Rules.schedule_extended_baker_remote_mode_tests
+    (lazy Rules.schedule_extended_baker_remote_mode_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with baker using remote node, weekly on \
@@ -128,7 +128,7 @@ let schedule_extended_baker_remote_mode_test =
 let schedule_extended_dal_use_baker =
   Cacio.new_global_pipeline
     "schedule_extended_dal_use_baker"
-    Rules.schedule_extended_dal_use_baker
+    (lazy Rules.schedule_extended_dal_use_baker)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
@@ -153,7 +153,7 @@ let register_custom_extended_test_jobs jobs =
 let schedule_test_release =
   Cacio.new_global_pipeline
     "schedule_test_release"
-    Rules.schedule_test_release
+    (lazy Rules.schedule_test_release)
     ~description:
       "Scheduled pipeline that runs a test release pipeline. The jobs are the \
        same as a release pipeline but run in dry-mode."
@@ -161,7 +161,7 @@ let schedule_test_release =
 let schedule_security_scans =
   Cacio.new_global_pipeline
     "schedule_security_scans"
-    Rules.schedule_security_scans
+    (lazy Rules.schedule_security_scans)
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images"
@@ -169,7 +169,7 @@ let schedule_security_scans =
 let schedule_docker_master_snapshot =
   Cacio.new_global_pipeline
     "schedule_docker_master_snapshot"
-    Rules.schedule_docker_master_snapshot
+    (lazy Rules.schedule_docker_master_snapshot)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled pipeline publishing a dated master Docker image to Docker \
@@ -182,7 +182,7 @@ let schedule_docker_master_snapshot =
 let schedule_docker_build_pipeline =
   Cacio.new_global_pipeline
     "schedule_docker_build_pipeline"
-    Rules.schedule_docker_build
+    (lazy Rules.schedule_docker_build)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
@@ -192,11 +192,11 @@ let schedule_docker_build_pipeline =
 let publish_test_release_page =
   Cacio.new_global_pipeline
     "publish_test_release_page"
-    Rules.(If.(api_release_page && not_on_tezos_namespace))
+    (lazy Rules.(If.(api_release_page && not_on_tezos_namespace)))
     ~description:"Pipeline that updates and publishes the test release page."
 
 let publish_release_page =
   Cacio.new_global_pipeline
     "publish_release_page"
-    Rules.(If.(api_release_page && on_tezos_namespace))
+    (lazy Rules.(If.(api_release_page && on_tezos_namespace)))
     ~description:"Pipeline that updates and publishes the release page."

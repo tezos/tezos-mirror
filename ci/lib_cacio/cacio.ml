@@ -876,7 +876,7 @@ end
 module External_global_pipeline = struct
   type t = {
     name : string;
-    rule : Gitlab_ci.If.t;
+    rule : Gitlab_ci.If.t Lazy.t;
     description : string;
     variables : Gitlab_ci.Types.variables option;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
@@ -1070,7 +1070,7 @@ let close () =
     ~description:pipeline.description
     ~jobs:(get_jobs (External pipeline))
     pipeline.name
-    pipeline.rule
+    (Lazy.force pipeline.rule)
 
 let release_tag_rexes = ref String_set.empty
 
