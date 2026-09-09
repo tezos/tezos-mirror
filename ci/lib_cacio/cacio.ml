@@ -915,13 +915,11 @@ type global_pipeline =
   | Debian_daily
   (* Homebrew packaging pipelines *)
   | Homebrew_daily
-  (* Security scan pipelines *)
-  (* Base images pipelines *)
-  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+(* Security scan pipelines *)
+(* Base images pipelines *)
+(* TODO: consider migrating base images to a [Cacio.Make] component instead,
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
-  | Base_images_daily
-  | Base_images_refresh
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -1056,8 +1054,7 @@ let get_jobs pipeline =
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
       | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-      | Schedule_extended_test | Base_images_daily | Base_images_refresh
-      | Homebrew_daily ->
+      | Schedule_extended_test | Homebrew_daily ->
           (* Scheduled pipelines. *)
           convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)

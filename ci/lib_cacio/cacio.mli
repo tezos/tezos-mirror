@@ -451,16 +451,14 @@ type global_pipeline =
   | Debian_daily
   (* Homebrew packaging pipelines *)
   | Homebrew_daily
-  (* Security scan pipelines *)
-  (* Base images pipelines *)
-  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+(* Security scan pipelines *)
+(* Base images pipelines *)
+(* TODO: consider migrating base images to a [Cacio.Make] component instead,
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
-  | Base_images_daily
-  (* Same jobs as [Base_images_daily] for now, but the pipeline should only run
+(* Same jobs as [Base_images_daily] for now, but the pipeline should only run
      on refresh branches (e.g. [master-ci-images] branch).
      The two pipelines should diverge after #8367. *)
-  | Base_images_refresh
 
 (** Define a global pipeline outside of Cacio.
 

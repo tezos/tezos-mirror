@@ -33,6 +33,33 @@ open Tezos_ci
    to testing the special options, and there is no reason why at least some tests
    could be run with special options in dedicated jobs in [before_merging] pipelines. *)
 
+(* Rebuilds the base images on the [master-ci-images] branch.
+   [DOCKER_FORCE_BUILD] disables the Docker layer cache, so the images are
+   rebuilt fresh. This periodic refresh is necessary to avoid image deletion
+   due to the registry retention policy.
+   [CI_COMMIT_REF_SLUG] is overridden to [master] so the rebuilt images are
+   tagged [master-<sha>] rather than [master-ci-images-<sha>].
+   TODO (#8374): drop the [CI_COMMIT_REF_SLUG] override once base-image tags
+   no longer embed the ref slug. *)
+let base_images_refresh =
+  Cacio.new_global_pipeline
+    "base_images.refresh"
+    Rules.base_images_refresh
+    ~interruptible_pipeline:false
+    ~variables:
+      [("CI_COMMIT_REF_SLUG", "master"); ("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Refresh pipeline: rebuild the base images from scratch on the \
+       [master-ci-images] branch (same jobs as [base_images.daily])."
+
+let base_images_daily =
+  Cacio.new_global_pipeline
+    "base_images.daily"
+    Rules.base_images_daily
+    ~interruptible_pipeline:false
+    ~description:
+      "Daily pipeline containing all Base Images jobs (build and merge)."
+
 let schedule_extended_rpc_test =
   Cacio.new_global_pipeline
     "schedule_extended_rpc_test"

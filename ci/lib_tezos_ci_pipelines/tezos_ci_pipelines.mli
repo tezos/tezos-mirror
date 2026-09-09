@@ -10,6 +10,12 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Refresh pipeline: rebuild the base images from scratch. *)
+val base_images_refresh : Cacio.global_pipeline
+
+(** Daily pipeline containing all Base Images jobs (build and merge). *)
+val base_images_daily : Cacio.global_pipeline
+
 (** Scheduled run of all tezt tests with external RPC servers. *)
 val schedule_extended_rpc_test : Cacio.global_pipeline
 
