@@ -7,4 +7,5 @@
   gitlab_ci
   tezos_ci
   cacio
+  tezos_ci_pipelines
   release_site_ci))

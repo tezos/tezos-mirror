@@ -45,6 +45,16 @@ let ci_lib_cacio =
     ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci; tezt_core_lib]
     ~release_status:Unreleased
 
+let ci_lib_tezos_ci_pipelines =
+  private_lib
+    "tezos_ci_pipelines"
+    ~opam:""
+    ~path:"ci/lib_tezos_ci_pipelines"
+    ~bisect_ppx:No
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+    ~release_status:Unreleased
+
 let ci_sdk_bindings =
   private_lib
     "sdk_bindings_ci"
@@ -53,7 +63,12 @@ let ci_sdk_bindings =
     ~bisect_ppx:No
     ~modules:["sdk_bindings_ci"]
     ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
+      ]
     ~release_status:Unreleased
 
 let ci_release_site =
@@ -63,7 +78,12 @@ let ci_release_site =
     ~path:"release_site/ci"
     ~bisect_ppx:No
     ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
+      ]
     ~release_status:Unreleased
 
 let ci_grafazos =
@@ -73,7 +93,13 @@ let ci_grafazos =
     ~path:"grafazos/ci"
     ~bisect_ppx:No
     ~deps:
-      [ci_lib_gitlab_ci_main; ci_lib_tezos_ci; ci_lib_cacio; ci_release_site]
+      [
+        ci_lib_gitlab_ci_main;
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
+        ci_release_site;
+      ]
     ~release_status:Unreleased
 
 let ci_teztale =
@@ -87,6 +113,7 @@ let ci_teztale =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
         ci_release_site;
       ]
     ~release_status:Unreleased
@@ -102,6 +129,7 @@ let ci_rollup_node =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
         ci_release_site;
       ]
     ~release_status:Unreleased
@@ -117,6 +145,7 @@ let ci_lib_tezos_ci_jobs =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
         ci_sdk_bindings;
         tezt_core_lib;
         ci_release_site;
@@ -137,6 +166,7 @@ let ci_etherlink =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
         ci_lib_tezos_ci_jobs;
       ]
     ~release_status:Unreleased
@@ -152,6 +182,7 @@ let ci_documentation =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
+        ci_lib_tezos_ci_pipelines;
         ci_lib_tezos_ci_jobs;
       ]
     ~release_status:Unreleased

@@ -474,22 +474,6 @@ let () =
        any cache mechanism) for the current master branch of Octez. The newly \
        built images should contains the latest available Alpine packages"
 
-(** {Manual pipelines} *)
-
-let () =
-  let open Pipeline in
-  let open Rules in
-  register
-    "publish_test_release_page"
-    If.(api_release_page && not_on_tezos_namespace)
-    ~jobs:(Cacio.get_jobs Test_publish_release_page)
-    ~description:"Pipeline that updates and publishes the test release page." ;
-  register
-    "publish_release_page"
-    If.(api_release_page && on_tezos_namespace)
-    ~jobs:(Cacio.get_jobs Publish_release_page)
-    ~description:"Pipeline that updates and publishes the release page."
-
 (** {2 Closing the set of pipelines} *)
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].

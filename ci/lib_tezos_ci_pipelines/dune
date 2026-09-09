@@ -2,13 +2,11 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name teztale_ci)
+ (name tezos_ci_pipelines)
  (libraries
   gitlab_ci
   tezos_ci
-  cacio
-  tezos_ci_pipelines
-  release_site_ci)
+  cacio)
  (flags
   (:standard)
   -open Gitlab_ci.Base))

@@ -902,8 +902,6 @@ type global_pipeline =
   | Scheduled_docker_build
   | Scheduled_docker_master_snapshot
   | Scheduled_test_release
-  | Publish_release_page
-  | Test_publish_release_page
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
