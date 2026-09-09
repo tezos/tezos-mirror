@@ -24,6 +24,29 @@
 open Gitlab_ci
 open Tezos_ci
 
+let schedule_docker_master_snapshot =
+  Cacio.new_global_pipeline
+    "schedule_docker_master_snapshot"
+    Rules.schedule_docker_master_snapshot
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled pipeline publishing a dated master Docker image to Docker \
+       Hub.\n\n\
+       This pipeline publishes the Octez Docker image tagged as \
+       [master-YYYYMMDD] (where the date is computed at build time) to \
+       DockerHub (https://hub.docker.com/r/tezos/tezos), then promotes it to \
+       the rolling [weekly] tag."
+
+let schedule_docker_build_pipeline =
+  Cacio.new_global_pipeline
+    "schedule_docker_build_pipeline"
+    Rules.schedule_docker_build
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Scheduled pipeline for forcing building fresh Docker image (skipping \
+       any cache mechanism) for the current master branch of Octez. The newly \
+       built images should contains the latest available Alpine packages"
+
 let publish_test_release_page =
   Cacio.new_global_pipeline
     "publish_test_release_page"

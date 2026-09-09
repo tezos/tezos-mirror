@@ -346,6 +346,8 @@ let () =
    to prevent them from being canceled after a push to master.
    Instead of modifying the definition of each job, we override the value
    with [with_interruptible]. *)
+
+(** {2 Closing the set of pipelines} *)
 let () =
   let open Pipeline in
   let open Rules in
@@ -452,29 +454,7 @@ let () =
     ~jobs:(Cacio.get_jobs Schedule_security_scans)
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
-       vulnerabilities in Docker images" ;
-  register
-    "schedule_docker_master_snapshot"
-    schedule_docker_master_snapshot
-    ~jobs:(Cacio.get_jobs Scheduled_docker_master_snapshot)
-    ~description:
-      "Scheduled pipeline publishing a dated master Docker image to Docker \
-       Hub.\n\n\
-       This pipeline publishes the Octez Docker image tagged as \
-       [master-YYYYMMDD] (where the date is computed at build time) to \
-       DockerHub (https://hub.docker.com/r/tezos/tezos), then promotes it to \
-       the rolling [weekly] tag." ;
-  register
-    "schedule_docker_build_pipeline"
-    schedule_docker_build
-    ~jobs:(Cacio.get_jobs Scheduled_docker_build)
-    ~variables:[("DOCKER_FORCE_BUILD", "true")]
-    ~description:
-      "Scheduled pipeline for forcing building fresh Docker image (skipping \
-       any cache mechanism) for the current master branch of Octez. The newly \
-       built images should contains the latest available Alpine packages"
-
-(** {2 Closing the set of pipelines} *)
+       vulnerabilities in Docker images"
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)
