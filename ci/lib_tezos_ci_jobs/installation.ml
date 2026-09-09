@@ -79,7 +79,8 @@ let job_compile_sources_doc =
     ~image:Tezos_ci.Images.Base_images.debian_build_trixie
 
 let register () =
-  Cacio.register_merge_request_jobs [(Auto, job_compile_sources_doc)] ;
+  Tezos_ci_pipelines.register_merge_request_jobs
+    [(Auto, job_compile_sources_doc)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_extended_test
     [

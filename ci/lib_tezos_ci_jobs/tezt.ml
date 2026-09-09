@@ -168,7 +168,7 @@ let job_tezt_static_binaries =
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]
 
 let register () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_tezt `merge_request);
       (Auto, job_tezt_time_sensitive `merge_request);

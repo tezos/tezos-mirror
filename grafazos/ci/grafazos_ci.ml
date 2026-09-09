@@ -81,7 +81,7 @@ let job_deploy_release_page_assets =
       ]
 
 let register () =
-  Cacio.register_merge_request_jobs [(Auto, job_build Test)] ;
+  Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_build Test)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Grafazos."

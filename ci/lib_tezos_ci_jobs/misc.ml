@@ -424,7 +424,7 @@ let job_test_sdk_rust =
     ~script:["make -C sdk/rust check"; "make -C sdk/rust test"]
 
 let register () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);

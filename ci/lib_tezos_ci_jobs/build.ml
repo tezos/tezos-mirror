@@ -256,7 +256,7 @@ let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
   Cacio.register_jobs
-    Before_merging
+    Tezos_ci_pipelines.before_merging
     [
       (Manual, build_octez_source);
       (Manual, job_build_released Arm64);
@@ -268,7 +268,7 @@ let register () =
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
      even if the tests need not be run. *)
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_build_released Amd64);
       (Auto, job_build_extra_dev Amd64);

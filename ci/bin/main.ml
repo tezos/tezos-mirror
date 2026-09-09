@@ -10,7 +10,6 @@
    Here we register the set of pipelines, stages and images and
    generate the GitLab CI configuration file. *)
 
-open Gitlab_ci
 open Gitlab_ci.Types
 open Tezos_ci
 
@@ -119,37 +118,6 @@ let () = Tezos_ci_jobs.Security_scans.register ()
 let () = Release_tag.register ()
 
 let () = Sdk_bindings_ci.register ()
-
-(** {3 General pipelines} *)
-
-let () =
-  let open Rules in
-  let open Pipeline in
-  register
-    "before_merging"
-    If.(merge_request && not merge_train)
-    ~jobs:(Cacio.get_jobs Before_merging)
-    ~description:
-      "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
-       This pipeline is created on each push to a branch with an associated \
-       open merge request, typically by the developer. It runs sanity checks, \
-       linters and checks that code of the MR compiles and that the tests \
-       pass. Must be manually started through the job 'trigger'." ;
-  register
-    "merge_train"
-    ~auto_cancel:{on_job_failure = true; on_new_commit = false}
-    If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Cacio.get_jobs Merge_train)
-    ~description:
-      "A merge-train-specific version of 'before_merging'.\n\n\
-       This pipeline contains the same set of jobs as 'before_merging' but \
-       with auto-cancelling enabled on job failures. That is, if one job in \
-       the pipeline fails, the full pipeline is cancelled. This ensures that \
-       pipelines running in a merge train, that are bound to fail (due to some \
-       failing job), does so as early as possible. This prevents unneccessary \
-       delays in merging MRs further down the train.\n\n\
-       The merge train pipeline is created by GitLab when a merge request is \
-       added to the merge train (typically by marge-bot)."
 
 (** {2 Closing the set of pipelines} *)
 

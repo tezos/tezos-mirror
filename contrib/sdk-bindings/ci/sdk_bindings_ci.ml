@@ -175,7 +175,7 @@ module Release = struct
 end
 
 let register () =
-  Cacio.register_merge_request_jobs [(Auto, job_test)] ;
+  Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_test)] ;
   (* TODO: split into a new pipeline [sdk_bindings.daily] *)
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_extended_test

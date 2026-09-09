@@ -977,11 +977,6 @@ let register_jobs pipeline jobs =
          incorrect, since its hash would change as jobs are added to it. *)
       List.iter (Hashtbl.add global_jobs pipeline) jobs
 
-let register_merge_request_jobs jobs =
-  register_jobs Before_merging jobs ;
-  let non_manual_jobs = List.filter (fun x -> not (is_manual x)) jobs in
-  register_jobs Merge_train non_manual_jobs
-
 (* Defined at the end of this module. *)
 let job_trigger : job option ref = ref None
 

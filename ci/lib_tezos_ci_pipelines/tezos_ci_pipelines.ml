@@ -38,6 +38,56 @@ open Tezos_ci
    Instead of modifying the definition of each job, we override the value
    by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
 
+let before_merging =
+  Cacio.new_global_pipeline
+    "before_merging"
+    (lazy Rules.(If.(merge_request && not merge_train)))
+    ~with_job_trigger:true
+    ~with_condition:true
+    ~with_datadog_pipeline_trace:false
+    ~description:
+      "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
+       This pipeline is created on each push to a branch with an associated \
+       open merge request, typically by the developer. It runs sanity checks, \
+       linters and checks that code of the MR compiles and that the tests \
+       pass. Must be manually started through the job 'trigger'."
+
+let merge_train =
+  Cacio.new_global_pipeline
+    "merge_train"
+    (lazy Rules.(If.(on_tezos_namespace && merge_request && merge_train)))
+    ~with_condition:true
+    ~allow_manual_jobs:false
+    ~auto_cancel:Types.{on_job_failure = true; on_new_commit = false}
+    ~description:
+      "A merge-train-specific version of 'before_merging'.\n\n\
+       This pipeline contains the same set of jobs as 'before_merging' but \
+       with auto-cancelling enabled on job failures. That is, if one job in \
+       the pipeline fails, the full pipeline is cancelled. This ensures that \
+       pipelines running in a merge train, that are bound to fail (due to some \
+       failing job), does so as early as possible. This prevents unneccessary \
+       delays in merging MRs further down the train.\n\n\
+       The merge train pipeline is created by GitLab when a merge request is \
+       added to the merge train (typically by marge-bot)."
+
+(* Add jobs to both the [before_merging] and the [merge_train] pipelines.
+
+   Manual jobs are only added to [before_merging]: [merge_train] must finish
+   ASAP so as to not block other MRs, so it does not make sense to have to wait
+   on a manual action there. Manual, allowed to fail jobs would not block the
+   pipeline, but they are better reserved for other pipelines. *)
+let register_merge_request_jobs jobs =
+  Cacio.register_jobs before_merging jobs ;
+  let non_manual_jobs =
+    List.filter
+      (fun (trigger, _) ->
+        match trigger with
+        | Cacio.Manual -> false
+        | Cacio.Auto | Cacio.Immediate -> true)
+      jobs
+  in
+  Cacio.register_jobs merge_train non_manual_jobs
+
 let master_branch =
   Cacio.new_global_pipeline
     "master_branch"

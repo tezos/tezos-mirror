@@ -98,7 +98,7 @@ let job_render ?(needs = []) pipeline_type =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 let register () =
-  Cacio.register_merge_request_jobs [(Auto, job_test)] ;
+  Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_test)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_extended_test
     [(Auto, job_test)] ;
