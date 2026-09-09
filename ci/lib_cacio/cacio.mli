@@ -412,37 +412,15 @@ module Shared : COMPONENT_API
 
 (** {2 Global pipelines} *)
 
-(** Global pipelines that are defined outside of Cacio.
-
-    Use {!new_global_pipeline} to define one. *)
-type external_global_pipeline
-
 (** Global pipelines.
 
-    Global pipelines are shared between components.
+    Global pipelines are pipelines that are shared between components:
+    several components can add jobs to them with {!register_jobs}, and no
+    single component owns them.
 
-    Note that [Manual] jobs are not allowed in [Merge_train] pipelines,
-    because this pipeline must finish ASAP so as to not block other MRs
-    so it doesn't make sense to have to wait on a manual action.
-    Manual, allowed to fail jobs would not block the pipeline,
-    but they are better reserved for other pipelines. *)
-type global_pipeline =
-  | External of external_global_pipeline
-      (** A global pipeline defined outside of Cacio,
-          with {!new_global_pipeline}. *)
-  | Before_merging
-  | Merge_train
-(* Release tag pipelines *)
-(* Debian packaging pipelines *)
-(* Homebrew packaging pipelines *)
-(* Security scan pipelines *)
-(* Base images pipelines *)
-(* TODO: consider migrating base images to a [Cacio.Make] component instead,
-     which would allow using [register_scheduled_pipeline] and avoid adding
-     a [global_pipeline] variant for it. *)
-(* Same jobs as [Base_images_daily] for now, but the pipeline should only run
-     on refresh branches (e.g. [master-ci-images] branch).
-     The two pipelines should diverge after #8367. *)
+    Cacio does not define any global pipeline itself: use
+    {!new_global_pipeline} to define one. *)
+type global_pipeline
 
 (** Define a global pipeline outside of Cacio.
 
@@ -500,12 +478,7 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
 
 (** {2 Listing registered jobs and more} *)
 
-(** Only call these functions after all jobs are registered.
-    They are meant to be called from [ci/bin/main.ml]
-    when registering the pipelines with CIAO. *)
-
-(** Get the list of jobs registered for a given global pipeline. *)
-val get_jobs : global_pipeline -> Tezos_ci.tezos_job list
+(** Only call these functions after all jobs are registered. *)
 
 (** Register all pipelines that were defined with {!new_global_pipeline}
     with CIAO.
@@ -516,8 +489,11 @@ val close : unit -> unit
 
 (** Regular expressions that match release tags.
 
-    To be used in [ci/bin/main.ml] to define the [non_release_tag]
-    and [non_release_tag_test] pipelines. *)
+    Those are the tags of the release pipelines that components declared with
+    the [register_dedicated_*_pipeline] functions of {!COMPONENT_API}.
+    Used to define the pipelines that run on tags which are {e not} release
+    tags. Only call this once all components have been initialized:
+    {!close} is what guarantees it, since it forces the rules of pipelines. *)
 val get_release_tag_rexes : unit -> string list
 
 (** Get the names and locations of the jobs that were registered with the [job] function. *)
@@ -558,13 +534,6 @@ val output_tezt_job_list : string -> unit
 
 (** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
     Or to automatically add this label to the list. *)
-
-(** Global pipelines should all become [External] eventually.
-    The [global_pipeline] type would then have a single constructor and could
-    be merged with [external_global_pipeline], which would be renamed into
-    [global_pipeline]. Cacio would no longer know anything about the pipelines
-    of this particular repository, which would all be defined in
-    [ci/lib_tezos_ci_pipelines]. *)
 
 (** Pipelines that are declared by components, with the
     [register_*_pipeline] functions of {!COMPONENT_API}, are registered with
