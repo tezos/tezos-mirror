@@ -550,6 +550,13 @@ val register_test_release_jobs : (trigger * job) list -> unit
 (** Get the list of jobs registered for a given global pipeline. *)
 val get_jobs : global_pipeline -> Tezos_ci.tezos_job list
 
+(** Register all pipelines that were defined with {!new_global_pipeline}
+    with CIAO.
+
+    After that, it is no longer possible to register new jobs and pipelines:
+    the set of pipelines is closed. *)
+val close : unit -> unit
+
 (** Regular expressions that match release tags.
 
     To be used in [ci/bin/main.ml] to define the [non_release_tag]

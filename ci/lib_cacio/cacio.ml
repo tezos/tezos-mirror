@@ -1070,6 +1070,25 @@ let get_jobs pipeline =
           convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)
 
+(* Register all pipelines that were defined with [new_global_pipeline] with CIAO.
+
+   Pipelines cannot be registered with CIAO as soon as they are defined,
+   since CIAO needs the full list of jobs of a pipeline at registration time,
+   and components add jobs to global pipelines after those are defined. *)
+let close () =
+  if !closed then failwith "Cacio.close has already been called" ;
+  closed := true ;
+  Fun.flip List.iter (List.rev !external_global_pipelines)
+  @@ fun (pipeline : external_global_pipeline) ->
+  let open External_global_pipeline in
+  Tezos_ci.Pipeline.register
+    ?variables:pipeline.variables
+    ?auto_cancel:pipeline.auto_cancel
+    ~description:pipeline.description
+    ~jobs:(get_jobs (External pipeline))
+    pipeline.name
+    pipeline.rule
+
 let release_tag_rexes = ref String_set.empty
 
 let get_release_tag_rexes () = String_set.elements !release_tag_rexes
@@ -1554,6 +1573,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
      - including the DataDog job.
      Returns the pipeline name. *)
   let register_pipeline ?interruptible_pipeline ~description ~jobs name rules =
+    check_not_closed (sf "pipeline %s" (make_name name)) ;
     let job_datadog_pipeline_trace =
       match !job_datadog_pipeline_trace with
       | None ->

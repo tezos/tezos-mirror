@@ -490,6 +490,12 @@ let () =
     ~jobs:(Cacio.get_jobs Publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
+(** {2 Closing the set of pipelines} *)
+
+(* Register the pipelines that are defined with [Cacio.new_global_pipeline].
+   No job and no pipeline can be registered after this point. *)
+let () = Cacio.close ()
+
 (** {2 Entry point of the generator binary} *)
 
 let () =
