@@ -10,6 +10,9 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Scheduled pipeline that runs a test release pipeline. *)
+val schedule_test_release : Cacio.global_pipeline
+
 (** Scheduled pipeline for various security scans. *)
 val schedule_security_scans : Cacio.global_pipeline
 

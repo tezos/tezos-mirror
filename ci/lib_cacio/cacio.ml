@@ -899,7 +899,6 @@ type global_pipeline =
   | Schedule_extended_test
   | Custom_extended_test
   | Master
-  | Scheduled_test_release
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test

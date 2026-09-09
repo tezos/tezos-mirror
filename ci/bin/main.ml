@@ -440,14 +440,7 @@ let () =
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
        'master'.\n\n\
-       This scheduled pipeline exercices the full tezt tests suites." ;
-  register
-    "schedule_test_release"
-    schedule_test_release
-    ~jobs:(Cacio.get_jobs Scheduled_test_release)
-    ~description:
-      "Scheduled pipeline that runs a test release pipeline. The jobs are the \
-       same as a release pipeline but run in dry-mode."
+       This scheduled pipeline exercices the full tezt tests suites."
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)

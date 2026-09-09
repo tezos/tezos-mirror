@@ -24,6 +24,14 @@
 open Gitlab_ci
 open Tezos_ci
 
+let schedule_test_release =
+  Cacio.new_global_pipeline
+    "schedule_test_release"
+    Rules.schedule_test_release
+    ~description:
+      "Scheduled pipeline that runs a test release pipeline. The jobs are the \
+       same as a release pipeline but run in dry-mode."
+
 let schedule_security_scans =
   Cacio.new_global_pipeline
     "schedule_security_scans"
