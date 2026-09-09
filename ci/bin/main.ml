@@ -149,18 +149,7 @@ let () =
        failing job), does so as early as possible. This prevents unneccessary \
        delays in merging MRs further down the train.\n\n\
        The merge train pipeline is created by GitLab when a merge request is \
-       added to the merge train (typically by marge-bot)." ;
-  register
-    "master_branch"
-    If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Cacio.get_jobs Master)
-    ~description:
-      "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
-       This pipeline publishes the documentation at tezos.gitlab.io, builds \
-       static binaries, and the 'master' tag of the Octez Docker distribution. \
-       This pipeline is created automatically by GitLab on each push, \
-       typically resulting from the merge of a merge request, to the 'master' \
-       branch on tezos/tezos."
+       added to the merge train (typically by marge-bot)."
 
 (** {2 Closing the set of pipelines} *)
 

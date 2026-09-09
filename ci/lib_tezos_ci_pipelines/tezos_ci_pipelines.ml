@@ -38,6 +38,19 @@ open Tezos_ci
    Instead of modifying the definition of each job, we override the value
    by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
 
+let master_branch =
+  Cacio.new_global_pipeline
+    "master_branch"
+    (lazy Rules.(If.(on_tezos_namespace && push && on_branch "master")))
+    ~interruptible_publish:true
+    ~description:
+      "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
+       This pipeline publishes the documentation at tezos.gitlab.io, builds \
+       static binaries, and the 'master' tag of the Octez Docker distribution. \
+       This pipeline is created automatically by GitLab on each push, \
+       typically resulting from the merge of a merge request, to the 'master' \
+       branch on tezos/tezos."
+
 (* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
 let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/"
 

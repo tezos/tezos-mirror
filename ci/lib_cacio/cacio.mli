@@ -432,7 +432,6 @@ type global_pipeline =
           with {!new_global_pipeline}. *)
   | Before_merging
   | Merge_train
-  | Master
 (* Release tag pipelines *)
 (* Debian packaging pipelines *)
 (* Homebrew packaging pipelines *)

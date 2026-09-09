@@ -292,7 +292,7 @@ let register () =
       (Auto, job_build_static_linux_experimental_binaries Arm64);
     ] ;
   Cacio.register_jobs
-    Master
+    Tezos_ci_pipelines.master_branch
     [
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);

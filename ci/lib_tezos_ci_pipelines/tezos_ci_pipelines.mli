@@ -10,6 +10,9 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Publishes artifacts (docs, static binaries) from master on each merge. *)
+val master_branch : Cacio.global_pipeline
+
 (** Updates the 'latest' tag of the Octez Docker distribution on Docker Hub. *)
 val octez_latest_release : Cacio.global_pipeline
 

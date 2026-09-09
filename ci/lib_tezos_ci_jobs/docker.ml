@@ -251,7 +251,7 @@ let register () =
       (Auto, job_docker `experimental `test Arm64);
     ] ;
   Cacio.register_jobs
-    Master
+    Tezos_ci_pipelines.master_branch
     [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_docker_build_pipeline
