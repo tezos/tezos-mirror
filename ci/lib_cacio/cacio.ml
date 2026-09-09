@@ -273,6 +273,36 @@ module UID_map = Map.Make (Int)
    Those successive transformations are driven by the [convert_jobs] function,
    which is used by all functions that take Cacio jobs and register them as CIAO jobs. *)
 
+(* ACYCLICITY
+
+   The graph transformations above assume that the job graph is acyclic.
+   This holds by construction, for the following reason.
+
+   The [uid] of a job is allocated by [fresh_uid] in the same function that
+   builds the job record, and the dependencies of this job are given to this
+   very function, as its [needs] argument. So the dependencies of a job are
+   necessarily built before the job itself, and thus have strictly smaller UIDs.
+   Following a dependency edge always strictly decreases the UID,
+   so no path can come back to its starting point.
+
+   One cannot circumvent this by defining two jobs recursively:
+
+     let rec a = job ~needs:[(Job, b)] ... and b = job ~needs:[(Job, a)] ...
+
+   is rejected by the compiler ("This kind of expression is not allowed as
+   right-hand side of 'let rec'"), because the right-hand sides are function
+   applications. Turning the definitions into functions does compile:
+
+     let rec a () = job ~needs:[(Job, b ())] ... and b () = ...
+
+   but each call allocates a fresh UID: this defines infinitely many jobs,
+   each of them depending on yet another job, instead of two jobs that
+   depend on each other.
+
+   The only place where the [needs] of a job is modified after the job was
+   built is [add_dependency_on_job_trigger] (step 4 above).
+   See the comment there for why it cannot introduce a cycle either. *)
+
 (* [rev_deps]: UIDs of jobs that directly depend on [job].
    [explicit]: whether the job was explicitly requested
    or automatically added to satisfy dependencies. *)
@@ -487,7 +517,16 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
   !result
 
 (* Add a dependency on [job_trigger] in all jobs that are not [Immediate] or [Manual].
-   See GRAPH TRANSFORMATIONS above (step 4). *)
+   See GRAPH TRANSFORMATIONS above (step 4).
+
+   This is the only place where the [needs] of a job is modified after the job
+   was built, i.e. the only place where a dependency edge can point to a job
+   with a larger UID (see ACYCLICITY above). It cannot introduce a cycle:
+   all edges that are added point to [job_trigger], and [job_trigger] is defined
+   with no dependency at all (see the definition of [job_trigger] at the end of
+   this file), so no path can leave it and come back to it.
+   In particular, [job_trigger] itself is registered with trigger [Manual]
+   (see [get_jobs]) and is thus left unchanged below: it gets no self-loop. *)
 let add_dependency_on_job_trigger (job_trigger : job) (graph : fixed_job_graph)
     : fixed_job_graph =
   (* The actual [trigger] job is defined deep inside [code_verification.ml]
