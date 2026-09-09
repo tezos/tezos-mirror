@@ -99,7 +99,9 @@ let job_render ?(needs = []) pipeline_type =
 
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_test)] ;
-  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
+  Cacio.register_jobs
+    Tezos_ci_pipelines.schedule_extended_test
+    [(Auto, job_test)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.publish_release_page
     [(Manual, job_render `real)] ;

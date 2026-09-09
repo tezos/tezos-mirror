@@ -340,28 +340,7 @@ let () =
        create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
        to the 'nomadic-labs/tezos' project."
 
-(** {3 Scheduled pipelines} *)
-
-(* All jobs in scheduled pipelines have "interruptible: false"
-   to prevent them from being canceled after a push to master.
-   Instead of modifying the definition of each job, we override the value
-   with [with_interruptible]. *)
-
 (** {2 Closing the set of pipelines} *)
-let () =
-  let open Pipeline in
-  let open Rules in
-  register
-    "schedule_extended_test"
-    schedule_extended_tests
-    ~jobs:(Cacio.get_jobs Schedule_extended_test)
-    ~description:
-      "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
-       This pipeline unconditionally executes all jobs in 'before_merging' \
-       pipelines, daily on the 'master_branch'. Regular 'before_merging' \
-       pipelines run only subset of all jobs depending on files modified by \
-       the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
-       daily."
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)

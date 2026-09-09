@@ -278,7 +278,7 @@ let register () =
       (Auto, job_build_static_linux_experimental_binaries Amd64);
     ] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Auto, build_octez_source);
       (Auto, job_build_released Amd64);

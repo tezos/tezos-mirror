@@ -33,6 +33,24 @@ open Tezos_ci
    to testing the special options, and there is no reason why at least some tests
    could be run with special options in dedicated jobs in [before_merging] pipelines. *)
 
+(* All jobs in scheduled pipelines have "interruptible: false"
+   to prevent them from being canceled after a push to master.
+   Instead of modifying the definition of each job, we override the value
+   by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
+
+let schedule_extended_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_test"
+    Rules.schedule_extended_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
+       This pipeline unconditionally executes all jobs in 'before_merging' \
+       pipelines, daily on the 'master_branch'. Regular 'before_merging' \
+       pipelines run only subset of all jobs depending on files modified by \
+       the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
+       daily."
+
 let debian_daily =
   Cacio.new_global_pipeline
     "debian.daily"

@@ -298,7 +298,7 @@ let register () =
   Cacio.register_jobs Before_merging [(Immediate, job_commit_titles `lenient)] ;
   Cacio.register_jobs Merge_train [(Immediate, job_commit_titles `strict)] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);

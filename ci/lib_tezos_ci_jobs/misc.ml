@@ -449,7 +449,7 @@ let register () =
       (Auto, job_test_sdk_rust);
     ] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);

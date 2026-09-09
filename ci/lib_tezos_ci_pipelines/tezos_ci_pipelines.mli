@@ -10,6 +10,9 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Scheduled, full version of 'before_merging', daily on 'master'. *)
+val schedule_extended_test : Cacio.global_pipeline
+
 (** Daily pipeline containing all Debian jobs (build and extended tests). *)
 val debian_daily : Cacio.global_pipeline
 

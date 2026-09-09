@@ -896,7 +896,6 @@ type global_pipeline =
   | External of external_global_pipeline
   | Before_merging
   | Merge_train
-  | Schedule_extended_test
   | Master
   (* Release tag pipelines *)
   | Major_release_tag
@@ -1052,9 +1051,6 @@ let get_jobs pipeline =
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
       | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-      | Schedule_extended_test ->
-          (* Scheduled pipelines. *)
-          convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)
 
 (* Register all pipelines that were defined with [new_global_pipeline] with CIAO.

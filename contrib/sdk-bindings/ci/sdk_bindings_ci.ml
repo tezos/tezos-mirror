@@ -177,7 +177,9 @@ end
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_test)] ;
   (* TODO: split into a new pipeline [sdk_bindings.daily] *)
-  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
+  Cacio.register_jobs
+    Tezos_ci_pipelines.schedule_extended_test
+    [(Auto, job_test)] ;
   (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
   CI.register_dedicated_release_pipeline
     ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"

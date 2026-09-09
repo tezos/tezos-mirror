@@ -179,7 +179,7 @@ let register () =
       (Manual, job_tezt_flaky `merge_request);
     ] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);

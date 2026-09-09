@@ -432,7 +432,6 @@ type global_pipeline =
           with {!new_global_pipeline}. *)
   | Before_merging
   | Merge_train
-  | Schedule_extended_test
   | Master
   (* Release tag pipelines *)
   | Major_release_tag
