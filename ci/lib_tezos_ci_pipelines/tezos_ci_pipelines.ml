@@ -24,6 +24,72 @@
 open Gitlab_ci
 open Tezos_ci
 
+(* The "custom extended test" pipelines test the codebase with some particular options.
+   This allows testing behaviors that are not enabled by default on the node,
+   and are thus not tested in Tezt jobs of [before_merging] pipelines in particular.
+
+   Note: this method is simple to implement but is not ideal.
+   It duplicates a lot of tests that do not actually contribute
+   to testing the special options, and there is no reason why at least some tests
+   could be run with special options in dedicated jobs in [before_merging] pipelines. *)
+
+let schedule_extended_rpc_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_rpc_test"
+    Rules.schedule_extended_rpc_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with external RPC servers, weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites, but with \
+       Octez nodes configured to use external RPC servers."
+
+let schedule_extended_validation_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_validation_test"
+    Rules.schedule_extended_validation_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with single-process validation, weekly \
+       on 'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites, but with \
+       Octez nodes configured to use single-process validation."
+
+let schedule_extended_baker_remote_mode_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_baker_remote_mode_test"
+    Rules.schedule_extended_baker_remote_mode_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with baker using remote node, weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites."
+
+let schedule_extended_dal_use_baker =
+  Cacio.new_global_pipeline
+    "schedule_extended_dal_use_baker"
+    Rules.schedule_extended_dal_use_baker
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with dal using baker commands weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites."
+
+let custom_extended_test_pipelines =
+  [
+    schedule_extended_rpc_test;
+    schedule_extended_validation_test;
+    schedule_extended_baker_remote_mode_test;
+    schedule_extended_dal_use_baker;
+  ]
+
+(* Add jobs to all the "custom extended test" pipelines.
+   They all contain exactly the same jobs. *)
+let register_custom_extended_test_jobs jobs =
+  List.iter
+    (fun pipeline -> Cacio.register_jobs pipeline jobs)
+    custom_extended_test_pipelines
+
 let schedule_test_release =
   Cacio.new_global_pipeline
     "schedule_test_release"

@@ -396,51 +396,7 @@ let () =
     base_images_daily
     ~jobs:(Cacio.get_jobs Base_images_daily)
     ~description:
-      "Daily pipeline containing all Base Images jobs (build and merge)." ;
-
-  (* The "custom extended test" pipelines test the codebase with some particular options.
-     This allows testing behaviors that are not enabled by default on the node,
-     and are thus not tested in Tezt jobs of [before_merging] pipelines in particular.
-
-     Note: this method is simple to implement but is not ideal.
-     It duplicates a lot of tests that do not actually contribute
-     to testing the special options, and there is no reason why at least some tests
-     could be run with special options in dedicated jobs in [before_merging] pipelines. *)
-  let custom_extended_test_jobs = Cacio.get_jobs Custom_extended_test in
-  register
-    "schedule_extended_rpc_test"
-    schedule_extended_rpc_tests
-    ~jobs:custom_extended_test_jobs
-    ~description:
-      "Scheduled run of all tezt tests with external RPC servers, weekly on \
-       'master'.\n\n\
-       This scheduled pipeline exercices the full tezt tests suites, but with \
-       Octez nodes configured to use external RPC servers." ;
-  register
-    "schedule_extended_validation_test"
-    schedule_extended_validation_tests
-    ~jobs:custom_extended_test_jobs
-    ~description:
-      "Scheduled run of all tezt tests with single-process validation, weekly \
-       on 'master'.\n\n\
-       This scheduled pipeline exercices the full tezt tests suites, but with \
-       Octez nodes configured to use single-process validation." ;
-  register
-    "schedule_extended_baker_remote_mode_test"
-    schedule_extended_baker_remote_mode_tests
-    ~jobs:custom_extended_test_jobs
-    ~description:
-      "Scheduled run of all tezt tests with baker using remote node, weekly on \
-       'master'.\n\n\
-       This scheduled pipeline exercices the full tezt tests suites." ;
-  register
-    "schedule_extended_dal_use_baker"
-    schedule_extended_dal_use_baker
-    ~jobs:custom_extended_test_jobs
-    ~description:
-      "Scheduled run of all tezt tests with dal using baker commands weekly on \
-       'master'.\n\n\
-       This scheduled pipeline exercices the full tezt tests suites."
+      "Daily pipeline containing all Base Images jobs (build and merge)."
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)

@@ -897,7 +897,6 @@ type global_pipeline =
   | Before_merging
   | Merge_train
   | Schedule_extended_test
-  | Custom_extended_test
   | Master
   (* Release tag pipelines *)
   | Major_release_tag
@@ -1057,8 +1056,8 @@ let get_jobs pipeline =
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
       | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-      | Schedule_extended_test | Custom_extended_test | Base_images_daily
-      | Base_images_refresh | Homebrew_daily ->
+      | Schedule_extended_test | Base_images_daily | Base_images_refresh
+      | Homebrew_daily ->
           (* Scheduled pipelines. *)
           convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)
