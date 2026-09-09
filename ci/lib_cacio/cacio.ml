@@ -918,7 +918,6 @@ type global_pipeline =
   (* Homebrew packaging pipelines *)
   | Homebrew_daily
   (* Security scan pipelines *)
-  | Schedule_security_scans
   (* Base images pipelines *)
   (* TODO: consider migrating base images to a [Cacio.Make] component instead,
      which would allow using [register_scheduled_pipeline] and avoid adding

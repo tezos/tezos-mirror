@@ -447,14 +447,7 @@ let () =
     ~jobs:(Cacio.get_jobs Scheduled_test_release)
     ~description:
       "Scheduled pipeline that runs a test release pipeline. The jobs are the \
-       same as a release pipeline but run in dry-mode." ;
-  register
-    "schedule_security_scans"
-    schedule_security_scans
-    ~jobs:(Cacio.get_jobs Schedule_security_scans)
-    ~description:
-      "Scheduled pipeline for various security scans. Currently scanning for \
-       vulnerabilities in Docker images"
+       same as a release pipeline but run in dry-mode."
 
 (* Register the pipelines that are defined with [Cacio.new_global_pipeline].
    No job and no pipeline can be registered after this point. *)

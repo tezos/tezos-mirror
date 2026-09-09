@@ -24,6 +24,14 @@
 open Gitlab_ci
 open Tezos_ci
 
+let schedule_security_scans =
+  Cacio.new_global_pipeline
+    "schedule_security_scans"
+    Rules.schedule_security_scans
+    ~description:
+      "Scheduled pipeline for various security scans. Currently scanning for \
+       vulnerabilities in Docker images"
+
 let schedule_docker_master_snapshot =
   Cacio.new_global_pipeline
     "schedule_docker_master_snapshot"

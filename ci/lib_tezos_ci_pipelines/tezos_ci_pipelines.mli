@@ -10,6 +10,9 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Scheduled pipeline for various security scans. *)
+val schedule_security_scans : Cacio.global_pipeline
+
 (** Scheduled pipeline publishing a dated master Docker image to Docker Hub. *)
 val schedule_docker_master_snapshot : Cacio.global_pipeline
 
