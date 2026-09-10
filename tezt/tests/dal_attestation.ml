@@ -950,7 +950,7 @@ let create_low_stake node dal_parameters proto_params blocks_per_cycle =
     - The attestable slots field of /dal_participation's result is equal to the
     number of attested slots counted in blocks metadata. *)
 let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
-    _dal_node =
+    _bootstrap_key =
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
@@ -2559,7 +2559,118 @@ let test_backfill_replay_of_decision_level (protocol : Protocol.t)
       bake_until_processed ~level:(published_level + max_lag) client [producer];
     ]
 
+(* Security regression: negative DAL attestation bitsets must not poison the
+   mempool.
+
+   A DAL attestation transports its bitset as a *signed* Zarith integer. Absent
+   a sign check, [Dal_apply.validate_attestations] accepts a negative value: the
+   size gate uses [Z.numbits] ([Z.numbits (-1) = 1]) and the structural decode
+   uses [Z.testbit] ([Z.testbit (-1) i = true] everywhere), both benign on
+   negatives. A delegate holding attestation and DAL-committee rights could then
+   sign a protocol-valid attestation carrying the bitset [-1].
+
+   Such an operation would be a landmine: the shell mempool keeps validated
+   operations in a set ordered by [Proto.compare_operations], whose weight
+   computation calls [Dal_attestations_repr.weight = Bitset.cardinal =
+   Z.popcount], and [Z.popcount] raises [Z.Overflow] on a negative argument.
+   Once it sits in the validated mempool, [Prevalidator_bounding.add_operation]
+   compares every subsequent candidate against it and fails with an uncaught
+   [Z.Overflow], refusing all further (non-forced) operations until the next
+   block purges it. [Bitset] is the protocol environment's [Tezos_base.Bitset],
+   so both the flaw and its fix are shell-side and affect every protocol.
+
+   The fix has two layers: [Bitset.cardinal] is made total shell-side (so
+   [compare_operations] can never raise, protecting every protocol including
+   frozen ones), and [proto_alpha] rejects negative bitsets at the encoding
+   boundary (so they cannot be parsed into an operation at all).
+   [test_negative_dal_bitset_does_not_poison_mempool] exercises the shell layer
+   on a permissive protocol (025) that admits the bitset; proto_alpha's encoding
+   rejection is covered by the [dal_attestations_repr] unit test.
+   [test_dal_bitset_zero_control] is the negative control showing an empty
+   bitset behaves normally. *)
+
+let get_head_attestation_fields ~protocol ~delegate client =
+  let* level = Client.level client in
+  let* round = Client.RPC.call client @@ RPC.get_chain_block_helper_round () in
+  let* block_payload_hash = Operation.Consensus.get_block_payload_hash client in
+  let* slot =
+    Operation.Consensus.get_attestation_slot ~level ~protocol ~delegate client
+  in
+  return (slot, level, round, block_payload_hash)
+
+(* Returns the mempool bucket name ("validated", "refused", ...) in which the
+   operation with hash [oph] currently sits, or [None] if it is absent. *)
+let mempool_classification client ~oph =
+  let* mempool =
+    Client.RPC.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
+  in
+  let in_bucket name =
+    List.exists
+      (fun op -> String.equal JSON.(op |-> "hash" |> as_string) oph)
+      JSON.(mempool |-> name |> as_list)
+  in
+  return
+  @@ List.find_opt
+       in_bucket
+       ["validated"; "branch_delayed"; "branch_refused"; "refused"; "outdated"]
+
+let inject_dal_attestation ~protocol ~dal_attestation delegate client =
+  let* slot, level, round, block_payload_hash =
+    get_head_attestation_fields ~protocol ~delegate client
+  in
+  Operation.Consensus.attest_for
+    ~protocol
+    ~slot
+    ~level
+    ~round
+    ~block_payload_hash
+    ~dal_attestation
+    delegate
+    client
+
+let test_negative_dal_bitset_does_not_poison_mempool protocol _dal_parameters
+    _cryptobox _node client _bootstrap_key =
+  (* Bake so that we are past the migration block. *)
+  let* () = bake_for ~count:1 client in
+  Log.info
+    "Inject an attestation carrying the negative DAL bitset -1 in an empty \
+     mempool" ;
+  (* Note: injection in a non-empty mempool fails for the same reason the latter
+     transfer fails. *)
+  let* (`OpHash oph) =
+    inject_dal_attestation
+      ~protocol
+      ~dal_attestation:"-1"
+      Constant.bootstrap1
+      client
+  in
+  let* classification = mempool_classification client ~oph in
+  Log.info
+    "Negative-bitset operation classified as: %s"
+    (Option.value ~default:"absent" classification) ;
+  Check.(
+    (classification = Some "validated")
+      (option string)
+      ~__LOC__
+      ~error_msg:"Expected the negative-bitset operation to be %R, got %L") ;
+  Log.info "The mempool is unpoisoned: a subsequent transfer must succeed" ;
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1)
+      ~giver:Constant.bootstrap3.alias
+      ~receiver:Constant.bootstrap4.alias
+      client
+  in
+  unit
+
 let register ~__FILE__ ~protocols =
+  scenario_with_layer1_node
+    ~__FILE__
+    "DAL negative attestation bitset does not poison the mempool"
+    ~tags:["dal"; "attestation"; "mempool"; "bitset"]
+    test_negative_dal_bitset_does_not_poison_mempool
+    protocols ;
   scenario_with_layer1_node
     ~__FILE__
     "attesters receive expected DAL rewards depending on participation"
