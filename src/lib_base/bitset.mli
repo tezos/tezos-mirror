@@ -98,7 +98,7 @@ val diff : t -> t -> t
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
 
-(** [cardinat bitset] returns the number of elements in the [bitsest]. *)
+(** [cardinat bitset] returns the number of elements in the [bitset]. *)
 val cardinal : t -> int
 
 (** [to_z t] returns the sum of powers of two of the integers in the given

@@ -102,11 +102,37 @@ let test_fill =
         ~error_msg:"Expected %L, Found %R") ;
     Z.equal f1 f2 && Z.equal f2 f3
 
+(* [encoding] decodes a raw integer into a bitset, bypassing [from_z]'s sign
+   check -- this is exactly how a negative value reaches [cardinal] from the
+   wire (e.g. an attestation's DAL content). *)
+let bitset_of_z z =
+  Data_encoding.Binary.of_bytes_exn
+    encoding
+    (Data_encoding.Binary.to_bytes_exn Data_encoding.z z)
+
+(* [cardinal] must be total: [Z.popcount] raises [Z.Overflow] on negative
+   inputs, so [cardinal] of a negative bitset must return without raising. *)
+let test_cardinal_negative () =
+  List.iter
+    (fun z ->
+      Check.(
+        (cardinal (bitset_of_z (Z.of_int z)) = 0)
+          int
+          ~__LOC__
+          ~error_msg:
+            (Format.sprintf
+               "cardinal of the negative bitset %d must be %%R, got %%L"
+               z)))
+    [-1; -2; -42; -1000]
+
 let () =
   Alcotest.run
     ~__FILE__
     "Bitset"
     [
+      ( "cardinal",
+        [Alcotest.test_case "negative is total" `Quick test_cardinal_negative]
+      );
       ( "quantity",
         qcheck_wrap
           [
