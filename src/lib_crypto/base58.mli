@@ -255,6 +255,16 @@ end) : sig
     ?alphabet:Alphabet.t -> C.context -> string -> string list Lwt.t
 end
 
+module Internal_for_tests : sig
+  (** [iter_encodings f] calls [f ~prefix ~length ~encoded_length] once for
+      every currently-registered encoding, in unspecified order. Note that
+      the set of encodings iterated over depends on what is registered at
+      the time of the call (and so, transitively, on which modules happen
+      to be linked into the calling binary). *)
+  val iter_encodings :
+    (prefix:string -> length:int -> encoded_length:int -> unit) -> unit
+end
+
 (** {2 Low-level Base58Check encodings} *)
 
 (** Base58Check-encoding/decoding functions (with error detections). *)
