@@ -407,6 +407,14 @@ struct
   end)
 end
 
+module Internal_for_tests = struct
+  let iter_encodings f =
+    List.iter
+      (fun (Encoding {prefix; length; encoded_length; _}) ->
+        f ~prefix ~length ~encoded_length)
+      !encodings
+end
+
 module Prefix = struct
   (* These encoded prefixes are computed using scripts/base58_prefix.py
      $ ./scripts/base58_prefix.py tz1 20
