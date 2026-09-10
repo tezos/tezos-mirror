@@ -152,7 +152,12 @@ type 'a encoding = private {
     prefix. The [to_raw] and [of_raw] are the ad-hoc
     serialisation/deserialisation for the data. The [wrap] should wrap
     the deserialised value into the extensible sum-type [data] (see
-    the generic function [decode]). *)
+    the generic function [decode]).
+
+    The registered [of_raw] returns [None], without calling the provided
+    one, on a raw payload whose length is not [length]: decoding a
+    checksum-valid string with the right prefix but a payload of the wrong
+    length fails instead of raising. *)
 val register_encoding :
   prefix:string ->
   length:int ->
@@ -163,6 +168,11 @@ val register_encoding :
 
 (** Checks that an encoding has a certain prefix and length. *)
 val check_encoded_prefix : 'a encoding -> string -> int -> unit
+
+(** [max_encoded_size ()] is the length of the longest Base58Check
+    encoding currently registered. Note that the result depends on the
+    set of encodings registered at the time of the call. *)
+val max_encoded_size : unit -> int
 
 module Alphabet : sig
   type t
@@ -184,11 +194,20 @@ end
 val simple_encode : ?alphabet:Alphabet.t -> 'a encoding -> 'a -> string
 
 (** Decoder for a given kind of data. It returns [None] when
-    the decoded data does not start with the expected prefix. *)
+    the decoded data does not start with the expected prefix.
+
+    Inputs longer than the [encoding]'s own [encoded_length] — which a
+    valid input for that specific encoding can never exceed — are rejected
+    before decoding. *)
 val simple_decode : ?alphabet:Alphabet.t -> 'a encoding -> string -> 'a option
 
 (** Generic decoder. It returns [None] when the decoded data does
-    not start with a registered prefix. *)
+    not start with a registered prefix.
+
+    Inputs are bounded to {!max_encoded_size}, the longest currently
+    registered encoding — which no valid decode of any registered type can
+    ever exceed — and, independently, to {!encoded_max_length}. Inputs longer
+    than these bounds are rejected before decoding. *)
 val decode : ?alphabet:Alphabet.t -> string -> data option
 
 (** {2 Completion of partial Base58Check value} *)
@@ -218,7 +237,16 @@ end) : sig
     wrap:('a -> data) ->
     'a encoding
 
+  (** Same bound behavior as the top-level {!Base58.decode}, but tightened
+      to this instance's own {!max_encoded_size} rather than the top-level
+      one's. *)
   val decode : ?alphabet:Alphabet.t -> string -> data option
+
+  (** [max_encoded_size ()] is the length of the longest Base58Check
+      encoding currently registered in this instance. Note that the
+      result depends on the set of encodings registered at the time of
+      the call. *)
+  val max_encoded_size : unit -> int
 
   val register_resolver :
     'a encoding -> (C.context -> string -> 'a list Lwt.t) -> unit
@@ -232,12 +260,20 @@ end
 (** Base58Check-encoding/decoding functions (with error detections). *)
 val safe_encode : ?alphabet:Alphabet.t -> string -> string
 
+(** Inputs longer than {!encoded_max_length} are rejected before decoding. *)
 val safe_decode : ?alphabet:Alphabet.t -> string -> string option
 
 (** Base58-encoding/decoding functions (without error detections). *)
 val raw_encode : ?alphabet:Alphabet.t -> string -> string
 
+(** Inputs longer than {!encoded_max_length} are rejected before decoding,
+    without attempting to decode them. *)
 val raw_decode : ?alphabet:Alphabet.t -> string -> string option
+
+(** Upper bound on the length of an input accepted by the decoders by
+    default, and on the encoded length of any encoding that
+    {!register_encoding} accepts. *)
+val encoded_max_length : int
 
 (**/**)
 
