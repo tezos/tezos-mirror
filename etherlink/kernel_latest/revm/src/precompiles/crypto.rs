@@ -167,4 +167,41 @@ mod tests {
         assert_eq!(etherlink(&rn, 0, &MSG), k256_ref(&rn, 0, &MSG));
         assert!(etherlink(&rn, 0, &MSG).is_none());
     }
+
+    proptest::proptest! {
+        /// Over arbitrary raw inputs (recovery id restricted to the 27/28 the
+        /// precompile accepts), the libsecp256k1 and k256 paths must return the
+        /// same result — `Some(addr)` or `None` — every time.
+        #[test]
+        fn ecrecover_agrees_with_k256_on_random_input(
+            sig in proptest::prelude::any::<[u8; 64]>(),
+            recid in 0u8..2,
+            msg in proptest::prelude::any::<[u8; 32]>(),
+        ) {
+            proptest::prop_assert_eq!(
+                etherlink(&sig, recid, &msg),
+                k256_ref(&sig, recid, &msg)
+            );
+        }
+
+        /// Over freshly signed messages, both implementations recover the same
+        /// non-empty address.
+        #[test]
+        fn ecrecover_agrees_with_k256_on_valid_signatures(
+            sk_bytes in proptest::prelude::any::<[u8; 32]>(),
+            msg in proptest::prelude::any::<[u8; 32]>(),
+        ) {
+            proptest::prop_assume!(libsecp256k1::SecretKey::parse(&sk_bytes).is_ok());
+            let sk = libsecp256k1::SecretKey::parse(&sk_bytes).unwrap();
+            let message = libsecp256k1::Message::parse(&msg);
+            let (sig, recid) = libsecp256k1::sign(&message, &sk);
+            let sig64 = sig.serialize();
+            let recid_b = recid.serialize();
+            proptest::prop_assert_eq!(
+                etherlink(&sig64, recid_b, &msg),
+                k256_ref(&sig64, recid_b, &msg)
+            );
+            proptest::prop_assert!(etherlink(&sig64, recid_b, &msg).is_some());
+        }
+    }
 }

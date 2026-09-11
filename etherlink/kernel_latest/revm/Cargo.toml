@@ -55,6 +55,8 @@ tezos_ethereum = { workspace = true, features = ["testing"] }
 tezosx-interfaces = { workspace = true, features = ["testing"] }
 tezosx-ethereum-runtime = { workspace = true, features = ["testing"] }
 http.workspace = true
+proptest.workspace = true
+revm.workspace = true
 
 [features]
 tracing = [

@@ -2685,6 +2685,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "primitive-types",
+ "proptest",
  "revm",
  "rlp",
  "tezos-evm-logging-latest",
