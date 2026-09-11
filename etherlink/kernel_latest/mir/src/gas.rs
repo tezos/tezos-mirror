@@ -371,7 +371,7 @@ impl BigIntByteSize for BigUint {
 #[allow(missing_docs)]
 pub mod interpret_cost {
     use checked::Checked;
-    use num_bigint::{BigInt, BigUint};
+    use num_bigint::{BigInt, BigUint, Sign};
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
@@ -707,13 +707,20 @@ pub mod interpret_cost {
         Ok(time.max(alloc_cost(sz)?))
     }
 
-    // corresponds to cost_N_IAnd_int_nat in the Tezos protocol
+    // corresponds to cost_N_IAnd_int_nat_synthesized in the Tezos protocol
     pub fn and_int_nat(
-        i1: &impl BigIntByteSize,
+        i1: &BigInt,
         i2: &impl BigIntByteSize,
     ) -> Result<u32, CostOverflow> {
         let w = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));
-        ((w >> 2) + (w >> 6) + 65).as_gas_cost()
+        let alloc = if i1.sign() == Sign::Minus {
+            // A negative int acts as infinitely many set bits: the result is the nat.
+            Checked::from(i2.byte_size())
+        } else {
+            w
+        };
+        let time = ((w >> 2) + (w >> 6) + 65).as_gas_cost()?;
+        Ok(time.max(alloc_cost(alloc)?))
     }
 
     // corresponds to cost_N_IAnd_nat in the Tezos protocol
