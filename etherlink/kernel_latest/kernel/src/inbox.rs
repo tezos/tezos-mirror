@@ -85,37 +85,37 @@ where
     /// Abstracts the type used to store the inputs once handled
     type Inbox;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         deposit: Deposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 }
 
 impl InputHandler for ProxyInput {
@@ -123,15 +123,15 @@ impl InputHandler for ProxyInput {
     // everything is doable in a single kernel_run.
     type Inbox = ProxyInboxContent;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
     {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
@@ -141,12 +141,7 @@ impl InputHandler for ProxyInput {
                 tx_hash,
                 num_chunks,
                 chunk_hashes,
-            } => create_chunked_transaction(
-                rk.host_mut(),
-                &tx_hash,
-                num_chunks,
-                chunk_hashes,
-            )?,
+            } => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
             Self::TransactionChunk {
                 tx_hash,
                 i,
@@ -154,7 +149,7 @@ impl InputHandler for ProxyInput {
                 data,
             } => {
                 if let Some(tx) =
-                    handle_transaction_chunk(rk.host_mut(), tx_hash, i, chunk_hash, data)?
+                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
                 {
                     inbox_content.transactions.push(tx.into())
                 }
@@ -163,38 +158,38 @@ impl InputHandler for ProxyInput {
         Ok(())
     }
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         deposit: Deposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        KS: SafeKeyspace,
         Host: HostReveal,
     {
         inbox_content
             .transactions
-            .push(handle_deposit(rk.host_mut(), deposit)?);
+            .push(handle_deposit(host, deposit)?);
         Ok(())
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        KS: SafeKeyspace,
         Host: HostReveal,
     {
         inbox_content
             .transactions
-            .push(handle_fa_deposit(rk.host_mut(), fa_deposit)?);
+            .push(handle_fa_deposit(host, fa_deposit)?);
         Ok(())
     }
 }
@@ -219,24 +214,25 @@ impl InputHandler for SequencerInput {
     // there is nothing to return in the end.
     type Inbox = DelayedInbox;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
-                let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-                let level = read_l1_level(rk.base())?;
+                let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+                let level = read_l1_level(base)?;
                 log!(Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(
-                    rk,
+                    host,
+                    base,
                     TezosXTransaction::Ethereum(tx),
                     previous_timestamp,
                     level,
@@ -244,7 +240,7 @@ impl InputHandler for SequencerInput {
                 )
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
-                handle_blueprint_chunk(rk.base_mut(), seq_blueprint)
+                handle_blueprint_chunk(base, seq_blueprint)
             }
             Self::SequencerBlueprint(
                 InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
@@ -257,11 +253,11 @@ impl InputHandler for SequencerInput {
                 signature: _,
             }) => {
                 log!(Debug, "Importing {} DAL signals", &signals.0.len());
-                let params = rk.host().reveal_dal_parameters();
+                let params = host.reveal_dal_parameters();
                 let slot_size = params.slot_size;
                 let page_size = params.page_size;
                 let next_blueprint_number: U256 =
-                    crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
+                    crate::blueprint_storage::read_next_blueprint_number(base)?;
                 for signal in signals.0.iter() {
                     let published_level = signal.published_level;
                     let slot_indices = &signal.slot_indices;
@@ -274,7 +270,7 @@ impl InputHandler for SequencerInput {
                         );
                         if let Some(unsigned_seq_blueprints) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
-                                rk.host_mut(),
+                                host,
                                 slot_size,
                                 page_size,
                                 &next_blueprint_number,
@@ -288,7 +284,7 @@ impl InputHandler for SequencerInput {
                                 unsigned_seq_blueprints.len()
                             );
                             for chunk in unsigned_seq_blueprints {
-                                handle_blueprint_chunk(rk.base_mut(), chunk)?
+                                handle_blueprint_chunk(base, chunk)?
                             }
                         }
                     }
@@ -298,8 +294,9 @@ impl InputHandler for SequencerInput {
         }
     }
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         deposit: Deposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
@@ -307,17 +304,17 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-        let level = read_l1_level(rk.base())?;
-        let tx = handle_deposit(rk.host_mut(), deposit)?;
-        delayed_inbox.save_transaction(rk, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+        let level = read_l1_level(base)?;
+        let tx = handle_deposit(host, deposit)?;
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
@@ -325,12 +322,11 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-        let level = read_l1_level(rk.base())?;
-        let tx = handle_fa_deposit(rk.host_mut(), fa_deposit)?;
-        delayed_inbox.save_transaction(rk, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+        let level = read_l1_level(base)?;
+        let tx = handle_fa_deposit(host, fa_deposit)?;
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 }
 
@@ -520,7 +516,8 @@ where
 {
     match input {
         Input::ModeSpecific(input) => {
-            Mode::handle_input(rk, input, inbox_content, common)?
+            let (host, base) = rk.base_parts_mut();
+            Mode::handle_input(host, base, input, inbox_content, common)?
         }
         Input::Upgrade(kernel_upgrade) => {
             store_kernel_upgrade(rk.base_mut(), &kernel_upgrade, common)?
@@ -540,10 +537,19 @@ where
             store_l1_level(rk.base_mut(), info.level)?
         }
         Input::Deposit((deposit, chain_id)) => {
-            Mode::handle_deposit(rk, deposit, chain_id, inbox_content, common)?
+            let (host, base) = rk.base_parts_mut();
+            Mode::handle_deposit(host, base, deposit, chain_id, inbox_content, common)?
         }
         Input::FaDeposit((fa_deposit, chain_id)) => {
-            Mode::handle_fa_deposit(rk, fa_deposit, chain_id, inbox_content, common)?
+            let (host, base) = rk.base_parts_mut();
+            Mode::handle_fa_deposit(
+                host,
+                base,
+                fa_deposit,
+                chain_id,
+                inbox_content,
+                common,
+            )?
         }
         Input::ForceKernelUpgrade => force_kernel_upgrade(rk)?,
         Input::DalAttestedSlots {
