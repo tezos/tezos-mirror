@@ -429,7 +429,8 @@ where
             if current_timestamp >= (activation_timestamp + 86400i64) {
                 // If the kernel upgrade still exist 1 day after it was supposed
                 // to be activated. It is possible to force its execution.
-                upgrade::upgrade(rk, kernel_upgrade.preimage_hash)?
+                let (host, base) = rk.base_parts_mut();
+                upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?
             };
             Ok(())
         }
@@ -525,7 +526,8 @@ where
             store_kernel_upgrade(rk.base_mut(), &kernel_upgrade, common)?
         }
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            store_sequencer_upgrade(rk, sequencer_upgrade, common)?
+            let (host, base) = rk.base_parts_mut();
+            store_sequencer_upgrade(host, base, sequencer_upgrade, common)?
         }
         Input::RemoveSequencer => remove_sequencer(rk.host_mut())?,
         Input::Info(info) => {

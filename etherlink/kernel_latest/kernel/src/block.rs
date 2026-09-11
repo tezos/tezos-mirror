@@ -304,7 +304,8 @@ where
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
                 if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
-                    upgrade::upgrade(rk, kernel_upgrade.preimage_hash)?;
+                    let (host, base) = rk.base_parts_mut();
+                    upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?;
                     // We abort the call, as there is no blueprint to execute,
                     // the kernel will reboot.
                     return Ok(BlueprintParsing::Postponed);

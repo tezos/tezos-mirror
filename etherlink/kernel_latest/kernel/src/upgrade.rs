@@ -108,24 +108,24 @@ pub fn read_kernel_upgrade(
         .context("Failed to decode kernel upgrade")
 }
 
-pub fn upgrade<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn upgrade<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: KeySpace,
 {
     log!(Info, "Kernel upgrade initialisation.");
 
-    backup_current_kernel(rk)?;
+    backup_current_kernel(host, base)?;
     let config = upgrade_reveal_flow(root_hash);
     config
-        .evaluate(rk.host_mut())
+        .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    rk.base_mut().set(&KERNEL_ROOT_HASH_KEY, root_hash)?;
-    rk.base_mut().delete(&KERNEL_UPGRADE_KEY);
+    base.set(&KERNEL_ROOT_HASH_KEY, root_hash)?;
+    base.delete(&KERNEL_UPGRADE_KEY);
 
     log!(Info, "Kernel is ready to be upgraded.");
     Ok(())
@@ -188,14 +188,14 @@ impl Encodable for SequencerUpgrade {
     }
 }
 
-pub fn store_sequencer_upgrade<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn store_sequencer_upgrade<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     sequencer_upgrade: SequencerUpgrade,
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1,
-    KS: KeySpace,
 {
     log!(
         Info,
@@ -204,10 +204,9 @@ where
         sequencer_upgrade.activation_timestamp
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
-    Event::SequencerUpgrade(sequencer_upgrade).store(rk.base_mut(), common)?;
+    Event::SequencerUpgrade(sequencer_upgrade).store(base, common)?;
     let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
-    rk.host_mut()
-        .store_write_all(&path, bytes)
+    host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")
 }
 
@@ -342,16 +341,20 @@ mod tests {
             U256::ZERO
         );
 
-        store_sequencer_upgrade(
-            &mut rk,
-            SequencerUpgrade {
-                sequencer: test_public_key(),
-                pool_address: H160::zero(),
-                activation_timestamp: Timestamp::from(100i64),
-            },
-            &CommonConfig::default(),
-        )
-        .unwrap();
+        {
+            let (host, base) = rk.base_parts_mut();
+            store_sequencer_upgrade(
+                host,
+                base,
+                SequencerUpgrade {
+                    sequencer: test_public_key(),
+                    pool_address: H160::zero(),
+                    activation_timestamp: Timestamp::from(100i64),
+                },
+                &CommonConfig::default(),
+            )
+            .unwrap();
+        }
 
         // Merely scheduling the upgrade must not move the counter.
         assert_eq!(

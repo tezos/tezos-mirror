@@ -293,7 +293,8 @@ where
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(rk)?;
+            let (host, base) = rk.base_parts_mut();
+            fallback_backup_kernel(host, base)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
