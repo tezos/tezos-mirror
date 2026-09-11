@@ -464,8 +464,10 @@ where
     }
 
     if is_revealed_storage(rk.base()) {
+        let (host, base) = rk.base_parts_mut();
         reveal_storage(
-            &mut rk,
+            host,
+            base,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
