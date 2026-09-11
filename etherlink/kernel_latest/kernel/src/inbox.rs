@@ -435,8 +435,9 @@ where
 
 /// Import DAL slots based on protocol attestation information.
 /// This is called when processing DalAttestedSlots internal messages.
-fn import_dal_attested_slots<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn import_dal_attested_slots<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     published_level: i32,
     slot_size: u64,
     page_size: u64,
@@ -444,7 +445,6 @@ fn import_dal_attested_slots<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal,
-    KS: SafeKeyspace,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
@@ -452,7 +452,7 @@ where
     }
 
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
+        crate::blueprint_storage::read_next_blueprint_number(base)?;
 
     log!(
         Debug,
@@ -471,7 +471,7 @@ where
 
         if let Some(unsigned_seq_blueprints) =
             fetch_and_parse_sequencer_blueprint_from_dal(
-                rk.host_mut(),
+                host,
                 slot_size,
                 page_size,
                 &next_blueprint_number,
@@ -486,7 +486,7 @@ where
                 unsigned_seq_blueprints.len()
             );
             for chunk in unsigned_seq_blueprints {
-                if let Err(e) = handle_blueprint_chunk(rk.base_mut(), chunk) {
+                if let Err(e) = handle_blueprint_chunk(base, chunk) {
                     log!(
                         Error,
                         "Failed to handle blueprint chunk from slot {}: {:?}",
@@ -560,8 +560,10 @@ where
             page_size,
             slot_indices,
         } => {
+            let (host, base) = rk.base_parts_mut();
             import_dal_attested_slots(
-                rk,
+                host,
+                base,
                 published_level,
                 slot_size,
                 page_size,
