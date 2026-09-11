@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
+use crate::chains::{ExperimentalFeatures, TezosXTransaction};
 use crate::configuration::{CommonConfig, SequencerConfig, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -565,25 +565,24 @@ enum ReadStatus {
     FinishedIgnore,
     FinishedRead,
     Ongoing,
+    Simulation,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn read_and_dispatch_input<Host, KS, Mode>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn read_and_dispatch_input<Host, Mode>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
     parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
-    chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
-        rk.host_mut(),
+        host,
         smart_rollup_address,
         &common.tezos_contracts,
         inbox_is_empty,
@@ -607,15 +606,12 @@ where
         }
         InputResult::Unparsable => Ok(ReadStatus::Ongoing),
         InputResult::Simulation => {
-            // kernel enters in simulation mode, reading will be done by the
-            // simulation and all the previous and next transactions are
-            // discarded.
-            let registry = chain_configuration.init_registry();
-            chain_configuration.start_simulation_mode(rk, &registry)?;
-            Ok(ReadStatus::FinishedIgnore)
+            // Starting simulation mode needs the full `RuntimeKeyspaces`
+            // (eth_accounts, for account state), which this function no
+            // longer holds: the caller performs it once this returns.
+            Ok(ReadStatus::Simulation)
         }
         InputResult::Input(input) => {
-            let (host, base) = rk.base_parts_mut();
             handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
         }
@@ -626,7 +622,6 @@ pub fn read_proxy_inbox<Host, KS>(
     rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
-    chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
     Host: HostReveal + WasmHost + KeyspaceHost<KS>,
@@ -641,14 +636,15 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_and_dispatch_input::<Host, KS, ProxyInput>(
-            rk,
+        let (host, base) = rk.base_parts_mut();
+        match read_and_dispatch_input::<Host, ProxyInput>(
+            host,
+            base,
             smart_rollup_address,
             common,
             &mut (),
             &mut inbox_is_empty,
             &mut res,
-            chain_configuration,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -665,17 +661,24 @@ where
             Ok(ReadStatus::Ongoing) => (),
             Ok(ReadStatus::FinishedRead) => return Ok(Some(res)),
             Ok(ReadStatus::FinishedIgnore) => return Ok(None),
+            // The EVM node no longer drives proxy mode, so no simulation
+            // trigger reaches this loop.
+            Ok(ReadStatus::Simulation) => return Ok(None),
         }
     }
 }
 
-/// The StageOne can yield with three possible states:
+/// The StageOne can yield with four possible states:
 ///
 /// - Done: the inbox has been fully read during the current `kernel_run`
 ///
 /// - Reboot: the inbox cannot been read further as there are not enough ticks
 ///   and needs a reboot before continuing. This is only supported in sequencer
 ///   mode as the inputs are stored directly in the process.
+///
+/// - Simulation: a simulation trigger was read from the inbox. Simulation
+///   mode is started for the current `kernel_run`, which then finishes
+///   immediately without entering stage two.
 ///
 /// - Skipped: the inbox was empty during the current `kernel_run`, implying it
 ///   has been emptied during a previous `kernel_run` and the kernel is
@@ -685,6 +688,7 @@ where
 pub enum StageOneStatus {
     Done,
     Reboot,
+    Simulation,
     Skipped,
 }
 
@@ -692,7 +696,6 @@ pub enum StageOneStatus {
 pub fn read_sequencer_inbox<Host, KS>(
     rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     smart_rollup_address: [u8; 20],
-    config_chain: &TezosXChainConfig,
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
@@ -737,14 +740,15 @@ where
             );
             return Ok(StageOneStatus::Reboot);
         };
-        match read_and_dispatch_input::<Host, KS, SequencerInput>(
-            rk,
+        let (host, base) = rk.base_parts_mut();
+        match read_and_dispatch_input::<Host, SequencerInput>(
+            host,
+            base,
             smart_rollup_address,
             config_common,
             &mut parsing_context,
             &mut inbox_is_empty,
             &mut config_sequencer.delayed_inbox,
-            config_chain,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -768,6 +772,9 @@ where
                 return Ok(StageOneStatus::Done);
             }
             Ok(ReadStatus::FinishedIgnore) => return Ok(StageOneStatus::Skipped),
+            Ok(ReadStatus::Simulation) => {
+                return Ok(StageOneStatus::Simulation);
+            }
         }
     }
 }
@@ -779,7 +786,6 @@ mod tests {
         blueprint_exists, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
     };
-    use crate::chains::test_tezosx_chain_config;
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -931,14 +937,10 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -964,14 +966,10 @@ mod tests {
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1028,7 +1026,6 @@ mod tests {
                 },
                 ..CommonConfig::default()
             },
-            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1071,13 +1068,9 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(rk.host_mut(), &tx_hash)
             .expect("The number of chunks should exist");
@@ -1124,13 +1117,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -1164,13 +1153,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -1222,14 +1207,10 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         assert_eq!(
             inbox_content,
             ProxyInboxContent {
@@ -1243,14 +1224,10 @@ mod tests {
                 .host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash,
@@ -1306,14 +1283,10 @@ mod tests {
 
         rk.host_mut().host.add_external(framed);
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1331,23 +1304,15 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         rk.host_mut().host.add_external(Bytes::from(vec![]));
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
         assert!(inbox_content.is_none());
     }
 
@@ -1457,14 +1422,8 @@ mod tests {
             dal: None,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
-        let _ = read_sequencer_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &test_tezosx_chain_config(),
-            &common,
-            &mut seq,
-        )
-        .unwrap();
+        let _ = read_sequencer_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &common, &mut seq)
+            .unwrap();
 
         // The blueprint was valid if it was stored in the storage.
         blueprint_exists(rk.base(), unsigned_blueprint.number).unwrap()

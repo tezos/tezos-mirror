@@ -116,7 +116,7 @@ where
     log!(Debug, "Configuration: {}", configuration);
 
     enter_stage_one(rk.base_mut())?;
-    let res = fetch_blueprints(rk, smart_rollup_address, chain_config, configuration);
+    let res = fetch_blueprints(rk, smart_rollup_address, configuration);
     leave_stage_one(rk.base_mut())?;
     res
 }
@@ -338,16 +338,25 @@ where
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot = stage_one(
+    let stage_one_status = stage_one(
         rk,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
     )
-    .context("Failed during stage 1")?
-    {
-        #[cfg(not(target_arch = "riscv64"))]
-        return Ok(SingleRunStatus::Reboot);
+    .context("Failed during stage 1")?;
+
+    match stage_one_status {
+        StageOneStatus::Reboot => {
+            #[cfg(not(target_arch = "riscv64"))]
+            return Ok(SingleRunStatus::Reboot);
+        }
+        StageOneStatus::Simulation => {
+            let registry = chain_configuration.init_registry();
+            chain_configuration.start_simulation_mode(rk, &registry)?;
+            return Ok(SingleRunStatus::Finished);
+        }
+        StageOneStatus::Done | StageOneStatus::Skipped => (),
     };
 
     let trace_input = read_tracer_input(rk.base())?;
