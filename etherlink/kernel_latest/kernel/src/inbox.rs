@@ -410,22 +410,21 @@ fn handle_fa_deposit(
     .into())
 }
 
-fn force_kernel_upgrade<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn force_kernel_upgrade<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: SafeKeyspace,
 {
-    match upgrade::read_kernel_upgrade(rk.base())? {
+    match upgrade::read_kernel_upgrade(base)? {
         Some(kernel_upgrade) => {
-            let current_timestamp = read_last_info_per_level_timestamp(rk.base())?.i64();
+            let current_timestamp = read_last_info_per_level_timestamp(base)?.i64();
             let activation_timestamp = kernel_upgrade.activation_timestamp.i64();
 
             if current_timestamp >= (activation_timestamp + 86400i64) {
                 // If the kernel upgrade still exist 1 day after it was supposed
                 // to be activated. It is possible to force its execution.
-                let (host, base) = rk.base_parts_mut();
                 upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?
             };
             Ok(())
@@ -551,7 +550,10 @@ where
                 common,
             )?
         }
-        Input::ForceKernelUpgrade => force_kernel_upgrade(rk)?,
+        Input::ForceKernelUpgrade => {
+            let (host, base) = rk.base_parts_mut();
+            force_kernel_upgrade(host, base)?
+        }
         Input::DalAttestedSlots {
             published_level,
             slot_size,
