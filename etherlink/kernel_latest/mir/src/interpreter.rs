@@ -5245,6 +5245,50 @@ mod interpreter_tests {
         }
     }
 
+    // Checks `UPDATE` on a shared map charges at least `alloc_cost`'s per-byte
+    // rate, below which an operation's gas budget could fund more than the 4 GiB
+    // WASM heap. Part of the path it copies is allocated outside the tree, so the
+    // charge can fall behind without the data structure changing.
+    #[test]
+    fn map_update_gas_covers_the_path_it_copies() {
+        fn marginal_bytes(entries: i64) -> u64 {
+            let run = |k: usize| {
+                let map = V::Map(rc_map((1..=entries).map(|i| (V::int(i), V::int(i)))));
+                let prog: Vec<Instruction> = (0..k)
+                    .flat_map(|_| {
+                        [
+                            Dup(None),
+                            Push(RcTypedValue::new(V::new_option(Some(V::int(7))))),
+                            Push(RcTypedValue::new(V::int(0))),
+                            Update(overloads::Update::Map),
+                        ]
+                    })
+                    .collect();
+                let mut stack = stk![map];
+                let mut ctx = Ctx::default();
+                let before = thread_allocated_bytes();
+                interpret(&prog, &mut ctx, &mut stack).unwrap();
+                thread_allocated_bytes() - before
+            };
+            (run(100) - run(10)) / 90
+        }
+
+        for exp in [10u32, 16] {
+            let entries = 1i64 << exp;
+            let bytes = marginal_bytes(entries);
+            let gas =
+                interpret_cost::map_update(&V::int(0), entries as usize).unwrap() as u64;
+            // 0.15625 milligas per byte, as 5/32, to stay in integers
+            assert!(
+                bytes * 5 <= gas * 32,
+                "map_update charges {gas} milligas for {bytes} bytes copied at \
+                 2^{exp} entries, above the {} bytes per milligas the \
+                 allocation floor allows",
+                bytes as f64 / gas as f64
+            );
+        }
+    }
+
     // A large operand kept live by extra copies on the stack must not be
     // copied by the op. A reintroduced operand copy shows up as one extra buffer.
     #[test]

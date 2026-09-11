@@ -1171,16 +1171,34 @@ pub mod interpret_cost {
         Ok(((w >> 3) + (w >> 4) + (w >> 5) + (w >> 6) + 40).as_gas_cost()?)
     }
 
+    const TREE_PATH_BYTES_PER_LEVEL: u64 = 64;
+
+    const TREE_UPDATE_FIXED_BYTES: u64 = 232;
+
+    fn tree_path_alloc(size: usize) -> Result<Checked<u64>, CostOverflow> {
+        // one extra level of slack: the measured law assumes the tree the
+        // insertion order actually builds, not the taller one red-black
+        // permits
+        let levels = (Checked::from(size as u64) + 1)
+            .ok_or(CostOverflow)?
+            .ilog2()
+            + 1;
+        Ok(Checked::from(TREE_PATH_BYTES_PER_LEVEL) * u64::from(levels)
+            + Checked::from(TREE_UPDATE_FIXED_BYTES))
+    }
+
     // corresponds to cost_N_IMap_update in the Tezos protocol
     pub fn map_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         let w = lookup_var(k, map_size)?;
-        Ok(((w * 4) + (w >> 2) + 55).as_gas_cost()?)
+        let time = ((w * 4) + (w >> 2) + 55).as_gas_cost()?;
+        Ok(time.max(alloc_cost(tree_path_alloc(map_size)?)?))
     }
 
     // corresponds to cost_N_ISet_update in the Tezos protocol
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, CompareError> {
         let w = lookup_var(k, map_size)?;
-        Ok(((w * 3) + (w >> 1) + (w >> 2) + 60).as_gas_cost()?)
+        let time = ((w * 3) + (w >> 1) + (w >> 2) + 60).as_gas_cost()?;
+        Ok(time.max(alloc_cost(tree_path_alloc(map_size)?)?))
     }
 
     // corresponds to cost_N_IMap_get_and_update in the Tezos protocol
@@ -1189,7 +1207,8 @@ pub mod interpret_cost {
         map_size: usize,
     ) -> Result<u32, CompareError> {
         let w = lookup_var(k, map_size)?;
-        Ok(((w * 4) + (w >> 2) + (w >> 3) + 80).as_gas_cost()?)
+        let time = ((w * 4) + (w >> 2) + (w >> 3) + 80).as_gas_cost()?;
+        Ok(time.max(alloc_cost(tree_path_alloc(map_size)?)?))
     }
 
     /// Measures size of Michelson using several metrics.
@@ -1529,6 +1548,37 @@ pub mod unparsing_cost {
     pub fn annotation(annot: &Annotation) -> Result<u32, CostOverflow> {
         let size = Checked::from(annot.len());
         (size * 10).as_gas_cost()
+    }
+}
+
+#[cfg(test)]
+mod tree_update_cost_tests {
+    use super::interpret_cost;
+    use crate::ast::TypedValue;
+
+    #[test]
+    fn tree_update_cost_grows_with_the_collection() {
+        let key = TypedValue::int(0);
+        for sizes in [1usize << 8, 1 << 16, 1 << 24].windows(2) {
+            let (small, large) = (sizes[0], sizes[1]);
+            assert!(
+                interpret_cost::map_update(&key, small).unwrap()
+                    < interpret_cost::map_update(&key, large).unwrap(),
+                "map_update must grow with the map size: a key of comparable \
+                 size zero leaves the time term flat, so only the allocation \
+                 floor can make it grow"
+            );
+            assert!(
+                interpret_cost::set_update(&key, small).unwrap()
+                    < interpret_cost::set_update(&key, large).unwrap(),
+                "set_update must grow with the set size"
+            );
+            assert!(
+                interpret_cost::map_get_and_update(&key, small).unwrap()
+                    < interpret_cost::map_get_and_update(&key, large).unwrap(),
+                "map_get_and_update copies the same path as map_update"
+            );
+        }
     }
 }
 
