@@ -2670,7 +2670,10 @@ let register ~__FILE__ ~protocols =
     "DAL negative attestation bitset does not poison the mempool"
     ~tags:["dal"; "attestation"; "mempool"; "bitset"]
     test_negative_dal_bitset_does_not_poison_mempool
-    protocols ;
+    (* Protos >=026 reject negative bitsets at the encoding, so the malicious
+       operation cannot even be forged there (that rejection is covered by the
+       unit test in test_dal_attestations_repr.ml). *)
+    (List.filter (fun p -> Protocol.number p < 026) protocols) ;
   scenario_with_layer1_node
     ~__FILE__
     "attesters receive expected DAL rewards depending on participation"
