@@ -6,10 +6,18 @@
 (*****************************************************************************)
 
 (** [download ~preimages_endpoint ~preimages ~root_hash ?num_download_retries
-    ?progress ()] fetches from [preimages_endpoint] all the preimages the kernel
-    [root_hash] is made of, and stores them in the [preimages] directory. A
-    preimage whose hash does not match the one it was requested for is
-    downloaded again at most [num_download_retries] times (once by default).
+    ?concurrency ?progress ()] fetches from [preimages_endpoint] all the
+    preimages the kernel [root_hash] is made of, and stores them in the
+    [preimages] directory. A preimage whose hash does not match the one it was
+    requested for is downloaded again at most [num_download_retries] times
+    (once by default).
+
+    [concurrency] is how many preimages are fetched at a time (one by default,
+    that is, sequentially), and also the number of connections opened onto
+    [preimages_endpoint]. It must be at least one; the function fails
+    otherwise. Only the content pages of the kernel are fetched concurrently;
+    the hash pages naming them are walked one level at a time, as a level
+    cannot be known before the level above it has been read.
 
     A preimage already present in [preimages] is read from there instead of
     being fetched again, so an interrupted download resumes where it stopped.
@@ -22,6 +30,7 @@ val download :
   preimages:string ->
   root_hash:Hex.t ->
   ?num_download_retries:int ->
+  ?concurrency:int ->
   ?progress:bool ->
   unit ->
   unit tzresult Lwt.t
