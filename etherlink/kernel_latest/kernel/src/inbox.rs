@@ -502,65 +502,52 @@ where
     Ok(())
 }
 
-pub fn handle_input<Host, KS, Mode>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn handle_input<Host, Mode>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: SafeKeyspace,
     Mode: Parsable + InputHandler,
 {
     match input {
         Input::ModeSpecific(input) => {
-            let (host, base) = rk.base_parts_mut();
             Mode::handle_input(host, base, input, inbox_content, common)?
         }
         Input::Upgrade(kernel_upgrade) => {
-            store_kernel_upgrade(rk.base_mut(), &kernel_upgrade, common)?
+            store_kernel_upgrade(base, &kernel_upgrade, common)?
         }
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            let (host, base) = rk.base_parts_mut();
             store_sequencer_upgrade(host, base, sequencer_upgrade, common)?
         }
-        Input::RemoveSequencer => remove_sequencer(rk.host_mut())?,
+        Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
-            clear_events(rk.base_mut())?;
-            store_last_info_per_level_timestamp(
-                rk.base_mut(),
-                info.info.predecessor_timestamp,
-            )?;
-            store_l1_level(rk.base_mut(), info.level)?
+            clear_events(base)?;
+            store_last_info_per_level_timestamp(base, info.info.predecessor_timestamp)?;
+            store_l1_level(base, info.level)?
         }
         Input::Deposit((deposit, chain_id)) => {
-            let (host, base) = rk.base_parts_mut();
             Mode::handle_deposit(host, base, deposit, chain_id, inbox_content, common)?
         }
-        Input::FaDeposit((fa_deposit, chain_id)) => {
-            let (host, base) = rk.base_parts_mut();
-            Mode::handle_fa_deposit(
-                host,
-                base,
-                fa_deposit,
-                chain_id,
-                inbox_content,
-                common,
-            )?
-        }
-        Input::ForceKernelUpgrade => {
-            let (host, base) = rk.base_parts_mut();
-            force_kernel_upgrade(host, base)?
-        }
+        Input::FaDeposit((fa_deposit, chain_id)) => Mode::handle_fa_deposit(
+            host,
+            base,
+            fa_deposit,
+            chain_id,
+            inbox_content,
+            common,
+        )?,
+        Input::ForceKernelUpgrade => force_kernel_upgrade(host, base)?,
         Input::DalAttestedSlots {
             published_level,
             slot_size,
             page_size,
             slot_indices,
         } => {
-            let (host, base) = rk.base_parts_mut();
             import_dal_attested_slots(
                 host,
                 base,
@@ -628,7 +615,8 @@ where
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(rk, input, res, common)?;
+            let (host, base) = rk.base_parts_mut();
+            handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
         }
     }
