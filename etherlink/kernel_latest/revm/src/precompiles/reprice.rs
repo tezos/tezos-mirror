@@ -23,6 +23,8 @@ use revm::precompile::{
     Precompile, PrecompileHalt, PrecompileId, PrecompileSpecId, Precompiles,
 };
 use revm::primitives::{alloy_primitives::B512, Address, Bytes, OnceLock, B256};
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// ecrecover: `ECRECOVER_MULTIPLIER` × the upstream Istanbul base (3000).
 const ECRECOVER_MULTIPLIER: u64 = 3;
@@ -93,15 +95,26 @@ fn build(spec: PrecompileSpecId) -> Precompiles {
 
 /// The standard precompiles for `spec` with `0x01`/`0x08` overridden to the
 /// repriced gas, memoised as `&'static` (upstream `EthPrecompiles` holds a
-/// `&'static Precompiles`). Repricing activates for a single spec, so a
-/// first-spec-wins cache is sufficient; a later differing spec is a bug.
+/// `&'static Precompiles`).
+///
+/// Memoised **per spec**, not first-spec-wins: the active `EVMVersion` — hence
+/// the `SpecId` — can change within a kernel's lifetime (e.g. a migration bumps
+/// it), and each spec must get the set built for it. Each distinct spec is built
+/// and leaked once; the set of specs is small and bounded, so the leak is
+/// effectively static data (mirroring upstream `Precompiles::new`, which is also
+/// `&'static` and per-spec memoised).
 pub fn repriced_precompiles(spec: PrecompileSpecId) -> &'static Precompiles {
-    static CACHE: OnceLock<(PrecompileSpecId, Precompiles)> = OnceLock::new();
-    let (cached_spec, precompiles) = CACHE.get_or_init(|| (spec, build(spec)));
-    debug_assert_eq!(
-        *cached_spec, spec,
-        "repriced_precompiles called with a second spec"
-    );
+    static CACHE: OnceLock<Mutex<HashMap<PrecompileSpecId, &'static Precompiles>>> =
+        OnceLock::new();
+    let mut cache = CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .expect("repriced_precompiles cache mutex poisoned");
+    if let Some(precompiles) = cache.get(&spec) {
+        return precompiles;
+    }
+    let precompiles: &'static Precompiles = Box::leak(Box::new(build(spec)));
+    cache.insert(spec, precompiles);
     precompiles
 }
 
@@ -177,6 +190,29 @@ mod tests {
         assert!(matches!(
             run_pair(&PAIR1, cost - 1),
             Err(PrecompileHalt::OutOfGas)
+        ));
+    }
+
+    /// The cache is keyed per spec, not first-spec-wins: two different specs get
+    /// two different sets, and each spec is idempotent. Guards against silently
+    /// returning the first spec's precompiles after a spec change (e.g. a
+    /// migration bumping EVMVersion).
+    #[test]
+    fn repriced_precompiles_memoized_per_spec() {
+        use revm::primitives::hardfork::SpecId;
+        let shanghai =
+            repriced_precompiles(PrecompileSpecId::from_spec_id(SpecId::SHANGHAI));
+        let osaka = repriced_precompiles(PrecompileSpecId::from_spec_id(SpecId::OSAKA));
+        // Different specs -> distinct sets (not first-spec-wins).
+        assert!(!std::ptr::eq(shanghai, osaka));
+        // Same spec -> same cached set.
+        assert!(std::ptr::eq(
+            shanghai,
+            repriced_precompiles(PrecompileSpecId::from_spec_id(SpecId::SHANGHAI))
+        ));
+        assert!(std::ptr::eq(
+            osaka,
+            repriced_precompiles(PrecompileSpecId::from_spec_id(SpecId::OSAKA))
         ));
     }
 }
