@@ -468,7 +468,8 @@ pub mod interpret_cost {
     pub const EMPTY_BIG_MAP: u32 = 60;
     pub const CHAIN_ID: u32 = 65;
     pub const PACK: u32 = 0;
-    pub const SELF: u32 = 10;
+    // max of its 10 time cost and its 22 allocation cost
+    pub const SELF: u32 = 22;
     pub const ADDRESS: u32 = 60;
     pub const LEFT: u32 = 20;
     pub const RIGHT: u32 = 20;
@@ -1047,6 +1048,10 @@ pub mod interpret_cost {
         ((bytes >> 3) + (bytes >> 5)).as_gas_cost()
     }
 
+    /// Bytes a fresh `Rc<TypedValue>` occupies, counters included. Hard-coded
+    /// so the charge does not vary with the target's pointer width.
+    const BOXED_VALUE_BYTES: u64 = 120;
+
     // corresponds to cost_N_IConcat_string in the Tezos protocol (the model's
     // list-length coefficient is 0; the per-element precheck above stays as a
     // MIR-specific protection)
@@ -1449,10 +1454,13 @@ pub mod interpret_cost {
     }
 
     pub fn pair_n(size: usize) -> Result<u32, CostOverflow> {
-        // corresponds to cost_N_IComb in the Tezos protocol; the protocol's
-        // S.sub floors at 0, hence saturating_sub
+        // corresponds to cost_N_IComb_synthesized in the Tezos protocol; the
+        // protocol's S.sub floors at 0, hence saturating_sub
         let v0 = Checked::from(size.saturating_sub(2));
-        (50 + (v0 * 15)).as_gas_cost()
+        let time = (50 + (v0 * 15)).as_gas_cost()?;
+        // the comb folds `size` values into `size - 1` fresh pairs
+        let boxes = Checked::from(size.saturating_sub(1) as u64) * BOXED_VALUE_BYTES;
+        Ok(time.max(alloc_cost(boxes)?))
     }
 
     pub fn unpair_n(size: usize) -> Result<u32, CostOverflow> {
