@@ -52,9 +52,16 @@ let get mem addr =
   Array.unsafe_get mem.raw addr
 
 let get_string mem ~address ~length =
-  check_bounds mem address length ;
-  String.init length @@ fun i ->
-  Array.unsafe_get mem.raw (i + address) |> Unsigned.UInt8.to_int |> Char.chr
+  (* Checked in the order the interpreter's [Partial_memory] uses, which
+     this memory has to agree with: a negative [length] is rejected before
+     the address is looked at, and an empty read accesses no byte, hence
+     checks no bound. [set_string] carves out the empty write too. *)
+  if length < 0 then invalid_arg "Memory.get_string: negative length"
+  else if length = 0 then ""
+  else (
+    check_bounds mem address length ;
+    String.init length @@ fun i ->
+    Array.unsafe_get mem.raw (i + address) |> Unsigned.UInt8.to_int |> Char.chr)
 
 let set mem addr value =
   check_bounds mem addr 1 ;
