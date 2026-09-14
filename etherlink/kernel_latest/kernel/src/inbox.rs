@@ -36,8 +36,8 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+#[cfg(test)]
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -691,16 +691,15 @@ pub enum StageOneStatus {
     Skipped,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn read_sequencer_inbox<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn read_sequencer_inbox<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -708,12 +707,11 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
-    let experimental_features =
-        ExperimentalFeatures::read_from_storage(rk.host(), rk.base());
+        crate::blueprint_storage::read_next_blueprint_number(base)?;
+    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = (
-        crate::storage::is_legacy_dal_signals_disabled(rk.base()),
-        crate::storage::read_dal_publishers_whitelist(rk.base()).unwrap_or_default(),
+        crate::storage::is_legacy_dal_signals_disabled(base),
+        crate::storage::read_dal_publishers_whitelist(base).unwrap_or_default(),
     );
     let maximum_allowed_ticks = config_common.maximum_allowed_ticks;
     let mut parsing_context = SequencerParsingContext {
@@ -739,7 +737,6 @@ where
             );
             return Ok(StageOneStatus::Reboot);
         };
-        let (host, base) = rk.base_parts_mut();
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             base,
@@ -1432,7 +1429,8 @@ mod tests {
             dal: None,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
-        let _ = read_sequencer_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &common, &mut seq)
+        let (host, base) = rk.base_parts_mut();
+        let _ = read_sequencer_inbox(host, base, SMART_ROLLUP_ADDRESS, &common, &mut seq)
             .unwrap();
 
         // The blueprint was valid if it was stored in the storage.

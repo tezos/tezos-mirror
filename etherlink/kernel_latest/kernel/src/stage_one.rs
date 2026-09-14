@@ -120,8 +120,14 @@ where
     Host: HostReveal + WasmHost + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
-    match read_sequencer_inbox(rk, smart_rollup_address, config_common, config_sequencer)?
-    {
+    let (host, base) = rk.base_parts_mut();
+    match read_sequencer_inbox(
+        host,
+        base,
+        smart_rollup_address,
+        config_common,
+        config_sequencer,
+    )? {
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
