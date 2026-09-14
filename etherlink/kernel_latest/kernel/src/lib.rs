@@ -116,7 +116,8 @@ where
     log!(Debug, "Configuration: {}", configuration);
 
     enter_stage_one(rk.base_mut())?;
-    let res = fetch_blueprints(rk, smart_rollup_address, configuration);
+    let (host, base) = rk.base_parts_mut();
+    let res = fetch_blueprints(host, base, smart_rollup_address, configuration);
     leave_stage_one(rk.base_mut())?;
     res
 }

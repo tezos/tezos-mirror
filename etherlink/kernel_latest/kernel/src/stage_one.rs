@@ -20,8 +20,6 @@ use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
@@ -150,16 +148,15 @@ where
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn fetch_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn fetch_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
-    let (host, base) = rk.base_parts_mut();
     match &mut config.mode {
         ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
             host,
@@ -195,6 +192,7 @@ mod tests {
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
@@ -388,7 +386,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -415,7 +415,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -435,7 +437,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -469,7 +473,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -497,7 +503,9 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         let (host, base) = rk.base_parts_mut();
@@ -534,7 +542,9 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -610,7 +620,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -646,7 +658,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -683,7 +697,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata)
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -708,7 +724,9 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -738,7 +756,9 @@ mod tests {
             ),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -765,7 +785,9 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -841,7 +863,8 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(rk.host_mut(), filled_slots);
 
-        fetch_blueprints(rk, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
     }
 
     #[test]
@@ -937,7 +960,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -974,7 +998,8 @@ mod tests {
                 .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         }
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -1020,7 +1045,8 @@ mod tests {
             &metadata,
         );
 
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -1057,7 +1083,9 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
 
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
