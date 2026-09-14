@@ -618,14 +618,14 @@ where
     }
 }
 
-pub fn read_proxy_inbox<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn read_proxy_inbox<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -636,7 +636,6 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        let (host, base) = rk.base_parts_mut();
         match read_and_dispatch_input::<Host, ProxyInput>(
             host,
             base,
@@ -936,9 +935,9 @@ mod tests {
         rk.host_mut()
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
-
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -966,8 +965,9 @@ mod tests {
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -1013,8 +1013,10 @@ mod tests {
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         rk.host_mut().host.add_transfer(payload, &transfer_metadata);
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content = read_proxy_inbox(
-            &mut rk,
+            host,
+            base,
             [0; 20],
             &CommonConfig {
                 tezos_contracts: TezosContracts {
@@ -1068,8 +1070,9 @@ mod tests {
             new_chunk2,
         )));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(rk.host_mut(), &tx_hash)
@@ -1117,8 +1120,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         // The out of bounds chunk should not exist.
@@ -1153,8 +1157,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         // The unknown chunk should not exist.
@@ -1207,8 +1212,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         assert_eq!(
@@ -1224,8 +1230,9 @@ mod tests {
                 .host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
 
@@ -1283,8 +1290,9 @@ mod tests {
 
         rk.host_mut().host.add_external(framed);
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -1304,14 +1312,16 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         rk.host_mut().host.add_external(Bytes::from(vec![]));
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
         assert!(inbox_content.is_none());
     }

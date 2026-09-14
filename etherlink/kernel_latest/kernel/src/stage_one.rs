@@ -38,8 +38,9 @@ where
     Host: HostReveal + WasmHost + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
+    let (host, base) = rk.base_parts_mut();
     if let Some(ProxyInboxContent { transactions }) =
-        read_proxy_inbox(rk, smart_rollup_address, common)?
+        read_proxy_inbox(host, base, smart_rollup_address, common)?
     {
         let timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
@@ -554,7 +555,8 @@ mod tests {
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
 
-        match read_proxy_inbox(&mut rk, DEFAULT_SR_ADDRESS, &conf.common).unwrap() {
+        let (host, base) = rk.base_parts_mut();
+        match read_proxy_inbox(host, base, DEFAULT_SR_ADDRESS, &conf.common).unwrap() {
             None => panic!("There should be an InboxContent"),
             Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
                 transactions,
