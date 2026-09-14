@@ -13,7 +13,7 @@ module CI = Cacio.Shared
    pipeline. Used to build more complex base images and avoid code duplications *)
 let base_dep_img_name image =
   let prefix = "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos" in
-  let tag = "${RELEASE}-${CI_COMMIT_REF_SLUG}" in
+  let tag = "${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}" in
   Format.sprintf "%s/%s:%s" prefix image tag
 
 type compilation =
@@ -35,7 +35,7 @@ type upstream_image = Pipeline_dep of string | Upstream of string
    Upstream is the full upstream image ref ( eg. debian:$RELEASE or
    debian:$RELEASE-slim ).
    Pipeline_dep is the name of an image generate in this pipeline ( eg.
-   ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$COMMIT_REF_SLUG )
+   ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA )
 *)
 
 module Files = struct
