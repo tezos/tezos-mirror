@@ -219,7 +219,7 @@ images.ci-release:
   variables:
     DISTRIBUTION: ci-release
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
@@ -292,7 +292,7 @@ images.debian-build:
   variables:
     DISTRIBUTION: debian-build
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: ""
   retry:
     max: 2
@@ -367,7 +367,7 @@ images.debian-homebrew:
   variables:
     DISTRIBUTION: debian-homebrew
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
@@ -404,7 +404,7 @@ images.debian-jsonnet:
   variables:
     DISTRIBUTION: debian-jsonnet
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
@@ -441,7 +441,7 @@ images.debian-rust:
   variables:
     DISTRIBUTION: debian-rust
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: ""
   retry:
     max: 2
@@ -481,7 +481,7 @@ images.debian-rust-sdk-bindings:
   variables:
     DISTRIBUTION: debian-rust-sdk-bindings
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
@@ -550,7 +550,7 @@ images.debian-systemd:
   variables:
     DISTRIBUTION: debian-systemd
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
@@ -625,7 +625,7 @@ images.ubuntu-build:
   variables:
     DISTRIBUTION: ubuntu-build
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: ""
   retry:
     max: 2
@@ -704,7 +704,7 @@ images.ubuntu-systemd:
   variables:
     DISTRIBUTION: ubuntu-systemd
     DOCKER_VERSION: 28.5.1
-    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
     PLATFORM: linux/amd64
   retry:
     max: 2
