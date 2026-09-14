@@ -17,3 +17,6 @@ tezosx-constants.workspace = true
 http.workspace = true
 nom.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+num-bigint.workspace = true

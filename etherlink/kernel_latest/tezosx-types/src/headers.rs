@@ -147,6 +147,10 @@ pub fn check_crac_depth(depth: u32) -> Result<(), TezosXRuntimeError> {
 // ---------------------------------------------------------------------------
 // TEZ decimal-string formatting and parsing
 // ---------------------------------------------------------------------------
+// TODO: https://linear.app/tezos/issue/L2-2021
+//   Retype this amount seam on the crate's `Mutez`/`Wei` (in the
+//   signatures instead of raw `u64`/`U256`) and tighten the inbound mutez
+//   cap to the mutez domain bound (`i64::MAX`).
 
 /// Format a wei amount (`10^-18 TEZ`) as a canonical TEZ decimal string.
 ///

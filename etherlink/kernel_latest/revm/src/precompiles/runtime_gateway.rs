@@ -1,6 +1,7 @@
 use alloy_sol_types::{sol, SolError, SolInterface, SolValue};
 use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use http::header::HeaderMap;
+use primitive_types::U256 as PU256;
 use revm::{
     context::{Block, ContextTr, JournalTr, Transaction},
     context_interface::journaled_state::account::JournaledAccountTr,
@@ -10,7 +11,6 @@ use revm::{
         Address, Bytes, Log, U256,
     },
 };
-use tezos_ethereum::wei::{mutez_to_evm_gas, Wei};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_interfaces::{
     canonicalize_native_address,
@@ -21,6 +21,7 @@ use tezosx_interfaces::{
     X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
     X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME, X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
+use tezosx_types::{mutez_to_evm_gas, Mutez};
 
 use crate::{
     database::EtherlinkVMDB,
@@ -277,6 +278,8 @@ fn classify_and_charge_crac_response(
         let delegated_storage_cost_mutez =
             parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
                 .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
+        let delegated_storage_cost_mutez =
+            narrow_delegated_storage_cost(gas, delegated_storage_cost_mutez)?;
         charge_delegated_storage_cost(
             gas,
             delegated_storage_cost_mutez,
@@ -308,6 +311,25 @@ fn classify_and_charge_crac_response(
     }
 }
 
+/// Narrow a raw mutez-denominated storage-delegation cost to the mutez
+/// domain, wherever it originates (the `X-Tezos-Storage-Cost` header, or an
+/// `AliasResolution`'s `delegated_storage_cost`).
+///
+/// Out-of-domain values are economically unreachable (storage costs are far
+/// below `i64::MAX` mutez); surfaced as a catchable revert rather than
+/// silently truncated.
+fn narrow_delegated_storage_cost(
+    gas: &Gas,
+    cost_mutez: Option<u64>,
+) -> Result<Option<Mutez>, CustomPrecompileError> {
+    cost_mutez.map(Mutez::try_from).transpose().map_err(|_| {
+        CustomPrecompileError::Revert(
+            "delegated storage cost out of the mutez domain".into(),
+            *gas,
+        )
+    })
+}
+
 /// Charge the EVM caller, in gas, for the storage-fee cost (in mutez)
 /// a CRAC callee delegated to it.
 ///
@@ -320,11 +342,11 @@ fn classify_and_charge_crac_response(
 ///   construction, surfaced as `OutOfGas`.
 fn charge_delegated_storage_cost(
     gas: &mut Gas,
-    cost_mutez: Option<u64>,
+    cost_mutez: Option<Mutez>,
     base_fee_per_gas: u64,
 ) -> Result<(), CustomPrecompileError> {
     let Some(v) = cost_mutez else { return Ok(()) };
-    if v == 0 {
+    if v == Mutez::ZERO {
         return Ok(());
     }
     if base_fee_per_gas == 0 {
@@ -333,9 +355,9 @@ fn charge_delegated_storage_cost(
             *gas,
         ));
     }
-    let g2 = mutez_to_evm_gas(v, Wei::from(base_fee_per_gas))
+    let g2 = mutez_to_evm_gas(v, PU256::from(base_fee_per_gas))
         .ok_or(CustomPrecompileError::OutOfGas)?;
-    charge(gas, EvmGas::new(g2))
+    charge(gas, g2)
 }
 
 /// Core logic for the `originOf` selector, extracted for unit-testability.
@@ -771,11 +793,9 @@ where
         .journal_mut()
         .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
     charge_consumed_gas(gas, sender_resolution.consumed_gas)?;
-    charge_delegated_storage_cost(
-        gas,
-        sender_resolution.delegated_storage_cost,
-        context.block().basefee(),
-    )?;
+    let sender_storage_cost =
+        narrow_delegated_storage_cost(gas, sender_resolution.delegated_storage_cost)?;
+    charge_delegated_storage_cost(gas, sender_storage_cost, context.block().basefee())?;
 
     // --- source alias ---
     // Fast path: if sender == source, reuse the resolved alias and skip
@@ -789,11 +809,9 @@ where
         .journal_mut()
         .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
     charge_consumed_gas(gas, source_resolution.consumed_gas)?;
-    charge_delegated_storage_cost(
-        gas,
-        source_resolution.delegated_storage_cost,
-        context.block().basefee(),
-    )?;
+    let source_storage_cost =
+        narrow_delegated_storage_cost(gas, source_resolution.delegated_storage_cost)?;
+    charge_delegated_storage_cost(gas, source_storage_cost, context.block().basefee())?;
 
     Ok((sender_alias, source_alias))
 }
@@ -2643,14 +2661,43 @@ mod tests {
     }
 
     #[test]
+    fn test_narrow_delegated_storage_cost_reverts_out_of_domain() {
+        // A cost past the mutez domain (i64::MAX) must revert rather than
+        // silently truncate.
+        let gas = Gas::new(1_000_000);
+        let result = narrow_delegated_storage_cost(&gas, Some(u64::MAX));
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                if msg.contains("delegated storage cost out of the mutez domain")
+            ),
+            "expected a Revert naming the out-of-domain cost, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_narrow_delegated_storage_cost_accepts_none() {
+        let gas = Gas::new(1_000_000);
+        assert!(matches!(
+            narrow_delegated_storage_cost(&gas, None),
+            Ok(None)
+        ));
+    }
+
+    #[test]
     fn test_charge_delegated_storage_cost_converts_mutez_to_wei() {
         // 1 mutez = 10^12 wei; base_fee = 1 GWei = 10^9 wei/gas.
         // g2 = ceil(1 * 10^12 / 10^9) = 1000. Guards against the
         // mutez-as-wei unit bug, which would charge 1 / 10^9 = 0.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(1), 1_000_000_000)
-            .expect("should succeed");
+        charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(1u64).unwrap()),
+            1_000_000_000,
+        )
+        .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit - 1000,
@@ -2676,7 +2723,8 @@ mod tests {
         // cost = 0 → no storage charge.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(0), 100).expect("should succeed");
+        charge_delegated_storage_cost(&mut gas, Some(Mutez::ZERO), 100)
+            .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit,
@@ -2689,8 +2737,12 @@ mod tests {
         // cost_wei = 10^12, base_fee = 10^12 → exactly 1, no rounding.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(1), 1_000_000_000_000)
-            .expect("should succeed");
+        charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(1u64).unwrap()),
+            1_000_000_000_000,
+        )
+        .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit - 1,
@@ -2703,8 +2755,12 @@ mod tests {
         // cost_wei = 3 * 10^12, base_fee = 2 * 10^12 → 1.5, ceil → 2.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(3), 2_000_000_000_000)
-            .expect("should succeed");
+        charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(3u64).unwrap()),
+            2_000_000_000_000,
+        )
+        .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit - 2,
@@ -2718,8 +2774,12 @@ mod tests {
         // Under ceil, any non-zero delegated cost charges at least 1 gas.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(1), 3_000_000_000_000)
-            .expect("should succeed");
+        charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(1u64).unwrap()),
+            3_000_000_000_000,
+        )
+        .expect("should succeed");
         assert_eq!(
             gas.remaining(),
             gas_limit - 1,
@@ -2731,7 +2791,11 @@ mod tests {
     fn test_charge_delegated_storage_cost_reverts_on_zero_base_fee_with_cost() {
         // cost > 0 with base_fee == 0 must revert explicitly.
         let mut gas = Gas::new(1_000_000);
-        let result = charge_delegated_storage_cost(&mut gas, Some(42), 0);
+        let result = charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(42u64).unwrap()),
+            0,
+        );
         assert!(
             matches!(
                 result,
@@ -2748,7 +2812,7 @@ mod tests {
         // cost == 0 + base_fee == 0 → division skipped, no revert, no charge.
         let gas_limit = 1_000_000u64;
         let mut gas = Gas::new(gas_limit);
-        charge_delegated_storage_cost(&mut gas, Some(0), 0)
+        charge_delegated_storage_cost(&mut gas, Some(Mutez::ZERO), 0)
             .expect("zero cost with zero base_fee must not revert");
         assert_eq!(
             gas.remaining(),
@@ -2776,7 +2840,11 @@ mod tests {
         // cost_wei = 20_000_000 * 10^12 = 2e19 > u64::MAX at base_fee 1 →
         // g2 overflows u64, so the cost is unaffordable: OutOfGas.
         let mut gas = Gas::new(u64::MAX);
-        let result = charge_delegated_storage_cost(&mut gas, Some(20_000_000), 1);
+        let result = charge_delegated_storage_cost(
+            &mut gas,
+            Some(Mutez::try_from(20_000_000u64).unwrap()),
+            1,
+        );
         assert!(
             matches!(result, Err(CustomPrecompileError::OutOfGas)),
             "a gas equivalent overflowing u64 must surface as OutOfGas, got: {result:?}"

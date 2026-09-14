@@ -7,11 +7,25 @@
 //! Lives separately from `tezosx-interfaces` (which carries traits
 //! that depend on `tezosx-journal`) so that `tezosx-journal` can use
 //! these types without creating a dependency cycle.
+//!
+//! Also home to the amount newtypes of the native-token unit boundary.
+//! Every kernel-authored amount is an explicit [`Mutez`] (the Tezos-side
+//! unit) or [`Wei`] (the seam-only EVM-side unit, used only in the
+//! mutez/wei conversion API, header amounts, and bridge amounts — never
+//! threaded into general EVM code, which stays on alloy's `U256`). Every
+//! unit crossing is an explicit, named conversion: mixing the two units,
+//! or converting without naming a rounding policy, does not compile.
 
 mod gas;
 pub mod headers;
+mod mutez;
+mod pricing;
+mod wei;
 
 pub use gas::{EvmGas, Gas, Milligas};
+pub use mutez::{Mutez, MutezError};
+pub use pricing::{michelson_gas_to_mutez, mutez_to_evm_gas};
+pub use wei::{Wei, WeiToMutezError, ONE_MUTEZ_WEI};
 
 use primitive_types::U256;
 use tezos_data_encoding::{enc::BinWriter, encoding::HasEncoding, nom::NomReader};

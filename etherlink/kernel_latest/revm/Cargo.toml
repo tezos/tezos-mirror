@@ -17,6 +17,7 @@ revm.workspace = true
 michelson-types.workspace = true
 evm-types.workspace = true
 tezosx-journal.workspace = true
+tezosx-types.workspace = true
 tezosx-constants.workspace = true
 evm-inspectors.workspace = true
 

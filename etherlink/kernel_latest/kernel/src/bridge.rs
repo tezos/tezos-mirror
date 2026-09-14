@@ -20,13 +20,10 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Narith;
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
-use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
-use tezos_ethereum::wei::mutez_from_wei;
-use tezos_ethereum::{
-    rlp_helpers::{decode_field, next},
-    wei::eth_from_mutez,
+use tezos_ethereum::rlp_helpers::{
+    decode_field, decode_field_u256_le, decode_option_explicit, next,
 };
+use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
@@ -47,6 +44,7 @@ use tezos_tezlink::operation_result::{
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_tezos_runtime::TezosRuntime;
+use tezosx_types::{Mutez, Wei};
 
 use crate::apply::{
     pure_xtz_deposit, EthereumTransactionResult, ExecutionResult,
@@ -291,12 +289,17 @@ impl Deposit {
     ) -> Result<(Self, Option<U256>), BridgeError> {
         // Amount
         let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
-        // We use the `U256::from_little_endian` as it takes arbitrary long
-        // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
-        // obviously safe as we deposit CTEZ and the amount is limited by
-        // the XTZ quantity.
-        let amount_mutez: u64 = U256::from_little_endian(&amount_bytes).as_u64();
-        let amount: U256 = eth_from_mutez(amount_mutez);
+        // `U256::from_little_endian` takes arbitrary-length bytes, so a
+        // ticket amount past `u64` (let alone the mutez domain) is parsed
+        // without panicking; `Mutez::try_from` then narrows it to the
+        // domain, rejecting rather than truncating anything that doesn't
+        // fit.
+        let amount_u256 = U256::from_little_endian(&amount_bytes);
+        let amount_mutez = u64::try_from(amount_u256)
+            .ok()
+            .and_then(|raw| Mutez::try_from(raw).ok())
+            .ok_or(BridgeError::InvalidAmount(amount_u256))?;
+        let amount: U256 = amount_mutez.to_wei().as_u256();
 
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
@@ -518,12 +521,13 @@ where
             Ok(ExecutionResult::Valid(transaction_result))
         }
         DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
-            let amount = mutez_from_wei(deposit.amount)
+            let amount = Wei::from_u256(deposit.amount)
+                .to_mutez_exact()
                 .map_err(|_| crate::Error::InvalidConversion)?;
 
             let receiver = Contract::Implicit(pkh.clone());
             let content = TransferContent {
-                amount: amount.into(),
+                amount: amount.to_narith(),
                 destination: receiver.clone(),
                 parameters: Parameters::default(),
             };
@@ -538,35 +542,38 @@ where
 
             let depositor = Contract::Implicit(source.clone());
 
-            let (result, internal_operation_results) =
-                match TezosRuntime::add_balance(rk.host_mut(), pkh, U256::from(amount)) {
-                    Ok(()) => {
-                        let event = build_deposit_event(
-                            depositor.clone(),
-                            deposit.inbox_level,
-                            deposit.inbox_msg_id,
-                        )?;
-                        let success = TransferSuccess {
-                            balance_updates: BalanceUpdate::transfer(
-                                depositor, receiver, amount,
-                            ),
-                            ..TransferSuccess::default()
-                        };
-                        (
-                            ContentResult::Applied(TransferTarget::ToContract(success)),
-                            vec![event],
-                        )
-                    }
-                    Err(err) => {
-                        log!(Info, "Deposit failed because of {err}");
-                        (
-                            ContentResult::Failed(ApplyOperationErrors {
-                                errors: vec![],
-                            }),
-                            vec![],
-                        )
-                    }
-                };
+            let (result, internal_operation_results) = match TezosRuntime::add_balance(
+                rk.host_mut(),
+                pkh,
+                U256::from(amount.as_u64()),
+            ) {
+                Ok(()) => {
+                    let event = build_deposit_event(
+                        depositor.clone(),
+                        deposit.inbox_level,
+                        deposit.inbox_msg_id,
+                    )?;
+                    let success = TransferSuccess {
+                        balance_updates: BalanceUpdate::transfer(
+                            depositor,
+                            receiver,
+                            amount.as_u64(),
+                        ),
+                        ..TransferSuccess::default()
+                    };
+                    (
+                        ContentResult::Applied(TransferTarget::ToContract(success)),
+                        vec![event],
+                    )
+                }
+                Err(err) => {
+                    log!(Info, "Deposit failed because of {err}");
+                    (
+                        ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
+                        vec![],
+                    )
+                }
+            };
 
             let applied_operation = AppliedOperation {
                 hash: transaction_hash.into(),
@@ -656,16 +663,17 @@ where
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;
 
-    let amount = mutez_from_wei(deposit.amount)
+    let amount = Wei::from_u256(deposit.amount)
+        .to_mutez_exact()
         .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
 
     let content = TransferContent {
-        amount: amount.into(),
+        amount: amount.to_narith(),
         destination: receiver.clone(),
         parameters: Parameters::default(),
     };
 
-    let result = match tezlink_deposit(host, amount, receiver) {
+    let result = match tezlink_deposit(host, amount.as_u64(), receiver) {
         Ok(success) => ContentResult::Applied(TransferTarget::ToContract(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],
@@ -710,7 +718,7 @@ mod tests {
     use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
     use revm_etherlink::storage::world_state_handler::StorageAccount;
 
-    use super::{apply_tezosx_xtz_deposit, Deposit};
+    use super::{apply_tezosx_xtz_deposit, BridgeError, Deposit, Mutez};
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     mod xtz_events {
@@ -754,6 +762,40 @@ mod tests {
     }
 
     #[test]
+    fn deposit_parsing_rejects_amount_above_u64_max() {
+        // Pre-fix, this panicked inside `U256::as_u64()` instead of
+        // failing gracefully.
+        let huge_amount = BigInt::from(u64::MAX) * BigInt::from(4);
+        let ticket = create_fa_ticket(
+            "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+            0,
+            &[0u8],
+            huge_amount,
+        );
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let result = Deposit::try_parse(ticket, receiver, 0, 0);
+        assert!(
+            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
+        );
+    }
+
+    #[test]
+    fn deposit_parsing_rejects_amount_above_i64_max() {
+        // Within u64 but past the mutez domain (i64::MAX): pre-fix, this
+        // was accepted via `U256::as_u64()` without complaint.
+        let amount = BigInt::from(i64::MAX as u64) + BigInt::from(1);
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], amount);
+        let receiver = MichelsonBytes(vec![1u8; 20]);
+        let result = Deposit::try_parse(ticket, receiver, 0, 0);
+        assert!(
+            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
+        );
+    }
+
+    #[test]
     fn deposit_parsing_no_chain_id() {
         let ticket =
             create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
@@ -763,7 +805,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                amount: Mutez::try_from(2u64).unwrap().to_wei().as_u256(),
                 receiver: DepositReceiver::Ethereum(H160([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -786,7 +828,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                amount: Mutez::try_from(2u64).unwrap().to_wei().as_u256(),
                 receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
