@@ -6334,6 +6334,7 @@ let _octez_scoru_wasm_tests =
       "test_host_functions_ticks";
       "test_nds_activation";
       "test_nds_host_func_crash";
+      "test_nds_verify_uncovered_read";
       "test_init";
       "test_input";
       "test_output";
@@ -6361,6 +6362,7 @@ let _octez_scoru_wasm_tests =
         qcheck_alcotest;
         alcotezt;
         octez_scoru_wasm_helpers |> open_;
+        octez_scoru_wasm_helpers_functor |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
         octez_riscv_nds_memory;
