@@ -26,30 +26,30 @@ use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::KeySpace;
 
-pub fn fetch_proxy_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn fetch_proxy_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     common: &CommonConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
-    let (host, base) = rk.base_parts_mut();
     if let Some(ProxyInboxContent { transactions }) =
         read_proxy_inbox(host, base, smart_rollup_address, common)?
     {
         let timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let blueprint = Blueprint {
             transactions,
             timestamp,
         };
         // Store the blueprint.
-        store_inbox_blueprint(rk.base_mut(), blueprint)?;
+        store_inbox_blueprint(base, blueprint)?;
         Ok(StageOneStatus::Reboot)
     } else {
         Ok(StageOneStatus::Done)
@@ -110,17 +110,16 @@ fn fetch_delayed_transactions(
     Ok(())
 }
 
-fn fetch_sequencer_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn fetch_sequencer_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
-    let (host, base) = rk.base_parts_mut();
     match read_sequencer_inbox(
         host,
         base,
@@ -131,12 +130,10 @@ where
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = config_sequencer
-                .delayed_inbox
-                .first_has_timed_out(rk.base())?;
+            let timed_out = config_sequencer.delayed_inbox.first_has_timed_out(base)?;
             if timed_out {
                 fetch_delayed_transactions(
-                    rk.base_mut(),
+                    base,
                     &mut config_sequencer.delayed_inbox,
                     config_common,
                 )?
@@ -162,12 +159,17 @@ where
     Host: HostReveal + WasmHost + KeyspaceHost<KS>,
     KS: SafeKeyspace,
 {
+    let (host, base) = rk.base_parts_mut();
     match &mut config.mode {
-        ConfigurationMode::Sequencer(seq) => {
-            fetch_sequencer_blueprints(rk, smart_rollup_address, &config.common, seq)
-        }
+        ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
+            host,
+            base,
+            smart_rollup_address,
+            &config.common,
+            seq,
+        ),
         ConfigurationMode::Proxy => {
-            fetch_proxy_blueprints(rk, smart_rollup_address, &config.common)
+            fetch_proxy_blueprints(host, base, smart_rollup_address, &config.common)
         }
     }
 }
