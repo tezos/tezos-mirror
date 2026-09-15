@@ -5,15 +5,22 @@
 //! The Michelson scopes.
 //!
 //! A scope is the region between a snapshot being taken and its commit or
-//! revert. [`CracOperationScope`] borrows a keyspace handle through
-//! [`ScopeRuntimeKeyspace`].
+//! revert. The mirror is the `/tmp` copy of the safe roots that
+//! [`SafeStorage`] writes to until `promote`; a keyspace loaded through it
+//! writes into the mirror too.
+//!
+//! [`CracOperationScope`] borrows a keyspace handle through
+//! [`ScopeRuntimeKeyspace`], while [`OperationScope`] owns the operation
+//! mirror and builds the keyspace handle over it.
 
 use crate::mir_ctx::TcCtx;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError};
+use tezos_tezlink::operation_result::OperationError;
 use tezosx_journal::TezosXJournal;
 
 /// Reaches the keyspace handle under one of the kernel's context values.
@@ -107,6 +114,138 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
     /// The context and the journal, for callees that need both at once.
     pub fn parts_mut(&mut self) -> (&mut C, &mut TezosXJournal) {
         (&mut *self.ctx, &mut *self.journal)
+    }
+}
+
+/// The phase of a Michelson operation a scope covers.
+///
+/// An operation runs in two phases, each under its own scope, and the
+/// scopes close independently: the validation scope is committed before
+/// the application scope opens, so reverting the application leaves the
+/// validation writes in place.
+#[derive(Clone, Copy, Debug)]
+pub enum Phase {
+    /// The operation is checked, the fee is debited. A revert only drops the
+    /// mirror.
+    Validation,
+    /// The operation is applied. A revert also clears the EVM journal and the
+    /// cross-runtime originator, and restores the origination index.
+    Application,
+}
+
+/// What a phase keeps from its open for its close.
+#[derive(Clone, Copy, Debug)]
+enum PhaseState {
+    Validation,
+    Application {
+        /// The origination index at open.
+        origination_index_before: u32,
+    },
+}
+
+/// The scope of one phase of a Michelson operation.
+///
+/// Open starts the operation mirror over the host; close promotes it or
+/// rolls it back. The keyspace handle is built over the mirror on demand,
+/// so the keyspace writes follow the close as well.
+#[must_use = "an operation scope must be committed or reverted"]
+pub struct OperationScope<'s, Host> {
+    safe_host: SafeStorage<&'s mut Host>,
+    journal: &'s mut TezosXJournal,
+    phase: PhaseState,
+}
+
+impl<'s, Host: StorageV1> OperationScope<'s, Host> {
+    /// Open the scope: `start` the mirror of `world_states` over `host`, and
+    /// under [`Phase::Application`] record the origination index.
+    ///
+    /// `phase` is consumed by [`Self::revert`].
+    /// No EVM frame covers this path, so nothing rolls the origination index
+    /// back: it is captured here for [`Self::revert`] to restore.
+    pub fn open(
+        host: &'s mut Host,
+        world_states: &[OwnedPath],
+        journal: &'s mut TezosXJournal,
+        phase: Phase,
+    ) -> Result<Self, OperationError> {
+        let mut safe_host = SafeStorage {
+            host,
+            world_states: world_states.to_vec(),
+        };
+        safe_host.start()?;
+        let phase = match phase {
+            Phase::Validation => PhaseState::Validation,
+            Phase::Application => PhaseState::Application {
+                origination_index_before: journal.michelson.origination_index(),
+            },
+        };
+        Ok(Self {
+            safe_host,
+            journal,
+            phase,
+        })
+    }
+
+    /// Close the scope on success: `promote`.
+    pub fn commit(self) -> Result<(), OperationError> {
+        let Self { mut safe_host, .. } = self;
+        safe_host.promote()?;
+        Ok(())
+    }
+
+    /// Close the scope on failure, in this order: `revert` → under
+    /// [`Phase::Application`] only: `evm.clear()`, `reset_original_source()`,
+    /// `restore_origination_index(index at open)`.
+    ///
+    /// The mirror rolls back durable storage only, so the in-memory journal
+    /// state is restored by hand: the EVM journal, which would otherwise
+    /// persist the writes of a backtracked operation; the cross-runtime
+    /// originator, which must not reach the next operation; the origination
+    /// index, which a backtracked batch must not consume.
+    pub fn revert(self) -> Result<(), OperationError> {
+        let Self {
+            mut safe_host,
+            journal,
+            phase,
+            ..
+        } = self;
+        safe_host.revert()?;
+        if let PhaseState::Application {
+            origination_index_before,
+        } = phase
+        {
+            journal.evm.clear();
+            journal.reset_original_source();
+            journal
+                .michelson
+                .restore_origination_index(origination_index_before);
+        }
+        Ok(())
+    }
+}
+
+impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
+    /// The keyspace handle, loaded over the mirror, and the journal, for
+    /// callees that need both at once.
+    ///
+    /// The handle borrows the scope, so it is gone before the scope closes.
+    /// Errors with the loader's error: a mirrored name over the size limit,
+    /// or a handle on the same name still held elsewhere.
+    #[allow(clippy::type_complexity)]
+    pub fn parts_mut(
+        &mut self,
+    ) -> Result<
+        (
+            RuntimeKeyspaces<
+                '_,
+                impl StorageV1 + KeySpaceLoader<KeySpace = Host::KeySpace> + use<'s, Host>,
+            >,
+            &mut TezosXJournal,
+        ),
+        KeySpaceLoaderError,
+    > {
+        let rk = RuntimeKeyspaces::init(&mut self.safe_host)?;
+        Ok((rk, &mut *self.journal))
     }
 }
 
@@ -209,5 +348,196 @@ mod tests {
                 .expect("the probe survives"),
             b"before"
         );
+    }
+
+    #[test]
+    fn a_committed_operation_scope_keeps_its_writes() {
+        use tezos_evm_runtime::safe_storage::TMP_PATH;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        // The mirror copies the safe roots: the subtree must exist.
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+
+        let mut scope = OperationScope::open(
+            rk.host_mut(),
+            &[world_state()],
+            &mut journal,
+            Phase::Application,
+        )
+        .expect("the scope is opened");
+        {
+            let (mut scoped_rk, _) = scope.parts_mut().expect("the keyspaces are loaded");
+            scoped_rk
+                .host_mut()
+                .store_write_all(&probe(), b"inside")
+                .expect("the write goes through");
+        }
+        scope.commit().expect("the scope is committed");
+
+        assert_eq!(
+            rk.host_mut()
+                .store_read_all(&probe())
+                .expect("the probe is readable"),
+            b"inside"
+        );
+        assert!(
+            rk.host_mut()
+                .store_has(&TMP_PATH)
+                .expect("/tmp is readable")
+                .is_none(),
+            "a committed scope leaves no `/tmp` behind"
+        );
+    }
+
+    #[test]
+    fn a_reverted_application_scope_gives_the_origination_indices_back() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+        let index_before = journal.michelson.origination_index();
+
+        let mut scope = OperationScope::open(
+            rk.host_mut(),
+            &[world_state()],
+            &mut journal,
+            Phase::Application,
+        )
+        .expect("the scope is opened");
+        {
+            let (mut scoped_rk, scoped_journal) =
+                scope.parts_mut().expect("the keyspaces are loaded");
+            scoped_rk
+                .host_mut()
+                .store_write_all(&probe(), b"inside")
+                .expect("the write goes through");
+            scoped_journal.michelson.next_origination_index();
+        }
+        scope.revert().expect("the scope is reverted");
+
+        assert_eq!(
+            rk.host_mut()
+                .store_read_all(&probe())
+                .expect("the probe survives"),
+            b"before"
+        );
+        assert_eq!(journal.michelson.origination_index(), index_before);
+    }
+
+    #[test]
+    fn a_reverted_application_scope_resets_the_journal() {
+        use tezosx_journal::OriginalSource;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+
+        let mut scope = OperationScope::open(
+            rk.host_mut(),
+            &[world_state()],
+            &mut journal,
+            Phase::Application,
+        )
+        .expect("the scope is opened");
+        {
+            let (_scoped_rk, scoped_journal) =
+                scope.parts_mut().expect("the keyspaces are loaded");
+            scoped_journal.evm.set_crac_chain_depth(1);
+            scoped_journal.set_original_source(OriginalSource::new(
+                RuntimeId::Tezos,
+                "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
+            ));
+        }
+        scope.revert().expect("the scope is reverted");
+
+        assert_eq!(journal.evm.crac_chain_depth(), 0);
+        assert_eq!(journal.original_source(), None);
+    }
+
+    /// Guards the shared-journal case: an operation dispatched from the EVM
+    /// runs on that execution's journal.
+    #[test]
+    fn a_reverted_validation_scope_leaves_the_origination_index_alone() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+        let index_before = journal.michelson.origination_index();
+
+        let mut scope = OperationScope::open(
+            rk.host_mut(),
+            &[world_state()],
+            &mut journal,
+            Phase::Validation,
+        )
+        .expect("the scope is opened");
+        {
+            let (_scoped_rk, scoped_journal) =
+                scope.parts_mut().expect("the keyspaces are loaded");
+            scoped_journal.michelson.next_origination_index();
+        }
+        scope.revert().expect("the scope is reverted");
+
+        assert_eq!(journal.michelson.origination_index(), index_before + 1);
+    }
+
+    /// Runs one application scope that writes to the `/probe` key of the
+    /// `eth_accounts` keyspace it lends, commits or reverts it, and returns
+    /// what the live keyspace holds afterwards.
+    fn eth_accounts_probe_after(commit: bool) -> Option<Vec<u8>> {
+        use tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH;
+        use tezos_smart_rollup_keyspace::{Key, KeySpace};
+
+        let key = Key::from_static(b"/probe");
+        let mut host = MockKernelHost::default();
+        // The mirror copies the safe roots: the root must exist.
+        host.store_write_all(&ETH_ACCOUNTS_ROOT_PATH, b"seed")
+            .expect("the root is written");
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let mut scope = OperationScope::open(
+            rk.host_mut(),
+            &[OwnedPath::from(ETH_ACCOUNTS_ROOT_PATH)],
+            &mut journal,
+            Phase::Application,
+        )
+        .expect("the scope is opened");
+        {
+            let (mut scoped_rk, _journal) =
+                scope.parts_mut().expect("the keyspaces are loaded");
+            scoped_rk
+                .eth_accounts_mut()
+                .set(&key, b"inside")
+                .expect("the write goes through");
+        }
+        if commit {
+            scope.commit().expect("the scope is committed");
+        } else {
+            scope.revert().expect("the scope is reverted");
+        }
+
+        rk.eth_accounts().get(&key)
+    }
+
+    #[test]
+    fn a_committed_operation_scope_keeps_the_keyspace_writes() {
+        assert_eq!(eth_accounts_probe_after(true), Some(b"inside".to_vec()));
+    }
+
+    #[test]
+    fn a_reverted_operation_scope_drops_the_keyspace_writes() {
+        assert_eq!(eth_accounts_probe_after(false), None);
     }
 }

@@ -42,7 +42,6 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -81,7 +80,7 @@ pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
     convert_big_map_diff, BlockCtx, Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx,
 };
-use crate::scope::CracOperationScope;
+use crate::scope::{CracOperationScope, OperationScope, Phase};
 
 /// Result of applying a single operation within a batch.
 ///
@@ -2922,19 +2921,20 @@ pub fn validate_and_apply_operation<Host>(
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let mut safe_host = SafeStorage {
-        host: rk.host_mut(),
-        world_states: safe_roots.to_vec(),
-    };
-
-    safe_host.start()?;
+    let mut validation = OperationScope::open(
+        rk.host_mut(),
+        safe_roots,
+        &mut *journal,
+        Phase::Validation,
+    )?;
 
     log!(Debug, "Verifying that the batch is valid");
 
-    // The validation writes the counter and the balance of the source on `safe_host`.
-    // When the batch is invalid, `safe_host.revert()` below drops these writes.
-    let validation = {
-        let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
+    // The validation writes the counter and the balance of the source on the
+    // validation scope. When the batch is invalid, `validation.revert()` below
+    // drops these writes.
+    let validity = {
+        let (mut rk, _) = validation.parts_mut()?;
         validate::execute_validation(
             rk.tez_accounts_mut(),
             operation,
@@ -2942,11 +2942,11 @@ where
             required_fees,
         )
     };
-    let validation_info = match validation {
+    let validation_info = match validity {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(Debug, "Reverting the changes because the batch is invalid.");
-            safe_host.revert()?;
+            validation.revert()?;
             return Err(OperationError::Validation(validity_err));
         }
     };
@@ -2956,24 +2956,22 @@ where
 
     log!(Debug, "Batch is valid!");
 
-    safe_host.promote()?;
-    safe_host.start()?;
+    validation.commit()?;
+
+    let mut application = OperationScope::open(
+        rk.host_mut(),
+        safe_roots,
+        &mut *journal,
+        Phase::Application,
+    )?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
     let mut nonce_counter: u16 = 0;
-    // The origination nonce lives on the journal.
-    // Snapshot the index so the revert branch below can put it back: unlike an EVM-driven frame,
-    // this path never opens a journal frame, so `revert_frame` does not roll it back for us — and a
-    // backtracked batch must not consume indices, since on L1 the nonce dies with the reverted
-    // context.
-    let origination_index_before = journal.michelson.origination_index();
     // We use `mut` here because apply_batch does not handle fee refund,
     // so we append the refund balance updates to processed_ops afterwards.
     let (mut processed_ops, applied) = {
-        // Loaded under the mirror, so the batch's account writes follow the
-        // promote or revert below.
-        let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
+        let (mut rk, journal) = application.parts_mut()?;
         apply_batch(
             &mut rk,
             registry,
@@ -2990,28 +2988,14 @@ where
             Debug,
             "Committing the changes because the batch was successfully applied."
         );
-        safe_host.promote()?;
+        application.commit()?;
     } else {
         log!(
             Debug,
             "Reverting the changes because some operation failed."
         );
         log!(Debug, "Processed operations: {processed_ops:#?}");
-        safe_host.revert()?;
-        // Clear the in-memory EVM journal: `safe_host.revert()` only rolls
-        // back durable storage and cannot affect the in-memory REVM
-        // JournalInner. Without this, commit_evm_journal_from_external()
-        // would persist EVM state changes from a backtracked operation.
-        journal.evm.clear();
-        // The captured cross-runtime originator now lives on the shared
-        // journal (not `evm`), so drop it here too — a backtracked
-        // operation's originator must not leak into the next one.
-        journal.reset_original_source();
-        // Give the origination-nonce indices back: none of this batch's
-        // originations survived, so none of them may consume an index.
-        journal
-            .michelson
-            .restore_origination_index(origination_index_before);
+        application.revert()?;
     }
 
     // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
