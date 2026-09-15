@@ -81,6 +81,7 @@ pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
     convert_big_map_diff, BlockCtx, Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx,
 };
+use crate::scope::CracOperationScope;
 
 /// Result of applying a single operation within a batch.
 ///
@@ -196,6 +197,7 @@ pub(crate) mod counting_host;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
+pub mod scope;
 pub mod storage_fees;
 mod validate;
 
@@ -2376,17 +2378,16 @@ where
     let world_state = tezos_smart_rollup_host::path::OwnedPath::from(
         &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
     );
-    let checkpoint_index = journal
-        .michelson
-        .checkpoint(tc_ctx.rk.host_mut(), &world_state)
+    let mut scope = CracOperationScope::open(&mut *tc_ctx, &mut *journal, &world_state)
         .map_err(|e| CracTransferError::from(gw(e)))?;
 
     let mut internal_receipts = Vec::new();
+    let (scoped_ctx, scoped_journal) = scope.parts_mut();
     match transfer(
-        tc_ctx,
+        scoped_ctx,
         operation_ctx,
         registry,
-        journal,
+        scoped_journal,
         sender,
         amount,
         dest,
@@ -2414,10 +2415,7 @@ where
                 subtree.all_applied() && last_own_receipt_applied(&internal_receipts);
             if all_internal_succeeded {
                 // promote: discard the snapshot, keep changes
-                journal
-                    .michelson
-                    .checkpoint_commit(tc_ctx.rk.host_mut(), checkpoint_index)
-                    .map_err(|e| CracTransferError::from(gw(e)))?;
+                scope.commit().map_err(|e| CracTransferError::from(gw(e)))?;
 
                 let target: TransferTarget = success.into();
                 let own_storage_cost =
@@ -2439,10 +2437,7 @@ where
                 })
             } else {
                 // revert: restore the snapshot
-                journal
-                    .michelson
-                    .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
-                    .map_err(|e| CracTransferError::from(gw(e)))?;
+                scope.revert().map_err(|e| CracTransferError::from(gw(e)))?;
                 internal_receipts
                     .iter_mut()
                     .for_each(|t| t.op.transform_result_backtrack());
@@ -2478,10 +2473,7 @@ where
             }
         }
         Err(e) => {
-            journal
-                .michelson
-                .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
-                .map_err(|e| CracTransferError::from(gw(e)))?;
+            scope.revert().map_err(|e| CracTransferError::from(gw(e)))?;
             internal_receipts
                 .iter_mut()
                 .for_each(|t| t.op.transform_result_backtrack());

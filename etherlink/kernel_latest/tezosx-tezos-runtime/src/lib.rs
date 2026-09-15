@@ -25,8 +25,9 @@ use tezos_execution::{
     context, cross_runtime_transfer,
     enshrined_contracts::{self, CracError},
     mir_ctx::{InterpretContext, OperationCtx, TcCtx},
-    originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
-    TezlinkOperationGas,
+    originate_contract,
+    scope::CracOperationScope,
+    storage_fees, typecheck_code_and_storage, CracTransferError, TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -1192,14 +1193,15 @@ impl RuntimeInterface for TezosRuntime {
         let world_state = OwnedPath::from(
             &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
         );
-        journal
-            .michelson
-            .checkpoint(rk.host_mut(), &world_state)
+        // The enclosing EVM CALL frame disposes of this snapshot when it
+        // commits or reverts.
+        CracOperationScope::open(&mut *rk, journal, &world_state)
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to snapshot world state for alias: {e:?}"
                 ))
-            })?;
+            })?
+            .defer_to_parent();
 
         // Deploy the forwarder via the
         // shared `originate_contract` path, passing `Origin::Alias` so
