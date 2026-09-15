@@ -3461,6 +3461,10 @@ val aggregate_bls_signatures :
 (** Run [octez-client create bls proof for <signer>]. *)
 val create_bls_proof : ?override_pk:string -> signer:string -> t -> string Lwt.t
 
+(** Same as [create_bls_proof], but do not wait for the process to exit. *)
+val spawn_create_bls_proof :
+  ?override_pk:string -> signer:string -> t -> Process.t
+
 (** Run [octez-client check bls proof <proof> for <pk>]. *)
 val check_bls_proof :
   ?override_pk:string -> pk:string -> proof:string -> t -> unit Lwt.t

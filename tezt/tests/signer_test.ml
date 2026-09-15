@@ -550,6 +550,360 @@ let signer_mldsa44_test ~authenticate =
   let* signature = Client.sign_message client message ~src:alias in
   Client.check_message client ~src:alias ~signature message
 
+(* [authentication_payload ~request_tag ~pkh ~override_pk] rebuilds
+   the bytes that one of the authorized keys must sign for a signer
+   started with [--require-authentication] to answer, the way
+   [Signer_messages.Bls_prove_possession.Request.to_sign] builds them:
+   [\x04 | tag | pkh | override_pk], where [request_tag] is the tag of
+   the request being authorized (1 for a signing request, 4 for a
+   proof of possession).
+
+   The signer protocol has no freshness, so this payload is the only
+   thing that scopes an authentication signature. It is rebuilt here
+   rather than linked from the signer's own code, so that a change to
+   what goes on the wire has to be made deliberately in both
+   places. *)
+let authentication_payload ~request_tag ~pkh ~override_pk =
+  let pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check_exn pkh in
+  let override_pk_bytes =
+    match override_pk with
+    | None -> Bytes.empty
+    | Some pk ->
+        Tezos_crypto.Signature.Bls.Public_key.of_b58check_exn pk
+        |> Data_encoding.Binary.to_bytes_exn
+             Tezos_crypto.Signature.Bls.Public_key.encoding
+  in
+  Bytes.concat
+    Bytes.empty
+    [
+      Bytes.of_string "\x04";
+      Bytes.make 1 (Char.chr request_tag);
+      Tezos_crypto.Signature.Public_key_hash.to_bytes pkh;
+      override_pk_bytes;
+    ]
+  |> Hex.of_bytes |> Hex.show
+
+(* [prove_possession_frame ~pkh ~override_pk ~authentication] builds the
+   payload of a proof-of-possession request the way [Signer_messages.Request]
+   lays it out for a socket signer: the [\x07] case tag, the public key hash
+   with its own algorithm tag, a presence byte for the optional overridden
+   public key, then the authentication signature. That last field is read to
+   the end of the frame, so it takes no byte at all when absent. Built here
+   rather than linked from the signer's own encodings, for the same reason as
+   [authentication_payload]. *)
+let prove_possession_frame ~pkh ~override_pk ~authentication =
+  let open Tezos_crypto.Signature in
+  let override_pk_bytes =
+    match override_pk with
+    | None -> Bytes.make 1 '\x00'
+    | Some pk ->
+        Bytes.cat
+          (Bytes.make 1 '\x01')
+          (Data_encoding.Binary.to_bytes_exn
+             Bls.Public_key.encoding
+             (Bls.Public_key.of_b58check_exn pk))
+  in
+  let authentication_bytes =
+    match authentication with
+    | None -> Bytes.empty
+    | Some signature -> to_bytes (of_b58check_exn signature)
+  in
+  Bytes.concat
+    Bytes.empty
+    [
+      Bytes.make 1 '\x07';
+      Public_key_hash.to_bytes (Public_key_hash.of_b58check_exn pkh);
+      override_pk_bytes;
+      authentication_bytes;
+    ]
+
+(* [socket_roundtrip ~uri payload] sends [payload] as one message on the
+   socket signer listening at [uri] and returns the one it answers with.
+   Messages are framed by a big-endian 16-bit length, as
+   [Tezos_base_unix.Socket] does. *)
+let socket_roundtrip ~uri payload =
+  let address =
+    match Uri.scheme uri with
+    | Some "unix" -> Unix.ADDR_UNIX (Uri.path uri)
+    | Some "tcp" ->
+        let host =
+          match Uri.host uri with
+          | Some host -> host
+          | None -> Constant.default_host
+        in
+        let port =
+          match Uri.port uri with
+          | Some port -> port
+          | None -> Test.fail "no port in signer URI %s" (Uri.to_string uri)
+        in
+        Unix.ADDR_INET (Unix.inet_addr_of_string host, port)
+    | _ -> Test.fail "not a socket signer URI: %s" (Uri.to_string uri)
+  in
+  let fd =
+    Lwt_unix.socket (Unix.domain_of_sockaddr address) Unix.SOCK_STREAM 0
+  in
+  Lwt.finalize
+    (fun () ->
+      let* () = Lwt_unix.connect fd address in
+      let write buf =
+        let length = Bytes.length buf in
+        let rec loop offset =
+          if offset >= length then unit
+          else
+            let* written = Lwt_unix.write fd buf offset (length - offset) in
+            loop (offset + written)
+        in
+        loop 0
+      in
+      let read length =
+        let buf = Bytes.create length in
+        let rec loop offset =
+          if offset >= length then return buf
+          else
+            let* n = Lwt_unix.read fd buf offset (length - offset) in
+            if n = 0 then
+              Test.fail
+                "signer closed the connection after %d of %d bytes"
+                offset
+                length
+            else loop (offset + n)
+        in
+        loop 0
+      in
+      let header = Bytes.create 2 in
+      Bytes.set_uint16_be header 0 (Bytes.length payload) ;
+      let* () = write (Bytes.cat header payload) in
+      let* header = read 2 in
+      read (Bytes.get_uint16_be header 0))
+    (fun () -> Lwt_unix.close fd)
+
+let signer_bls_pop_authentication_test =
+  register_signer_test
+    ~__FILE__
+    ~title:"BLS proof of possession authentication test"
+    ~tags:[team; "signer"; "bls"; "possession"; "authentication"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun launch_mode protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let key = Constant.tz4_account in
+  let alias = "remote_bls_key" in
+  (* The public key the proofs below are made over instead of the
+     signer's own. Any BLS public key works: what matters is that the
+     caller, not the signer, chooses it. *)
+  let override_pk =
+    "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY"
+  in
+  let* signer =
+    Signer.init
+      ~launch_mode
+      ~keys:[key]
+      ~allow_to_prove_possession:true
+      ~require_authentication:true
+      ()
+  in
+  (* [bootstrap1] is the only key the signer accepts as an
+     authorization, and [client] holds its secret key. [bootstrap2] is
+     a key [client] holds too, but which the signer knows nothing
+     about. *)
+  let* () = Signer.add_authorized_key signer Constant.bootstrap1 in
+  let* () =
+    Client.import_signer_key
+      ~alias
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:key.public_key_hash
+      client
+  in
+  Log.info
+    "An authorized caller gets a proof, over the key itself and over a public \
+     key of its choosing" ;
+  let* proof = Client.create_bls_proof ~signer:alias client in
+  let* () = Client.check_bls_proof ~pk:key.public_key ~proof client in
+  let* proof_over_override =
+    Client.create_bls_proof ~override_pk ~signer:alias client
+  in
+  let* () =
+    Client.check_bls_proof
+      ~override_pk
+      ~pk:key.public_key
+      ~proof:proof_over_override
+      client
+  in
+  Log.info "A caller holding none of the authorized keys gets nothing" ;
+  let* unauthorized_client = Client.init ~endpoint:(Node node) ~keys:[] () in
+  let* () =
+    Client.import_signer_key
+      ~alias
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:key.public_key_hash
+      unauthorized_client
+  in
+  let* () =
+    Client.spawn_create_bls_proof ~override_pk ~signer:alias unauthorized_client
+    |> Process.check_error
+         ~msg:(rex "no authorized key was found in the wallet")
+  in
+  Log.info "On the wire: what an authentication signature is bound to" ;
+  (* Request tags, from [Signer_messages]. An authentication signature covers
+     the tag of the request it authorizes, so that it cannot be replayed on
+     another kind of request. *)
+  let sign_request_tag = 1 and prove_possession_request_tag = 4 in
+  let authenticate ~request_tag ~override_pk ~authorizer =
+    let payload =
+      authentication_payload ~request_tag ~pkh:key.public_key_hash ~override_pk
+    in
+    Client.sign_bytes ~signer:authorizer ~data:("0x" ^ payload) client
+  in
+  (* [wire_cases check] runs the cases below on whichever transport the signer
+     was started with: [check ~case ~expected ?override_pk ?authentication ()]
+     issues one proof-of-possession request there and checks the answer. Both
+     daemons call the same [Handler.bls_prove_possession], so what each
+     transport contributes is the wiring that carries [signature] and
+     [require_auth] to it; running the same cases on each is what covers that
+     wiring. *)
+  let wire_cases
+      (check :
+        case:string ->
+        expected:[`Proof of string | `Error of string] ->
+        ?override_pk:string ->
+        ?authentication:string ->
+        unit ->
+        unit Lwt.t) =
+    let* () =
+      check
+        ~case:"a request without an authentication signature"
+        ~expected:(`Error "missing authentication signature field")
+        ~override_pk
+        ()
+    in
+    (* The proof expected here is the one the authorized client already
+       obtained, which is what gives the refusals below their meaning: it
+       shows the payload signed above is the one the signer expects, so that
+       the rest fails on the binding and not on a malformed request. *)
+    let* authentication =
+      authenticate
+        ~request_tag:prove_possession_request_tag
+        ~override_pk:(Some override_pk)
+        ~authorizer:Constant.bootstrap1.alias
+    in
+    let* () =
+      check
+        ~case:"a correct authentication signature"
+        ~expected:(`Proof proof_over_override)
+        ~override_pk
+        ~authentication
+        ()
+    in
+    let* () =
+      check
+        ~case:"an authentication signature replayed on another public key"
+        ~expected:(`Error "invalid authentication signature")
+        ~override_pk:key.public_key
+        ~authentication
+        ()
+    in
+    let* () =
+      check
+        ~case:"an authentication signature replayed without the override"
+        ~expected:(`Error "invalid authentication signature")
+        ~authentication
+        ()
+    in
+    let* signing_authentication =
+      authenticate
+        ~request_tag:sign_request_tag
+        ~override_pk:(Some override_pk)
+        ~authorizer:Constant.bootstrap1.alias
+    in
+    let* () =
+      check
+        ~case:"a signing authorization replayed as a proof of possession"
+        ~expected:(`Error "invalid authentication signature")
+        ~override_pk
+        ~authentication:signing_authentication
+        ()
+    in
+    let* unknown_authentication =
+      authenticate
+        ~request_tag:prove_possession_request_tag
+        ~override_pk:(Some override_pk)
+        ~authorizer:Constant.bootstrap2.alias
+    in
+    check
+      ~case:"a well-formed request signed by a key the signer does not know"
+      ~expected:(`Error "invalid authentication signature")
+      ~override_pk
+      ~authentication:unknown_authentication
+      ()
+  in
+  match launch_mode with
+  | Signer.Socket | Local ->
+      wire_cases @@ fun ~case ~expected ?override_pk ?authentication () ->
+      let* response =
+        socket_roundtrip
+          ~uri:(Signer.uri signer)
+          (prove_possession_frame
+             ~pkh:key.public_key_hash
+             ~override_pk
+             ~authentication)
+      in
+      (* The answer is an [Error_monad.result_encoding]: a [\x00] tag followed
+         by the proof, or a [\x01] tag followed by the error trace, which
+         carries the failure message as plain text. *)
+      let body = Bytes.to_string response in
+      let answered_as_expected =
+        match expected with
+        | `Proof proof ->
+            String.equal
+              body
+              ("\x00"
+              ^ Bytes.to_string
+                  Tezos_crypto.Signature.Bls.(to_bytes (of_b58check_exn proof))
+              )
+        | `Error message ->
+            String.length body > 0
+            && Char.equal body.[0] '\x01'
+            && body =~ rex message
+      in
+      if answered_as_expected then unit
+      else
+        Test.fail
+          "%s: expected the signer to answer %s, got: %s"
+          case
+          (match expected with
+          | `Proof proof -> proof
+          | `Error message -> message)
+          (Hex.show (Hex.of_bytes response))
+  | Http ->
+      let request ?override_pk ?authentication () =
+        let query =
+          List.filter_map
+            Fun.id
+            [
+              Option.map (sf "bls_pk=%s") override_pk;
+              Option.map (sf "authentication=%s") authentication;
+            ]
+          |> String.concat "&"
+        in
+        Curl.get_raw
+        @@ sf
+             "%s/bls_prove_possession/%s?%s"
+             (Uri.to_string (Signer.uri signer))
+             key.public_key_hash
+             query
+      in
+      wire_cases @@ fun ~case ~expected ?override_pk ?authentication () ->
+      let*! response = request ?override_pk ?authentication () in
+      let expected =
+        match expected with `Proof proof -> proof | `Error message -> message
+      in
+      if response =~ rex expected then unit
+      else
+        Test.fail
+          "%s: expected the signer to answer %s, got: %s"
+          case
+          expected
+          response
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
@@ -560,4 +914,5 @@ let register ~protocols =
   signer_prove_possession_test
     (List.filter (fun p -> Protocol.number p > 022) protocols) ;
   signer_highwatermark_test protocols ;
+  signer_bls_pop_authentication_test protocols ;
   signer_bls_proof_command_test ()
