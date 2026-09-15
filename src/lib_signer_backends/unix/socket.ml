@@ -58,7 +58,10 @@ struct
         Request.Deterministic_nonce_hash
           {Deterministic_nonce_hash.Request.pkh; data; signature}
 
-  let maybe_authenticate pkh msg conn =
+  (* [maybe_authenticate_payload to_sign conn] returns the authentication
+     signature over [to_sign], or [None] when the signer does not require
+     authentication. *)
+  let maybe_authenticate_payload to_sign conn =
     let open Lwt_result_syntax in
     let* () =
       Tezos_base_unix.Socket.send conn Request.encoding Request.Authorized_keys
@@ -72,10 +75,11 @@ struct
     match v with
     | No_authentication -> return_none
     | Authorized_keys authorized_keys ->
-        let* signature =
-          authenticate authorized_keys (Sign.Request.to_sign ~pkh ~data:msg)
-        in
+        let* signature = authenticate authorized_keys to_sign in
         return_some signature
+
+  let maybe_authenticate pkh msg conn =
+    maybe_authenticate_payload (Sign.Request.to_sign ~pkh ~data:msg) conn
 
   let with_signer_operation ?version path pkh msg request_type enc =
     let open Lwt_result_syntax in

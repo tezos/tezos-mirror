@@ -280,13 +280,17 @@ let check_magic_byte name magic_bytes data =
         let*! () = Events.(emit signing_data_failure) (name, failure) in
         failwith "%s" failure
 
-let check_authorization cctxt pkh data require_auth signature =
+(* [check_authorization_of ~to_sign] checks that [signature] is a signature of
+   [to_sign] by one of the authorized keys. Each request kind builds its own
+   [to_sign] payload, so that an authorization cannot be replayed on a
+   different request kind or on the same request kind with other
+   parameters. *)
+let check_authorization_of cctxt ~to_sign require_auth signature =
   let open Lwt_result_syntax in
   match (require_auth, signature) with
   | false, _ -> return_unit
   | true, None -> failwith "missing authentication signature field"
   | true, Some signature ->
-      let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
       let* keys = Authorized_key.load cctxt in
       if
         List.exists
@@ -294,6 +298,13 @@ let check_authorization cctxt pkh data require_auth signature =
           keys
       then return_unit
       else failwith "invalid authentication signature"
+
+let check_authorization cctxt pkh data require_auth signature =
+  check_authorization_of
+    cctxt
+    ~to_sign:(Signer_messages.Sign.Request.to_sign ~pkh ~data)
+    require_auth
+    signature
 
 let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet)
