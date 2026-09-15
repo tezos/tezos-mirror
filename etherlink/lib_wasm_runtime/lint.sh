@@ -25,8 +25,8 @@ rustup show active-toolchain > /dev/null 2> /dev/null
 # ensure the build script will be run
 touch build.rs
 
-if ! LINT=yes cargo build 2> "$BUILD_LOGS"; then
-  echo "'cargo build' failed:"
+if ! LINT=yes cargo check 2> "$BUILD_LOGS"; then
+  echo "'cargo check' failed:"
   cat "$BUILD_LOGS"
 
   exit 2
@@ -42,7 +42,7 @@ for file in "${FILES[@]}"; do
 done
 
 if [ "$exit_code" -ne 0 ]; then
-  echo "Run 'cargo clean; cargo build' to regenerate outdated files"
+  echo "Run 'cargo clean; cargo check' to regenerate outdated files"
 fi
 
 exit $exit_code
