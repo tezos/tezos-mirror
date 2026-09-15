@@ -509,6 +509,114 @@ let test_counter =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_submitted_counter =
+  register_tezosx_test
+    ~title:"Test user-submitted counters"
+    ~tags:["evm"; "rpc"; "counter"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
+  let source = Constant.bootstrap1 in
+  let source_key_hash = source.public_key_hash in
+  let get_counter () =
+    let* res =
+      RPC_core.call tezlink_endpoint
+      @@ RPC.get_chain_block_context_contract_counter ~id:source_key_hash ()
+    in
+    return @@ (JSON.as_string res |> int_of_string)
+  in
+  (* Setup: inject some operations so that the counter is not 0 and we have
+     leeway to test past counters. Let's target 5 arbitrarily. *)
+  let target_counter = 5 in
+  let rec move_counter n =
+    if n <= 0 then unit
+    else
+      let* () =
+        let* () =
+          Client.transfer
+            ~endpoint:(Client.Foreign_endpoint tezlink_endpoint)
+            ~amount:(Tez.of_int 1)
+            ~giver:source_key_hash
+            ~receiver:source_key_hash
+            ~burn_cap:Tez.one
+            client
+        in
+        let*@ _ = produce_block sequencer in
+        unit
+      in
+      move_counter (n - 1)
+  in
+  let* () = move_counter target_counter in
+  let* current_counter = get_counter () in
+  (* Check that we're indeed at the counter we were targeting. *)
+  Check.(
+    (current_counter = target_counter)
+      int
+      ~__LOC__
+      ~error_msg:
+        "Expected the current counter to be the setup target %R, got %L") ;
+  (* [next_counter] is the counter expected for the next successful
+     operation. *)
+  let next_counter = current_counter + 1 in
+  (* A few helpers before doing our checks: we'll always simulate the same
+     operation (a self-transfer) with different counters, and fetch the
+     interesting error fields (id and expected counter). *)
+  let build_op counter =
+    let* branch =
+      RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash ()
+    in
+    Operation.Manager.(
+      operation
+        ~branch
+        ~signer:source
+        [
+          make
+            ~source
+            ~counter
+            ~fee:5000
+            ~gas_limit:100000
+            ~storage_limit:1000
+            (transfer ~dest:source ~amount:1 ());
+        ]
+        client)
+  in
+  let simulate counter =
+    let* op = build_op counter in
+    let* data = Operation.make_run_operation_input op client in
+    RPC_core.call_raw tezlink_endpoint
+    @@ RPC.post_chain_block_helpers_scripts_simulate_operation
+         ~data:(RPC_core.Data data)
+         ()
+  in
+  let error_components response =
+    let err =
+      JSON.parse ~origin:"operation" response.RPC_core.body |> JSON.geti 0
+    in
+    let field f = JSON.(err |-> f |> as_string) in
+    (field "id", int_of_string @@ field "expected")
+  in
+  (* Simulating with the current counter fails with a [counter_in_the_past]
+     error, with the reported expected counter being the successor of the
+     current one. *)
+  let* response = simulate current_counter in
+  let err_id, err_expected = error_components response in
+  Check.(
+    (err_id =~ rex "counter_in_the_past")
+      ~error_msg:"Expected a counter_in_the_past error id, got %L") ;
+  Check.(
+    (err_expected = next_counter)
+      int
+      ~__LOC__
+      ~error_msg:"The expected counter should be %R, got %L") ;
+  (* Simulating with the next counter succeeds. *)
+  let* response = simulate next_counter in
+  Check.(
+    (response.code = 200)
+      int
+      ~__LOC__
+      ~error_msg:"Expected the next counter to succeed (HTTP %R), got %L") ;
+  unit
+
 let test_version =
   register_tezosx_test ~title:"Test of the version rpc" ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
@@ -7035,6 +7143,7 @@ let () =
   test_balance [Alpha] ;
   test_manager_key [Alpha] ;
   test_counter [Alpha] ;
+  test_submitted_counter [Alpha] ;
   test_protocols [Alpha] ;
   test_genesis_block_arg [Alpha] ;
   test_expected_issuance [Alpha] ;

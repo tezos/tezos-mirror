@@ -474,7 +474,7 @@ let validate_first_counter ~state ~source ~first_counter =
   else
     let expected =
       Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
-      @@ Z.to_int counter
+      @@ (Z.to_int counter + 1)
     in
     let found =
       Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
