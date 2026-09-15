@@ -607,7 +607,8 @@ where
             // This runs on the live host, before the failsafe mirror is
             // started: `start()` has not copied the world state into `/tmp`
             // yet, so a read through the mirror would come back empty.
-            upgrade::possible_sequencer_upgrade(rk)?;
+            let (host, base) = rk.base_parts_mut();
+            upgrade::possible_sequencer_upgrade(host, base)?;
 
             log!(Debug, "Creating BIP from Blueprint.");
             // Execute at most one of the stored blueprints
@@ -746,7 +747,8 @@ where
     // The mirror is promoted, so its `/tmp` copy is gone: the sequencer key
     // change runs on the live host.
     if let Some(timestamp) = key_change_at {
-        upgrade::possible_sequencer_key_change(rk, timestamp)?;
+        let (host, base) = rk.base_parts_mut();
+        upgrade::possible_sequencer_key_change(host, base, timestamp)?;
     }
     Ok(result)
 }
