@@ -615,6 +615,20 @@ let test_submitted_counter =
       int
       ~__LOC__
       ~error_msg:"Expected the next counter to succeed (HTTP %R), got %L") ;
+  (* Simulating with a future counter fails with a [counter_in_the_future]
+     error, with the reported expected counter being the successor of the
+     current one. *)
+  let future_counter = next_counter + 10 in
+  let* response = simulate future_counter in
+  let err_id, err_expected = error_components response in
+  Check.(
+    (err_id =~ rex "counter_in_the_future")
+      ~error_msg:"Expected a counter_in_the_future error id, got %L") ;
+  Check.(
+    (err_expected = next_counter)
+      int
+      ~__LOC__
+      ~error_msg:"The expected counter should be %R, got %L") ;
   unit
 
 let test_version =
