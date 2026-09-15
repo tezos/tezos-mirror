@@ -166,11 +166,16 @@ struct
   let bls_prove_possession path ?override_pk pkh =
     let open Lwt_result_syntax in
     Tezos_base_unix.Socket.with_connection path (fun conn ->
+        let* signature =
+          maybe_authenticate_payload
+            (Bls_prove_possession.Request.to_sign ~pkh ~override_pk)
+            conn
+        in
         let* () =
           Tezos_base_unix.Socket.send
             conn
             Request.encoding
-            (Request.Bls_prove_possession (pkh, override_pk))
+            (Request.Bls_prove_possession {pkh; override_pk; signature})
         in
         let encoding = result_encoding Bls_prove_possession.Response.encoding in
         let* proof_of_possession = Tezos_base_unix.Socket.recv conn encoding in

@@ -55,13 +55,18 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       Tezos_rpc.Directory.register1
         dir
         Signer_services.bls_prove_possession
-        (fun pkh override_pk () ->
-          Handler.bls_prove_possession cctxt ?override_pk pkh)
+        (fun pkh (override_pk, signature) () ->
+          Handler.bls_prove_possession
+            cctxt
+            ?override_pk
+            ~require_auth
+            pkh
+            signature)
     else
       Tezos_rpc.Directory.register1
         dir
         Signer_services.bls_prove_possession
-        (fun _pkh _override_pk () ->
+        (fun _pkh _query () ->
           failwith "Request to prove possession is not allowed.")
   in
   let dir =

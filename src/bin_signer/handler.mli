@@ -75,8 +75,20 @@ val known_keys :
   #Client_context.wallet ->
   Tezos_crypto.Signature.public_key_hash list tzresult Lwt.t
 
+(** [bls_prove_possession cctxt ?override_pk ~require_auth pkh signature]
+    returns a BLS proof of possession for the key [pkh], over [override_pk]
+    when provided instead of over the key's own public key.
+
+    When [require_auth] is set, [signature] must be a signature by one of the
+    authorized keys over
+    {!Signer_messages.Bls_prove_possession.Request.to_sign}, which binds both
+    [pkh] and [override_pk]. Without that check the signer would produce, for
+    unauthenticated callers, a proof of possession over a caller-chosen public
+    key. *)
 val bls_prove_possession :
   #Client_context.wallet ->
   ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+  require_auth:bool ->
   Signature.public_key_hash ->
+  Tezos_crypto.Signature.t option ->
   Tezos_crypto.Signature.Bls.t tzresult Lwt.t

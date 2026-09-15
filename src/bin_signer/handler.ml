@@ -398,8 +398,17 @@ let known_keys (cctxt : #Client_context.wallet) =
   let+ all_keys = Client_keys.list_keys cctxt in
   List.map (fun (_, pkh, _, _) -> pkh) all_keys
 
-let bls_prove_possession (cctxt : #Client_context.wallet) ?override_pk pkh =
+let bls_prove_possession (cctxt : #Client_context.wallet) ?override_pk
+    ~require_auth pkh signature =
   let open Lwt_result_syntax in
   let*! () = Events.(emit request_for_proof_of_possession pkh) in
+  let* () =
+    check_authorization_of
+      cctxt
+      ~to_sign:
+        (Signer_messages.Bls_prove_possession.Request.to_sign ~pkh ~override_pk)
+      require_auth
+      signature
+  in
   let* _name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
   Client_keys.bls_prove_possession cctxt ?override_pk sk_uri

@@ -242,6 +242,13 @@ struct
     let bls_prove_possession ?override_pk uri =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
+      let* signature =
+        authenticate
+          base
+          (Signer_messages.Bls_prove_possession.Request.to_sign
+             ~pkh
+             ~override_pk)
+      in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -249,7 +256,7 @@ struct
         ~base
         Signer_services.bls_prove_possession
         ((), pkh)
-        override_pk
+        (override_pk, signature)
         ()
   end
 
