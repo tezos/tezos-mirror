@@ -52,6 +52,16 @@ impl<'h, Host: KeySpaceLoader + StorageV1> ScopeRuntimeKeyspace<'h>
     }
 }
 
+/// How a scope's body asks it to close. Both variants carry the body's
+/// value out to the caller of [`OperationScope::run`] or
+/// [`CracOperationScope::run`].
+pub enum Close<T> {
+    /// Commit the scope. See each scope's `run` for what is kept.
+    Commit(T),
+    /// Revert the scope. See each scope's `run` for what is restored.
+    Revert(T),
+}
+
 /// The scope of the Michelson side of a cross-runtime call.
 ///
 /// Open snapshots a world-state subtree through the journal; close keeps the
@@ -114,6 +124,43 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
     /// The context and the journal, for callees that need both at once.
     pub fn parts_mut(&mut self) -> (&mut C, &mut TezosXJournal) {
         (&mut *self.ctx, &mut *self.journal)
+    }
+
+    /// Runs `body` under a journal checkpoint of `from_path`, then keeps the
+    /// writes on [`Close::Commit`] or restores `from_path` on [`Close::Revert`]
+    /// or a body error.
+    ///
+    /// A commit leaves the checkpoint to the enclosing EVM frame, which can
+    /// still revert it. A close error takes precedence over the body's result.
+    pub fn run<T, E: From<RuntimeError>>(
+        ctx: &'s mut C,
+        journal: &'s mut TezosXJournal,
+        from_path: &OwnedPath,
+        body: impl FnOnce(&mut Self) -> Result<Close<T>, E>,
+    ) -> Result<T, E> {
+        let mut scope = Self::open(ctx, journal, from_path)?;
+        match body(&mut scope) {
+            Ok(Close::Commit(t)) => scope.commit().map(|()| t).map_err(E::from),
+            Ok(Close::Revert(t)) => scope.revert().map(|()| t).map_err(E::from),
+            Err(e) => {
+                scope.revert()?;
+                Err(e)
+            }
+        }
+    }
+
+    /// Checkpoints `from_path` and leaves the checkpoint to the enclosing code,
+    /// which closes it through the journal: an EVM frame's `commit_frame` or
+    /// `revert_frame`, or `release_snapshots_from` or `revert_snapshots_from`.
+    ///
+    /// Fails if `from_path` cannot be copied.
+    pub fn checkpoint_for_parent(
+        ctx: &'s mut C,
+        journal: &'s mut TezosXJournal,
+        from_path: &OwnedPath,
+    ) -> Result<(), RuntimeError> {
+        let _scope = Self::open(ctx, journal, from_path)?;
+        Ok(())
     }
 }
 
@@ -225,6 +272,38 @@ impl<'s, Host: StorageV1> OperationScope<'s, Host> {
 }
 
 impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
+    /// Runs `body` on a `/tmp` mirror of `world_states`, then promotes the
+    /// mirror on [`Close::Commit`] or drops it on [`Close::Revert`] or a body
+    /// error.
+    ///
+    /// A commit keeps only `world_states`; see [`Phase`] for what a revert
+    /// also resets. `world_states` must not
+    /// overlap. A close error takes precedence over the body's result.
+    pub fn run<'h, C, T, E>(
+        ctx: &'s mut C,
+        world_states: &[OwnedPath],
+        journal: &'s mut TezosXJournal,
+        phase: Phase,
+        body: impl FnOnce(&mut Self) -> Result<Close<T>, E>,
+    ) -> Result<T, E>
+    where
+        'h: 's,
+        Host: 'h,
+        C: ScopeRuntimeKeyspace<'h, Host = Host>,
+        E: From<OperationError>,
+    {
+        let host = ctx.rk_mut().host_mut();
+        let mut scope = Self::open(host, world_states, journal, phase)?;
+        match body(&mut scope) {
+            Ok(Close::Commit(t)) => scope.commit().map(|()| t).map_err(E::from),
+            Ok(Close::Revert(t)) => scope.revert().map(|()| t).map_err(E::from),
+            Err(e) => {
+                scope.revert()?;
+                Err(e)
+            }
+        }
+    }
+
     /// The keyspace handle, loaded over the mirror, and the journal, for
     /// callees that need both at once.
     ///
@@ -312,6 +391,69 @@ mod tests {
             .expect("the write goes through");
         scope.revert().expect("the scope is reverted");
 
+        assert_eq!(
+            rk.host_mut()
+                .store_read_all(&probe())
+                .expect("the probe survives"),
+            b"before"
+        );
+    }
+
+    #[test]
+    fn run_reverts_when_the_body_errs() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+
+        let result = CracOperationScope::run(
+            &mut rk,
+            &mut journal,
+            &world_state(),
+            |scope| -> Result<Close<()>, RuntimeError> {
+                let (ctx, _journal) = scope.parts_mut();
+                ctx.host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                Err(RuntimeError::PathNotFound)
+            },
+        );
+
+        assert!(matches!(result, Err(RuntimeError::PathNotFound)));
+        assert_eq!(
+            rk.host_mut()
+                .store_read_all(&probe())
+                .expect("the probe survives"),
+            b"before"
+        );
+    }
+
+    #[test]
+    fn run_returns_the_bodys_value_after_a_revert() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+
+        let value = CracOperationScope::run(
+            &mut rk,
+            &mut journal,
+            &world_state(),
+            |scope| -> Result<Close<u8>, RuntimeError> {
+                let (ctx, _journal) = scope.parts_mut();
+                ctx.host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                Ok(Close::Revert(42))
+            },
+        )
+        .expect("the scope is reverted");
+
+        assert_eq!(value, 42);
         assert_eq!(
             rk.host_mut()
                 .store_read_all(&probe())
@@ -539,5 +681,50 @@ mod tests {
     #[test]
     fn a_reverted_operation_scope_drops_the_keyspace_writes() {
         assert_eq!(eth_accounts_probe_after(false), None);
+    }
+
+    #[test]
+    fn run_reverts_the_operation_scope_when_the_body_errs() {
+        use tezos_evm_runtime::safe_storage::TMP_PATH;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        rk.host_mut()
+            .store_write_all(&probe(), b"before")
+            .expect("the probe is written");
+        let index_before = journal.michelson.origination_index();
+
+        let result = OperationScope::run(
+            &mut rk,
+            &[world_state()],
+            &mut journal,
+            Phase::Application,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (mut scoped_rk, scoped_journal) = scope.parts_mut()?;
+                scoped_rk
+                    .host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                scoped_journal.michelson.next_origination_index();
+                Err(OperationError::BlockAbort("the body fails".into()))
+            },
+        );
+
+        assert!(matches!(result, Err(OperationError::BlockAbort(_))));
+        assert_eq!(
+            rk.host_mut()
+                .store_read_all(&probe())
+                .expect("the probe survives"),
+            b"before"
+        );
+        assert_eq!(journal.michelson.origination_index(), index_before);
+        assert!(
+            rk.host_mut()
+                .store_has(&TMP_PATH)
+                .expect("/tmp is readable")
+                .is_none(),
+            "a reverted scope leaves no `/tmp` behind"
+        );
     }
 }
