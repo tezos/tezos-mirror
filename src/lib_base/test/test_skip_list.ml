@@ -539,6 +539,347 @@ let () =
   true
 
 let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ QCheck2.Test.make
+       ~name:"Skip list: genesis has valid indices"
+       ~count:10_000
+       QCheck2.Gen.(pair (2 -- 73) int)
+  @@ fun (basis, content) ->
+  let module M = Skip_list.Make (struct
+    let basis = basis
+  end) in
+  M.valid_indices
+    ~deref:(fun _ -> Test.fail "Genesis must not dereference any pointer")
+    (M.genesis content)
+
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@
+  let generator =
+    QCheck2.Gen.(
+      let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
+      let large_index =
+        let* bytes = list_size (0 -- 128) (0 -- 255) in
+        return
+          (List.fold_left
+             (fun n byte -> Z.(add (shift_left n 8) (of_int byte)))
+             Z.zero
+             bytes)
+      in
+      let power =
+        let* exponent = 0 -- 128 in
+        return (Z.pow (Z.of_int basis) exponent)
+      in
+      let boundary =
+        let* power = power in
+        let* multiple = 1 -- (basis - 1) in
+        return Z.(mul power (of_int multiple))
+      in
+      let steps = frequency [(1, pure 0); (3, pure 1); (2, 2 -- 8)] in
+      let* initial_index, steps =
+        frequency
+          [
+            (* Crossing a power adds a new back-pointer slot. *)
+            (4, map (fun power -> (Z.pred power, 1)) power);
+            (* Crossing a multiple refreshes existing pointer slots. *)
+            (3, map (fun boundary -> (Z.pred boundary, 1)) boundary);
+            ( 2,
+              let* boundary = boundary in
+              let* offset = -1 -- 1 in
+              let* steps = steps in
+              return (Z.max Z.zero Z.(add boundary (of_int offset)), steps) );
+            ( 2,
+              let* offset = -1 -- 1 in
+              let* steps = 1 -- 8 in
+              return (Z.of_int (15_000_000 + offset), steps) );
+            (1, pair large_index steps);
+          ]
+      in
+      return (basis, initial_index, steps))
+  in
+  QCheck2.Test.make
+    ~name:"Skip list: next preserves valid indices"
+    ~count:10_000
+    ~print:(fun (basis, initial_index, steps) ->
+      Printf.sprintf
+        "basis=%d, initial_index=%s, steps=%d"
+        basis
+        (Z.to_string initial_index)
+        steps)
+    generator
+  @@ fun (basis, initial_index, steps) ->
+  let module M = Skip_list.Make (struct
+    let basis = basis
+  end) in
+  let encoding = M.encoding Data_encoding.n Data_encoding.unit in
+  let raw_encoding =
+    Data_encoding.(
+      obj3 (req "index" n) (req "content" unit) (req "back_pointers" (list n)))
+  in
+  let cell_at index pointers =
+    Data_encoding.Json.destruct
+      encoding
+      (Data_encoding.Json.construct raw_encoding (index, (), pointers))
+  in
+  (* Pointers are indices. Only target indices are inspected by the predicate,
+     so dereferencing needs no recursively materialised ancestor list. *)
+  let deref index = Some (cell_at index []) in
+  let rec pointers power =
+    if Z.gt power initial_index then []
+    else
+      Z.(pred (mul (div initial_index power) power))
+      :: pointers Z.(mul power (of_int basis))
+  in
+  let initial_cell = cell_at initial_index (pointers Z.one) in
+  let rec check cell remaining =
+    M.valid_indices ~deref cell
+    && (remaining = 0
+       || check
+            (M.next ~prev_cell:cell ~prev_cell_ptr:(M.index cell) ())
+            (remaining - 1))
+  in
+  check initial_cell steps
+
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Skip list: reject tampered path indices"
+    ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ fun () ->
+  let module M = TestNat (struct
+    let basis = 2
+  end) in
+  let list = M.nlist 2 13 in
+  let path =
+    match M.back_path list 13 3 with
+    | Some path -> path
+    | None -> Test.fail "Could not produce fixture proof"
+  in
+  if not (M.valid_back_path list 13 3 path) then
+    Test.fail "Original proof rejected by valid_back_path" ;
+  let proof =
+    List.map
+      (fun ptr ->
+        match M.deref list ptr with
+        | Some cell -> (ptr, cell)
+        | None -> Test.fail "Missing fixture cell")
+      path
+  in
+  let make_cell index content pointers =
+    let raw_encoding =
+      Data_encoding.(
+        obj3
+          (req "index" n)
+          (req "content" int31)
+          (req "back_pointers" (list int31)))
+    in
+    Data_encoding.Json.destruct
+      (M.encoding Data_encoding.int31 Data_encoding.int31)
+      (Data_encoding.Json.construct raw_encoding (index, content, pointers))
+  in
+  let valid ?(start_index = Z.of_int 13) proof path =
+    M.valid_back_path_indices
+      ~equal_ptr:Int.equal
+      ~deref:(fun ptr -> List.assoc ~equal:Int.equal ptr proof)
+      ~start_index
+      path
+  in
+  if not (valid proof path) then Test.fail "Valid sparse proof rejected" ;
+  List.iter
+    (fun changed_ptr ->
+      let tampered =
+        List.map
+          (fun (ptr, cell) ->
+            ( ptr,
+              if ptr = changed_ptr then
+                make_cell
+                  (Z.pred (M.index cell))
+                  (M.content cell)
+                  (M.back_pointers cell)
+              else cell ))
+          proof
+      in
+      if valid tampered path then Test.fail "Tampered index accepted")
+    path ;
+  if valid ~start_index:(Z.of_int 12) proof path then
+    Test.fail "Incorrect starting index accepted" ;
+  if valid proof [] then Test.fail "Empty path accepted" ;
+  if valid proof [13; 3] then Test.fail "Nonexistent edge accepted" ;
+  if valid proof [13; 7; 2] then Test.fail "Missing path cell accepted" ;
+  if not (valid proof [13]) then Test.fail "Valid singleton rejected" ;
+  if not (valid ~start_index:Z.zero [(0, M.genesis 0)] [0]) then
+    Test.fail "Genesis path rejected" ;
+  let malformed = make_cell (Z.of_int 3) 0 [] in
+  let malformed_proof =
+    List.map
+      (fun (ptr, cell) -> (ptr, if ptr = 3 then malformed else cell))
+      proof
+  in
+  if valid malformed_proof path then
+    Test.fail "Malformed final pointer count accepted" ;
+  let large_index = Z.shift_left Z.one 100 in
+  let large_proof =
+    [
+      (13, make_cell large_index 0 (7 :: Stdlib.List.init 100 (fun _ -> 0)));
+      (7, make_cell (Z.pred large_index) 0 (Stdlib.List.init 100 (fun _ -> 0)));
+    ]
+  in
+  if not (valid ~start_index:large_index large_proof [13; 7]) then
+    Test.fail "Large path indices rejected" ;
+  unit
+
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Skip list: reject relabelled generated proofs"
+    ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ fun () ->
+  List.iter
+    (fun basis ->
+      let module M = TestNat (struct
+        let basis = basis
+      end) in
+      let history = M.nlist basis 32 in
+      let encoding = M.encoding Data_encoding.int31 Data_encoding.int31 in
+      let relabel cell new_index =
+        match Data_encoding.Json.construct encoding cell with
+        | `O fields ->
+            Data_encoding.Json.destruct
+              encoding
+              (`O
+                 (List.map
+                    (fun (name, value) ->
+                      ( name,
+                        if String.equal name "index" then
+                          Data_encoding.Json.construct Data_encoding.n new_index
+                        else value ))
+                    fields))
+        | _ -> Test.fail "Expected a cell object"
+      in
+      for start = 0 to 32 do
+        for target = 0 to start do
+          let path =
+            match M.back_path history start target with
+            | Some path -> path
+            | None -> Test.fail "Could not produce original proof"
+          in
+          if not (M.valid_back_path history start target path) then
+            Test.fail "Original proof rejected by valid_back_path" ;
+          (* Only proof cells are available; pointer identities and contents
+             stay unchanged when the encoded indices are tampered with. *)
+          let proof =
+            List.map
+              (fun ptr ->
+                match M.deref history ptr with
+                | Some cell -> (ptr, cell)
+                | None -> Test.fail "Missing original proof cell")
+              path
+          in
+          let valid proof =
+            M.valid_back_path_indices
+              ~equal_ptr:Int.equal
+              ~deref:(fun ptr -> List.assoc ~equal:Int.equal ptr proof)
+              ~start_index:(Z.of_int start)
+              path
+          in
+          if not (valid proof) then
+            Test.fail
+              "Original sparse proof rejected: basis=%d start=%d target=%d"
+              basis
+              start
+              target ;
+          List.iter
+            (fun changed_ptr ->
+              List.iter
+                (fun delta ->
+                  if changed_ptr + delta >= 0 then
+                    let tampered =
+                      List.map
+                        (fun (ptr, cell) ->
+                          ( ptr,
+                            if ptr = changed_ptr then
+                              relabel cell Z.(add (M.index cell) (of_int delta))
+                            else cell ))
+                        proof
+                    in
+                    if valid tampered then
+                      Test.fail
+                        "Relabelled proof accepted: basis=%d start=%d \
+                         target=%d changed_ptr=%d delta=%d"
+                        basis
+                        start
+                        target
+                        changed_ptr
+                        delta)
+                [-1; 1; basis])
+            path ;
+          let shifted =
+            List.map
+              (fun (ptr, cell) -> (ptr, relabel cell (Z.succ (M.index cell))))
+              proof
+          in
+          if valid shifted then Test.fail "Uniformly shifted proof accepted"
+        done
+      done)
+    [2; 3; 4; 16] ;
+  unit
+
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Skip list: validate cell indices"
+    ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ fun () ->
+  List.iter
+    (fun basis ->
+      let module M = TestNat (struct
+        let basis = basis
+      end) in
+      let l = M.nlist basis 64 in
+      let deref = M.deref l in
+      List.iter
+        (fun (_, cell) ->
+          if not (M.valid_indices ~deref cell) then
+            Test.fail "Valid cell rejected (basis %d)" basis)
+        l.cells ;
+      let _, cell = M.head l in
+      if M.valid_indices ~deref:(fun _ -> None) cell then
+        Test.fail "Missing target accepted" ;
+      if M.valid_indices ~deref:(fun _ -> Some cell) cell then
+        Test.fail "Incorrect target index accepted" ;
+      let encoding = M.encoding Data_encoding.int31 Data_encoding.int31 in
+      let with_pointers cell pointers =
+        match Data_encoding.Json.construct encoding cell with
+        | `O fields ->
+            Data_encoding.Json.destruct
+              encoding
+              (`O
+                 (List.map
+                    (fun (name, value) ->
+                      ( name,
+                        if String.equal name "back_pointers" then
+                          Data_encoding.Json.construct
+                            Data_encoding.(list int31)
+                            pointers
+                        else value ))
+                    fields))
+        | _ -> Test.fail "Expected a cell object"
+      in
+      let pointers = M.back_pointers cell in
+      let fewer = match pointers with [] -> [] | _ :: rest -> rest in
+      List.iter
+        (fun malformed ->
+          if M.valid_indices ~deref malformed then
+            Test.fail "Incorrect pointer count accepted")
+        [
+          with_pointers cell fewer;
+          with_pointers cell (0 :: pointers);
+          with_pointers (M.genesis 0) [0];
+        ])
+    [2; 3; 4; 16] ;
+  unit
+
+let () =
   Test.register
     ~__FILE__
     ~title:"Skip list: `search` may not produce minimal path"
@@ -599,3 +940,130 @@ let () =
       (* The cell does not exist in the list. *)
       assert false) ;
   unit
+
+let index_proof_case ?(min_head = 0) () =
+  QCheck2.Gen.(
+    let* basis = frequency [(5, pure 4); (1, 2 -- 16)] in
+    let* head = min_head -- 500 in
+    let* target = 0 -- head in
+    return (basis, head, target))
+
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ QCheck2.Test.make
+       ~name:"Skip list: produce and verify index proofs"
+       ~count:1_000
+       (index_proof_case ())
+  @@ fun (basis, head, target) ->
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  let history = M.nlist basis head in
+  let index_proof =
+    match
+      M.produce_index_proof
+        ~equal_ptr:Int.equal
+        ~deref:(M.deref history)
+        ~cell_ptr:head
+    with
+    | Some proof -> proof
+    | None -> Test.fail "Could not produce index proof"
+  in
+  let inclusion_proof =
+    match M.back_path history head target with
+    | Some proof -> proof
+    | None -> Test.fail "Could not produce inclusion proof"
+  in
+  M.verify_index_proof
+    ~equal_ptr:Int.equal
+    ~deref:(M.deref history)
+    ~cell_ptr:head
+    ~inclusion_proof
+    index_proof
+
+let () =
+  Qcheck_tezt.register ~__FILE__ ~tags:Tezos_test_helpers.Tag.[layer1; base]
+  @@ QCheck2.Test.make
+       ~name:"Skip list: reject malformed index proofs"
+       ~count:1_000
+       (index_proof_case ~min_head:1 ())
+  @@ fun (basis, head, target) ->
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  let target = if Int.equal target head then head - 1 else target in
+  let history = M.nlist basis head in
+  let index_proof =
+    match
+      M.produce_index_proof
+        ~equal_ptr:Int.equal
+        ~deref:(M.deref history)
+        ~cell_ptr:head
+    with
+    | Some proof -> proof
+    | None -> Test.fail "Could not produce index proof"
+  in
+  let inclusion_proof =
+    match M.back_path history head target with
+    | Some proof -> proof
+    | None -> Test.fail "Could not produce inclusion proof"
+  in
+  let encoding = M.encoding Data_encoding.int31 Data_encoding.int31 in
+  let relabel cell =
+    match Data_encoding.Json.construct encoding cell with
+    | `O fields ->
+        Data_encoding.Json.destruct
+          encoding
+          (`O
+             (List.map
+                (fun (name, value) ->
+                  ( name,
+                    if String.equal name "index" then
+                      Data_encoding.Json.construct
+                        Data_encoding.n
+                        Z.(succ (M.index cell))
+                    else value ))
+                fields))
+    | _ -> Test.fail "Expected a cell object"
+  in
+  let rejects_relabelled ptr =
+    let deref candidate =
+      match M.deref history candidate with
+      | Some cell when Int.equal candidate ptr -> Some (relabel cell)
+      | cell -> cell
+    in
+    not
+      (M.verify_index_proof
+         ~equal_ptr:Int.equal
+         ~deref
+         ~cell_ptr:head
+         ~inclusion_proof
+         index_proof)
+  in
+  let witness_ptr =
+    match List.tl index_proof with
+    | Some (ptr :: _) -> ptr
+    | Some [] | None -> Test.fail "Index proof is unexpectedly a singleton"
+  in
+  let inclusion_ptr =
+    match List.tl inclusion_proof with
+    | Some (ptr :: _) -> ptr
+    | Some [] | None ->
+        (* [target = head] produces a singleton path; use the witness mutation
+           for this generated case. *)
+        witness_ptr
+  in
+  let truncated =
+    match List.rev index_proof with
+    | _last :: rest -> List.rev rest
+    | [] -> Test.fail "Index proof is unexpectedly empty"
+  in
+  rejects_relabelled witness_ptr
+  && rejects_relabelled inclusion_ptr
+  && not
+       (M.verify_index_proof
+          ~equal_ptr:Int.equal
+          ~deref:(M.deref history)
+          ~cell_ptr:head
+          ~inclusion_proof
+          truncated)

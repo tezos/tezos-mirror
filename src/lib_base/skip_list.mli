@@ -227,6 +227,63 @@ module type S = sig
   module Make_monadic (M : MONAD) : MONADIC with type 'a result := 'a M.t
 end
 
+(** Checks that the indices a skip list path discloses are the ones its shape
+    prescribes.
+
+    The cells of a skip list carry their index, but a scheme authenticating
+    them may leave that index out, in which case a path can be relabelled and
+    still verify. These functions close that gap: the number of back pointers
+    of a cell and the index each of them reaches are both determined by the
+    cell's index, so a path can be checked against the canonical shape of a
+    skip list rather than against the indices it declares.
+
+    These functions live outside {!S} because the protocol environment pins
+    that signature. *)
+module type INDEX_CHECKS = sig
+  type ('content, 'ptr) cell
+
+  (** [produce_index_proof ~equal_ptr ~deref ~cell_ptr] produces a compact path
+      that determines the index of [cell_ptr] from the authenticated shape of
+      its skip list, without trusting the cells' index fields. *)
+  val produce_index_proof :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    cell_ptr:'ptr ->
+    'ptr list option
+
+  (** [verify_index_proof ~equal_ptr ~deref ~cell_ptr ~inclusion_proof proof]
+      checks that [proof] determines [cell_ptr]'s claimed index and that indices
+      are propagated correctly along [inclusion_proof]. Pointer authentication
+      and ordinary inclusion-path validity must be checked separately. *)
+  val verify_index_proof :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    cell_ptr:'ptr ->
+    inclusion_proof:'ptr list ->
+    'ptr list ->
+    bool
+
+  (** [valid_indices ~deref cell] checks the number of back pointers in [cell]
+      and the index of every cell they reference. *)
+  val valid_indices :
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    ('content, 'ptr) cell ->
+    bool
+
+  (** [valid_back_path_indices ~equal_ptr ~deref ~start_index path] checks
+      index consistency for every cell and edge disclosed by [path]. *)
+  val valid_back_path_indices :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    start_index:Z.t ->
+    'ptr list ->
+    bool
+end
+
 module Make (_ : sig
   val basis : int
-end) : S
+end) : sig
+  include S
+
+  include INDEX_CHECKS with type ('content, 'ptr) cell := ('content, 'ptr) cell
+end
