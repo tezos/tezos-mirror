@@ -71,6 +71,13 @@ RSS feed, uploads the site and invalidates the CDN). Rendering is owned by
 `release_site` and always operates on the whole site, as described in the
 vocabulary section above; components only deploy their own assets.
 
+Because the render always rebuilds the whole site, every component's release
+pipeline re-renders and re-uploads every tab (including octez's). This keeps the
+site consistent, but it also means any component's release depends on every
+other component's published `versions.json` being readable: a malformed
+`versions.json` for one component would fail the render of any component's
+release.
+
 The script lists the assets by reading the contents of directories in
 `s3://release-page-test.nomadic-labs.com/releases/`.
 

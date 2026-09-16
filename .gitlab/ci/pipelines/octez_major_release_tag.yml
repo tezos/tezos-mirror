@@ -105,7 +105,7 @@ dispatch-call:
   - gcp_not_interruptible
   needs:
   - gitlab:release
-  - release_page.publish
+  - release_page.deploy-assets
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -830,43 +830,6 @@ release_page.deploy-assets:
   environment:
     name: release-page
     action: access
-  retry: 0
-
-release_page.publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - release_page.deploy-assets
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - eval $(opam env)
-  - ./scripts/releases/publish-release-page.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    BUCKET_PATH: /releases
-    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
-    S3_BUCKET: site-prod.octez.tezos.com
-    URL: octez.tezos.com
-  environment:
-    name: release-page
-    action: access
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - index.html
-    - older_releases.html
-    - index.md
-    - older_releases.md
   retry: 0
 
 release_site.render:

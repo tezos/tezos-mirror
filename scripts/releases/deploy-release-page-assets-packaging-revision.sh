@@ -4,9 +4,9 @@
 # updates the build number in versions.json (the source of truth) and re-uploads
 # the binaries, checksums and archives to S3.
 #
-# It does NOT generate or publish the release page itself: that is done by
-# [publish-release-page.sh], which renders the page from the versions.json
-# published here.
+# It does NOT render the release site itself: that is done by the site-wide
+# [render_release_site.sh], which re-renders every component's page from the
+# versions.json published here.
 
 set -eu
 
