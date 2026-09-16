@@ -51,7 +51,7 @@ let _release_page_tests =
     ~opam:""
     ~synopsis:"Tests for the release page tools"
     ~release_status:Unreleased
-    ~modules:["main"; "test_version_manager"; "test_generate_release_page"]
+    ~modules:["main"; "test_version_manager"]
     ~profile:"release-tools-deps"
     ~deps:
       [tezt_lib |> open_ |> open_ ~m:"Base"; _release_page_base_lib |> open_]
