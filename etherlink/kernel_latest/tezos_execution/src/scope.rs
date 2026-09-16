@@ -65,8 +65,9 @@ pub enum Close<T> {
 /// The scope of the Michelson side of a cross-runtime call.
 ///
 /// Open snapshots a world-state subtree through the journal; close keeps the
-/// writes made under it or restores the subtree.
-#[must_use = "a cross-runtime scope must be committed, reverted or deferred to the enclosing EVM frame"]
+/// writes made under it or restores the subtree. Only [`Self::run`] opens and
+/// closes it, around a body; [`Self::checkpoint_for_parent`] opens one whose
+/// close is left to the enclosing code.
 pub struct CracOperationScope<'s, C> {
     ctx: &'s mut C,
     journal: &'s mut TezosXJournal,
@@ -75,7 +76,7 @@ pub struct CracOperationScope<'s, C> {
 
 impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
     /// Open the scope: snapshot the subtree at `from_path`.
-    pub fn open(
+    fn open(
         ctx: &'s mut C,
         journal: &'s mut TezosXJournal,
         from_path: &OwnedPath,
@@ -93,7 +94,7 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
     /// Close the scope on success: `checkpoint_commit`, which drops the
     /// snapshots taken under this scope and keeps its own for the enclosing
     /// EVM frame to revert through.
-    pub fn commit(self) -> Result<(), RuntimeError> {
+    fn commit(self) -> Result<(), RuntimeError> {
         let Self {
             ctx,
             journal,
@@ -106,7 +107,7 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
 
     /// Close the scope on failure: `checkpoint_revert`, restoring the subtree
     /// as it was at open.
-    pub fn revert(self) -> Result<(), RuntimeError> {
+    fn revert(self) -> Result<(), RuntimeError> {
         let Self {
             ctx,
             journal,
@@ -189,9 +190,9 @@ enum PhaseState {
 /// The scope of one phase of a Michelson operation.
 ///
 /// Open starts the operation mirror over the host; close promotes it or
-/// rolls it back. The keyspace handle is built over the mirror on demand,
-/// so the keyspace writes follow the close as well.
-#[must_use = "an operation scope must be committed or reverted"]
+/// rolls it back. Only [`Self::run`] opens and closes it, around a body. The
+/// keyspace handle is built over the mirror on demand, so the keyspace writes
+/// follow the close as well.
 pub struct OperationScope<'s, Host> {
     safe_host: SafeStorage<&'s mut Host>,
     journal: &'s mut TezosXJournal,
@@ -199,38 +200,8 @@ pub struct OperationScope<'s, Host> {
 }
 
 impl<'s, Host: StorageV1> OperationScope<'s, Host> {
-    /// Open the scope: `start` the mirror of `world_states` over `host`, and
-    /// under [`Phase::Application`] record the origination index.
-    ///
-    /// `phase` is consumed by [`Self::revert`].
-    /// No EVM frame covers this path, so nothing rolls the origination index
-    /// back: it is captured here for [`Self::revert`] to restore.
-    pub fn open(
-        host: &'s mut Host,
-        world_states: &[OwnedPath],
-        journal: &'s mut TezosXJournal,
-        phase: Phase,
-    ) -> Result<Self, OperationError> {
-        let mut safe_host = SafeStorage {
-            host,
-            world_states: world_states.to_vec(),
-        };
-        safe_host.start()?;
-        let phase = match phase {
-            Phase::Validation => PhaseState::Validation,
-            Phase::Application => PhaseState::Application {
-                origination_index_before: journal.michelson.origination_index(),
-            },
-        };
-        Ok(Self {
-            safe_host,
-            journal,
-            phase,
-        })
-    }
-
     /// Close the scope on success: `promote`.
-    pub fn commit(self) -> Result<(), OperationError> {
+    fn commit(self) -> Result<(), OperationError> {
         let Self { mut safe_host, .. } = self;
         safe_host.promote()?;
         Ok(())
@@ -245,7 +216,7 @@ impl<'s, Host: StorageV1> OperationScope<'s, Host> {
     /// persist the writes of a backtracked operation; the cross-runtime
     /// originator, which must not reach the next operation; the origination
     /// index, which a backtracked batch must not consume.
-    pub fn revert(self) -> Result<(), OperationError> {
+    fn revert(self) -> Result<(), OperationError> {
         let Self {
             mut safe_host,
             journal,
@@ -268,13 +239,49 @@ impl<'s, Host: StorageV1> OperationScope<'s, Host> {
 }
 
 impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
+    /// Open the scope: `start` the mirror of `world_states` over the host
+    /// under `ctx`, and under [`Phase::Application`] record the origination
+    /// index.
+    ///
+    /// `phase` is consumed by [`Self::revert`].
+    /// No EVM frame covers this path, so nothing rolls the origination index
+    /// back: it is captured here for [`Self::revert`] to restore.
+    fn open<'h, C>(
+        ctx: &'s mut C,
+        world_states: &[OwnedPath],
+        journal: &'s mut TezosXJournal,
+        phase: Phase,
+    ) -> Result<Self, OperationError>
+    where
+        'h: 's,
+        Host: 'h,
+        C: ScopeRuntimeKeyspace<'h, Host = Host>,
+    {
+        let mut safe_host = SafeStorage {
+            host: ctx.rk_mut().host_mut(),
+            world_states: world_states.to_vec(),
+        };
+        safe_host.start()?;
+        let phase = match phase {
+            Phase::Validation => PhaseState::Validation,
+            Phase::Application => PhaseState::Application {
+                origination_index_before: journal.michelson.origination_index(),
+            },
+        };
+        Ok(Self {
+            safe_host,
+            journal,
+            phase,
+        })
+    }
+
     /// Runs `body` on a `/tmp` mirror of `world_states`, then promotes the
     /// mirror on [`Close::Commit`] or drops it on [`Close::Revert`] or a body
     /// error.
     ///
     /// A commit keeps only `world_states`; see [`Phase`] for what a revert
-    /// also resets. `world_states` must not
-    /// overlap. A close error takes precedence over the body's result.
+    /// also resets. `world_states` must not overlap. A close error takes
+    /// precedence over the body's result.
     pub fn run<'h, C, T, E>(
         ctx: &'s mut C,
         world_states: &[OwnedPath],
@@ -288,8 +295,7 @@ impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
         C: ScopeRuntimeKeyspace<'h, Host = Host>,
         E: From<OperationError>,
     {
-        let host = ctx.rk_mut().host_mut();
-        let mut scope = Self::open(host, world_states, journal, phase)?;
+        let mut scope = Self::open(ctx, world_states, journal, phase)?;
         match body(&mut scope) {
             Ok(Close::Commit(t)) => scope.commit().map(|()| t).map_err(E::from),
             Ok(Close::Revert(t)) => scope.revert().map(|()| t).map_err(E::from),
@@ -354,13 +360,19 @@ mod tests {
             .store_write_all(&probe(), b"before")
             .expect("the probe is written");
 
-        let mut scope = CracOperationScope::open(&mut rk, &mut journal, &world_state())
-            .expect("the scope is opened");
-        let (ctx, _journal) = scope.parts_mut();
-        ctx.host_mut()
-            .store_write_all(&probe(), b"inside")
-            .expect("the write goes through");
-        scope.commit().expect("the scope is committed");
+        CracOperationScope::run(
+            &mut rk,
+            &mut journal,
+            &world_state(),
+            |scope| -> Result<Close<()>, RuntimeError> {
+                let (ctx, _journal) = scope.parts_mut();
+                ctx.host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                Ok(Close::Commit(()))
+            },
+        )
+        .expect("the scope is committed");
 
         assert_eq!(
             rk.host_mut()
@@ -379,13 +391,19 @@ mod tests {
             .store_write_all(&probe(), b"before")
             .expect("the probe is written");
 
-        let mut scope = CracOperationScope::open(&mut rk, &mut journal, &world_state())
-            .expect("the scope is opened");
-        let (ctx, _journal) = scope.parts_mut();
-        ctx.host_mut()
-            .store_write_all(&probe(), b"inside")
-            .expect("the write goes through");
-        scope.revert().expect("the scope is reverted");
+        CracOperationScope::run(
+            &mut rk,
+            &mut journal,
+            &world_state(),
+            |scope| -> Result<Close<()>, RuntimeError> {
+                let (ctx, _journal) = scope.parts_mut();
+                ctx.host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                Ok(Close::Revert(()))
+            },
+        )
+        .expect("the scope is reverted");
 
         assert_eq!(
             rk.host_mut()
@@ -498,21 +516,21 @@ mod tests {
             .store_write_all(&probe(), b"before")
             .expect("the probe is written");
 
-        let mut scope = OperationScope::open(
-            rk.host_mut(),
+        OperationScope::run(
+            &mut rk,
             &[world_state()],
             &mut journal,
             Phase::Application,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (mut scoped_rk, _) = scope.parts_mut()?;
+                scoped_rk
+                    .host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                Ok(Close::Commit(()))
+            },
         )
-        .expect("the scope is opened");
-        {
-            let (mut scoped_rk, _) = scope.parts_mut().expect("the keyspaces are loaded");
-            scoped_rk
-                .host_mut()
-                .store_write_all(&probe(), b"inside")
-                .expect("the write goes through");
-        }
-        scope.commit().expect("the scope is committed");
+        .expect("the scope is committed");
 
         assert_eq!(
             rk.host_mut()
@@ -539,23 +557,22 @@ mod tests {
             .expect("the probe is written");
         let index_before = journal.michelson.origination_index();
 
-        let mut scope = OperationScope::open(
-            rk.host_mut(),
+        OperationScope::run(
+            &mut rk,
             &[world_state()],
             &mut journal,
             Phase::Application,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (mut scoped_rk, scoped_journal) = scope.parts_mut()?;
+                scoped_rk
+                    .host_mut()
+                    .store_write_all(&probe(), b"inside")
+                    .expect("the write goes through");
+                scoped_journal.michelson.next_origination_index();
+                Ok(Close::Revert(()))
+            },
         )
-        .expect("the scope is opened");
-        {
-            let (mut scoped_rk, scoped_journal) =
-                scope.parts_mut().expect("the keyspaces are loaded");
-            scoped_rk
-                .host_mut()
-                .store_write_all(&probe(), b"inside")
-                .expect("the write goes through");
-            scoped_journal.michelson.next_origination_index();
-        }
-        scope.revert().expect("the scope is reverted");
+        .expect("the scope is reverted");
 
         assert_eq!(
             rk.host_mut()
@@ -577,23 +594,22 @@ mod tests {
             .store_write_all(&probe(), b"before")
             .expect("the probe is written");
 
-        let mut scope = OperationScope::open(
-            rk.host_mut(),
+        OperationScope::run(
+            &mut rk,
             &[world_state()],
             &mut journal,
             Phase::Application,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (_scoped_rk, scoped_journal) = scope.parts_mut()?;
+                scoped_journal.evm.set_crac_chain_depth(1);
+                scoped_journal.set_original_source(OriginalSource::new(
+                    RuntimeId::Tezos,
+                    "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
+                ));
+                Ok(Close::Revert(()))
+            },
         )
-        .expect("the scope is opened");
-        {
-            let (_scoped_rk, scoped_journal) =
-                scope.parts_mut().expect("the keyspaces are loaded");
-            scoped_journal.evm.set_crac_chain_depth(1);
-            scoped_journal.set_original_source(OriginalSource::new(
-                RuntimeId::Tezos,
-                "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx".to_string(),
-            ));
-        }
-        scope.revert().expect("the scope is reverted");
+        .expect("the scope is reverted");
 
         assert_eq!(journal.evm.crac_chain_depth(), 0);
         assert_eq!(journal.original_source(), None);
@@ -611,19 +627,18 @@ mod tests {
             .expect("the probe is written");
         let index_before = journal.michelson.origination_index();
 
-        let mut scope = OperationScope::open(
-            rk.host_mut(),
+        OperationScope::run(
+            &mut rk,
             &[world_state()],
             &mut journal,
             Phase::Validation,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (_scoped_rk, scoped_journal) = scope.parts_mut()?;
+                scoped_journal.michelson.next_origination_index();
+                Ok(Close::Revert(()))
+            },
         )
-        .expect("the scope is opened");
-        {
-            let (_scoped_rk, scoped_journal) =
-                scope.parts_mut().expect("the keyspaces are loaded");
-            scoped_journal.michelson.next_origination_index();
-        }
-        scope.revert().expect("the scope is reverted");
+        .expect("the scope is reverted");
 
         assert_eq!(journal.michelson.origination_index(), index_before + 1);
     }
@@ -643,26 +658,25 @@ mod tests {
         let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
-        let mut scope = OperationScope::open(
-            rk.host_mut(),
+        OperationScope::run(
+            &mut rk,
             &[OwnedPath::from(ETH_ACCOUNTS_ROOT_PATH)],
             &mut journal,
             Phase::Application,
+            |scope| -> Result<Close<()>, OperationError> {
+                let (mut scoped_rk, _journal) = scope.parts_mut()?;
+                scoped_rk
+                    .eth_accounts_mut()
+                    .set(&key, b"inside")
+                    .expect("the write goes through");
+                Ok(if commit {
+                    Close::Commit(())
+                } else {
+                    Close::Revert(())
+                })
+            },
         )
-        .expect("the scope is opened");
-        {
-            let (mut scoped_rk, _journal) =
-                scope.parts_mut().expect("the keyspaces are loaded");
-            scoped_rk
-                .eth_accounts_mut()
-                .set(&key, b"inside")
-                .expect("the write goes through");
-        }
-        if commit {
-            scope.commit().expect("the scope is committed");
-        } else {
-            scope.revert().expect("the scope is reverted");
-        }
+        .expect("the scope is closed");
 
         rk.eth_accounts().get(&key)
     }
