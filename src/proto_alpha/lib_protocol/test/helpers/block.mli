@@ -165,6 +165,7 @@ val genesis :
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
+  ?swrr_new_baker_lottery_enable:bool ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -446,6 +447,7 @@ val prepare_initial_context_params :
   ?consensus_rights_delay:int ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
+  ?swrr_new_baker_lottery_enable:bool ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

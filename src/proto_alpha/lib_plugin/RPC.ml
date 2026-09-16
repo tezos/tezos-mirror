@@ -5016,6 +5016,12 @@ let baking_power_distribution_for_current_cycle ctxt block =
 let tz4_baker_number_ratio ctxt ?cycle block =
   RPC_context.make_call0 S.tz4_baker_number_ratio ctxt block cycle ()
 
+let swrr_selected_bakers ctxt ?cycle block =
+  RPC_context.make_call0 S.swrr_selected_bakers ctxt block cycle ()
+
+let swrr_credits ctxt block =
+  RPC_context.make_call0 S.swrr_credits ctxt block () ()
+
 let rpc_services =
   register () ;
   RPC_directory.merge rpc_services !Registration.patched_services
