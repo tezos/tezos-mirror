@@ -117,10 +117,6 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
             .checkpoint_revert(ctx.rk_mut().host_mut(), index)
     }
 
-    /// Leave the snapshot to the enclosing EVM frame: its `commit_frame` or
-    /// `revert_frame` disposes of it.
-    pub fn defer_to_parent(self) {}
-
     /// The context and the journal, for callees that need both at once.
     pub fn parts_mut(&mut self) -> (&mut C, &mut TezosXJournal) {
         (&mut *self.ctx, &mut *self.journal)
@@ -463,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn a_deferred_scope_is_reverted_by_the_enclosing_frame() {
+    fn a_checkpoint_for_parent_is_reverted_by_the_enclosing_frame() {
         let mut host = MockKernelHost::default();
         let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -472,13 +468,11 @@ mod tests {
             .expect("the probe is written");
 
         journal.michelson.push_external_checkpoint();
-        let mut scope = CracOperationScope::open(&mut rk, &mut journal, &world_state())
-            .expect("the scope is opened");
-        let (ctx, _journal) = scope.parts_mut();
-        ctx.host_mut()
+        CracOperationScope::checkpoint_for_parent(&mut rk, &mut journal, &world_state())
+            .expect("the checkpoint is taken");
+        rk.host_mut()
             .store_write_all(&probe(), b"inside")
             .expect("the write goes through");
-        scope.defer_to_parent();
         journal
             .michelson
             .revert_frame(rk.host_mut())

@@ -1193,15 +1193,15 @@ impl RuntimeInterface for TezosRuntime {
         let world_state = OwnedPath::from(
             &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
         );
-        // The enclosing EVM CALL frame disposes of this snapshot when it
-        // commits or reverts.
-        CracOperationScope::open(&mut *rk, journal, &world_state)
+        // The caller disposes of this snapshot: the enclosing EVM CALL frame
+        // when it commits or reverts, or the Michelson gateway's
+        // `%materialize_alias` once the alias is created.
+        CracOperationScope::checkpoint_for_parent(&mut *rk, journal, &world_state)
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to snapshot world state for alias: {e:?}"
                 ))
-            })?
-            .defer_to_parent();
+            })?;
 
         // Deploy the forwarder via the
         // shared `originate_contract` path, passing `Origin::Alias` so
