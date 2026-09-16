@@ -86,6 +86,12 @@ let job_render ?(needs = []) pipeline_type =
        deployed by the [deploy-assets] jobs, so it neither deploys assets nor \
        depends on any build job."
     ~needs
+    ~artifacts:
+      ((* Keep the rendered site so a release's output can be inspected from
+          the job. *)
+       Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["_release_site"])
     ~variables:(release_site_variables pipeline_type)
     ~script:
       ["eval $(opam env)"; "./release_site/scripts/render_release_site.sh"]

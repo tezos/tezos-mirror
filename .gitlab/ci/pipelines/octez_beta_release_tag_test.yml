@@ -843,6 +843,10 @@ release_site.render:
   environment:
     name: release-page
     action: access
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - _release_site
   retry: 0
 
 teztale.build-arm64:
