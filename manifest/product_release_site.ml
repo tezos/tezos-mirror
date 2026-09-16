@@ -32,7 +32,7 @@ let _release_page_lib =
     ~release_status:Unreleased
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
-    ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
+    ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
 
 let _release_site =
   private_exe
@@ -59,7 +59,14 @@ let _version_manager =
     ~release_status:Unreleased
     ~modules:["version_manager"]
     ~profile:"release-tools-deps"
-    ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
+    ~deps:
+      [
+        unix;
+        clap;
+        tezt_json_lib;
+        _release_page_base_lib |> open_;
+        _release_page_lib;
+      ]
 
 let _release_page_tests =
   private_exe

@@ -21,6 +21,9 @@ type site_component = {
   subpath : string; (* location under [bucket]/[path]; "" for octez (root) *)
   asset_types : asset_type list;
   pages : site_page list;
+  emits_rss : bool;
+      (* If [true], an RSS [feed.xml] is emitted in the component's directory,
+         with the component's own page URL as its channel and item link. *)
 }
 
 (* The catalog of components that make up the release site: the single source of
@@ -34,6 +37,7 @@ let site_catalog =
       component_name = "octez";
       subpath = "";
       asset_types = [Changelog; Binaries; Packages];
+      emits_rss = true;
       pages =
         [
           {
@@ -52,6 +56,7 @@ let site_catalog =
       component_name = "grafazos";
       subpath = "grafazos";
       asset_types = [Dashboards];
+      emits_rss = false;
       pages =
         [
           {
@@ -65,6 +70,7 @@ let site_catalog =
       component_name = "teztale";
       subpath = "teztale";
       asset_types = [Binaries; Packages];
+      emits_rss = false;
       pages =
         [
           {
@@ -78,6 +84,7 @@ let site_catalog =
       component_name = "octez-smart-rollup-node";
       subpath = "octez-smart-rollup-node";
       asset_types = [Changelog; Binaries];
+      emits_rss = false;
       pages =
         [
           {
@@ -107,7 +114,7 @@ let render_site ?only ~bucket ~path ~url ~output_dir () =
             exit 1)
   in
   List.iter
-    (fun {component_name; subpath; asset_types; pages} ->
+    (fun {component_name; subpath; asset_types; pages; emits_rss} ->
       let component = make_component ~name:component_name ~bucket ~path ~url in
       let dir =
         if subpath = "" then output_dir else Filename.concat output_dir subpath
@@ -128,7 +135,18 @@ let render_site ?only ~bucket ~path ~url ~output_dir () =
             ~path
             ~file:None
             ~output:(Filename.concat dir (basename ^ ".md")))
-        pages)
+        pages ;
+      if emits_rss then
+        let versions = get_versions ~component ~file:None in
+        let page_url =
+          if subpath = "" then sf "https://%s%s" url path
+          else sf "https://%s%s/%s" url path subpath
+        in
+        generate_rss
+          ~component
+          ~link_url:page_url
+          ~versions
+          ~output:(Filename.concat dir "feed.xml"))
     components
 
 (* Renders the release site from the built-in [site_catalog]: every component's

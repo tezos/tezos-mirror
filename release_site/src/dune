@@ -17,6 +17,7 @@
   unix
   clap
   tezt.json
+  rss
   base_lib)
  (flags
   (:standard)
@@ -44,8 +45,8 @@
   unix
   clap
   tezt.json
-  rss
-  base_lib)
+  base_lib
+  release_page)
  (flags
   (:standard)
   -open Base_lib)

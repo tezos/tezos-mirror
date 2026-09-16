@@ -350,3 +350,77 @@ let render_page ~component ~asset_types ~filter_active ~title ~path ~file
   let dst_html = Filename.remove_extension output ^ ".html" in
   move md_path output ;
   move html_path dst_html
+
+(* [version_to_rss_items ~component ~link version] converts a [version] of
+   [component] to a list of RSS items, all pointing at [link]. The base release
+   item is always included. An additional item is generated for each packaging
+   revision in [version.revisions], preserving the full revision history in the
+   feed. *)
+let version_to_rss_items ~component ~link version =
+  let version_str = Version.to_string version in
+  let rc_suffix =
+    match version.prerelease with
+    | Some (RC n) -> sf "-rc%d" n
+    | Some (Beta n) -> sf "-beta%d" n
+    | None -> ""
+  in
+  let base_item =
+    let title =
+      sf "%s %s" (String.capitalize_ascii component.name) version_str
+    in
+    let guid = Rss.Guid_name (sf "%s-%s" component.name version_str) in
+    let pubdate = version.publication_date |> Ptime.of_float_s in
+    let desc =
+      sf
+        "%s version %s%s"
+        (String.capitalize_ascii component.name)
+        (number_to_string version.number)
+        rc_suffix
+    in
+    Rss.item ~title ~desc ~guid ~link ?pubdate ()
+  in
+  let revision_items =
+    List.map
+      (fun (rev : revision) ->
+        let title =
+          sf
+            "%s %s (packaging revision %d)"
+            (String.capitalize_ascii component.name)
+            version_str
+            rev.build_number
+        in
+        let guid =
+          Rss.Guid_name
+            (sf "%s-%s-%d" component.name version_str rev.build_number)
+        in
+        let pubdate = Ptime.of_float_s rev.revision_date in
+        let desc =
+          sf
+            "%s version %s%s - packaging revision %d"
+            (String.capitalize_ascii component.name)
+            (number_to_string version.number)
+            rc_suffix
+            rev.build_number
+        in
+        Rss.item ~title ~desc ~guid ~link ?pubdate ())
+      version.revisions
+  in
+  base_item :: revision_items
+
+(* [generate_rss ~component ~link_url ~versions ~output] writes to [output] an
+   RSS feed for [component]'s [versions], with [link_url] as the channel and
+   item link. *)
+let generate_rss ~component ~link_url ~versions ~output =
+  let link = Uri.of_string link_url in
+  let title = String.capitalize_ascii component.name in
+  let desc = sf "%s releases" component.name in
+  let last_build_date = Unix.time () |> Ptime.of_float_s in
+  let items =
+    List.concat_map (version_to_rss_items ~component ~link) versions
+  in
+  let channel = Rss.channel ~title ~desc ~link ?last_build_date items in
+  Format.printf "Generating RSS feed...@." ;
+  try
+    Rss.print_file ~indent:2 ~encoding:"UTF-8" output channel ;
+    Format.printf "RSS feed generated: %s@." output
+  with Sys_error msg -> failwith (sf "System error writing %s: %s" output msg)
