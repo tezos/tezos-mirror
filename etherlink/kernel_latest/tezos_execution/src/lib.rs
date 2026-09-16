@@ -80,7 +80,7 @@ pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
     convert_big_map_diff, BlockCtx, Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx,
 };
-use crate::scope::{CracOperationScope, OperationScope, Phase};
+use crate::scope::{Close, CracOperationScope, OperationScope, Phase};
 
 /// Result of applying a single operation within a batch.
 ///
@@ -2921,82 +2921,76 @@ pub fn validate_and_apply_operation<Host>(
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let mut validation = OperationScope::open(
-        rk.host_mut(),
+    log!(Debug, "Verifying that the batch is valid");
+
+    let validation_info = OperationScope::run(
+        &mut *rk,
         safe_roots,
         &mut *journal,
         Phase::Validation,
+        |validation| -> Result<Close<_>, OperationError> {
+            // The validation writes the counter and the balance of the source
+            // on the validation scope. When the batch is invalid, the error
+            // reverts the scope and drops these writes.
+            let (mut rk, _) = validation.parts_mut()?;
+            match validate::execute_validation(
+                rk.tez_accounts_mut(),
+                operation,
+                skip_signature_check,
+                required_fees,
+            ) {
+                Ok(validation_info) => Ok(Close::Commit(validation_info)),
+                Err(validity_err) => {
+                    log!(Debug, "Reverting the changes because the batch is invalid.");
+                    Err(OperationError::Validation(validity_err))
+                }
+            }
+        },
     )?;
-
-    log!(Debug, "Verifying that the batch is valid");
-
-    // The validation writes the counter and the balance of the source on the
-    // validation scope. When the batch is invalid, `validation.revert()` below
-    // drops these writes.
-    let validity = {
-        let (mut rk, _) = validation.parts_mut()?;
-        validate::execute_validation(
-            rk.tez_accounts_mut(),
-            operation,
-            skip_signature_check,
-            required_fees,
-        )
-    };
-    let validation_info = match validity {
-        Ok(validation_info) => validation_info,
-        Err(validity_err) => {
-            log!(Debug, "Reverting the changes because the batch is invalid.");
-            validation.revert()?;
-            return Err(OperationError::Validation(validity_err));
-        }
-    };
 
     let fee_refund_config =
         fee_refund_config.map(|config| (config, validation_info.total_fees));
 
     log!(Debug, "Batch is valid!");
 
-    validation.commit()?;
-
-    let mut application = OperationScope::open(
-        rk.host_mut(),
-        safe_roots,
-        &mut *journal,
-        Phase::Application,
-    )?;
-
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
     let mut nonce_counter: u16 = 0;
     // We use `mut` here because apply_batch does not handle fee refund,
     // so we append the refund balance updates to processed_ops afterwards.
-    let (mut processed_ops, applied) = {
-        let (mut rk, journal) = application.parts_mut()?;
-        apply_batch(
-            &mut rk,
-            registry,
-            journal,
-            validation_info,
-            block_ctx,
-            &mut nonce_counter,
-        )
-        .map_err(OperationError::BlockAbort)?
-    };
+    let mut processed_ops = OperationScope::run(
+        &mut *rk,
+        safe_roots,
+        &mut *journal,
+        Phase::Application,
+        |application| -> Result<Close<_>, OperationError> {
+            let (mut rk, journal) = application.parts_mut()?;
+            let (processed_ops, applied) = apply_batch(
+                &mut rk,
+                registry,
+                journal,
+                validation_info,
+                block_ctx,
+                &mut nonce_counter,
+            )
+            .map_err(OperationError::BlockAbort)?;
 
-    if applied {
-        log!(
-            Debug,
-            "Committing the changes because the batch was successfully applied."
-        );
-        application.commit()?;
-    } else {
-        log!(
-            Debug,
-            "Reverting the changes because some operation failed."
-        );
-        log!(Debug, "Processed operations: {processed_ops:#?}");
-        application.revert()?;
-    }
+            if applied {
+                log!(
+                    Debug,
+                    "Committing the changes because the batch was successfully applied."
+                );
+                Ok(Close::Commit(processed_ops))
+            } else {
+                log!(
+                    Debug,
+                    "Reverting the changes because some operation failed."
+                );
+                log!(Debug, "Processed operations: {processed_ops:#?}");
+                Ok(Close::Revert(processed_ops))
+            }
+        },
+    )?;
 
     // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
     // keeps the refund. A rollback of the storage under `rk` drops the refund too.
