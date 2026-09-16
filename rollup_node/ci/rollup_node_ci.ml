@@ -165,37 +165,6 @@ let job_deploy_release_page_assets =
       ]
     ~retry:no_retry
 
-let job_release_page =
-  Cacio.parameterize @@ fun pipeline_type ->
-  Cacio.parameterize @@ fun wait_for ->
-  CI.job
-    "release-page-publish"
-    ~__POS__
-    ~image:Images.Base_images.alpine_release_page
-    ~stage:Publish
-    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
-    ~description:
-      "Publish the Octez Smart Rollup node release page: regenerate \
-       [index.html] from the published versions.json and upload it. Reflects \
-       what has been deployed by \
-       [octez-smart-rollup-node.release-page-deploy-assets]."
-    ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~expire_in:(Duration (Days 1))
-         ["index.md"; "index.html"])
-    ~needs:
-      (match wait_for with
-      | `wait_for_nothing -> []
-      | `wait_for_deploy ->
-          [(Job, job_deploy_release_page_assets pipeline_type)])
-    ~variables:(release_page_variables pipeline_type)
-    ~script:
-      [
-        "eval $(opam env)";
-        "./scripts/rollup_node/releases/publish_release_page.sh";
-      ]
-    ~retry:no_retry
-
 let job_gitlab_release =
   CI.job
     "gitlab:octez-smart-rollup-node-release"
@@ -220,7 +189,11 @@ let register () =
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `test);
-      (Auto, job_release_page `test `wait_for_deploy);
+      (* Re-render the whole site once the Rollup node's assets are deployed. *)
+      ( Auto,
+        Release_site_ci.job_render
+          `test
+          ~needs:[(Job, job_deploy_release_page_assets `test)] );
     ] ;
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
@@ -230,7 +203,11 @@ let register () =
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `real);
-      (Auto, job_release_page `real `wait_for_deploy);
+      (* Re-render the whole site once the Rollup node's assets are deployed. *)
+      ( Auto,
+        Release_site_ci.job_render
+          `real
+          ~needs:[(Job, job_deploy_release_page_assets `real)] );
     ] ;
   Cacio.register_release_jobs
     [
@@ -238,7 +215,6 @@ let register () =
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_deploy_release_page_assets `real);
-      (Auto, job_release_page `real `wait_for_deploy);
     ] ;
   Cacio.register_test_release_jobs
     [
@@ -246,7 +222,6 @@ let register () =
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_deploy_release_page_assets `test);
-      (Auto, job_release_page `test `wait_for_deploy);
     ] ;
   Cacio.register_jobs
     Non_release_tag
@@ -261,22 +236,4 @@ let register () =
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `test);
-    ] ;
-  Cacio.register_jobs
-    Publish_release_page
-    [
-      ( Manual,
-        (* [wait_for_nothing]: this pipeline only regenerates the page from the
-           already-published versions.json, so it neither deploys assets nor
-           depends on the build jobs. *)
-        job_release_page `real `wait_for_nothing );
-    ] ;
-  Cacio.register_jobs
-    Test_publish_release_page
-    [
-      ( Manual,
-        (* [wait_for_nothing]: this pipeline only regenerates the page from the
-           already-published versions.json, so it neither deploys assets nor
-           depends on the build jobs. *)
-        job_release_page `test `wait_for_nothing );
     ]

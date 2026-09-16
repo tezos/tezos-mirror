@@ -271,7 +271,7 @@ octez-smart-rollup-node.release-page-deploy-assets:
     action: access
   retry: 0
 
-octez-smart-rollup-node.release-page-publish:
+release_site.render:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
   stage: publish
   tags:
@@ -287,7 +287,7 @@ octez-smart-rollup-node.release-page-publish:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - ./scripts/rollup_node/releases/publish_release_page.sh
+  - ./release_site/scripts/render_release_site.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -299,9 +299,4 @@ octez-smart-rollup-node.release-page-publish:
   environment:
     name: release-page
     action: access
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - index.md
-    - index.html
   retry: 0
