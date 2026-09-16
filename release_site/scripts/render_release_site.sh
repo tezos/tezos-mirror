@@ -30,7 +30,7 @@ fi
 
 dune build release_site/src/
 
-RELEASE_PAGE="_build/default/release_site/src/release_page.exe"
+RELEASE_SITE="_build/default/release_site/src/release_site.exe"
 VM="_build/default/release_site/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
@@ -43,7 +43,7 @@ mkdir -p "${site_dir}"
 # mirroring the site layout (octez at the root, each other component under its
 # own subdirectory).
 echo "Rendering release site..."
-$RELEASE_PAGE --site \
+$RELEASE_SITE --site \
   --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path "${BUCKET_PATH:-}" \
   --output-dir "${site_dir}"
 

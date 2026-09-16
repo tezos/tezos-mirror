@@ -24,8 +24,8 @@ let _release_page_base_lib =
     ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib]
 
-let _release_page =
-  private_exe
+let _release_page_lib =
+  private_lib
     "release_page"
     ~opam:""
     ~path:"release_site/src"
@@ -33,6 +33,23 @@ let _release_page =
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
+
+let _release_site =
+  private_exe
+    "release_site"
+    ~opam:""
+    ~path:"release_site/src"
+    ~release_status:Unreleased
+    ~modules:["release_site"]
+    ~profile:"release-tools-deps"
+    ~deps:
+      [
+        unix;
+        clap;
+        tezt_json_lib;
+        _release_page_base_lib |> open_;
+        _release_page_lib;
+      ]
 
 let _version_manager =
   private_exe

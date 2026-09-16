@@ -10,7 +10,7 @@
   tezt.json)
  (modules base))
 
-(executable
+(library
  (name release_page)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -22,6 +22,20 @@
   (:standard)
   -open Base_lib)
  (modules release_page))
+
+(executable
+ (name release_site)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  clap
+  tezt.json
+  base_lib
+  release_page)
+ (flags
+  (:standard)
+  -open Base_lib)
+ (modules release_site))
 
 (executable
  (name version_manager)
