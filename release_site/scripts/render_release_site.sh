@@ -43,7 +43,7 @@ mkdir -p "${site_dir}"
 # mirroring the site layout (octez at the root, each other component under its
 # own subdirectory).
 echo "Rendering release site..."
-$RELEASE_SITE --site \
+$RELEASE_SITE \
   --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path "${BUCKET_PATH:-}" \
   --output-dir "${site_dir}"
 

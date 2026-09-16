@@ -91,14 +91,6 @@ let string_of_asset_type = function
   | Packages -> "Packages"
   | Changelog -> "Changelog"
 
-let asset_type_of_string_opt asset_type =
-  match String.lowercase_ascii asset_type with
-  | "binaries" -> Some Binaries
-  | "dashboards" -> Some Dashboards
-  | "packages" -> Some Packages
-  | "changelog" -> Some Changelog
-  | _ -> None
-
 module Content = struct
   type t =
     | Text of string

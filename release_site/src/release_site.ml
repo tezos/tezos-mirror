@@ -8,7 +8,7 @@
 open Base
 open Release_page
 
-(* A page to render for a component in [--site] mode. *)
+(* A page to render for a component's tab. *)
 type site_page = {
   filter : active_filter option;
   page_title : string;
@@ -24,8 +24,8 @@ type site_component = {
 }
 
 (* The catalog of components that make up the release site: the single source of
-   truth used by [--site] to re-render the whole site from every component's
-   published versions.json. Keep it in sync with the per-component
+   truth used to re-render the whole site from every component's published
+   versions.json. Keep it in sync with the per-component
    [deploy_release_page_assets.sh] scripts, which decide the asset types and
    subpaths on the deploy side. *)
 let site_catalog =
@@ -89,10 +89,23 @@ let site_catalog =
     };
   ]
 
-(* [render_site ~bucket ~path ~url ~output_dir] renders every component in
-   [site_catalog] from its published versions.json into [output_dir], mirroring
-   the site layout: octez at the root, each other component under its subpath. *)
-let render_site ~bucket ~path ~url ~output_dir =
+(* [render_site ?only ~bucket ~path ~url ~output_dir] renders the release site
+   from [site_catalog] into [output_dir], mirroring the site layout: octez at
+   the root, each other component under its subpath. If [only] is given, only
+   that component's tab is (re-)rendered instead of the whole site. *)
+let render_site ?only ~bucket ~path ~url ~output_dir () =
+  let components =
+    match only with
+    | None -> site_catalog
+    | Some name -> (
+        match List.find_opt (fun c -> c.component_name = name) site_catalog with
+        | Some c -> [c]
+        | None ->
+            Printf.eprintf
+              "Error: unknown component %S: not in the release site catalog.\n"
+              name ;
+            exit 1)
+  in
   List.iter
     (fun {component_name; subpath; asset_types; pages} ->
       let component = make_component ~name:component_name ~bucket ~path ~url in
@@ -116,47 +129,17 @@ let render_site ~bucket ~path ~url ~output_dir =
             ~file:None
             ~output:(Filename.concat dir (basename ^ ".md")))
         pages)
-    site_catalog
+    components
 
-(* This script takes a [component] name, page [title], a [bucket] name,
-   a [path] and a list of [asset_type] as arguments.
-
-   It will create a release page, titled [title], associated to that [component].
-   For each versions found in [bucket/path/versions.json], the page will contain the list
-   of assets for each [asset_type] specified.
-
-   Alternatively, with [--site], it re-renders the whole release site from
-   [site_catalog] instead of a single component.
-*)
+(* Renders the release site from the built-in [site_catalog]: every component's
+   tab is rendered from its published versions.json in [BUCKET]/[PATH], written
+   into [--output-dir] mirroring the site layout (octez at the root, each other
+   component under its own subdirectory). With [--only COMPONENT], only that
+   component's tab is re-rendered. *)
 let () =
   Clap.description
-    "Creates a release page for the given COMPONENT. The page will contain \
-     sections for each asset type given as arguments. The assets listed are \
-     those stored in [BUCKET]/[PATH]." ;
-  let component =
-    Clap.optional_string
-      ~long:"component"
-      ~description:
-        "Name of the component for which you are building the release page.\n\
-         Required unless [--site] is given.\n\
-         Choose this carefully, as it will be used for paths and titles.\n\
-         In case the component is \"octez\", the release assets will be pulled \
-         from toplevel directory, instead of COMPONENT/COMPONENT-vX.Y as for \
-         any other component."
-      ~placeholder:"COMPONENT"
-      ~short:'c'
-      ()
-  in
-  let title =
-    Clap.optional_string
-      ~long:"title"
-      ~description:
-        "Title of the generated the release page. By default, it will be set \
-         to `COMPONENT releases`"
-      ~short:'t'
-      ~placeholder:"TITLE"
-      ()
-  in
+    "Renders the whole Octez release site from every component's published \
+     versions.json in [BUCKET]/[PATH]." ;
   let bucket =
     Clap.mandatory_string
       ~long:"bucket"
@@ -194,104 +177,26 @@ let () =
       ~placeholder:"URL"
       bucket
   in
-  let filter_active =
-    Clap.optional
-      ~long:"filter-active"
-      ~description:
-        "Filter versions by active status.\n\
-         Possible values are:\n\
-         - \"active\": Show only active versions (adds banner link to older \
-         releases)\n\
-         - \"inactive\": Show only inactive versions (adds banner link to \
-         current releases)\n\
-         - \"all\" or omitted: Show all versions"
-      ~placeholder:"FILTER"
-      (Clap.enum
-         "filter-active"
-         [("active", Active); ("inactive", Inactive); ("all", All)])
-      ()
-  in
-  let asset_types =
-    Clap.(
-      list
-        (typ
-           ~name:"asset_type"
-           ~dummy:Changelog
-           ~parse:asset_type_of_string_opt
-           ~show:string_of_asset_type)
-        ~description:
-          "List of assets types to display in the page.\n\
-           Possible values are:\n\
-           - \"changelog\"\n\
-           - \"binaries\"\n\
-           - \"dashboards\"\n\
-           - \"packages\"."
-        ~placeholder:"ASSET_TYPE"
-        ())
-  in
-  let file =
-    Clap.optional_string
-      ~long:"file"
-      ~short:'f'
-      ~description:
-        "Path to a local versions.json file. If provided, skips the S3 \
-         download."
-      ~placeholder:"FILE"
-      ()
-  in
-  let output =
-    Clap.default_string
-      ~long:"output"
-      ~description:
-        "Path where the generated markdown file is written (e.g. [index.md]). \
-         The corresponding HTML file is written alongside it (e.g. \
-         [index.html])."
-      ~placeholder:"FILE"
-      "./index.md"
-  in
-  let site =
-    Clap.flag
-      ~set_long:"site"
-      ~description:
-        "Render the whole release site from the built-in catalog instead of a \
-         single component. Every component's page is rendered from its \
-         published versions.json into [--output-dir], mirroring the site \
-         layout. Ignores [--component], [--title], [--filter-active], \
-         [--file], [--output] and the asset-type arguments."
-      false
-  in
   let output_dir =
     Clap.default_string
       ~long:"output-dir"
       ~description:
-        "Directory into which [--site] writes the rendered site (default: \
-         current directory). octez is written at the root, each other \
-         component under its own subdirectory. Ignored without [--site]."
+        "Directory into which the rendered site is written (default: current \
+         directory). octez is written at the root, each other component under \
+         its own subdirectory."
       ~placeholder:"DIR"
       "."
   in
+  let only =
+    Clap.optional_string
+      ~long:"only"
+      ~description:
+        "Render only the tab of the given COMPONENT from the catalog, instead \
+         of the whole site. The component must be one of the site catalog \
+         entries (e.g. \"octez\", \"grafazos\", \"teztale\", \
+         \"octez-smart-rollup-node\")."
+      ~placeholder:"COMPONENT"
+      ()
+  in
   Clap.close () ;
-  if site then render_site ~bucket ~path ~url ~output_dir
-  else
-    let component_name =
-      match component with
-      | Some component_name -> component_name
-      | None ->
-          Printf.eprintf
-            "Error: the --component option is required unless --site.\n" ;
-          exit 1
-    in
-    let title =
-      Option.value
-        title
-        ~default:(String.capitalize_ascii component_name ^ " releases")
-    in
-    let component = make_component ~name:component_name ~bucket ~path ~url in
-    render_page
-      ~component
-      ~asset_types
-      ~filter_active
-      ~title
-      ~path
-      ~file
-      ~output
+  render_site ?only ~bucket ~path ~url ~output_dir ()
