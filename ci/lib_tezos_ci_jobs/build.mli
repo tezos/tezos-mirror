@@ -5,6 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Build jobs.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)
+
 (** Jobs [oc.build_*-released]. *)
 val job_build_released : Tezos_ci.Runner.Arch.t -> Cacio.job
 
@@ -21,6 +26,3 @@ val job_build_static_linux_released_binaries :
 (** Jobs [oc.build:static-*-linux-experimental-binaries]. *)
 val job_build_static_linux_experimental_binaries :
   Tezos_ci.Runner.Arch.t -> Cacio.job
-
-(** Register build jobs. *)
-val register : unit -> unit

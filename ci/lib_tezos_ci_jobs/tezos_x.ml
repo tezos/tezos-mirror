@@ -44,7 +44,7 @@ let job_build_released =
         "./scripts/ci/build_full_unreleased.sh";
       ]
 
-let register () =
+let () =
   CI.register_scheduled_pipeline
     "build"
     ~description:

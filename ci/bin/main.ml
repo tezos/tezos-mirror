@@ -7,8 +7,9 @@
 
 (* Main entrypoint of CI-in-OCaml.
 
-   Here we register the set of pipelines, stages and images and
-   generate the GitLab CI configuration file. *)
+   Jobs and pipelines are registered by the libraries that this binary is
+   linked with. Here we close the set of pipelines and generate the GitLab CI
+   configuration file. *)
 
 open Gitlab_ci.Types
 open Tezos_ci
@@ -61,49 +62,6 @@ let variables : variables =
        https://docs.gitlab.com/ee/ci/yaml/ci_job_log_timestamps.html *)
     ("FF_TIMESTAMPS", "true");
   ]
-
-(** {2 Pipeline types} *)
-
-(* Register pipelines types. Pipelines types are used to generate
-   workflow rules and includes of the files where the jobs of the
-   pipeline is defined.
-
-   Please add a [~description] to each pipeline.
-
-   The first sentence of the description should be short (<=80
-   characters), and be terminated by two new-lines. It should
-   describe _what_ the pipeline does.
-
-   The remainder of the description should detail:
-   - what the pipeline does;
-   - why we do it;
-   - when it happens;
-   - how;
-   - and by whom it is triggered (a developer? a release manager? some automated system?). *)
-
-(** {3 Components} *)
-
-(* This must be done before registering shared pipelines. *)
-
-let () = Tezos_ci_jobs.Sanity.register ()
-
-let () = Tezos_ci_jobs.Build.register ()
-
-let () = Tezos_ci_jobs.Misc.register ()
-
-let () = Tezos_ci_jobs.Kernels.register ()
-
-let () = Tezos_ci_jobs.Tezos_x.register ()
-
-let () = Tezos_ci_jobs.Tezt.register ()
-
-let () = Tezos_ci_jobs.Installation.register ()
-
-let () = Tezos_ci_jobs.Docker.register ()
-
-let () = Tezos_ci_jobs.Security_scans.register ()
-
-let () = Release_tag.register ()
 
 (** {2 Closing the set of pipelines} *)
 

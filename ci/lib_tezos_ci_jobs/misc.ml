@@ -423,7 +423,7 @@ let job_test_sdk_rust =
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     ~script:["make -C sdk/rust check"; "make -C sdk/rust test"]
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_check_lift_limits_patch);

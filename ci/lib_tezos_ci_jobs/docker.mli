@@ -5,6 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Docker build and related jobs.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)
+
 (** The version of Docker to use. *)
 val version : string
 
@@ -24,6 +29,3 @@ val job_docker_merge_manifests :
     Should be set to [Manual], and must run after that job. *)
 val job_docker_mirror_to_gitlab_registry :
   [`released | `experimental] -> [`real | `test] -> Cacio.job
-
-(** Register Docker build and related jobs. *)
-val register : unit -> unit

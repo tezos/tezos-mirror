@@ -78,7 +78,7 @@ let job_compile_sources_doc =
     ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
     ~image:Tezos_ci.Images.Base_images.debian_build_trixie
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [(Auto, job_compile_sources_doc)] ;
   Cacio.register_jobs
