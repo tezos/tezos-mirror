@@ -180,7 +180,7 @@ let job_gitlab_release =
     ~description:"Create the gitlab release for the Octez Smart Rollup."
     ~script:["./scripts/rollup_node/releases/create_gitlab_release.sh"]
 
-let register () =
+let () =
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
     [

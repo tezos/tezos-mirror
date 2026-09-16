@@ -5,5 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Register jobs and pipelines for SDK bindings. *)
-val register : unit -> unit
+(** CI jobs and pipelines for the SDK bindings.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)

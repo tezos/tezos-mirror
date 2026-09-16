@@ -98,7 +98,7 @@ let job_deploy_release_page_assets =
         "./teztale/scripts/releases/deploy_release_page_assets.sh";
       ]
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
   CI.register_scheduled_pipeline

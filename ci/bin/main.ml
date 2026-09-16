@@ -85,18 +85,6 @@ let variables : variables =
 
 (* This must be done before registering shared pipelines. *)
 
-let () = Release_site_ci.register ()
-
-let () = Grafazos_ci.register ()
-
-let () = Teztale_ci.register ()
-
-let () = Rollup_node_ci.register ()
-
-let () = Documentation_ci.register ()
-
-let () = Etherlink_ci.register ()
-
 let () = Tezos_ci_jobs.Sanity.register ()
 
 let () = Tezos_ci_jobs.Build.register ()
@@ -116,8 +104,6 @@ let () = Tezos_ci_jobs.Docker.register ()
 let () = Tezos_ci_jobs.Security_scans.register ()
 
 let () = Release_tag.register ()
-
-let () = Sdk_bindings_ci.register ()
 
 (** {2 Closing the set of pipelines} *)
 

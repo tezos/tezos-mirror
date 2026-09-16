@@ -5,5 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Register Etherlink jobs and pipelines. *)
-val register : unit -> unit
+(** CI jobs and pipelines for Etherlink.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)
