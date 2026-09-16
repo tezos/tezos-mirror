@@ -71,6 +71,11 @@ class Octez < Formula
       #!/bin/sh
 
       set +x
+      # Stop at the first failing step. Without this, a failure in
+      # [make build-deps] does not stop the script: it carries on to
+      # [make release], which dies with "dune: not found" -- burying the real
+      # error many lines earlier in the build log.
+      set -e
 
       . ./scripts/version.sh
       rustup install $recommended_rust_version
