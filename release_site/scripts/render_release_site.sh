@@ -3,7 +3,7 @@
 # Renders the whole release site and publishes it.
 #
 # It renders every component's page at once from the built-in catalog in
-# [release_page.ml], reading each component's published versions.json. It
+# [release_site.ml], reading each component's published versions.json. It
 # renders nothing that has not already been deployed: the assets and
 # versions.json are deployed beforehand by the per-component
 # [deploy_release_page_assets.sh] scripts, so this can be re-run at any time to

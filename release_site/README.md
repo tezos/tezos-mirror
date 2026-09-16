@@ -7,8 +7,8 @@ from the components' `versions.json` manifests.
 
 The release assets are distributed either all at once (typically with Octez major releases) or for individual components (typically with Octez minor releases).
 
-To make these assets easily accessible, release pages can be generated using the `release_site/release_page.ml` script.
-This script enables the creation of release pages for any given component, specifying a set of asset types and the storage location where the assets are distributed.
+To make these assets easily accessible, the release site is rendered by the `release_site` tool (`release_site/src/release_site.ml`).
+It renders every component's tab from the built-in catalog, reading each component's published `versions.json` from the storage location where the assets are distributed.
 
 ## Vocabulary and naming convention
 
@@ -31,45 +31,40 @@ Consequently there is no per-component render/publish job (e.g. no `teztale.rele
 
 ## Usage
 
-Details on the usage are available with:
+The `release_site` tool renders the whole release site. Details on the usage
+are available with:
 
 ```shell
-release_page --help
+release_site --help
 ```
 
 ## Example
 
 ```shell
-release_page --component rollup-node --title "Rollup Node Releases" --bucket release-page-test.nomadic-labs.com --path releases/ changelog binaries packages
+release_site --bucket BUCKET --url URL --path PATH --output-dir DIR
 ```
 
-will create a release page titled `Rollup Node Releases` for the `rollup-node` component.
-The page will contain asset sections for each version, read from `release-page-test.nomadic-labs.com/releases/rollup-node/versions.json`.
-The sections will contain:
-  - A link to the changelogs.
-  - A list of links to download binaries stored in `release-page-test.nomadic-labs.com/releases/rollup-node/rollup-node-vx.y/binaries/`.
-  - A link to the packages install instructions.
-
-## Rendering the whole site
-
-The invocations above render a single component's page. To render the whole
-release site at once, use `--site`:
-
-```shell
-release_page --site --bucket BUCKET --url URL --path PATH --output-dir DIR
-```
-
-This renders every component from the built-in catalog (`site_catalog` in
-`release_site/src/release_page.ml`), each from its published `versions.json`,
+renders every component from the built-in catalog (`site_catalog` in
+`release_site/src/release_site.ml`), each from its published `versions.json`,
 into `DIR`: octez at the root, each other component under its own
 subdirectory. The catalog is the single source of truth for which components
-belong to the site and which asset types each one publishes.
+belong to the site, which asset types each one publishes, and which ones emit
+an RSS feed (`feed.xml`). The octez tab, for instance, contains asset sections
+read from `BUCKET/PATH/versions.json` with links to its changelogs, binaries
+and packages, plus its RSS feed.
 
-This is what the `release_site.render` CI job runs (through
-`release_site/scripts/render_release_site.sh`, which also generates the octez
-RSS feed, uploads the site and invalidates the CDN). Rendering is owned by
-`release_site` and always operates on the whole site, as described in the
-vocabulary section above; components only deploy their own assets.
+To (re-)render a single component's tab instead of the whole site, restrict the
+catalog with `--only`:
+
+```shell
+release_site --only octez-smart-rollup-node --bucket BUCKET --path PATH --output-dir DIR
+```
+
+Rendering is owned by `release_site` and always operates on the catalog, as
+described in the vocabulary section above; components only deploy their own
+assets. The page mechanism itself (rendering one tab from a `versions.json`,
+plus RSS generation) lives in the `release_page` library; `release_site` is the
+executable that holds the catalog and CLI.
 
 Because the render always rebuilds the whole site, every component's release
 pipeline re-renders and re-uploads every tab (including octez's). This keeps the
@@ -78,8 +73,12 @@ other component's published `versions.json` being readable: a malformed
 `versions.json` for one component would fail the render of any component's
 release.
 
-The script lists the assets by reading the contents of directories in
-`s3://release-page-test.nomadic-labs.com/releases/`.
+This is what the `release_site.render` CI job runs, through
+`release_site/scripts/render_release_site.sh`, which renders the site
+(including the octez RSS feed), uploads it and invalidates the CDN.
+
+The tool lists the assets by reading the contents of directories in
+`s3://BUCKET/PATH/`.
 
 ## Storage
 
@@ -117,7 +116,7 @@ version_manager --file versions.json generate-rss --path octez.tezos.com/release
 - `--base-url URL` (optional): overrides the base URL used for feed links.
 - `--output FILE` (optional): path to write the RSS feed to. Defaults to `feed.xml` in the current directory.
 
-The `release_page` script makes the following assumptions:
+The `release_site` tool makes the following assumptions:
 
   - Each component `COMPONENT` has a base path of `BUCKET/PATH/COMPONENT`, which we refer to as `COMPONENT_LOCATION`.
     The only exception is component `octez`, for which the base path is `BUCKET/PATH`.

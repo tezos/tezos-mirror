@@ -6,5 +6,6 @@
 (*****************************************************************************)
 
 module _ = Test_version_manager
+module _ = Test_release_site
 
 let () = Test.run ()
