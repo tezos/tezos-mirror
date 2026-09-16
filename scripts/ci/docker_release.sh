@@ -14,12 +14,9 @@ set -eu
 # default: for local builds, see scripts/create_docker_image.sh.
 runtime_image=""
 build_deps_image=""
-# The rust-toolchain image (L2 builder) used for with-EVM builds is passed
-# explicitly by the job via --rust-toolchain-image.
-rust_toolchain_image=""
 
 options=$(getopt -o '' \
-  -l runtime-image:,build-deps-image:,rust-toolchain-image: -- "$@")
+  -l runtime-image:,build-deps-image: -- "$@")
 eval set - "$options"
 while true; do
   case "$1" in
@@ -30,10 +27,6 @@ while true; do
   --build-deps-image)
     shift
     build_deps_image="$1"
-    ;;
-  --rust-toolchain-image)
-    shift
-    rust_toolchain_image="$1"
     ;;
   --)
     shift
@@ -71,7 +64,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 # signature never trusts a tag that failed the smoke test.
 
 # Disable the quote-warning from shellcheck so that we can pass the
-# optional --rust-toolchain-image / --sccache-bucket arguments.
+# optional --sccache-bucket argument.
 # shellcheck disable=SC2046
 ./scripts/create_docker_image.sh \
   --push \
@@ -82,7 +75,6 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
   --docker-target "${DOCKER_BUILD_TARGET}" \
-  $(if [ -n "${rust_toolchain_image}" ]; then echo "--rust-toolchain-image ${rust_toolchain_image}"; fi) \
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi

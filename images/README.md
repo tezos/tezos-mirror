@@ -103,17 +103,6 @@ instance the CI images built in a specific pipeline, pass their full
 references (`name:tag`) with the parameters `--runtime-image` and
 `--build-deps-image`.
 
-To build the Octez Docker Distribution with EVM artifacts, pass
-`--docker-target with-evm-artifacts` to
-`./scripts/create_docker_image.sh`. In addition to the CI images,
-building the EVM artifacts requires a rust-toolchain image as input,
-supplied with `--rust-toolchain-image` (required for
-`--docker-target with-evm-artifacts`). The CI distribution jobs pass
-the `debian-rust:trixie` base-image reference; that reference lives in
-the protected registry, so for a local build pass any
-`debian-rust:trixie`-compatible image (defined by
-`images/base-images/Dockerfile.rust`): `--rust-toolchain-image <ref>`.
-
 For more info on how to configure:
  - naming of the built images in the Octez Docker distribution,
  - input images used,

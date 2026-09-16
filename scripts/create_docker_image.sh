@@ -21,10 +21,6 @@ executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
 docker_target="without-evm-artifacts"
-# Full image reference (name:tag) for the rust-toolchain image (L2 builder).
-# Required only for --docker-target with-evm-artifacts (the CI distribution
-# jobs pass it via --rust-toolchain-image); unused for other targets.
-rust_toolchain_image=""
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
@@ -47,7 +43,6 @@ Usage:  $(basename "$0") [-h|--help]
   [--build-deps-image <IMAGE> ]
   [--variants VARIANTS]
   [--docker-target <TARGET> ]
-  [--rust-toolchain-image <IMAGE> ]
   [--executables <EXECUTABLES> ]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
@@ -72,12 +67,6 @@ DESCRIPTION
     images/ci runtime and build images matching the local checkout, resolved
     via scripts/version.sh and images/image_tag.sh; they can be overridden with
     --runtime-image and --build-deps-image.
-
-    If TARGET is 'with-evm-artifacts' then EVM artifacts are
-    included. The rust-toolchain image is used to build these
-    artifacts, and is pulled from RUST_TOOLCHAIN_IMAGE, which must then
-    be provided via --rust-toolchain-image. See ./images/README.md for
-    how the base images are built.
 
     The built distribution includes the set of executables defined by
     EXECUTABLES: for a set of valid values, see
@@ -106,11 +95,6 @@ OPTIONS
             environment, also used by the stripper stage). Default: the
             images/ci build image matching the local checkout.
 
-        --rust-toolchain-image RUST_TOOLCHAIN_IMAGE
-            Full reference (name:tag) of the rust-toolchain image (L2
-            builder), used to build the EVM artifacts. Required for
-            --docker-target with-evm-artifacts.
-
     Image contents
         --executables EXECUTABLES
             Set of executables to include.
@@ -127,7 +111,7 @@ OPTIONS
             IMAGE_NAME-VARIANT:IMAGE_TAG.
 
         --docker-target TARGET
-            'without-evm-artifacts' (default) or 'with-evm-artifacts'.
+            'without-evm-artifacts' (default and only valid value).
 
     Image metadata
         --commit-short-sha COMMIT_SHA
@@ -155,7 +139,6 @@ CURRENT VALUES
     BUILD_DEPS_IMAGE (default): $ci_image_name/build:$ci_image_version
     VARIANTS: $variants
     DOCKER_TARGET: $docker_target
-    RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
     EXECUTABLES: $(echo "$executables" | tr "\n" " ")
     COMMIT_SHORT_SHA: $commit_short_sha
     COMMIT_DATETIME: $commit_datetime
@@ -170,7 +153,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -208,10 +191,6 @@ while true; do
   --docker-target)
     shift
     docker_target="$1"
-    ;;
-  --rust-toolchain-image)
-    shift
-    rust_toolchain_image="$1"
     ;;
   --runtime-image)
     shift
@@ -263,18 +242,6 @@ for executable in $executables; do
   echo "- $executable"
 done
 
-# The rust-toolchain image is only consumed by the with-evm-artifacts build
-# stage, so require it explicitly for that target (the CI distribution jobs
-# pass --rust-toolchain-image). Other targets never reference it.
-case "$docker_target" in
-"with-evm-artifacts")
-  if [ -z "$rust_toolchain_image" ]; then
-    echo "Error: --rust-toolchain-image is required for --docker-target ${docker_target}." >&2
-    exit 1
-  fi
-  ;;
-esac
-
 # Default the image references to the ones matching the local checkout (via
 # 'ci_image_name'/version.sh) when not overridden, so callers that omit the
 # '--*-image' options keep working unchanged.
@@ -305,7 +272,6 @@ fi
 # Notes:
 # - $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to
 #   assign the correct version to the octez binaries at compile time.
-# - ${RUST_TOOLCHAIN_IMAGE} is the image used to build L2 binaries.
 # - [--allow network.host] is needed because build.Dockerfile has
 #   [RUN --network=host] (for sccache). Cf. the matching comment in
 #   build.Dockerfile.
@@ -346,7 +312,6 @@ IMAGE_NAME="$image_name" \
   GIT_DATETIME="$commit_datetime" \
   GIT_VERSION="$commit_tag" \
   COMMIT_SHORT_SHA="$commit_short_sha" \
-  RUST_TOOLCHAIN_IMAGE="$rust_toolchain_image" \
   SCCACHE_GCS_BUCKET="$sccache_bucket" \
   PUSH="$push" \
   docker buildx bake \

@@ -37,3 +37,18 @@ Unrelated to #8357 but relevant to a wholesale re-sync: the root build has
 since moved from plain `docker build` to `docker buildx bake`
 (`docker-bake.hcl`), with the runtime and build-dependencies images passed as
 explicit full references.
+
+## Warning: drift from the root build (#8223)
+
+Issue #8223 removed the EVM artifacts from the root build entirely: the root
+`build.Dockerfile` no longer has `layer2-builder` / `with-evm-artifacts`
+stages nor a `RUST_TOOLCHAIN_IMAGE` ARG, the root `Dockerfile` no longer
+copies `evm_kernel` files into the published images, and the root
+`create_docker_image.sh` / `scripts/ci/docker_release.sh` no longer take
+`--rust-toolchain-image`.
+
+Impact on this directory: on top of the dead plumbing described in the #8357
+section above, the `evm_kernel` copies in the `Dockerfile` here (fed by no
+stage) and the `without-evm-artifacts` stage naming are now pure drift from
+the root build. This directory's EVM leftovers are to be cleaned up
+separately.
