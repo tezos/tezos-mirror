@@ -2996,6 +2996,8 @@ let test_prevalidation =
       client_tezlink
   in
 
+  let counter = 2 in
+
   (* case unsupported manager *)
   let* op_not_supported =
     Operation.Manager.(
@@ -3003,6 +3005,7 @@ let test_prevalidation =
         ~branch
         [
           make
+            ~counter
             ~fee:1000
             ~source:Constant.bootstrap1
             (update_consensus_key ~public_key:unknown.public_key ());
@@ -3021,7 +3024,6 @@ let test_prevalidation =
   in
 
   (* case batch with two sources *)
-  let counter = 2 in
   let* op_two_sources =
     Operation.Manager.(
       operation
@@ -3050,7 +3052,6 @@ let test_prevalidation =
   in
 
   (* case balance too low *)
-  let counter = 2 in
   let* balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
@@ -3108,7 +3109,6 @@ let test_prevalidation =
   in
 
   (* case batch with non consecutive counters *)
-  let counter = 2 in
   let* op_non_consecutive_counter =
     Operation.Manager.(
       operation
@@ -3145,7 +3145,7 @@ let test_prevalidation =
       operation
         ~branch
         ~signer:Constant.bootstrap2
-        [make ~fee:1000 ~counter:2 ~source:Constant.bootstrap1 (transfer ())]
+        [make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ())]
         client)
   in
   let wrong_signer_rex = rex "The operation signature is invalid" in
@@ -3182,7 +3182,7 @@ let test_prevalidation =
           make
             ~fee:1000
             ~gas_limit:(hard_gas_limit_per_operation + 1)
-            ~counter:2
+            ~counter
             ~source:Constant.bootstrap1
             (transfer ());
         ]
@@ -3205,7 +3205,7 @@ let test_prevalidation =
           make
             ~fee:1000
             ~gas_limit:(hard_gas_limit_per_operation - 1)
-            ~counter:2
+            ~counter
             ~source:Constant.bootstrap1
             (transfer ());
           make
@@ -3231,7 +3231,13 @@ let test_prevalidation =
     Operation.Manager.(
       operation
         ~branch
-        [make ~fee:1000 ~source:Constant.bootstrap1 (transfer ~dest:tz4 ())]
+        [
+          make
+            ~counter
+            ~fee:1000
+            ~source:Constant.bootstrap1
+            (transfer ~dest:tz4 ());
+        ]
         client)
   in
   let unsupported_rex = rex "evm_node.dev.tezlink.bls_is_not_allowed" in
@@ -3253,7 +3259,7 @@ let test_prevalidation =
           make
             ~fee:1000
             ~gas_limit:not_quite_too_high
-            ~counter:2
+            ~counter
             ~source:Constant.bootstrap1
             (transfer ());
           make
@@ -3313,7 +3319,7 @@ let test_prevalidation_gas_limit_lower_bound =
     build_and_inject
       ~error:(rex "gas_exhausted.operation")
       Operation.Manager.
-        [make ~gas_limit:0 ~source:Constant.bootstrap1 (transfer ())]
+        [make ~counter:1 ~gas_limit:0 ~source:Constant.bootstrap1 (transfer ())]
   in
 
   new_test () "Test 2: manager cost is not enough for a single operation" ;
@@ -3324,6 +3330,7 @@ let test_prevalidation_gas_limit_lower_bound =
       Operation.Manager.
         [
           make
+            ~counter:1
             ~gas_limit:minimum_transfer_cost
             ~source:Constant.bootstrap1
             (transfer ());
@@ -3461,9 +3468,9 @@ let test_validation_gas_limit =
   in
   let* (`OpHash op2) =
     Operation.inject_transfer
-      ~counter:2
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
+      ~counter:1
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap3
       ~fee
       ~gas_limit:almost_half_block
       client_tezlink
@@ -3481,7 +3488,7 @@ let test_validation_gas_limit =
   (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
   let* (`OpHash op3) =
     Operation.inject_transfer
-      ~counter:3
+      ~counter:2
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
       ~fee
@@ -3490,9 +3497,9 @@ let test_validation_gas_limit =
   in
   let* (`OpHash op4) =
     Operation.inject_transfer
-      ~counter:4
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
+      ~counter:2
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap3
       ~fee
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
@@ -3535,14 +3542,8 @@ let test_validation_counter =
       ~dest:Constant.bootstrap2
       client_tezlink
   in
+  let* () = produce_block_and_wait_for ~sequencer 1 in
   let* (`OpHash op2) =
-    Operation.inject_transfer
-      ~counter:2
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      client_tezlink
-  in
-  let* (`OpHash _) =
     Operation.inject_transfer
       ~counter:2
       ~source:Constant.bootstrap1
@@ -3562,7 +3563,15 @@ let test_validation_counter =
       ~__LOC__
       ~client:client_tezlink
       ~block:"5"
-      ~expected:[op1; op2; op3]
+      ~expected:[op1]
+      ()
+  in
+  let* () =
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"6"
+      ~expected:[op2; op3]
       ()
   in
   unit
@@ -3661,17 +3670,6 @@ let test_validation_balance =
       client_tezlink
   in
 
-  (* Following transfer won't be in the block because the previous transactions
-     will decrease the balance too much, but should still be injected as on it's
-     own it's valid. It's be rejected before the blueprint is produced. *)
-  let* (`OpHash _out) =
-    Operation.inject_transfer
-      ~counter:4
-      ~source:new_account
-      ~dest:Constant.bootstrap2
-      ~fee:half_amount
-      client_tezlink
-  in
   let* () = produce_block_and_wait_for ~sequencer 8 in
   let* () =
     check_operations

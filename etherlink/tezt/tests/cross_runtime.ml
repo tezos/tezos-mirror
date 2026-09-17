@@ -2023,7 +2023,8 @@ module CracRunnerWrapper = struct
 
     (** Inject a TEZ→EVM CRAC via the Tezlink RPC without producing a
         block.  The CRAC calls the [run] entrypoint on [tez_runner]. *)
-    val inject_crac_no_block : tez_runner -> unit Lwt.t
+    val inject_crac_no_block :
+      ?source:Account.key -> ?counter:int -> tez_runner -> unit Lwt.t
 
     (** Send a simple EVM transfer via [send_raw_transaction] without
         producing a block.  Returns the tx hash. [gas] defaults to 21_000,
@@ -2109,6 +2110,8 @@ module CracRunnerWrapper = struct
       let sender = sender
 
       let source = source
+
+      let source_ = source
 
       let evm_nonce = evm_nonce
 
@@ -2798,9 +2801,11 @@ module CracRunnerWrapper = struct
         in
         return (evm_runner, tez_runner)
 
-      let inject_crac_no_block (`Tez_runner (_, dest)) =
+      let inject_crac_no_block ?source ?counter (`Tez_runner (_, dest)) =
         let* arg = Client.convert_data_to_json ~data:"Unit" client in
         let* branch = tez_branch client_tezlink in
+        let source = Option.value ~default:source_ source in
+        let counter = Option.value ~default:(tez_counter ()) counter in
         let* crac_op =
           Operation.Manager.(
             operation
@@ -2808,7 +2813,7 @@ module CracRunnerWrapper = struct
               [
                 make
                   ~fee:100_000
-                  ~counter:(tez_counter ())
+                  ~counter
                   ~gas_limit:100_000
                   ~storage_limit:1000
                   ~source
@@ -5960,10 +5965,13 @@ let test_crac_l2_1212_multi_michelson_block () =
     send_evm_transfer_no_block ~value:Wei.one ~address:normal_addr ()
   in
   (* Two independent Michelson manager operations, each triggering a TEZ->EVM
-     crossing on the same runner (counter reaches 2). Distinct counters keep
-     them valid in sequence; both land in the next produced block. *)
+     crossing on the same runner (counter reaches 1). They come from distinct
+     accounts, since a single account may only have one operation per block;
+     both land in the next produced block. *)
   let* () = inject_crac_no_block tez_runner in
-  let* () = inject_crac_no_block tez_runner in
+  let* () =
+    inject_crac_no_block ~source:Constant.bootstrap4 ~counter:1 tez_runner
+  in
   let*@ _ = Rpc.produce_block sequencer in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
   let*@ block = latest_block ~sequencer in
@@ -11804,10 +11812,10 @@ let test_crac_receipt_tez_not_first_tx () =
         [
           make
             ~fee:100_000
-            ~counter:(tez_counter ())
+            ~counter:1
             ~gas_limit:100_000
             ~storage_limit:1000
-            ~source
+            ~source:Constant.bootstrap4
             (transfer ~amount:0 ());
         ])
       client
