@@ -15,6 +15,7 @@ __pycache__
 /node_modules
 /_opam-repo-for-releases/
 /_tobi/
+/_release_site/
 
 /test_results
 

@@ -2,13 +2,12 @@
 
 # Renders the whole release site and publishes it.
 #
-# Unlike the per-component [publish_release_page.sh] scripts, this renders every
-# component's page at once from the built-in catalog in [release_page.ml],
-# reading each component's published versions.json. It renders nothing that has
-# not already been deployed: the assets and versions.json are deployed
-# beforehand by the per-component [deploy_release_page_assets.sh] scripts, so
-# this can be re-run at any time to regenerate the site without re-running a
-# release.
+# It renders every component's page at once from the built-in catalog in
+# [release_page.ml], reading each component's published versions.json. It
+# renders nothing that has not already been deployed: the assets and
+# versions.json are deployed beforehand by the per-component
+# [deploy_release_page_assets.sh] scripts, so this can be re-run at any time to
+# regenerate the site without re-running a release.
 
 set -eu
 
@@ -35,7 +34,10 @@ RELEASE_PAGE="_build/default/release_site/src/release_page.exe"
 VM="_build/default/release_site/src/version_manager.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
-site_dir="$(mktemp -d)"
+# Render into a fixed workspace directory so the CI job can keep it as an artifact.
+site_dir="_release_site"
+rm -rf "${site_dir}"
+mkdir -p "${site_dir}"
 
 # Render every component's page from its published versions.json into [site_dir],
 # mirroring the site layout (octez at the root, each other component under its

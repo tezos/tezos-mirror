@@ -98,32 +98,6 @@ let job_deploy_release_page_assets =
         "./teztale/scripts/releases/deploy_release_page_assets.sh";
       ]
 
-let job_release_page =
-  Cacio.parameterize @@ fun pipeline_type ->
-  Cacio.parameterize @@ fun wait_for ->
-  CI.job
-    "release-page-publish"
-    ~__POS__
-    ~image:Tezos_ci.Images.Base_images.alpine_release_page
-    ~stage:Publish
-    ~environment:Gitlab_ci.Types.{name = "release-page"; action = Some Access}
-    ~description:
-      "Publish the Teztale release page: regenerate [index.html] from the \
-       published versions.json and upload it. Reflects what has been deployed \
-       by [teztale.release-page-deploy-assets]."
-    ~needs:
-      (match wait_for with
-      | `wait_for_nothing -> []
-      | `wait_for_deploy ->
-          [(Job, job_deploy_release_page_assets pipeline_type)])
-    ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~expire_in:(Duration (Days 1))
-         ["./index.md"; "index.html"])
-    ~variables:(release_page_variables pipeline_type)
-    ~script:
-      ["eval $(opam env)"; "./teztale/scripts/releases/publish_release_page.sh"]
-
 let register () =
   Cacio.register_merge_request_jobs
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
@@ -131,40 +105,15 @@ let register () =
     "daily"
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
-  Cacio.register_release_jobs
-    [
-      (Manual, job_deploy_release_page_assets `real);
-      (Auto, job_release_page `real `wait_for_deploy);
-    ] ;
+  Cacio.register_release_jobs [(Manual, job_deploy_release_page_assets `real)] ;
   Cacio.register_test_release_jobs
-    [
-      (Manual, job_deploy_release_page_assets `test);
-      (Auto, job_release_page `test `wait_for_deploy);
-    ] ;
+    [(Manual, job_deploy_release_page_assets `test)] ;
   Cacio.register_jobs
     Non_release_tag
     [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
   Cacio.register_jobs
     Non_release_tag_test
     [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
-  Cacio.register_jobs
-    Publish_release_page
-    [
-      ( Manual,
-        (* [wait_for_nothing]: this pipeline only regenerates the page from the
-           already-published versions.json, so it neither deploys assets nor
-           depends on the build jobs. *)
-        job_release_page `real `wait_for_nothing );
-    ] ;
-  Cacio.register_jobs
-    Test_publish_release_page
-    [
-      ( Manual,
-        (* [wait_for_nothing]: this pipeline only regenerates the page from the
-           already-published versions.json, so it neither deploys assets nor
-           depends on the build jobs. *)
-        job_release_page `test `wait_for_nothing );
-    ] ;
   Cacio.register_jobs
     Scheduled_test_release
     [
@@ -179,7 +128,6 @@ let register () =
     [
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `real);
-      (Auto, job_release_page `real `wait_for_deploy);
       (* Re-render the whole site once Teztale's assets are deployed. *)
       ( Auto,
         Release_site_ci.job_render
@@ -190,7 +138,6 @@ let register () =
     [
       (Auto, job_gitlab_release);
       (Manual, job_deploy_release_page_assets `test);
-      (Auto, job_release_page `test `wait_for_deploy);
       ( Auto,
         Release_site_ci.job_render
           `test
