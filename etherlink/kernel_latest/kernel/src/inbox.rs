@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ExperimentalFeatures, TezosXChainConfig, TezosXTransaction};
+use crate::chains::{ExperimentalFeatures, TezosXTransaction};
 use crate::configuration::{CommonConfig, SequencerConfig, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -85,37 +85,37 @@ where
     /// Abstracts the type used to store the inputs once handled
     type Inbox;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         deposit: Deposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace;
+        Host: StorageV1 + HostReveal;
 }
 
 impl InputHandler for ProxyInput {
@@ -123,15 +123,15 @@ impl InputHandler for ProxyInput {
     // everything is doable in a single kernel_run.
     type Inbox = ProxyInboxContent;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
     {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
@@ -141,12 +141,7 @@ impl InputHandler for ProxyInput {
                 tx_hash,
                 num_chunks,
                 chunk_hashes,
-            } => create_chunked_transaction(
-                rk.host_mut(),
-                &tx_hash,
-                num_chunks,
-                chunk_hashes,
-            )?,
+            } => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
             Self::TransactionChunk {
                 tx_hash,
                 i,
@@ -154,7 +149,7 @@ impl InputHandler for ProxyInput {
                 data,
             } => {
                 if let Some(tx) =
-                    handle_transaction_chunk(rk.host_mut(), tx_hash, i, chunk_hash, data)?
+                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
                 {
                     inbox_content.transactions.push(tx.into())
                 }
@@ -163,38 +158,38 @@ impl InputHandler for ProxyInput {
         Ok(())
     }
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         deposit: Deposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        KS: SafeKeyspace,
         Host: HostReveal,
     {
         inbox_content
             .transactions
-            .push(handle_deposit(rk.host_mut(), deposit)?);
+            .push(handle_deposit(host, deposit)?);
         Ok(())
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        _base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        KS: SafeKeyspace,
         Host: HostReveal,
     {
         inbox_content
             .transactions
-            .push(handle_fa_deposit(rk.host_mut(), fa_deposit)?);
+            .push(handle_fa_deposit(host, fa_deposit)?);
         Ok(())
     }
 }
@@ -219,24 +214,25 @@ impl InputHandler for SequencerInput {
     // there is nothing to return in the end.
     type Inbox = DelayedInbox;
 
-    fn handle_input<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_input<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
-                let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-                let level = read_l1_level(rk.base())?;
+                let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+                let level = read_l1_level(base)?;
                 log!(Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(
-                    rk,
+                    host,
+                    base,
                     TezosXTransaction::Ethereum(tx),
                     previous_timestamp,
                     level,
@@ -244,7 +240,7 @@ impl InputHandler for SequencerInput {
                 )
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
-                handle_blueprint_chunk(rk.base_mut(), seq_blueprint)
+                handle_blueprint_chunk(base, seq_blueprint)
             }
             Self::SequencerBlueprint(
                 InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
@@ -257,11 +253,11 @@ impl InputHandler for SequencerInput {
                 signature: _,
             }) => {
                 log!(Debug, "Importing {} DAL signals", &signals.0.len());
-                let params = rk.host().reveal_dal_parameters();
+                let params = host.reveal_dal_parameters();
                 let slot_size = params.slot_size;
                 let page_size = params.page_size;
                 let next_blueprint_number: U256 =
-                    crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
+                    crate::blueprint_storage::read_next_blueprint_number(base)?;
                 for signal in signals.0.iter() {
                     let published_level = signal.published_level;
                     let slot_indices = &signal.slot_indices;
@@ -274,7 +270,7 @@ impl InputHandler for SequencerInput {
                         );
                         if let Some(unsigned_seq_blueprints) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
-                                rk.host_mut(),
+                                host,
                                 slot_size,
                                 page_size,
                                 &next_blueprint_number,
@@ -288,7 +284,7 @@ impl InputHandler for SequencerInput {
                                 unsigned_seq_blueprints.len()
                             );
                             for chunk in unsigned_seq_blueprints {
-                                handle_blueprint_chunk(rk.base_mut(), chunk)?
+                                handle_blueprint_chunk(base, chunk)?
                             }
                         }
                     }
@@ -298,8 +294,9 @@ impl InputHandler for SequencerInput {
         }
     }
 
-    fn handle_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         deposit: Deposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
@@ -307,17 +304,17 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-        let level = read_l1_level(rk.base())?;
-        let tx = handle_deposit(rk.host_mut(), deposit)?;
-        delayed_inbox.save_transaction(rk, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+        let level = read_l1_level(base)?;
+        let tx = handle_deposit(host, deposit)?;
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    fn handle_fa_deposit<Host>(
+        host: &mut Host,
+        base: &mut impl KeySpace,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
@@ -325,12 +322,11 @@ impl InputHandler for SequencerInput {
     ) -> anyhow::Result<()>
     where
         Host: StorageV1 + HostReveal,
-        KS: SafeKeyspace,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(rk.base())?;
-        let level = read_l1_level(rk.base())?;
-        let tx = handle_fa_deposit(rk.host_mut(), fa_deposit)?;
-        delayed_inbox.save_transaction(rk, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
+        let level = read_l1_level(base)?;
+        let tx = handle_fa_deposit(host, fa_deposit)?;
+        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
     }
 }
 
@@ -414,22 +410,22 @@ fn handle_fa_deposit(
     .into())
 }
 
-fn force_kernel_upgrade<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn force_kernel_upgrade<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: SafeKeyspace,
 {
-    match upgrade::read_kernel_upgrade(rk.base())? {
+    match upgrade::read_kernel_upgrade(base)? {
         Some(kernel_upgrade) => {
-            let current_timestamp = read_last_info_per_level_timestamp(rk.base())?.i64();
+            let current_timestamp = read_last_info_per_level_timestamp(base)?.i64();
             let activation_timestamp = kernel_upgrade.activation_timestamp.i64();
 
             if current_timestamp >= (activation_timestamp + 86400i64) {
                 // If the kernel upgrade still exist 1 day after it was supposed
                 // to be activated. It is possible to force its execution.
-                upgrade::upgrade(rk, kernel_upgrade.preimage_hash)?
+                upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?
             };
             Ok(())
         }
@@ -439,8 +435,9 @@ where
 
 /// Import DAL slots based on protocol attestation information.
 /// This is called when processing DalAttestedSlots internal messages.
-fn import_dal_attested_slots<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn import_dal_attested_slots<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     published_level: i32,
     slot_size: u64,
     page_size: u64,
@@ -448,7 +445,6 @@ fn import_dal_attested_slots<Host, KS>(
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal,
-    KS: SafeKeyspace,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
@@ -456,7 +452,7 @@ where
     }
 
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
+        crate::blueprint_storage::read_next_blueprint_number(base)?;
 
     log!(
         Debug,
@@ -475,7 +471,7 @@ where
 
         if let Some(unsigned_seq_blueprints) =
             fetch_and_parse_sequencer_blueprint_from_dal(
-                rk.host_mut(),
+                host,
                 slot_size,
                 page_size,
                 &next_blueprint_number,
@@ -490,7 +486,7 @@ where
                 unsigned_seq_blueprints.len()
             );
             for chunk in unsigned_seq_blueprints {
-                if let Err(e) = handle_blueprint_chunk(rk.base_mut(), chunk) {
+                if let Err(e) = handle_blueprint_chunk(base, chunk) {
                     log!(
                         Error,
                         "Failed to handle blueprint chunk from slot {}: {:?}",
@@ -506,44 +502,46 @@ where
     Ok(())
 }
 
-pub fn handle_input<Host, KS, Mode>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn handle_input<Host, Mode>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
     Host: StorageV1 + HostReveal + WasmHost,
-    KS: SafeKeyspace,
     Mode: Parsable + InputHandler,
 {
     match input {
         Input::ModeSpecific(input) => {
-            Mode::handle_input(rk, input, inbox_content, common)?
+            Mode::handle_input(host, base, input, inbox_content, common)?
         }
         Input::Upgrade(kernel_upgrade) => {
-            store_kernel_upgrade(rk.base_mut(), &kernel_upgrade, common)?
+            store_kernel_upgrade(base, &kernel_upgrade, common)?
         }
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            store_sequencer_upgrade(rk, sequencer_upgrade, common)?
+            store_sequencer_upgrade(host, base, sequencer_upgrade, common)?
         }
-        Input::RemoveSequencer => remove_sequencer(rk.host_mut())?,
+        Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
-            clear_events(rk.base_mut())?;
-            store_last_info_per_level_timestamp(
-                rk.base_mut(),
-                info.info.predecessor_timestamp,
-            )?;
-            store_l1_level(rk.base_mut(), info.level)?
+            clear_events(base)?;
+            store_last_info_per_level_timestamp(base, info.info.predecessor_timestamp)?;
+            store_l1_level(base, info.level)?
         }
         Input::Deposit((deposit, chain_id)) => {
-            Mode::handle_deposit(rk, deposit, chain_id, inbox_content, common)?
+            Mode::handle_deposit(host, base, deposit, chain_id, inbox_content, common)?
         }
-        Input::FaDeposit((fa_deposit, chain_id)) => {
-            Mode::handle_fa_deposit(rk, fa_deposit, chain_id, inbox_content, common)?
-        }
-        Input::ForceKernelUpgrade => force_kernel_upgrade(rk)?,
+        Input::FaDeposit((fa_deposit, chain_id)) => Mode::handle_fa_deposit(
+            host,
+            base,
+            fa_deposit,
+            chain_id,
+            inbox_content,
+            common,
+        )?,
+        Input::ForceKernelUpgrade => force_kernel_upgrade(host, base)?,
         Input::DalAttestedSlots {
             published_level,
             slot_size,
@@ -551,7 +549,8 @@ where
             slot_indices,
         } => {
             import_dal_attested_slots(
-                rk,
+                host,
+                base,
                 published_level,
                 slot_size,
                 page_size,
@@ -566,25 +565,24 @@ enum ReadStatus {
     FinishedIgnore,
     FinishedRead,
     Ongoing,
+    Simulation,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn read_and_dispatch_input<Host, KS, Mode>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn read_and_dispatch_input<Host, Mode>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
     parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
-    chain_configuration: &TezosXChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
     Mode: Parsable + InputHandler,
 {
     let input: InputResult<Mode> = read_input(
-        rk.host_mut(),
+        host,
         smart_rollup_address,
         &common.tezos_contracts,
         inbox_is_empty,
@@ -608,15 +606,13 @@ where
         }
         InputResult::Unparsable => Ok(ReadStatus::Ongoing),
         InputResult::Simulation => {
-            // kernel enters in simulation mode, reading will be done by the
-            // simulation and all the previous and next transactions are
-            // discarded.
-            let registry = chain_configuration.init_registry();
-            chain_configuration.start_simulation_mode(rk, &registry)?;
-            Ok(ReadStatus::FinishedIgnore)
+            // Starting simulation mode needs the full `RuntimeKeyspaces`
+            // (eth_accounts, for account state), which this function no
+            // longer holds: the caller performs it once this returns.
+            Ok(ReadStatus::Simulation)
         }
         InputResult::Input(input) => {
-            handle_input(rk, input, res, common)?;
+            handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
         }
     }
@@ -626,7 +622,6 @@ pub fn read_proxy_inbox<Host, KS>(
     rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
-    chain_configuration: &TezosXChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
     Host: HostReveal + WasmHost + KeyspaceHost<KS>,
@@ -641,14 +636,15 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_and_dispatch_input::<Host, KS, ProxyInput>(
-            rk,
+        let (host, base) = rk.base_parts_mut();
+        match read_and_dispatch_input::<Host, ProxyInput>(
+            host,
+            base,
             smart_rollup_address,
             common,
             &mut (),
             &mut inbox_is_empty,
             &mut res,
-            chain_configuration,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -665,17 +661,24 @@ where
             Ok(ReadStatus::Ongoing) => (),
             Ok(ReadStatus::FinishedRead) => return Ok(Some(res)),
             Ok(ReadStatus::FinishedIgnore) => return Ok(None),
+            // The EVM node no longer drives proxy mode, so no simulation
+            // trigger reaches this loop.
+            Ok(ReadStatus::Simulation) => return Ok(None),
         }
     }
 }
 
-/// The StageOne can yield with three possible states:
+/// The StageOne can yield with four possible states:
 ///
 /// - Done: the inbox has been fully read during the current `kernel_run`
 ///
 /// - Reboot: the inbox cannot been read further as there are not enough ticks
 ///   and needs a reboot before continuing. This is only supported in sequencer
 ///   mode as the inputs are stored directly in the process.
+///
+/// - Simulation: a simulation trigger was read from the inbox. Simulation
+///   mode is started for the current `kernel_run`, which then finishes
+///   immediately without entering stage two.
 ///
 /// - Skipped: the inbox was empty during the current `kernel_run`, implying it
 ///   has been emptied during a previous `kernel_run` and the kernel is
@@ -685,6 +688,7 @@ where
 pub enum StageOneStatus {
     Done,
     Reboot,
+    Simulation,
     Skipped,
 }
 
@@ -692,7 +696,6 @@ pub enum StageOneStatus {
 pub fn read_sequencer_inbox<Host, KS>(
     rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     smart_rollup_address: [u8; 20],
-    config_chain: &TezosXChainConfig,
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
@@ -737,14 +740,15 @@ where
             );
             return Ok(StageOneStatus::Reboot);
         };
-        match read_and_dispatch_input::<Host, KS, SequencerInput>(
-            rk,
+        let (host, base) = rk.base_parts_mut();
+        match read_and_dispatch_input::<Host, SequencerInput>(
+            host,
+            base,
             smart_rollup_address,
             config_common,
             &mut parsing_context,
             &mut inbox_is_empty,
             &mut config_sequencer.delayed_inbox,
-            config_chain,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -768,6 +772,9 @@ where
                 return Ok(StageOneStatus::Done);
             }
             Ok(ReadStatus::FinishedIgnore) => return Ok(StageOneStatus::Skipped),
+            Ok(ReadStatus::Simulation) => {
+                return Ok(StageOneStatus::Simulation);
+            }
         }
     }
 }
@@ -779,7 +786,6 @@ mod tests {
         blueprint_exists, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
     };
-    use crate::chains::test_tezosx_chain_config;
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -931,14 +937,10 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -964,14 +966,10 @@ mod tests {
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1028,7 +1026,6 @@ mod tests {
                 },
                 ..CommonConfig::default()
             },
-            &test_tezosx_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1071,13 +1068,9 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(rk.host_mut(), &tx_hash)
             .expect("The number of chunks should exist");
@@ -1124,13 +1117,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -1164,13 +1153,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -1222,14 +1207,10 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         assert_eq!(
             inbox_content,
             ProxyInboxContent {
@@ -1243,14 +1224,10 @@ mod tests {
                 .host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash,
@@ -1306,14 +1283,10 @@ mod tests {
 
         rk.host_mut().host.add_external(framed);
 
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1331,23 +1304,15 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         rk.host_mut().host.add_external(Bytes::from(vec![]));
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let inbox_content = read_proxy_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &CommonConfig::default(),
-            &test_tezosx_chain_config(),
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap();
         assert!(inbox_content.is_none());
     }
 
@@ -1457,14 +1422,8 @@ mod tests {
             dal: None,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
-        let _ = read_sequencer_inbox(
-            &mut rk,
-            SMART_ROLLUP_ADDRESS,
-            &test_tezosx_chain_config(),
-            &common,
-            &mut seq,
-        )
-        .unwrap();
+        let _ = read_sequencer_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &common, &mut seq)
+            .unwrap();
 
         // The blueprint was valid if it was stored in the storage.
         blueprint_exists(rk.base(), unsigned_blueprint.number).unwrap()

@@ -13,8 +13,6 @@ use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -63,18 +61,15 @@ pub fn is_revealed_storage(base: &impl KeySpace) -> bool {
     base.contains(&CONFIG_KEY)
 }
 
-pub fn reveal_storage<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn reveal_storage(
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
-) where
-    Host: StorageV1,
-    KS: SafeKeyspace,
-{
+) {
     log!(Info, "Starting the reveal dump");
 
-    let config_bytes = rk
-        .base()
+    let config_bytes = base
         .get(&CONFIG_KEY)
         .expect("Failed reading the configuration");
 
@@ -87,37 +82,31 @@ pub fn reveal_storage<Host, KS>(
         if index % 50_000 == 0 {
             log!(Info, "{}/{}", index, length)
         };
-        rk.host_mut()
-            .store_write_all(to, value)
+        host.store_write_all(to, value)
             .expect("Failed to write value");
     }
 
     // Remove temporary configuration
-    rk.base_mut().delete(&CONFIG_KEY);
+    base.delete(&CONFIG_KEY);
 
     // Change the sequencer if asked:
     if let Some(sequencer) = sequencer {
         let pk_b58 = PublicKey::to_b58check(&sequencer);
         let bytes = String::as_bytes(&pk_b58);
-        rk.host_mut()
-            .store_write_all(&SEQUENCER_KEY_PATH, bytes)
-            .unwrap();
+        host.store_write_all(&SEQUENCER_KEY_PATH, bytes).unwrap();
     }
 
     // Change the admin if asked:
     if let Some(admin) = admin {
         let kt1_b58 = admin.to_base58_check();
         let bytes = String::as_bytes(&kt1_b58);
-        rk.base_mut().set(&ADMIN_KEY, bytes).unwrap();
+        base.set(&ADMIN_KEY, bytes).unwrap();
     }
 
     log!(Info, "Done revealing");
 
-    let chain_config = {
-        let (host, base) = rk.base_parts_mut();
-        fetch_tezosx_configuration(host, base)
-    };
-    let configuration = fetch_configuration(rk.host(), rk.base());
+    let chain_config = fetch_tezosx_configuration(host, base);
+    let configuration = fetch_configuration(host, base);
     log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }

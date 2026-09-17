@@ -20,7 +20,6 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
@@ -210,9 +209,10 @@ impl DelayedInbox {
         Ok(Self(linked_list))
     }
 
-    pub fn save_transaction<Host, KS>(
+    pub fn save_transaction<Host>(
         &mut self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        host: &Host,
+        base: &mut impl KeySpace,
         tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
@@ -220,15 +220,13 @@ impl DelayedInbox {
     ) -> Result<()>
     where
         Host: StorageV1,
-        KS: KeySpace,
     {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
                 let Transaction { tx_hash, content } = *tx.clone();
                 // Validate the branch at delayed-inbox entry; drop foreign/stale branches (cross-instance replay).
                 if let TransactionContent::TezosDelayed(op) = &content {
-                    if !crate::chains::is_valid_tez_branch(rk.host(), &H256(*op.branch))?
-                    {
+                    if !crate::chains::is_valid_tez_branch(host, &H256(*op.branch))? {
                         log!(
                             Error,
                             "Dropping delayed Tezos operation {}: branch {} is not a recent block of this instance",
@@ -251,9 +249,9 @@ impl DelayedInbox {
                     level,
                 };
 
-                Event::NewDelayedTransaction(tx).store(rk.base_mut(), common)?;
+                Event::NewDelayedTransaction(tx).store(base, common)?;
 
-                self.0.push(rk.base_mut(), &Hash(tx_hash), &item)?;
+                self.0.push(base, &Hash(tx_hash), &item)?;
                 log!(
                     Info,
                     "Saved transaction {} in the delayed inbox",
@@ -502,9 +500,11 @@ mod tests {
 
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+        let (host, base) = rk.base_parts_mut();
         delayed_inbox
             .save_transaction(
-                &mut rk,
+                host,
+                base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -544,9 +544,11 @@ mod tests {
 
         let timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+        let (host, base) = rk.base_parts_mut();
         delayed_inbox
             .save_transaction(
-                &mut rk,
+                host,
+                base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -583,9 +585,11 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
+        let (host, base) = rk.base_parts_mut();
         delayed_inbox
             .save_transaction(
-                &mut rk,
+                host,
+                base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -618,8 +622,10 @@ mod tests {
 
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+        let (host, base) = rk.base_parts_mut();
         let res = delayed_inbox.save_transaction(
-            &mut rk,
+            host,
+            base,
             tx.into(),
             timestamp,
             0,

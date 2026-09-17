@@ -116,7 +116,7 @@ where
     log!(Debug, "Configuration: {}", configuration);
 
     enter_stage_one(rk.base_mut())?;
-    let res = fetch_blueprints(rk, smart_rollup_address, chain_config, configuration);
+    let res = fetch_blueprints(rk, smart_rollup_address, configuration);
     leave_stage_one(rk.base_mut())?;
     res
 }
@@ -293,7 +293,8 @@ where
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(rk)?;
+            let (host, base) = rk.base_parts_mut();
+            fallback_backup_kernel(host, base)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
@@ -337,16 +338,25 @@ where
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot = stage_one(
+    let stage_one_status = stage_one(
         rk,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
     )
-    .context("Failed during stage 1")?
-    {
-        #[cfg(not(target_arch = "riscv64"))]
-        return Ok(SingleRunStatus::Reboot);
+    .context("Failed during stage 1")?;
+
+    match stage_one_status {
+        StageOneStatus::Reboot => {
+            #[cfg(not(target_arch = "riscv64"))]
+            return Ok(SingleRunStatus::Reboot);
+        }
+        StageOneStatus::Simulation => {
+            let registry = chain_configuration.init_registry();
+            chain_configuration.start_simulation_mode(rk, &registry)?;
+            return Ok(SingleRunStatus::Finished);
+        }
+        StageOneStatus::Done | StageOneStatus::Skipped => (),
     };
 
     let trace_input = read_tracer_input(rk.base())?;
@@ -463,8 +473,10 @@ where
     }
 
     if is_revealed_storage(rk.base()) {
+        let (host, base) = rk.base_parts_mut();
         reveal_storage(
-            &mut rk,
+            host,
+            base,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
