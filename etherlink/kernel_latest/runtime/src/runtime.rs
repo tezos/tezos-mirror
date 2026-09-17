@@ -17,7 +17,7 @@ use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
     input::Message,
     metadata::RollupMetadata,
-    path::{Path, RefPath},
+    path::Path,
     reveal::HostReveal,
     runtime::{RuntimeError, ValueType},
     storage::{CoreStorage, StorageV1},
@@ -288,13 +288,9 @@ pub fn read_logs_verbosity(base: &impl KeySpace) -> Level {
 // If the flag is set, the kernel consider that this is local evm node execution.
 // Key inside the `/base` keyspace, resolving to `/base/__evm_node`.
 const EVM_NODE_FLAG_KEY: Key = Key::from_static(b"/__evm_node");
-// TODO: L2-1158 — remove legacy fallback once all kernels are past V51
-// Legacy path, at the storage root and therefore outside the `/base` keyspace.
-const LEGACY_EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
-pub fn evm_node_flag(host: &impl StorageV1, base: &impl KeySpace) -> bool {
+pub fn evm_node_flag(base: &impl KeySpace) -> bool {
     base.contains(&EVM_NODE_FLAG_KEY)
-        || Ok(Some(ValueType::Value)) == host.store_has(&LEGACY_EVM_NODE_FLAG)
 }
 
 impl<R, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {
