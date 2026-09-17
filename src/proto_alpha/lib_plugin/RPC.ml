@@ -4924,19 +4924,10 @@ let register () =
           (Contract_services.Non_activated_feature SWRR)
       else
         let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
-        Stake_storage.fold_on_active_delegates_with_minimal_stake_es
-          ctxt
-          ~order:`Undefined
-          ~init:[]
-          ~f:(fun pkh acc ->
-            let* credit_opt =
-              Storage.Contract.SWRR_credit.find
-                ctxt
-                (Contract_repr.Implicit pkh)
-            in
-            let credit = Option.value ~default:Z.zero credit_opt in
-            let entry = {delegate = pkh; credit} in
-            return (entry :: acc))) ;
+        let* credits_list = Storage.Stake.SWRR_credits.find ctxt in
+        let credits_list = Option.value ~default:[] credits_list in
+        return
+          (List.map (fun (delegate, credit) -> {delegate; credit}) credits_list)) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio

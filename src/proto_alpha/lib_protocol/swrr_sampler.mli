@@ -17,7 +17,7 @@
     This module is responsible for maintaining and accessing the following
     storage fields:
     - [Storage.Stake.Selected_bakers]: precomputed baker arrays per cycle
-    - [Storage.Contract.SWRR_credit]: accumulated credits per delegate
+    - [Storage.Stake.SWRR_credits]: global credit map (list of (account, credit) pairs)
 
     Other modules should NOT access these storage fields directly. All SWRR
     storage operations must go through the functions provided in this interface
@@ -53,8 +53,10 @@
 
     Credits persist across cycles to maintain long-term fairness. This means
     that fractional stake weights carry over, ensuring delegates aren't
-    disadvantaged by rounding in any particular cycle. Credits are only reset
-    when a delegate is deactivated (see [reset_credit_for_deactivated_delegates]).
+    disadvantaged by rounding in any particular cycle. Delegates that drop
+    out of the stake distribution (deactivation or falling below minimum
+    stake) are automatically excluded from the credit map when it is
+    rewritten at cycle end.
 
     {2 Determinism}
 
@@ -76,7 +78,7 @@
 
     Side effects:
     - Stores selected bakers in [Storage.Stake.Selected_bakers]
-    - Updates all delegates' credits in [Storage.Contract.SWRR_credit]
+    - Reads/writes global credit map [Storage.Stake.SWRR_credits]
     - Caches result with [Swrr_selected_distribution] (cache index 4)
 
     Called during cycle finalization from [Delegate_sampler.select_distribution_for_cycle].
@@ -106,16 +108,6 @@ val get_baker :
   Level_repr.t ->
   Round_repr.round ->
   (Raw_context.t * Delegate_consensus_key.pk option) tzresult Lwt.t
-
-(** [reset_credit_for_deactivated_delegates ctxt deactivated_delegates]
-    resets SWRR credits to zero for [deactivated_delegates].
-
-    Ensures fair restart when delegate reactivates.
-
-    Called from [Delegate_cycles.unfreeze_deposits] during cycle finalization,
-    before [select_bakers_at_cycle_end] for next cycle. *)
-val reset_credit_for_deactivated_delegates :
-  Raw_context.t -> Implicit_account_repr.t list -> Raw_context.t tzresult Lwt.t
 
 (** [remove_outdated_cycle ctxt cycle] removes SWRR sampling data for [cycle]
     from both storage and cache.

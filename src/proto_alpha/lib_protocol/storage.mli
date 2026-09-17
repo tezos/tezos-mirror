@@ -209,22 +209,6 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  (* SWRR Credit Storage
-
-   Per-delegate credit for the SWRR baker selection algorithm.
-   Stored as [Z.t] to avoid overflow and keep exact integer arithmetic.
-
-     Persistence:
-     - Credits persist across cycles (cross-cycle fairness)
-     - Reset to zero on delegate deactivation
-     - No expiration: indefinite persistence for active delegates
-  *)
-  module SWRR_credit :
-    Indexed_data_storage
-      with type key = Contract_repr.t
-       and type value = Z.t
-       and type t := Raw_context.t
-
   (** Tez that were part of frozen deposits (either [own_frozen] or
       [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
@@ -647,6 +631,22 @@ module Stake : sig
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Stake_repr.t
+       and type t := Raw_context.t
+
+  (* Global SWRR credit map.
+
+     Stores the credit balance for each delegate at the end of a cycle,
+     as a list of [(account, credit)] pairs. Only delegates present in the
+     current stake distribution are included, which automatically drops
+     delegates that fell below minimum stake or were deactivated.
+
+     Read at the start of [select_bakers_at_cycle_end] to initialize
+     credits, written at the end with updated credits, which happens
+     every cycle.
+   *)
+  module SWRR_credits :
+    Single_data_storage
+      with type value = (Implicit_account_repr.t * Z.t) list
        and type t := Raw_context.t
 end
 
