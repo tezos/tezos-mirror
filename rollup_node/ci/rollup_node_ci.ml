@@ -34,7 +34,6 @@ let job_docker_build =
       [
         ("DOCKER_VERSION", Images.Base_images.docker_version);
         ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
-        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
         ("EXECUTABLE_FILES", "script-inputs/smart-rollup-node-executable");
       ]

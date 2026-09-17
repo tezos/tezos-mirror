@@ -20,7 +20,6 @@ ci_image_version=${arch}--$(./images/image_tag.sh images/ci)
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
-docker_target="without-evm-artifacts"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
@@ -42,7 +41,6 @@ Usage:  $(basename "$0") [-h|--help]
   [--runtime-image <IMAGE> ]
   [--build-deps-image <IMAGE> ]
   [--variants VARIANTS]
-  [--docker-target <TARGET> ]
   [--executables <EXECUTABLES> ]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
@@ -110,9 +108,6 @@ OPTIONS
             is tagged IMAGE_NAME:IMAGE_TAG whereas the others are tagged
             IMAGE_NAME-VARIANT:IMAGE_TAG.
 
-        --docker-target TARGET
-            'without-evm-artifacts' (default and only valid value).
-
     Image metadata
         --commit-short-sha COMMIT_SHA
             Git commit short SHA for the Octez version string.
@@ -138,7 +133,6 @@ CURRENT VALUES
     RUNTIME_IMAGE (default): $ci_image_name/runtime:$ci_image_version
     BUILD_DEPS_IMAGE (default): $ci_image_name/build:$ci_image_version
     VARIANTS: $variants
-    DOCKER_TARGET: $docker_target
     EXECUTABLES: $(echo "$executables" | tr "\n" " ")
     COMMIT_SHORT_SHA: $commit_short_sha
     COMMIT_DATETIME: $commit_datetime
@@ -153,7 +147,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,docker-target:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -187,10 +181,6 @@ while true; do
       esac
     done
 
-    ;;
-  --docker-target)
-    shift
-    docker_target="$1"
     ;;
   --runtime-image)
     shift
@@ -306,7 +296,6 @@ IMAGE_NAME="$image_name" \
   IMAGE_VERSION="$image_version" \
   RUNTIME_IMAGE="$runtime_image" \
   BUILD_DEPS_IMAGE="$build_deps_image" \
-  DOCKER_TARGET="$docker_target" \
   OCTEZ_EXECUTABLES="$executables" \
   GIT_SHORTREF="$commit_short_sha" \
   GIT_DATETIME="$commit_datetime" \

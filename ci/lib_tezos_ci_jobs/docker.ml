@@ -40,7 +40,6 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
       [
         ("DOCKER_VERSION", version);
         ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
-        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("IMAGE_ARCH_PREFIX", arch_str ^ "_");
         ( "EXECUTABLE_FILES",
           match contents with
