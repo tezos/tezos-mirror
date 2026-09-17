@@ -484,15 +484,31 @@ let with_open_file ~flags ?(perm = 0o640) filename task =
   match rfd with
   | Error _ as r -> Lwt.return r
   | Ok fd ->
-      let* res = task fd in
-      Lwt.catch
-        (fun () ->
-          let* () = Lwt_unix.close fd in
-          Lwt.return (Ok res))
-        (function
-          | Unix.Unix_error (unix_code, caller, arg) ->
-              Lwt.return (Error {action = `Close; unix_code; caller; arg})
-          | exn -> Lwt.reraise exn)
+      let close () =
+        Lwt.catch
+          (fun () ->
+            let* () = Lwt_unix.close fd in
+            Lwt.return_none)
+          (function
+            | Unix.Unix_error (unix_code, caller, arg) ->
+                Lwt.return_some {action = `Close; unix_code; caller; arg}
+            | exn -> Lwt.reraise exn)
+      in
+      Lwt.try_bind
+        (fun () -> task fd)
+        (fun res ->
+          let* close_failure = close () in
+          match close_failure with
+          | None -> Lwt.return (Ok res)
+          | Some error -> Lwt.return (Error error))
+        (fun exn ->
+          (* [task] raised or was cancelled. The descriptor is closed here
+             because the close above is only reached when [task] returns a
+             value, and it would otherwise be leaked. The original exception is
+             what the caller is told about; a failure to close on top of it
+             says nothing useful. *)
+          let* (_ : _ option) = close () in
+          Lwt.reraise exn)
 
 let with_open_out ?(overwrite = true) file task =
   let flags =
@@ -512,12 +528,32 @@ let with_atomic_open_out ?(overwrite = true) filename
   let temp_file =
     Filename.temp_file ~temp_dir (Filename.basename filename) ".tmp"
   in
-  let* res = with_open_out ~overwrite temp_file f in
-  Lwt.catch
-    (fun () ->
-      let*! () = Lwt_unix.rename temp_file filename in
-      return res)
+  (* [Filename.temp_file] has created the file. Every path that does not rename
+     it onto [filename] has to remove it, or it stays in [temp_dir] for good. *)
+  let remove_temp_file () =
+    Lwt.catch (fun () -> Lwt_unix.unlink temp_file) (fun _ -> Lwt.return_unit)
+  in
+  let rename_or_remove res =
+    Lwt.catch
+      (fun () ->
+        let*! () = Lwt_unix.rename temp_file filename in
+        return res)
+      (function
+        | Unix.Unix_error (unix_code, caller, arg) ->
+            let*! () = remove_temp_file () in
+            Lwt.return (Error {action = `Rename; unix_code; caller; arg})
+        | exn ->
+            let*! () = remove_temp_file () in
+            Lwt.reraise exn)
+  in
+  Lwt.try_bind
+    (fun () -> with_open_out ~overwrite temp_file f)
     (function
-      | Unix.Unix_error (unix_code, caller, arg) ->
-          Lwt.return (Error {action = `Rename; unix_code; caller; arg})
-      | exn -> Lwt.reraise exn)
+      | Ok res -> rename_or_remove res
+      | Error _ as error ->
+          let*! () = remove_temp_file () in
+          Lwt.return error)
+    (fun exn ->
+      (* [f] raised or was cancelled. *)
+      let*! () = remove_temp_file () in
+      Lwt.reraise exn)
