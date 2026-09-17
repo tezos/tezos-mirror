@@ -49,6 +49,7 @@ module Acl = struct
             [
               "GET /global/block/*/durable/wasm_2_0_0/subkeys";
               "GET /global/block/*/durable/wasm_2_0_0/values";
+              "POST /global/block/*/simulate";
               "/local/batcher/**";
               "/local/dal/**";
               "/admin/**";
