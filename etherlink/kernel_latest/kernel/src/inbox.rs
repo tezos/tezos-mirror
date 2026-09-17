@@ -605,12 +605,7 @@ where
             }
         }
         InputResult::Unparsable => Ok(ReadStatus::Ongoing),
-        InputResult::Simulation => {
-            // Starting simulation mode needs the full `RuntimeKeyspaces`
-            // (eth_accounts, for account state), which this function no
-            // longer holds: the caller performs it once this returns.
-            Ok(ReadStatus::Simulation)
-        }
+        InputResult::Simulation => Ok(ReadStatus::Simulation),
         InputResult::Input(input) => {
             handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
