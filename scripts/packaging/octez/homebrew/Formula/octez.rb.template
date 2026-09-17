@@ -32,6 +32,14 @@ class Octez < Formula
     ENV["CARGO_HOME"]="./.cargo"
     ENV["OPAMROOT"]="./.opam"
     ENV["OPAMYES"]="true"
+    # Homebrew >= 7.0 sets OPAMNODEPEXTS=1 for every formula build
+    # (Homebrew/brew#23810), to stop opam installing system packages itself.
+    # [make build-deps] runs [opam install --depext-only], which opam refuses to
+    # combine with it -- and with --assume-depexts too, so the only way to keep
+    # that step is to turn the setting off here. The external dependencies are
+    # already installed, from [depends_on] above, so opam finds nothing missing
+    # and installs nothing.
+    ENV["OPAMNODEPEXTS"]="0"
     ENV["BLST_PORTABLE"]="yes"
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
