@@ -28,7 +28,6 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_evm_logging::{log, Level::*};
 #[cfg(test)]
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::SafeKeyspace;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
@@ -535,7 +534,7 @@ pub enum DelayedTransactionFetchingResult<Tx> {
 
 pub fn fetch_hashes_from_delayed_inbox(
     host: &impl StorageV1,
-    base: &impl SafeKeyspace,
+    base: &impl KeySpace,
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
@@ -602,7 +601,7 @@ fn transactions_from_bytes(
 
 pub fn fetch_delayed_txs(
     host: &impl StorageV1,
-    base: &impl SafeKeyspace,
+    base: &impl KeySpace,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
@@ -653,7 +652,7 @@ pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 #[allow(clippy::too_many_arguments)]
 fn parse_and_validate_blueprint(
     host: &impl StorageV1,
-    base: &impl SafeKeyspace,
+    base: &impl KeySpace,
     bytes: &[u8],
     delayed_inbox: &DelayedInbox,
     current_blueprint_size: usize,
@@ -773,7 +772,7 @@ fn read_blueprint_chunk(
 #[allow(clippy::too_many_arguments)]
 fn read_all_chunks_and_validate(
     host: &impl StorageV1,
-    base: &mut impl SafeKeyspace,
+    base: &mut impl KeySpace,
     number: U256,
     nb_chunks: u16,
     config: &Configuration,
@@ -846,7 +845,7 @@ fn read_all_chunks_and_validate(
 
 pub fn read_blueprint(
     host: &impl StorageV1,
-    base: &mut impl SafeKeyspace,
+    base: &mut impl KeySpace,
     config: &Configuration,
     number: U256,
     previous_timestamp: Timestamp,
@@ -886,14 +885,15 @@ pub fn read_blueprint(
 #[cfg(test)]
 pub fn read_next_blueprint<Host, KS>(
     rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    base: &mut KS,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
 {
     let (number, previous_timestamp, block_header) =
-        match read_current_block_header::<EVMBlockHeader>(rk.base()) {
+        match read_current_block_header::<EVMBlockHeader>(base) {
             Ok(BlockHeader {
                 blueprint_header,
                 chain_header,
@@ -908,9 +908,8 @@ where
                 EVMBlockHeader::genesis_header(),
             ),
         };
-    let (host, base) = rk.base_parts_mut();
     read_blueprint(
-        host,
+        rk.host_mut(),
         base,
         config,
         number,
@@ -953,6 +952,7 @@ pub fn clear_all_blueprints(base: &mut impl KeySpace) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use crate::load_base;
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
@@ -986,9 +986,10 @@ mod tests {
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
             ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
                 .unwrap();
@@ -1046,14 +1047,14 @@ mod tests {
             chain_id: None,
         };
 
-        store_last_info_per_level_timestamp(rk.base_mut(), Timestamp::from(40)).unwrap();
+        store_last_info_per_level_timestamp(&mut base, Timestamp::from(40)).unwrap();
 
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
             rk.host(),
-            rk.base(),
+            &base,
             blueprint_with_hashes_bytes.as_ref(),
             &delayed_inbox,
             0,
@@ -1074,26 +1075,26 @@ mod tests {
         );
 
         // Store blueprint
-        store_sequencer_blueprint(rk.base_mut(), seq_blueprint)
+        store_sequencer_blueprint(&mut base, seq_blueprint)
             .expect("Should be able to store sequencer blueprint");
 
         // Blueprint 0 should be stored
-        let exists = blueprint_exists(rk.base(), U256::zero()).unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the delayed hash
         // isn't in the delayed inbox
-        let blueprint = read_next_blueprint(&mut rk, &mut config)
+        let blueprint = read_next_blueprint(&mut rk, &mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 
         // Next number should be 0, as we didn't read one
-        let number = read_next_blueprint_number(rk.base())
+        let number = read_next_blueprint_number(&base)
             .expect("Should be able to read next blueprint number");
         assert!(number.is_zero());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(rk.base(), U256::zero()).unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(!exists);
 
         // Test with invalid parent hash
@@ -1117,11 +1118,11 @@ mod tests {
         };
 
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
             rk.host(),
-            rk.base(),
+            &base,
             blueprint_with_hashes_bytes.as_ref(),
             &delayed_inbox,
             0,
@@ -1139,20 +1140,20 @@ mod tests {
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
 
         // Store blueprint
-        store_sequencer_blueprint(rk.base_mut(), seq_blueprint)
+        store_sequencer_blueprint(&mut base, seq_blueprint)
             .expect("Should be able to store sequencer blueprint");
         // Blueprint 0 should be stored
-        let exists = blueprint_exists(rk.base(), U256::zero()).unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the parent hash
         // is invalid
-        let blueprint = read_next_blueprint(&mut rk, &mut config)
+        let blueprint = read_next_blueprint(&mut rk, &mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 
         // The blueprint 0 should have been removed
-        let exists = blueprint_exists(rk.base(), U256::zero()).unwrap();
+        let exists = blueprint_exists(&base, U256::zero()).unwrap();
         assert!(!exists)
     }
 
@@ -1172,6 +1173,7 @@ mod tests {
     #[test]
     fn store_current_block_header_resolves_to_absolute_path() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let block_header = BlockHeader {
             blueprint_header: BlueprintHeader {
@@ -1185,7 +1187,7 @@ mod tests {
             }),
         };
 
-        store_current_block_header(rk.base_mut(), &block_header).unwrap();
+        store_current_block_header(&mut base, &block_header).unwrap();
 
         // The keyspace write must land at the historical absolute path...
         assert!(rk
@@ -1193,7 +1195,7 @@ mod tests {
             .store_read_all(&EVM_CURRENT_BLOCK_HEADER)
             .is_ok());
         // ...and the keyspace reader must decode the same blueprint header back.
-        let read = read_current_block_header::<EVMBlockHeader>(rk.base()).unwrap();
+        let read = read_current_block_header::<EVMBlockHeader>(&base).unwrap();
         assert_eq!(read.blueprint_header.number, 7.into());
         assert_eq!(read.blueprint_header.timestamp, Timestamp::from(10));
     }
@@ -1205,6 +1207,7 @@ mod tests {
     #[test]
     fn store_sequencer_blueprint_resolves_to_absolute_paths() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let number = U256::from(3);
         let chunk_index = 2u16;
@@ -1218,7 +1221,7 @@ mod tests {
             chunk_index,
             chain_id: None,
         };
-        store_sequencer_blueprint(rk.base_mut(), blueprint).unwrap();
+        store_sequencer_blueprint(&mut base, blueprint).unwrap();
 
         // The keyspace writes must land at the historical absolute paths,
         // identical to the `concat`-built ones.
@@ -1239,23 +1242,20 @@ mod tests {
         assert!(rk.host_mut().store_read_all(&chunk_path).is_ok());
 
         // ...and the migrated readers read the same values back.
+        assert_eq!(read_blueprint_nb_chunks(&base, number).unwrap(), nb_chunks);
         assert_eq!(
-            read_blueprint_nb_chunks(rk.base(), number).unwrap(),
-            nb_chunks
-        );
-        assert_eq!(
-            read_blueprint_generation_or_default(rk.base(), number, U256::one()).unwrap(),
+            read_blueprint_generation_or_default(&base, number, U256::one()).unwrap(),
             U256::zero()
         );
         assert_eq!(
-            read_blueprint_chunk(rk.base(), number, chunk_index).unwrap(),
+            read_blueprint_chunk(&base, number, chunk_index).unwrap(),
             StoreBlueprint::SequencerChunk(chunk)
         );
 
         // The blueprint exists and is removed cleanly through the keyspace.
-        assert!(blueprint_exists(rk.base(), number).unwrap());
-        delete_blueprint(rk.base_mut(), number).unwrap();
-        assert!(!blueprint_exists(rk.base(), number).unwrap());
+        assert!(blueprint_exists(&base, number).unwrap());
+        delete_blueprint(&mut base, number).unwrap();
+        assert!(!blueprint_exists(&base, number).unwrap());
         assert!(rk.host_mut().store_read_all(&chunk_path).is_err());
     }
 
