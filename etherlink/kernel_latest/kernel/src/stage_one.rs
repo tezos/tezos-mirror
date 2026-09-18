@@ -391,7 +391,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -420,7 +420,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -442,7 +442,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -478,7 +478,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -510,7 +510,6 @@ mod tests {
 
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
-            rk.host_mut(),
             &mut base,
             &conf,
             U256::from(10),
@@ -546,7 +545,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -592,7 +591,7 @@ mod tests {
             U256::from(9),
         )
         .unwrap();
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -626,7 +625,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -664,7 +663,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -703,7 +702,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
         {
             None => panic!("There should be a blueprint"),
@@ -730,7 +729,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -762,7 +761,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -791,7 +790,7 @@ mod tests {
         fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -879,7 +878,7 @@ mod tests {
 
         setup_dal_signal(&mut rk, &mut base, &mut conf, None, None);
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_none()
@@ -897,7 +896,7 @@ mod tests {
 
         setup_dal_signal(&mut rk, &mut base, &mut conf, Some(vec![21]), Some(vec![]));
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -915,7 +914,7 @@ mod tests {
 
         setup_dal_signal(&mut rk, &mut base, &mut conf, None, None);
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_none()
@@ -933,7 +932,7 @@ mod tests {
 
         setup_dal_signal(&mut rk, &mut base, &mut conf, Some(vec![6]), None);
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -951,7 +950,7 @@ mod tests {
 
         setup_dal_signal(&mut rk, &mut base, &mut conf, Some(vec![21]), None);
 
-        if read_next_blueprint(&mut rk, &mut base, &mut conf)
+        if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
             .is_some()
@@ -978,7 +977,7 @@ mod tests {
             "Even with no user transactions the proxy reads the inbox and requests a reboot"
         );
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1017,7 +1016,7 @@ mod tests {
             "Non-empty proxy inbox should request a reboot"
         );
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1065,7 +1064,7 @@ mod tests {
             "Mixed tx+deposit inbox should request a reboot"
         );
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {
@@ -1103,7 +1102,7 @@ mod tests {
         let stored_ts = read_last_info_per_level_timestamp(&base)
             .expect("timestamp should be readable after fetch");
 
-        match read_next_blueprint(&mut rk, &mut base, &mut conf)
+        match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0
         {

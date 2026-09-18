@@ -162,7 +162,7 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &impl StorageV1, base: &impl KeySpace) -> Self {
+    pub fn read_from_storage(base: &impl KeySpace) -> Self {
         let (enable_michelson_gas_refund, tezos_runtime_enabled) = (
             crate::storage::enable_michelson_gas_refund(base),
             crate::storage::enable_tezos_runtime(base),
@@ -173,7 +173,7 @@ impl ExperimentalFeatures {
             // current deployment where only enable_tezos_runtime is set to still
             // activate the Michelson runtime.
             Some(
-                crate::storage::read_michelson_runtime_target_sunrise_level(host)
+                crate::storage::read_michelson_runtime_target_sunrise_level(base)
                     .unwrap_or(U256::zero()),
             )
         } else {
@@ -565,7 +565,6 @@ impl TezosXChainConfig {
     }
 
     pub fn fetch_hashes_from_delayed_inbox(
-        host: &impl StorageV1,
         base: &impl KeySpace,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &DelayedInbox,
@@ -574,7 +573,6 @@ impl TezosXChainConfig {
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
-            host,
             base,
             delayed_hashes,
             delayed_inbox,

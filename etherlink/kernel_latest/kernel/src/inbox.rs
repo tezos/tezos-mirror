@@ -703,7 +703,7 @@ where
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(base)?;
-    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
+    let experimental_features = ExperimentalFeatures::read_from_storage(base);
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = (
         crate::storage::is_legacy_dal_signals_disabled(base),
         crate::storage::read_dal_publishers_whitelist(base).unwrap_or_default(),

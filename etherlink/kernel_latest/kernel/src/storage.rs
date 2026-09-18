@@ -19,6 +19,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
+use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
@@ -72,6 +73,7 @@ pub enum StorageVersion {
     V63,
     V64,
     V65,
+    V66,
 }
 
 impl From<StorageVersion> for u64 {
@@ -86,7 +88,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V65;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V66;
 
 // Legacy storage version path, outside the `/base` keyspace. Only read once,
 // by `init_storage_versioning` at stage zero, which promotes the recorded
@@ -142,10 +144,11 @@ pub const ENABLE_TEZOS_RUNTIME: RefPath =
 const ENABLE_TEZOS_RUNTIME_KEY: Key =
     Key::from_static(b"/feature_flags/enable_tezos_runtime");
 
-// Target EVM block number for the Michelson runtime sunrise. Written by the
-// installer when scheduling a future activation.
-const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
-    RefPath::assert_from(b"/tez/world_state/michelson_runtime/target_sunrise_level");
+// Target EVM block number for the Michelson runtime sunrise, inside the
+// `/base` keyspace. Written by the installer when scheduling a future
+// activation. Resolves to `/base/michelson_runtime_target_sunrise_level`.
+const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL_KEY: Key =
+    Key::from_static(b"/michelson_runtime_target_sunrise_level");
 
 // EVM block number where the Michelson runtime first started producing
 // Tezos blocks. Written once by the kernel at the sunrise block.
@@ -932,10 +935,8 @@ pub fn enable_tezos_runtime(base: &impl KeySpace) -> bool {
     base.contains(&ENABLE_TEZOS_RUNTIME_KEY)
 }
 
-pub fn read_michelson_runtime_target_sunrise_level(
-    host: &impl StorageV1,
-) -> Option<U256> {
-    read_u256_le(host, &MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL).ok()
+pub fn read_michelson_runtime_target_sunrise_level(base: &impl KeySpace) -> Option<U256> {
+    base.get_u256_le(&MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL_KEY)
 }
 
 pub fn store_michelson_runtime_sunrise_level(

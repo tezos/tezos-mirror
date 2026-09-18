@@ -56,7 +56,7 @@ let supports_dal = function
    value for a network when that network's kernel is rebaked; treat this as
    the single source of truth when picking storage-version-gated paths in
    tezt. *)
-let storage_version = function Latest -> 65 | Previewnet -> 60 | Mainnet -> 65
+let storage_version = function Latest -> 66 | Previewnet -> 60 | Mainnet -> 65
 
 let of_tag tag =
   let contain_exp ~exp =
@@ -72,10 +72,10 @@ let of_tag tag =
 
 (* Select the appropriate EVM version for the specified kernel.
 
-   Mainnet now honours an explicitly requested version: ganesha-r2 ships
-   storage version 65, the same generation as Latest, and [kernel_config]
-   emits the evm_version slot for it. Previewnet keeps the default until
-   someone checks that its kernel reads that slot. *)
+   Mainnet honours an explicitly requested version: ganesha-r2 ships storage
+   version 65, and [kernel_config] emits the evm_version slot for it.
+   Previewnet keeps the default until someone checks that its kernel reads
+   that slot. *)
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
   | Some v, (Latest | Mainnet) -> v

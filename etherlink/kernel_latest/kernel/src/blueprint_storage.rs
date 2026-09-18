@@ -533,7 +533,6 @@ pub enum DelayedTransactionFetchingResult<Tx> {
 }
 
 pub fn fetch_hashes_from_delayed_inbox(
-    host: &impl StorageV1,
     base: &impl KeySpace,
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &DelayedInbox,
@@ -542,7 +541,7 @@ pub fn fetch_hashes_from_delayed_inbox(
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
-    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
+    let experimental_features = ExperimentalFeatures::read_from_storage(base);
     for tx_hash in delayed_hashes {
         let tx = delayed_inbox.find_transaction(base, tx_hash)?;
         match tx {
@@ -600,7 +599,6 @@ fn transactions_from_bytes(
 }
 
 pub fn fetch_delayed_txs(
-    host: &impl StorageV1,
     base: &impl KeySpace,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &DelayedInbox,
@@ -609,7 +607,6 @@ pub fn fetch_delayed_txs(
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     let (mut delayed_txs, total_size) =
         match TezosXChainConfig::fetch_hashes_from_delayed_inbox(
-            host,
             base,
             blueprint_with_hashes.delayed_hashes,
             delayed_inbox,
@@ -651,7 +648,6 @@ pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
 #[allow(clippy::too_many_arguments)]
 fn parse_and_validate_blueprint(
-    host: &impl StorageV1,
     base: &impl KeySpace,
     bytes: &[u8],
     delayed_inbox: &DelayedInbox,
@@ -730,7 +726,6 @@ fn parse_and_validate_blueprint(
 
             // Fetch delayed transactions
             fetch_delayed_txs(
-                host,
                 base,
                 blueprint_with_hashes,
                 delayed_inbox,
@@ -771,7 +766,6 @@ fn read_blueprint_chunk(
 
 #[allow(clippy::too_many_arguments)]
 fn read_all_chunks_and_validate(
-    host: &impl StorageV1,
     base: &mut impl KeySpace,
     number: U256,
     nb_chunks: u16,
@@ -815,7 +809,6 @@ fn read_all_chunks_and_validate(
             ..
         }) => {
             let validity: (BlueprintValidity, usize) = parse_and_validate_blueprint(
-                host,
                 base,
                 chunks.concat().as_slice(),
                 delayed_inbox,
@@ -844,7 +837,6 @@ fn read_all_chunks_and_validate(
 }
 
 pub fn read_blueprint(
-    host: &impl StorageV1,
     base: &mut impl KeySpace,
     config: &Configuration,
     number: U256,
@@ -865,7 +857,6 @@ pub fn read_blueprint(
         log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
         let (blueprint, size) = read_all_chunks_and_validate(
-            host,
             base,
             number,
             nb_chunks,
@@ -883,15 +874,10 @@ pub fn read_blueprint(
 }
 
 #[cfg(test)]
-pub fn read_next_blueprint<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
-    base: &mut KS,
+pub fn read_next_blueprint(
+    base: &mut impl KeySpace,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint>, usize)>
-where
-    Host: StorageV1,
-    KS: KeySpace,
-{
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<EVMBlockHeader>(base) {
             Ok(BlockHeader {
@@ -908,14 +894,7 @@ where
                 EVMBlockHeader::genesis_header(),
             ),
         };
-    read_blueprint(
-        rk.host_mut(),
-        base,
-        config,
-        number,
-        previous_timestamp,
-        &block_header,
-    )
+    read_blueprint(base, config, number, previous_timestamp, &block_header)
 }
 
 pub fn drop_blueprint(base: &mut impl KeySpace, number: U256) -> Result<(), Error> {
@@ -987,7 +966,6 @@ mod tests {
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let delayed_inbox =
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         let delayed_bridge: ContractKt1Hash =
@@ -1053,7 +1031,6 @@ mod tests {
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
-            rk.host(),
             &base,
             blueprint_with_hashes_bytes.as_ref(),
             &delayed_inbox,
@@ -1084,7 +1061,7 @@ mod tests {
 
         // Reading the next blueprint should be None, as the delayed hash
         // isn't in the delayed inbox
-        let blueprint = read_next_blueprint(&mut rk, &mut base, &mut config)
+        let blueprint = read_next_blueprint(&mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 
@@ -1121,7 +1098,6 @@ mod tests {
             DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
         let validity = parse_and_validate_blueprint(
-            rk.host(),
             &base,
             blueprint_with_hashes_bytes.as_ref(),
             &delayed_inbox,
@@ -1148,7 +1124,7 @@ mod tests {
 
         // Reading the next blueprint should be None, as the parent hash
         // is invalid
-        let blueprint = read_next_blueprint(&mut rk, &mut base, &mut config)
+        let blueprint = read_next_blueprint(&mut base, &mut config)
             .expect("Reading next blueprint should work");
         assert!(blueprint.0.is_none());
 

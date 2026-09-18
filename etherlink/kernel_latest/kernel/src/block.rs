@@ -264,7 +264,7 @@ where
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) =
-        { read_blueprint(host, base, config, next_bip_number, timestamp, chain_header)? };
+        { read_blueprint(base, config, next_bip_number, timestamp, chain_header)? };
     log!(Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -383,7 +383,7 @@ where
         error
     );
     host.revert()?;
-    drop_invalid_blueprint(host, base, config)?;
+    drop_invalid_blueprint(base, config)?;
     Ok(())
 }
 
@@ -405,7 +405,7 @@ where
             allow_path_not_found(host.store_delete(&TMP_PATH))?;
             allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
 
-            drop_invalid_blueprint(host, base, config)?;
+            drop_invalid_blueprint(base, config)?;
         }
 
         return Ok(());
@@ -420,18 +420,13 @@ where
 ///
 /// Multi-transaction blueprints and non-delayed lone transactions leave the
 /// inbox untouched.
-fn drop_invalid_blueprint<Host>(
-    host: &mut Host,
+fn drop_invalid_blueprint(
     base: &mut impl KeySpace,
     config: &mut Configuration,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-{
+) -> anyhow::Result<()> {
     let (number, previous_timestamp, ref previous_chain_header) = get_next_bip_info(base);
 
     if let (Some(blueprint), _) = read_blueprint(
-        host,
         base,
         config,
         number,
@@ -1359,7 +1354,7 @@ mod tests {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         init_safe_storage_roots(host);
-        let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
+        let experimental_features = ExperimentalFeatures::read_from_storage(base);
         let debug_features = DebugFeatures::read_from_storage(base);
         TezosXChainConfig::create_config(
             DUMMY_CHAIN_ID,
