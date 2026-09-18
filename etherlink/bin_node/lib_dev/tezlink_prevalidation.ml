@@ -464,25 +464,32 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
+let counter_repr_of_z : Z.t -> Imported_protocol.Manager_counter_repr.t tzresult
+    =
+  Tezos_types.convert_using_serialization
+    ~name:"counter"
+    ~dst:Imported_protocol.Manager_counter_repr.encoding_for_errors
+    ~src:Data_encoding.z
+
 let validate_first_counter ~state ~source ~first_counter =
   let open Lwt_result_syntax in
+  let open Imported_protocol in
+  let open Manager_counter_repr in
   let* counter = Tezlink_durable_storage.counter state source in
-  let counter = Option.value ~default:Z.zero counter in
+  let*? counter = Option.value ~default:Z.zero counter |> counter_repr_of_z in
   let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
-  if Z.gt first_counter counter then
-    (* we allow the first counter to be in the future *) return (Ok ())
+  let*? first_counter = counter_repr_of_z first_counter in
+  let expected = succ counter in
+  if first_counter = expected then return (Ok ())
   else
-    let expected =
-      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
-      @@ (Z.to_int counter + 1)
-    in
-    let found =
-      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
-      @@ Z.to_int first_counter
-    in
-    tzfail_p
-    @@ Imported_protocol.Contract_storage.(
-         Counter_in_the_past {contract = Implicit source; expected; found})
+    let contract = Contract_repr.Implicit source in
+    let found = first_counter in
+    if first_counter > counter then
+      tzfail_p
+      @@ Contract_storage.(Counter_in_the_future {contract; expected; found})
+    else
+      tzfail_p
+      @@ Contract_storage.(Counter_in_the_past {contract; expected; found})
 
 let validate_size ~op_raw_size ~error_clue =
   let open Lwt_result_syntax in

@@ -589,7 +589,7 @@ let test_reveal_in_funding_block () =
   (* Both land in the blueprint produced below. The reveal is forged by hand:
      the client will not estimate fees for a source that does not exist yet.
      Distinct funders, so the funding transfers do not share a counter. *)
-  let fund_and_reveal ~funder ~counter =
+  let fund_and_reveal ?error ~funder ~counter () =
     let* account = Client.gen_and_show_keys tez_client in
     let* () =
       Client.transfer
@@ -615,14 +615,22 @@ let test_reveal_in_funding_block () =
           ])
         tez_client
     in
-    let* (`OpHash _) = Operation.inject ~dont_wait:true reveal_op tez_client in
+    let* (`OpHash _) =
+      Operation.inject ?error ~dont_wait:true reveal_op tez_client
+    in
     return account
   in
   let* expected_counter_account =
-    fund_and_reveal ~funder:Constant.bootstrap5 ~counter:1
+    fund_and_reveal ~funder:Constant.bootstrap5 ~counter:1 ()
   in
+  (* The counter in the future is rejected at injection; the check below that
+     the reveal did not land then holds whatever the prevalidator answers. *)
   let* future_counter_account =
-    fund_and_reveal ~funder:Constant.bootstrap4 ~counter:2
+    fund_and_reveal
+      ~error:(rex "Command failed")
+      ~funder:Constant.bootstrap4
+      ~counter:2
+      ()
   in
   let*@ _ = Rpc.produce_block sandbox in
   let* manager_key =
