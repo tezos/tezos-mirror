@@ -49,7 +49,12 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     to use [Evm_ro_context] instead.
 
     [snapshot_source] can be provided to automatically fetch and import the
-    snapshot from a URL if the [data_dir] was not initialized before. *)
+    snapshot from a URL if the [data_dir] was not initialized before.
+
+    [preemptive_kernel_download] (false by default) makes the node download in
+    the background the preimages of the kernel upgrade that is pending, if
+    any. It is meant for the daemons the upgrade will eventually be applied by,
+    not for the one-shot commands sharing this function. *)
 val start :
   configuration:Configuration.t ->
   ?kernel_path:Pvm_types.kernel ->
@@ -57,6 +62,7 @@ val start :
   store_perm:Sqlite.perm ->
   ?sequencer_key_source:sequencer_key_source ->
   ?snapshot_source:snapshot_source ->
+  ?preemptive_kernel_download:bool ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 

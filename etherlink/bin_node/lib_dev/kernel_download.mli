@@ -11,6 +11,9 @@
     preimage whose hash does not match the one it was requested for is
     downloaded again at most [num_download_retries] times (once by default).
 
+    A preimage already present in [preimages] is read from there instead of
+    being fetched again, so an interrupted download resumes where it stopped.
+
     When [progress] is set (it is not by default), a progress bar reporting the
     number of preimages downloaded out of the total is displayed on the
     terminal. *)

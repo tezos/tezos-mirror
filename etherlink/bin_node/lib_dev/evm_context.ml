@@ -45,6 +45,7 @@ type parameters = {
   store_perm : Sqlite.perm;
   sequencer_key_source : sequencer_key_source option;
   snapshot_source : snapshot_source option;
+  preemptive_kernel_download : bool;
 }
 
 type future_block_info = {
@@ -2581,7 +2582,8 @@ module State = struct
     return (evm_state, context, storage_version)
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-      ~store_perm ?sequencer_key_source ?snapshot_source () =
+      ~store_perm ?sequencer_key_source ?snapshot_source
+      ~preemptive_kernel_download () =
     let open Lwt_result_syntax in
     let signer =
       match sequencer_key_source with
@@ -2780,7 +2782,15 @@ module State = struct
 
     let*! () =
       Option.iter_s
-        (fun upgrade -> Events.pending_upgrade upgrade.Evm_store.kernel_upgrade)
+        (fun {Evm_store.kernel_upgrade; _} ->
+          (* The preemptive download started when the upgrade was announced
+             (see [apply_evm_event_unsafe]) does not survive a restart, and the
+             announcement event is not applied a second time. Start it again
+             here, so that a node restarted during the upgrade window still
+             fetches the preimages it is missing before the activation. *)
+          if preemptive_kernel_download then
+            background_preemptive_download configuration kernel_upgrade ;
+          Events.pending_upgrade kernel_upgrade)
         pending_upgrade
     in
 
@@ -3039,6 +3049,7 @@ module Handlers = struct
         store_perm;
         sequencer_key_source;
         snapshot_source;
+        preemptive_kernel_download;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -3049,6 +3060,7 @@ module Handlers = struct
         ~store_perm
         ?sequencer_key_source
         ?snapshot_source
+        ~preemptive_kernel_download
         ()
     in
     Lwt.wakeup execution_config_waker
@@ -3322,7 +3334,8 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-    ~store_perm ?sequencer_key_source ?snapshot_source () =
+    ~store_perm ?sequencer_key_source ?snapshot_source
+    ?(preemptive_kernel_download = false) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
@@ -3336,6 +3349,7 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         store_perm;
         sequencer_key_source;
         snapshot_source;
+        preemptive_kernel_download;
       }
       (module Handlers)
   in

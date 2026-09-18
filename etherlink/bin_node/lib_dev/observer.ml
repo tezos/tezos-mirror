@@ -240,6 +240,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~store_perm:Read_write
       ?sequencer_key_source
       ?snapshot_source
+      ~preemptive_kernel_download:true
       ()
   in
 
