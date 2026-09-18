@@ -773,6 +773,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::load_base;
+
     use crate::blueprint_storage::{
         blueprint_exists, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
@@ -913,6 +915,7 @@ mod tests {
     #[test]
     fn parse_valid_simple_transaction() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap();
@@ -927,11 +930,14 @@ mod tests {
         rk.host_mut()
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
-        let (host, base) = rk.base_parts_mut();
-        let inbox_content =
-            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
-                .unwrap()
-                .unwrap();
+        let inbox_content = read_proxy_inbox(
+            rk.host_mut(),
+            &mut base,
+            SMART_ROLLUP_ADDRESS,
+            &CommonConfig::default(),
+        )
+        .unwrap()
+        .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -944,6 +950,7 @@ mod tests {
     fn parse_valid_chunked_transaction() {
         let address = smart_rollup_address();
         let mut host = MockKernelHost::init(MockHost::with_address(&address));
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let (data, tx) = large_transaction();
@@ -957,7 +964,7 @@ mod tests {
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
@@ -973,6 +980,7 @@ mod tests {
     #[test]
     fn parse_valid_kernel_upgrade() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Prepare the upgrade's payload
@@ -1005,7 +1013,7 @@ mod tests {
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         rk.host_mut().host.add_transfer(payload, &transfer_metadata);
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let _inbox_content = read_proxy_inbox(
             host,
             base,
@@ -1028,8 +1036,7 @@ mod tests {
             activation_timestamp,
         });
 
-        let stored_kernel_upgrade =
-            crate::upgrade::read_kernel_upgrade(rk.base()).unwrap();
+        let stored_kernel_upgrade = crate::upgrade::read_kernel_upgrade(&base).unwrap();
         assert_eq!(stored_kernel_upgrade, expected_upgrade);
     }
 
@@ -1038,6 +1045,7 @@ mod tests {
     // the first `NewChunkedTransaction` should be considered.
     fn recreate_chunked_transaction() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let chunk_hashes = vec![[1; TRANSACTION_HASH_SIZE], [2; TRANSACTION_HASH_SIZE]];
@@ -1062,7 +1070,7 @@ mod tests {
             new_chunk2,
         )));
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let _inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
@@ -1078,6 +1086,7 @@ mod tests {
     // not make the kernel fail.
     fn out_of_bound_chunk_is_ignored() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let (data, _tx) = large_transaction();
@@ -1112,7 +1121,7 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let _inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
@@ -1131,6 +1140,7 @@ mod tests {
     // not make the kernel fail.
     fn unknown_chunk_is_ignored() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let (data, _tx) = large_transaction();
@@ -1149,7 +1159,7 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let _inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
@@ -1183,6 +1193,7 @@ mod tests {
     // |--> Fails because the chunk is unknown
     fn transaction_is_complete_when_each_chunk_is_stored() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let (data, tx) = large_transaction();
@@ -1204,7 +1215,7 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
@@ -1222,7 +1233,7 @@ mod tests {
                 .host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
@@ -1243,6 +1254,7 @@ mod tests {
         let address = smart_rollup_address();
 
         let mut host = MockKernelHost::init(MockHost::with_address(&address));
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let tx_bytes = &hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
@@ -1282,7 +1294,7 @@ mod tests {
 
         rk.host_mut().host.add_external(framed);
 
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
@@ -1298,20 +1310,21 @@ mod tests {
     #[test]
     fn empty_inbox_returns_none() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Even reading the inbox with only the default elements returns
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         rk.host_mut().host.add_external(Bytes::from(vec![]));
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), base);
         let inbox_content =
             read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
@@ -1374,6 +1387,7 @@ mod tests {
     ) -> bool {
         // Prepare the host.
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let address = smart_rollup_address();
         let evm_block_header = EVMBlockHeader {
@@ -1382,7 +1396,7 @@ mod tests {
             transactions_root: vec![],
         };
         store_current_block_header(
-            rk.base_mut(),
+            &mut base,
             &BlockHeader {
                 blueprint_header: BlueprintHeader {
                     number: head_level,
@@ -1407,7 +1421,7 @@ mod tests {
         // Add to the inbox.
         rk.host_mut().host.add_external(framed);
         // Consume the inbox
-        let delayed_inbox = DelayedInbox::from_base(rk.base()).unwrap();
+        let delayed_inbox = DelayedInbox::from_base(&base).unwrap();
         let common = CommonConfig {
             tezos_contracts: TezosContracts::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
@@ -1424,12 +1438,12 @@ mod tests {
             dal: None,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
-        let (host, base) = rk.base_parts_mut();
+        let (host, base) = (rk.host_mut(), &mut base);
         let _ = read_sequencer_inbox(host, base, SMART_ROLLUP_ADDRESS, &common, &mut seq)
             .unwrap();
 
         // The blueprint was valid if it was stored in the storage.
-        blueprint_exists(rk.base(), unsigned_blueprint.number).unwrap()
+        blueprint_exists(&base, unsigned_blueprint.number).unwrap()
     }
 
     #[test]
