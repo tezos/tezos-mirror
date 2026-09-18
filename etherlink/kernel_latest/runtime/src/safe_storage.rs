@@ -13,7 +13,9 @@ use tezos_smart_rollup_host::{
 };
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 
-pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
+/// The prefix the mirror copies its roots under.
+const TMP: &str = "/tmp";
+pub const TMP_PATH: RefPath = RefPath::assert_from(TMP.as_bytes());
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/base/trace");
 pub const HTTP_TRACE_PATH: RefPath = RefPath::assert_from(b"/base/__http_trace");
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
@@ -192,17 +194,23 @@ impl<Host: StorageV1> SafeStorage<&mut Host> {
     }
 }
 
-/// Forwards to the underlying host: a keyspace loaded here reads and writes
-/// the live root, not the `/tmp` mirror, so its backups survive
-/// [`Self::revert`].
 impl<Host: KeySpaceLoader> KeySpaceLoader for SafeStorage<&mut Host> {
     type KeySpace = Host::KeySpace;
 
+    /// Loads `/tmp<name>`, so the keyspace writes into the mirror:
+    /// [`Self::revert`] drops its writes, and [`Self::promote`] carries them
+    /// back when `name` is one of `world_states`.
+    ///
+    /// Errors with [`KeySpaceLoaderError::InvalidName`] when the prefixed
+    /// name exceeds the name size limit, and otherwise with whatever the
+    /// wrapped loader returns, notably [`KeySpaceLoaderError::AlreadyLoaded`]
+    /// when a handle on the same prefixed name is still alive.
     fn load_or_create(
         &mut self,
         name: Name,
     ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
-        self.host.load_or_create(name)
+        let tmp_name = Name::try_from(format!("{TMP}{name}"))?;
+        self.host.load_or_create(tmp_name)
     }
 }
 
@@ -220,7 +228,64 @@ impl<Host: WithGas> WithGas for SafeStorage<&mut Host> {
 mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
+    use crate::runtime_keyspaces::{ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH};
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::{Key, KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
+
+    #[test]
+    fn keyspace_writes_follow_the_mirror() {
+        let mut host = MockKernelHost::default();
+        // `start` copies the root, so it has to exist.
+        host.store_write_all(&ETH_ACCOUNTS_ROOT_PATH, b"seed")
+            .unwrap();
+        let probe = Key::from_static(b"/probe");
+        let live_probe = RefPath::assert_from(b"/evm/eth_accounts/probe");
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(ETH_ACCOUNTS_ROOT_PATH)],
+        };
+
+        safe.start().unwrap();
+        {
+            let mut keyspace = safe.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME).unwrap();
+            assert_eq!(keyspace.name().to_string(), "/tmp/evm/eth_accounts");
+            keyspace.set(&probe, b"inside").unwrap();
+        }
+        assert!(safe.host.store_has(&live_probe).unwrap().is_none());
+        assert_eq!(
+            safe.host
+                .store_read_all(&safe_path(&live_probe).unwrap())
+                .unwrap(),
+            b"inside"
+        );
+        safe.revert().unwrap();
+        assert!(safe.host.store_has(&live_probe).unwrap().is_none());
+
+        safe.start().unwrap();
+        {
+            let mut keyspace = safe.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME).unwrap();
+            keyspace.set(&probe, b"kept").unwrap();
+        }
+        safe.promote().unwrap();
+        assert_eq!(safe.host.store_read_all(&live_probe).unwrap(), b"kept");
+    }
+
+    #[test]
+    fn load_or_create_rejects_a_name_the_prefix_overflows() {
+        let mut host = MockKernelHost::default();
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![],
+        };
+        // The longest name the loader takes on its own: `/tmp` on top of it
+        // does not fit any more.
+        let name = Name::try_from(format!("/{}", "a".repeat(MAX_KEYSPACE_NAME_SIZE - 1)))
+            .unwrap();
+        assert!(matches!(
+            safe.load_or_create(name),
+            Err(KeySpaceLoaderError::InvalidName(NameError::NameTooLong))
+        ));
+    }
 
     fn trace_call_trace_path() -> OwnedPath {
         // /tmp/evm/trace/call_trace — where traces land through SafeStorage

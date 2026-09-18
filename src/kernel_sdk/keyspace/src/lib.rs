@@ -415,6 +415,9 @@ pub enum KeySpaceLoaderError {
     /// dropped yet.
     #[error("a key space with this name is already loaded")]
     AlreadyLoaded,
+    /// The requested name is not a valid key space name.
+    #[error("invalid key space name: {0}")]
+    InvalidName(#[from] NameError),
     /// Invalid/Inconsistent storage detected
     #[cfg(not(feature = "irmin-compat"))]
     #[error("KeySpaceLoader encountered a malformed name mapping for {0}")]
@@ -441,8 +444,10 @@ pub trait KeySpaceLoader {
     /// key spaces simultaneously as long as their names do not overlap.
     ///
     /// Returns an error if the requested name overlaps with any
-    /// previously loaded key space, or if a key space with this exact
-    /// name is already loaded.
+    /// previously loaded key space, if a key space with this exact
+    /// name is already loaded, or if a loader that derives a name from
+    /// `name` (a mirroring wrapper) ends up with an invalid one, see
+    /// [`KeySpaceLoaderError::InvalidName`].
     fn load_or_create(
         &mut self,
         name: Name,

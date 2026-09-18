@@ -6,57 +6,44 @@
 //!
 //! It borrows the host and holds the keyspaces the execution reads and
 //! writes, and lends them out one at a time. [`RuntimeKeyspaces::init`]
-//! builds it, and is the only keyspace load of a kernel invocation.
+//! builds it over any [`KeySpaceLoader`]: the live host, or a
+//! [`SafeStorage`](crate::safe_storage::SafeStorage) whose `/tmp` mirror then
+//! covers the keyspaces.
 
-use tezos_evm_logging::{log, set_global_verbosity, Level};
-use thiserror::Error;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 
-use tezos_smart_rollup_host::path::OwnedPath;
-use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpaceLoader, Name};
+use crate::runtime::MockKernelHost;
 
-use crate::runtime::{read_logs_verbosity, MockKernelHost};
-use crate::safe_storage::SafeStorage;
-use crate::snapshot::{PreviousRun, SafeKeyspace, SnapshotError, SnapshottedKeySpace};
-
-/// Name of the `/base` keyspace, holding kernel configuration and
-/// node-interaction values that do not belong to any world state.
-pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
+/// Durable root of the `/evm/eth_accounts` keyspace.
+const ETH_ACCOUNTS_ROOT: &str = "/evm/eth_accounts";
 
 /// Name of the `/evm/eth_accounts` keyspace, holding the EVM runtime's
 /// account state.
-pub const ETH_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static("/evm/eth_accounts");
+pub const ETH_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(ETH_ACCOUNTS_ROOT);
+
+/// [`ETH_ACCOUNTS_KEYSPACE_NAME`] as a path, for the raw copies and moves of
+/// the `/tmp` mirror.
+pub const ETH_ACCOUNTS_ROOT_PATH: RefPath =
+    RefPath::assert_from(ETH_ACCOUNTS_ROOT.as_bytes());
 
 /// Storage handle threaded through kernel execution.
 ///
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back
 /// once the handle is gone.
-pub struct RuntimeKeyspaces<'host, Host, KS> {
+pub struct RuntimeKeyspaces<'host, Host, KeySpace> {
     host: &'host mut Host,
-    base: KS,
-    keyspaces: Keyspaces<KS>,
+    keyspaces: Keyspaces<KeySpace>,
 }
 
-impl<'host, Host, KS> RuntimeKeyspaces<'host, Host, KS> {
-    /// The `/base` keyspace.
-    pub fn base(&self) -> &KS {
-        &self.base
-    }
-
-    /// The `/base` keyspace, for the writers.
-    pub fn base_mut(&mut self) -> &mut KS {
-        &mut self.base
-    }
-
+impl<'host, Host, KeySpace> RuntimeKeyspaces<'host, Host, KeySpace> {
     /// The `/evm/eth_accounts` keyspace.
-    pub fn eth_accounts(&self) -> &KS {
+    pub fn eth_accounts(&self) -> &KeySpace {
         &self.keyspaces.eth_accounts
     }
 
     /// The `/evm/eth_accounts` keyspace, for the writers.
-    pub fn eth_accounts_mut(&mut self) -> &mut KS {
+    pub fn eth_accounts_mut(&mut self) -> &mut KeySpace {
         &mut self.keyspaces.eth_accounts
     }
 
@@ -69,250 +56,30 @@ impl<'host, Host, KS> RuntimeKeyspaces<'host, Host, KS> {
     pub fn host_mut(&mut self) -> &mut Host {
         &mut *self.host
     }
-
-    /// The host and the `/base` keyspace, lent out together.
-    ///
-    /// For callers that only need those two, not the full keyspace set, and
-    /// so cannot go through `host_mut`/`base_mut` alone because they need
-    /// both borrows alive at once.
-    pub fn base_parts_mut(&mut self) -> (&mut Host, &mut KS) {
-        (&mut *self.host, &mut self.base)
-    }
-
-    /// Open a frame on every keyspace.
-    ///
-    /// On `Err`, some keyspaces may be framed and some not: the caller must
-    /// abort the run.
-    pub fn checkpoint(&mut self) -> Result<(), SnapshotError>
-    where
-        KS: SafeKeyspace,
-        Host: KeySpaceLoader<KeySpace = KS::Live>,
-    {
-        for keyspace in self.keyspaces.iter_mut() {
-            keyspace.checkpoint(&mut *self.host)?;
-        }
-        Ok(())
-    }
-
-    /// Commit the innermost frame of every keyspace.
-    pub fn commit_inner(&mut self) -> Result<(), SnapshotError>
-    where
-        KS: SafeKeyspace,
-    {
-        for keyspace in self.keyspaces.iter_mut() {
-            keyspace.commit_inner()?;
-        }
-        Ok(())
-    }
-
-    /// Revert the innermost frame of every keyspace.
-    pub fn revert_inner(&mut self) -> Result<(), SnapshotError>
-    where
-        KS: SafeKeyspace,
-    {
-        for keyspace in self.keyspaces.iter_mut() {
-            keyspace.revert_inner()?;
-        }
-        Ok(())
-    }
-
-    /// End the kernel run. A keyspace left at a non-zero depth is one whose
-    /// writes no close covered: it is reverted to its bedrock rather than
-    /// kept half-written.
-    pub fn end_kernel_run(&mut self)
-    where
-        KS: SafeKeyspace,
-    {
-        for keyspace in self.keyspaces.iter_mut().filter(|ks| ks.depth() > 0) {
-            log!(
-                Level::Error,
-                "kernel run ended with {} open frame(s) on {}, reverting to its bedrock",
-                keyspace.depth(),
-                keyspace.name()
-            );
-            keyspace.revert_all();
-        }
-    }
-
-    /// Mark every transactional keyspace's open frames so the next run takes
-    /// them back. Call it before yielding to a reboot, in place of
-    /// [`Self::end_kernel_run`].
-    ///
-    /// An `Err` may leave the roots marked by halves, and a reboot on top of
-    /// that resumes one root while starting the other over: the caller must
-    /// abort the run rather than yield.
-    pub fn create_reboot_marker(&mut self) -> Result<(), SnapshotError>
-    where
-        KS: SafeKeyspace,
-    {
-        for keyspace in self.keyspaces.iter_mut().filter(|ks| ks.depth() > 0) {
-            keyspace.create_reboot_marker()?;
-        }
-        Ok(())
-    }
-
-    /// Replace the bedrocks with the live state. The next
-    /// [`Self::end_kernel_run`] will restore the live state to this point.
-    pub fn commit_all(&mut self) -> Result<(), SnapshotError>
-    where
-        KS: SafeKeyspace,
-    {
-        for keyspace in self.keyspaces.iter_mut() {
-            keyspace.commit_all()?;
-        }
-        Ok(())
-    }
-
-    /// Runs `f` over the handle rewrapped in the failsafe mirror.
-    ///
-    /// The mirror covers `world_states` and lives for the call: `f` starts,
-    /// promotes or reverts it itself. `/base` and the keyspaces are the ones
-    /// of `self`.
-    pub fn with_safe_host<T>(
-        &mut self,
-        world_states: Vec<OwnedPath>,
-        f: impl FnOnce(&mut RuntimeKeyspaces<'_, SafeStorage<&mut Host>, &mut KS>) -> T,
-    ) -> T {
-        let mut safe_host = SafeStorage {
-            host: &mut *self.host,
-            world_states,
-        };
-        let mut safe_rk = RuntimeKeyspaces {
-            host: &mut safe_host,
-            base: &mut self.base,
-            keyspaces: self.keyspaces.as_mut(),
-        };
-        f(&mut safe_rk)
-    }
 }
 
-/// A root [`RuntimeKeyspaces::revert_both`] could not revert.
-#[derive(Debug, Error)]
-pub enum RevertError {
-    #[error("cannot revert the /tmp copy: {0:?}")]
-    TmpCopy(RuntimeError),
-    #[error("cannot revert the keyspace frames: {0}")]
-    Frames(#[from] SnapshotError),
-}
-
-impl<Host, KS> RuntimeKeyspaces<'_, SafeStorage<&mut Host>, &mut KS>
-where
-    Host: StorageV1,
-    KS: SafeKeyspace,
-{
-    /// Revert both roots this scope covers, the `/tmp` copy and the keyspace
-    /// frames. Both are attempted before either is reported.
-    pub fn revert_both(&mut self) -> Result<(), RevertError> {
-        let tmp_copy = self.host_mut().revert();
-        let frames = self.revert_inner();
-        tmp_copy.map_err(RevertError::TmpCopy)?;
-        frames?;
-        Ok(())
-    }
-}
-
-impl<'host, Host> RuntimeKeyspaces<'host, Host, SnapshottedKeySpace<Host::KeySpace>>
-where
-    Host: KeySpaceLoader + WasmHost,
-{
-    /// Loads the keyspaces from `host` and applies the log verbosity recorded
-    /// under `/base`.
+impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host, Host::KeySpace> {
+    /// Loads the keyspaces from `host`.
     ///
-    /// Each keyspace is started here, at the top of the run, so a transaction
-    /// a reboot interrupted is re-attached before any caller looks: `start`
-    /// reads the in-progress marker and takes depth 0 back when it is set.
-    ///
-    /// Whether the previous run was cut short is read before any `start`, since
-    /// `start` is what would otherwise adopt an interrupted run's writes.
-    pub fn init(host: &'host mut Host) -> Result<Self, SnapshotError> {
-        let previous = if host
-            .last_run_aborted()
-            .map_err(SnapshotError::PreviousRun)?
-        {
-            log!(Level::Error, "The previous kernel run was cut short");
-            PreviousRun::Aborted
-        } else {
-            PreviousRun::Complete
-        };
-        let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
-        set_global_verbosity(read_logs_verbosity(&base));
-        // `/base` belongs to no block: reverting it would drop blueprints from
-        // an inbox level that cannot be read twice.
-        let base = SnapshottedKeySpace::start(&mut *host, base, PreviousRun::Complete)?;
+    /// Errors with the loader's error: a keyspace already held elsewhere, or
+    /// a name the loader cannot accept.
+    pub fn init(host: &'host mut Host) -> Result<Self, KeySpaceLoaderError> {
         let eth_accounts = host.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME)?;
-        let eth_accounts =
-            SnapshottedKeySpace::start(&mut *host, eth_accounts, previous)?;
         Ok(Self {
             host,
-            base,
             keyspaces: Keyspaces { eth_accounts },
         })
     }
 }
 
-/// The keyspaces under transactional control. `/base` is not one of them.
-///
-/// A field of its own so that `self.host` and `self.keyspaces` can be
-/// borrowed at the same time.
+/// The keyspaces the handle lends out.
 struct Keyspaces<KS> {
     eth_accounts: KS,
 }
 
-impl<KS> Keyspaces<KS> {
-    /// Lends each keyspace in turn. Putting a keyspace under transactional
-    /// control means adding an entry here.
-    fn iter_mut(&mut self) -> impl Iterator<Item = &mut KS> {
-        [&mut self.eth_accounts].into_iter()
-    }
-
-    /// Lends every keyspace at once, as a set.
-    fn as_mut(&mut self) -> Keyspaces<&mut KS> {
-        Keyspaces {
-            eth_accounts: &mut self.eth_accounts,
-        }
-    }
-}
-
 /// A keyspace a [`MockKernelHost`] mints, for the tests.
-pub type MockKeySpace = SnapshottedKeySpace<<MockKernelHost as KeySpaceLoader>::KeySpace>;
+pub type MockKeySpace = <MockKernelHost as KeySpaceLoader>::KeySpace;
 
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
 pub type MockRuntimeKeyspaces<'host> =
     RuntimeKeyspaces<'host, MockKernelHost, MockKeySpace>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_host::storage::StorageV1;
-
-    const PROBE: RefPath = RefPath::assert_from(b"/evm/eth_accounts/probe");
-
-    #[test]
-    fn frames_cover_the_eth_accounts_keyspace() {
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        rk.host_mut().store_write_all(&PROBE, b"before").unwrap();
-
-        rk.checkpoint().unwrap();
-        rk.host_mut().store_write_all(&PROBE, b"inside").unwrap();
-        rk.revert_inner().unwrap();
-
-        assert_eq!(rk.host_mut().store_read_all(&PROBE).unwrap(), b"before");
-    }
-
-    #[test]
-    fn end_kernel_run_restores_the_eth_accounts_bedrock() {
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        rk.host_mut().store_write_all(&PROBE, b"before").unwrap();
-
-        rk.checkpoint().unwrap();
-        rk.host_mut().store_write_all(&PROBE, b"inside").unwrap();
-        rk.end_kernel_run();
-
-        // The bedrock was taken at `init`, before any write: the whole run's
-        // writes are gone.
-        assert!(rk.host_mut().store_read_all(&PROBE).is_err());
-    }
-}
