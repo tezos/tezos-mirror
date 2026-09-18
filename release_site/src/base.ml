@@ -128,9 +128,13 @@ module Version = struct
 
   type prerelease = RC of int | Beta of int
 
+  (* Octez uses major.minor. The rollup node uses a date and a counter. *)
+  type number =
+    | Semver of {major : int; minor : int}
+    | Dated of {date : int; counter : int option}
+
   type t = {
-    major : int;
-    minor : int;
+    number : number;
     prerelease : prerelease option;
     revisions : revision list;
     latest : bool;
@@ -139,11 +143,10 @@ module Version = struct
     publication_date : float;
   }
 
-  let make ~major ~minor ?prerelease ?(revisions = []) ~latest ~active
-      ?announcement ~publication_date () =
+  let make ~number ?prerelease ?(revisions = []) ~latest ~active ?announcement
+      ~publication_date () =
     {
-      major;
-      minor;
+      number;
       prerelease;
       revisions;
       latest;
@@ -152,11 +155,22 @@ module Version = struct
       publication_date;
     }
 
-  let to_string {major; minor; prerelease; _} =
-    match prerelease with
-    | Some (RC n) -> sf "v%d.%d-rc%d" major minor n
-    | Some (Beta n) -> sf "v%d.%d-beta%d" major minor n
-    | None -> sf "v%d.%d" major minor
+  let number_to_string = function
+    | Semver {major; minor} -> sf "%d.%d" major minor
+    | Dated {date; counter = None} -> sf "%d" date
+    | Dated {date; counter = Some n} -> sf "%d.%d" date n
+
+  (* The release page also uses this suffix as the version directory. *)
+  let tag ~number ?prerelease () =
+    let suffix =
+      match prerelease with
+      | Some (RC n) -> sf "-rc%d" n
+      | Some (Beta n) -> sf "-beta%d" n
+      | None -> ""
+    in
+    sf "v%s%s" (number_to_string number) suffix
+
+  let to_string {number; prerelease; _} = tag ~number ?prerelease ()
 
   let revision_of_json json =
     let open JSON in
@@ -184,9 +198,22 @@ module Version = struct
           | "beta" -> Some (Beta number)
           | _ -> failwith (sf "Unknown prerelease kind: %s" kind)
       in
+      let number =
+        if is_null (json |-> "date") then
+          Semver
+            {
+              major = json |-> "major" |> as_int;
+              minor = json |-> "minor" |> as_int;
+            }
+        else
+          Dated
+            {
+              date = json |-> "date" |> as_int;
+              counter = json |-> "counter" |> as_int_opt;
+            }
+      in
       {
-        major = json |-> "major" |> as_int;
-        minor = json |-> "minor" |> as_int;
+        number;
         prerelease;
         revisions = json |-> "revisions" |> as_list |> List.map revision_of_json;
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
@@ -212,8 +239,7 @@ module Version = struct
   (* [to_json version] converts a version record to a JSON object. *)
   let to_json
       {
-        major;
-        minor;
+        number;
         prerelease;
         revisions;
         latest;
@@ -222,13 +248,23 @@ module Version = struct
         publication_date;
       } : JSON.u =
     `O
-      ([
-         ("major", `Float (Int.to_float major));
-         ("minor", `Float (Int.to_float minor));
-         ("latest", `Bool latest);
-         ("active", `Bool active);
-         ("pubDate", `Float publication_date);
-       ]
+      ((match number with
+       | Semver {major; minor} ->
+           [
+             ("major", `Float (Int.to_float major));
+             ("minor", `Float (Int.to_float minor));
+           ]
+       | Dated {date; counter} ->
+           ("date", `Float (Int.to_float date))
+           ::
+           (match counter with
+           | None -> []
+           | Some n -> [("counter", `Float (Int.to_float n))]))
+      @ [
+          ("latest", `Bool latest);
+          ("active", `Bool active);
+          ("pubDate", `Float publication_date);
+        ]
       @ (match prerelease with
         | None -> []
         | Some (RC n) ->
@@ -282,49 +318,34 @@ module Version = struct
   (* [add_version new_version versions] adds a new version to the list, ensuring uniqueness. *)
   let add_version new_version versions =
     let version_exists version =
-      version.major = new_version.major
-      && version.minor = new_version.minor
+      version.number = new_version.number
       && version.prerelease = new_version.prerelease
     in
     if List.exists version_exists versions then
       failwith (sf "Version %s already exists" (to_string new_version))
     else versions @ [new_version]
 
-  (* [add_build_number ~major ~minor ?rc ~build_number ~revision_date versions]
-     appends a new packaging revision to the version matching major/minor/rc.
+  (* [add_build_number ~number ?prerelease ~build_number ~revision_date versions]
+     appends a new packaging revision to the version matching number/rc.
      Each call adds a new entry to the [revisions] list, preserving the full
      history. Fails if no matching version is found. *)
-  let add_build_number ~major ~minor ?prerelease ~build_number ~revision_date
-      versions =
+  let add_build_number ~number ?prerelease ~build_number ~revision_date versions
+      =
     let matches version =
-      version.major = major && version.minor = minor
-      && version.prerelease = prerelease
+      version.number = number && version.prerelease = prerelease
     in
-    let version_suffix =
-      match prerelease with
-      | Some (RC n) -> sf "-rc%d" n
-      | Some (Beta n) -> sf "-beta%d" n
-      | None -> ""
-    in
+    let label = tag ~number ?prerelease () in
     match List.filter matches versions with
-    | [] ->
-        failwith
-          (sf
-             "Version v%d.%d%s not found, cannot add build number"
-             major
-             minor
-             version_suffix)
+    | [] -> failwith (sf "Version %s not found, cannot add build number" label)
     | [version] ->
         if
           List.exists (fun r -> r.build_number = build_number) version.revisions
         then
           failwith
             (sf
-               "Build number %d already exists for version v%d.%d%s"
+               "Build number %d already exists for version %s"
                build_number
-               major
-               minor
-               version_suffix) ;
+               label) ;
         List.map
           (fun version ->
             if matches version then
@@ -333,20 +354,14 @@ module Version = struct
             else version)
           versions
     | _ ->
-        failwith
-          (sf
-             "Multiple versions v%d.%d%s found, data is inconsistent"
-             major
-             minor
-             version_suffix)
+        failwith (sf "Multiple versions %s found, data is inconsistent" label)
 
   (* [set_latest target_version versions] sets a specific version as latest, unset all others. *)
   let set_latest target_version versions =
     List.map
       (fun version ->
         if
-          version.major = target_version.major
-          && version.minor = target_version.minor
+          version.number = target_version.number
           && version.prerelease = target_version.prerelease
         then {version with latest = true}
         else {version with latest = false})

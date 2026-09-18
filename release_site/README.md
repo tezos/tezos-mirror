@@ -98,6 +98,9 @@ version_manager --file versions.json download --path BUCKET/PATH
 version_manager --file versions.json add --major 25 --minor 0
 version_manager --file versions.json set-latest --major 25 --minor 0
 
+# A dated version (smart rollup node) uses --date and an optional --counter
+version_manager --file versions.json add --date 20260724 --counter 1
+
 # Upload versions.json back to remote storage
 version_manager --file versions.json upload --path BUCKET/PATH
 ```
@@ -165,6 +168,8 @@ This file is a JSON file with the following schema:
     "properties": {
       "major": { "type": "integer" },
       "minor": { "type": "integer" },
+      "date": { "type": "integer" },
+      "counter": { "type": "integer" },
       "prerelease": {
         "type": "object",
         "properties": {
@@ -189,14 +194,19 @@ This file is a JSON file with the following schema:
       "announcement": { "type": "string" },
       "pubDate": { "type": "number" }
     },
-    "required": ["major", "minor"]
+    "oneOf": [{ "required": ["major", "minor"] }, { "required": ["date"] }]
   }
 }
 ```
 
+A version uses one of two number schemes. Octez components use `major` and
+`minor`, rendered as `v<major>.<minor>`. The smart rollup node uses `date`
+(`YYYYMMDD`) and an optional same-day `counter`, rendered as `v<date>` or
+`v<date>.<counter>`.
+
 For backward compatibility, the parser also accepts the legacy flat fields `rc` (integer) and `beta` (integer) instead of the `prerelease` object.
 
-Each item of the array represents a version `<major>.<minor>[~rc<N>|~beta<N>]`.
+Each item of the array represents a version `<major>.<minor>[~rc<N>|~beta<N>]` or `<date>[.<counter>][~rc<N>|~beta<N>]`.
 If `latest` is `true`, the version will be identified as "latest" in the generated page, for instance by appending "(latest)" to its section title. Only one version should be identified as latest, although this is not enforced by the script.
 
 The `revisions` field is an optional array that tracks packaging revisions. Each time a packaging revision tag (e.g. `octez-v20.0-1`, `octez-v20.0-2`) is processed, a new entry is appended with the revision's `buildNumber` and `revisionDate`. This preserves the full history of packaging revisions. The version string and S3 paths are not affected. The RSS feed generates a distinct entry for each revision alongside the original release entry.
