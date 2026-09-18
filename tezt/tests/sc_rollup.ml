@@ -555,6 +555,134 @@ let test_dal_endpoints_protected_by_secure_acl ~kind =
      endpoints (batcher and DAL) all reject anonymous callers with HTTP 401." ;
   unit
 
+(* The [log_kernel_debug_file] of a simulate request names a file under
+   [<data_dir>/simulation_kernel_logs]. A relative path is served and the log
+   lands where it says; anything that could leave that directory is refused. *)
+let test_simulate_kernel_log_file ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["simulate"; "kernel_log"; "security"; "rpc"];
+      description = "simulate keeps its kernel log inside the log directory";
+    }
+    ~kind
+  @@ fun _protocol rollup_node sc_rollup _tezos_node _tezos_client ->
+  let* () =
+    Sc_rollup_node.run rollup_node sc_rollup [Sc_rollup_node.Log_kernel_debug]
+  in
+  let* _level = Sc_rollup_node.wait_sync rollup_node ~timeout:30. in
+  let data_dir = Sc_rollup_node.data_dir rollup_node in
+  let logs_dir = Filename.concat data_dir "simulation_kernel_logs" in
+  let simulate file =
+    let* {RPC_core.code; body; _} =
+      Sc_rollup_node.RPC.call_raw rollup_node
+      @@ Sc_rollup_rpc.post_global_block_simulate ~log_kernel_debug_file:file []
+    in
+    Log.info "log_kernel_debug_file=%S -> HTTP %d: %s" file code body ;
+    let error_id =
+      match JSON.parse ~origin:"simulate" body |> JSON.as_list_opt with
+      | Some (first :: _) ->
+          JSON.(first |-> "id" |> as_string_opt) |> Option.value ~default:""
+      | _ -> ""
+    in
+    return (code, error_id)
+  in
+  let served = (200, "") in
+  let refused = (500, "simulation.invalid_kernel_log_file") in
+  let* plain = simulate "x.out" in
+  let* nested = simulate "x/y.out" in
+  let* current_segment = simulate "./a.log" in
+  let* up_and_back = simulate "a/../b.log" in
+  let* double_slash = simulate "b//c.log" in
+  let* parent = simulate "../x.out" in
+  let* parent_then_down = simulate "../a/x.out" in
+  let* absolute = simulate "/tmp/x.out" in
+  let* empty = simulate "" in
+  let* current_dir = simulate "." in
+  let* back_to_dir = simulate "a/.." in
+  let answer = Check.tuple2 Check.int Check.string in
+  Check.(
+    (plain = served)
+      answer
+      ~error_msg:"a plain file name must be served (expected %R, got %L)") ;
+  Check.is_true
+    (Sys.file_exists (Filename.concat logs_dir "x.out"))
+    ~error_msg:
+      "the kernel log of a plain file name must exist in the log directory" ;
+  Check.(
+    (nested = served)
+      answer
+      ~error_msg:"a relative path must be served (expected %R, got %L)") ;
+  Check.is_true
+    (Sys.file_exists (Filename.concat logs_dir "x/y.out"))
+    ~error_msg:
+      "the kernel log of a relative path must exist under the log directory" ;
+  Check.(
+    (current_segment = served)
+      answer
+      ~error_msg:
+        "a path with a current-directory segment must be served (expected %R, \
+         got %L)") ;
+  Check.is_true
+    (Sys.file_exists (Filename.concat logs_dir "a.log"))
+    ~error_msg:"the kernel log of \"./a.log\" must exist as \"a.log\"" ;
+  Check.(
+    (up_and_back = served)
+      answer
+      ~error_msg:
+        "a path going up and back inside must be served (expected %R, got %L)") ;
+  Check.is_true
+    (Sys.file_exists (Filename.concat logs_dir "b.log"))
+    ~error_msg:"the kernel log of \"a/../b.log\" must exist as \"b.log\"" ;
+  Check.(
+    (double_slash = served)
+      answer
+      ~error_msg:
+        "a path with an empty segment must be served (expected %R, got %L)") ;
+  Check.is_true
+    (Sys.file_exists (Filename.concat logs_dir "b/c.log"))
+    ~error_msg:"the kernel log of \"b//c.log\" must exist as \"b/c.log\"" ;
+  Check.(
+    (parent = refused)
+      answer
+      ~error_msg:
+        "a path leaving the log directory must be refused (expected %R, got %L)") ;
+  Check.is_false
+    (Sys.file_exists (Filename.concat data_dir "x.out"))
+    ~error_msg:
+      "a refused request must not create a file outside the log directory" ;
+  Check.(
+    (parent_then_down = refused)
+      answer
+      ~error_msg:
+        "a path leaving the log directory before coming back down must be \
+         refused (expected %R, got %L)") ;
+  Check.is_false
+    (Sys.file_exists (Filename.concat data_dir "a/x.out"))
+    ~error_msg:
+      "a refused request must not create a file outside the log directory" ;
+  Check.(
+    (absolute = refused)
+      answer
+      ~error_msg:"an absolute path must be refused (expected %R, got %L)") ;
+  Check.(
+    (empty = refused)
+      answer
+      ~error_msg:"an empty file name must be refused (expected %R, got %L)") ;
+  Check.(
+    (current_dir = refused)
+      answer
+      ~error_msg:
+        "a path naming the log directory itself must be refused (expected %R, \
+         got %L)") ;
+  Check.(
+    (back_to_dir = refused)
+      answer
+      ~error_msg:
+        "a path coming back to the log directory must be refused (expected %R, \
+         got %L)") ;
+  unit
+
 (** Genesis information and last cemented commitment at origination are correct
 ----------------------------------------------------------
 
@@ -10278,6 +10406,7 @@ let register ~protocols =
   test_signals_empty protocols ;
   test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
+  test_simulate_kernel_log_file ~kind:"wasm_2_0_0" [Protocol.Alpha] ;
   test_multitick_proof_rejected_by_plugin
     ~kind:"arith"
     (List.filter (fun p -> Protocol.number p >= 024) protocols) ;
