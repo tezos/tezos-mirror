@@ -25,7 +25,6 @@ use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -247,19 +246,16 @@ where
     Ok(())
 }
 
-pub fn possible_sequencer_upgrade<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-    KS: KeySpace,
-{
-    let upgrade = read_sequencer_upgrade(rk.host())?;
+pub fn possible_sequencer_upgrade(
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
+) -> anyhow::Result<()> {
+    let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
-        let ipl_timestamp = storage::read_last_info_per_level_timestamp(rk.base())?;
+        let ipl_timestamp = storage::read_last_info_per_level_timestamp(base)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
-            sequencer_upgrade(rk.host_mut(), upgrade.pool_address, &upgrade.sequencer)?;
-            blueprint_storage::clear_all_blueprints(rk.base_mut())?;
+            sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
+            blueprint_storage::clear_all_blueprints(base)?;
         }
     }
     Ok(())
@@ -295,19 +291,16 @@ where
     Ok(())
 }
 
-pub fn possible_sequencer_key_change<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn possible_sequencer_key_change(
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-    KS: KeySpace,
-{
-    let upgrade = read_sequencer_key_change(rk.host())?;
+) -> anyhow::Result<()> {
+    let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {
-            sequencer_key_change(rk.host_mut(), upgrade)?;
-            blueprint_storage::clear_all_blueprints(rk.base_mut())?;
+            sequencer_key_change(host, upgrade)?;
+            blueprint_storage::clear_all_blueprints(base)?;
         }
     }
     Ok(())
@@ -321,6 +314,7 @@ mod tests {
         read_sequencer_change_counter, store_sequencer_key_change,
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     fn test_public_key() -> PublicKey {
         PublicKey::from_b58check("edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2")
@@ -368,7 +362,8 @@ mod tests {
             Timestamp::from(50i64),
         )
         .unwrap();
-        possible_sequencer_upgrade(&mut rk).unwrap();
+        let (host, base) = rk.base_parts_mut();
+        possible_sequencer_upgrade(host, base).unwrap();
         assert_eq!(
             read_sequencer_change_counter(rk.host()).unwrap(),
             U256::ZERO
@@ -380,7 +375,8 @@ mod tests {
             Timestamp::from(100i64),
         )
         .unwrap();
-        possible_sequencer_upgrade(&mut rk).unwrap();
+        let (host, base) = rk.base_parts_mut();
+        possible_sequencer_upgrade(host, base).unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
     }
 
@@ -404,11 +400,13 @@ mod tests {
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // Before activation nothing applies.
-        possible_sequencer_key_change(&mut rk, Timestamp::from(50i64)).unwrap();
+        let (host, base) = rk.base_parts_mut();
+        possible_sequencer_key_change(host, base, Timestamp::from(50i64)).unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // At/after activation the change applies but the counter is unchanged.
-        possible_sequencer_key_change(&mut rk, Timestamp::from(100i64)).unwrap();
+        let (host, base) = rk.base_parts_mut();
+        possible_sequencer_key_change(host, base, Timestamp::from(100i64)).unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
     }
 
