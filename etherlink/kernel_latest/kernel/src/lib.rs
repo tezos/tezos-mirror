@@ -29,18 +29,27 @@ use storage::{
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime::KernelHost;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
+use tezos_evm_runtime::runtime_keyspaces::{RuntimeKeyspaces, BASE_KEYSPACE_NAME};
 use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError};
 use tezos_tracing::trace_kernel;
+
+/// Loads the `/base` keyspace and applies the log verbosity it records.
+pub(crate) fn load_base<Host: KeySpaceLoader>(
+    host: &mut Host,
+) -> Result<Host::KeySpace, KeySpaceLoaderError> {
+    let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
+    set_global_verbosity(read_logs_verbosity(&base));
+    Ok(base)
+}
 
 mod apply;
 mod block;

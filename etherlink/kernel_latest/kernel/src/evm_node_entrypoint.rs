@@ -21,7 +21,7 @@ use crate::{
     configuration::{fetch_common_config, fetch_tezosx_configuration},
     delayed_inbox::DelayedInbox,
     journal::{prepare_tezosx_journal, TezosXHashes},
-    sub_block,
+    load_base, sub_block,
     transaction::Transaction,
 };
 use mir::ast::{Entrypoint, IntoMicheline, Type};
@@ -84,20 +84,26 @@ where
     Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
+    let mut base = match load_base(&mut kernel_host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+            log!(Error, "Failed to load the /base keyspace: {:?}", err);
             return;
         }
     };
-    let payload = rk.base().get(&DELAYED_INPUT_KEY).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
-    let mut delayed_inbox = DelayedInbox::from_base(rk.base()).unwrap();
-    let common = fetch_common_config(rk.host(), rk.base());
-    let (host, base) = rk.base_parts_mut();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+    let common = fetch_common_config(&kernel_host, &base);
     delayed_inbox
-        .save_transaction(host, base, transaction, 0.into(), 0u32, &common)
+        .save_transaction(
+            &kernel_host,
+            &mut base,
+            transaction,
+            0.into(),
+            0u32,
+            &common,
+        )
         .unwrap();
 }
 
@@ -114,18 +120,18 @@ where
     Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
+    let mut base = match load_base(&mut kernel_host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+            log!(Error, "Failed to load the /base keyspace: {:?}", err);
             return;
         }
     };
-    let payload = rk.base().get(&DELAYED_INPUT_KEY).unwrap();
+    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
-    let mut delayed_inbox = DelayedInbox::from_base(rk.base()).unwrap();
+    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
     delayed_inbox
-        .delete(rk.base_mut(), crate::delayed_inbox::Hash(transaction_hash))
+        .delete(&mut base, crate::delayed_inbox::Hash(transaction_hash))
         .unwrap();
 }
 #[cfg(target_arch = "wasm32")]
@@ -554,34 +560,33 @@ where
     Host: StorageV1 + CoreStorage + WasmHost,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
+    let mut base = match load_base(&mut kernel_host) {
+        Ok(base) => base,
         Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+            log!(Error, "Failed to load the /base keyspace: {:?}", err);
             return;
         }
     };
-    tezosx_michelson_entrypoints_fn(&mut rk);
+    tezosx_michelson_entrypoints_fn(&kernel_host, &mut base);
 }
 
-/// Takes the handle rather than the host: the caller owns the single `/base`
-/// load, so no second one is nested inside this query.
+/// Answers a contract entrypoints query from the node.
+///
+/// The node leaves the contract address, a 22-byte binary `AddressHash`, at
+/// `/base/tezosx_entrypoints/input` and calls this entrypoint, which puts the
+/// encoded entrypoints and enshrined views at
+/// `/base/tezosx_entrypoints/result`. A missing or undecodable address is
+/// logged and leaves the result key untouched.
 #[allow(dead_code)]
-pub fn tezosx_michelson_entrypoints_fn<Host, R, KS>(
-    rk: &mut RuntimeKeyspaces<'_, KernelHost<R, Host>, KS>,
-) where
-    R: StorageV1,
-    Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
-    KS: KeySpace,
-{
-    let input = match rk.base().get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
+pub fn tezosx_michelson_entrypoints_fn(host: &impl StorageV1, base: &mut impl KeySpace) {
+    let input = match base.get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
         Some(bytes) => bytes,
         None => {
             log!(Error, "Tezos X entrypoints input not found");
             return;
         }
     };
-    handle_query_entrypoints_to(rk, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
+    handle_query_entrypoints_to(host, base, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -894,15 +899,12 @@ where
 /// through `/script` directly.
 ///
 /// Input: binary-encoded contract AddressHash (22 bytes).
-fn handle_query_entrypoints_to<Host, R, KS>(
-    rk: &mut RuntimeKeyspaces<'_, KernelHost<R, Host>, KS>,
+fn handle_query_entrypoints_to(
+    host: &impl StorageV1,
+    base: &mut impl KeySpace,
     payload: &[u8],
     result_key: &Key,
-) where
-    R: StorageV1,
-    Host: std::borrow::BorrowMut<R> + std::borrow::Borrow<R>,
-    KS: KeySpace,
-{
+) {
     let address = match mir::ast::AddressHash::try_from(payload) {
         Ok(a) => a,
         Err(err) => {
@@ -921,13 +923,10 @@ fn handle_query_entrypoints_to<Host, R, KS>(
     // on the conversion coefficient and is currently larger, so default
     // would reject RPC calls that would succeed in an operation. Use
     // Gas::unmetered() instead.
-    let entrypoints = tezos_execution::get_contract_entrypoint(
-        rk.host(),
-        &address,
-        &mut Gas::unmetered(),
-    );
-    let views = tezos_execution::get_enshrined_contract_views(rk.host(), &address)
-        .unwrap_or_default();
+    let entrypoints =
+        tezos_execution::get_contract_entrypoint(host, &address, &mut Gas::unmetered());
+    let views =
+        tezos_execution::get_enshrined_contract_views(host, &address).unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -939,7 +938,7 @@ fn handle_query_entrypoints_to<Host, R, KS>(
             return;
         }
     };
-    if let Err(err) = rk.base_mut().set(result_key, result) {
+    if let Err(err) = base.set(result_key, result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
 }
@@ -1280,9 +1279,9 @@ mod tests {
             }
         }
     }
+    use crate::load_base;
     use mir::parser::Parser;
     use std::collections::HashMap;
-    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_keyspace::KeySpace;
 
     use crate::evm_node_entrypoint::tezosx_michelson_entrypoints_fn;
@@ -1547,13 +1546,11 @@ mod tests {
         // keyspace, and `tezosx_michelson_entrypoints_fn` consumes/produces
         // them the same way.
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        rk.base_mut()
-            .set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
+        let mut base = load_base(&mut host).unwrap();
+        base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
             .expect("write input");
-        tezosx_michelson_entrypoints_fn(&mut rk);
-        rk.base()
-            .get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
+        tezosx_michelson_entrypoints_fn(&host, &mut base);
+        base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }
 
