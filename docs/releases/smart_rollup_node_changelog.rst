@@ -43,6 +43,9 @@ Unreleased
   set by the new ``--rpc-max-request-body`` option (in bytes, 32 MiB by
   default).
 
+- The public ``secure`` RPC ACL now denies ``POST
+  /global/block/<id>/simulate``. (MR :gl:`!22890`)
+
 Version 25.3 (2026-10-20)
 =========================
 
