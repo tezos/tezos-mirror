@@ -16,7 +16,6 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
 use tezos_data_encoding::{enc::BinWriter, types::Narith};
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::{
     account_storage::TezosAccount,
     context, cross_runtime_transfer,
@@ -28,6 +27,7 @@ use tezos_execution::{
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 // `Parameters` could come from `tezos_protocol::operation`, but we also need
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
@@ -643,8 +643,8 @@ fn execute_request<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    KS: KeySpace,
 {
     match *request.method() {
         http::Method::POST => {
@@ -681,8 +681,8 @@ fn execute_entrypoint_call<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    KS: KeySpace,
 {
     // Drain on entry, NOT on exit: pending alias-origination
     // internal ops in the journal at this point can only belong
@@ -1115,8 +1115,8 @@ impl RuntimeInterface for TezosRuntime {
         gas_remaining: TezosXGas,
     ) -> Result<AliasResolution, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         // Gas costs in milligas, charged incrementally so we fail early.
         // The closure pattern would persist a borrow on `remaining`; a
@@ -1295,7 +1295,7 @@ impl RuntimeInterface for TezosRuntime {
     ) -> Result<bool, TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         let kt1 = ContractKt1Hash::from_base58_check(alias).map_err(|err| {
             TezosXRuntimeError::ConversionError(format!(
@@ -1330,8 +1330,8 @@ impl RuntimeInterface for TezosRuntime {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         // Open a dispatch slot for this CRAC entry so that any inner
         // %collect_result deposits land here. The slot is owned by
@@ -1380,7 +1380,7 @@ impl RuntimeInterface for TezosRuntime {
     ) -> Result<(Classification, TezosXGas), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         let host = rk.host();
         // Malformed → Unknown, no charge.

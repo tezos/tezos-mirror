@@ -21,8 +21,8 @@ pub use tezosx_types::{
 #[cfg(feature = "testing")]
 use primitive_types::U256;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 
 /// Result of an alias-resolution call.
 ///
@@ -83,9 +83,9 @@ pub trait Registry {
     /// (a legacy account from before this work), the call writes the
     /// classification only and skips the redeploy.
     #[allow(clippy::too_many_arguments)]
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -94,19 +94,17 @@ pub trait Registry {
         gas_remaining: Gas,
     ) -> Result<(String, AliasResolution), TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace;
+        Host: StorageV1 + KeySpaceLoader;
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace;
+        Host: StorageV1 + KeySpaceLoader;
 
     /// Derive the alias naming `alias_info.native_address` inside
     /// `alias_info.runtime`.
@@ -144,7 +142,7 @@ pub trait Registry {
     ) -> Result<(Classification, Gas /* consumed */), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace;
+        KS: KeySpace;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
     fn serve<Host, KS>(
@@ -154,8 +152,8 @@ pub trait Registry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace;
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace;
 }
 
 pub trait RuntimeInterface {
@@ -176,8 +174,8 @@ pub trait RuntimeInterface {
         gas_remaining: Gas,
     ) -> Result<AliasResolution, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace;
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace;
 
     fn alias_exists<Host, KS>(
         &self,
@@ -187,7 +185,7 @@ pub trait RuntimeInterface {
     ) -> Result<bool, TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace;
+        KS: KeySpace;
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
@@ -209,8 +207,8 @@ pub trait RuntimeInterface {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace;
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace;
 
     /// The URL host that identifies this runtime in HTTP requests routed
     /// by the registry (e.g. `"tezos"`, `"ethereum"`).
@@ -244,7 +242,7 @@ pub trait RuntimeInterface {
     ) -> Result<(Classification, Gas /* consumed */), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace;
+        KS: KeySpace;
 
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
