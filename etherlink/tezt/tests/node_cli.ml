@@ -311,25 +311,12 @@ let test_preimages_endpoint =
     ~error_msg:"The sequencer should have used the file server" ;
   unit
 
-let test_preimages_endpoint_retry =
-  (* Add a delay between first block and activation timestamp. *)
-  let genesis_timestamp =
-    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
-  in
-  let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_all
-    ~__FILE__
-    ~sequencer:Constant.bootstrap1
-    ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
-    ~title:"Sequencer use remote server to get preimages with retries"
-    ~kernels:[Mainnet]
-    ~additional_uses:[Constant.WASM.evm_kernel]
-    ~genesis_timestamp
-  @@
-  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
-      _protocol
-    ->
+(* Prepares a fresh sequencer, with an empty preimages directory, whose store
+   holds an upgrade that is announced but not activated yet. Returns the
+   sequencer, the root hash of the announced kernel, and the port and endpoint
+   its preimages are expected to be served on — no server listens there yet. *)
+let setup_pending_upgrade ~sc_rollup_node ~l1_contracts ~sc_rollup_address
+    ~client ~sequencer ~activation_timestamp () =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer in
   let finalizeL1 () =
@@ -337,10 +324,13 @@ let test_preimages_endpoint_retry =
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
+  (* Prepares the sequencer without [preimages-dir], to force the use of the
+     preimages endpoint. Not passing ~preimages_dir to create means it will be
+     None. *)
   let sequencer_mode =
     match Evm_node.mode sequencer with
-    | Evm_node.Sequencer config -> Evm_node.Sequencer config
-    | _ -> assert false
+    | Evm_node.Sequencer _ as mode -> mode
+    | _ -> Test.fail "the tests below need a sequencer"
   in
   let new_sequencer =
     Evm_node.create ~node_setup:(Evm_node.make_setup ()) ~mode:sequencer_mode ()
@@ -366,13 +356,47 @@ let test_preimages_endpoint_retry =
   let preimages_endpoint =
     sf "http://%s:%d" Constant.default_host provider_port
   in
+  return (new_sequencer, root_hash, provider_port, preimages_endpoint)
+
+let test_preimages_endpoint_retry =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~__FILE__
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
+    ~title:"Sequencer use remote server to get preimages with retries"
+    ~kernels:[Mainnet]
+    ~additional_uses:[Constant.WASM.evm_kernel]
+    ~genesis_timestamp
+  @@
+  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
+      _protocol
+    ->
+  let* new_sequencer, root_hash, provider_port, preimages_endpoint =
+    setup_pending_upgrade
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sc_rollup_address
+      ~client
+      ~sequencer
+      ~activation_timestamp
+      ()
+  in
   let* () =
     Evm_node.run
       ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
       new_sequencer
   in
   let* () =
-    Evm_node.wait_for_predownload_kernel_failed new_sequencer ~root_hash
+    Evm_node.wait_for_predownload_kernel_failed
+      ~timeout:120.
+      new_sequencer
+      ~root_hash
   in
   (* Create a file server that serves the preimages. *)
   let served = ref false in
@@ -382,7 +406,75 @@ let test_preimages_endpoint_retry =
     ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
     ~on_request:(fun _ -> served := true)
   @@ fun () ->
-  let* _ =
+  let* () =
+    Evm_node.wait_for_predownload_kernel ~timeout:90. new_sequencer ~root_hash
+  in
+  Check.is_true
+    !served
+    ~error_msg:"The sequencer should have used the file server" ;
+  unit
+
+let test_preimages_endpoint_restart =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~__FILE__
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"; "restart"]
+    ~title:"Sequencer gets the preimages of a pending upgrade after a restart"
+    ~kernels:[Mainnet]
+    ~additional_uses:[Constant.WASM.evm_kernel]
+    ~genesis_timestamp
+  @@
+  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
+      _protocol
+    ->
+  let* new_sequencer, root_hash, provider_port, preimages_endpoint =
+    setup_pending_upgrade
+      ~sc_rollup_node
+      ~l1_contracts
+      ~sc_rollup_address
+      ~client
+      ~sequencer
+      ~activation_timestamp
+      ()
+  in
+  let run () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_sequencer
+  in
+  (* The node learns about the upgrade, but no server serves its preimages
+     yet. *)
+  let* () = run () in
+  let* () =
+    Evm_node.wait_for_predownload_kernel_failed
+      ~timeout:120.
+      new_sequencer
+      ~root_hash
+  in
+  (* The requests of the node are processed one at a time, so a block produced
+     now is produced after the announcement has been committed to the store.
+     The restarted node therefore has a pending upgrade, and cannot apply the
+     announcement a second time: the download it starts can only come from the
+     restart. The block is produced before the activation timestamp, so the
+     upgrade is not applied. *)
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:09Z" new_sequencer in
+  let* () = Evm_node.terminate new_sequencer in
+  (* The preimages become available while the node is down. *)
+  let served = ref false in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+    ~on_request:(fun _ -> served := true)
+  @@ fun () ->
+  let* () = run () in
+  let* () =
     Evm_node.wait_for_predownload_kernel ~timeout:90. new_sequencer ~root_hash
   in
   Check.is_true
@@ -539,6 +631,7 @@ let protocols = [Protocol.Alpha]
 let () =
   test_preimages_endpoint protocols ;
   test_preimages_endpoint_retry protocols ;
+  test_preimages_endpoint_restart protocols ;
   test_evm_node_flag [Alpha] ;
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;

@@ -241,6 +241,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~store_perm:Read_write
       ~sequencer_key_source
       ?snapshot_source
+      ~preemptive_kernel_download:true
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
