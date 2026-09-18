@@ -20,35 +20,34 @@ use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::KeySpace;
 
-pub fn fetch_proxy_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn fetch_proxy_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     common: &CommonConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     if let Some(ProxyInboxContent { transactions }) =
-        read_proxy_inbox(rk, smart_rollup_address, common)?
+        read_proxy_inbox(host, base, smart_rollup_address, common)?
     {
         let timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let blueprint = Blueprint {
             transactions,
             timestamp,
         };
         // Store the blueprint.
-        store_inbox_blueprint(rk.base_mut(), blueprint)?;
+        store_inbox_blueprint(base, blueprint)?;
         Ok(StageOneStatus::Reboot)
     } else {
         Ok(StageOneStatus::Done)
@@ -109,27 +108,30 @@ fn fetch_delayed_transactions(
     Ok(())
 }
 
-fn fetch_sequencer_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn fetch_sequencer_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
-    match read_sequencer_inbox(rk, smart_rollup_address, config_common, config_sequencer)?
-    {
+    match read_sequencer_inbox(
+        host,
+        base,
+        smart_rollup_address,
+        config_common,
+        config_sequencer,
+    )? {
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = config_sequencer
-                .delayed_inbox
-                .first_has_timed_out(rk.base())?;
+            let timed_out = config_sequencer.delayed_inbox.first_has_timed_out(base)?;
             if timed_out {
                 fetch_delayed_transactions(
-                    rk.base_mut(),
+                    base,
                     &mut config_sequencer.delayed_inbox,
                     config_common,
                 )?
@@ -146,21 +148,25 @@ where
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn fetch_blueprints<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn fetch_blueprints<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     match &mut config.mode {
-        ConfigurationMode::Sequencer(seq) => {
-            fetch_sequencer_blueprints(rk, smart_rollup_address, &config.common, seq)
-        }
+        ConfigurationMode::Sequencer(seq) => fetch_sequencer_blueprints(
+            host,
+            base,
+            smart_rollup_address,
+            &config.common,
+            seq,
+        ),
         ConfigurationMode::Proxy => {
-            fetch_proxy_blueprints(rk, smart_rollup_address, &config.common)
+            fetch_proxy_blueprints(host, base, smart_rollup_address, &config.common)
         }
     }
 }
@@ -186,6 +192,7 @@ mod tests {
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
@@ -379,7 +386,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -406,7 +415,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -426,7 +437,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -460,7 +473,9 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -488,7 +503,9 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         let (host, base) = rk.base_parts_mut();
@@ -525,7 +542,9 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -554,7 +573,8 @@ mod tests {
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
 
-        match read_proxy_inbox(&mut rk, DEFAULT_SR_ADDRESS, &conf.common).unwrap() {
+        let (host, base) = rk.base_parts_mut();
+        match read_proxy_inbox(host, base, DEFAULT_SR_ADDRESS, &conf.common).unwrap() {
             None => panic!("There should be an InboxContent"),
             Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
                 transactions,
@@ -600,7 +620,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -636,7 +658,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -673,7 +697,9 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata)
         }
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -698,7 +724,9 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -728,7 +756,9 @@ mod tests {
             ),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -755,7 +785,9 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut rk, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -831,7 +863,8 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(rk.host_mut(), filled_slots);
 
-        fetch_blueprints(rk, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
     }
 
     #[test]
@@ -927,7 +960,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -964,7 +998,8 @@ mod tests {
                 .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         }
         let mut conf = dummy_proxy_configuration();
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -1010,7 +1045,8 @@ mod tests {
             &metadata,
         );
 
-        let status = fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf)
+        let (host, base) = rk.base_parts_mut();
+        let status = fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
             .expect("fetch failed");
 
         assert!(
@@ -1047,7 +1083,9 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
 
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut rk, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        let (host, base) = rk.base_parts_mut();
+        fetch_blueprints(host, base, DEFAULT_SR_ADDRESS, &mut conf)
+            .expect("fetch failed");
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.

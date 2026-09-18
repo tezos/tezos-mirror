@@ -101,23 +101,23 @@ where
 // function is visible in the profiling results.
 #[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn stage_one<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn stage_one<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     log!(Debug, "Entering stage one.");
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(rk.base_mut())?;
-    let res = fetch_blueprints(rk, smart_rollup_address, configuration);
-    leave_stage_one(rk.base_mut())?;
+    enter_stage_one(base)?;
+    let res = fetch_blueprints(host, base, smart_rollup_address, configuration);
+    leave_stage_one(base)?;
     res
 }
 
@@ -338,8 +338,10 @@ where
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
+    let (host, base) = rk.base_parts_mut();
     let stage_one_status = stage_one(
-        rk,
+        host,
+        base,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,

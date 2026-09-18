@@ -36,8 +36,8 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+#[cfg(test)]
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -605,12 +605,7 @@ where
             }
         }
         InputResult::Unparsable => Ok(ReadStatus::Ongoing),
-        InputResult::Simulation => {
-            // Starting simulation mode needs the full `RuntimeKeyspaces`
-            // (eth_accounts, for account state), which this function no
-            // longer holds: the caller performs it once this returns.
-            Ok(ReadStatus::Simulation)
-        }
+        InputResult::Simulation => Ok(ReadStatus::Simulation),
         InputResult::Input(input) => {
             handle_input(host, base, input, res, common)?;
             Ok(ReadStatus::Ongoing)
@@ -618,14 +613,14 @@ where
     }
 }
 
-pub fn read_proxy_inbox<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn read_proxy_inbox<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     common: &CommonConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -636,7 +631,6 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        let (host, base) = rk.base_parts_mut();
         match read_and_dispatch_input::<Host, ProxyInput>(
             host,
             base,
@@ -692,16 +686,15 @@ pub enum StageOneStatus {
     Skipped,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn read_sequencer_inbox<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn read_sequencer_inbox<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
     smart_rollup_address: [u8; 20],
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -709,12 +702,11 @@ where
     // during this kernel run.
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
-        crate::blueprint_storage::read_next_blueprint_number(rk.base())?;
-    let experimental_features =
-        ExperimentalFeatures::read_from_storage(rk.host(), rk.base());
+        crate::blueprint_storage::read_next_blueprint_number(base)?;
+    let experimental_features = ExperimentalFeatures::read_from_storage(host, base);
     let (legacy_dal_signals_disabled, dal_publishers_whitelist) = (
-        crate::storage::is_legacy_dal_signals_disabled(rk.base()),
-        crate::storage::read_dal_publishers_whitelist(rk.base()).unwrap_or_default(),
+        crate::storage::is_legacy_dal_signals_disabled(base),
+        crate::storage::read_dal_publishers_whitelist(base).unwrap_or_default(),
     );
     let maximum_allowed_ticks = config_common.maximum_allowed_ticks;
     let mut parsing_context = SequencerParsingContext {
@@ -740,7 +732,6 @@ where
             );
             return Ok(StageOneStatus::Reboot);
         };
-        let (host, base) = rk.base_parts_mut();
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             base,
@@ -936,9 +927,9 @@ mod tests {
         rk.host_mut()
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
-
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -966,8 +957,9 @@ mod tests {
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -1013,8 +1005,10 @@ mod tests {
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         rk.host_mut().host.add_transfer(payload, &transfer_metadata);
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content = read_proxy_inbox(
-            &mut rk,
+            host,
+            base,
             [0; 20],
             &CommonConfig {
                 tezos_contracts: TezosContracts {
@@ -1068,8 +1062,9 @@ mod tests {
             new_chunk2,
         )));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(rk.host_mut(), &tx_hash)
@@ -1117,8 +1112,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         // The out of bounds chunk should not exist.
@@ -1153,8 +1149,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
+        let (host, base) = rk.base_parts_mut();
         let _inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
         // The unknown chunk should not exist.
@@ -1207,8 +1204,9 @@ mod tests {
             .host
             .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         assert_eq!(
@@ -1224,8 +1222,9 @@ mod tests {
                 .host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
 
@@ -1283,8 +1282,9 @@ mod tests {
 
         rk.host_mut().host.add_external(framed);
 
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
                 .unwrap();
         let expected_transactions = vec![Transaction {
@@ -1304,14 +1304,16 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         rk.host_mut().host.add_external(Bytes::from(vec![]));
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
+        let (host, base) = rk.base_parts_mut();
         let inbox_content =
-            read_proxy_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+            read_proxy_inbox(host, base, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
         assert!(inbox_content.is_none());
     }
@@ -1422,7 +1424,8 @@ mod tests {
             dal: None,
             max_blueprint_lookahead_in_seconds: 100_000i64,
         };
-        let _ = read_sequencer_inbox(&mut rk, SMART_ROLLUP_ADDRESS, &common, &mut seq)
+        let (host, base) = rk.base_parts_mut();
+        let _ = read_sequencer_inbox(host, base, SMART_ROLLUP_ADDRESS, &common, &mut seq)
             .unwrap();
 
         // The blueprint was valid if it was stored in the storage.
