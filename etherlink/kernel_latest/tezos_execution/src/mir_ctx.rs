@@ -31,12 +31,12 @@ use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
@@ -105,8 +105,8 @@ impl Default for InterpretContext {
     }
 }
 
-pub struct TcCtx<'operation, 'host, Host: StorageV1, KS> {
-    pub rk: &'operation mut RuntimeKeyspaces<'host, Host, KS>,
+pub struct TcCtx<'operation, 'host, Host: KeySpaceLoader + StorageV1> {
+    pub rk: &'operation mut RuntimeKeyspaces<'host, Host, Host::KeySpace>,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
@@ -175,8 +175,8 @@ pub struct ExecCtx {
     pub contract_account: TezosOriginatedAccount,
 }
 
-pub struct Ctx<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> {
-    pub tc_ctx: &'a mut TcCtx<'operation, 'host, Host, KS>,
+pub struct Ctx<'a, 'operation, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> {
+    pub tc_ctx: &'a mut TcCtx<'operation, 'host, Host>,
     pub exec_ctx: ExecCtx,
     pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub journal: &'a mut tezosx_journal::TezosXJournal,
@@ -248,7 +248,9 @@ impl ExecCtx {
     }
 }
 
-impl<'a, 'host, Host: StorageV1, KS> TypecheckingCtx<'a> for TcCtx<'a, 'host, Host, KS> {
+impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
+    for TcCtx<'a, 'host, Host>
+{
     fn gas(&mut self) -> &mut mir::gas::Gas {
         &mut self.operation_gas.remaining
     }
@@ -301,8 +303,8 @@ impl<'a, 'host, Host: StorageV1, KS> TypecheckingCtx<'a> for TcCtx<'a, 'host, Ho
     }
 }
 
-impl<'a, Host: StorageV1, KS, R: Registry> TypecheckingCtx<'a>
-    for Ctx<'_, '_, '_, Host, KS, R>
+impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> TypecheckingCtx<'a>
+    for Ctx<'_, '_, '_, Host, R>
 {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
@@ -360,8 +362,8 @@ pub fn read_address_counter<Host: StorageV1>(
         .0)
 }
 
-impl<'a, Host: KeyspaceHost<KS>, KS: SafeKeyspace, R: Registry> CtxTrait<'a>
-    for Ctx<'_, 'a, '_, Host, KS, R>
+impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
+    for Ctx<'_, 'a, '_, Host, R>
 {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
@@ -699,9 +701,7 @@ pub fn enshrined_synthetic_views(
     }
 }
 
-impl<'a, Host: KeyspaceHost<KS>, KS: SafeKeyspace, R: Registry>
-    Ctx<'_, 'a, '_, Host, KS, R>
-{
+impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R> {
     /// Body of the `originOf` arm of
     /// [`try_dispatch_enshrined_view`](CtxTrait::try_dispatch_enshrined_view).
     ///
@@ -853,7 +853,7 @@ impl<'a, Host: KeyspaceHost<KS>, KS: SafeKeyspace, R: Registry>
         // Distinct-field split borrows on `self`: `tc_ctx.rk`,
         // `tc_ctx.operation_gas`, `journal`, `registry`. The dispatcher
         // consumes them for the call only.
-        let rk: &mut RuntimeKeyspaces<'_, Host, KS> = &mut *self.tc_ctx.rk;
+        let rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace> = &mut *self.tc_ctx.rk;
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let crac_chain_depth = self.operation_ctx.crac_chain_depth;
@@ -960,24 +960,24 @@ pub trait HasCrossRuntime<'host, Host: StorageV1, KS>: HasJournal + HasRegistry 
     );
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasContractAccount
-    for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
+    HasContractAccount for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn contract_account(&self) -> &TezosOriginatedAccount {
         &self.exec_ctx.contract_account
     }
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasHost<Host>
-    for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasHost<Host>
+    for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn host(&mut self) -> &mut Host {
         self.tc_ctx.rk.host_mut()
     }
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasOriginLookup
-    for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasOriginLookup
+    for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn read_origin_for_address(
         &self,
@@ -987,16 +987,16 @@ impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasOriginLookup
     }
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasJournal
-    for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasJournal
+    for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
         self.journal
     }
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasRegistry
-    for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasRegistry
+    for Ctx<'a, 'operation, 'host, Host, R>
 {
     type R = R;
     fn registry(&self) -> &Self::R {
@@ -1004,13 +1004,13 @@ impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry> HasRegistry
     }
 }
 
-impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry>
-    HasCrossRuntime<'host, Host, KS> for Ctx<'a, 'operation, 'host, Host, KS, R>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
+    HasCrossRuntime<'host, Host, Host::KeySpace> for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn cross_runtime_split(
         &mut self,
     ) -> (
-        &mut RuntimeKeyspaces<'host, Host, KS>,
+        &mut RuntimeKeyspaces<'host, Host, Host::KeySpace>,
         &mut tezosx_journal::TezosXJournal,
         &R,
     ) {
@@ -1018,8 +1018,8 @@ impl<'a, 'operation, 'host, Host: StorageV1, KS, R: Registry>
     }
 }
 
-impl<'operation, 'host, Host: StorageV1, KS> HasOriginLookup
-    for TcCtx<'operation, 'host, Host, KS>
+impl<'operation, 'host, Host: KeySpaceLoader + StorageV1> HasOriginLookup
+    for TcCtx<'operation, 'host, Host>
 {
     fn read_origin_for_address(
         &self,
@@ -1029,22 +1029,24 @@ impl<'operation, 'host, Host: StorageV1, KS> HasOriginLookup
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry> HasOperationGas for Ctx<'_, '_, '_, Host, KS, R> {
+impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasOperationGas
+    for Ctx<'_, '_, '_, Host, R>
+{
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
         self.tc_ctx.operation_gas
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry> HasSourcePublicKey
-    for Ctx<'_, '_, '_, Host, KS, R>
+impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasSourcePublicKey
+    for Ctx<'_, '_, '_, Host, R>
 {
     fn source_public_key(&self) -> &[u8] {
         self.operation_ctx.source_public_key
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry> HasCracChainDepth
-    for Ctx<'_, '_, '_, Host, KS, R>
+impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasCracChainDepth
+    for Ctx<'_, '_, '_, Host, R>
 {
     fn crac_chain_depth(&self) -> u32 {
         self.operation_ctx.crac_chain_depth
@@ -1055,8 +1057,8 @@ impl<Host: StorageV1, KS, R: Registry> HasCracChainDepth
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry> HasDelegatedStorageCost
-    for Ctx<'_, '_, '_, Host, KS, R>
+impl<Host: KeySpaceLoader + StorageV1, R: Registry> HasDelegatedStorageCost
+    for Ctx<'_, '_, '_, Host, R>
 {
     fn delegated_storage_cost(&self) -> u64 {
         self.operation_ctx.delegated_storage_cost
@@ -1070,7 +1072,7 @@ impl<Host: StorageV1, KS, R: Registry> HasDelegatedStorageCost
     }
 }
 
-impl<Host: StorageV1, KS> TcCtx<'_, '_, Host, KS> {
+impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -1315,7 +1317,9 @@ fn set_total_bytes(
     Ok(())
 }
 
-impl<'a, 'host, Host: StorageV1, KS> LazyStorage<'a> for TcCtx<'a, 'host, Host, KS> {
+impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
+    for TcCtx<'a, 'host, Host>
+{
     /// The kernel's metered implementation: this is the one that has to bite,
     /// since the end-of-execution walk runs here over an attacker-shaped value
     /// inside a 4 GiB heap and against the PVM's tick ceiling.
@@ -1585,8 +1589,8 @@ pub mod tests {
 
     /// Dump a single standalone big map through [dump_big_map_updates] by
     /// wrapping it in a value, then unwrap the mutated map back out.
-    fn dump_one<'a, Host: StorageV1, KS>(
-        ctx: &mut TcCtx<'a, '_, Host, KS>,
+    fn dump_one<'a, Host: KeySpaceLoader + StorageV1>(
+        ctx: &mut TcCtx<'a, '_, Host>,
         started: &[BigMapId],
         map: BigMap<'a>,
     ) -> BigMap<'a> {
@@ -1627,8 +1631,8 @@ pub mod tests {
         };
     }
 
-    pub fn assert_big_map_eq<'a, Host: StorageV1, KS>(
-        ctx: &mut TcCtx<'a, '_, Host, KS>,
+    pub fn assert_big_map_eq<'a, Host: KeySpaceLoader + StorageV1>(
+        ctx: &mut TcCtx<'a, '_, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -1652,8 +1656,8 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: StorageV1, KS>(
-        ctx: &TcCtx<'a, '_, Host, KS>,
+    fn assert_big_map_removed<'a, Host: KeySpaceLoader + StorageV1>(
+        ctx: &TcCtx<'a, '_, Host>,
         id: &BigMapId,
     ) {
         let key_type_path = key_type_path(id).unwrap();
