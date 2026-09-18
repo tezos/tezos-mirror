@@ -47,8 +47,10 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
+use tezos_evm_runtime::{
+    extensions::WithGas,
+    runtime_keyspaces::{RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH},
+};
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
 };
@@ -56,7 +58,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -110,28 +112,30 @@ pub use tezos_execution::context::TEZOS_ACCOUNTS_ROOT;
 /// snapshot of every root in `full_roots` (one `store_copy` + `store_move`
 /// per root, twice — once for validation, once for application). Most
 /// operations only read or write account state under
-/// [TEZOS_ACCOUNTS_ROOT]; snapshotting the EVM roots and
-/// the Tez block/global-state root just to roll them back on failure is pure
+/// [TEZOS_ACCOUNTS_ROOT]; snapshotting the EVM world state and the Tez
+/// block/global-state root just to roll them back on failure is pure
 /// overhead. For batches that provably touch nothing else (see
-/// [Operation::touches_only_accounts]), narrow the snapshot to the accounts
-/// root alone; otherwise keep the full conservative set.
+/// [Operation::touches_only_accounts]), narrow the snapshot to the two
+/// account roots; otherwise keep the full conservative set.
+///
+/// [ETH_ACCOUNTS_ROOT_PATH] always stays in: the `RuntimeKeyspaces` built
+/// inside the snapshot loads its keyspace under the mirror, and a root the
+/// mirror did not copy reads empty and loses its writes at `promote`.
 fn operation_safe_roots(
     operation: &Operation,
     full_roots: &[OwnedPath],
 ) -> Vec<OwnedPath> {
-    if operation.touches_only_accounts() {
-        let narrowed: Vec<OwnedPath> = full_roots
-            .iter()
-            .filter(|root| root.as_bytes() == TEZOS_ACCOUNTS_ROOT.as_bytes())
-            .cloned()
-            .collect();
-        // Fall back to the full set if the accounts root is unexpectedly
-        // absent, so we never snapshot fewer roots than the operation needs.
-        if !narrowed.is_empty() {
-            return narrowed;
-        }
+    if !operation.touches_only_accounts() {
+        return full_roots.to_vec();
     }
-    full_roots.to_vec()
+    full_roots
+        .iter()
+        .filter(|root| {
+            root.as_bytes() == TEZOS_ACCOUNTS_ROOT.as_bytes()
+                || root.as_bytes() == ETH_ACCOUNTS_ROOT_PATH.as_bytes()
+        })
+        .cloned()
+        .collect()
 }
 
 #[derive(Debug, Default)]
@@ -562,7 +566,7 @@ impl TezosXChainConfig {
 
     pub fn fetch_hashes_from_delayed_inbox(
         host: &impl StorageV1,
-        base: &impl SafeKeyspace,
+        base: &impl KeySpace,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &DelayedInbox,
         current_blueprint_size: usize,
@@ -604,10 +608,10 @@ impl TezosXChainConfig {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn apply_transaction<Host, KS>(
+    pub fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &TezosXBlockConstants,
@@ -624,8 +628,7 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader + WithGas,
     {
         match transaction {
             TezosXTransaction::Ethereum(transaction) => {
@@ -696,16 +699,15 @@ impl TezosXChainConfig {
         }
     }
 
-    pub fn finalize_and_store<Host, KS>(
+    pub fn finalize_and_store<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         block_in_progress: BlockInProgress,
         block_constants: &TezosXBlockConstants,
         _chain_header: EVMBlockHeader,
     ) -> anyhow::Result<L2Block>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let current_level = block_in_progress.number;
         block_in_progress.finalize_and_store(
@@ -715,16 +717,16 @@ impl TezosXChainConfig {
         )
     }
 
-    pub fn start_simulation_mode<Host, KS>(
+    pub fn start_simulation_mode<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        base: &mut impl KeySpace,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     ) -> anyhow::Result<()>
     where
-        Host: WasmHost + KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader + WasmHost,
     {
-        start_simulation_mode(rk, registry, &self.spec_id)
+        start_simulation_mode(rk, base, registry, &self.spec_id)
     }
 
     /// The durable roots the failsafe mirror shadows: the world-state roots
@@ -742,19 +744,20 @@ impl TezosXChainConfig {
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
                 TEZOS_ACCOUNTS_ROOT,
+                ETH_ACCOUNTS_ROOT_PATH,
             ]
         } else {
-            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
+            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH]
         }
     }
 }
 
 impl TezosXChainConfig {
     #[allow(clippy::too_many_arguments)]
-    fn apply_tezos_operation<Host, KS>(
+    fn apply_tezos_operation<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         operation: TezlinkOperation,
@@ -768,8 +771,7 @@ impl TezosXChainConfig {
         http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader + WithGas,
     {
         let tx_hash = operation.tx_hash;
         let crac_id = tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
@@ -1110,10 +1112,10 @@ fn get_fees_data(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn apply_tezos_operation<Host, KS>(
+pub fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &TezlinkBlockConstants,
     operation: TezlinkOperation,
@@ -1134,8 +1136,7 @@ pub fn apply_tezos_operation<Host, KS>(
     enable_da_fees: bool,
 ) -> Result<crate::apply::ExecutionResult<TezosExecutionInfo>, anyhow::Error>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader + WithGas,
 {
     let level = block_constants.level;
     let now = block_in_progress.timestamp;
@@ -1208,7 +1209,7 @@ where
             // on whether it failed or not
             let journal = external_journal;
             // Snapshot only the roots this operation can touch (often just the
-            // accounts root) instead of the full conservative set.
+            // account roots) instead of the full conservative set.
             let safe_roots =
                 operation_safe_roots(&operation, &block_constants.safe_roots);
             let processed_operations = match tezos_execution::validate_and_apply_operation(
@@ -1230,11 +1231,13 @@ where
                 Err(OperationError::RuntimeError(err)) => {
                     return Err(err.into());
                 }
+                Err(OperationError::KeySpace(err)) => {
+                    return Err(err.into());
+                }
                 Err(OperationError::BlockAbort(msg)) => {
                     return Err(anyhow::anyhow!("cross-runtime call block abort: {msg}"));
                 }
             };
-
             let consumed_milligas =
                 ProcessedOperation::total_consumed_milligas(&processed_operations);
             let operations = ProcessedOperation::into_receipts(processed_operations);
