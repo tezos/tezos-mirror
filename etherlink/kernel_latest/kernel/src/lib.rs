@@ -33,7 +33,6 @@ use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
@@ -53,6 +52,16 @@ pub(crate) fn load_base<Host: KeySpaceLoader>(
     let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
     set_global_verbosity(read_logs_verbosity(&base));
     Ok(base)
+}
+
+/// [`load_base`] for the entrypoints that return instead of failing: the
+/// error is logged and becomes `None`.
+pub(crate) fn load_base_or_log<Host: KeySpaceLoader>(
+    host: &mut Host,
+) -> Option<Host::KeySpace> {
+    load_base(host)
+        .inspect_err(|err| log!(Error, "Failed to load the /base keyspace: {err:?}"))
+        .ok()
 }
 
 mod apply;
@@ -232,35 +241,23 @@ where
     Ok(block_fees)
 }
 
-pub fn run<Host, KS>(rk: &mut RuntimeKeyspaces<'_, Host, KS>) -> Result<(), anyhow::Error>
+pub fn run<Host>(host: &mut Host, base: impl KeySpace) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
 {
     // Reboot by default, to ensure the health check implemented before the stage 2 is executed in
     // the same L1 level
-    rk.host_mut()
-        .mark_for_reboot()
+    host.mark_for_reboot()
         .expect("This function should never fail");
-    match single_run(rk) {
-        // Mark the open frames so the next run takes them back.
-        Ok(SingleRunStatus::Reboot) => {
-            rk.create_reboot_marker()
-                .expect("This function should never fail");
-            Ok(())
-        }
+    match single_run(host, base) {
+        Ok(SingleRunStatus::Reboot) => Ok(()),
         Ok(SingleRunStatus::Finished) => {
-            rk.end_kernel_run();
-            rk.host_mut()
-                .clear_reboot_mark()
+            host.clear_reboot_mark()
                 .expect("This function should never fail");
             Ok(())
         }
         Err(err) => {
-            // Revert any frame the failed run left open.
-            rk.end_kernel_run();
-            rk.host_mut()
-                .clear_reboot_mark()
+            host.clear_reboot_mark()
                 .expect("This function should never fail");
             Err(err)
         }
@@ -272,23 +269,22 @@ pub enum SingleRunStatus {
     Finished,
 }
 
-pub fn single_run<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn single_run<Host>(
+    host: &mut Host,
+    mut base: impl KeySpace,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
-    Host: HostReveal + WasmHost + WithGas + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
 {
     // We always start by doing the migration if needed.
-    let (host, base) = rk.base_parts_mut();
-    match stage_zero(host, base) {
+    match stage_zero(host, &mut base) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
             // at every kernel run.
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
-            set_kernel_version(rk.base_mut())?;
+            set_kernel_version(&mut base)?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -298,16 +294,15 @@ where
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
-            set_kernel_version(rk.base_mut())?;
-            let configuration = fetch_configuration(rk.host(), rk.base());
+            set_kernel_version(&mut base)?;
+            let configuration = fetch_configuration(host, &base);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            let (host, base) = rk.base_parts_mut();
-            fallback_backup_kernel(host, base)?;
+            fallback_backup_kernel(host, &mut base)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
@@ -325,36 +320,35 @@ where
     // Fetch kernel metadata:
 
     // 1. Fetch the smart rollup address via the host function, it cannot fail.
-    let smart_rollup_address = rk.host_mut().reveal_metadata().raw_rollup_address;
+    let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = {
-        let (host, base) = rk.base_parts_mut();
-        fetch_tezosx_configuration(host, base)
-    };
-    let mut configuration = fetch_configuration(rk.host(), rk.base());
-    let sequencer_pool_address = read_sequencer_pool_address(rk.host());
+    let chain_configuration = fetch_tezosx_configuration(host, &base);
+    let mut configuration = fetch_configuration(host, &base);
+    let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !configuration.common.evm_node_flag {
-        let (host, base) = rk.base_parts_mut();
-        health_check(host, base, &mut configuration)?;
+        health_check(host, &mut base, &mut configuration)?;
     }
+
+    let mut eth_accounts = host.load_or_create(
+        tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_KEYSPACE_NAME,
+    )?;
 
     // Initialize custom precompile
     let tezosx_enabled = chain_configuration.tezos_runtime_feature_flag();
-    init_precompile_bytecodes(rk.eth_accounts_mut(), tezosx_enabled)
+    init_precompile_bytecodes(&mut eth_accounts, tezosx_enabled)
         .map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    let (host, base) = rk.base_parts_mut();
     let stage_one_status = stage_one(
         host,
-        base,
+        &mut base,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
@@ -367,21 +361,25 @@ where
             return Ok(SingleRunStatus::Reboot);
         }
         StageOneStatus::Simulation => {
+            drop(eth_accounts);
+            let mut rk = RuntimeKeyspaces::init(host)?;
             let registry = chain_configuration.init_registry();
-            chain_configuration.start_simulation_mode(rk, &registry)?;
+            chain_configuration.start_simulation_mode(&mut rk, &mut base, &registry)?;
             return Ok(SingleRunStatus::Finished);
         }
         StageOneStatus::Done | StageOneStatus::Skipped => (),
     };
 
-    let trace_input = read_tracer_input(rk.base())?;
+    let trace_input = read_tracer_input(&base)?;
 
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(Debug, "Entering stage two.");
+        drop(eth_accounts);
         if let block::ComputationResult::Finished = block::produce(
-            rk,
+            host,
+            base,
             &chain_configuration,
             &mut configuration,
             sequencer_pool_address,
@@ -397,7 +395,9 @@ where
     {
         log!(Benchmarking, "Shortcircuiting computation");
         #[cfg(not(target_arch = "riscv64"))]
-        return Ok(SingleRunStatus::Finished);
+        {
+            return Ok(SingleRunStatus::Finished);
+        }
     }
 
     log!(Debug, "End of kernel run.");
@@ -418,17 +418,8 @@ where
     Host: StorageV1 + CoreStorage + HostReveal + WasmHost,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
-        Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
-            return;
-        }
-    };
 
-    let reboot_counter = rk
-        .host()
-        .host
+    let reboot_counter = kernel_host
         .reboot_left()
         .expect("The kernel failed to get the number of reboot left");
     if reboot_counter == 1000 {
@@ -437,9 +428,7 @@ where
         )
     }
 
-    let world_state_subkeys = rk
-        .host()
-        .host
+    let world_state_subkeys = kernel_host
         .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
@@ -447,8 +436,7 @@ where
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
     if world_state_subkeys == 0 {
-        rk.host_mut()
-            .host
+        kernel_host
             .store_write(
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 "Un festival de GADT".as_bytes(),
@@ -457,15 +445,12 @@ where
             .unwrap();
     }
 
-    let tez_world_state_subkeys = rk
-        .host()
-        .host
+    let tez_world_state_subkeys = kernel_host
         .store_count_subkeys(&chains::TEZ_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /tez/world_state subkeys");
 
     if tez_world_state_subkeys == 0 {
-        rk.host_mut()
-            .host
+        kernel_host
             .store_write(
                 &chains::TEZ_SAFE_STORAGE_ROOT_PATH,
                 b"Une sarabande de monades",
@@ -474,24 +459,41 @@ where
             .unwrap();
     }
 
-    let tez_tez_accounts_subkeys = rk
-        .host()
-        .host
+    let tez_tez_accounts_subkeys = kernel_host
         .store_count_subkeys(&chains::TEZOS_ACCOUNTS_ROOT)
         .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
 
     if tez_tez_accounts_subkeys == 0 {
-        rk.host_mut()
-            .host
+        kernel_host
             .store_write(&chains::TEZOS_ACCOUNTS_ROOT, b"Un carnaval de foncteur", 0)
             .unwrap();
     }
 
-    if is_revealed_storage(rk.base()) {
-        let (host, base) = rk.base_parts_mut();
+    // `SafeStorage::start` copies every mirrored root and `store_copy` fails
+    // on a missing source: seed `/evm/eth_accounts` like the roots above.
+    let eth_accounts_subkeys = kernel_host
+        .store_count_subkeys(
+            &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
+        )
+        .expect("The kernel failed to read the number of /evm/eth_accounts subkeys");
+
+    if eth_accounts_subkeys == 0 {
+        kernel_host
+            .store_write(
+                &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
+                "Un défilé d'isomorphismes".as_bytes(),
+                0,
+            )
+            .unwrap();
+    }
+
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
+    };
+    if is_revealed_storage(&base) {
         reveal_storage(
-            host,
-            base,
+            &mut kernel_host,
+            &mut base,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -500,8 +502,7 @@ where
             }),
         );
     }
-
-    match run(&mut rk) {
+    match run(&mut kernel_host, base) {
         Ok(()) => (),
         Err(err) => {
             log!(Fatal, "The kernel produced an error: {:?}", err);
@@ -641,84 +642,92 @@ mod tests {
     fn test_xtz_withdrawal_applied() {
         // init host
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        rk.host_mut()
-            .store_write_all(
-                &NATIVE_TOKEN_TICKETER_PATH,
-                b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+        let level;
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            rk.host_mut()
+                .store_write_all(
+                    &NATIVE_TOKEN_TICKETER_PATH,
+                    b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+                )
+                .unwrap();
+            store_evm_chain_id(rk.host_mut(), DUMMY_CHAIN_ID).unwrap();
+
+            // run level in order to initialize outbox counter (by SOL message)
+            level = rk.host_mut().host.run_level(|_| ());
+
+            // provision sender account
+            let sender =
+                H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+            let sender_initial_balance = U256::from(10000000000000000000u64);
+            set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
+
+            // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
+            let data = hex::decode(
+                "cda4fee2\
+                 0000000000000000000000000000000000000000000000000000000000000020\
+                 0000000000000000000000000000000000000000000000000000000000000024\
+                 747a31526a745a5556654c6841444648444c385577445a4136766a5757686f6a70753577\
+                 00000000000000000000000000000000000000000000000000000000",
             )
             .unwrap();
-        store_evm_chain_id(rk.host_mut(), DUMMY_CHAIN_ID).unwrap();
 
-        // run level in order to initialize outbox counter (by SOL message)
-        let level = rk.host_mut().host.run_level(|_| ());
+            // create and sign precompile call
+            let gas_price = U256::from(40000000000u64);
+            let to = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
+            let tx = EthereumTransactionCommon::new(
+                TransactionType::Legacy,
+                Some(DUMMY_CHAIN_ID),
+                0,
+                gas_price,
+                gas_price,
+                30_000_000,
+                Some(to),
+                U256::from(1000000000000000000u64),
+                data,
+                vec![],
+                None,
+                None,
+            );
 
-        // provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
+            // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+            let tx_payload = tx
+                .sign_transaction(
+                    "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                        .to_string(),
+                )
+                .unwrap()
+                .to_bytes();
 
-        // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
-        let data = hex::decode(
-            "cda4fee2\
-             0000000000000000000000000000000000000000000000000000000000000020\
-             0000000000000000000000000000000000000000000000000000000000000024\
-             747a31526a745a5556654c6841444648444c385577445a4136766a5757686f6a70753577\
-             00000000000000000000000000000000000000000000000000000000",
-        )
-        .unwrap();
+            let tx_hash = keccak256(&tx_payload);
 
-        // create and sign precompile call
-        let gas_price = U256::from(40000000000u64);
-        let to = H160::from_str("ff00000000000000000000000000000000000001").unwrap();
-        let tx = EthereumTransactionCommon::new(
-            TransactionType::Legacy,
-            Some(DUMMY_CHAIN_ID),
-            0,
-            gas_price,
-            gas_price,
-            30_000_000,
-            Some(to),
-            U256::from(1000000000000000000u64),
-            data,
-            vec![],
-            None,
-            None,
-        );
+            // encode as external message and submit to inbox
+            let mut contents = Vec::new();
+            contents.push(0x00); // simple tx tag
+            contents.extend_from_slice(tx_hash.as_slice());
+            contents.extend_from_slice(&tx_payload);
 
-        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        let tx_payload = tx
-            .sign_transaction(
-                "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                    .to_string(),
-            )
-            .unwrap()
-            .to_bytes();
+            let message = ExternalMessageFrame::Targetted {
+                address: SmartRollupAddress::from_b58check(
+                    "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
+                )
+                .unwrap(),
+                contents,
+            };
 
-        let tx_hash = keccak256(&tx_payload);
-
-        // encode as external message and submit to inbox
-        let mut contents = Vec::new();
-        contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_slice());
-        contents.extend_from_slice(&tx_payload);
-
-        let message = ExternalMessageFrame::Targetted {
-            address: SmartRollupAddress::from_b58check(
-                "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
-            )
-            .unwrap(),
-            contents,
-        };
-
-        rk.host_mut().host.add_external(message);
+            rk.host_mut().host.add_external(message);
+            // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
+            // dropped at the end of this block.
+        }
 
         // run kernel twice to get to the stage with block creation:
-        run(&mut rk).expect("Kernel error");
-        run(&mut rk).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
 
         // verify outbox is not empty
-        let outbox = rk.host_mut().host.outbox_at(level + 1);
+        let outbox = host.host.outbox_at(level + 1);
         assert!(!outbox.is_empty());
 
         // check message contents:
@@ -756,54 +765,60 @@ mod tests {
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        // enable FA bridge feature
-        if enable_fa_bridge {
-            rk.host_mut()
-                .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
-                .unwrap();
+            // enable FA bridge feature
+            if enable_fa_bridge {
+                rk.host_mut()
+                    .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
+                    .unwrap();
+            }
+
+            // init rollup parameters (legacy optimized forge)
+            // type:
+            //   (or
+            //     (or (pair %deposit (bytes %routing_info)
+            //                        (ticket %ticket (pair %content (nat %token_id)
+            //                                                       (option %metadata bytes))))
+            //         (bytes %b))
+            //     (bytes %c))
+            // value:
+            // {
+            //   "deposit": {
+            //     "routing_info": "01" * 20 + "02" * 20,
+            //     "ticket": (
+            //         "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
+            //         (1, None),
+            //         42
+            //     )
+            //   }
+            // }
+            let params = hex::decode(
+                "\
+                0505050507070a00000028010101010101010101010101010101010101010102\
+                0202020202020202020202020202020202020207070a0000001601d496def47a\
+                3be89f5d54c6e6bb13cc6645d6e166000707070700010306002a",
+            )
+            .unwrap();
+            let (_, payload) =
+                RollupType::nom_read(&params).expect("Failed to decode params");
+
+            let metadata = TransferMetadata::new(
+                "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
+                "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
+            );
+            rk.host_mut().host.add_transfer(payload, &metadata);
+            // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
+            // dropped at the end of this block.
         }
 
-        // init rollup parameters (legacy optimized forge)
-        // type:
-        //   (or
-        //     (or (pair %deposit (bytes %routing_info)
-        //                        (ticket %ticket (pair %content (nat %token_id)
-        //                                                       (option %metadata bytes))))
-        //         (bytes %b))
-        //     (bytes %c))
-        // value:
-        // {
-        //   "deposit": {
-        //     "routing_info": "01" * 20 + "02" * 20,
-        //     "ticket": (
-        //         "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
-        //         (1, None),
-        //         42
-        //     )
-        //   }
-        // }
-        let params = hex::decode(
-            "\
-            0505050507070a00000028010101010101010101010101010101010101010102\
-            0202020202020202020202020202020202020207070a0000001601d496def47a\
-            3be89f5d54c6e6bb13cc6645d6e166000707070700010306002a",
-        )
-        .unwrap();
-        let (_, payload) =
-            RollupType::nom_read(&params).expect("Failed to decode params");
-
-        let metadata = TransferMetadata::new(
-            "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
-            "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
-        );
-        rk.host_mut().host.add_transfer(payload, &metadata);
-
         // run kernel
-        run(&mut rk).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        run(&mut rk).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -825,7 +840,7 @@ mod tests {
         let deposit = FaDeposit {
             amount: 42.into(),
             proxy: Some(H160([2u8; 20])),
-            inbox_level: rk.host_mut().host.level(), // level not yet advanced
+            inbox_level: host.host.level(), // level not yet advanced
             inbox_msg_id: 2,
             receiver: H160([1u8; 20]),
             ticket_hash: ticket_hash(&ticket).unwrap(),
@@ -834,7 +849,7 @@ mod tests {
         let tx_hash = deposit.hash(&[0u8; 20]);
 
         // read transaction receipt
-        read_transaction_receipt_status(rk.host_mut(), &tx_hash.0).ok()
+        read_transaction_receipt_status(&mut host, &tx_hash.0).ok()
     }
 
     #[test]
@@ -850,112 +865,120 @@ mod tests {
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let level;
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        // enable FA bridge feature
-        if enable_fa_bridge {
-            rk.host_mut()
-                .store_write(&ENABLE_FA_BRIDGE, &[1u8], 0)
+            // enable FA bridge feature
+            if enable_fa_bridge {
+                rk.host_mut()
+                    .store_write(&ENABLE_FA_BRIDGE, &[1u8], 0)
+                    .unwrap();
+            }
+
+            // run level in order to initialize outbox counter (by SOL message)
+            level = rk.host_mut().host.run_level(|_| ());
+
+            // provision sender account
+            let sender =
+                H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+            let sender_initial_balance = U256::from(10000000000000000000u64);
+            set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
+
+            // construct ticket
+            let ticket = dummy_ticket();
+            let ticket_hash = h256_to_alloy(&ticket_hash(&ticket).unwrap());
+            let (_, bytes) = ticket.amount().to_bytes_le();
+            let amount = U256::from_little_endian(&bytes);
+
+            let mut system = StorageAccount::from_address(&SYSTEM_SOL_ADDR).unwrap();
+
+            // patch ticket table
+            let ticket_balance = system
+                .read_ticket_balance(
+                    rk.eth_accounts(),
+                    &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                    &h160_to_alloy(&sender),
+                )
                 .unwrap();
+            system
+                .write_ticket_balance(
+                    rk.eth_accounts_mut(),
+                    &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                    &h160_to_alloy(&sender),
+                    ticket_balance + u256_to_alloy(&amount),
+                )
+                .unwrap();
+
+            // construct withdraw calldata
+            let (ticketer, content) = ticket_id(&ticket);
+            let routing_info = hex::decode("0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000").unwrap();
+
+            let data = kernel_wrapper::withdrawCall::new((
+                h160_to_alloy(&sender),
+                routing_info.into(),
+                u256_to_alloy(&amount),
+                ticketer.into(),
+                content.into(),
+            ))
+            .abi_encode();
+
+            // create and sign precompile call
+            let gas_price = U256::from(40000000000u64);
+            let to = alloy_to_h160(&FA_BRIDGE_SOL_ADDR);
+            let tx = EthereumTransactionCommon::new(
+                TransactionType::Legacy,
+                Some(U256::from(1337)),
+                0,
+                gas_price,
+                gas_price,
+                10_000_000,
+                Some(to),
+                U256::zero(),
+                data,
+                vec![],
+                None,
+                None,
+            );
+
+            // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+            let tx_payload = tx
+                .sign_transaction(
+                    "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                        .to_string(),
+                )
+                .unwrap()
+                .to_bytes();
+
+            let tx_hash = keccak256(&tx_payload);
+
+            // encode as external message and submit to inbox
+            let mut contents = Vec::new();
+            contents.push(0x00); // simple tx tag
+            contents.extend_from_slice(tx_hash.as_slice());
+            contents.extend_from_slice(&tx_payload);
+
+            let message = ExternalMessageFrame::Targetted {
+                address: SmartRollupAddress::from_b58check(
+                    "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
+                )
+                .unwrap(),
+                contents,
+            };
+
+            rk.host_mut().host.add_external(message);
+            // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
+            // dropped at the end of this block.
         }
 
-        // run level in order to initialize outbox counter (by SOL message)
-        let level = rk.host_mut().host.run_level(|_| ());
-
-        // provision sender account
-        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let sender_initial_balance = U256::from(10000000000000000000u64);
-        set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
-
-        // construct ticket
-        let ticket = dummy_ticket();
-        let ticket_hash = h256_to_alloy(&ticket_hash(&ticket).unwrap());
-        let (_, bytes) = ticket.amount().to_bytes_le();
-        let amount = U256::from_little_endian(&bytes);
-
-        let mut system = StorageAccount::from_address(&SYSTEM_SOL_ADDR).unwrap();
-
-        // patch ticket table
-        let ticket_balance = system
-            .read_ticket_balance(
-                rk.eth_accounts(),
-                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
-                &h160_to_alloy(&sender),
-            )
-            .unwrap();
-        system
-            .write_ticket_balance(
-                rk.eth_accounts_mut(),
-                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
-                &h160_to_alloy(&sender),
-                ticket_balance + u256_to_alloy(&amount),
-            )
-            .unwrap();
-
-        // construct withdraw calldata
-        let (ticketer, content) = ticket_id(&ticket);
-        let routing_info = hex::decode("0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000").unwrap();
-
-        let data = kernel_wrapper::withdrawCall::new((
-            h160_to_alloy(&sender),
-            routing_info.into(),
-            u256_to_alloy(&amount),
-            ticketer.into(),
-            content.into(),
-        ))
-        .abi_encode();
-
-        // create and sign precompile call
-        let gas_price = U256::from(40000000000u64);
-        let to = alloy_to_h160(&FA_BRIDGE_SOL_ADDR);
-        let tx = EthereumTransactionCommon::new(
-            TransactionType::Legacy,
-            Some(U256::from(1337)),
-            0,
-            gas_price,
-            gas_price,
-            10_000_000,
-            Some(to),
-            U256::zero(),
-            data,
-            vec![],
-            None,
-            None,
-        );
-
-        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
-        let tx_payload = tx
-            .sign_transaction(
-                "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
-                    .to_string(),
-            )
-            .unwrap()
-            .to_bytes();
-
-        let tx_hash = keccak256(&tx_payload);
-
-        // encode as external message and submit to inbox
-        let mut contents = Vec::new();
-        contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_slice());
-        contents.extend_from_slice(&tx_payload);
-
-        let message = ExternalMessageFrame::Targetted {
-            address: SmartRollupAddress::from_b58check(
-                "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57",
-            )
-            .unwrap(),
-            contents,
-        };
-
-        rk.host_mut().host.add_external(message);
-
         // run kernel
-        run(&mut rk).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        run(&mut rk).expect("Kernel error");
+        let base = crate::load_base(&mut host).unwrap();
+        run(&mut host, base).expect("Kernel error");
 
-        rk.host_mut().host.outbox_at(level + 1)
+        host.host.outbox_at(level + 1)
     }
 
     #[test]
