@@ -7,13 +7,14 @@ use revm::{context::ContextTr, primitives::Log};
 use tezosx_interfaces::Registry;
 
 use crate::{database::EtherlinkVMDB, journal::Journal};
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 pub fn log<'j, 'host, Host, KS, R, CTX>(context: &mut CTX, log: Log)
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,

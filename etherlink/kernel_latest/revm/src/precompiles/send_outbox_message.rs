@@ -46,7 +46,8 @@ use evm_types::{
     CustomPrecompileError, DatabasePrecompileStateChanges, IntoWithRemainder,
     PrecompileStateError,
 };
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 sol! {
     contract SendOutboxMessage {
@@ -280,8 +281,8 @@ fn send_outbox_methods<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -473,8 +474,8 @@ pub(crate) fn send_outbox_message_precompile<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,

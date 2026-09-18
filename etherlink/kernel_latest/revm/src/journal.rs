@@ -41,9 +41,9 @@ use evm_types::{
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{
     canonicalize_native_address, resolve_routing, AliasInfo, AliasResolution,
     CrossRuntimeContext, Gas as TezosXGas, Registry, RoutingDecision, RuntimeId,
@@ -58,7 +58,7 @@ pub struct Journal<
     'a,
     'host,
     Host: StorageV1,
-    KS,
+    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 > {
     /// Database
@@ -77,7 +77,7 @@ impl<
         'a,
         'host,
         Host: StorageV1,
-        KS,
+        KS: KeySpace,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
     > Journal<'a, 'host, Host, KS, R>
 {
@@ -104,7 +104,7 @@ impl<
         'a,
         'host,
         Host: StorageV1,
-        KS,
+        KS: KeySpace,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
     > TracerContainer for Journal<'a, 'host, Host, KS, R>
 {
@@ -122,8 +122,8 @@ impl<
 impl<
         'a,
         'host,
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1,
+        KS: KeySpace,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
     > JournalTr for Journal<'a, 'host, Host, KS, R>
 {
@@ -544,8 +544,11 @@ impl<
     }
 }
 
-impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> JournalExt
-    for Journal<'_, '_, Host, KS, R>
+impl<
+        Host: StorageV1,
+        KS: KeySpace,
+        R: Registry<Journal = tezosx_journal::TezosXJournal>,
+    > JournalExt for Journal<'_, '_, Host, KS, R>
 {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
@@ -564,8 +567,8 @@ impl<Host: StorageV1, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> 
 }
 
 impl<
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1,
+        KS: KeySpace,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
     > Journal<'_, '_, Host, KS, R>
 {
@@ -787,8 +790,8 @@ pub trait CrossRuntimeCall {
 impl<
         'a,
         'host,
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
         R: Registry<Journal = TezosXJournal>,
     > CrossRuntimeCall for Journal<'a, 'host, Host, KS, R>
 {
@@ -998,8 +1001,8 @@ pub fn commit_evm_journal_from_external<Host, KS>(
     sequencer_credit: Option<(Address, U256)>,
 ) -> Result<Vec<Withdrawal>, EvmRunError>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1,
+    KS: KeySpace,
 {
     // Cross-runtime callers are classified through their staged alias,
     // never as Native: no caller to classify here.
