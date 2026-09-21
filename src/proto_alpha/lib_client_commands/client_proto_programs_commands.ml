@@ -96,15 +96,17 @@ let commands () =
   in
   let now_arg = Client_proto_args.now_arg in
   let level_arg = Client_proto_args.level_arg in
-  let resolve_max_gas cctxt block =
+  let resolve_max_gas cctxt block ~unlimited_gas custom_gas =
     let open Lwt_result_syntax in
-    function
-    | None ->
-        let* {parametric = {hard_gas_limit_per_operation; _}; _} =
-          Alpha_services.Constants.all cctxt (cctxt#chain, block)
-        in
-        return hard_gas_limit_per_operation
-    | Some gas -> return gas
+    if unlimited_gas then return_none
+    else
+      match custom_gas with
+      | None ->
+          let* {parametric = {hard_gas_limit_per_operation; _}; _} =
+            Alpha_services.Constants.all cctxt (cctxt#chain, block)
+          in
+          return_some hard_gas_limit_per_operation
+      | Some gas -> return_some gas
   in
   let parse_expr expr =
     Lwt.return @@ Micheline_parser.no_parsing_error
@@ -445,14 +447,16 @@ let commands () =
          ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
-        let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
+        let* gas =
+          resolve_max_gas cctxt cctxt#block ~unlimited_gas:false original_gas
+        in
         handle_parsing_error "size" cctxt setup program @@ fun program ->
         let* code_size =
           script_size
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:(Some original_gas)
+            ~gas
             ~legacy
             ~program
             ~storage
@@ -569,11 +573,12 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck one or several scripts."
-      (args7
+      (args8
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
          run_gas_limit_arg
+         unlimited_gas_arg
          legacy_switch
          display_names_flag
          keep_going_flag)
@@ -584,6 +589,7 @@ let commands () =
              emacs_mode,
              no_print_source,
              original_gas,
+             unlimited_gas,
              legacy,
              display_names,
              keep_going )
@@ -620,15 +626,19 @@ let commands () =
                   let* () =
                     handle_parsing_error "types" cctxt setup program
                     @@ fun program ->
-                    let* original_gas =
-                      resolve_max_gas cctxt cctxt#block original_gas
+                    let* gas =
+                      resolve_max_gas
+                        cctxt
+                        cctxt#block
+                        ~unlimited_gas
+                        original_gas
                     in
                     let*! res =
                       typecheck_program
                         cctxt
                         ~chain:cctxt#chain
                         ~block:cctxt#block
-                        ~gas:(Some original_gas)
+                        ~gas
                         ~legacy
                         ~show_types
                         program
@@ -664,21 +674,27 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
-      (args3 no_print_source_flag run_gas_limit_arg legacy_switch)
+      (args4
+         no_print_source_flag
+         run_gas_limit_arg
+         unlimited_gas_arg
+         legacy_switch)
       (prefixes ["typecheck"; "data"]
       @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
       @@ param ~name:"type" ~desc:"the expected type" data_parameter
       @@ stop)
-      (fun (no_print_source, custom_gas, legacy) data ty cctxt ->
+      (fun (no_print_source, custom_gas, unlimited_gas, legacy) data ty cctxt ->
         let open Lwt_result_syntax in
-        let* original_gas = resolve_max_gas cctxt cctxt#block custom_gas in
+        let* gas =
+          resolve_max_gas cctxt cctxt#block ~unlimited_gas custom_gas
+        in
         let*! r =
           Client_proto_programs.typecheck_data
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:(Some original_gas)
+            ~gas
             ~legacy
             ~data
             ~ty
@@ -720,12 +736,14 @@ let commands () =
       @@ stop)
       (fun (custom_gas, scriptable) data typ cctxt ->
         let open Lwt_result_syntax in
-        let* original_gas = resolve_max_gas cctxt cctxt#block custom_gas in
+        let* gas =
+          resolve_max_gas cctxt cctxt#block ~unlimited_gas:false custom_gas
+        in
         let*! r =
           Plugin.RPC.Scripts.pack_data
             cctxt
             (cctxt#chain, cctxt#block)
-            ~gas:(Some original_gas)
+            ~gas
             ~data:data.expanded
             ~ty:typ.expanded
         in
