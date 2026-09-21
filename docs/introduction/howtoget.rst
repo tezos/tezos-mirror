@@ -458,6 +458,10 @@ build one locally and reference it. Run the following command to build the image
 
     ./scripts/create_docker_image.sh
 
+The distribution is built FROM base images that the script expects to find first. If they are
+missing, it stops and prints how to obtain them; see ``images/README.md`` and
+``./scripts/create_docker_image.sh --help`` for the details.
+
 
 And then update the docker-compose file (e.g., ``alpha.yml``) with the docker tag::
 
