@@ -2004,6 +2004,181 @@ let test_tz4_manager_operation ~with_empty_mempool =
           "Reveal of tz4 account is not included in the block: %s"
           receipt
 
+(* Maps a bootstrap account's public key to its public key hash. The
+   [swrr_selected_bakers] RPC returns consensus public keys, whereas baking
+   rights are expressed in terms of delegate public key hashes. *)
+let bootstrap_pkh_of_public_key =
+  let bindings =
+    Array.to_list Account.Bootstrap.keys
+    |> List.map (fun (key : Account.key) ->
+           (key.public_key, key.public_key_hash))
+  in
+  fun public_key ->
+    match List.assoc_opt public_key bindings with
+    | Some pkh -> pkh
+    | None -> Test.fail "SWRR: unknown consensus public key %s" public_key
+
+(* [get_swrr_selected_bakers ~blocks_per_cycle client] returns the delegates
+   selected by the SWRR sampler for the current cycle, as an array indexed by
+   the position of the slot in the cycle. *)
+let get_swrr_selected_bakers ~blocks_per_cycle client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_helpers_swrr_selected_bakers ()
+  in
+  let entries = JSON.as_list json in
+  (* A [FallbackArray.t] is encoded as its underlying array, which holds one
+     extra trailing cell for the fallback value; that cell is not a slot. *)
+  Check.((List.length entries = blocks_per_cycle + 1) ~__LOC__ int)
+    ~error_msg:
+      "Expected %R selected bakers entries (blocks_per_cycle + 1), got %L" ;
+  let delegate_of_entry entry =
+    match JSON.(entry |-> "delegate" |> as_string_opt) with
+    | Some pkh ->
+        (* The [delegate] field is omitted when it coincides with the
+           consensus key. *)
+        pkh
+    | None ->
+        bootstrap_pkh_of_public_key JSON.(entry |-> "consensus_pk" |> as_string)
+  in
+  return
+    (List.filteri (fun i _ -> i < blocks_per_cycle) entries
+    |> List.map delegate_of_entry |> Array.of_list)
+
+(* Checks that the baking rights of the current level are the ones dictated by
+   the SWRR selection of the current cycle: the baker of a level at round [r]
+   is the one stored at index [(cycle_position + 3 * r) mod blocks_per_cycle].
+   Every round up to [blocks_per_cycle] is checked, not only the first
+   opportunity of each baker, so that the index wraps around the selection. *)
+let check_baking_rights_against_swrr ~blocks_per_cycle client =
+  let* level =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
+  let* selected_bakers = get_swrr_selected_bakers ~blocks_per_cycle client in
+  let max_round = blocks_per_cycle in
+  let* baking_rights_json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_helper_baking_rights
+         ~level:level.level
+         ~max_round
+         ~all:true
+         ()
+  in
+  let baking_rights = JSON.as_list baking_rights_json in
+  Check.((List.length baking_rights = max_round + 1) ~__LOC__ int)
+    ~error_msg:
+      (Format.sprintf
+         "At level %d: expected %%R baking opportunities (one per round), got \
+          %%L"
+         level.level) ;
+  List.iter
+    (fun json ->
+      let round = JSON.(json |-> "round" |> as_int) in
+      let delegate = JSON.(json |-> "delegate" |> as_string) in
+      let idx = (level.cycle_position + (3 * round)) mod blocks_per_cycle in
+      Check.((delegate = selected_bakers.(idx)) ~__LOC__ string)
+        ~error_msg:
+          (Format.sprintf
+             "At level %d round %d: baking rights give %%L whereas the SWRR \
+              selection gives %%R"
+             level.level
+             round))
+    baking_rights ;
+  unit
+
+(* Checks that SWRR, enabled before the migration, keeps driving the baker
+   selection after it. *)
+let test_swrr_method_activation ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration for new baker selection with SWRR"
+    ~tags:[team; "protocol"; "migration"; "baking"; "swrr"]
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [(["swrr_new_baker_lottery_enable"], `Bool true)]
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let consensus_rights_delay =
+    JSON.(get "consensus_rights_delay" parameters |> as_int)
+  in
+  (* Migration at the end of cycle 1 *)
+  let migration_level = 2 * blocks_per_cycle in
+  let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+  let* client, _node =
+    perform_protocol_migration
+      ~parameter_file
+      ~blocks_per_cycle
+      ~migration_level
+      ~migrate_from
+      ~migrate_to
+      ~baked_blocks_after_migration:0
+      ()
+  in
+  (* The feature flag survives the migration. *)
+  let* parameters_after_activation =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_constants_parametric ()
+  in
+  let swrr_enabled =
+    JSON.(
+      get "swrr_new_baker_lottery_enable" parameters_after_activation |> as_bool)
+  in
+  if not swrr_enabled then
+    Test.fail
+      "SWRR: swrr_new_baker_lottery_enable should still be set after the \
+       migration" ;
+  (* Credits have not been used yet *)
+  Log.info ~color:Log.Color.FG.green "Checking SWRR credits" ;
+  let* credits_json =
+    Client.RPC.call client @@ RPC.get_chain_block_helpers_swrr_credits ()
+  in
+  (match JSON.as_list credits_json with
+  | [] -> ()
+  | _ :: _ -> Test.fail "SWRR: the credits list should be empty") ;
+  (* The stored selection determines the baking rights. Checked right away,
+     on the first block of the new protocol, so that the selection carried over
+     the migration is covered and not only the ones recomputed afterwards. *)
+  Log.info
+    ~color:Log.Color.FG.green
+    "Checking SWRR selection against the baking rights just after the migration" ;
+  let* () = check_baking_rights_against_swrr ~blocks_per_cycle client in
+  (* The migration block is the last one of cycle 1. Check the rights at every
+     level of each of the [consensus_rights_delay + 1] cycles that follow. *)
+  let first_cycle_after_migration = migration_level / blocks_per_cycle in
+  let* () =
+    Lwt_list.iter_s
+      (fun cycle ->
+        Log.info
+          ~color:Log.Color.FG.green
+          "Checking SWRR selection against the baking rights at every level of \
+           cycle %d"
+          cycle ;
+        repeat blocks_per_cycle (fun () ->
+            let* () = Client.bake_for_and_wait client in
+            check_baking_rights_against_swrr ~blocks_per_cycle client))
+      (range
+         first_cycle_after_migration
+         (first_cycle_after_migration + consensus_rights_delay))
+  in
+  (* Credits are stored for the active delegates. *)
+  Log.info ~color:Log.Color.FG.green "Checking SWRR credits" ;
+  let* credits_json =
+    Client.RPC.call client @@ RPC.get_chain_block_helpers_swrr_credits ()
+  in
+  (match JSON.as_list credits_json with
+  | [] -> Test.fail "SWRR: the credits list should not be empty"
+  | _ :: _ -> ()) ;
+  (* Check baker selection on the first level of the next cycle. *)
+  Log.info
+    ~color:Log.Color.FG.green
+    "Checking SWRR selection against the baking rights after %d cycles"
+    (consensus_rights_delay + 1) ;
+  let* () = Client.bake_for_and_wait client in
+  check_baking_rights_against_swrr ~blocks_per_cycle client
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -2014,4 +2189,5 @@ let register ~migrate_from ~migrate_to =
   test_unstaked_requests_and_min_delegated () ;
   test_reveal_migration () ;
   test_tz4_manager_operation ~with_empty_mempool:true ;
-  test_tz4_manager_operation ~with_empty_mempool:false
+  test_tz4_manager_operation ~with_empty_mempool:false ;
+  test_swrr_method_activation ~migrate_from ~migrate_to

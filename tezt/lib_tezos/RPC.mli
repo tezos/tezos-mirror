@@ -773,6 +773,8 @@ val get_chain_block_context_contract_unstaked_frozen_balance :
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
+    [all] defaults to [false]. When set, all the baking opportunities of each
+    baker are returned, instead of only the first one.
 *)
 val get_chain_block_helper_baking_rights :
   ?chain:string ->
@@ -781,6 +783,7 @@ val get_chain_block_helper_baking_rights :
   ?level:int ->
   ?cycle:int ->
   ?max_round:int ->
+  ?all:bool ->
   unit ->
   JSON.t t
 
