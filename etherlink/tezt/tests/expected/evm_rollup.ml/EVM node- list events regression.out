@@ -1470,6 +1470,32 @@ is_ready:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+kernel_activation_dry_run:
+  description: dry run activation for kernel {version} successfully applied
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* kernel_activation_dry_run version 0 */
+      "kernel_activation_dry_run.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_activation_dry_run_failed:
+  description: failed dry run activation for kernel {version}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* kernel_activation_dry_run_failed version 0 */
+      "kernel_activation_dry_run_failed.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 kernel_log_debug:
   description: {msg}
   level: debug
@@ -3181,6 +3207,19 @@ evm_events_unreadable_event:
       "evm_events_unreadable_event.v0":
         { "index": integer ∈ [-2^30, 2^30],
           "level": integer ∈ [-2^31-1, 2^31] } }
+  
+kernel_activation_dry_run_failed:
+  description: failed dry run activation for kernel {version}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* kernel_activation_dry_run_failed version 0 */
+      "kernel_activation_dry_run_failed.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_error:
   description: {msg}

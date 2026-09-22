@@ -103,6 +103,37 @@ $ git commit -m "Bump failed_migration"
 $ git restore etherlink
 ```
 
+## `sink_kernel.wasm`
+
+This kernel is used to demonstrate what would happen if the node is not able to
+read blocks produced by the kernel. We instrument the latest kernel to drop the
+next blueprint before it starts processing it. The resulting block is not
+produced, which is indistinguishable from not being able to read the result
+(e.g., because the kernel writes it somewhere else).
+
+The patch to apply is quite simple.
+
+```patch
+diff --git a/etherlink/kernel_latest/kernel/src/block.rs b/etherlink/kernel_latest/kernel/src/block.rs
+index 5c5086b640e..941b593fb29 100644
+--- a/etherlink/kernel_latest/kernel/src/block.rs
++++ b/etherlink/kernel_latest/kernel/src/block.rs
+@@ -578,6 +578,7 @@ where
+     let coinbase = sequencer_pool_address.unwrap_or_default();
+ 
+     let (next_bip_number, timestamp, chain_header) = get_next_bip_info(rk.base());
++    drop_blueprint(rk.base_mut(), next_bip_number)?;
+ 
+     let world_states = chain_config.world_states(next_bip_number);
+```
+
+Then, similarly to `failed_migration.wasm`
+
+```bash
+make -f etherlink.mk evm_kernel.wasm
+cp evm_kernel.wasm etherlink/kernel_latest/kernel/tests/resources/sink_kernel.wasm
+```
+
 ## ghostnet_evm_kernel.wasm
 
 The kernel `ghostnet_evm_kernel.wasm` is a compiled version of the latest

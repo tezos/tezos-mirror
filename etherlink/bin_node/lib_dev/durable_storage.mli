@@ -75,6 +75,7 @@ type ('a, 'cap) path =
   | Multichain_flag : (unit, ro) path
   | Sequencer_key : (Signature.Public_key.t, ro) path
   | Sequencer_change_counter : (Ethereum_types.quantity, ro) path
+  | Kernel_upgrade : (Evm_events.Upgrade.t, rw) path
   | Chain_config_family :
       L2_types.chain_id
       -> (L2_types.ex_chain_family, ro) path

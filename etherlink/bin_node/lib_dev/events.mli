@@ -172,6 +172,14 @@ val predownload_kernel : Hex.t -> unit Lwt.t
     failed to download preimages under [root_hash] with [error]. *)
 val predownload_kernel_failed : Hex.t -> tztrace -> unit Lwt.t
 
+(** [kernel_activation_dry_run_failed root_hash] advertizes the EVM node
+    was not able to complete a dry-run activation of kernel under [root_hash]. *)
+val kernel_activation_dry_run_failed : Ethereum_types.hash -> unit Lwt.t
+
+(** [kernel_activation_dry_run root_hash] advertizes the EVM node
+    successfully activate the kernel under [root_hash] in dry-run. *)
+val kernel_activation_dry_run : Ethereum_types.hash -> unit Lwt.t
+
 (** [sandbox_started level] advertizes that sandbox mode started on top of
     level [level]. *)
 val sandbox_started : Z.t -> unit Lwt.t

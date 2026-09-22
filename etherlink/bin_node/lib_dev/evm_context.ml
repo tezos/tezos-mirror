@@ -116,16 +116,17 @@ let pvm_config ctxt =
     ~trace_host_funs:ctxt.configuration.opentelemetry.trace_host_functions
     ()
 
+let select_blueprint_version storage_version tezosx_runtimes :
+    Sequencer_blueprint.blueprint_version =
+  if storage_version >= 49 && not (List.is_empty tezosx_runtimes) then V1
+  else Legacy
+
 (* The kernel deserializes V1 blueprints (a per-transaction runtime tag plus a
    version marker) once the storage version is recent enough and at least one
    Tezos X runtime is enabled; otherwise it uses the Legacy format. *)
 let blueprint_version (head_info : head) : Sequencer_blueprint.blueprint_version
     =
-  if
-    head_info.storage_version >= 48
-    && not (List.is_empty head_info.tezosx_runtimes)
-  then V1
-  else Legacy
+  select_blueprint_version head_info.storage_version head_info.tezosx_runtimes
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
@@ -631,7 +632,61 @@ module State = struct
       ~config
       `Skip_stage_one
 
-  let background_preemptive_download config upgrade_event =
+  let activation_dry_run ~ctxt upgrade_event =
+    let open Lwt_syntax in
+    let* data_dir, config = execution_config in
+    let (Ex_chain_family chain_family) =
+      Configuration.retrieve_chain_family
+        ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+    in
+    (* Ensure [evm_state] contains the kernel upgrade payload, to
+       handle the case preimages have been provisioned ahead of the trigger
+       time. *)
+    let* evm_state =
+      Misc.unwrap_error_monad @@ fun () ->
+      Durable_storage.(
+        write Kernel_upgrade upgrade_event ctxt.session.evm_state)
+    in
+    let chunks =
+      Sequencer_blueprint.make_blueprint_chunks
+        ~number:ctxt.session.next_blueprint_number
+        {
+          version =
+            select_blueprint_version
+              ctxt.session.storage_version
+              ctxt.session.tezosx_runtimes;
+          parent_hash = ctxt.session.current_block_hash;
+          delayed_transactions = [];
+          transactions = [];
+          timestamp = upgrade_event.timestamp;
+        }
+    in
+    let* result =
+      Lwt.catch
+        (fun () ->
+          let pool = Lwt_domain.setup_pool 1 in
+          let+ r =
+            Evm_state.apply_unsigned_chunks
+              ~pool
+              ~native_execution_policy:
+                ctxt.configuration.kernel_execution.native_execution_policy
+              ~data_dir
+              ~chain_family
+              ~config
+              evm_state
+              chunks
+          in
+          Lwt_domain.teardown_pool pool ;
+          r)
+        (fun _exn -> return_ok Evm_state.Apply_failure)
+    in
+    match result with
+    | Ok (Evm_state.Apply_success _) ->
+        Events.kernel_activation_dry_run upgrade_event.hash
+    | Ok Evm_state.Apply_failure | Error _ ->
+        Events.kernel_activation_dry_run_failed upgrade_event.hash
+
+  let background_preemptive_download ~ctxt upgrade_event =
     let open Lwt_syntax in
     let open Evm_events.Upgrade in
     let rec downloader root_hash preimages_endpoint preimages =
@@ -650,16 +705,21 @@ module State = struct
           let* () = Lwt_unix.sleep 60.0 in
           downloader root_hash preimages_endpoint preimages)
     in
-    match config.Configuration.kernel_execution.preimages_endpoint with
+    match
+      ctxt.configuration.Configuration.kernel_execution.preimages_endpoint
+    with
     | None -> ()
     | Some preimages_endpoint ->
         let (Hash (Hex root_hash)) = upgrade_event.hash in
         let root_hash = `Hex root_hash in
         Lwt.async (fun () ->
-            downloader
-              root_hash
-              preimages_endpoint
-              (Configuration.preimages_path config))
+            let* () =
+              downloader
+                root_hash
+                preimages_endpoint
+                (Configuration.preimages_path ctxt.configuration)
+            in
+            activation_dry_run ~ctxt upgrade_event)
 
   let reset_to_level ctxt conn l2_level checkpoint =
     let open Lwt_result_syntax in
@@ -1770,10 +1830,10 @@ module State = struct
       Sequencer_blueprint.make_blueprint_chunks
         ~number:flushed_level
         {
-          version = Legacy;
-          (* Flushed blueprints contain no transactions so the version
-             field (which versions the format of the "transactions"
-             field) is irrelevant. *)
+          version =
+            select_blueprint_version
+              ctxt.session.storage_version
+              ctxt.session.tezosx_runtimes;
           parent_hash;
           delayed_transactions = hashes;
           transactions = [];
@@ -2078,7 +2138,7 @@ module State = struct
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
             } ;
-        background_preemptive_download ctxt.configuration upgrade ;
+        background_preemptive_download ~ctxt upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
         let* storage_version =
           Durable_storage.storage_version ctxt.session.evm_state
@@ -2789,7 +2849,7 @@ module State = struct
              here, so that a node restarted during the upgrade window still
              fetches the preimages it is missing before the activation. *)
           if preemptive_kernel_download then
-            background_preemptive_download configuration kernel_upgrade ;
+            background_preemptive_download ~ctxt kernel_upgrade ;
           Events.pending_upgrade kernel_upgrade)
         pending_upgrade
     in
