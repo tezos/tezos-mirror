@@ -63,6 +63,9 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 # signed until [docker_sign.sh] runs -- so a consumer verifying the cosign
 # signature never trusts a tag that failed the smoke test.
 
+# --cargo-mirror is unconditional: this script only runs in the CI, where the
+# crates-io mirror proxy resolves. Local builds call create_docker_image.sh
+# directly and leave it off.
 # Disable the quote-warning from shellcheck so that we can pass the
 # optional --sccache-bucket argument.
 # shellcheck disable=SC2046
@@ -74,6 +77,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   --build-deps-image "${build_deps_image}" \
   --executables "${OCTEZ_EXECUTABLES}" \
   --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
+  --cargo-mirror \
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi

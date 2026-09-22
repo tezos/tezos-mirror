@@ -22,8 +22,20 @@ ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters
-# Cargo registry: use the CI crates-io mirror proxy (requires --network=host)
-COPY --chown=tezos:nogroup images/ci/.cargo/config.toml /home/tezos/.cargo/config.toml
+# Cargo registry: route crates.io through the CI mirror proxy when CARGO_MIRROR
+# is non-empty (requires --network=host). The proxy is an in-cluster service, so
+# the default is empty and a build outside the CI goes to crates.io directly --
+# the same gating as SCCACHE_GCS_BUCKET below.
+ARG CARGO_MIRROR=""
+COPY --chown=tezos:nogroup images/ci/.cargo/config.toml /tmp/cargo-mirror.toml
+RUN if [ -n "${CARGO_MIRROR}" ]; then \
+      install -o tezos -g nogroup -D -m 644 \
+        /tmp/cargo-mirror.toml /home/tezos/.cargo/config.toml; \
+      echo "### cargo crates-io mirror enabled"; \
+    else \
+      echo "### cargo crates-io mirror disabled (direct crates.io)"; \
+    fi; \
+    rm -f /tmp/cargo-mirror.toml
 # COPY layers are ordered by change frequency (rarely -> frequently) so that a
 # change in a later group does not invalidate the cached COPY layers of the
 # earlier groups, maximizing Docker layer cache reuse across commits.
