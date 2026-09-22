@@ -42,7 +42,7 @@ let injector_operation_to_manager :
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let commitment = Sc_rollup_proto_types.Commitment.of_octez commitment in
       Manager (Sc_rollup_publish {rollup; commitment})
-  | Refute {rollup; opponent; refutation} ->
+  | Refute {rollup; opponent; refutation; index_proof = _} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let refutation =
         Sc_rollup_proto_types.Game.refutation_of_octez refutation
@@ -85,6 +85,21 @@ let injector_operation_to_manager :
              commitment_proof;
            })
 
+(* The manager operations one injector operation is made of, the last of which
+   is the operation proper. A refutation move carrying an inbox proof comes
+   first with the [Sc_rollup_add_messages] publishing the index proof the
+   block-validation plugin demands: expanding it here is what keeps the two in
+   a single batch, whatever the injector later does with it. *)
+let manager_operations_of_injector_operation op =
+  let operation = injector_operation_to_manager op in
+  match op with
+  | L1_operation.Refute {index_proof = _ :: _ as messages; _} ->
+      [
+        Protocol.Alpha_context.Manager (Sc_rollup_add_messages {messages});
+        operation;
+      ]
+  | _ -> [operation]
+
 let injector_operation_of_manager : type kind.
     kind Protocol.Alpha_context.manager_operation -> L1_operation.t option =
   function
@@ -104,7 +119,7 @@ let injector_operation_of_manager : type kind.
         Sc_rollup_proto_types.Game.refutation_to_octez refutation
       in
       let opponent = Tezos_crypto.Signature.Of_V3.public_key_hash opponent in
-      Some (Refute {rollup; opponent; refutation})
+      Some (Refute {rollup; opponent; refutation; index_proof = []})
   | Sc_rollup_timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
@@ -126,6 +141,35 @@ let injector_operation_of_manager : type kind.
              commitment_proof;
            })
   | _ -> None
+
+(* The injector expects one status per operation it handed over, so the
+   statuses of the manager operations an operation expanded into are folded
+   back into one. It counts as failed as soon as one of them did, and it is
+   reported at the index of the operation proper, the index the injector looks
+   the batch up by on Layer 1. [arities] gives, in order, how many manager
+   operations each of them took. *)
+let collapse_statuses ~arities statuses =
+  let collapse group =
+    Option.map
+      (fun last ->
+        match
+          List.find_map
+            (function
+              | {status = Unsuccessful (Failed _) as status; _} -> Some status
+              | _ -> None)
+            group
+        with
+        | Some status -> {last with status}
+        | None -> last)
+      (List.last_opt group)
+  in
+  List.fold_left_map
+    (fun statuses arity ->
+      let group, remaining = List.split_n arity statuses in
+      (remaining, collapse group))
+    statuses
+    arities
+  |> snd |> List.filter_map Fun.id
 
 module Proto_client = struct
   open Protocol_client_context
@@ -156,7 +200,10 @@ module Proto_client = struct
     Data_encoding.Binary.length Operation.contents_encoding (Contents contents)
 
   let operation_size op =
-    manager_operation_size (injector_operation_to_manager op)
+    List.fold_left
+      (fun size operation -> size + manager_operation_size operation)
+      0
+      (manager_operations_of_injector_operation op)
 
   (* The operation size overhead is an upper bound (in practice) of the overhead
      that will be added to a manager operation. To compute it we can use any
@@ -308,17 +355,23 @@ module Proto_client = struct
       }
     in
     let open Annotated_manager_operation in
+    (* One injector operation may expand to several manager operations, so
+       [arities] records how many each of them took, in order, to map the
+       results back below. *)
+    let expansions =
+      List.map manager_operations_of_injector_operation operations
+    in
+    let arities = List.map List.length expansions in
     let annotated_operations =
       List.map
-        (fun operation ->
-          let (Manager operation) = injector_operation_to_manager operation in
+        (fun (Protocol.Alpha_context.Manager operation) ->
           Annotated_manager_operation
             (Injection.prepare_manager_operation
                ~fee:Limit.unknown
                ~gas_limit:Limit.unknown
                ~storage_limit:Limit.unknown
                operation))
-        operations
+        (List.concat expansions)
     in
     let (Manager_list annot_op) =
       Annotated_manager_operation.manager_of_list annotated_operations
@@ -362,12 +415,12 @@ module Proto_client = struct
         in
         fail (if exceeds_quota then `Exceeds_quotas trace else `TzError trace)
     | Ok (_oph, packed_op, _contents, results) ->
-        let nb_ops = List.length operations in
+        let nb_ops = List.length annotated_operations in
         let results = Apply_results.to_list (Contents_result_list results) in
         (* packed_op can have reveal operations added automatically. *)
         let start_index = List.length results - nb_ops in
         (* remove extra reveal operations *)
-        let operations_statuses =
+        let manager_statuses =
           List.fold_left_i
             (fun index_in_batch acc (Apply_results.Contents_result result) ->
               if index_in_batch < start_index then acc
@@ -377,6 +430,7 @@ module Proto_client = struct
             results
           |> List.rev
         in
+        let operations_statuses = collapse_statuses ~arities manager_statuses in
         let unsigned_operation =
           let {shell; protocol_data = Operation_data {contents; signature = _}}
               =
@@ -524,5 +578,17 @@ module Proto_client = struct
     in
     Protocol.Alpha_context.Tez.to_mutez balance
 end
+
+(* The injector picks an operation only when its size, the overhead it adds and
+   the header of the batch holding it all fit in one manager operation; see
+   [get_n_ops_batch_from_queue]. An operation that never fits stays at the head
+   of its queue, and the operations behind it are never injected. *)
+let operation_fits operation =
+  let batch_header = Block_hash.size + Signature.size Signature.zero in
+  Compare.Int.(
+    batch_header
+    + Proto_client.operation_size operation
+    + Proto_client.operation_size_overhead
+    <= Proto_client.max_operation_data_length)
 
 let () = Injector.register_proto_client Protocol.hash (module Proto_client)

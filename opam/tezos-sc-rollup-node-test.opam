@@ -21,6 +21,7 @@ depends: [
   "tezos-protocol-025-PsUshuai" {with-test}
   "octez-protocol-025-PsUshuai-libs" {with-test}
   "octez-smart-rollup-node-PsUshuai" {with-test}
+  "octez-injector" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

@@ -105,6 +105,51 @@ let metadata (node_ctxt : _ Node_context.t) =
   let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
   Sc_rollup.Metadata.{address; origination_level}
 
+(* The messages [Sc_rollup_injector] batches with the move. Bakers drop a move
+   that comes without them, so a player that cannot build them has no move to
+   make and has to hear about it.
+
+   The head cell the index proof is about is the one the payloads proof starts
+   at, and its hash is the witness under which the level's messages are
+   stored. *)
+let produce_index_proof (node_ctxt : _ Node_context.t)
+    (proof : _ Sc_rollup.Proof.t) =
+  let open Lwt_result_syntax in
+  match proof.Sc_rollup.Proof.input_proof with
+  | Some (Sc_rollup.Proof.Inbox_proof {proof = serialized; _}) -> (
+      let head =
+        let open Option_syntax in
+        let* inbox_proof = Sc_rollup.Inbox.of_serialized_proof serialized in
+        let _inclusion_proof, payloads_proof =
+          Sc_rollup.Inbox.Internal_for_tests.expose_proof inbox_proof
+        in
+        match
+          (payloads_proof.Sc_rollup.Inbox.Internal_for_tests.proof
+            :> Sc_rollup.Inbox_merkelized_payload_hashes.t list)
+        with
+        | head :: _ -> return head
+        | [] -> None
+      in
+      match head with
+      | None ->
+          (* [Sc_rollup.Proof.valid] has just read this proof back. *)
+          failwith
+            "Refutation game: the proof just produced holds no inbox path"
+      | Some head -> (
+          let witness = Sc_rollup.Inbox_merkelized_payload_hashes.hash head in
+          let* messages = Node_context.get_messages node_ctxt witness in
+          let*? history = Inbox.payloads_history_of_all_messages messages in
+          match Inbox_index_proof.produce history ~head with
+          | Some index_proof ->
+              return (Inbox_index_proof.to_messages index_proof)
+          | None ->
+              failwith
+                "Refutation game: cannot produce the index proof of the head \
+                 cell %a"
+                Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+                witness))
+  | Some (Reveal_proof _) | Some First_inbox_message | None -> return_nil
+
 let generate_proof (node_ctxt : _ Node_context.t)
     (game : Octez_smart_rollup.Game.t) (start_state : _ Context.pvmstate) =
   let open Lwt_result_syntax in
@@ -316,10 +361,39 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   let res = Environment.wrap_tzresult result in
   assert (Result.is_ok res) ;
-  let proof =
+  let* index_proof = produce_index_proof node_ctxt proof in
+  let serialized_proof =
     Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof
   in
-  return proof
+  (* The move and its index proof travel in one manager operation, so they have
+     to fit in one. The opponent and the tick below stand in for the real ones;
+     they weigh a few bytes against a limit of tens of kilobytes. *)
+  let* () =
+    let operation =
+      L1_operation.Refute
+        {
+          rollup = node_ctxt.config.sc_rollup_address;
+          opponent = Signature.Public_key_hash.zero;
+          refutation = Move {choice = Z.zero; step = Proof serialized_proof};
+          index_proof;
+        }
+    in
+    if Sc_rollup_injector.operation_fits operation then return_unit
+    else
+      failwith
+        "Refutation game: the proof for level %ld (%d bytes) and the index \
+         proof of its inbox (%d bytes in %d messages) do not fit in one \
+         operation of %d bytes"
+        game.inbox_level
+        (String.length serialized_proof)
+        (List.fold_left
+           (fun total message -> total + String.length message)
+           0
+           index_proof)
+        (List.length index_proof)
+        Protocol.Alpha_context.Constants.max_operation_data_length
+  in
+  return (serialized_proof, index_proof)
 
 let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
     ~start_state ~start_chunk ~our_stop_chunk ~default_number_of_sections

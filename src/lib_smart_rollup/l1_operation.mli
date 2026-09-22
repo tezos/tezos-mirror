@@ -32,6 +32,10 @@ type t =
       rollup : Address.t;
       opponent : Signature.Public_key_hash.t;
       refutation : Game.refutation;
+      index_proof : string list;
+          (** Messages publishing the index proof of the inbox this refutation
+              reads. Protocol 025 asks for one and no other protocol does, so
+              every other protocol drops them. *)
     }
   | Timeout of {rollup : Address.t; stakers : Game.index}
   | Recover_bond of {rollup : Address.t; staker : Signature.Public_key_hash.t}
