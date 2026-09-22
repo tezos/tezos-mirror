@@ -74,6 +74,35 @@ let test_ill_typecheck script error_pattern =
   Client.spawn_typecheck_script ~scripts:[script_path] client
   |> Process.check_error ~msg:error_pattern
 
+(* The protocol produces more detailed errors when gas is
+   unlimited. We catch the difference in error details in the
+   regression traces. *)
+let test_error_details_regression =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Test Typecheck Error Details - error details with and without unlimited \
+       gas"
+    ~tags:[team; "client"; "script"; "michelson"; "typechecking"; "gas"]
+    ~uses_node:false
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let script_path =
+    Michelson_script.(
+      find ["ill_typed"; "stack_bottom_undup2able"] protocol |> path)
+  in
+  Lwt_list.iter_s
+    (fun unlimited_gas ->
+      Client.spawn_typecheck_script
+        ~hooks:Tezos_regression.hooks
+        ~protocol_hash:(Protocol.hash protocol)
+        ~no_base_dir_warnings:true
+        ~scripts:[script_path]
+        ~unlimited_gas
+        client
+      |> Process.check ~expect_failure:true)
+    [true; false]
+
 let register ~protocols =
   protocols
   |> List.iter (fun protocol ->
@@ -170,4 +199,5 @@ let register ~protocols =
       rex "The proper type of the return list cannot be inferred." );
   ]
   |> List.iter (fun (script, error_pattern) ->
-         test_ill_typecheck script error_pattern protocols)
+         test_ill_typecheck script error_pattern protocols) ;
+  test_error_details_regression protocols
