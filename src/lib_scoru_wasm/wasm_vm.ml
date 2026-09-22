@@ -511,7 +511,24 @@ module Make_vm (Params : Params) : S = struct
         | Tezos_webassembly_interpreter.Eval.Nds_host_func_without_nds_storage
           ->
             Lwt.reraise exn
+        | Nds_errors.Verification_failed _ ->
+            (* A Verify-mode NDS operation read data the proof does not
+               cover, so the proof supports no transition for this tick.
+               Every state this function can answer with asserts one,
+               [Stuck] included, so the verdict belongs to the replay
+               boundary instead: [Nds.with_verification] turns the
+               re-raised exception into an [Error] and the dual state's
+               [verify_proof] rejects the proof. *)
+            Lwt.reraise exn
         | _ ->
+            (* TODO: https://linear.app/tezos/issue/L2-1987
+               An operational Verify-mode NDS failure — a [Failure] raised
+               when the worker thread behind the NDS FFI dies — supports no
+               transition either, but is indistinguishable from a kernel
+               error here, so it is committed as a [Stuck] that asserts
+               one. The distinction belongs to the FFI: raising
+               [Verification_failed] for the operational case routes it
+               through the arm above. *)
             let+ tick_state = exn_to_stuck pvm_state exn in
             (pvm_state.storage, tick_state, Failing))
 
