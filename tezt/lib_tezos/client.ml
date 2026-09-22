@@ -2459,13 +2459,15 @@ let normalize_script ?hooks ?mode ~script client =
   spawn_normalize_script ?hooks ?mode ~script client
   |> Process.check_and_read_stdout
 
-let spawn_typecheck_data ~data ~typ ?gas ?(legacy = false) client =
+let spawn_typecheck_data ~data ~typ ?gas ?(unlimited_gas = false)
+    ?(legacy = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
   let cmd =
     ["typecheck"; "data"; data; "against"; "type"; typ]
     @ Option.value ~default:[] gas_cmd
+    @ (if unlimited_gas then ["--unlimited-gas"] else [])
     @ if legacy then ["--legacy"] else []
   in
   spawn_command client cmd
@@ -2476,18 +2478,21 @@ let spawn_normalize_type ?hooks ~typ client =
 let normalize_type ?hooks ~typ client =
   spawn_normalize_type ?hooks ~typ client |> Process.check_and_read_stdout
 
-let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
-  spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
+let typecheck_data ~data ~typ ?gas ?(unlimited_gas = false) ?(legacy = false)
+    client =
+  spawn_typecheck_data ~data ~typ ?gas ~unlimited_gas ~legacy client
+  |> Process.check
 
 let spawn_typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
-    ?(legacy = false) ?(display_names = false) client =
+    ?(unlimited_gas = false) ?(legacy = false) ?(display_names = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
   spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
   @@ ["typecheck"; "script"] @ scripts
   @ Option.value ~default:[] gas_cmd
+  @ (if unlimited_gas then ["--unlimited-gas"] else [])
   @ (if details then ["--details"] else [])
   @ (if emacs then ["--emacs"] else [])
   @ (if no_print_source then ["--no-print-source"] else [])
@@ -2496,7 +2501,7 @@ let spawn_typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
 
 let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
-    ?(legacy = false) ?display_names client =
+    ?(unlimited_gas = false) ?(legacy = false) ?display_names client =
   spawn_typecheck_script
     ?hooks
     ?protocol_hash
@@ -2506,6 +2511,7 @@ let typecheck_script ?hooks ?protocol_hash ~scripts ?no_base_dir_warnings
     ~emacs
     ~no_print_source
     ?gas
+    ~unlimited_gas
     ~legacy
     ?display_names
     client
