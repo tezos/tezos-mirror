@@ -50,6 +50,17 @@ Node
   single operation per block, so both players can try to open the same game in
   the same block.
 
+- Bakers and validators now reject a smart-rollup refutation ``Proof`` move on
+  protocol 025 whose inbox proof discloses skip-list indices that the shape of
+  the inbox contradicts. The cells of the shared inbox are authenticated by a
+  hash that leaves their index out, so such a proof presents a message at a
+  position it does not occupy and lets a dishonest player win a refutation
+  game. Since the protocol does not record how many messages a level holds,
+  the move must come batched with a ``smart_rollup_add_messages`` operation
+  publishing an index proof of that level. **Smart rollup nodes have to be
+  upgraded before bakers**: a node that does not publish this index proof can
+  no longer make ``Proof`` moves, and loses its games by timeout.
+
 Client
 ------
 
