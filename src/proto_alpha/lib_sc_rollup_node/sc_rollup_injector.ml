@@ -42,7 +42,7 @@ let injector_operation_to_manager :
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let commitment = Sc_rollup_proto_types.Commitment.of_octez commitment in
       Manager (Sc_rollup_publish {rollup; commitment})
-  | Refute {rollup; opponent; refutation} ->
+  | Refute {rollup; opponent; refutation; index_proof = _} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let refutation =
         Sc_rollup_proto_types.Game.refutation_of_octez refutation
@@ -116,7 +116,7 @@ let injector_operation_of_manager : type kind.
         Tezos_crypto.Signature.Of_V3.public_key_hash
           (Protocol.Implicit_account_repr.Forbidden.to_pkh opponent)
       in
-      Some (Refute {rollup; opponent; refutation})
+      Some (Refute {rollup; opponent; refutation; index_proof = []})
   | Sc_rollup_timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in

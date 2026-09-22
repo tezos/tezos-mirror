@@ -63,13 +63,14 @@ let turn ~self game ({alice; bob} as players) =
 (** [inject_next_move node_ctxt ~refutation ~opponent ~commitment
       ~opponent_commitment] submits an L1 operation to
       issue the next move in the refutation game. *)
-let inject_next_move node_ctxt ~refutation ~opponent =
+let inject_next_move node_ctxt ~refutation ~index_proof ~opponent =
   let open Lwt_result_syntax in
   let refute_operation =
     L1_operation.Refute
       {
         rollup = node_ctxt.Node_context.config.sc_rollup_address;
         refutation;
+        index_proof;
         opponent;
       }
   in
@@ -281,7 +282,7 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
         tzfail
           Rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
     | Some {state = start_state; _} ->
-        let* proof =
+        let* proof, index_proof =
           Plugin.Refutation_game_helpers.generate_proof
             node_ctxt
             game
@@ -292,7 +293,9 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
             let opponent = Signature.Public_key_hash.to_b58check opponent in
             Metrics.Refutation.clear_state_refutation_game
               [opponent; Int32.to_string game.start_level]) ;
-        return (Octez_smart_rollup.Game.Move {choice; step = Proof proof})
+        return
+          ( Octez_smart_rollup.Game.Move {choice; step = Proof proof},
+            index_proof )
   in
 
   match game.game_state with
@@ -311,7 +314,8 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
       if Z.(equal chosen_section_len one) then final_move choice
       else
         return
-          (Octez_smart_rollup.Game.Move {choice; step = Dissection dissection})
+          ( Octez_smart_rollup.Game.Move {choice; step = Dissection dissection},
+            [] )
   | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
       let choice = agreed_start_chunk.tick in
       final_move choice
@@ -320,7 +324,7 @@ let play_next_move plugin node_ctxt state_cache ~commitment_period_tick_offset
     game opponent =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.playing_next_move ~opponent game in
-  let* refutation =
+  let* refutation, index_proof =
     next_move
       plugin
       node_ctxt
@@ -329,7 +333,7 @@ let play_next_move plugin node_ctxt state_cache ~commitment_period_tick_offset
       ~commitment_period_tick_offset
       game
   in
-  inject_next_move node_ctxt ~refutation ~opponent
+  inject_next_move node_ctxt ~refutation ~index_proof ~opponent
 
 let play_timeout (node_ctxt : _ Node_context.t) stakers =
   let open Lwt_result_syntax in
@@ -428,4 +432,8 @@ let play_opening_move node_ctxt (conflict : Octez_smart_rollup.Game.conflict) =
     Octez_smart_rollup.Game.Start
       {player_commitment_hash; opponent_commitment_hash}
   in
-  inject_next_move node_ctxt ~refutation ~opponent:conflict.other
+  inject_next_move
+    node_ctxt
+    ~refutation
+    ~index_proof:[]
+    ~opponent:conflict.other

@@ -291,7 +291,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let proof =
     Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof
   in
-  return proof
+  return (proof, [])
 
 let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
     ~start_state ~start_chunk ~our_stop_chunk ~default_number_of_sections
