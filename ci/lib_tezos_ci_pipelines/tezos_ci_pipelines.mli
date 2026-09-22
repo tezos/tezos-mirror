@@ -19,7 +19,9 @@ val debian_daily : Cacio.global_pipeline
 (** Daily pipeline containing all Homebrew jobs (build and extended tests). *)
 val homebrew_daily : Cacio.global_pipeline
 
-(** Refresh pipeline: rebuild the base images from scratch. *)
+(** Refresh pipeline: rebuild the base images from scratch.
+
+    TODO: https://gitlab.com/tezos/tezos/-/work_items/8367 *)
 val base_images_refresh : Cacio.global_pipeline
 
 (** Daily pipeline containing all Base Images jobs (build and merge). *)
