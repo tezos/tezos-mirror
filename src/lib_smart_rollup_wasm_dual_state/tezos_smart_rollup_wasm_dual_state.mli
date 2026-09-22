@@ -59,6 +59,16 @@ module type NDS_BACKEND = sig
   val copy : Octez_riscv_nds_common.Nds.t -> Octez_riscv_nds_common.Nds.t
 end
 
+(** Raised when a state's [/pvm/nds_hash] marker and its [nds_state] tag
+    disagree, on presence or on value.
+
+    On the encoding and checkout paths both halves come from stores the
+    node owns, so a disagreement is a store-drift bug and propagates. On
+    the verification path the marker comes from an untrusted proof, so
+    [Dual_state.verify_proof] catches this and rejects the proof rather
+    than letting it escape into the protocol. *)
+exception Marker_handle_mismatch of string
+
 (** Content hash of an empty NDS registry — the expected
     [/pvm/nds_hash] marker on the (host-function-free) activation tick.
 
