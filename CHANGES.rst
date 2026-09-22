@@ -98,6 +98,15 @@ Packaging
 Smart Rollup node
 -----------------
 
+- On protocol 025, a refutation move proving an inbox message is now injected
+  together with a ``smart_rollup_add_messages`` operation publishing the index
+  proof of the level it reads, which bakers demand to tell the message's real
+  position from a forged one. Both end up in the same manager batch, so a node
+  playing a refutation game pays for that operation. Every kernel of the level
+  receives the published messages. Kernels that read the framing protocol drop
+  them, since they do not carry the frame; a kernel that parses every external
+  message has to skip them itself.
+
 Smart Rollup WASM Debugger
 --------------------------
 
