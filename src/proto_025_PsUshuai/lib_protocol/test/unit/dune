@@ -16,6 +16,7 @@
   octez-proto-libs.protocol-environment
   octez-libs.stdlib-unix
   tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.smart-rollup
   octez-libs.test-helpers
   octez-protocol-025-PsUshuai-libs.test-helpers
   octez-alcotezt
@@ -36,6 +37,7 @@
   -open Tezos_client_025_PsUshuai
   -open Tezos_protocol_025_PsUshuai_parameters
   -open Tezos_protocol_025_PsUshuai
+  -open Tezos_smart_rollup_025_PsUshuai
   -open Tezos_test_helpers
   -open Tezos_025_PsUshuai_test_helpers
   -open Octez_alcotezt

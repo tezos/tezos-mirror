@@ -7147,6 +7147,9 @@ end = struct
                  older protocols have no such test, so the dependency is
                  scoped by protocol number. *)
               plugin |> if_some |> if_ N.(number >= 026) |> open_;
+              (* The inbox unit tests check the index proofs of
+                 [Inbox_index_proof], which only 025 defines. *)
+              octez_sc_rollup |> if_some |> if_ N.(number == 025) |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotezt;
