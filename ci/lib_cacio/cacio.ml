@@ -859,7 +859,41 @@ module type COMPONENT_API = sig
     ?tag_rex:string -> (trigger * job) list -> unit
 end
 
+(* A global pipeline that is defined outside of Cacio.
+
+   Cacio needs to know [name], [rule], [description], [variables] and
+   [auto_cancel] to register the pipeline with CIAO in [close],
+   and the other fields to know how to convert the jobs of this pipeline
+   (see [get_jobs]).
+
+   [jobs] is the list of jobs that were added with [register_jobs],
+   in reverse order of registration.
+
+   This record is defined in its own module because several of its fields
+   ([name], [description], [variables]) are also fields of type [job]:
+   defining it at toplevel would change how [job] field accesses are
+   disambiguated in the rest of this file. *)
+module External_global_pipeline = struct
+  type t = {
+    name : string;
+    rule : Gitlab_ci.If.t;
+    description : string;
+    variables : Gitlab_ci.Types.variables option;
+    auto_cancel : Gitlab_ci.Types.auto_cancel option;
+    interruptible_pipeline : bool option;
+    interruptible_publish : bool option;
+    with_condition : bool option;
+    with_job_trigger : bool;
+    with_datadog_pipeline_trace : bool;
+    allow_manual_jobs : bool;
+    mutable jobs : (trigger * job) list;
+  }
+end
+
+type external_global_pipeline = External_global_pipeline.t
+
 type global_pipeline =
+  | External of external_global_pipeline
   | Before_merging
   | Merge_train
   | Schedule_extended_test
@@ -868,8 +902,6 @@ type global_pipeline =
   | Scheduled_docker_build
   | Scheduled_docker_master_snapshot
   | Scheduled_test_release
-  | Publish_release_page
-  | Test_publish_release_page
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
@@ -899,22 +931,74 @@ type global_pipeline =
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
 
+(* Pipelines that were defined with [new_global_pipeline],
+   in reverse order of definition. *)
+let external_global_pipelines : external_global_pipeline list ref = ref []
+
+(* Whether [close] was called. *)
+let closed = ref false
+
+let check_not_closed what =
+  if !closed then
+    failwith (sf "cannot register %s: Cacio.close has already been called" what)
+
+let new_global_pipeline ?variables ?auto_cancel ?interruptible_pipeline
+    ?interruptible_publish ?with_condition ?(with_job_trigger = false)
+    ?(with_datadog_pipeline_trace = true) ?(allow_manual_jobs = true)
+    ~description name rule =
+  check_not_closed (sf "pipeline %s" name) ;
+  let pipeline =
+    External_global_pipeline.
+      {
+        name;
+        rule;
+        description;
+        variables;
+        auto_cancel;
+        interruptible_pipeline;
+        interruptible_publish;
+        with_condition;
+        with_job_trigger;
+        with_datadog_pipeline_trace;
+        allow_manual_jobs;
+        jobs = [];
+      }
+  in
+  external_global_pipelines := pipeline :: !external_global_pipelines ;
+  External pipeline
+
 let is_manual =
  fun (mode, _) -> match mode with Manual -> true | Auto | Immediate -> false
 
+let check_no_manual_jobs pipeline_name (jobs : (trigger * job) list) =
+  match List.filter is_manual jobs with
+  | [] -> ()
+  | _ :: _ as manual_jobs ->
+      failwith
+        (sf
+           "the following jobs are manual in the %s pipeline, which is not \
+            allowed (see the documentation of type global_pipeline in \
+            cacio.mli): %s"
+           pipeline_name
+           (String.concat
+              ", "
+              (List.map (fun (_, job) -> job.name) manual_jobs)))
+
 let register_jobs pipeline jobs =
-  (if pipeline = Merge_train then
-     match List.filter is_manual jobs with
-     | [] -> ()
-     | _ :: _ as manual_jobs ->
-         failwith
-           ("the following jobs are manual in the merge_train pipeline, which \
-             is not allowed (see the documentation of type global_pipeline in \
-             cacio.mli): "
-           ^ String.concat
-               ", "
-               (List.map (fun (_, job) -> job.name) manual_jobs))) ;
-  List.iter (Hashtbl.add global_jobs pipeline) jobs
+  check_not_closed "jobs" ;
+  match pipeline with
+  | External pipeline ->
+      let open External_global_pipeline in
+      if not pipeline.allow_manual_jobs then
+        check_no_manual_jobs pipeline.name jobs ;
+      pipeline.jobs <- List.rev_append jobs pipeline.jobs
+  | _ ->
+      if pipeline = Merge_train then check_no_manual_jobs "merge_train" jobs ;
+      (* [pipeline] is not [External] here, so it is a constant constructor
+         and it is safe to use it as a [Hashtbl] key. [External] carries a
+         record with a mutable field: hashing it would be both expensive and
+         incorrect, since its hash would change as jobs are added to it. *)
+      List.iter (Hashtbl.add global_jobs pipeline) jobs
 
 let register_merge_request_jobs jobs =
   register_jobs Before_merging jobs ;
@@ -936,7 +1020,6 @@ let job_trigger : job option ref = ref None
 let job_datadog_pipeline_trace : job option ref = ref None
 
 let get_jobs pipeline =
-  let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
   let job_trigger, job_datadog_pipeline_trace =
     match (!job_trigger, !job_datadog_pipeline_trace) with
     | None, _ | _, None ->
@@ -945,22 +1028,64 @@ let get_jobs pipeline =
         assert false
     | Some a, Some b -> (a, b)
   in
-  let jobs =
-    match pipeline with
-    | Before_merging -> (Manual, job_trigger) :: jobs
-    | _ -> (Auto, job_datadog_pipeline_trace) :: jobs
-  in
   match pipeline with
-  | Before_merging ->
-      convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
-  | Merge_train -> convert_jobs ~with_condition:true jobs
-  | Master -> convert_jobs ~interruptible_publish:true jobs
-  | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-  | Schedule_extended_test | Custom_extended_test | Base_images_daily
-  | Base_images_refresh | Homebrew_daily | Scheduled_docker_master_snapshot ->
-      (* Scheduled pipelines. *)
-      convert_jobs ~interruptible_pipeline:false jobs
-  | _ -> convert_jobs jobs
+  | External pipeline ->
+      let open External_global_pipeline in
+      let jobs = List.rev pipeline.jobs in
+      let jobs =
+        if pipeline.with_datadog_pipeline_trace then
+          (Auto, job_datadog_pipeline_trace) :: jobs
+        else jobs
+      in
+      let jobs =
+        if pipeline.with_job_trigger then (Manual, job_trigger) :: jobs
+        else jobs
+      in
+      convert_jobs
+        ?interruptible_pipeline:pipeline.interruptible_pipeline
+        ?interruptible_publish:pipeline.interruptible_publish
+        ?with_condition:pipeline.with_condition
+        ?with_job_trigger:
+          (if pipeline.with_job_trigger then Some job_trigger else None)
+        jobs
+  | _ -> (
+      let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
+      let jobs =
+        match pipeline with
+        | Before_merging -> (Manual, job_trigger) :: jobs
+        | _ -> (Auto, job_datadog_pipeline_trace) :: jobs
+      in
+      match pipeline with
+      | Before_merging ->
+          convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
+      | Merge_train -> convert_jobs ~with_condition:true jobs
+      | Master -> convert_jobs ~interruptible_publish:true jobs
+      | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
+      | Schedule_extended_test | Custom_extended_test | Base_images_daily
+      | Base_images_refresh | Homebrew_daily | Scheduled_docker_master_snapshot
+        ->
+          (* Scheduled pipelines. *)
+          convert_jobs ~interruptible_pipeline:false jobs
+      | _ -> convert_jobs jobs)
+
+(* Register all pipelines that were defined with [new_global_pipeline] with CIAO.
+
+   Pipelines cannot be registered with CIAO as soon as they are defined,
+   since CIAO needs the full list of jobs of a pipeline at registration time,
+   and components add jobs to global pipelines after those are defined. *)
+let close () =
+  if !closed then failwith "Cacio.close has already been called" ;
+  closed := true ;
+  Fun.flip List.iter (List.rev !external_global_pipelines)
+  @@ fun (pipeline : external_global_pipeline) ->
+  let open External_global_pipeline in
+  Tezos_ci.Pipeline.register
+    ?variables:pipeline.variables
+    ?auto_cancel:pipeline.auto_cancel
+    ~description:pipeline.description
+    ~jobs:(get_jobs (External pipeline))
+    pipeline.name
+    pipeline.rule
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1446,6 +1571,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
      - including the DataDog job.
      Returns the pipeline name. *)
   let register_pipeline ?interruptible_pipeline ~description ~jobs name rules =
+    check_not_closed (sf "pipeline %s" (make_name name)) ;
     let job_datadog_pipeline_trace =
       match !job_datadog_pipeline_trace with
       | None ->

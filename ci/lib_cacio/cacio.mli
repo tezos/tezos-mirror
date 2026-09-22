@@ -412,6 +412,11 @@ module Shared : COMPONENT_API
 
 (** {2 Global pipelines} *)
 
+(** Global pipelines that are defined outside of Cacio.
+
+    Use {!new_global_pipeline} to define one. *)
+type external_global_pipeline
+
 (** Global pipelines.
 
     Global pipelines are shared between components.
@@ -422,6 +427,9 @@ module Shared : COMPONENT_API
     Manual, allowed to fail jobs would not block the pipeline,
     but they are better reserved for other pipelines. *)
 type global_pipeline =
+  | External of external_global_pipeline
+      (** A global pipeline defined outside of Cacio,
+          with {!new_global_pipeline}. *)
   | Before_merging
   | Merge_train
   | Schedule_extended_test
@@ -430,8 +438,6 @@ type global_pipeline =
   | Scheduled_docker_build
   | Scheduled_docker_master_snapshot
   | Scheduled_test_release
-  | Publish_release_page
-  | Test_publish_release_page
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
@@ -460,6 +466,51 @@ type global_pipeline =
      on refresh branches (e.g. [master-ci-images] branch).
      The two pipelines should diverge after #8367. *)
   | Base_images_refresh
+
+(** Define a global pipeline outside of Cacio.
+
+    [new_global_pipeline ~description name rule] defines a global pipeline
+    named [name], that GitLab creates when [rule] holds. Components can then
+    add jobs to it with {!register_jobs}, and {!close} registers it with CIAO
+    once all jobs have been added.
+
+    [description] is printed by [ci/bin/main.exe --list-pipelines].
+    Its first sentence should be short (<= 80 characters) and be followed by
+    two new-lines. The remainder should detail what the pipeline does, why we
+    do it, when it happens, how, and by whom it is triggered.
+
+    If [variables] is set, these variables are added to the [workflow:] clause
+    of this pipeline. Similarly for [auto_cancel].
+
+    The other arguments control how the jobs of this pipeline are converted:
+    - if [interruptible_pipeline] is [false], jobs are not interruptible
+      (for instance, scheduled pipelines usually are not supposed to be interruptible);
+    - if [interruptible_publish] is [true], jobs of the [Publish] stage are
+      interruptible;
+    - if [with_condition] is [true], the conditions of jobs (see [only_if])
+      are taken into account; use this for merge request pipelines only,
+      as other pipelines run all of their jobs unconditionally;
+    - if [with_job_trigger] is [true], the manual [trigger] job is added to the
+      pipeline and all jobs that are not [Immediate] or [Manual] are made to
+      depend on it;
+    - if [with_datadog_pipeline_trace] is [false], the
+      [datadog_pipeline_trace] job is not added to the pipeline
+      (it is added by default);
+    - if [allow_manual_jobs] is [false], {!register_jobs} refuses [Manual]
+      jobs for this pipeline. *)
+val new_global_pipeline :
+  ?variables:Gitlab_ci.Types.variables ->
+  ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+  ?interruptible_pipeline:bool ->
+  ?interruptible_publish:bool ->
+  ?with_condition:bool ->
+  ?with_job_trigger:bool ->
+  ?with_datadog_pipeline_trace:bool ->
+  ?allow_manual_jobs:bool ->
+  description:string ->
+  string ->
+  Gitlab_ci.If.t ->
+  global_pipeline
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit
@@ -496,6 +547,13 @@ val register_test_release_jobs : (trigger * job) list -> unit
 
 (** Get the list of jobs registered for a given global pipeline. *)
 val get_jobs : global_pipeline -> Tezos_ci.tezos_job list
+
+(** Register all pipelines that were defined with {!new_global_pipeline}
+    with CIAO.
+
+    After that, it is no longer possible to register new jobs and pipelines:
+    the set of pipelines is closed. *)
+val close : unit -> unit
 
 (** Regular expressions that match release tags.
 
@@ -541,6 +599,21 @@ val output_tezt_job_list : string -> unit
 
 (** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
     Or to automatically add this label to the list. *)
+
+(** Global pipelines should all become [External] eventually.
+    The [global_pipeline] type would then have a single constructor and could
+    be merged with [external_global_pipeline], which would be renamed into
+    [global_pipeline]. Cacio would no longer know anything about the pipelines
+    of this particular repository, which would all be defined in
+    [ci/lib_tezos_ci_pipelines]. *)
+
+(** Pipelines that are declared by components, with the
+    [register_*_pipeline] functions of {!COMPONENT_API}, are registered with
+    CIAO as soon as they are declared, since all of their jobs are given at
+    that point. They could instead be defined with {!new_global_pipeline}
+    (renamed into [new_pipeline]) and registered by {!close} like global
+    pipelines, which would unify the two code paths. The value of doing so is
+    low though: it would not make Cacio more modular. *)
 
 (** The function [job] currently takes [?image_dependencies] as an optional argument.
     This is temporary and should be replaced by ~needs:[job_to_build_image]

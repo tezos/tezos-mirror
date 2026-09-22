@@ -28,6 +28,9 @@ CIAO is the set of the following subdirectories.
   which in turn allows to split the CI into multiple libraries located at different
   places (such as one library per component).
 
+- `lib_tezos_ci_pipelines` contains global pipelines definitions.
+  Global pipelines are pipelines shared by all components.
+
 - `bin`: contains the main CIAO executable which generates the GitLab CI configuration files.
 
 ## Cacio
@@ -42,7 +45,7 @@ when it should not be the role of the user to make those choices.
 It is also designed to make it easy to define the CI component by component.
 For this to work well, all jobs need to be migrated to Cacio.
 
-Once all jobs are migrated to Cacio, we can remove `lib_tezos_ci_jobs`.
+Once all jobs are migrated to Cacio and componentified, we can remove `lib_tezos_ci_jobs`.
 And we can probably start thinking about merging Cacio back into CIAO
 (or to reimplement the transformations and checks from `lib_tezos_ci` into Cacio)
 to have only one API.
