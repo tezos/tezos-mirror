@@ -972,6 +972,321 @@ let test_dal_attested_slots_messages_of_cells_split_large_messages () =
   in
   return_unit
 
+(* -------------------------------------------------------------------------
+   Index proofs
+   ------------------------------------------------------------------------- *)
+
+(* A cell is hashed without its index, so a proof whose indices are rewritten
+   still verifies against the same inbox. [f] takes the position of a cell in
+   the proof, 0 for the head, and its index, and returns the index to write. *)
+let relabel_cell ~f position cell =
+  match cell with
+  | `O fields ->
+      `O
+        (List.map
+           (fun (name, value) ->
+             if String.equal name "index" then
+               let index = Data_encoding.Json.destruct Data_encoding.n value in
+               ( name,
+                 Data_encoding.Json.construct Data_encoding.n (f position index)
+               )
+             else (name, value))
+           fields)
+  | _ -> Stdlib.failwith "a skip list cell is encoded as an object"
+
+(* Rewrites the index every cell of [cells] declares. *)
+let relabel_cells ~f cells =
+  let encoding = Merkelized_payload_hashes.encoding in
+  List.mapi
+    (fun position cell ->
+      Data_encoding.Json.destruct
+        encoding
+        (relabel_cell ~f position (Data_encoding.Json.construct encoding cell)))
+    cells
+
+(* Rewrites the index of the cells that [disclosed] does not hold. The two
+   lists still agree on every cell they share, so only walking the path tells
+   that the rewritten ones are wrong. *)
+let relabel_undisclosed ~disclosed cells =
+  let encoding = Merkelized_payload_hashes.encoding in
+  let disclosed = List.map Merkelized_payload_hashes.hash disclosed in
+  List.map
+    (fun cell ->
+      if
+        List.mem
+          ~equal:Merkelized_payload_hashes.Hash.equal
+          (Merkelized_payload_hashes.hash cell)
+          disclosed
+      then cell
+      else
+        Data_encoding.Json.destruct
+          encoding
+          (relabel_cell
+             ~f:(fun _position index -> Z.succ index)
+             0
+             (Data_encoding.Json.construct encoding cell)))
+    cells
+
+let shift_head position index =
+  if Compare.Int.(position = 0) then Z.succ index else index
+
+let shift_path _position index = Z.succ index
+
+(* Leaves the head cell alone, so that only the cells a path walks through
+   afterwards are relabelled. *)
+let shift_tail =
+ fun position index ->
+  if Compare.Int.(position = 0) then index else Z.succ index
+
+let cells_of_payloads_proof proof =
+  (proof.Inbox.Internal_for_tests.proof :> Merkelized_payload_hashes.t list)
+
+let relabel_payloads_proof ~f proof =
+  {
+    Inbox.Internal_for_tests.proof =
+      Merkelized_payload_hashes.Internal_for_tests.make_proof
+        (relabel_cells ~f (cells_of_payloads_proof proof));
+    payload = proof.Inbox.Internal_for_tests.payload;
+  }
+
+let index_proof_of_head node_inbox ~head =
+  let open Lwt_result_syntax in
+  let*! history =
+    get_payloads_history
+      node_inbox.Node_inbox.payloads_histories
+      (Merkelized_payload_hashes.hash head)
+  in
+  match Inbox_index_proof.produce history ~head with
+  | Some index_proof -> return index_proof
+  | None -> failwith "could not produce an index proof of the head cell"
+
+let assert_outcome ~__LOC__ expected found =
+  let to_string = function
+    | Inbox_index_proof.Valid -> "valid"
+    | Inconsistent_indices -> "inconsistent indices"
+    | Unconvertible_cells -> "unconvertible cells"
+  in
+  Assert.equal_string ~loc:__LOC__ (to_string expected) (to_string found)
+
+(* One level, with its head cell, the index of its last message and an index
+   proof of that head. *)
+let setup_level payloads_for_level =
+  let open Lwt_result_wrap_syntax in
+  let*? node_inbox, proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      [payloads_for_level]
+  in
+  let head_cell_hash = latest_level_proof_hash proto_inbox in
+  let*! history =
+    get_payloads_history node_inbox.Node_inbox.payloads_histories head_cell_hash
+  in
+  let head =
+    (opt_get ~__LOC__
+    @@ Merkelized_payload_hashes.History.find head_cell_hash history)
+      .Merkelized_payload_hashes.merkelized
+  in
+  let max_index = Merkelized_payload_hashes.get_index head in
+  let* index_proof = index_proof_of_head node_inbox ~head in
+  return (node_inbox, head, head_cell_hash, max_index, index_proof)
+
+(* One head cell answers the same request in two ways once the index its proof
+   shows is rewritten. The level holds no message at [max_index + 1], but with
+   the head rewritten it serves its last message at that counter. This is the
+   hole the index proofs close. *)
+let test_relabelled_payloads_proof_still_verifies payloads_for_level =
+  let open Lwt_result_wrap_syntax in
+  let* node_inbox, _head, head_cell_hash, max_index, _index_proof =
+    setup_level payloads_for_level
+  in
+  let absent_counter = Z.succ max_index in
+  let* absence_proof =
+    Node_inbox.produce_payloads_proof node_inbox head_cell_hash absent_counter
+  in
+  let*?@ honest_answer =
+    Inbox.Internal_for_tests.verify_payloads_proof
+      absence_proof
+      head_cell_hash
+      absent_counter
+  in
+  let* () = assert_equal_payload_option ~__LOC__ honest_answer None in
+  let* last_message_proof =
+    Node_inbox.produce_payloads_proof node_inbox head_cell_hash max_index
+  in
+  let relabelled = relabel_payloads_proof ~f:shift_head last_message_proof in
+  let*?@ relabelled_answer =
+    Inbox.Internal_for_tests.verify_payloads_proof
+      relabelled
+      head_cell_hash
+      absent_counter
+  in
+  match relabelled_answer with
+  | None -> failwith "the relabelled proof should disclose a message"
+  | Some _ -> return_unit
+
+(* The index proof of a head cell accepts the payload-hashes paths of its own
+   level, and rejects the ones whose indices have been rewritten. *)
+let test_index_proof_rejects_relabelled_payloads_proof payloads_for_level =
+  let open Lwt_result_wrap_syntax in
+  let* node_inbox, _head, head_cell_hash, max_index, index_proof =
+    setup_level payloads_for_level
+  in
+  let* proofs =
+    List.map_es
+      (fun index ->
+        Node_inbox.produce_payloads_proof node_inbox head_cell_hash index)
+      [Z.zero; max_index; Z.succ max_index]
+  in
+  let* () =
+    List.iter_es
+      (fun proof ->
+        assert_outcome
+          ~__LOC__
+          Inbox_index_proof.Valid
+          (Inbox_index_proof.verify_payloads_indices
+             ~inclusion:(cells_of_payloads_proof proof)
+             ~index_proof))
+      proofs
+  in
+  let* () =
+    List.iter_es
+      (fun (proof, f) ->
+        assert_outcome
+          ~__LOC__
+          Inbox_index_proof.Inconsistent_indices
+          (Inbox_index_proof.verify_payloads_indices
+             ~inclusion:
+               (cells_of_payloads_proof (relabel_payloads_proof ~f proof))
+             ~index_proof))
+      (List.concat_map
+         (fun proof ->
+           let mutations =
+             (* [shift_tail] leaves the head cell alone, so the index proof and
+              the path still agree on it. A path of one cell has no tail. *)
+             if Compare.List_length_with.(cells_of_payloads_proof proof > 1)
+             then [shift_head; shift_path; shift_tail]
+             else [shift_head; shift_path]
+           in
+           List.map (fun f -> (proof, f)) mutations)
+         proofs)
+  in
+  (* A cell the index proof does not disclose is only reached by walking the
+     path, so relabelling one is caught there rather than by the two lists
+     disagreeing. *)
+  List.iter_es
+    (fun proof ->
+      let inclusion = cells_of_payloads_proof proof in
+      let relabelled = relabel_undisclosed ~disclosed:index_proof inclusion in
+      if
+        List.for_all2
+          ~when_different_lengths:()
+          Merkelized_payload_hashes.equal
+          inclusion
+          relabelled
+        = Ok true
+      then return_unit
+      else
+        assert_outcome
+          ~__LOC__
+          Inbox_index_proof.Inconsistent_indices
+          (Inbox_index_proof.verify_payloads_indices
+             ~inclusion:relabelled
+             ~index_proof))
+    proofs
+
+(* Rewriting the index proof along with the path it backs gains nothing. The
+   head index comes from how many hops the path takes, not from what its cells
+   declare. *)
+let test_index_proof_rejects_relabelled_index_proof payloads_for_level =
+  let open Lwt_result_wrap_syntax in
+  let* node_inbox, _head, head_cell_hash, max_index, index_proof =
+    setup_level payloads_for_level
+  in
+  let* payloads_proof =
+    Node_inbox.produce_payloads_proof node_inbox head_cell_hash max_index
+  in
+  List.iter_es
+    (fun f ->
+      assert_outcome
+        ~__LOC__
+        Inbox_index_proof.Inconsistent_indices
+        (Inbox_index_proof.verify_payloads_indices
+           ~inclusion:
+             (relabel_cells ~f (cells_of_payloads_proof payloads_proof))
+           ~index_proof:(relabel_cells ~f index_proof)))
+    [shift_head; shift_path]
+
+(* An index proof only backs the level it was produced for: a verifier looks it
+   up by the head cell it is about. *)
+let test_index_proof_is_about_one_level payloads_for_levels =
+  let open Lwt_result_wrap_syntax in
+  let*? node_inbox, _proto_inbox =
+    construct_node_and_protocol_inbox
+      ~inbox_creation_level:Raw_level.root
+      payloads_for_levels
+  in
+  let heads =
+    Payloads_histories.fold
+      (fun head_cell_hash history heads ->
+        match Merkelized_payload_hashes.History.find head_cell_hash history with
+        | Some {Merkelized_payload_hashes.merkelized; _} -> merkelized :: heads
+        | None -> heads)
+      node_inbox.Node_inbox.payloads_histories
+      []
+  in
+  let* index_proofs =
+    List.map_es (fun head -> index_proof_of_head node_inbox ~head) heads
+  in
+  (* The index proof of one level says nothing about the head cell of another,
+     which is why a verifier looks it up by the cell it is about. *)
+  match (heads, index_proofs) with
+  | head :: _, _ :: index_proof :: _ ->
+      assert_outcome
+        ~__LOC__
+        Inbox_index_proof.Inconsistent_indices
+        (Inbox_index_proof.verify_payloads_indices
+           ~inclusion:[head]
+           ~index_proof)
+  | _, _ -> return_unit
+
+(* An index proof survives the messages that carry it, one message or several.
+   Other messages are left alone, and a cut sequence of chunks yields nothing
+   rather than half an index proof. *)
+let test_index_proof_messages payloads_for_level =
+  let open Lwt_result_wrap_syntax in
+  let* _node_inbox, _head, _head_cell_hash, _max_index, index_proof =
+    setup_level payloads_for_level
+  in
+  let check ~__LOC__ expected messages =
+    Assert.equal_int
+      ~loc:__LOC__
+      expected
+      (List.length (Inbox_index_proof.of_messages messages))
+  in
+  let messages = Inbox_index_proof.to_messages index_proof in
+  let* () = check ~__LOC__ 1 messages in
+  let* () = check ~__LOC__ 1 (("not an index proof" :: messages) @ [""]) in
+  let* () = check ~__LOC__ 2 (messages @ messages) in
+  let* () =
+    List.iter_es
+      (fun message ->
+        Assert.leq_int
+          ~loc:__LOC__
+          (String.length message)
+          (Constants.sc_rollup_message_size_limit - 1))
+      messages
+  in
+  let chunked = Inbox_index_proof.to_messages ~chunk_size:32 index_proof in
+  let* () = Assert.leq_int ~loc:__LOC__ 2 (List.length chunked) in
+  let* () = check ~__LOC__ 1 chunked in
+  (* A sequence of chunks that does not start at the first one, and one that
+     stops before the last, both yield nothing. *)
+  let* () = check ~__LOC__ 0 (opt_get ~__LOC__ (List.tl chunked)) in
+  let* () =
+    check ~__LOC__ 0 (List.rev (opt_get ~__LOC__ (List.tl (List.rev chunked))))
+  in
+  check ~__LOC__ 2 (chunked @ chunked)
+
 let inbox_tests =
   [
     Tztest.tztest
@@ -1052,6 +1367,33 @@ let inbox_tests =
       ~name:"messages are correctly added in payloads history"
       (gen_payloads_for_level ())
       test_messages_are_correctly_added_in_history;
+    Tztest.tztest_qcheck2
+      ~count:100
+      ~name:
+        "relabelling the head of a payloads proof moves the message it \
+         discloses"
+      (gen_payloads_for_level ())
+      test_relabelled_payloads_proof_still_verifies;
+    Tztest.tztest_qcheck2
+      ~count:100
+      ~name:"an index proof rejects a relabelled payloads proof"
+      (gen_payloads_for_level ())
+      test_index_proof_rejects_relabelled_payloads_proof;
+    Tztest.tztest_qcheck2
+      ~count:100
+      ~name:"an index proof relabelled along with its proof is rejected"
+      (gen_payloads_for_level ())
+      test_index_proof_rejects_relabelled_index_proof;
+    Tztest.tztest_qcheck2
+      ~count:50
+      ~name:"an index proof is about the head cell of one level"
+      (gen_payloads_for_levels ())
+      test_index_proof_is_about_one_level;
+    Tztest.tztest_qcheck2
+      ~count:50
+      ~name:"an index proof survives the messages carrying it"
+      (gen_payloads_for_level ())
+      test_index_proof_messages;
   ]
 
 let tests =
