@@ -1386,8 +1386,10 @@ module Scripts = struct
       (Operation.to_list (Contents_list contents))
 
   let check_refutation_proof context
-      ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+      ({protocol_data = Operation_data {contents; _}; _} as packed_op :
+        packed_operation) =
     let open Environment.Error_monad.Lwt_result_syntax in
+    let index_proofs = Block_validation.index_proofs_of_batch packed_op in
     List.iter_es
       (fun op ->
         match op with
@@ -1413,6 +1415,7 @@ module Scripts = struct
                     ~rollup
                     ~stakers
                     ~choice
+                    ~index_proofs
                     ~proof
               | _ -> return_unit
             in
