@@ -15,7 +15,7 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -68,7 +68,7 @@ oc.docker:amd64:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -105,7 +105,7 @@ oc.docker:arm64:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
