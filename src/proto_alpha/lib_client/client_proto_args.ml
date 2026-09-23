@@ -582,14 +582,18 @@ let run_gas_limit_arg =
   Tezos_clic.arg
     ~long:"gas"
     ~short:'G'
-    ~doc:"Initial quantity of gas for typechecking and execution"
+    ~doc:
+      "Initial quantity of gas for typechecking and execution. Defaults to the \
+       gas limit of an operation. Ignored if --unlimited-gas is given"
     ~placeholder:"gas"
     gas_limit_kind
 
 let unlimited_gas_arg =
   Tezos_clic.switch
     ~long:"unlimited-gas"
-    ~doc:"Allows interpretation with virtually unlimited gas"
+    ~doc:
+      "Allows typechecking and interpretation with virtually unlimited gas. \
+       Takes precedence over --gas"
     ()
 
 let storage_limit_kind =

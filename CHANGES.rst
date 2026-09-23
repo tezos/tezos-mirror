@@ -69,6 +69,10 @@ Node
 Client
 ------
 
+- Added an ``--unlimited-gas`` switch to the ``typecheck script`` and
+  ``typecheck data`` commands of ``octez-client``. Typechecking is then
+  performed with unaccounted gas, which produces more detailed error messages.
+
 Signer
 ------
 

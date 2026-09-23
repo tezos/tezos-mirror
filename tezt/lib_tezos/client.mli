@@ -1861,11 +1861,23 @@ val spawn_normalize_type :
 
 (** Run [octez-client typecheck data ..]*)
 val typecheck_data :
-  data:string -> typ:string -> ?gas:int -> ?legacy:bool -> t -> unit Lwt.t
+  data:string ->
+  typ:string ->
+  ?gas:int ->
+  ?unlimited_gas:bool ->
+  ?legacy:bool ->
+  t ->
+  unit Lwt.t
 
 (** Same as [typecheck_data], but do not wait for the process to exit. *)
 val spawn_typecheck_data :
-  data:string -> typ:string -> ?gas:int -> ?legacy:bool -> t -> Process.t
+  data:string ->
+  typ:string ->
+  ?gas:int ->
+  ?unlimited_gas:bool ->
+  ?legacy:bool ->
+  t ->
+  Process.t
 
 (** Run [octez-client typecheck script ..]*)
 val typecheck_script :
@@ -1877,6 +1889,7 @@ val typecheck_script :
   ?emacs:bool ->
   ?no_print_source:bool ->
   ?gas:int ->
+  ?unlimited_gas:bool ->
   ?legacy:bool ->
   ?display_names:bool ->
   t ->
@@ -1892,6 +1905,7 @@ val spawn_typecheck_script :
   ?emacs:bool ->
   ?no_print_source:bool ->
   ?gas:int ->
+  ?unlimited_gas:bool ->
   ?legacy:bool ->
   ?display_names:bool ->
   t ->
