@@ -126,10 +126,15 @@ target "e2etest" {
   inherits   = ["_common"]
   dockerfile = "images/ci/Dockerfile.e2etest"
   tags       = ["${REGISTRY}/alpine-e2etest:${TAG}"]
-  # The "npm ci" step mounts this secret to authenticate against the private
-  # npm registry. /tmp/npm_token.txt is created by docker_initialize.sh
-  # (-> docker_registry_auth.sh) in the build job's before_script.
-  secret = ["id=npm_token,src=/tmp/npm_token.txt"]
+  # The "npm ci" step authenticates against the private npm registry when
+  # NPM_REGISTRY is set, which is the case in the CI only; Dockerfile.e2etest
+  # reads the token behind that same condition. Declare the secret under it too,
+  # so that a local bake neither needs /tmp/npm_token.txt (written by
+  # docker_registry_auth.sh in the build job's before_script) nor the
+  # filesystem entitlement that reading it from outside the context requires.
+  # bake resolves 'secret' before building, so an unconditional declaration
+  # aborts the whole invocation when the file is absent.
+  secret = NPM_REGISTRY != "" ? ["id=npm_token,src=/tmp/npm_token.txt"] : []
   contexts = {
     monitoring = "target:monitoring"
     build      = "target:build"
