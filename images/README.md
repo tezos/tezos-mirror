@@ -82,21 +82,57 @@ straightforward. Simplifying local build is planned as future work.)
 
 # `ci` images
 
-The `ci` images is a suite of images, defined as different layer in
-the Dockerfile `ci/Dockerfile`. It is used in the CI to run a wide
-variety of jobs.  Its `runtime` and `build` layers are also used as
-input for the Octez Docker distribution.  To build these images for
-local use, run `create_ci_images.sh`.
+The `ci` images are a suite of images named `alpine-<component>`
+(`runtime`, `monitoring`, `prebuild`, `build`, `test`, `release-page`,
+`e2etest`), each defined by its own Dockerfile
+(`images/ci/Dockerfile.<component>`) and built on top of the previous
+one. They are used in the CI to run a wide variety of jobs; the
+`alpine-runtime` and `alpine-build` images are also used as input for
+the Octez Docker distribution.
 
+The images are built by `docker buildx bake` from the bake definition
+`images/ci/ci-images.hcl`, which declares one target per image and
+wires the inter-image dependencies as named build contexts. See
+`images/ci/README.md` for the layering and the contents of each image.
 
-# Common files in `common`
+In the CI, they are built by the
+`images.alpine-ci-all:{amd64,arm64}` jobs of the `base_images.daily`
+pipeline. They are merged into multi-arch manifests by
+`images.alpine-ci-all.merge`.
 
-Files that are shared between image built contexts are stored in
-`common` and are symlinked into the build contexts for images that
-require them. `docker build` does not resolve symlinks, but we work
-around this by tarring the image's build context directory, having tar
-resolve symlinks and piping the result to `docker build`. See
-`create_ci_images.sh` for an example.
+## Local build
+
+To build them locally, run the bake from the repository root:
+
+```
+$ docker buildx bake -f images/ci/ci-images.hcl --load
+```
+
+NB: `--load` ensures that the produced images are loaded in the local
+store. You can omit it if the `docker` [build
+driver](https://docs.docker.com/build/builders/drivers/) is used, but
+not if you use the `docker-container` driver, which is the one mostly
+used for CI images.
+
+Local images will be named using the `REGISTRY` and `TAG` bake
+variables. The default ones in the bake file `ci-images.hcl` are respectively `octez-local-ci` and `latest`.
+
+So for example, the `runtime` image will have `octez-local-ci/alpine-runtime:latest` as full name.
+
+If you only need to build some targets, you can specify them directly, it will save you some disk storage and time.
+
+For example if you want to build the Octez Docker distribution locally (cf. below), you
+will need only `runtime` and `build`:
+
+```
+$ docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+```
+
+This produces `octez-local-ci/alpine-runtime:latest` and
+`octez-local-ci/alpine-build:latest` -- the `REGISTRY` and `TAG` bake
+variables default to those local names. The images a named target builds
+upon (here `prebuild` and `monitoring`) are built as well, but only into
+the build cache.
 
 # Building the Octez Docker Distribution
 
