@@ -74,11 +74,10 @@ modifications in the CI image are merged.
 
 # `jsonnet` image
 
-The `jsonnet` image is used in the CI to build and test Grafazos.  It
-contains the `jsonnet` tools to compile and format jsonnet files.  ~To
-build this image for local use, run `create_image.sh "grafazos"`~
-(This has changed and building this image locally is currently not
-straightforward. Simplifying local build is planned as future work.)
+The `jsonnet` image is used in the CI to build and test Grafazos. It
+contains the `jsonnet` tools to compile and format jsonnet files. It is
+one of the base images: `images.debian-jsonnet` builds it from
+`images/base-images/Dockerfile.debian-jsonnet`.
 
 # `ci` images
 
