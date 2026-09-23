@@ -17,8 +17,12 @@
 # Variables
 # ---------------------------------------------------------------------------
 
-# Image registry and tag. Set by the CI job that runs bake.
-variable "REGISTRY" { default = "" }
+# Image registry and tag. Both are set explicitly by [job_alpine_ci]
+# (ci/lib_tezos_ci_jobs/base_images.ml), the only job that runs this bake file.
+# The defaults are the local-build ones, so that a bake run without them
+# produces usable references: they are what scripts/create_docker_image.sh
+# defaults to when no image is passed (see images/README.md).
+variable "REGISTRY" { default = "octez-local-ci" }
 variable "TAG" { default = "latest" }
 
 # Versions (defaults kept in sync with scripts/version.sh).
