@@ -435,18 +435,12 @@ let update_pqc_monitoring ~pqc_watched ops =
     candidate_watched;
     get_slot_voting_power;
     current_voting_power;
-    preattestations_received;
     preattestations_count;
     _;
   } =
     pqc_watched
   in
   let preattestations = Operation_pool.filter_preattestations ops in
-  let fresh_preattestations =
-    List.filter
-      (fun op -> not (Preattestation_set.mem op preattestations_received))
-      preattestations
-  in
   List.iter
     (function
       | ({
@@ -455,7 +449,11 @@ let update_pqc_monitoring ~pqc_watched ops =
            shell = {branch};
          } as op :
           Kind.preattestation Operation.t) -> (
-          if is_eligible candidate_watched branch consensus_content then
+          if
+            (not
+               (Preattestation_set.mem op pqc_watched.preattestations_received))
+            && is_eligible candidate_watched branch consensus_content
+          then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 pqc_watched.preattestations_received <-
@@ -468,7 +466,7 @@ let update_pqc_monitoring ~pqc_watched ops =
                 (* preattestations that do not use the first slot of a
                    delegate are not added to the quorum *)
                 ()))
-    fresh_preattestations ;
+    preattestations ;
   let additional_voting_power =
     Int64.sub pqc_watched.current_voting_power current_voting_power
   in
@@ -489,18 +487,12 @@ let update_qc_monitoring ~qc_watched ops =
     candidate_watched;
     get_slot_voting_power;
     current_voting_power;
-    attestations_received;
     attestations_count;
     _;
   } =
     qc_watched
   in
   let attestations = Operation_pool.filter_attestations ops in
-  let fresh_attestations =
-    List.filter
-      (fun op -> not (Attestation_set.mem op attestations_received))
-      attestations
-  in
   List.iter
     (function
       | ({
@@ -509,7 +501,10 @@ let update_qc_monitoring ~qc_watched ops =
            shell = {branch};
          } as op :
           Kind.attestation Operation.t) -> (
-          if is_eligible candidate_watched branch consensus_content then
+          if
+            (not (Attestation_set.mem op qc_watched.attestations_received))
+            && is_eligible candidate_watched branch consensus_content
+          then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 qc_watched.attestations_received <-
@@ -522,7 +517,7 @@ let update_qc_monitoring ~qc_watched ops =
                 (* attestations that do not use the first slot of a delegate
                    are not added to the quorum *)
                 ()))
-    fresh_attestations ;
+    attestations ;
   let additional_voting_power =
     Int64.sub qc_watched.current_voting_power current_voting_power
   in
