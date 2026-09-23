@@ -24,9 +24,13 @@ more details).
 
 ## Image build contexts
 
-Build contexts for image builds are produced from the images build
-context directory `images/IMAGE_NAME`. All files in this folder will
-be available to the Dockerfile during build.
+Images are built from the repository root and reference their inputs
+by real repo-root paths, so their build context is the whole tree (see
+`images/ci/ci-images.hcl` and `scripts/ci/build-base-images.sh`).
+
+NB: docker never resolves symlinks in a build context. Building from the
+root and referencing files by their real path removes the need for
+symlinks altogether.
 
 ## Image provenance
 
