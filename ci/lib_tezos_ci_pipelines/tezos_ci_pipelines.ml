@@ -24,6 +24,171 @@
 open Gitlab_ci
 open Tezos_ci
 
+(* The "custom extended test" pipelines test the codebase with some particular options.
+   This allows testing behaviors that are not enabled by default on the node,
+   and are thus not tested in Tezt jobs of [before_merging] pipelines in particular.
+
+   Note: this method is simple to implement but is not ideal.
+   It duplicates a lot of tests that do not actually contribute
+   to testing the special options, and there is no reason why at least some tests
+   could be run with special options in dedicated jobs in [before_merging] pipelines. *)
+
+(* All jobs in scheduled pipelines have "interruptible: false"
+   to prevent them from being canceled after a push to master.
+   Instead of modifying the definition of each job, we override the value
+   by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
+
+let schedule_extended_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_test"
+    Rules.schedule_extended_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
+       This pipeline unconditionally executes all jobs in 'before_merging' \
+       pipelines, daily on the 'master_branch'. Regular 'before_merging' \
+       pipelines run only subset of all jobs depending on files modified by \
+       the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
+       daily."
+
+let debian_daily =
+  Cacio.new_global_pipeline
+    "debian.daily"
+    Rules.debian_daily
+    ~description:
+      "Daily pipeline containing all Debian jobs (build and extended tests)."
+
+let homebrew_daily =
+  Cacio.new_global_pipeline
+    "homebrew.daily"
+    Rules.homebrew_daily
+    ~interruptible_pipeline:false
+    ~description:
+      "Daily pipeline containing all Homebrew jobs (build and extended tests)."
+
+(* Rebuilds the base images on the [master-ci-images] branch.
+   [DOCKER_FORCE_BUILD] disables the Docker layer cache, so the images are
+   rebuilt fresh. This periodic refresh is necessary to avoid image deletion
+   due to the registry retention policy.
+   [CI_COMMIT_REF_SLUG] is overridden to [master] so the rebuilt images are
+   tagged [master-<sha>] rather than [master-ci-images-<sha>].
+   TODO (#8374): drop the [CI_COMMIT_REF_SLUG] override once base-image tags
+   no longer embed the ref slug. *)
+let base_images_refresh =
+  Cacio.new_global_pipeline
+    "base_images.refresh"
+    Rules.base_images_refresh
+    ~interruptible_pipeline:false
+    ~variables:
+      [("CI_COMMIT_REF_SLUG", "master"); ("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Refresh pipeline: rebuild the base images from scratch on the \
+       [master-ci-images] branch (same jobs as [base_images.daily])."
+
+let base_images_daily =
+  Cacio.new_global_pipeline
+    "base_images.daily"
+    Rules.base_images_daily
+    ~interruptible_pipeline:false
+    ~description:
+      "Daily pipeline containing all Base Images jobs (build and merge)."
+
+let schedule_extended_rpc_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_rpc_test"
+    Rules.schedule_extended_rpc_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with external RPC servers, weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites, but with \
+       Octez nodes configured to use external RPC servers."
+
+let schedule_extended_validation_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_validation_test"
+    Rules.schedule_extended_validation_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with single-process validation, weekly \
+       on 'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites, but with \
+       Octez nodes configured to use single-process validation."
+
+let schedule_extended_baker_remote_mode_test =
+  Cacio.new_global_pipeline
+    "schedule_extended_baker_remote_mode_test"
+    Rules.schedule_extended_baker_remote_mode_tests
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with baker using remote node, weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites."
+
+let schedule_extended_dal_use_baker =
+  Cacio.new_global_pipeline
+    "schedule_extended_dal_use_baker"
+    Rules.schedule_extended_dal_use_baker
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled run of all tezt tests with dal using baker commands weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites."
+
+let custom_extended_test_pipelines =
+  [
+    schedule_extended_rpc_test;
+    schedule_extended_validation_test;
+    schedule_extended_baker_remote_mode_test;
+    schedule_extended_dal_use_baker;
+  ]
+
+(* Add jobs to all the "custom extended test" pipelines.
+   They all contain exactly the same jobs. *)
+let register_custom_extended_test_jobs jobs =
+  List.iter
+    (fun pipeline -> Cacio.register_jobs pipeline jobs)
+    custom_extended_test_pipelines
+
+let schedule_test_release =
+  Cacio.new_global_pipeline
+    "schedule_test_release"
+    Rules.schedule_test_release
+    ~description:
+      "Scheduled pipeline that runs a test release pipeline. The jobs are the \
+       same as a release pipeline but run in dry-mode."
+
+let schedule_security_scans =
+  Cacio.new_global_pipeline
+    "schedule_security_scans"
+    Rules.schedule_security_scans
+    ~description:
+      "Scheduled pipeline for various security scans. Currently scanning for \
+       vulnerabilities in Docker images"
+
+let schedule_docker_master_snapshot =
+  Cacio.new_global_pipeline
+    "schedule_docker_master_snapshot"
+    Rules.schedule_docker_master_snapshot
+    ~interruptible_pipeline:false
+    ~description:
+      "Scheduled pipeline publishing a dated master Docker image to Docker \
+       Hub.\n\n\
+       This pipeline publishes the Octez Docker image tagged as \
+       [master-YYYYMMDD] (where the date is computed at build time) to \
+       DockerHub (https://hub.docker.com/r/tezos/tezos), then promotes it to \
+       the rolling [weekly] tag."
+
+let schedule_docker_build_pipeline =
+  Cacio.new_global_pipeline
+    "schedule_docker_build_pipeline"
+    Rules.schedule_docker_build
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Scheduled pipeline for forcing building fresh Docker image (skipping \
+       any cache mechanism) for the current master branch of Octez. The newly \
+       built images should contains the latest available Alpine packages"
+
 let publish_test_release_page =
   Cacio.new_global_pipeline
     "publish_test_release_page"

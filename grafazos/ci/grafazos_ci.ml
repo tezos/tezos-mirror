@@ -92,7 +92,7 @@ let register () =
   Cacio.register_jobs Non_release_tag [(Auto, job_build Build)] ;
   Cacio.register_jobs Non_release_tag_test [(Auto, job_build Build)] ;
   Cacio.register_jobs
-    Scheduled_test_release
+    Tezos_ci_pipelines.schedule_test_release
     [
       (* The build job runs to exercise it during the scheduled test release.
          No manual job is registered here: it is not relevant to have manual

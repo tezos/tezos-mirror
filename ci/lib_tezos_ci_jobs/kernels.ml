@@ -128,7 +128,7 @@ let register () =
       (Auto, job_build_kernels);
     ] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Auto, job_check_riscv_kernels);
       (Auto, job_audit_riscv_deps);

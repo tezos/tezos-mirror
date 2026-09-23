@@ -896,12 +896,7 @@ type global_pipeline =
   | External of external_global_pipeline
   | Before_merging
   | Merge_train
-  | Schedule_extended_test
-  | Custom_extended_test
   | Master
-  | Scheduled_docker_build
-  | Scheduled_docker_master_snapshot
-  | Scheduled_test_release
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
@@ -915,18 +910,13 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
-  (* Debian packaging pipelines *)
-  | Debian_daily
-  (* Homebrew packaging pipelines *)
-  | Homebrew_daily
-  (* Security scan pipelines *)
-  | Schedule_security_scans
-  (* Base images pipelines *)
-  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+(* Debian packaging pipelines *)
+(* Homebrew packaging pipelines *)
+(* Security scan pipelines *)
+(* Base images pipelines *)
+(* TODO: consider migrating base images to a [Cacio.Make] component instead,
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
-  | Base_images_daily
-  | Base_images_refresh
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -1061,11 +1051,6 @@ let get_jobs pipeline =
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
       | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
-      | Schedule_extended_test | Custom_extended_test | Base_images_daily
-      | Base_images_refresh | Homebrew_daily | Scheduled_docker_master_snapshot
-        ->
-          (* Scheduled pipelines. *)
-          convert_jobs ~interruptible_pipeline:false jobs
       | _ -> convert_jobs jobs)
 
 (* Register all pipelines that were defined with [new_global_pipeline] with CIAO.

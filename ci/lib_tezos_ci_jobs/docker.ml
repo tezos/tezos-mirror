@@ -254,10 +254,10 @@ let register () =
     Master
     [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
-    Scheduled_docker_build
+    Tezos_ci_pipelines.schedule_docker_build_pipeline
     [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
-    Scheduled_docker_master_snapshot
+    Tezos_ci_pipelines.schedule_docker_master_snapshot
     [
       (Auto, job_docker_merge_manifests_snapshot `experimental);
       (Auto, job_docker_promote_weekly);

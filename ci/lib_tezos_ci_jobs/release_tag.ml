@@ -374,7 +374,7 @@ let () =
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
-    Scheduled_test_release
+    Tezos_ci_pipelines.schedule_test_release
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_docker_container_scanning `test);

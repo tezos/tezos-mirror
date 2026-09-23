@@ -96,7 +96,7 @@ let () =
       (Auto, job_build_homebrew_formula_macosx);
     ] ;
   Cacio.register_jobs
-    Homebrew_daily
+    Tezos_ci_pipelines.homebrew_daily
     [
       (Auto, job_build_homebrew_formula);
       (Auto, job_build_homebrew_formula_macosx);

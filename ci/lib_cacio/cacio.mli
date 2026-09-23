@@ -432,12 +432,7 @@ type global_pipeline =
           with {!new_global_pipeline}. *)
   | Before_merging
   | Merge_train
-  | Schedule_extended_test
-  | Custom_extended_test
   | Master
-  | Scheduled_docker_build
-  | Scheduled_docker_master_snapshot
-  | Scheduled_test_release
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
@@ -451,21 +446,16 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
-  (* Debian packaging pipelines *)
-  | Debian_daily
-  (* Homebrew packaging pipelines *)
-  | Homebrew_daily
-  (* Security scan pipelines *)
-  | Schedule_security_scans
-  (* Base images pipelines *)
-  (* TODO: consider migrating base images to a [Cacio.Make] component instead,
+(* Debian packaging pipelines *)
+(* Homebrew packaging pipelines *)
+(* Security scan pipelines *)
+(* Base images pipelines *)
+(* TODO: consider migrating base images to a [Cacio.Make] component instead,
      which would allow using [register_scheduled_pipeline] and avoid adding
      a [global_pipeline] variant for it. *)
-  | Base_images_daily
-  (* Same jobs as [Base_images_daily] for now, but the pipeline should only run
+(* Same jobs as [Base_images_daily] for now, but the pipeline should only run
      on refresh branches (e.g. [master-ci-images] branch).
      The two pipelines should diverge after #8367. *)
-  | Base_images_refresh
 
 (** Define a global pipeline outside of Cacio.
 

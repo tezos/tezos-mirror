@@ -158,7 +158,7 @@ let slack_jobs = List.map job_container_scanning_slack_notification build_images
    implementation detail of producing the reports. *)
 let register () =
   Cacio.register_jobs
-    Schedule_security_scans
+    Tezos_ci_pipelines.schedule_security_scans
     (List.map
        (fun j -> (Cacio.Auto, j))
        (job_container_scanning_merge_reports :: slack_jobs))

@@ -81,7 +81,7 @@ let job_compile_sources_doc =
 let register () =
   Cacio.register_merge_request_jobs [(Auto, job_compile_sources_doc)] ;
   Cacio.register_jobs
-    Schedule_extended_test
+    Tezos_ci_pipelines.schedule_extended_test
     [
       (Auto, job_compile_sources_doc_deps_debian);
       (Auto, job_compile_sources_doc_deps_ubuntu);
