@@ -14,13 +14,11 @@ For more details on the contents and usage of each image, see below,
 in the header comment of each corresponding Dockerfile and in the
 `IMAGE/README.md` file when applicable.
 
-## Input hashes
+## Image tags
 
-Images are rebuilt on-demand in the Tezos CI whenever one of their
-*inputs* change.  The inputs are image-specific and correspond to a
-set of paths in the tree. Images are tagged with the input hash and
-the branch on which they were produced (see `images/image_tag.sh` for
-more details).
+Images are built by `base_images.daily` pipelines. They are
+tagged after the commit they were built from
+(`<ref-slug>-<short-sha>`, e.g. `master-18884dda`).
 
 ## Image build contexts
 
@@ -53,13 +51,26 @@ These labels can be extracted from a locally pulled image using
 
 ## Usage in the Tezos CI
 
-If you modify the definition of these images above, then the Tezos CI
-will automatically rebuild it and the new image will be used in
-subsequent jobs of the pipeline. This works by tagging each image with
-its input hash, and putting this tag as a variable in a [dotenv report
-artifact](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportsdotenv).
-Jobs that use the image refer to this variable in their `image:`
-field and thus reuse the image directly.
+Images are referenced in the CI by the shared tag `base_images_tag` in
+`ci/lib_tezos_ci/tezos_ci.ml`. This tag should contain the commit hash
+for which a `base_images.daily` ran. The CI uses then the images
+produced by the latest `base_images.daily` pipeline that ran on this
+commit.
+
+NB: in order to have fresh images, `base_images.daily` pipeline run
+regularly on the commit that is referred to in `base_images_tag`. Note
+also that due to our retention policy, older CI images will be erased
+(currently after 30 days since the last push).
+
+Bumping the commit hash in `base_images_tag` is what makes the CI use a newer build.
+
+If you want to modify the images used in CI jobs, you should:
+1. merge your changes on `master`
+2. make sure that a `base_images.daily` pipeline ran successfully on a commit recent enough to contain your changes
+3. merge the bump of the tag.
+
+Ideally, the tag should be bumped not too long (less than a day) after
+modifications in the CI image are merged.
 
 # `jsonnet` image
 
