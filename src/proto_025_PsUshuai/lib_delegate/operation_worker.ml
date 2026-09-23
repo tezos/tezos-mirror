@@ -909,4 +909,58 @@ let get_quorum_event_stream state = state.qc_event_stream.stream
 module Internal_for_tests = struct
   (* State creation *)
   let make_initial_state = make_initial_state
+
+  (* [account_preattestation_quorum ~get_slot_voting_power candidate_watched
+     batches] feeds each batch of [batches] to [update_pqc_monitoring] in turn,
+     over a single [pqc_watched] starting from an empty received-set — mirroring
+     the successive quorum-monitor updates the worker performs. Returns the final
+     [(voting_power, count, certificate)] where [certificate] is the set of
+     counted preattestations. A delegate's power must be counted at most once
+     across all batches. *)
+  let account_preattestation_quorum ~get_slot_voting_power candidate_watched
+      (batches : Kind.preattestation Operation.t list list) =
+    let pqc_watched =
+      {
+        candidate_watched;
+        get_slot_voting_power;
+        consensus_threshold = Int64.max_int;
+        consensus_committee = Int64.max_int;
+        current_voting_power = 0L;
+        preattestations_received = Preattestation_set.empty;
+        preattestations_count = 0;
+        previous_prequorum_progression = 0;
+      }
+    in
+    List.iter
+      (fun batch ->
+        let ops = List.map Operation.pack batch in
+        ignore (update_pqc_monitoring ~pqc_watched ops : int64 * int))
+      batches ;
+    ( pqc_watched.current_voting_power,
+      pqc_watched.preattestations_count,
+      Preattestation_set.elements pqc_watched.preattestations_received )
+
+  (* Attestation counterpart of {!account_preattestation_quorum}. *)
+  let account_attestation_quorum ~get_slot_voting_power candidate_watched
+      (batches : Kind.attestation Operation.t list list) =
+    let qc_watched =
+      {
+        candidate_watched;
+        get_slot_voting_power;
+        consensus_threshold = Int64.max_int;
+        consensus_committee = Int64.max_int;
+        current_voting_power = 0L;
+        attestations_received = Attestation_set.empty;
+        attestations_count = 0;
+        previous_quorum_progression = 0;
+      }
+    in
+    List.iter
+      (fun batch ->
+        let ops = List.map Operation.pack batch in
+        ignore (update_qc_monitoring ~qc_watched ops : int64 * int))
+      batches ;
+    ( qc_watched.current_voting_power,
+      qc_watched.attestations_count,
+      Attestation_set.elements qc_watched.attestations_received )
 end

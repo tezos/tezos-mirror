@@ -130,4 +130,28 @@ module Internal_for_tests : sig
   (** {2 State creation} *)
 
   val make_initial_state : ?monitor_node_operations:bool -> unit -> t
+
+  (** {2 Quorum accounting} *)
+
+  (** [account_preattestation_quorum ~get_slot_voting_power candidate batches]
+      feeds each batch of [batches] to the prequorum accounting in turn, over a
+      single monitoring state starting from an empty received-set (mirroring the
+      successive quorum-monitor updates the worker performs). Returns the final
+      [(voting_power, count, certificate)] where [certificate] is the set of
+      counted preattestations, [count] their number, and [voting_power] their
+      total counted power. A delegate's power must be counted at most once across
+      all batches, regardless of how many signature-distinct copies of the same
+      vote appear. *)
+  val account_preattestation_quorum :
+    get_slot_voting_power:(slot:Slot.t -> int64 option) ->
+    candidate ->
+    Kind.preattestation operation list list ->
+    int64 * int * Kind.preattestation operation list
+
+  (** Attestation counterpart of {!account_preattestation_quorum}. *)
+  val account_attestation_quorum :
+    get_slot_voting_power:(slot:Slot.t -> int64 option) ->
+    candidate ->
+    Kind.attestation operation list list ->
+    int64 * int * Kind.attestation operation list
 end
