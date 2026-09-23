@@ -141,14 +141,18 @@ script will build the Octez Docker Distribution with the *released*
 set of executables (see `scripts-inputs/released-executables`) and
 without EVM artifacts.
 
-Building the Octez Docker distribution requires some of the CI images
-as input. The definition of these input images can be found in
-`images/ci`, and they can be built locally using
-`./images/create_ci_images.sh.`
+Building the Octez Docker distribution requires two of the CI images
+as input: `alpine-runtime` (the base of the distribution variants) and
+`alpine-build` (the build environment). Their definition can be found
+in `images/ci`, and they can be built locally with:
+
+```
+$ docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+```
 
 By default, the script `./scripts/create_docker_image.sh` uses the
-CI images that correspond to the current state of the checkout (see
-`images/image_tag.sh` for more info). To use other images, for
+locally baked images `octez-local-ci/alpine-runtime:latest` and
+`octez-local-ci/alpine-build:latest`. To use other images, for
 instance the CI images built in a specific pipeline, pass their full
 references (`name:tag`) with the parameters `--runtime-image` and
 `--build-deps-image`.
@@ -164,58 +168,49 @@ see `./scripts/create_docker_image.sh --help`.
 ## Using the CI images from tezos/tezos CI
 
 Like the Octez Docker distribution, the CI images are also built in
-the tezos/tezos CI. By default, `./scripts/create_docker_image.sh` is
-configured to pull the CI images from the CI's protected Docker
-registry if they cannot be found locally.
-
-Note that if the image you want to use is from a branch that has not
-yet been merged to `master`, then it will not be in the protected
-Docker registry, but in the public one. To configure the script to use
-the public registry:
+the tezos/tezos CI, by the `images.alpine-ci-all` jobs. To build the
+distribution FROM a specific build of those images, pass their full
+references. For the images the CI currently uses, the tag is the value
+of `base_images_tag` in `ci/lib_tezos_ci/tezos_ci.ml`:
 
 ```
-$ ci_image_name="$(. ./scripts/version.sh; echo "$GCP_PUBLIC_REGISTRY")/tezos/tezos/ci"
-$ ci_image_tag="${ARCH:-amd64}--$(./images/image_tag.sh images/ci)"
+$ registry="$(. ./scripts/version.sh; echo "$GCP_PROTECTED_REGISTRY")/tezos/tezos"
+$ tag=<base_images_tag>
 $ ./scripts/create_docker_image.sh \
-    --runtime-image "${ci_image_name}/runtime:${ci_image_tag}" \
-    --build-deps-image "${ci_image_name}/build:${ci_image_tag}"
+    --runtime-image "${registry}/alpine-runtime:${tag}" \
+    --build-deps-image "${registry}/alpine-build:${tag}"
 ```
+
+Reading from that registry requires the corresponding credentials.
+Builds on unprotected refs push to the public registry
+(`GCP_PUBLIC_REGISTRY`) rather than the protected one, under the tag
+`<ref-slug>-<short-sha>`.
 
 ## Using local CI images
 
 First, build the `ci` images locally:
 
 ```
-$ ./images/create_ci_images.sh
+$ docker buildx bake -f images/ci/ci-images.hcl --load runtime build
 ```
 
-The newly built images will use the same naming scheme as the images
-built in the tezos/tezos CI. Therefore, you can now simply rebuild the
-Octez Docker distribution and it will automatically use the locally
-built CI images:
+Both the bake and `./scripts/create_docker_image.sh` default to
+`octez-local-ci/alpine-*:latest`, so you can now simply rebuild the Octez
+Docker distribution and it will use the locally built CI images:
 
 ```
 $ ./scripts/create_docker_image.sh
 ```
 
-To make this more explicit, run:
+To use a different naming scheme, set `REGISTRY` and `TAG`: they drive
+both commands, since `create_docker_image.sh` reads the same two bake
+variables.
 
 ```
-$ ./images/create_ci_images.sh \
-    --image-base octez-local-ci \
-    --tag-suffix ""
-$ ./scripts/create_docker_image.sh \
-    --runtime-image octez-local-ci/runtime:amd64 \
-    --build-deps-image octez-local-ci/build:amd64
+$ export REGISTRY=my-ci TAG=wip
+$ docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+$ ./scripts/create_docker_image.sh
 ```
 
-The first command will create the set of CI images on the following naming scheme:
-
- - `octez-local-ci/runtime:amd64`
- - `octez-local-ci/prebuild:amd64`
- - ...
-
-(These images are always tagged by architecture, and the architecture defaults to amd64).
-
-The parameters to the second command state the full references of the
-images `create_docker_image.sh` builds FROM.
+Passing `--runtime-image` / `--build-deps-image` explicitly, as in the
+previous section, still overrides both.
