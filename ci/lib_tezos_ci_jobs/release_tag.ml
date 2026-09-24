@@ -343,8 +343,6 @@ let () =
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_beta_release_tag_test
@@ -356,8 +354,6 @@ let () =
       (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test ~components:component_deploys);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Non-release *)
   Cacio.register_jobs
