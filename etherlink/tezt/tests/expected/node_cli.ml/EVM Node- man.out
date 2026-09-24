@@ -717,7 +717,7 @@ Kernel commands:
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
       kernel ("mainnet-beta", "mainnet-gamma", "bifrost", "calypso", "calypso2", "dionysus",
       "dionysus-r1", "ebisu", "farfadet", "farfadet-r1", "farfadet-r2", "farfadet-r3",
-      "farfadet-r4", "farfadet-r5", "farfadet-r6", "ganesha" or "ganesha-r1").
+      "farfadet-r4", "farfadet-r5", "farfadet-r6", "ganesha", "ganesha-r1" or "ganesha-r2").
     <activation_timestamp>: After activation timestamp, the kernel will upgrade to this
       value.
       Must follow one of the following format:
@@ -796,8 +796,8 @@ Kernel commands:
     --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
       specified kernel version. Supported values: mainnet-beta, mainnet-gamma, bifrost,
       calypso, calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, farfadet-r2,
-      farfadet-r3, farfadet-r4, farfadet-r5, farfadet-r6, ganesha, ganesha-r1, previewnet-0.2,
-      previewnet-0.4, previewnet-0.5, previewnet-0.6, latest.
+      farfadet-r3, farfadet-r4, farfadet-r5, farfadet-r6, ganesha, ganesha-r1, ganesha-r2,
+      previewnet-0.2, previewnet-0.4, previewnet-0.5, previewnet-0.6, latest.
     --kernel-root-hash <root hash>: Value for kernel_root_hash in the installer config.
     --chain-id <chain id>: Value for chain_id in the installer config.
     --sequencer <edpk...>: Value for sequencer in the installer config.
@@ -878,8 +878,8 @@ Kernel commands:
     --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
       specified kernel version. Supported values: mainnet-beta, mainnet-gamma, bifrost,
       calypso, calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, farfadet-r2,
-      farfadet-r3, farfadet-r4, farfadet-r5, farfadet-r6, ganesha, ganesha-r1, previewnet-0.2,
-      previewnet-0.4, previewnet-0.5, previewnet-0.6, latest.
+      farfadet-r3, farfadet-r4, farfadet-r5, farfadet-r6, ganesha, ganesha-r1, ganesha-r2,
+      previewnet-0.2, previewnet-0.4, previewnet-0.5, previewnet-0.6, latest.
     --minimum-base-fee-per-gas <111...>: Value for minimum_base_fee_per_gas in the installer
       config.
     --da-fee-per-byte <111...>: Value for da_fee_per_byte in the installer config.
@@ -914,7 +914,7 @@ Kernel commands:
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
       kernel ("mainnet-beta", "mainnet-gamma", "bifrost", "calypso", "calypso2", "dionysus",
       "dionysus-r1", "ebisu", "farfadet", "farfadet-r1", "farfadet-r2", "farfadet-r3",
-      "farfadet-r4", "farfadet-r5", "farfadet-r6", "ganesha" or "ganesha-r1").
+      "farfadet-r4", "farfadet-r5", "farfadet-r6", "ganesha", "ganesha-r1" or "ganesha-r2").
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
