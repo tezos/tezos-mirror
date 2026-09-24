@@ -29,6 +29,10 @@ class Octez < Formula
   # hidapi -> systemd -> python@3.14, until systemd dropped that dependency
   # (Homebrew/homebrew-core@2ecc31ed). On macOS the system bzip2 is used.
   uses_from_macos "bzip2" => :build
+  # Same for .txz archives: xz is only on the Linux PATH today because
+  # systemd happens to depend on it at runtime, and macOS does not ship it
+  # at all, hence a plain depends_on. The xz formula also provides lzma.
+  depends_on "xz" => :build
 
   dependencies = %w[gmp hidapi libev libffi libpq zstd]
   dependencies.each do |dependency|
