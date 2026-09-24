@@ -23,6 +23,7 @@ variants="debug bare minimal"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
+cargo_mirror=""
 # Full image references (name:tag) for the runtime and build-dependencies images
 # the distribution builds FROM. Default (after option parsing) to the images
 # matching the local checkout (via 'ci_image_name'/version.sh); overridable via
@@ -46,6 +47,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
   [--sccache-bucket <BUCKET> ]
+  [--cargo-mirror]
   [--push]
 
 DESCRIPTION
@@ -122,6 +124,11 @@ OPTIONS
             RUSTC_WRAPPER=sccache is activated in build.Dockerfile,
             caching Rust artifacts in GCS across builds.
 
+        --cargo-mirror
+            Route crates.io through the CI mirror proxy. The proxy is an
+            in-cluster service, so this is for CI builds only; without it
+            cargo fetches from crates.io directly.
+
     Output
         --push
             Push the built variants to the registry instead of loading
@@ -138,6 +145,7 @@ CURRENT VALUES
     COMMIT_DATETIME: $commit_datetime
     COMMIT_TAG: $commit_tag
     SCCACHE_BUCKET: $sccache_bucket
+    CARGO_MIRROR: $cargo_mirror
     PUSH: $push
 
 SEE ALSO
@@ -147,7 +155,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,commit-datetime:,commit-tag:,sccache-bucket:,push -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,commit-datetime:,commit-tag:,sccache-bucket:,cargo-mirror,push -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -201,6 +209,9 @@ while true; do
   --sccache-bucket)
     shift
     sccache_bucket="$1"
+    ;;
+  --cargo-mirror)
+    cargo_mirror="true"
     ;;
   --push)
     push="true"
@@ -302,6 +313,7 @@ IMAGE_NAME="$image_name" \
   GIT_VERSION="$commit_tag" \
   COMMIT_SHORT_SHA="$commit_short_sha" \
   SCCACHE_GCS_BUCKET="$sccache_bucket" \
+  CARGO_MIRROR="$cargo_mirror" \
   PUSH="$push" \
   docker buildx bake \
   $builder_arg \

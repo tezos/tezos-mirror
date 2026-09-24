@@ -33,6 +33,9 @@ variable "GIT_DATETIME" { default = "" }
 variable "GIT_VERSION" { default = "" }
 variable "COMMIT_SHORT_SHA" { default = "" }
 variable "SCCACHE_GCS_BUCKET" { default = "" }
+# When non-empty, build.Dockerfile installs the CI crates-io mirror config.
+# The mirror is an in-cluster service, so this is empty outside the CI.
+variable "CARGO_MIRROR" { default = "" }
 
 # CI provenance labels (empty in local dev; auto-populated in GitLab CI).
 variable "CI_PIPELINE_ID" { default = "" }
@@ -58,6 +61,7 @@ target "build" {
     GIT_DATETIME              = GIT_DATETIME
     GIT_VERSION               = GIT_VERSION
     SCCACHE_GCS_BUCKET        = SCCACHE_GCS_BUCKET
+    CARGO_MIRROR              = CARGO_MIRROR
   }
   # build.Dockerfile has `RUN --network=host` (cargo CI mirror / sccache).
   # bake requires the entitlement to be declared per target; the CLI also
