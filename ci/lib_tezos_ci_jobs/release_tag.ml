@@ -319,8 +319,6 @@ let () =
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_minor_release_tag_test
@@ -333,8 +331,6 @@ let () =
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test);
       (Auto, job_docker_promote_to_latest `test_wait);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Beta *)
   Cacio.register_jobs
