@@ -909,7 +909,7 @@ Kernel commands:
   
   download kernel <kernel-id> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>] [--retry <1>]
-      [--network <network>]
+      [--parallel-download <8>] [--network <network>]
     Preemptively download a kernel before running the EVM node.
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
       kernel ("mainnet-beta", "mainnet-gamma", "bifrost", "calypso", "calypso2", "dionysus",
@@ -928,6 +928,11 @@ Kernel commands:
     --retry <1>: Number of times a revealed preimage can be redownloaded in case the it
       doesn't pass the sanity check. It can be useful if the download is corrupted for some
       reason.
+    --parallel-download <8>: Number of preimages to download at a time, between 1 and 256.
+      Downloading a kernel is bound by the latency of the preimages endpoint, so fetching
+      several at a time is significantly faster; raise it for a distant endpoint, lower it for
+      one that limits the number of requests it accepts.
+      Defaults to `8`.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
       `testnet`, `shadownet` or `previewnet`.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
