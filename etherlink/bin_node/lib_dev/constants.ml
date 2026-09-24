@@ -53,6 +53,7 @@ type kernel =
   | Previewnet06
   | Ganesha
   | GaneshaR1
+  | GaneshaR2
   | Latest
 
 let kernel_from_string = function
@@ -77,6 +78,7 @@ let kernel_from_string = function
   | "previewnet-0.6" -> Some Previewnet06
   | "ganesha" -> Some Ganesha
   | "ganesha-r1" -> Some GaneshaR1
+  | "ganesha-r2" -> Some GaneshaR2
   | "latest" -> Some Latest
   | _ -> None
 
@@ -110,6 +112,7 @@ let kernel_to_ordinal = function
   | Previewnet06 -> 18
   | Ganesha -> 19
   | GaneshaR1 -> 20
+  | GaneshaR2 -> 21
   | Latest -> Int.max_int
 
 let compare_kernel a b = Int.compare (kernel_to_ordinal a) (kernel_to_ordinal b)
@@ -187,6 +190,10 @@ let root_hash_from_released_kernel = function
       Some
         (`Hex
            "00db5a8b279b9915f7ffef420347b5d9667ac4e73a9c766b7ef71513f748f52c67")
+  | GaneshaR2 ->
+      Some
+        (`Hex
+           "009e07373751a43acbf0cd747b404f45130e0ad561c4b7da937e02eb812bd0f7e8")
   | Previewnet02 | Previewnet04 | Previewnet05 | Previewnet06 | Latest -> None
 
 let michelson_runtime_node_version ~smart_rollup_address ~l2_chain_id =

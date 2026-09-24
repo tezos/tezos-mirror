@@ -41,6 +41,7 @@ type kernel =
   | Previewnet06
   | Ganesha
   | GaneshaR1
+  | GaneshaR2
   | Latest
 
 val kernel_from_string : string -> kernel option
