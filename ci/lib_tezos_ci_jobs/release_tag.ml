@@ -382,8 +382,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `scheduled_test);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Octez Latest Release *)
   Cacio.register_jobs
