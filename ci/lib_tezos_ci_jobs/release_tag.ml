@@ -363,8 +363,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag_test
@@ -374,8 +372,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
