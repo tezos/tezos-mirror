@@ -130,14 +130,21 @@ ARG NPM_REGISTRY
 
 COPY images/ci/e2etest/package.json images/ci/e2etest/package-lock.json /usr/local/lib/
 # Etherlink tests have hardcoded /usr/local/lib as path,
-# and `npm ci` installs the node_modules directory locally
+# and `npm ci` installs the node_modules directory locally.
+# The registry npm resolved is echoed before the install: nothing else in this
+# step names it, so a build that fell back to the public registry -- because
+# NPM_REGISTRY is unset, or because ci-images.hcl declared no secret -- is
+# otherwise indistinguishable from an authenticated one. [npm config get
+# registry] prints no credentials, unlike [npm config list].
 # hadolint ignore=DL3003
 RUN --mount=type=secret,id=npm_token \
     if [ -n "$NPM_REGISTRY" ] ; then \
       npm set registry "$NPM_REGISTRY" && \
       npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
     fi \
-    && cd /usr/local/lib/ && npm ci
+    && cd /usr/local/lib/ \
+    && echo "### npm registry: $(npm config get registry)" \
+    && npm ci
 
 USER tezos
 WORKDIR /home/tezos

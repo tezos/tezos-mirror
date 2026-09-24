@@ -42,7 +42,9 @@ The images, their content and intended usage, are:
 | `e2etest`     | `eth-cli` + `solc` + cast          | CI: Octez integration tests       |
 
 For more details on the contents and usage of each image, see the
-header comment of each corresponding layer in the Dockerfile.
+header comment of the corresponding `images/ci/Dockerfile.<component>`.
+The images are published as `alpine-<component>`; the build graph that
+ties them together is `images/ci/ci-images.hcl`.
 
 ## Adding OPAM dependencies
 
