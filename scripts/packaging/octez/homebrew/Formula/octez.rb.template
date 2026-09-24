@@ -22,6 +22,14 @@ class Octez < Formula
     depends_on dependency => :build
   end
 
+  # opam extracts .tbz source archives with bzip2. Homebrew does not put it on
+  # the sandbox PATH by itself: bzip2 is only a runtime dependency of unzip, a
+  # build dependency, and Homebrew prunes the transitive dependencies of build
+  # dependencies. It used to reach the PATH by accident, through
+  # hidapi -> systemd -> python@3.14, until systemd dropped that dependency
+  # (Homebrew/homebrew-core@2ecc31ed). On macOS the system bzip2 is used.
+  uses_from_macos "bzip2" => :build
+
   dependencies = %w[gmp hidapi libev libffi libpq zstd]
   dependencies.each do |dependency|
     depends_on dependency
