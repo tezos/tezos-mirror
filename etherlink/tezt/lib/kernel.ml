@@ -34,14 +34,14 @@ let commit_of = function
 let name_of = function
   | Latest -> None
   | Previewnet -> Some "previewnet-0.6"
-  | Mainnet -> Some "ganesha-r1"
+  | Mainnet -> Some "ganesha-r2"
 
 let upgrade_to = function
   | Latest -> Latest
   | Mainnet -> Latest
   | Previewnet -> Latest
 
-(* Ganesha-r1 does support the DAL, but enabling it here registers a second,
+(* Ganesha-r2 does support the DAL, but enabling it here registers a second,
    DAL-enabled variant of every Etherlink test against the Mainnet kernel.
    Left off until that CI cost is deliberately taken; flipping it is
    test-registration only. *)
@@ -72,7 +72,7 @@ let of_tag tag =
 
 (* Select the appropriate EVM version for the specified kernel.
 
-   Mainnet now honours an explicitly requested version: ganesha-r1 ships
+   Mainnet now honours an explicitly requested version: ganesha-r2 ships
    storage version 65, the same generation as Latest, and [kernel_config]
    emits the evm_version slot for it. Previewnet keeps the default until
    someone checks that its kernel reads that slot. *)
