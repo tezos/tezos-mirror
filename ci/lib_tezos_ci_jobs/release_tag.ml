@@ -478,11 +478,6 @@ let () =
           `real
           ~needs:
             [(Job, job_deploy_release_page_assets_packaging_revision `real)] );
-      (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian Release);
-      (Manual, Debian_repository.job_build_ubuntu Release);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_packaging_revision_test
@@ -500,10 +495,5 @@ let () =
           `test
           ~needs:
             [(Job, job_deploy_release_page_assets_packaging_revision `test)] );
-      (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian Release);
-      (Manual, Debian_repository.job_build_ubuntu Release);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   ()
