@@ -474,14 +474,8 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
   let with_runtimes =
     List.concat_map
       (fun (runtime, target_sunrise_level) ->
-        let flag_path =
-          let prefix =
-            if feature_flags_in_base then feature_flag_prefix_base
-            else feature_flag_prefix_evm
-          in
-          match runtime with
-          | Tezosx.Tezos ->
-              String.concat "/" (("" :: prefix) @ ["enable_tezos_runtime"])
+        let flag =
+          match runtime with Tezosx.Tezos -> "enable_tezos_runtime"
         in
         let target_sunrise_level_path = function
           | Tezosx.Tezos ->
@@ -491,16 +485,16 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
               Durable_storage_path.michelson_runtime_target_sunrise_level
                 ~storage_version
         in
-        Installer_config.make ~key:flag_path ~value:""
-        ::
-        (match target_sunrise_level with
-        | None -> []
-        | Some level ->
-            [
-              Installer_config.make
-                ~key:(target_sunrise_level_path runtime)
-                ~value:(Tezosx.encode_target_sunrise_level level);
-            ]))
+        make_feature_flag_instr
+          ~legacy_prefix:feature_flag_prefix_evm
+          (Some (flag, ""))
+        @ Option.to_list
+            (Option.map
+               (fun level ->
+                 Installer_config.make
+                   ~key:(target_sunrise_level_path runtime)
+                   ~value:(Tezosx.encode_target_sunrise_level level))
+               target_sunrise_level))
       with_runtimes
   in
   let instrs =
