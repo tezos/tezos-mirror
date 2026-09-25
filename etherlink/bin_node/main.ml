@@ -1152,27 +1152,22 @@ let num_download_retries =
     ~placeholder:"1"
     Params.int
 
-let default_download_concurrency =
-  Evm_node_lib_dev.Kernel_download.default_concurrency
-
-(* The pool holds one connection per unit of concurrency, and the download
-   stops getting faster well before this: past a couple of dozen, the extra
-   file descriptors buy nothing the endpoint is willing to serve. *)
-let max_download_concurrency = 256
-
 let download_concurrency =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~doc:
       (Format.sprintf
          "Number of preimages to download at a time, between 1 and %d. \
           Downloading a kernel is bound by the latency of the preimages \
           endpoint, so fetching several at a time is significantly faster; \
           raise it for a distant endpoint, lower it for one that limits the \
-          number of requests it accepts."
-         max_download_concurrency)
+          number of requests it accepts. Defaults to \
+          `kernel_execution.preimages_download_concurrency` from the \
+          configuration file, `%d` if it is not set."
+         Configuration.max_preimages_download_concurrency
+         Configuration.default_preimages_download_concurrency)
     ~long:"parallel-download"
-    ~placeholder:(string_of_int default_download_concurrency)
-    ~default:(string_of_int default_download_concurrency)
+    ~placeholder:
+      (string_of_int Configuration.default_preimages_download_concurrency)
     Params.int
 
 let history_arg =
@@ -4005,13 +4000,18 @@ let preemptive_kernel_download_command =
        ->
       let open Lwt_result_syntax in
       let*? () =
-        error_unless
-          Compare.Int.(
-            1 <= concurrency && concurrency <= max_download_concurrency)
-          (error_of_fmt
-             "--parallel-download must be between 1 and %d, got %d."
-             max_download_concurrency
-             concurrency)
+        Option.iter_e
+          (fun concurrency ->
+            error_unless
+              Compare.Int.(
+                1 <= concurrency
+                && concurrency
+                   <= Configuration.max_preimages_download_concurrency)
+              (error_of_fmt
+                 "--parallel-download must be between 1 and %d, got %d."
+                 Configuration.max_preimages_download_concurrency
+                 concurrency))
+          concurrency
       in
       let config_file =
         Configuration.config_filename ~data_dir ?config_file ()
@@ -4039,7 +4039,10 @@ let preemptive_kernel_download_command =
         ~preimages
         ~preimages_endpoint
         ?num_download_retries
-        ~concurrency
+        ~concurrency:
+          (Option.value
+             concurrency
+             ~default:kernel_execution_config.preimages_download_concurrency)
         ~progress:true
         ())
 

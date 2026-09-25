@@ -232,7 +232,13 @@
            execution provides better performance, but increases the complexity of the software
            stack of the node by adding an additional layer between what is executed by the EVM
            node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or `always`. Default
-           to `never`. */ },
+           to `never`. */,
+      "preimages_download_concurrency"?:
+        integer ∈ [1, 256]
+        /* Number of preimages downloaded at a time from the preimages endpoint, when the node
+           downloads a kernel it has seen an upgrade announced for, or with `download kernel`.
+           Raise it for a distant endpoint, lower it for one that limits the number of
+           requests it accepts. */ },
   "public_rpc"?:
     { "port"?:
         integer ∈ [1, 2^16-1]

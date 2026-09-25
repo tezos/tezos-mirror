@@ -46,6 +46,7 @@ type kernel_execution_config = {
   preimages : string option;
   preimages_endpoint : Uri.t option;
   native_execution_policy : native_execution_policy;
+  preimages_download_concurrency : int;
 }
 
 type garbage_collector_parameters = {
@@ -586,6 +587,15 @@ let restricted_rpcs_encoding =
 
 let default_native_execution_policy = Rpcs_only
 
+(* Enough to hide most of the latency of a preimages endpoint without opening
+   so many connections that a modest one starts refusing them. *)
+let default_preimages_download_concurrency = 8
+
+(* The download holds one connection per unit of concurrency, and it stops
+   getting faster well before this: past a couple of dozen, the extra file
+   descriptors buy nothing the endpoint is willing to serve. *)
+let max_preimages_download_concurrency = 256
+
 let kernel_execution_config_dft ?preimages ?preimages_endpoint
     ?native_execution_policy () =
   {
@@ -595,6 +605,7 @@ let kernel_execution_config_dft ?preimages ?preimages_endpoint
       Option.value
         ~default:default_native_execution_policy
         native_execution_policy;
+    preimages_download_concurrency = default_preimages_download_concurrency;
   }
 
 let default_sequencer_sunset_sec = 300L
@@ -1553,11 +1564,29 @@ let kernel_execution_encoding ?network () =
       | None -> opt ~description name encoding
     in
     conv
-      (fun {preimages; preimages_endpoint; native_execution_policy} ->
-        (preimages, preimages_endpoint, native_execution_policy))
-      (fun (preimages, preimages_endpoint, native_execution_policy) ->
-        {preimages; preimages_endpoint; native_execution_policy})
-      (obj3
+      (fun {
+             preimages;
+             preimages_endpoint;
+             native_execution_policy;
+             preimages_download_concurrency;
+           }
+         ->
+        ( preimages,
+          preimages_endpoint,
+          native_execution_policy,
+          preimages_download_concurrency ))
+      (fun ( preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             preimages_download_concurrency )
+         ->
+        {
+          preimages;
+          preimages_endpoint;
+          native_execution_policy;
+          preimages_download_concurrency;
+        })
+      (obj4
          (opt
             ~description:
               "Path to a directory containing the preimages the kernel can \
@@ -1581,7 +1610,17 @@ let kernel_execution_encoding ?network () =
                `always`. Default to `never`."
             "native_execution_policy"
             native_execution_policy_encoding
-            default_native_execution_policy)))
+            default_native_execution_policy)
+         (dft
+            ~description:
+              "Number of preimages downloaded at a time from the preimages \
+               endpoint, when the node downloads a kernel it has seen an \
+               upgrade announced for, or with `download kernel`. Raise it for \
+               a distant endpoint, lower it for one that limits the number of \
+               requests it accepts."
+            "preimages_download_concurrency"
+            (ranged_int 1 max_preimages_download_concurrency)
+            default_preimages_download_concurrency)))
 
 let rpc_encoding =
   Data_encoding.(
@@ -2207,7 +2246,12 @@ module Cli = struct
         ~default:kernel_execution.native_execution_policy
         native_execution_policy
     in
-    {preimages; preimages_endpoint; native_execution_policy}
+    {
+      kernel_execution with
+      preimages;
+      preimages_endpoint;
+      native_execution_policy;
+    }
 
   let patch_rpc ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?batch_limit
       ?restricted_rpcs ?max_active_connections rpc =
