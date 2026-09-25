@@ -814,12 +814,6 @@ mod tests {
 
     /// Phase 1 of the durable-storage reorg: V52 must move the EVM-node
     /// flag from [/__evm_node] to [/base/__evm_node].
-    ///
-    /// This is only testable at the unit level: seeding [/__evm_node] in
-    /// an E2E test would flip the mainnet kernel into EVM-node mode
-    /// (the runtime checks both paths as a legacy fallback — see
-    /// [evm_node_flag] in runtime/src/runtime.rs).  The mock host has no
-    /// such side effect, so we can seed and verify freely here.
     #[test]
     fn v52_migration_moves_evm_node_flag() {
         let mut host = MockKernelHost::default();
