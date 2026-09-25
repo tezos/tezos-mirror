@@ -23,7 +23,7 @@ Master)
 SoftRelease)
   distribution="${CI_COMMIT_TAG}/${distroname}"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   distribution="${CI_COMMIT_REF_NAME}/${distroname}"
   ;;
 *)
