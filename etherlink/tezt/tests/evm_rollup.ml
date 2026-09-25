@@ -959,6 +959,32 @@ let test_rpc_getBalance =
          Eth_account.bootstrap_accounts.(0).address) ;
   unit
 
+let test_rpc_getBalance_bare_hash () =
+  register_sandbox
+    ~__FILE__
+    ~tags:["evm"; "rpc"; "get_balance"]
+    ~title:"RPC method eth_getBalance supports bare hashes"
+  @@ fun evm_node ->
+  let evm_node_endpoint = Evm_node.endpoint evm_node in
+  let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint () in
+  let* resp =
+    Evm_node.(
+      jsonrpc
+        evm_node
+        {
+          method_ = "eth_getBalance";
+          parameters =
+            `A
+              [
+                `String Eth_account.bootstrap_accounts.(0).address;
+                `String block.hash;
+              ];
+        })
+  in
+  (* Assert it was a success *)
+  let _ = Evm_node.extract_result resp |> JSON.as_string in
+  unit
+
 let test_rpc_getBlockByNumber =
   register_sequencer
     ~tags:["evm"; "rpc"; "get_block_by_number"]
@@ -6588,6 +6614,7 @@ let register_evm_node ~protocols =
   test_kernel_root_hash_after_upgrade protocols ;
   test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;
+  test_rpc_getBalance_bare_hash () ;
   test_rpc_getCode protocols ;
   test_rpc_blockNumber protocols ;
   test_rpc_net_version protocols ;
