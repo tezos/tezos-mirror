@@ -26,11 +26,11 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
@@ -484,8 +484,8 @@ fn build_deposit_event(
 
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn apply_tezosx_xtz_deposit<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn apply_tezosx_xtz_deposit<Host>(
+    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
@@ -494,8 +494,7 @@ pub fn apply_tezosx_xtz_deposit<Host, KS>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
 where
-    KS: SafeKeyspace,
-    Host: KeyspaceHost<KS>,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {

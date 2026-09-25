@@ -431,6 +431,7 @@ mod tests {
     use crate::block_storage;
     use crate::chains::{make_test_operation, TEZ_SAFE_STORAGE_ROOT_PATH};
     use crate::configuration::CommonConfig;
+    use crate::load_base;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use primitive_types::{H160, H256, U256};
@@ -492,19 +493,19 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
 
         let tx: Transaction = dummy_transaction(0);
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
-        let (host, base) = rk.base_parts_mut();
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                host,
-                base,
+                rk.host_mut(),
+                &mut base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -513,10 +514,10 @@ mod tests {
             .expect("Tx should be saved in the delayed inbox");
 
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_transaction(rk.base(), Hash(tx.tx_hash))
+            .find_transaction(&base, Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
@@ -525,9 +526,10 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_roundtrip() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
 
         let op = make_test_operation();
         // Register the branch as live so the entry check accepts the operation.
@@ -543,12 +545,11 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
-        let (host, base) = rk.base_parts_mut();
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                host,
-                base,
+                rk.host_mut(),
+                &mut base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -557,10 +558,10 @@ mod tests {
             .expect("Tezos operation should be saved in the delayed inbox");
 
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_transaction(rk.base(), Hash(tx.tx_hash))
+            .find_transaction(&base, Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
@@ -570,9 +571,10 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_dropped_on_stale_branch() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
 
         // A branch neither in live_blocks nor covered by the genesis fallback: must be rejected.
         let mut op = make_test_operation();
@@ -583,13 +585,12 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
-        let (host, base) = rk.base_parts_mut();
         delayed_inbox
             .save_transaction(
-                host,
-                base,
+                rk.host_mut(),
+                &mut base,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -598,9 +599,9 @@ mod tests {
             .expect("save_transaction should drop, not fail");
 
         let delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
         let read = delayed_inbox
-            .find_transaction(rk.base(), Hash(tx.tx_hash))
+            .find_transaction(&base, Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work");
         assert!(
             read.is_none(),
@@ -611,9 +612,10 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip_error_non_delayed() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(rk.base()).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
 
         let tx: Transaction = Transaction {
             tx_hash: [12; TRANSACTION_HASH_SIZE],
@@ -621,11 +623,10 @@ mod tests {
         };
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
-        let (host, base) = rk.base_parts_mut();
+            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(
-            host,
-            base,
+            rk.host_mut(),
+            &mut base,
             tx.into(),
             timestamp,
             0,
@@ -647,10 +648,11 @@ mod tests {
         use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 
         let mut host = MockKernelHost::default();
+        let base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert_eq!(
-            rk.base().get_le_or(
+            base.get_le_or(
                 &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
                 super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
             ),
@@ -664,7 +666,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            rk.base().get_le_or(
+            base.get_le_or(
                 &super::MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY,
                 super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
             ),

@@ -42,7 +42,7 @@ use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
 use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
@@ -495,15 +495,14 @@ impl BlockInProgress {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    pub fn finalize_and_store<Host, KS>(
+    pub fn finalize_and_store<Host>(
         self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let michelson_commitment = crate::state_hash::michelson_ops_commitment(
             &self.cumulative_tezos_operation_receipts.list,

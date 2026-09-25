@@ -20,9 +20,9 @@ use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
@@ -218,8 +218,8 @@ pub(crate) fn execute_enshrined_contract<'a, 'host, Host, KS>(
               + HasDelegatedStorageCost),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace,
 {
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
@@ -1020,8 +1020,8 @@ fn inject_context_headers<'a, 'host, Host, KS>(
               + HasDelegatedStorageCost),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace,
 {
     let target_host = request.uri().host().map(str::to_string);
     let target_runtime = target_host
@@ -1348,8 +1348,8 @@ fn dispatch_crac_call<'a, 'host, Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace,
 {
     if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()).into());
@@ -1448,7 +1448,7 @@ fn classify_origin_for_view<'a, Host, KS, R>(
 ) -> Result<Classification, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // The remaining milligas is the budget; `Gas` carries the unit across
@@ -1493,7 +1493,7 @@ fn derive_alias_for_view<'a, Host, KS, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     operation_gas
@@ -1548,7 +1548,7 @@ pub fn dispatch_origin_of_get<'a, Host, KS, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // ── Runtime ID validation ────────────────────────────────────────────
@@ -1580,7 +1580,7 @@ pub fn dispatch_resolve_address_get<'a, Host, KS, R>(
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Reusing `EnshrinedViewDispatchError::AliasResolution` for all three
@@ -1814,8 +1814,8 @@ pub fn dispatch_staticcall_evm_get<'a, Host, KS, R>(
     calldata: &[u8],
 ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias

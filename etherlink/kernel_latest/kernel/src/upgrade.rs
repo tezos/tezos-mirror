@@ -309,6 +309,7 @@ pub fn possible_sequencer_key_change(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::load_base;
     use revm::primitives::U256;
     use revm_etherlink::storage::sequencer_key_change::{
         read_sequencer_change_counter, store_sequencer_key_change,
@@ -328,6 +329,7 @@ mod tests {
     #[test]
     fn governance_change_increments_counter_once_on_apply() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert_eq!(
@@ -336,10 +338,10 @@ mod tests {
         );
 
         {
-            let (host, base) = rk.base_parts_mut();
+            let host = rk.host_mut();
             store_sequencer_upgrade(
                 host,
-                base,
+                &mut base,
                 SequencerUpgrade {
                     sequencer: test_public_key(),
                     pool_address: H160::zero(),
@@ -357,26 +359,18 @@ mod tests {
         );
 
         // Before activation nothing applies, so the counter stays put.
-        storage::store_last_info_per_level_timestamp(
-            rk.base_mut(),
-            Timestamp::from(50i64),
-        )
-        .unwrap();
-        let (host, base) = rk.base_parts_mut();
-        possible_sequencer_upgrade(host, base).unwrap();
+        storage::store_last_info_per_level_timestamp(&mut base, Timestamp::from(50i64))
+            .unwrap();
+        possible_sequencer_upgrade(rk.host_mut(), &mut base).unwrap();
         assert_eq!(
             read_sequencer_change_counter(rk.host()).unwrap(),
             U256::ZERO
         );
 
         // At/after activation the upgrade applies exactly once: counter is +1.
-        storage::store_last_info_per_level_timestamp(
-            rk.base_mut(),
-            Timestamp::from(100i64),
-        )
-        .unwrap();
-        let (host, base) = rk.base_parts_mut();
-        possible_sequencer_upgrade(host, base).unwrap();
+        storage::store_last_info_per_level_timestamp(&mut base, Timestamp::from(100i64))
+            .unwrap();
+        possible_sequencer_upgrade(rk.host_mut(), &mut base).unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
     }
 
@@ -387,6 +381,7 @@ mod tests {
     #[test]
     fn precompile_change_apply_does_not_increment_counter() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Simulate the precompile store-time effects: the pending change is
@@ -400,13 +395,13 @@ mod tests {
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // Before activation nothing applies.
-        let (host, base) = rk.base_parts_mut();
-        possible_sequencer_key_change(host, base, Timestamp::from(50i64)).unwrap();
+        possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(50i64))
+            .unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
 
         // At/after activation the change applies but the counter is unchanged.
-        let (host, base) = rk.base_parts_mut();
-        possible_sequencer_key_change(host, base, Timestamp::from(100i64)).unwrap();
+        possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(100i64))
+            .unwrap();
         assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
     }
 

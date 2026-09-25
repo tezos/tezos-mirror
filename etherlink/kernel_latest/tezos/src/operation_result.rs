@@ -29,6 +29,7 @@ use tezos_nom::NomReader;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_keyspace::KeySpaceLoaderError;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -373,6 +374,10 @@ pub enum OperationError {
     Validation(#[from] ValidityError),
     #[error("Runtime error: {0}")]
     RuntimeError(#[from] RuntimeError),
+    /// A keyspace the operation runs over could not be loaded. Aborts the
+    /// block: the operation is not what is wrong.
+    #[error("Key space error: {0}")]
+    KeySpace(#[from] KeySpaceLoaderError),
     #[error("Block abort: {0}")]
     BlockAbort(String),
 }

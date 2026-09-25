@@ -29,13 +29,14 @@ use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
 use tezos_data_encoding::types::Narith;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_execution::account_storage::TezosAccount;
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::TezlinkOperationGas;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{Milligas, TezosXRuntimeError};
 use tezosx_journal::TezosXJournal;
 
@@ -183,8 +184,8 @@ pub(crate) fn execute_view_call<Host, KS>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    KS: KeySpace,
 {
     let parsed = url::parse_tezos_view_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;

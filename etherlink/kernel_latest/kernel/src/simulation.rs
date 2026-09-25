@@ -39,11 +39,12 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 
 use evm_inspectors::TracerInput;
+use tezos_smart_rollup::host::StorageV1;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::CracId;
 
@@ -382,9 +383,10 @@ impl Evaluation {
 
     /// Execute the simulation, returning both the result and the HTTP
     /// traces captured during cross-runtime execution.
-    pub fn run<Host, KS>(
+    pub fn run<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        base: &mut impl KeySpace,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
@@ -396,8 +398,7 @@ impl Evaluation {
         Error,
     >
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
         let minimum_base_fee_per_gas =
@@ -405,8 +406,8 @@ impl Evaluation {
         let da_fee = crate::retrieve_da_fee(rk.host_mut())?;
         let coinbase = read_sequencer_pool_address(rk.host()).unwrap_or_default();
         let experimental_features =
-            ExperimentalFeatures::read_from_storage(rk.host(), rk.base());
-        let debug_features = DebugFeatures::read_from_storage(rk.base());
+            ExperimentalFeatures::read_from_storage(rk.host(), base);
+        let debug_features = DebugFeatures::read_from_storage(base);
 
         let current_block = block_storage::read_current_etherlink_block(rk.host_mut());
         let constants = match current_block {
@@ -447,7 +448,7 @@ impl Evaluation {
                     .map(|timestamp| U256::from(timestamp.as_u64()))
                     .unwrap_or_else(|| {
                         U256::from(
-                            read_last_info_per_level_timestamp(rk.base())
+                            read_last_info_per_level_timestamp(base)
                                 .unwrap_or(Timestamp::from(0))
                                 .as_u64(),
                         )
@@ -533,7 +534,7 @@ impl Evaluation {
             CracId::mock(RuntimeId::Ethereum),
             &operation_hashes,
             &constants,
-            crate::storage::is_http_trace_enabled(rk.base()),
+            crate::storage::is_http_trace_enabled(base),
             &debug_features,
             0,
             tracer_input,
@@ -719,30 +720,31 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
     }
 }
 
-pub fn start_simulation_mode<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn start_simulation_mode<Host>(
+    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    base: &mut impl KeySpace,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
-    Host: WasmHost + KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader + WasmHost,
 {
     log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(rk.host_mut())?;
     match simulation {
         Message::Evaluation(simulation) => {
-            let tracer_input = read_tracer_input(rk.base())?;
+            let tracer_input = read_tracer_input(base)?;
             let (outcome, traces) =
-                simulation.run(rk, registry, tracer_input, spec_id)?;
-            storage::store_simulation_http_traces(rk.base_mut(), &traces)?;
-            storage::store_simulation_result(rk.base_mut(), outcome)
+                simulation.run(rk, base, registry, tracer_input, spec_id)?;
+            storage::store_simulation_http_traces(base, &traces)?;
+            storage::store_simulation_result(base, outcome)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::load_base;
     use alloy_primitives::hex::FromHex;
     use primitive_types::H256;
     use revm::primitives::Address;
@@ -751,6 +753,7 @@ mod tests {
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXJournal;
 
     use crate::registry_impl::RegistryImpl;
@@ -827,13 +830,16 @@ mod tests {
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
     #[cfg(test)]
-    fn create_contract<Host, KS>(rk: &mut RuntimeKeyspaces<'_, Host, KS>) -> H160
+    fn create_contract<Host, KS>(
+        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        base: &mut KS,
+    ) -> H160
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         let timestamp =
-            read_last_info_per_level_timestamp(rk.base()).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
         let block_fees = retrieve_block_fees(rk.host_mut());
@@ -898,9 +904,10 @@ mod tests {
     fn simulation_result() {
         // setup
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut rk);
+        let new_address = create_contract(&mut rk, &mut base);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -913,7 +920,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut rk, &mut base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -939,7 +947,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut rk, &mut base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -958,9 +967,10 @@ mod tests {
     fn evaluation_result_no_gas() {
         // setup
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let registry = RegistryImpl::default();
-        let new_address = create_contract(&mut rk);
+        let new_address = create_contract(&mut rk, &mut base);
 
         // run evaluation num
         let evaluation = Evaluation {
@@ -973,7 +983,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut rk, &registry, None, &SpecId::default());
+        let outcome =
+            evaluation.run(&mut rk, &mut base, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let (outcome, _traces) = outcome.unwrap();
@@ -1028,8 +1039,9 @@ mod tests {
     fn parse_simulation2() {
         // setup
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let new_address = create_contract(&mut rk);
+        let new_address = create_contract(&mut rk, &mut base);
 
         let to = Some(new_address);
         let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();

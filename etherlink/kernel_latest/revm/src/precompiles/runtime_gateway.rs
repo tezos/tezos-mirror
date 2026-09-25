@@ -38,8 +38,8 @@ use crate::{
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_journal::OriginalSource;
 
 sol! {
@@ -369,7 +369,7 @@ fn charge_delegated_storage_cost(
 /// charge — those stay in the outer dispatch arm.
 fn dispatch_origin_of<
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
     rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -439,7 +439,7 @@ fn reject_same_runtime_target(
 /// guard, or the initial `RESOLVE_ADDRESS_BASE_COST` charge.
 fn dispatch_resolve_address<
     Host: StorageV1,
-    KS: SafeKeyspace,
+    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
     rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -554,8 +554,8 @@ fn burn_gateway_residual<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<(), CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -607,8 +607,8 @@ fn emit_crac_sent<'j, 'host, CTX, Host, KS, R>(
     amount: U256,
 ) where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -650,8 +650,8 @@ fn build_original_source<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -718,8 +718,8 @@ fn capture_original_source<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -746,8 +746,8 @@ fn resolve_original_source<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<OriginalSource, CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -779,8 +779,8 @@ fn resolve_aliases<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<(String, String), CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -891,8 +891,8 @@ fn inject_tezos_headers_from_context<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<(), CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
@@ -925,8 +925,8 @@ pub(crate) fn runtime_gateway_precompile<'j, 'host, CTX, Host, KS, R>(
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     'host: 'j,
-    Host: KeyspaceHost<KS> + 'host,
-    KS: SafeKeyspace + 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
         Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,

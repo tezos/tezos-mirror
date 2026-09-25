@@ -11,8 +11,8 @@
 
 use std::cell::{Cell, RefCell};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_journal::TezosXJournal;
 
 use crate::{
@@ -27,9 +27,9 @@ pub struct UnimplementedRegistry;
 
 impl Registry for UnimplementedRegistry {
     type Journal = TezosXJournal;
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -38,21 +38,20 @@ impl Registry for UnimplementedRegistry {
         _gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         unimplemented!("UnimplementedRegistry::ensure_alias")
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut Self::Journal,
         _target_runtime: RuntimeId,
         _alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         unimplemented!("UnimplementedRegistry::alias_exists")
     }
@@ -81,7 +80,7 @@ impl Registry for UnimplementedRegistry {
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
@@ -93,7 +92,8 @@ impl Registry for UnimplementedRegistry {
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         unimplemented!("UnimplementedRegistry::serve")
     }
@@ -108,9 +108,9 @@ pub struct NotWiredRegistry;
 
 impl Registry for NotWiredRegistry {
     type Journal = TezosXJournal;
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -119,21 +119,20 @@ impl Registry for NotWiredRegistry {
         _gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         _alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(target_runtime))
     }
@@ -162,7 +161,7 @@ impl Registry for NotWiredRegistry {
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
@@ -174,7 +173,8 @@ impl Registry for NotWiredRegistry {
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         http::Response::builder()
             .status(http::StatusCode::INTERNAL_SERVER_ERROR)
@@ -251,9 +251,9 @@ impl MockRegistry {
 
 impl Registry for MockRegistry {
     type Journal = TezosXJournal;
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -262,7 +262,7 @@ impl Registry for MockRegistry {
         gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
         self.ensure_alias_calls
             .borrow_mut()
@@ -277,16 +277,15 @@ impl Registry for MockRegistry {
         Ok((self.generated_alias.clone(), resolution))
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         _journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Ok(self.ensure_alias_calls.borrow().iter().any(|(info, rt)| {
             let stored_alias = self.compute_alias(info).unwrap_or_default();
@@ -322,7 +321,7 @@ impl Registry for MockRegistry {
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         Ok((crate::Classification::Unknown, Gas::ZERO))
     }
@@ -334,7 +333,8 @@ impl Registry for MockRegistry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         self.serve_calls.borrow_mut().push(request);
         match &self.serve_override {
@@ -414,9 +414,9 @@ impl StubRegistry {
 
 impl Registry for StubRegistry {
     type Journal = TezosXJournal;
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -425,8 +425,7 @@ impl Registry for StubRegistry {
         gas_remaining: Gas,
     ) -> Result<(String, crate::AliasResolution), TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         self.inner.ensure_alias(
             rk,
@@ -439,16 +438,15 @@ impl Registry for StubRegistry {
         )
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         self.inner.alias_exists(rk, journal, target_runtime, alias)
     }
@@ -499,7 +497,7 @@ impl Registry for StubRegistry {
     ) -> Result<(Classification, Gas), TezosXRuntimeError>
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         let count = self.read_count.get();
         self.read_count.set(count + 1);
@@ -520,8 +518,8 @@ impl Registry for StubRegistry {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         self.inner.serve(rk, journal, request)
     }

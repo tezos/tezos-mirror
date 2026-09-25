@@ -21,8 +21,8 @@ impl RegistryImpl {
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{AliasResolution, Registry, RuntimeInterface};
 use tezosx_journal::TezosXJournal;
@@ -31,9 +31,9 @@ use tezosx_tezos_runtime::TezosRuntime;
 impl Registry for RegistryImpl {
     type Journal = TezosXJournal;
 
-    fn ensure_alias<Host, KS>(
+    fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut TezosXJournal,
         alias_info: tezosx_interfaces::AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -45,8 +45,7 @@ impl Registry for RegistryImpl {
         tezosx_interfaces::TezosXRuntimeError,
     >
     where
-        KS: SafeKeyspace,
-        Host: KeyspaceHost<KS>,
+        Host: StorageV1 + KeySpaceLoader,
     {
         // The alias lives in `target_runtime`, so it is that runtime's
         // derivation that names it. `alias_info.runtime` is the *source*
@@ -85,16 +84,15 @@ impl Registry for RegistryImpl {
         result.map(|resolution| (alias, resolution))
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
         journal: &mut Self::Journal,
         target_runtime: tezosx_interfaces::RuntimeId,
         alias: &str,
     ) -> Result<bool, tezosx_interfaces::TezosXRuntimeError>
     where
-        Host: KeyspaceHost<KS>,
-        KS: SafeKeyspace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         match target_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
@@ -147,7 +145,7 @@ impl Registry for RegistryImpl {
     >
     where
         Host: StorageV1,
-        KS: SafeKeyspace,
+        KS: KeySpace,
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
@@ -166,8 +164,8 @@ impl Registry for RegistryImpl {
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        KS: SafeKeyspace,
-        Host: KeyspaceHost<KS>,
+        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+        KS: KeySpace,
     {
         journal.record_request(&request);
         let response = match request.uri().host() {

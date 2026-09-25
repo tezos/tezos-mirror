@@ -21,7 +21,7 @@ use crate::{
     configuration::{fetch_common_config, fetch_tezosx_configuration},
     delayed_inbox::DelayedInbox,
     journal::{prepare_tezosx_journal, TezosXHashes},
-    load_base, sub_block,
+    load_base_or_log, sub_block,
     transaction::Transaction,
 };
 use mir::ast::{Entrypoint, IntoMicheline, Type};
@@ -42,14 +42,15 @@ use tezos_ethereum::{
     transaction::TransactionHash,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::snapshot::{KeyspaceHost, SafeKeyspace};
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -81,15 +82,11 @@ pub extern "C" fn populate_delayed_inbox() {
 #[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut base = match load_base(&mut kernel_host) {
-        Ok(base) => base,
-        Err(err) => {
-            log!(Error, "Failed to load the /base keyspace: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
     };
     let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
@@ -117,15 +114,11 @@ pub extern "C" fn drop_delayed_transaction() {
 #[allow(dead_code)]
 pub fn drop_delayed_transaction_with_durable_storage<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut base = match load_base(&mut kernel_host) {
-        Ok(base) => base,
-        Err(err) => {
-            log!(Error, "Failed to load the /base keyspace: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
     };
     let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
     let transaction_hash: TransactionHash = decode_tx_hash(Rlp::new(&payload)).unwrap();
@@ -138,23 +131,20 @@ where
 #[no_mangle]
 pub extern "C" fn single_tx_execution() {
     let mut sdk_host = unsafe { RollupHost::new() };
-    single_tx_execution_fn(&mut sdk_host);
+    let mut kernel_host: KernelHost<RollupHost, &mut RollupHost> =
+        KernelHost::init(&mut sdk_host);
+    single_tx_execution_fn(&mut kernel_host);
 }
 
 #[allow(dead_code)]
 pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + KeySpaceLoader + CoreStorage + WithGas,
 {
-    let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
-        Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(host) else {
+        return;
     };
-    let tx_input = match sub_block::read_single_tx_execution_input(rk.base_mut()) {
+    let tx_input = match sub_block::read_single_tx_execution_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(
@@ -172,7 +162,7 @@ where
             return;
         }
     };
-    match sub_block::handle_run_transaction(&mut rk, tx_input) {
+    match sub_block::handle_run_transaction(host, base, tx_input) {
         Ok(()) => (),
         Err(err) => {
             log!(
@@ -188,23 +178,20 @@ where
 #[no_mangle]
 pub extern "C" fn assemble_block() {
     let mut sdk_host = unsafe { RollupHost::new() };
-    assemble_block_fn(&mut sdk_host);
+    let mut kernel_host: KernelHost<RollupHost, &mut RollupHost> =
+        KernelHost::init(&mut sdk_host);
+    assemble_block_fn(&mut kernel_host);
 }
 
 #[allow(dead_code)]
 pub fn assemble_block_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage + WasmHost + KeySpaceLoader,
 {
-    let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
-        Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(host) else {
+        return;
     };
-    let assemble_block_input = match sub_block::read_assemble_block_input(rk.base_mut()) {
+    let assemble_block_input = match sub_block::read_assemble_block_input(&mut base) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(Error, "No assemble block input found in storage");
@@ -215,7 +202,7 @@ where
             return;
         }
     };
-    match sub_block::assemble_block(&mut rk, assemble_block_input) {
+    match sub_block::assemble_block(host, base, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
             log!(Error, "Error while assembling block: {:?}", err);
@@ -233,9 +220,12 @@ pub extern "C" fn tezosx_simulate() {
 #[allow(dead_code)]
 pub fn tezosx_simulate_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
+    };
     let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
         Ok(rk) => rk,
         Err(err) => {
@@ -243,7 +233,7 @@ where
             return;
         }
     };
-    let input = match rk.base().get(&TEZOSX_SIMULATION_INPUT_KEY) {
+    let input = match base.get(&TEZOSX_SIMULATION_INPUT_KEY) {
         Some(bytes) => bytes,
         None => {
             log!(Error, "Tezos X simulation input not found");
@@ -293,11 +283,8 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = {
-        let (host, base) = rk.base_parts_mut();
-        fetch_tezosx_configuration(host, base)
-    };
-    let blueprint_header = match read_current_blueprint_header(rk.base()) {
+    let chain_config = fetch_tezosx_configuration(rk.host_mut(), &base);
+    let blueprint_header = match read_current_blueprint_header(&base) {
         Ok(h) => h,
         Err(err) => {
             log!(
@@ -415,7 +402,7 @@ where
                 tezosx_journal::CracId::new(0, 0),
                 &TezosXHashes::from_michelson_operation(michelson),
                 &block_constants.evm_runtime_block_constants,
-                crate::storage::is_http_trace_enabled(rk.base()),
+                crate::storage::is_http_trace_enabled(&base),
                 &chain_config.debug_features,
                 0,
                 None,
@@ -492,8 +479,7 @@ where
     };
 
     // Store captured HTTP traces.
-    if let Err(err) = crate::storage::store_simulation_http_traces(rk.base_mut(), &traces)
-    {
+    if let Err(err) = crate::storage::store_simulation_http_traces(&mut base, &traces) {
         log!(
             Error,
             "Tezos X simulation: failed to store HTTP traces: {:?}",
@@ -539,10 +525,7 @@ where
     // Result is RLP-encoded as a value containing the serialized operation.
     let mut stream = RlpStream::new();
     stream.append(&op_bytes);
-    if let Err(err) = rk
-        .base_mut()
-        .set(&TEZOSX_SIMULATION_RESULT_KEY, stream.out())
-    {
+    if let Err(err) = base.set(&TEZOSX_SIMULATION_RESULT_KEY, stream.out()) {
         log!(Error, "Error writing Tezos X simulation result: {:?}", err);
     }
 }
@@ -557,15 +540,11 @@ pub extern "C" fn tezosx_michelson_entrypoints() {
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_entry<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut base = match load_base(&mut kernel_host) {
-        Ok(base) => base,
-        Err(err) => {
-            log!(Error, "Failed to load the /base keyspace: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
     };
     tezosx_michelson_entrypoints_fn(&kernel_host, &mut base);
 }
@@ -677,22 +656,18 @@ impl From<Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>>
 #[allow(dead_code)]
 pub fn tezosx_run_code_fn<Host>(host: &mut Host)
 where
-    Host: StorageV1 + CoreStorage + WasmHost,
+    Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
-        Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
-            return;
-        }
+    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+        return;
     };
-    let result = match rk.base().get(&TEZOSX_RUN_CODE_INPUT_KEY) {
+    let result = match base.get(&TEZOSX_RUN_CODE_INPUT_KEY) {
         // Reported through the error channel rather than leaving the node
         // to fail on an absent result key. `Host`, not `Execution`: the
         // caller's script is not what is wrong.
         None => RunCodeResult::HostError("run_code input not found".to_string()),
-        Some(payload) => run_code_from_input(&mut rk, &payload).into(),
+        Some(payload) => run_code_from_input(&mut kernel_host, &base, &payload).into(),
     };
     let mut bytes = Vec::new();
     if let Err(err) = result.bin_write(&mut bytes) {
@@ -703,7 +678,7 @@ where
         );
         return;
     }
-    if let Err(err) = rk.base_mut().set(&TEZOSX_RUN_CODE_RESULT_KEY, bytes) {
+    if let Err(err) = base.set(&TEZOSX_RUN_CODE_RESULT_KEY, bytes) {
         log!(
             Error,
             "Error writing the Tezos X run_code result: {:?}",
@@ -781,13 +756,13 @@ fn run_code_params(
 
 /// Decode and validate the input, build the block environment, and run
 /// the script.
-fn run_code_from_input<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn run_code_from_input<Host>(
+    host: &mut Host,
+    base: &impl KeySpace,
     payload: &[u8],
 ) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
 where
-    Host: KeyspaceHost<KS>,
-    KS: SafeKeyspace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     use tezos_execution::RunCodeError;
 
@@ -795,13 +770,11 @@ where
         RunCodeError::Execution(format!("cannot decode the input: {e:?}"))
     })?;
 
-    let chain_config = {
-        let (host, base) = rk.base_parts_mut();
-        fetch_tezosx_configuration(host, base)
-    };
+    let chain_config = fetch_tezosx_configuration(host, base);
+
     // Reading the block header is durable-storage work: a failure here is
     // infrastructure, not the caller's script being wrong.
-    let blueprint_header = read_current_blueprint_header(rk.base()).map_err(|err| {
+    let blueprint_header = read_current_blueprint_header(base).map_err(|err| {
         RunCodeError::Host(format!("cannot read the blueprint header: {err:?}"))
     })?;
 
@@ -814,7 +787,7 @@ where
 
     let registry = chain_config.init_registry();
     let block_in_progress = bip_from_blueprint(
-        rk.host(),
+        host,
         &chain_config,
         blueprint_header.number,
         H256::zero(),
@@ -825,12 +798,7 @@ where
         },
     );
     let mut block_constants = chain_config
-        .constants(
-            rk.host_mut(),
-            &block_in_progress,
-            U256::zero(),
-            H160::zero(),
-        )
+        .constants(host, &block_in_progress, U256::zero(), H160::zero())
         .map_err(|err| {
             RunCodeError::Host(format!("cannot build block constants: {err:?}"))
         })?;
@@ -851,41 +819,34 @@ where
         block_constants.evm_runtime_block_constants.clone(),
     );
 
-    // The roots an applied Michelson operation snapshots, unnarrowed:
-    // nothing here proves the run touches accounts only.
-    rk.with_safe_host(
-        block_constants
-            .michelson_runtime_block_constants
-            .safe_roots
-            .clone(),
-        |safe_rk| {
-            safe_rk.host_mut().start().map_err(|err| {
-                RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
-            })?;
-            // Open a keyspace frame alongside the `/tmp` copy.
-            safe_rk.checkpoint().map_err(|err| {
-                RunCodeError::Host(format!("cannot frame the state: {err:?}"))
-            })?;
-
-            let result =
-                tezos_execution::run_code(safe_rk, &registry, &mut journal, &params);
-
-            // The `/tmp` copy and the keyspace frames cover disjoint roots: revert
-            // both.
-            match (result, safe_rk.revert_both()) {
-                (result, Ok(())) => result,
-                // A failed revert makes the simulation result unusable.
-                (Ok(_), Err(why)) => Err(RunCodeError::Host(format!(
-                    "cannot revert the simulation: {why}"
-                ))),
-                // The run's own error is the one the caller asked about.
-                (Err(run_err), Err(why)) => {
-                    log!(Error, "Reverting the run_code simulation failed: {}", why);
-                    Err(run_err)
-                }
-            }
-        },
-    )
+    // The roots an applied Michelson operation mirrors, unnarrowed: nothing
+    // here proves the run touches accounts only.
+    let mut safe_host = SafeStorage {
+        host,
+        world_states: block_constants.michelson_runtime_block_constants.safe_roots,
+    };
+    safe_host.start().map_err(|err| {
+        RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
+    })?;
+    let result = RuntimeKeyspaces::init(&mut safe_host)
+        .map_err(|err| {
+            RunCodeError::Host(format!("cannot load the runtime keyspaces: {err:?}"))
+        })
+        .and_then(|mut rk| {
+            tezos_execution::run_code(&mut rk, &registry, &mut journal, &params)
+        });
+    match (result, safe_host.revert()) {
+        (result, Ok(())) => result,
+        // A failed revert makes the simulation result unusable.
+        (Ok(_), Err(why)) => Err(RunCodeError::Host(format!(
+            "cannot revert the simulation: {why}"
+        ))),
+        // The run's own error is the one the caller asked about.
+        (Err(run_err), Err(why)) => {
+            log!(Error, "Reverting the run_code simulation failed: {}", why);
+            Err(run_err)
+        }
+    }
 }
 
 /// Query the entrypoints and synthetic views of a contract and write
@@ -1051,12 +1012,32 @@ mod tests {
     /// snapshot of this file's own derives.
     mod run_code_codec {
         use super::super::{
-            run_code_params, RunCodeInput, RunCodeResult, RunCodeStorage,
+            run_code_from_input, run_code_params, RunCodeInput, RunCodeResult,
+            RunCodeStorage,
         };
+        use crate::blueprint_storage::{
+            store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
+            EVMBlockHeader,
+        };
+        use crate::chains::{TEZOS_ACCOUNTS_ROOT, TEZ_SAFE_STORAGE_ROOT_PATH};
+        use crate::load_base;
+        use mir::ast::big_map::BigMapId;
+        use mir::ast::Micheline;
+        use mir::gas::Gas;
+        use mir::parser::Parser;
+        use primitive_types::H256;
         use tezos_data_encoding::enc::BinWriter;
         use tezos_data_encoding::nom::NomReader;
+        use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH;
+        use tezos_evm_runtime::safe_storage::{
+            ETHERLINK_SAFE_STORAGE_ROOT_PATH, TMP_PATH,
+        };
+        use tezos_execution::context::big_maps::{big_map_path, next_id_path};
         use tezos_execution::TezlinkOperationGas;
         use tezos_protocol::contract::Contract;
+        use tezos_smart_rollup::types::Timestamp;
+        use tezos_smart_rollup_host::storage::StorageV1;
 
         const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
         const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
@@ -1113,6 +1094,81 @@ mod tests {
                 now: Some(5),
                 level: Some(42),
             }
+        }
+
+        fn micheline_bytes(micheline: Micheline<'_>) -> Vec<u8> {
+            micheline
+                .encode(&mut Gas::default())
+                .expect("encoding fits the default gas budget")
+                .expect("the value is encodable")
+        }
+
+        /// The run is reverted whatever the script does: here it fills a
+        /// big map the returned storage keeps, which the dump allocates in
+        /// durable storage, and neither that allocation nor the mirror
+        /// survive.
+        #[test]
+        fn run_code_from_input_leaves_the_state_untouched() {
+            let mut host = MockKernelHost::default();
+            // The Michelson roots join the mirror once the runtime is
+            // enabled, and `start` copies every mirrored root, so they all
+            // have to exist.
+            host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
+                .unwrap();
+            for root in [
+                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                TEZ_SAFE_STORAGE_ROOT_PATH,
+                TEZOS_ACCOUNTS_ROOT,
+                ETH_ACCOUNTS_ROOT_PATH,
+            ] {
+                host.store_write_all(&root, b"seed").unwrap();
+            }
+            let mut base = load_base(&mut host).unwrap();
+            store_current_block_header(
+                &mut base,
+                &BlockHeader {
+                    blueprint_header: BlueprintHeader {
+                        number: 7.into(),
+                        timestamp: Timestamp::from(10),
+                    },
+                    chain_header: ChainHeader::Eth(EVMBlockHeader {
+                        hash: H256::zero(),
+                        receipts_root: vec![],
+                        transactions_root: vec![],
+                    }),
+                },
+            )
+            .unwrap();
+            let parser = Parser::new();
+            let payload = encode(&RunCodeInput {
+                script: micheline_bytes(
+                    parser
+                        .parse_top_level(
+                            "parameter nat; storage (big_map nat nat); \
+                             code { UNPAIR; PUSH nat 1; SOME; SWAP; UPDATE; \
+                             NIL operation; PAIR }",
+                        )
+                        .unwrap(),
+                ),
+                storage: micheline_bytes(parser.parse("{}").unwrap()),
+                input: micheline_bytes(parser.parse("7").unwrap()),
+                gas: None,
+                ..full_input()
+            });
+
+            let result = run_code_from_input(&mut host, &base, &payload);
+
+            // The returned storage names the big map the run allocated.
+            assert_eq!(
+                result.unwrap().storage,
+                micheline_bytes(parser.parse("0").unwrap())
+            );
+            assert!(host.store_has(&next_id_path().unwrap()).unwrap().is_none());
+            assert!(host
+                .store_has(&big_map_path(&BigMapId::from(0)).unwrap())
+                .unwrap()
+                .is_none());
+            assert!(host.store_has(&TMP_PATH).unwrap().is_none());
         }
 
         fn bare_input() -> RunCodeInput {

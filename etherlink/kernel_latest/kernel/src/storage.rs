@@ -1112,6 +1112,7 @@ pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractK
 
 #[cfg(test)]
 mod tests {
+    use crate::load_base;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
@@ -1169,6 +1170,7 @@ mod tests {
     #[test]
     fn base_keyspace_readers_resolve_to_absolute_paths() {
         let mut host = MockKernelHost::default();
+        let base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let kt1 = tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
             "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
@@ -1228,26 +1230,26 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(super::read_admin(rk.base()), Some(kt1.clone()));
-        assert_eq!(super::read_kernel_governance(rk.base()), Some(kt1.clone()));
+        assert_eq!(super::read_admin(&base), Some(kt1.clone()));
+        assert_eq!(super::read_kernel_governance(&base), Some(kt1.clone()));
         assert_eq!(
-            super::read_kernel_security_governance(rk.base()),
+            super::read_kernel_security_governance(&base),
             Some(kt1.clone())
         );
-        assert_eq!(super::read_delayed_transaction_bridge(rk.base()), Some(kt1));
-        assert_eq!(super::read_maximum_allowed_ticks(rk.base()), Some(42));
+        assert_eq!(super::read_delayed_transaction_bridge(&base), Some(kt1));
+        assert_eq!(super::read_maximum_allowed_ticks(&base), Some(42));
         assert_eq!(
-            super::max_blueprint_lookahead_in_seconds(rk.base()).unwrap(),
+            super::max_blueprint_lookahead_in_seconds(&base).unwrap(),
             300
         );
-        assert!(super::is_enable_fa_bridge(rk.base()));
-        assert!(super::enable_dal(rk.base(), false));
+        assert!(super::is_enable_fa_bridge(&base));
+        assert!(super::enable_dal(&base, false));
         // EVM node always sees the DAL feature as disabled.
-        assert!(!super::enable_dal(rk.base(), true));
-        assert!(super::is_legacy_dal_signals_disabled(rk.base()));
-        assert_eq!(super::dal_slots(rk.base()), Some(vec![3u8, 7u8]));
+        assert!(!super::enable_dal(&base, true));
+        assert!(super::is_legacy_dal_signals_disabled(&base));
+        assert_eq!(super::dal_slots(&base), Some(vec![3u8, 7u8]));
         assert_eq!(
-            super::read_dal_publishers_whitelist(rk.base()).unwrap(),
+            super::read_dal_publishers_whitelist(&base).unwrap(),
             vec![pkh]
         );
     }
@@ -1260,21 +1262,21 @@ mod tests {
     #[test]
     fn base_keyspace_readers_on_empty_base_return_absent() {
         let mut host = MockKernelHost::default();
-        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let base = load_base(&mut host).unwrap();
 
-        assert_eq!(super::read_admin(rk.base()), None);
-        assert_eq!(super::read_kernel_governance(rk.base()), None);
-        assert_eq!(super::read_kernel_security_governance(rk.base()), None);
-        assert_eq!(super::read_delayed_transaction_bridge(rk.base()), None);
-        assert_eq!(super::read_maximum_allowed_ticks(rk.base()), None);
-        assert!(super::max_blueprint_lookahead_in_seconds(rk.base()).is_err());
-        assert!(!super::is_enable_fa_bridge(rk.base()));
-        assert!(!super::enable_dal(rk.base(), false));
-        assert!(!super::is_legacy_dal_signals_disabled(rk.base()));
-        assert_eq!(super::dal_slots(rk.base()), None);
+        assert_eq!(super::read_admin(&base), None);
+        assert_eq!(super::read_kernel_governance(&base), None);
+        assert_eq!(super::read_kernel_security_governance(&base), None);
+        assert_eq!(super::read_delayed_transaction_bridge(&base), None);
+        assert_eq!(super::read_maximum_allowed_ticks(&base), None);
+        assert!(super::max_blueprint_lookahead_in_seconds(&base).is_err());
+        assert!(!super::is_enable_fa_bridge(&base));
+        assert!(!super::enable_dal(&base, false));
+        assert!(!super::is_legacy_dal_signals_disabled(&base));
+        assert_eq!(super::dal_slots(&base), None);
         // An absent whitelist decodes to the empty list, which the kernel
         // treats as "reject all publishers".
-        assert!(super::read_dal_publishers_whitelist(rk.base())
+        assert!(super::read_dal_publishers_whitelist(&base)
             .unwrap()
             .is_empty());
     }
@@ -1287,10 +1289,11 @@ mod tests {
         use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        super::store_l1_level(rk.base_mut(), 99).unwrap();
-        assert_eq!(super::read_l1_level(rk.base()).unwrap(), 99);
+        super::store_l1_level(&mut base, 99).unwrap();
+        assert_eq!(super::read_l1_level(&base).unwrap(), 99);
         // The keyspace writer must land at the historical absolute path.
         assert_eq!(
             rk.host_mut()
@@ -1299,10 +1302,10 @@ mod tests {
             99u32.to_le_bytes()
         );
 
-        super::store_last_info_per_level_timestamp(rk.base_mut(), Timestamp::from(123))
+        super::store_last_info_per_level_timestamp(&mut base, Timestamp::from(123))
             .unwrap();
         assert_eq!(
-            super::read_last_info_per_level_timestamp(rk.base()).unwrap(),
+            super::read_last_info_per_level_timestamp(&base).unwrap(),
             Timestamp::from(123)
         );
         assert_eq!(
@@ -1320,25 +1323,26 @@ mod tests {
     #[test]
     fn base_keyspace_dal_writers_resolve_to_absolute_paths() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let enable_dal_path = RefPath::assert_from(b"/base/feature_flags/enable_dal");
         let dal_slots_path = RefPath::assert_from(b"/base/dal_slots");
 
-        tweak_dal_activation(rk.base_mut(), true).unwrap();
+        tweak_dal_activation(&mut base, true).unwrap();
         assert!(rk.host_mut().store_read_all(&enable_dal_path).is_ok());
-        assert!(super::enable_dal(rk.base(), false));
+        assert!(super::enable_dal(&base, false));
 
-        tweak_dal_activation(rk.base_mut(), false).unwrap();
+        tweak_dal_activation(&mut base, false).unwrap();
         assert!(rk.host_mut().store_read_all(&enable_dal_path).is_err());
-        assert!(!super::enable_dal(rk.base(), false));
+        assert!(!super::enable_dal(&base, false));
 
-        store_dal_slots(rk.base_mut(), &[0, 1, 2]).unwrap();
+        store_dal_slots(&mut base, &[0, 1, 2]).unwrap();
         assert_eq!(
             rk.host_mut().store_read_all(&dal_slots_path).unwrap(),
             vec![0, 1, 2]
         );
-        assert_eq!(super::dal_slots(rk.base()), Some(vec![0, 1, 2]));
+        assert_eq!(super::dal_slots(&base), Some(vec![0, 1, 2]));
     }
 
     // The read-only config readers (set by the installer/node, read by the
@@ -1348,6 +1352,7 @@ mod tests {
     #[test]
     fn base_keyspace_config_readers_resolve_to_absolute_paths() {
         let mut host = MockKernelHost::default();
+        let base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         rk.host_mut()
@@ -1375,10 +1380,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(super::delayed_inbox_timeout(rk.base()).unwrap(), 3600);
-        assert_eq!(super::delayed_inbox_min_levels(rk.base()).unwrap(), 120);
-        assert!(super::enable_tezos_runtime(rk.base()));
-        assert!(super::enable_michelson_gas_refund(rk.base()));
+        assert_eq!(super::delayed_inbox_timeout(&base).unwrap(), 3600);
+        assert_eq!(super::delayed_inbox_min_levels(&base).unwrap(), 120);
+        assert!(super::enable_tezos_runtime(&base));
+        assert!(super::enable_michelson_gas_refund(&base));
     }
 
     // On a fresh `/base`, the delayed-inbox scalars fall back to their
@@ -1387,12 +1392,12 @@ mod tests {
     #[test]
     fn base_keyspace_config_readers_on_empty_base_use_defaults() {
         let mut host = MockKernelHost::default();
-        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let base = load_base(&mut host).unwrap();
 
-        assert_eq!(super::delayed_inbox_timeout(rk.base()).unwrap(), 43200);
-        assert_eq!(super::delayed_inbox_min_levels(rk.base()).unwrap(), 720);
-        assert!(!super::enable_tezos_runtime(rk.base()));
-        assert!(!super::enable_michelson_gas_refund(rk.base()));
+        assert_eq!(super::delayed_inbox_timeout(&base).unwrap(), 43200);
+        assert_eq!(super::delayed_inbox_min_levels(&base).unwrap(), 720);
+        assert!(!super::enable_tezos_runtime(&base));
+        assert!(!super::enable_michelson_gas_refund(&base));
     }
 
     // `clear_events` reads the one-shot `keep_rollup_events` flag through the
@@ -1400,18 +1405,19 @@ mod tests {
     #[test]
     fn clear_events_consumes_keep_flag_through_keyspace() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let keep_path = RefPath::assert_from(b"/base/keep_rollup_events");
 
         // Flag set at its historical absolute path: clear_events keeps the
         // events and consumes the flag.
         rk.host_mut().store_write_all(&keep_path, &[]).unwrap();
-        super::clear_events(rk.base_mut()).unwrap();
+        super::clear_events(&mut base).unwrap();
         assert!(rk.host_mut().store_read_all(&keep_path).is_err());
 
         // Flag absent: clear_events takes the index-clearing branch and
         // succeeds (no events to clear on a fresh base).
-        super::clear_events(rk.base_mut()).unwrap();
+        super::clear_events(&mut base).unwrap();
     }
 
     // Storage and kernel version now go through the `/base` keyspace on both
@@ -1420,14 +1426,15 @@ mod tests {
     #[test]
     fn base_keyspace_version_writers_resolve_to_absolute_paths() {
         let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // On a fresh base, versioning is not yet initialised.
-        assert!(!rk.base().contains(&super::STORAGE_VERSION_KEY));
+        assert!(!base.contains(&super::STORAGE_VERSION_KEY));
 
-        super::store_storage_version(rk.base_mut(), super::STORAGE_VERSION).unwrap();
+        super::store_storage_version(&mut base, super::STORAGE_VERSION).unwrap();
         assert_eq!(
-            super::read_storage_version(rk.base()).unwrap(),
+            super::read_storage_version(&base).unwrap(),
             super::STORAGE_VERSION
         );
         // The keyspace writer must land at the historical absolute path.
@@ -1435,13 +1442,10 @@ mod tests {
             rk.host_mut().store_read_all(&STORAGE_VERSION_PATH).unwrap(),
             u64::from(super::STORAGE_VERSION).to_le_bytes()
         );
-        assert!(rk.base().contains(&super::STORAGE_VERSION_KEY));
+        assert!(base.contains(&super::STORAGE_VERSION_KEY));
 
-        super::store_kernel_version(rk.base_mut(), "kernel-test").unwrap();
-        assert_eq!(
-            super::read_kernel_version(rk.base()).unwrap(),
-            "kernel-test"
-        );
+        super::store_kernel_version(&mut base, "kernel-test").unwrap();
+        assert_eq!(super::read_kernel_version(&base).unwrap(), "kernel-test");
         assert_eq!(
             rk.host_mut()
                 .store_read_all(&RefPath::assert_from(b"/base/kernel_version"))
@@ -1460,25 +1464,22 @@ mod tests {
         use tezos_ethereum::rlp_helpers::VersionedEncoding;
 
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut base = load_base(&mut host).unwrap();
 
         // The simulation result is RLP-encoded with a leading version byte
         // (`VersionedEncoding`). The keyspace writer must store exactly those
         // bytes under `SIMULATION_RESULT_KEY`.
         let result: SimulationResult<u64, String> = SimulationResult::Ok(42);
         let expected = result.to_bytes();
-        super::store_simulation_result(rk.base_mut(), result).unwrap();
-        assert_eq!(
-            rk.base().get(&super::SIMULATION_RESULT_KEY).unwrap(),
-            expected
-        );
+        super::store_simulation_result(&mut base, result).unwrap();
+        assert_eq!(base.get(&super::SIMULATION_RESULT_KEY).unwrap(), expected);
 
         // The HTTP traces are stored as an RLP list. An empty capture is the
         // common case (no cross-runtime HTTP call); it must resolve to the
         // empty-list encoding under `SIMULATION_HTTP_TRACES_KEY`.
-        super::store_simulation_http_traces(rk.base_mut(), &[]).unwrap();
+        super::store_simulation_http_traces(&mut base, &[]).unwrap();
         assert_eq!(
-            rk.base().get(&super::SIMULATION_HTTP_TRACES_KEY).unwrap(),
+            base.get(&super::SIMULATION_HTTP_TRACES_KEY).unwrap(),
             rlp::RlpStream::new_list(0).out().to_vec()
         );
     }
@@ -1493,11 +1494,11 @@ mod tests {
         // Fresh storage bootstraps to the current version.
         {
             let mut host = MockKernelHost::default();
+            let mut base = load_base(&mut host).unwrap();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-            let (host, base) = rk.base_parts_mut();
-            crate::init_storage_versioning(host, base).unwrap();
+            crate::init_storage_versioning(rk.host_mut(), &mut base).unwrap();
             assert_eq!(
-                super::read_storage_version(rk.base()).unwrap(),
+                super::read_storage_version(&base).unwrap(),
                 super::STORAGE_VERSION
             );
         }
@@ -1505,14 +1506,13 @@ mod tests {
         // A version already under `/base` is left untouched.
         {
             let mut host = MockKernelHost::default();
+            let mut base = load_base(&mut host).unwrap();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-            rk.base_mut()
-                .set(&super::STORAGE_VERSION_KEY, 46u64.to_le_bytes())
+            base.set(&super::STORAGE_VERSION_KEY, 46u64.to_le_bytes())
                 .unwrap();
-            let (host, base) = rk.base_parts_mut();
-            crate::init_storage_versioning(host, base).unwrap();
+            crate::init_storage_versioning(rk.host_mut(), &mut base).unwrap();
             assert_eq!(
-                rk.base().get(&super::STORAGE_VERSION_KEY).unwrap(),
+                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
                 46u64.to_le_bytes()
             );
         }
@@ -1522,6 +1522,7 @@ mod tests {
         // is cleared.
         {
             let mut host = MockKernelHost::default();
+            let mut base = load_base(&mut host).unwrap();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
             rk.host_mut()
                 .store_write_all(
@@ -1529,10 +1530,9 @@ mod tests {
                     &46u64.to_le_bytes(),
                 )
                 .unwrap();
-            let (host, base) = rk.base_parts_mut();
-            crate::init_storage_versioning(host, base).unwrap();
+            crate::init_storage_versioning(rk.host_mut(), &mut base).unwrap();
             assert_eq!(
-                rk.base().get(&super::STORAGE_VERSION_KEY).unwrap(),
+                base.get(&super::STORAGE_VERSION_KEY).unwrap(),
                 46u64.to_le_bytes()
             );
             assert_eq!(
@@ -1569,18 +1569,16 @@ mod tests {
     #[test]
     fn http_trace_flag_default_off() {
         let mut host = MockKernelHost::default();
-        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        assert!(!super::is_http_trace_enabled(rk.base()));
+        let base = load_base(&mut host).unwrap();
+        assert!(!super::is_http_trace_enabled(&base));
     }
 
     #[test]
     fn http_trace_flag_on_once_written() {
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        rk.base_mut()
-            .set(&super::HTTP_TRACE_ENABLED_KEY, [1u8])
-            .unwrap();
-        assert!(super::is_http_trace_enabled(rk.base()));
+        let mut base = load_base(&mut host).unwrap();
+        base.set(&super::HTTP_TRACE_ENABLED_KEY, [1u8]).unwrap();
+        assert!(super::is_http_trace_enabled(&base));
     }
 
     #[test]
