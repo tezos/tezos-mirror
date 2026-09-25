@@ -480,7 +480,10 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         let target_sunrise_level_path = function
           | Tezosx.Tezos ->
               let storage_version =
-                if michelson_runtime_paths_in_world_state then 57 else 56
+                let open Storage_version in
+                if michelson_runtime_paths_in_world_state then
+                  michelson_runtime_paths_moved_to_world_state_version
+                else michelson_runtime_paths_moved_to_world_state_version - 1
               in
               Durable_storage_path.michelson_runtime_target_sunrise_level
                 ~storage_version
