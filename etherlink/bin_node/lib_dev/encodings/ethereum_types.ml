@@ -126,7 +126,13 @@ let block_hash_of_string s = Block_hash (hex_of_string s)
 
 let block_hash_encoding =
   Data_encoding.(
-    conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
+    conv_with_guard
+      (fun (Block_hash h) -> hex_to_string h)
+      (fun s ->
+        match block_hash_of_string s with
+        | Block_hash (Hex h) as res when String.length h == 64 -> Ok res
+        | _ -> Error "block hashes are 32-byte long")
+      string)
 
 let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
 
@@ -211,6 +217,13 @@ module Block_parameter = struct
     let open Data_encoding in
     union
       [
+        case
+          ~title:"block_paramater_bare_hash"
+          (Tag 3)
+          block_hash_encoding
+          (* Never used for encoding *)
+          (function _ -> None)
+          (fun hash -> Block_hash {hash; require_canonical = false});
         case
           ~title:"block_parameter"
           (Tag 0)
