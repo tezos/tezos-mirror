@@ -1152,9 +1152,8 @@ let num_download_retries =
     ~placeholder:"1"
     Params.int
 
-(* Enough to hide most of the latency of a preimages endpoint without opening
-   so many connections that a modest one starts refusing them. *)
-let default_download_concurrency = 8
+let default_download_concurrency =
+  Evm_node_lib_dev.Kernel_download.default_concurrency
 
 (* The pool holds one connection per unit of concurrency, and the download
    stops getting faster well before this: past a couple of dozen, the extra

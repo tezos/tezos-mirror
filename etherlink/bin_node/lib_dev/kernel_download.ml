@@ -144,6 +144,8 @@ let rec reveal_and_check pool ~preimages ~num_download_retries hash =
         hash
   else return preimage
 
+let default_concurrency = 8
+
 (* The preimages of a kernel form a balanced tree: the content pages holding
    the kernel itself are the leaves, and each level above them lists the hashes
    of the level below (see [prepare_preimages] in the kernel SDK). Walking that

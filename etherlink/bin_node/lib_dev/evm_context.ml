@@ -694,7 +694,12 @@ module State = struct
         (fun () ->
           (* Download the kernel. *)
           Misc.unwrap_error_monad @@ fun () ->
-          Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ())
+          Kernel_download.download
+            ~preimages
+            ~preimages_endpoint
+            ~root_hash
+            ~concurrency:Kernel_download.default_concurrency
+            ())
         (fun exn ->
           (*  Error handling. *)
           let* () =

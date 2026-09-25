@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Number of preimages fetched at a time by default by callers that want a
+    concurrent download: enough to hide most of the latency of a preimages
+    endpoint without opening so many connections that a modest one starts
+    refusing them. *)
+val default_concurrency : int
+
 (** [download ~preimages_endpoint ~preimages ~root_hash ?num_download_retries
     ?concurrency ?progress ()] fetches from [preimages_endpoint] all the
     preimages the kernel [root_hash] is made of, and stores them in the
