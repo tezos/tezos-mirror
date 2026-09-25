@@ -371,6 +371,33 @@ let index_proofs_of_batch
          | _ -> [])
        (Operation.to_list (Contents_list contents)))
 
+(* Whichever refutation Proof move of [op] carries an inbox proof its own batch
+   does not back, or backs with indices the skip list contradicts. The mempool
+   runs this so a forged move stops at the first node that reads it, instead of
+   travelling to a baker that would drop it at forging. *)
+let find_relabelled_inbox_proof
+    ({protocol_data = Operation_data {contents; _}; _} as op : packed_operation)
+    =
+  (* Only a batch with a refutation Proof move needs its index proofs. *)
+  let index_proofs = lazy (index_proofs_of_batch op) in
+  List.find_map
+    (function
+      | Contents
+          (Manager_operation
+             {
+               operation =
+                 Sc_rollup_refute
+                   {refutation = Game.Move {step = Game.Proof proof; _}; _};
+               _;
+             }) -> (
+          match
+            check_payload_indices ~index_proofs:(Lazy.force index_proofs) proof
+          with
+          | Ok () -> None
+          | Error trace -> Some trace)
+      | _ -> None)
+    (Operation.to_list (Contents_list contents))
+
 let protect_use_wasm_pvm ?config context rollup k =
   let open Environment.Error_monad.Lwt_result_syntax in
   let* _ctxt, kind = Sr.kind context rollup in

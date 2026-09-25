@@ -530,6 +530,33 @@ let prefilter_consensus_operation info config level_and_round =
   else
     `Branch_refused [Environment.wrap_tzerror Consensus_operation_in_far_future]
 
+(* The refutation moves a baker running this plugin drops at forging. Filtering
+   them here keeps them off the network, instead of letting them travel to a
+   baker that will not use them.
+
+   A DAL page proof whose [published_level] is beyond the level of the block
+   the operation would be baked into ([head + 1]) is [`Branch_delayed], not
+   [`Refused]: the head advances, that level may be reached, and the operation
+   could become valid. An inbox proof its own batch does not back, or backs
+   with indices the skip list contradicts, is [`Refused]: a batch is signed, so
+   it can never gain the index proof it lacks, and rewritten indices never
+   become right. A batch that has both kinds of move is [`Refused], since that
+   verdict cannot change. *)
+let refute_prefilter_error ~level operation =
+  match Block_validation.find_relabelled_inbox_proof operation with
+  | Some trace -> Some (`Refused (Environment.wrap_tztrace trace))
+  | None ->
+      Option.map
+        (fun published_level ->
+          `Branch_delayed
+            [
+              Environment.wrap_tzerror
+                (Block_validation
+                 .Sc_rollup_refute_dal_proof_future_published_level
+                   {published_level; level});
+            ])
+        (Block_validation.find_future_dal_refute ~level operation)
+
 (** A quasi infinite amount of "valid" (pre)attestations could be
       sent by a committee member, one for each possible round number.
 
@@ -543,27 +570,9 @@ let pre_filter info config
     ({shell = _; protocol_data = Operation_data {contents; _} as op} as
      operation :
       Main.operation) =
-  (* Reject a smart-rollup refutation whose DAL page proof targets a
-     [published_level] beyond the level of the block it would be baked into
-     ([head + 1]): such an operation is un-appliable (see
-     [Block_validation.find_future_dal_refute]) and would otherwise be
-     classified [validated], gossiped, and selected by a baker. We classify it
-     [`Branch_delayed] (not [`Refused]): the op is not permanently invalid
-     -- its [published_level] is greater than [head + 1] and may be reached
-     as the head advances, after which the op could become valid -- so it
-     matches the [`Temporary] error kind (whose generic classification is
-     [`Branch_delayed]) and is retained and re-evaluated on each new head.
-     We compare against [head + 1] to agree with block validation (which
-     uses the level of the block being validated). *)
   let level = Raw_level.succ (Raw_level.of_int32_exn info.head.level) in
-  match Block_validation.find_future_dal_refute ~level operation with
-  | Some published_level ->
-      `Branch_delayed
-        [
-          Environment.wrap_tzerror
-            (Block_validation.Sc_rollup_refute_dal_proof_future_published_level
-               {published_level; level});
-        ]
+  match refute_prefilter_error ~level operation with
+  | Some classification -> classification
   | None -> (
       let prefilter_manager_op manager_op =
         match pre_filter_manager info config op manager_op with

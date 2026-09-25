@@ -102,6 +102,14 @@ type Environment.Error_monad.error +=
         Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
     }
 
+(** [find_relabelled_inbox_proof op] returns the error of the first refutation
+    Proof move of [op] whose inbox proof its own batch does not back, or backs
+    with indices the skip list contradicts. Used by the mempool, so that a
+    forged move stops at the first node that reads it. *)
+val find_relabelled_inbox_proof :
+  Protocol.Alpha_context.packed_operation ->
+  Environment.Error_monad.error Environment.Error_monad.trace option
+
 (** [index_proofs_of_batch op] returns the index proofs published by the
     [Sc_rollup_add_messages] operations of the manager batch [op], keyed by the
     inbox cell whose index each of them establishes. *)
