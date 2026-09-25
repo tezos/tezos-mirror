@@ -471,6 +471,9 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     make_instr ?convert ~path_prefix arg
   in
   let michelson_runtime_paths_in_world_state = newer_than_previewnet04 in
+  let michelson_runtime_target_sunrise_level_in_base =
+    Constants.(kernel_is_newer ~than:GaneshaR2 kernel_compat)
+  in
   let with_runtimes =
     List.concat_map
       (fun (runtime, target_sunrise_level) ->
@@ -481,7 +484,9 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Tezosx.Tezos ->
               let storage_version =
                 let open Storage_version in
-                if michelson_runtime_paths_in_world_state then
+                if michelson_runtime_target_sunrise_level_in_base then
+                  michelson_runtime_target_sunrise_level_moved_to_base_version
+                else if michelson_runtime_paths_in_world_state then
                   michelson_runtime_paths_moved_to_world_state_version
                 else michelson_runtime_paths_moved_to_world_state_version - 1
               in

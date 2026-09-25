@@ -307,6 +307,10 @@ let michelson_runtime_sunrise_level ~storage_version =
 
 let michelson_runtime_target_sunrise_level ~storage_version =
   if
+    Storage_version.michelson_runtime_target_sunrise_level_moved_to_base
+      ~storage_version
+  then BASE.make "/michelson_runtime_target_sunrise_level"
+  else if
     Storage_version.michelson_runtime_paths_moved_to_world_state
       ~storage_version
   then TEZ.World_state.make "/michelson_runtime/target_sunrise_level"

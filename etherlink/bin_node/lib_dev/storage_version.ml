@@ -68,3 +68,9 @@ let michelson_blocks_at_world_state_root ~storage_version =
 let tezosx_michelson_entrypoints ~storage_version = storage_version >= 51
 
 let tezosx_run_code ~storage_version = storage_version >= 64
+
+let michelson_runtime_target_sunrise_level_moved_to_base_version = 66
+
+let michelson_runtime_target_sunrise_level_moved_to_base ~storage_version =
+  storage_version
+  >= michelson_runtime_target_sunrise_level_moved_to_base_version
