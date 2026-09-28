@@ -76,6 +76,14 @@
 //! Here's a simple example, running a Fibonacci contract:
 //!
 //! ```
+//! # // Gate the example behind text-parser: without it, parse_top_level/parse
+//! # // don't exist and the doctest would fail to compile.
+//! # #[cfg(not(feature = "text-parser"))]
+//! # fn main() {}
+//! # #[cfg(feature = "text-parser")]
+//! # fn main() { example() }
+//! # #[cfg(feature = "text-parser")]
+//! # fn example() {
 //! use mir::ast::*;
 //! use mir::gas::Gas;
 //! use mir::context::{Ctx, TypecheckingCtx};
@@ -135,6 +143,7 @@
 //!     packed_new_storage,
 //!     vec![0x00, 0x82, 0x81, 0x8d, 0xe6, 0xdf, 0x96, 0x8c, 0xad, 0xa5, 0xc5, 0xb4, 0xac, 0x02]
 //! );
+//! # }
 //! ```
 //!
 //! You can find more examples in
@@ -159,6 +168,7 @@ pub mod stack;
 // coverage gate (which the grammar used to carry as inner attributes) are
 // applied here on the module, since inner attributes are not permitted in an
 // `include!`d file.
+#[cfg(feature = "text-parser")]
 #[allow(dead_code, unused_imports)]
 #[allow(clippy::all)]
 #[cfg(not(tarpaulin_include))]
@@ -166,9 +176,10 @@ mod syntax {
     include!(concat!(env!("OUT_DIR"), "/syntax.rs"));
 }
 pub mod typechecker;
+#[cfg(feature = "text-parser")]
 pub mod tzt;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 mod tests {
     use typed_arena::Arena;
 
@@ -1262,7 +1273,7 @@ mod tests {
     const MACRO_IF_SOME_SRC: &str = "{IF_SOME { PUSH nat 1 ; ADD } { PUSH nat 5; }}";
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 mod multisig_tests {
     use crate::ast::*;
     use crate::context::{Ctx, TypecheckingCtx};

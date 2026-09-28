@@ -6225,7 +6225,7 @@ pub(crate) fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), 
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text-parser"))]
 mod typecheck_tests {
     // These tests build deeply-nested Micheline trees in a `typed_arena`
     // via `alloc_extend` with fixed-size iterators (exact size hint, no

@@ -467,6 +467,7 @@ pub(crate) struct MapInfo<'a> {
     value_type: Type,
 }
 
+#[cfg(feature = "text-parser")]
 impl<'a> MapInfo<'a> {
     /// Construct a new, empty, in-memory storage.
     pub fn new(
@@ -500,6 +501,7 @@ impl<'a> InMemoryLazyStorage<'a> {
         }
     }
 
+    #[cfg(feature = "text-parser")]
     /// Construct in tzt with given big maps.
     pub(crate) fn with_big_maps(big_maps: BTreeMap<BigMapId, MapInfo<'a>>) -> Self {
         let next_id = big_maps
