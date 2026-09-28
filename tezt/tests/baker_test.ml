@@ -2513,7 +2513,142 @@ let preattestation_quorum_no_amplification =
     attacker_power ;
   unit
 
+(* Attestations for a payload other than the proposal's must not count towards
+   its quorum. This exercises the one-shot [bake for --minimal-timestamp]
+   path. We flood the mempool with attestations for a bogus payload (enough to
+   exceed the threshold) and check the baker still refuses to bake for lack of
+   voting power. *)
+let attestation_quorum_ignores_wrong_payload =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"attesting power ignores wrong-payload attestations"
+    ~tags:[team; "baker"; "attestation"; "quorum"; "payload"; "security"]
+    ~supports:(Protocol.From_protocol 025)
+  @@ fun protocol ->
+  let open Amplification in
+  (* A payload hash that differs from any real block's. *)
+  let wrong_payload = "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" in
+  (* Mainnet constants so the five equal-stake bootstrap delegates each hold
+     about a fifth of the committee: one is below the quorum threshold, four are
+     above it. *)
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, Some Protocol.Constants_mainnet))
+      [
+        (["minimal_block_delay"], `String "1");
+        (["delay_increment_per_round"], `String "0");
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let all_delegates =
+    [
+      Constant.bootstrap1;
+      Constant.bootstrap2;
+      Constant.bootstrap3;
+      Constant.bootstrap4;
+      Constant.bootstrap5;
+    ]
+  in
+  Log.info "Bake one block so the head is a regular (non-genesis) proposal" ;
+  let* () =
+    Client.bake_for_and_wait
+      ~keys:(List.map (fun (a : Account.key) -> a.alias) all_delegates)
+      client
+  in
+  let* attested_level = Client.level client in
+  let next_level = attested_level + 1 in
+  let* head_payload = Operation.Consensus.get_block_payload_hash client in
+  if String.equal head_payload wrong_payload then
+    Test.fail "Bogus payload accidentally matches the head payload" ;
+  let* round = Node.RPC.call node @@ RPC.get_chain_block_helper_round () in
+  let* branch = Operation.Consensus.get_branch ~attested_level client in
+  (* The delegate that will try to bake [next_level]: on its own it is below the
+     consensus threshold. *)
+  let* rights = baking_rights_by_round client ~level:next_level ~max_round:0 in
+  let proposer =
+    account_for_pkh
+      all_delegates
+      (match rights with
+      | (0, pkh) :: _ -> pkh
+      | _ -> Test.fail "no round-0 proposer")
+  in
+  let others =
+    List.filter
+      (fun (a : Account.key) ->
+        not (String.equal a.public_key_hash proposer.public_key_hash))
+      all_delegates
+  in
+  let* constants =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_threshold =
+    JSON.(constants |-> "consensus_threshold_size" |> as_int)
+  in
+  let* proposer_power = attesting_power client ~level:attested_level proposer in
+  let* others_powers =
+    Lwt_list.map_s (attesting_power client ~level:attested_level) others
+  in
+  let others_power = List.fold_left ( + ) 0 others_powers in
+  if proposer_power >= consensus_threshold then
+    Test.fail "Proposer alone already reaches the quorum threshold" ;
+  if others_power < consensus_threshold then
+    Test.fail "Wrong-payload attestations do not reach the threshold" ;
+  Log.info
+    "Flood %d wrong-payload attestations (power %d >= threshold %d) for level \
+     %d"
+    (List.length others)
+    others_power
+    consensus_threshold
+    attested_level ;
+  let* (_ : string list) =
+    Lwt_list.map_s
+      (fun (delegate : Account.key) ->
+        let* slot =
+          Operation.Consensus.get_attestation_slot
+            ~level:attested_level
+            ~protocol
+            ~delegate
+            client
+        in
+        let attestation =
+          Operation.Consensus.attestation
+            ~slot
+            ~level:attested_level
+            ~round
+            ~block_payload_hash:wrong_payload
+            ()
+        in
+        let* operation =
+          Operation.Consensus.operation
+            ~branch
+            ~signer:delegate
+            attestation
+            client
+        in
+        let* (`OpHash hash) = Operation.inject ~force:true operation client in
+        return hash)
+      others
+  in
+  Log.info
+    "Bake for the sub-threshold proposer: it must refuse for lack of voting \
+     power (only its own %d, wrong-payload attestations excluded)"
+    proposer_power ;
+  Client.spawn_bake_for
+    ~protocol
+    ~keys:[proposer.alias]
+    ~minimal_timestamp:true
+    client
+  |> Process.check_error ~msg:(rex "enough voting power")
+
 let register ~protocols =
+  attestation_quorum_ignores_wrong_payload protocols ;
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
   check_node_version_no_commit_allowed_test protocols ;
