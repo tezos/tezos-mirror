@@ -12,11 +12,16 @@ cd "$src_dir"
 # defaults
 image_name="tezos-"
 image_version="latest"
-# shellcheck disable=SC2154
-arch=${ARCH:-amd64}
-# Use the version of the CI images that corresponds to the state of the repo.
-# The image will be fetched from 'ci_image_name' from 'scripts/version.sh'.
-ci_image_version=${arch}--$(./images/image_tag.sh images/ci)
+# Default references for the alpine CI images the distribution builds FROM: the
+# ones produced by a local bake of images/ci/ci-images.hcl, i.e.
+#   docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+# REGISTRY and TAG are that bake's own variables, so setting them in the
+# environment points the bake and this script at the same images (see
+# images/README.md). The CI distribution jobs never rely on these defaults:
+# they pass the protected-registry references explicitly through
+# --runtime-image / --build-deps-image.
+local_ci_registry="${REGISTRY:-octez-local-ci}"
+local_ci_tag="${TAG:-latest}"
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 variants="debug bare minimal"
@@ -25,12 +30,10 @@ commit_tag=$(git describe --tags --always)
 sccache_bucket=""
 cargo_mirror=""
 # Full image references (name:tag) for the runtime and build-dependencies images
-# the distribution builds FROM. Default (after option parsing) to the images
-# matching the local checkout (via 'ci_image_name'/version.sh); overridable via
-# --runtime-image / --build-deps-image (the distribution jobs pass them
-# explicitly).
-runtime_image=""
-build_deps_image=""
+# the distribution builds FROM; overridable via --runtime-image /
+# --build-deps-image (the distribution jobs pass them explicitly).
+runtime_image="${local_ci_registry}/alpine-runtime:${local_ci_tag}"
+build_deps_image="${local_ci_registry}/alpine-build:${local_ci_tag}"
 push="false"
 
 # usage and help
@@ -64,9 +67,9 @@ DESCRIPTION
 
     The build starts FROM a runtime image (base of the variants) and a
     build-dependencies image (build environment). By default these are the
-    images/ci runtime and build images matching the local checkout, resolved
-    via scripts/version.sh and images/image_tag.sh; they can be overridden with
-    --runtime-image and --build-deps-image.
+    alpine CI images produced by a local bake of images/ci/ci-images.hcl (see
+    images/README.md); they can be overridden with --runtime-image and
+    --build-deps-image.
 
     The built distribution includes the set of executables defined by
     EXECUTABLES: for a set of valid values, see
@@ -87,13 +90,12 @@ OPTIONS
     Base image location
         --runtime-image IMAGE
             Full reference (name:tag) of the runtime image the variants are
-            built FROM. Default: the images/ci runtime image matching the
-            local checkout.
+            built FROM. Default: the locally baked alpine-runtime image.
 
         --build-deps-image IMAGE
             Full reference (name:tag) of the build-dependencies image (build
             environment, also used by the stripper stage). Default: the
-            images/ci build image matching the local checkout.
+            locally baked alpine-build image.
 
     Image contents
         --executables EXECUTABLES
@@ -137,8 +139,8 @@ OPTIONS
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
-    RUNTIME_IMAGE (default): $ci_image_name/runtime:$ci_image_version
-    BUILD_DEPS_IMAGE (default): $ci_image_name/build:$ci_image_version
+    RUNTIME_IMAGE: $runtime_image
+    BUILD_DEPS_IMAGE: $build_deps_image
     VARIANTS: $variants
     EXECUTABLES: $(echo "$executables" | tr "\n" " ")
     COMMIT_SHORT_SHA: $commit_short_sha
@@ -147,6 +149,14 @@ CURRENT VALUES
     SCCACHE_BUCKET: $sccache_bucket
     CARGO_MIRROR: $cargo_mirror
     PUSH: $push
+
+ENVIRONMENT
+    REGISTRY, TAG
+        The bake variables of images/ci/ci-images.hcl, read here as well so
+        that one environment drives both the bake and this script. They set
+        the default runtime and build-dependencies references
+        (\$REGISTRY/alpine-{runtime,build}:\$TAG); --runtime-image and
+        --build-deps-image override them. Default: octez-local-ci, latest.
 
 SEE ALSO
     For more information, see 'images/README.md' and
@@ -242,12 +252,6 @@ echo "Executables to include in Docker images:"
 for executable in $executables; do
   echo "- $executable"
 done
-
-# Default the image references to the ones matching the local checkout (via
-# 'ci_image_name'/version.sh) when not overridden, so callers that omit the
-# '--*-image' options keep working unchanged.
-runtime_image="${runtime_image:-${ci_image_name}/runtime:${ci_image_version}}"
-build_deps_image="${build_deps_image:-${ci_image_name}/build:${ci_image_version}}"
 
 image_test="${build_deps_image}"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
