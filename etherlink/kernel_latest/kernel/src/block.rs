@@ -656,9 +656,10 @@ where
                 // Seed the address registry (null address at index 0) when
                 // the runtime activates on a fresh network. Activation is the
                 // only seeding point.
-                tezos_execution::mir_ctx::init_address_registry(rk.host_mut()).map_err(
-                    |e| anyhow::anyhow!("seeding address registry failed: {e}"),
-                )?;
+                tezos_execution::mir_ctx::init_address_registry(rk.tez_accounts_mut())
+                    .map_err(|e| {
+                        anyhow::anyhow!("seeding address registry failed: {e}")
+                    })?;
             }
             promote_block(
                 rk.host_mut(),

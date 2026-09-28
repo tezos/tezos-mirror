@@ -3349,6 +3349,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_journal::TezosXHashes;
 
+    use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     use crate::account_storage::TezosImplicitAccount;
@@ -13126,7 +13127,6 @@ mod tests {
         use crate::context::address_registry;
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
-        use tezos_storage::read_optional_nom_value;
 
         const DEST: &str = CONTRACT_1;
         const A: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
@@ -13134,7 +13134,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13149,9 +13149,8 @@ mod tests {
         );
 
         let a_hash = mir::ast::AddressHash::from_base58_check(A).unwrap();
-        let a_entry = address_registry::entry_path(&a_hash).unwrap();
-        let baseline_a: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let a_entry = address_registry::entry_key(&a_hash).unwrap();
+        let baseline_a: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         assert_eq!(baseline_a, None, "A must start unregistered");
 
         let encode_address = |address: &str| {
@@ -13191,8 +13190,7 @@ mod tests {
             .expect("first indexing operation should apply"),
         );
 
-        let first_index: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let first_index: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         let first_index = first_index.expect("first INDEX_ADDRESS must register A");
         let first_storage = Micheline::from(first_index.0.clone())
             .encode(&mut Gas::default())
@@ -13260,8 +13258,7 @@ mod tests {
             .expect("second idempotent indexing operation should apply"),
         );
 
-        let second_index: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let second_index: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         assert_eq!(
             second_index,
             Some(first_index),
@@ -13325,7 +13322,6 @@ mod tests {
     fn parent_and_child_index_address_diffs_land_on_their_own_receipts() {
         use crate::context::address_registry;
         use crate::contract_from_address;
-        use tezos_storage::read_optional_nom_value;
         use tezos_tezlink::operation_result::AddressRegistry;
 
         const PARENT: &str = CONTRACT_1;
@@ -13336,7 +13332,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13395,8 +13391,10 @@ mod tests {
         let index_of = |address: &str| -> Zarith {
             use mir::ast::ByteReprTrait;
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
-            let index: Narith = read_optional_nom_value(rk.host(), &entry)
+            let entry = address_registry::entry_key(&hash).unwrap();
+            let index: Narith = rk
+                .tez_accounts()
+                .read_nom(&entry)
                 .unwrap()
                 .expect("address must be registered");
             Zarith(index.0.into())
@@ -13460,7 +13458,6 @@ mod tests {
         use crate::context::address_registry;
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
-        use tezos_storage::read_optional_nom_value;
 
         const PARENT: &str = CONTRACT_1;
         const CHILD: &str = CONTRACT_2;
@@ -13470,7 +13467,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13581,9 +13578,9 @@ mod tests {
         // The whole operation was reverted: neither address stays registered.
         for address in [P, C] {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
+            let entry = address_registry::entry_key(&hash).unwrap();
             assert_eq!(
-                read_optional_nom_value::<Narith>(rk.host(), &entry).unwrap(),
+                rk.tez_accounts().read_nom::<Narith>(&entry).unwrap(),
                 None,
                 "registry write for {address} must be rolled back"
             );
@@ -13600,7 +13597,6 @@ mod tests {
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
         use num_bigint::BigUint;
-        use tezos_storage::read_optional_nom_value;
         use tezos_tezlink::operation_result::AddressRegistry;
 
         const DEST: &str = CONTRACT_1;
@@ -13612,7 +13608,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13711,8 +13707,10 @@ mod tests {
         // The durable registry matches the reported indices.
         for (address, index) in [(X, 1u32), (A, 2), (B, 3), (C, 4)] {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
-            let stored: Narith = read_optional_nom_value(rk.host(), &entry)
+            let entry = address_registry::entry_key(&hash).unwrap();
+            let stored: Narith = rk
+                .tez_accounts()
+                .read_nom(&entry)
                 .unwrap()
                 .expect("address must be registered");
             assert_eq!(stored.0, BigUint::from(index));
@@ -13727,7 +13725,6 @@ mod tests {
         use crate::context::address_registry;
         use mir::ast::ByteReprTrait;
         use num_bigint::BigUint;
-        use tezos_storage::read_optional_nom_value;
 
         const DEST: &str = CONTRACT_1;
         const SR1: &str = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
@@ -13735,7 +13732,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13786,13 +13783,16 @@ mod tests {
         // Index 0 is reserved for the pre-registered null address, so sr1 is
         // assigned index 1 and the counter advances to 2.
         let sr1_hash = mir::ast::Address::from_base58_check(SR1).unwrap().hash;
-        let entry = address_registry::entry_path(&sr1_hash).unwrap();
-        let stored: Narith = read_optional_nom_value(rk.host(), &entry)
+        let entry = address_registry::entry_key(&sr1_hash).unwrap();
+        let stored: Narith = rk
+            .tez_accounts()
+            .read_nom(&entry)
             .unwrap()
             .expect("sr1 address must be registered");
         assert_eq!(stored.0, BigUint::from(1u32));
-        let counter_path = address_registry::counter_path().unwrap();
-        let counter: Narith = read_optional_nom_value(rk.host(), &counter_path)
+        let counter: Narith = rk
+            .tez_accounts()
+            .read_nom(&address_registry::COUNTER_KEY)
             .unwrap()
             .expect("counter must be initialised");
         assert_eq!(counter.0, BigUint::from(2u32));

@@ -16,6 +16,7 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeyError};
 use tezosx_interfaces::Origin;
 
 // Account resolution helpers.
@@ -186,22 +187,22 @@ pub mod address_registry {
 
     use super::*;
 
-    const ROOT: RefPath = RefPath::assert_from(b"/address_registry");
+    /// The registry, as a key of the accounts keyspace.
+    const ROOT: Key = Key::from_static(b"/address_registry");
 
-    const COUNTER: RefPath = RefPath::assert_from(b"/counter");
-
-    fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZ_ACCOUNTS_ROOT_PATH, &ROOT)
-    }
-
-    pub fn entry_path(address: &AddressHash) -> Result<OwnedPath, PathError> {
+    /// Returns the key of the registry entry of `address`, relative to the
+    /// accounts keyspace.
+    ///
+    /// Returns a [`KeyError`] if the key breaks the size or path limits of
+    /// [`Key`]. The hex encoding of an address hash stays within them.
+    pub fn entry_key(address: &AddressHash) -> Result<Key, KeyError> {
         let addr_hex = hex::encode(address.to_bytes_vec());
-        concat(&root()?, &OwnedPath::try_from(format!("/{addr_hex}"))?)
+        ROOT.concat(format!("/{addr_hex}"))
     }
 
-    pub fn counter_path() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &COUNTER)
-    }
+    /// Key of the registry counter (the next free index), relative to the
+    /// accounts keyspace.
+    pub const COUNTER_KEY: Key = Key::from_static(b"/address_registry/counter");
 }
 
 pub mod code {
@@ -246,8 +247,37 @@ pub mod code {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mir::ast::ByteReprTrait;
     use tezos_crypto_rs::blake2b;
     use tezos_evm_runtime::runtime::MockKernelHost;
+
+    /// Returns the durable path that `key` resolves to in the accounts
+    /// keyspace, which prepends its name to every key. This function writes
+    /// the name in full, and it does not read the name from the keyspace.
+    fn durable(key: &Key) -> Vec<u8> {
+        [b"/tez/tez_accounts", key.as_bytes()].concat()
+    }
+
+    /// Makes sure that every key of the address registry resolves to its
+    /// durable path under `/tez/tez_accounts/address_registry`. The expected
+    /// paths are literals, not rebuilt from the key builders, so a builder
+    /// that moves a key fails the test.
+    #[test]
+    fn address_registry_keys_keep_their_durable_paths() {
+        assert_eq!(
+            durable(&address_registry::COUNTER_KEY),
+            b"/tez/tez_accounts/address_registry/counter"
+        );
+        let zero = AddressHash::default();
+        assert_eq!(
+            durable(&address_registry::entry_key(&zero).unwrap()),
+            format!(
+                "/tez/tez_accounts/address_registry/{}",
+                hex::encode(zero.to_bytes_vec())
+            )
+            .into_bytes()
+        );
+    }
 
     #[test]
     fn read_origin_for_address_implicit_is_native_by_construction() {
