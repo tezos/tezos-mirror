@@ -6,9 +6,6 @@ script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 cd "$src_dir"
 
-# shellcheck source=scripts/version.sh
-. "$script_dir"/version.sh
-
 # defaults
 image_name="tezos-"
 image_version="latest"
