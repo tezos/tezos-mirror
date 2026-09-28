@@ -2250,6 +2250,269 @@ let register_with_abaab ~abaab ~protocols =
   attestations_aggregation_on_reproposal_remote_node ~abaab protocols ;
   aggregated_operations_retrival_from_block_content ~abaab protocols
 
+(* Within-batch preattestation quorum amplification.
+
+   A delegate's voting power must be counted at most once towards a prequorum,
+   even when several signature-distinct copies of the same preattestation reach
+   the baker in one quorum-monitor update. This exercises the real baker daemon:
+   [octez-client bake for] is immune (it counts power via a deduplicating
+   [List.sort_uniq]); the defect lives in the operation worker's continuous
+   [update_pqc_monitoring], which only the running daemon uses. *)
+
+module Amplification = struct
+  (* Predicts the payload hash of an empty block at [round] on top of
+     [predecessor_hash]. Mirrors [Block_payload_repr.hash] for an empty
+     operation list. The construction ([Block_payload_hash.hash_bytes] over the
+     predecessor, round and empty operations-list hash) is identical across
+     protocols, so computing it via the Alpha protocol module also predicts the
+     payload of a frozen-protocol block. A wrong prediction would make the baker
+     count zero preattestations, failing the test loudly. *)
+  let empty_payload_hash ~predecessor_hash ~round =
+    let predecessor_hash =
+      Tezos_crypto.Hashed.Block_hash.of_b58check_exn predecessor_hash
+    in
+    let payload_round =
+      match Tezos_protocol_alpha.Protocol.Round_repr.of_int round with
+      | Ok round -> round
+      | Error _ -> Test.fail "Cannot build round %d" round
+    in
+    Tezos_protocol_alpha.Protocol.Block_payload_repr.hash
+      ~predecessor_hash
+      ~payload_round
+      []
+    |> Tezos_protocol_alpha.Protocol.Block_payload_hash.to_b58check
+
+  let account_for_pkh accounts pkh =
+    match
+      List.find_opt
+        (fun (account : Account.key) ->
+          String.equal account.public_key_hash pkh)
+        accounts
+    with
+    | Some account -> account
+    | None -> Test.fail "No generated account matches baking right %s" pkh
+
+  let baking_rights_by_round client ~level ~max_round =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_helper_baking_rights ~level ~max_round ()
+    in
+    return
+    @@ List.map
+         JSON.(
+           fun item ->
+             (item |-> "round" |> as_int, item |-> "delegate" |> as_string))
+         JSON.(json |> as_list)
+
+  let attesting_power client ~level (account : Account.key) =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_helper_attestation_rights
+           ~level
+           ~delegate:account.public_key_hash
+           ()
+    in
+    match JSON.(json |> as_list) with
+    | level_rights :: _ -> (
+        match JSON.(level_rights |-> "delegates" |> as_list) with
+        | delegate_rights :: _ ->
+            return JSON.(delegate_rights |-> "attesting_power" |> as_int)
+        | [] ->
+            Test.fail
+              "No attestation rights for %s at level %d"
+              account.public_key_hash
+              level)
+    | [] ->
+        Test.fail
+          "No attestation-rights entry for %s at level %d"
+          account.public_key_hash
+          level
+end
+
+(* Preload several signature-distinct copies of one delegate's preattestation
+   into a single node, then check the baker counts that delegate's voting power
+   exactly once when it initializes prequorum monitoring over the accumulated
+   pool. *)
+let preattestation_quorum_no_amplification =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"baker counts duplicate preattestations once"
+    ~tags:
+      [
+        team; "baker"; "preattestation"; "prequorum"; "amplification"; "security";
+      ]
+    ~supports:(Protocol.From_protocol 025)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let open Amplification in
+  let target_level = 2 in
+  let target_round = 0 in
+  Log.info "Start a single node and generate five equal-stake P256 delegates" ;
+  let* node =
+    Node.init
+      ~name:"amplification-node"
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      [Synchronisation_threshold 0; Connections 0]
+  in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* delegates =
+    Client.stresstest_gen_keys
+      ~alias_prefix:"amplification_tz3"
+      ~sig_algo:"p256"
+      5
+      client
+  in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~overwrite_bootstrap_accounts:
+        (Some (List.map (fun key -> (key, None)) delegates))
+      ~base:(Right (protocol, Some Protocol.Constants_mainnet))
+      [
+        (* Round 0 must outlast the setup below (copies injection, baker
+           start-up), otherwise the attacker's proposal arrives after the round
+           ended and the baker monitors its own round-1 proposal instead. *)
+        (["minimal_block_delay"], `String "4");
+        (["delay_increment_per_round"], `String "1");
+      ]
+  in
+  let* () =
+    Client.activate_protocol ~timestamp:Now ~parameter_file ~protocol client
+  in
+  let* _ = Node.wait_for_level node 1 in
+  Log.info "Select the round-%d proposer as attacker" target_round ;
+  let* rights =
+    baking_rights_by_round client ~level:target_level ~max_round:target_round
+  in
+  let right_at round =
+    match List.assoc_opt round rights with
+    | Some pkh -> pkh
+    | None -> Test.fail "No baking right for round %d" round
+  in
+  let attacker = account_for_pkh delegates (right_at target_round) in
+  (* The victim baker runs every delegate except the attacker. None of them
+     proposes at [target_round] = 0 (that is the attacker's slot), so the
+     attacker's block is the one they monitor. *)
+  let honest_delegates =
+    List.filter
+      (fun (account : Account.key) ->
+        not (String.equal account.public_key_hash attacker.public_key_hash))
+      delegates
+  in
+  let* attacker_power = attesting_power client ~level:target_level attacker in
+  let* constants =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_threshold =
+    JSON.(constants |-> "consensus_threshold_size" |> as_int)
+  in
+  (* Choose the largest number of copies that stays strictly below the quorum
+     threshold, so both the vulnerable and fixed bakers stay in the
+     "preattestations received" (below quorum) branch: only the reported count
+     and power differ. *)
+  let variant_count = (consensus_threshold - 1) / attacker_power in
+  if variant_count < 2 then
+    Test.fail
+      "Attacker power %d too large to preload >= 2 sub-threshold copies \
+       (threshold %d)"
+      attacker_power
+      consensus_threshold ;
+  let* predecessor_hash =
+    Client.RPC.call client @@ RPC.get_chain_block_hash ()
+  in
+  let predicted_payload_hash =
+    empty_payload_hash ~predecessor_hash ~round:target_round
+  in
+  let* slot =
+    Operation.Consensus.get_attestation_slot
+      ~level:target_level
+      ~protocol
+      ~delegate:attacker
+      client
+  in
+  let* branch =
+    Operation.Consensus.get_branch ~attested_level:target_level client
+  in
+  let preattestation =
+    Operation.Consensus.preattestation
+      ~slot
+      ~level:target_level
+      ~round:target_round
+      ~block_payload_hash:predicted_payload_hash
+  in
+  Log.info
+    "Force-inject %d signature-distinct copies of the attacker's preattestation"
+    variant_count ;
+  let* hashes =
+    Lwt_list.map_s
+      (fun _ ->
+        let* operation =
+          Operation.Consensus.operation
+            ~branch
+            ~signer:attacker
+            preattestation
+            client
+        in
+        let* (`OpHash hash) = Operation.inject ~force:true operation client in
+        return hash)
+      (List.init variant_count Fun.id)
+  in
+  if List.length (List.sort_uniq String.compare hashes) <> variant_count then
+    Test.fail
+      "P256 signing did not produce %d distinct operation hashes"
+      variant_count ;
+  Log.info "Start the victim baker with the honest delegates" ;
+  let baker =
+    Agnostic_baker.create
+      ~name:"amplification-baker"
+      ~delegates:
+        (List.map
+           (fun (account : Account.key) -> account.alias)
+           honest_delegates)
+      node
+      client
+  in
+  Agnostic_baker.log_events baker ;
+  let ready = Agnostic_baker.wait_for_ready baker in
+  let* () = Agnostic_baker.run ~event_level:`Debug baker and* () = ready in
+  (* The first [preattestations_received] event comes from the initial monitor
+     pass over the accumulated pool (the preloaded copies), before the honest
+     delegates preattest. *)
+  let received =
+    Agnostic_baker.wait_for baker "preattestations_received.v0" (fun json ->
+        Some
+          ( JSON.(json |-> "count" |> as_int),
+            JSON.(json |-> "delta_power" |> as_int),
+            JSON.(json |-> "voting_power" |> as_int) ))
+  in
+  let reached_target = Node.wait_for_level node target_level in
+  let propose =
+    Client.spawn_propose_for
+      ~protocol
+      ~key:[attacker.alias]
+      ~minimal_timestamp:true
+      client
+  in
+  let* () = Process.check propose
+  and* _ = reached_target
+  and* count, delta_power, voting_power = received in
+  if
+    count <> 1
+    || delta_power <> attacker_power
+    || voting_power <> attacker_power
+  then
+    Test.fail
+      "Baker counted %d copies of one delegate's slot (delta_power=%d \
+       voting_power=%d); expected 1 copy worth %d"
+      count
+      delta_power
+      voting_power
+      attacker_power ;
+  Log.info
+    "Baker counted the attacker's %d preloaded copies as a single vote worth %d"
+    variant_count
+    attacker_power ;
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -2269,4 +2532,5 @@ let register ~protocols =
   baker_shutdown_on_node_shutdown protocols ;
   multi_node_inconsistent_chain_id protocols ;
   multi_node_staggered_crash protocols ;
-  multi_node_crash_resilience protocols
+  multi_node_crash_resilience protocols ;
+  preattestation_quorum_no_amplification protocols
