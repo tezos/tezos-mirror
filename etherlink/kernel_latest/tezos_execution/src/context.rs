@@ -98,8 +98,6 @@ pub mod contracts {
 
     const INDEX: RefPath = RefPath::assert_from(b"/index");
 
-    const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
-
     const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
     pub fn root() -> Result<OwnedPath, PathError> {
@@ -108,10 +106,6 @@ pub mod contracts {
 
     pub fn index() -> Result<OwnedPath, PathError> {
         concat(&root()?, &INDEX)
-    }
-
-    pub fn global_counter() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &GLOBAL_COUNTER)
     }
 
     /// Path segment identifying a contract under [`index`], using the same
