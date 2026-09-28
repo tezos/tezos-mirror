@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
 use mir::ast::{AddressHash, BorrowedUnparseError, Micheline, Type, TypedValue};
-use mir::context::{CtxTrait, TypecheckingCtx};
+use mir::context::{CtxTrait, LookupViewError, TypecheckingCtx};
 use mir::gas::OutOfGas;
 use mir::interpreter::{EnshrinedViewDispatchError, InterpretError};
 use mir::parser::Parser;
@@ -315,10 +315,16 @@ where
     let mir_result: Result<Vec<u8>, TezosXRuntimeError> = (|| {
         let (view, storage_ty_mich, storage_bytes, _) = mir_ctx
             .lookup_view_storage_balance(&destination_kt1, &view_name, &parser.arena)
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
+            .map_err(|e| match e {
+                // Decoding the target's script is metered against the
+                // caller's forwarded budget: exhausting it is a caller
+                // mistake (catchable 429), not a kernel fault. Every other
+                // lookup failure means an originated contract's stored
+                // code is unreadable, which is.
+                LookupViewError::OutOfGas(OutOfGas) => TezosXRuntimeError::OutOfGas,
+                e => TezosXRuntimeError::Custom(format!(
                     "view lookup on contract {destination_kt1:?} failed: {e}"
-                ))
+                )),
             })?
             .ok_or_else(|| {
                 TezosXRuntimeError::NotFound(format!(

@@ -2916,6 +2916,81 @@ mod tests {
         );
     }
 
+    /// A view lookup that runs out of gas while decoding the target's
+    /// script is the caller's budget problem, not a kernel fault: it must
+    /// surface as the catchable 429, never as a 500 that aborts the block.
+    #[test]
+    fn serve_view_lookup_out_of_gas_is_429() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+            X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        // Enough to start metering, not enough to decode the script
+        // (20 milligas per byte).
+        const GAS_LIMIT: u64 = 110;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = test_rk(&mut host);
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let parser = mir::parser::Parser::new();
+        let dest_kt1 = ContractKt1Hash::from(digest_160(b"view-lookup-out-of-gas"));
+        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        let script = parser
+            .parse_top_level(
+                r#"parameter unit; storage unit;
+                   code { CDR; NIL operation; PAIR };
+                   view "v" unit unit { DROP; UNIT }"#,
+            )
+            .unwrap();
+        dest.init(
+            rk.host_mut(),
+            Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
+            &Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            0.into(),
+        )
+        .unwrap();
+
+        let request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri(format!("http://tezos/{}/v", dest_kt1.to_base58_check()))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, GAS_LIMIT.to_string())
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "body: {}",
+            String::from_utf8_lossy(resp.body())
+        );
+        let consumed: u64 = resp
+            .headers()
+            .get(X_TEZOS_GAS_CONSUMED)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok())
+            .expect("gas-consumed header must parse");
+        assert_eq!(
+            consumed, GAS_LIMIT,
+            "an out-of-gas view must report its whole budget"
+        );
+    }
+
     /// Regression test for L2-1464: a gas-tight failed CRAC must still
     /// record its failed receipt for indexers / call-graph
     /// reconstruction.
