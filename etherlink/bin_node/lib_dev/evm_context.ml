@@ -698,7 +698,8 @@ module State = struct
             ~preimages
             ~preimages_endpoint
             ~root_hash
-            ~concurrency:Kernel_download.default_concurrency
+            ~concurrency:
+              ctxt.configuration.kernel_execution.preimages_download_concurrency
             ())
         (fun exn ->
           (*  Error handling. *)

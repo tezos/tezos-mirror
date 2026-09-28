@@ -931,8 +931,9 @@ Kernel commands:
     --parallel-download <8>: Number of preimages to download at a time, between 1 and 256.
       Downloading a kernel is bound by the latency of the preimages endpoint, so fetching
       several at a time is significantly faster; raise it for a distant endpoint, lower it for
-      one that limits the number of requests it accepts.
-      Defaults to `8`.
+      one that limits the number of requests it accepts. Defaults to
+      `kernel_execution.preimages_download_concurrency` from the configuration file, `8` if it
+      is not set.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
       `testnet`, `shadownet` or `previewnet`.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.

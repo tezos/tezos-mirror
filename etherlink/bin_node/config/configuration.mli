@@ -41,7 +41,16 @@ type kernel_execution_config = {
   native_execution_policy : native_execution_policy;
       (** Policy deciding when to use the native execution for supported
           kernels. *)
+  preimages_download_concurrency : int;
+      (** Number of preimages fetched at a time when downloading a kernel from
+          [preimages_endpoint]. *)
 }
+
+(** Default value of [preimages_download_concurrency]. *)
+val default_preimages_download_concurrency : int
+
+(** Largest value accepted for [preimages_download_concurrency]. *)
+val max_preimages_download_concurrency : int
 
 type blueprints_publisher_config = {
   max_blueprints_lag : int;
