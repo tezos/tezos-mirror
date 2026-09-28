@@ -1401,6 +1401,20 @@ impl RuntimeInterface for TezosRuntime {
         Ok((Classification::from(origin), consumed))
     }
 
+    fn check_is_native_address<Host, KS>(
+        &self,
+        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _address: &str,
+        _public_key: Option<&str>,
+        _budget: &mut TezosXGas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        Ok(())
+    }
+
     // Need to implement this only for IDE. Not needed in compilation or tests.
     #[cfg(feature = "testing")]
     fn get_balance(

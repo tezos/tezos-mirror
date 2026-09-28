@@ -12,7 +12,10 @@ use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{EVMError, ExecutionResult, HaltReason, Output};
 use revm::primitives::KECCAK_EMPTY;
-use revm_etherlink::precompiles::constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS;
+use revm_etherlink::precompiles::constants::{
+    alias_forwarder_delegation_code_hash, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+};
+use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
 use revm_etherlink::{
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
@@ -35,6 +38,8 @@ use tezosx_interfaces::{
     X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
+use tezosx_types::CheckNativeAddressError;
+use tezosx_types::RuntimeId::Ethereum;
 
 alloy_sol_types::sol! {
     function init_tezosx_alias(string nativeAddress, bytes nativePublicKey) external payable;
@@ -514,6 +519,38 @@ where
     Ok(outcome)
 }
 
+/// Whether `pk`, an uncompressed secp256k1 public key, is the one of
+/// `address`. Consumes the cost of hashing it from `budget`.
+///
+/// An Ethereum address is the last 20 bytes of the Keccak-256 hash of the
+/// 64-byte public key `X || Y`, the two 32-byte coordinates of the curve
+/// point (Ethereum Yellow Paper, Appendix F:
+/// <https://ethereum.github.io/yellowpaper/paper.pdf>).
+///
+/// The key is accepted either as these raw 64 bytes, or in the SEC 1
+/// uncompressed encoding that most libraries output: the same 64 bytes
+/// prefixed with the `0x04` tag (SEC 1 v2, section 2.3.3:
+/// <https://www.secg.org/sec1-v2.pdf>). The compressed encoding (33 bytes,
+/// `0x02`/`0x03` tag and `X` only) is rejected: getting `Y` back would need
+/// a curve computation.
+fn public_key_matches(
+    address: &Address,
+    pk: &[u8],
+    budget: &mut Gas,
+) -> Result<bool, TezosXRuntimeError> {
+    // Hashing a 64-byte key: two 32-byte words.
+    budget.consume(Gas::new(
+        revm_interpreter::gas::KECCAK256 + revm_interpreter::gas::KECCAK256WORD * 2,
+        Ethereum,
+    ))?;
+    let raw = match pk {
+        [0x04, rest @ ..] if rest.len() == 64 => rest,
+        rest if rest.len() == 64 => rest,
+        _ => return Ok(false), // compressed or invalid length: rejected
+    };
+    Ok(Address::from_raw_public_key(raw) == *address)
+}
+
 /// Read-only cross-runtime call (HTTP `GET`): the EVM-side entry
 /// point for any originating runtime that wants to read EVM state
 /// without leaving observable on-chain effects.
@@ -792,6 +829,69 @@ impl RuntimeInterface for EthereumRuntime {
             | None => Classification::Unknown,
         };
         Ok((cls, consumed))
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        address: &str,
+        public_key: Option<&str>,
+        budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        let addr = Address::from_hex(address)
+            .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
+        // Precompiles have no account behind them that could own an alias.
+        if EtherlinkPrecompiles::default().contains(&addr) {
+            return Err(CheckNativeAddressError::Precompile.into());
+        }
+        budget.consume(ALIAS_LOOKUP_COST)?;
+        let account = StorageAccount::from_address(&addr)
+            .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
+        let info = account
+            .info_without_migration(rk.eth_accounts())
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to read account info: {e}"))
+            })?;
+        match info {
+            // if it's native
+            Some(AccountInfo {
+                origin: AccountOrigin::Native,
+                ..
+            }) => return Ok(()),
+            // if it's an alias
+            Some(AccountInfo {
+                origin: AccountOrigin::Alias(_),
+                ..
+            }) => return Err(CheckNativeAddressError::NotProvablyNative.into()),
+            // if it has a nonce > 0
+            Some(AccountInfo { nonce, .. }) if nonce > 0 => return Ok(()),
+            // if it has a code that is different than an alias. The info
+            // record never carries the bytecode itself, only its hash.
+            Some(AccountInfo { code_hash, .. })
+                if code_hash != KECCAK_EMPTY
+                    && code_hash != alias_forwarder_delegation_code_hash() =>
+            {
+                return Ok(())
+            }
+            _ => {}
+        };
+
+        // We can't determine that the address is native with our data, so we check
+        // public key.
+        let Some(public_key) = public_key else {
+            return Err(CheckNativeAddressError::NotProvablyNative.into());
+        };
+        let public_key = hex::decode(public_key.strip_prefix("0x").unwrap_or(public_key))
+            .map_err(|_| CheckNativeAddressError::MalformedPublicKey)?;
+        if public_key_matches(&addr, &public_key, budget)? {
+            Ok(())
+        } else {
+            Err(CheckNativeAddressError::PublicKeyMismatch.into())
+        }
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
@@ -2757,6 +2857,337 @@ mod tests {
             let (class, consumed) = runtime.read_origin(&rk, &addr_str, budget).unwrap();
             assert_eq!(class, Classification::Unknown);
             assert_eq!(consumed, budget);
+        }
+    }
+
+    // ── EthereumRuntime::check_is_native_address ─────────────────────────
+
+    mod check_is_native_address_tests {
+        use super::*;
+        use revm_etherlink::{
+            helpers::storage::bytes_hash,
+            precompiles::constants::{
+                alias_forwarder_delegation_code_hash, ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            },
+            storage::world_state_handler::{AccountInfo, AccountOrigin, StorageAccount},
+        };
+        use tezosx_interfaces::{
+            Gas, RuntimeId, RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_COST,
+        };
+        use tezosx_types::CheckNativeAddressError;
+
+        // secp256k1 generator point G, i.e. the public key of the private
+        // key `1`, uncompressed without its `0x04` prefix.
+        const PUBLIC_KEY: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\
+                                  483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        // The Ethereum address of the private key `1`.
+        const ADDRESS: &str = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
+
+        const BUDGET: Gas = Gas::new(100_000, RuntimeId::Ethereum);
+
+        // Cost of hashing a 64-byte public key: two 32-byte words.
+        const HASH_COST: u64 =
+            revm_interpreter::gas::KECCAK256 + revm_interpreter::gas::KECCAK256WORD * 2;
+
+        fn evm_gas(gas: u64) -> Gas {
+            Gas::new(gas, RuntimeId::Ethereum)
+        }
+
+        fn lookup_cost() -> u64 {
+            ALIAS_LOOKUP_COST.as_runtime(RuntimeId::Ethereum)
+        }
+
+        fn set_info<KS: KeySpace>(
+            rk: &mut RuntimeKeyspaces<'_, MockKernelHost, KS>,
+            info: AccountInfo,
+        ) {
+            let addr = Address::from_hex(ADDRESS).unwrap();
+            let mut account = StorageAccount::from_address(&addr).unwrap();
+            account.set_info(rk.eth_accounts_mut(), info).unwrap();
+        }
+
+        fn check<KS: KeySpace>(
+            rk: &RuntimeKeyspaces<'_, MockKernelHost, KS>,
+            address: &str,
+            public_key: Option<&str>,
+            budget: Gas,
+        ) -> Result<Gas, TezosXRuntimeError> {
+            let mut budget = budget;
+            EthereumRuntime::default().check_is_native_address(
+                rk,
+                address,
+                public_key,
+                &mut budget,
+            )?;
+            Ok(budget)
+        }
+
+        #[test]
+        fn recorded_native_origin_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            set_info(
+                &mut rk,
+                AccountInfo {
+                    origin: AccountOrigin::Native,
+                    ..AccountInfo::default()
+                },
+            );
+
+            let remaining = check(&rk, ADDRESS, None, BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost()));
+        }
+
+        #[test]
+        fn positive_nonce_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            set_info(
+                &mut rk,
+                AccountInfo {
+                    nonce: 1,
+                    ..AccountInfo::default()
+                },
+            );
+
+            let remaining = check(&rk, ADDRESS, None, BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost()));
+        }
+
+        // A native EOA that EIP-7702-delegates to the alias forwarder has
+        // the alias code hash, but applying the authorization bumped its
+        // nonce: the nonce check must win over the code hash.
+        #[test]
+        fn positive_nonce_with_alias_code_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            set_info(
+                &mut rk,
+                AccountInfo {
+                    nonce: 1,
+                    code_hash: alias_forwarder_delegation_code_hash(),
+                    ..AccountInfo::default()
+                },
+            );
+
+            let remaining = check(&rk, ADDRESS, None, BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost()));
+        }
+
+        #[test]
+        fn non_alias_code_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            set_info(
+                &mut rk,
+                AccountInfo {
+                    code_hash: bytes_hash(&[0x60, 0x00]), // PUSH1 0x00
+                    ..AccountInfo::default()
+                },
+            );
+
+            let remaining = check(&rk, ADDRESS, None, BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost()));
+        }
+
+        #[test]
+        fn unclassified_alias_code_is_not_provably_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            set_info(
+                &mut rk,
+                AccountInfo {
+                    code_hash: alias_forwarder_delegation_code_hash(),
+                    ..AccountInfo::default()
+                },
+            );
+
+            let err = check(&rk, ADDRESS, None, BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
+        }
+
+        #[test]
+        fn unknown_account_without_public_key_is_not_provably_native() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, ADDRESS, None, BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
+        }
+
+        #[test]
+        fn unknown_account_with_matching_public_key_is_native() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let remaining = check(&rk, ADDRESS, Some(PUBLIC_KEY), BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost() - HASH_COST));
+        }
+
+        #[test]
+        fn matching_public_key_with_uncompressed_prefix_is_native() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let prefixed = format!("04{PUBLIC_KEY}");
+
+            let remaining = check(&rk, ADDRESS, Some(&prefixed), BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost() - HASH_COST));
+        }
+
+        #[test]
+        fn matching_public_key_with_hex_prefix_is_native() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let prefixed = format!("0x{PUBLIC_KEY}");
+
+            let remaining = check(&rk, ADDRESS, Some(&prefixed), BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost() - HASH_COST));
+        }
+
+        #[test]
+        fn matching_public_key_with_hex_and_uncompressed_prefixes_is_native() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let prefixed = format!("0x04{PUBLIC_KEY}");
+
+            let remaining = check(&rk, ADDRESS, Some(&prefixed), BUDGET).unwrap();
+            assert_eq!(remaining, evm_gas(100_000 - lookup_cost() - HASH_COST));
+        }
+
+        #[test]
+        fn ethereum_precompile_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            // ecrecover
+            let ecrecover = "0x0000000000000000000000000000000000000001";
+
+            let err = check(&rk, ecrecover, None, BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::Precompile.into());
+        }
+
+        // Rejected before any storage read: even a record claiming the
+        // precompile is native, and an empty budget, don't change the answer.
+        #[test]
+        fn etherlink_precompile_is_rejected_before_any_read() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut account =
+                StorageAccount::from_address(&RUNTIME_GATEWAY_PRECOMPILE_ADDRESS)
+                    .unwrap();
+            account
+                .set_info(
+                    rk.eth_accounts_mut(),
+                    AccountInfo {
+                        origin: AccountOrigin::Native,
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+            let gateway = RUNTIME_GATEWAY_PRECOMPILE_ADDRESS.to_string();
+
+            let err = check(&rk, &gateway, None, Gas::ZERO).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::Precompile.into());
+        }
+
+        #[test]
+        fn alias_forwarder_precompile_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let forwarder = ALIAS_FORWARDER_PRECOMPILE_ADDRESS.to_string();
+
+            let err = check(&rk, &forwarder, None, BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::Precompile.into());
+        }
+
+        #[test]
+        fn public_key_of_another_address_is_a_mismatch() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let other_address = "0x1111111111111111111111111111111111111111";
+
+            let err = check(&rk, other_address, Some(PUBLIC_KEY), BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::PublicKeyMismatch.into());
+        }
+
+        #[test]
+        fn compressed_public_key_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            // Compressed form of G: parity byte then X.
+            let compressed = format!("02{}", &PUBLIC_KEY[..64]);
+
+            let err = check(&rk, ADDRESS, Some(&compressed), BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::PublicKeyMismatch.into());
+        }
+
+        #[test]
+        fn non_hex_public_key_is_malformed() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, ADDRESS, Some("not-hex"), BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedPublicKey.into());
+        }
+
+        #[test]
+        fn malformed_address_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, "not-an-address", Some(PUBLIC_KEY), BUDGET).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedAddress.into());
+        }
+
+        #[test]
+        fn budget_below_lookup_cost_is_out_of_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let budget = evm_gas(lookup_cost() - 1);
+
+            let err = check(&rk, ADDRESS, Some(PUBLIC_KEY), budget).unwrap_err();
+            assert_eq!(err, TezosXRuntimeError::OutOfGas);
+        }
+
+        #[test]
+        fn budget_below_hash_cost_is_out_of_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let budget = evm_gas(lookup_cost() + HASH_COST - 1);
+
+            let err = check(&rk, ADDRESS, Some(PUBLIC_KEY), budget).unwrap_err();
+            assert_eq!(err, TezosXRuntimeError::OutOfGas);
+        }
+
+        // A failure after a charge keeps it: the caller is billed for the
+        // work done before the error.
+        #[test]
+        fn public_key_mismatch_still_consumes_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let other_address = "0x1111111111111111111111111111111111111111";
+            let mut budget = BUDGET;
+
+            let err = EthereumRuntime::default()
+                .check_is_native_address(
+                    &rk,
+                    other_address,
+                    Some(PUBLIC_KEY),
+                    &mut budget,
+                )
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::PublicKeyMismatch.into());
+            assert_eq!(budget, evm_gas(100_000 - lookup_cost() - HASH_COST));
+        }
+
+        #[test]
+        fn exact_budget_for_public_key_proof_succeeds() {
+            let mut host = MockKernelHost::default();
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let budget = evm_gas(lookup_cost() + HASH_COST);
+
+            let remaining = check(&rk, ADDRESS, Some(PUBLIC_KEY), budget).unwrap();
+            assert_eq!(remaining, Gas::ZERO);
         }
     }
 

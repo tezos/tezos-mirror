@@ -150,11 +150,19 @@ pub enum TezosXRuntimeError {
     /// The callee ran out of gas. Maps to HTTP 429.
     #[error("Gas exhaustion")]
     OutOfGas,
+    #[error("Native address verification error: {0}")]
+    CheckNativeAddressError(CheckNativeAddressError),
 }
 
 impl From<KernelStorageError> for TezosXRuntimeError {
     fn from(e: KernelStorageError) -> Self {
         TezosXRuntimeError::Storage(e)
+    }
+}
+
+impl From<CheckNativeAddressError> for TezosXRuntimeError {
+    fn from(e: CheckNativeAddressError) -> Self {
+        TezosXRuntimeError::CheckNativeAddressError(e)
     }
 }
 
@@ -367,6 +375,20 @@ impl RuntimeId {
             RuntimeId::Ethereum => "ethereum",
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum CheckNativeAddressError {
+    #[error("Not provably native")]
+    NotProvablyNative,
+    #[error("Precompile address")]
+    Precompile,
+    #[error("Public key mismatch")]
+    PublicKeyMismatch,
+    #[error("Malformed public key")]
+    MalformedPublicKey,
+    #[error("Malformed address")]
+    MalformedAddress,
 }
 
 /// Cost of a single `/origin` durable-storage read. Equivalent to a cold

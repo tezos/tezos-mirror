@@ -75,7 +75,8 @@ impl EtherlinkPrecompiles {
         )
     }
 
-    fn contains(&self, address: &Address) -> bool {
+    /// Whether `address` is an Ethereum or Etherlink precompile.
+    pub fn contains(&self, address: &Address) -> bool {
         CUSTOMS.contains(address)
             || self.builtins.contains(address)
             || (self.enable_debug_precompiles && DEBUGS.contains(address))

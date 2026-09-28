@@ -1478,6 +1478,7 @@ where
             | TezosXRuntimeError::NotFound(_)
             | TezosXRuntimeError::MethodNotAllowed(_)
             | TezosXRuntimeError::HeaderError(_)
+            | TezosXRuntimeError::CheckNativeAddressError(_)
             | TezosXRuntimeError::Key(_) => {
                 mir::interpreter::EnshrinedViewDispatchError::AliasResolution.into()
             }

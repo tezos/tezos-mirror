@@ -244,6 +244,17 @@ pub trait RuntimeInterface {
         Host: StorageV1,
         KS: KeySpace;
 
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        address: &str,
+        public_key: Option<&str>,
+        budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace;
+
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
