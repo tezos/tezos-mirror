@@ -257,8 +257,12 @@ if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
   # remotely. Although costly, it would've been pulled regardless in
   # the docker builds below.
   if ! docker pull "$image_test" > /dev/null 2>&1; then
-    echo "Failed to pull image $image_test."
-    echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
+    cat >&2 << EOF
+Failed to pull image $image_test.
+Build the alpine CI images locally with:
+  docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+or pass existing references with --runtime-image / --build-deps-image.
+EOF
     exit 1
   else
     echo "Pull of $image_test succeeded"
