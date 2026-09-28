@@ -252,6 +252,20 @@ done
 
 image_test="${build_deps_image}"
 if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
+  # 'octez-local-ci' is the built-in name of a local bake. It carries no
+  # registry host, so Docker resolves it to Docker Hub, where it will never
+  # exist: pulling it only costs a round trip, and hangs when offline. Report
+  # instead of probing.
+  if [ "$image_test" = "octez-local-ci/alpine-build:${local_ci_tag}" ]; then
+    cat >&2 << EOF
+Image $image_test is not in the local image store, and being the local-bake
+default there is nothing to pull.
+Build the alpine CI images locally with:
+  docker buildx bake -f images/ci/ci-images.hcl --load runtime build
+or pass existing references with --runtime-image / --build-deps-image.
+EOF
+    exit 1
+  fi
   echo "Image $image_test does not exist locally, attempt pull."
   # This pull is just to check whether the image exists
   # remotely. Although costly, it would've been pulled regardless in
