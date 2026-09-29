@@ -60,7 +60,7 @@ pub enum StorageError {
     BlockHashStorageFailed,
     #[error(transparent)]
     KeySpaceWrite(#[from] KeySpaceWriteError),
-    #[error("Invalid keyspace key: {0}")]
+    #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
 }
 

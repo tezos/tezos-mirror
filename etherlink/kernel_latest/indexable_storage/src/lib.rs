@@ -57,7 +57,7 @@ pub enum IndexableStorageError {
     Internal(String),
     #[error(transparent)]
     KeySpaceWrite(#[from] KeySpaceWriteError),
-    #[error("Invalid keyspace key: {0}")]
+    #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
 }
 
