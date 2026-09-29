@@ -383,6 +383,8 @@ pub enum CheckNativeAddressError {
     NotProvablyNative,
     #[error("Precompile address")]
     Precompile,
+    #[error("Missing public key")]
+    MissingPublicKey,
     #[error("Public key mismatch")]
     PublicKeyMismatch,
     #[error("Malformed public key")]

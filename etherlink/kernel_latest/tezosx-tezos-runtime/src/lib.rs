@@ -4,13 +4,14 @@
 
 use http::StatusCode;
 use mir::ast::{AddressHash, ByteReprTrait};
-use mir::gas::{Gas, OutOfGas};
+use mir::gas::{interpret_cost, Gas, OutOfGas};
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
     blake2b,
     hash::{BlockHash, ChainId, ContractKt1Hash, OperationHash, UnknownSignature},
 };
+use tezos_crypto_rs::{public_key::PublicKey, PublicKeyWithHash};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_types::CheckNativeAddressError;
 // UnknownSignature has a private constructor; use try_from to build one.
@@ -1406,7 +1407,7 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,
         address: &str,
-        _public_key: Option<&str>,
+        public_key: Option<&str>,
         budget: &mut TezosXGas,
     ) -> Result<(), TezosXRuntimeError>
     where
@@ -1416,9 +1417,27 @@ impl RuntimeInterface for TezosRuntime {
         let host = rk.host();
         let contract = Contract::from_b58check(address)
             .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
-        // if it's not a contract
         let kt1 = match contract {
-            Contract::Implicit(_) => return Ok(()),
+            // An implicit account is native by construction. Its public key
+            // is still required and must match the address, because the
+            // materialized alias stores it (e.g. for EIP-1271 signature
+            // checks): otherwise anyone could materialize the alias of
+            // someone else with a wrong key.
+            Contract::Implicit(pkh) => {
+                let public_key =
+                    public_key.ok_or(CheckNativeAddressError::MissingPublicKey)?;
+                let public_key = PublicKey::from_b58check(public_key)
+                    .map_err(|_| CheckNativeAddressError::MalformedPublicKey)?;
+                budget.consume(TezosXGas::new(
+                    interpret_cost::HASH_KEY.into(),
+                    RuntimeId::Tezos,
+                ))?;
+                return if public_key.pk_hash() == pkh {
+                    Ok(())
+                } else {
+                    Err(CheckNativeAddressError::PublicKeyMismatch.into())
+                };
+            }
             Contract::Originated(kt1) => kt1,
         };
         // Enshrined contracts, like the gateway, have no account behind them
@@ -3549,7 +3568,12 @@ mod tests {
         };
         use tezosx_types::CheckNativeAddressError;
 
+        // Sandbox `bootstrap1` account and its public key.
         const IMPLICIT: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        const PUBLIC_KEY: &str = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+        // Public key of the sandbox `bootstrap2` account.
+        const OTHER_PUBLIC_KEY: &str =
+            "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9";
         const BUDGET_MILLIGAS: u64 = 100_000_000;
 
         fn budget() -> TezosXGas {
@@ -3564,6 +3588,10 @@ mod tests {
             ALIAS_LOOKUP_COST.as_runtime(RuntimeId::Tezos)
         }
 
+        fn hash_cost() -> u64 {
+            interpret_cost::HASH_KEY.into()
+        }
+
         fn kt1(seed: &[u8]) -> ContractKt1Hash {
             ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(seed))
         }
@@ -3571,27 +3599,73 @@ mod tests {
         fn check<KS: KeySpace>(
             rk: &RuntimeKeyspaces<'_, MockKernelHost, KS>,
             address: &str,
+            public_key: Option<&str>,
             budget: TezosXGas,
         ) -> Result<TezosXGas, TezosXRuntimeError> {
             let mut budget = budget;
             TezosRuntime::new(ChainId::default()).check_is_native_address(
                 rk,
                 address,
-                None,
+                public_key,
                 &mut budget,
             )?;
             Ok(budget)
         }
 
-        // Implicit addresses need no durable read, so even an empty budget
-        // is enough.
         #[test]
-        fn implicit_address_with_empty_budget_is_native() {
+        fn implicit_address_with_matching_public_key_is_native() {
             let mut host = MockKernelHost::default();
             let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
 
-            let remaining = check(&rk, IMPLICIT, TezosXGas::ZERO).unwrap();
-            assert_eq!(remaining, TezosXGas::ZERO);
+            let remaining = check(&rk, IMPLICIT, Some(PUBLIC_KEY), budget()).unwrap();
+            assert_eq!(remaining, milligas(BUDGET_MILLIGAS - hash_cost()));
+        }
+
+        #[test]
+        fn implicit_address_without_public_key_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, IMPLICIT, None, budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MissingPublicKey.into());
+        }
+
+        #[test]
+        // The hash of the key is charged even though the key doesn't match.
+        fn implicit_address_with_public_key_of_another_account_is_a_mismatch() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let mut budget = budget();
+            let err = TezosRuntime::new(ChainId::default())
+                .check_is_native_address(
+                    &rk,
+                    IMPLICIT,
+                    Some(OTHER_PUBLIC_KEY),
+                    &mut budget,
+                )
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::PublicKeyMismatch.into());
+            assert_eq!(budget, milligas(BUDGET_MILLIGAS - hash_cost()));
+        }
+
+        #[test]
+        fn implicit_address_with_malformed_public_key_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, IMPLICIT, Some("edpk-not-a-key"), budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedPublicKey.into());
+        }
+
+        #[test]
+        fn implicit_address_with_budget_below_hash_cost_is_out_of_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, IMPLICIT, Some(PUBLIC_KEY), milligas(hash_cost() - 1))
+                .unwrap_err();
+            assert_eq!(err, TezosXRuntimeError::OutOfGas);
         }
 
         #[test]
@@ -3599,7 +3673,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
 
-            let err = check(&rk, "not-a-tezos-address", budget()).unwrap_err();
+            let err = check(&rk, "not-a-tezos-address", None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::MalformedAddress.into());
         }
 
@@ -3611,7 +3685,7 @@ mod tests {
             let account = context::originated_from_kt1(&kt1).unwrap();
             account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
 
-            let remaining = check(&rk, &kt1.to_base58_check(), budget()).unwrap();
+            let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
             assert_eq!(remaining, milligas(BUDGET_MILLIGAS - lookup_cost()));
         }
 
@@ -3627,7 +3701,7 @@ mod tests {
             });
             account.set_origin(rk.host_mut(), &origin).unwrap();
 
-            let err = check(&rk, &kt1.to_base58_check(), budget()).unwrap_err();
+            let err = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
         }
 
@@ -3643,7 +3717,7 @@ mod tests {
                 .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
                 .unwrap();
 
-            let remaining = check(&rk, &kt1.to_base58_check(), budget()).unwrap();
+            let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
             assert_eq!(remaining, milligas(BUDGET_MILLIGAS - 2 * lookup_cost()));
         }
 
@@ -3655,7 +3729,7 @@ mod tests {
             let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"unclassified_kt1_without_code");
 
-            let err = check(&rk, &kt1.to_base58_check(), budget()).unwrap_err();
+            let err = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
         }
 
@@ -3683,7 +3757,7 @@ mod tests {
             let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let gateway = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
 
-            let err = check(&rk, gateway, budget()).unwrap_err();
+            let err = check(&rk, gateway, None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::Precompile.into());
         }
 
@@ -3693,8 +3767,13 @@ mod tests {
             let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"oog_origin_lookup");
 
-            let err = check(&rk, &kt1.to_base58_check(), milligas(lookup_cost() - 1))
-                .unwrap_err();
+            let err = check(
+                &rk,
+                &kt1.to_base58_check(),
+                None,
+                milligas(lookup_cost() - 1),
+            )
+            .unwrap_err();
             assert_eq!(err, TezosXRuntimeError::OutOfGas);
         }
 
@@ -3708,8 +3787,13 @@ mod tests {
                 .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
                 .unwrap();
 
-            let err = check(&rk, &kt1.to_base58_check(), milligas(2 * lookup_cost() - 1))
-                .unwrap_err();
+            let err = check(
+                &rk,
+                &kt1.to_base58_check(),
+                None,
+                milligas(2 * lookup_cost() - 1),
+            )
+            .unwrap_err();
             assert_eq!(err, TezosXRuntimeError::OutOfGas);
         }
     }
