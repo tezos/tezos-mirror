@@ -2951,7 +2951,11 @@ let make_l2_kernel_config_command =
         | Some l2_chain_id -> return (Chain_id.to_string l2_chain_id)
       in
       Evm_node_lib_dev.Kernel_config.make_l2
-        ?kernel_compat
+        ~storage_version:
+          (Evm_node_lib_dev.Storage_version.storage_version_of_kernel
+             (Option.value
+                ~default:Evm_node_lib_dev.Constants.Latest
+                kernel_compat))
         ~eth_bootstrap_balance
         ~tez_bootstrap_balance
         ?eth_bootstrap_accounts
@@ -3095,7 +3099,11 @@ let make_kernel_config_command =
          ()
        ->
       Evm_node_lib_dev.Kernel_config.make
-        ?kernel_compat
+        ~storage_version:
+          (Evm_node_lib_dev.Storage_version.storage_version_of_kernel
+             (Option.value
+                ~default:Evm_node_lib_dev.Constants.Latest
+                kernel_compat))
         ~eth_bootstrap_balance
         ?l2_chain_ids
         ?kernel_root_hash

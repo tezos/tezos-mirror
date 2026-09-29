@@ -50,6 +50,8 @@ let simulation_v0 ~storage_version = storage_version < 12
 
 let simulation_v2 ~storage_version = storage_version > 12
 
+let ticketer_moved_to_world_state ~storage_version = storage_version >= 12
+
 let populate_delayed_inbox_disabled ~storage_version = storage_version < 15
 
 let kernel_has_txs_in_storage ~storage_version = storage_version < 17
@@ -73,6 +75,8 @@ let ipc_paths_moved_to_base ~storage_version = storage_version >= 52
 let tezosx_single_tx ~storage_version = storage_version >= 53
 
 let governance_config_moved_to_base ~storage_version = storage_version >= 54
+
+let feature_flags_moved_to_base ~storage_version = storage_version >= 55
 
 let michelson_runtime_paths_moved_to_world_state_version = 57
 

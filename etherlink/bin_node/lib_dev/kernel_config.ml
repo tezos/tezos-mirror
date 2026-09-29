@@ -83,14 +83,14 @@ let clean_path path =
     []
     (List.rev path)
 
-let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
-    ~tez_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_accounts
-    ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
-    ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?sequencer_pool_address
-    ?maximum_gas_per_transaction ?set_account_code ?world_state_path
-    ~l2_chain_id ~l2_chain_family ~output () =
+let make_l2 ~storage_version ~eth_bootstrap_balance ~tez_bootstrap_balance
+    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?tez_bootstrap_contracts
+    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?da_fee_per_byte
+    ?sequencer_pool_address ?maximum_gas_per_transaction ?set_account_code
+    ?world_state_path ~l2_chain_id ~l2_chain_family ~output () =
   let chain_configurations_root =
-    if Constants.(kernel_is_newer ~than:Previewnet02 kernel_compat) then "base"
+    if Storage_version.governance_config_moved_to_base ~storage_version then
+      "base"
     else "evm"
   in
   let make_l2_config_instr ?convert ~l2_chain_id config =
@@ -336,8 +336,8 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
          |> List.concat_map (fun (k, v) -> instr k v))
   |> List.flatten
 
-let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
-    ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id
+let make ~storage_version ~eth_bootstrap_balance ?l2_chain_ids
+    ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id
     ?michelson_runtime_chain_id ?sequencer ?delayed_bridge ?ticketer ?admin
     ?sequencer_governance ?kernel_governance ?kernel_security_governance
     ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?da_fee_per_byte
@@ -352,7 +352,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?tez_bootstrap_accounts ~tez_bootstrap_balance ?tez_bootstrap_contracts
     ~output () =
   let eth_bootstrap_path address =
-    if Constants.(kernel_is_newer ~than:Previewnet05 kernel_compat) then
+    if Storage_version.evm_accounts_isolated ~storage_version then
       ["evm"; "eth_accounts"; address]
     else ["evm"; "world_state"; "eth_accounts"; address]
   in
@@ -436,16 +436,14 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Osaka -> Z.of_int 3 ))
       evm_version
   in
-  let newer_than_previewnet02 =
-    Constants.(kernel_is_newer ~than:Previewnet02 kernel_compat)
+  let governance_in_base =
+    Storage_version.governance_config_moved_to_base ~storage_version
   in
-  let newer_than_previewnet04 =
-    Constants.(kernel_is_newer ~than:Previewnet04 kernel_compat)
+  let feature_flags_in_base =
+    Storage_version.feature_flags_moved_to_base ~storage_version
   in
-  let governance_in_base = newer_than_previewnet02 in
-  let feature_flags_in_base = newer_than_previewnet02 in
   let evm_config_in_world_state =
-    Constants.(kernel_is_newer ~than:Previewnet05 kernel_compat)
+    Storage_version.evm_config_moved_to_world_state ~storage_version
   in
   let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
   let evm_config_prefix =
@@ -470,10 +468,6 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     in
     make_instr ?convert ~path_prefix arg
   in
-  let michelson_runtime_paths_in_world_state = newer_than_previewnet04 in
-  let michelson_runtime_target_sunrise_level_in_base =
-    Constants.(kernel_is_newer ~than:GaneshaR2 kernel_compat)
-  in
   let with_runtimes =
     List.concat_map
       (fun (runtime, target_sunrise_level) ->
@@ -482,14 +476,6 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         in
         let target_sunrise_level_path = function
           | Tezosx.Tezos ->
-              let storage_version =
-                let open Storage_version in
-                if michelson_runtime_target_sunrise_level_in_base then
-                  michelson_runtime_target_sunrise_level_moved_to_base_version
-                else if michelson_runtime_paths_in_world_state then
-                  michelson_runtime_paths_moved_to_world_state_version
-                else michelson_runtime_paths_moved_to_world_state_version - 1
-              in
               Durable_storage_path.michelson_runtime_target_sunrise_level
                 ~storage_version
         in
@@ -506,11 +492,13 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
       with_runtimes
   in
   let instrs =
-    (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
+    (if Storage_version.ticketer_moved_to_world_state ~storage_version then
        make_instr ~path_prefix:["evm"; "world_state"] ticketer
      else make_instr ticketer)
-    @ (if newer_than_previewnet02 then
-         make_instr ~path_prefix:["evm"; "world_state"] sequencer
+    @ (if
+         Storage_version.sequencer_key_storage_migrated_to_world_state
+           ~storage_version
+       then make_instr ~path_prefix:["evm"; "world_state"] sequencer
        else make_instr sequencer)
     @ make_governance_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)

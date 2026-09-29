@@ -10,9 +10,12 @@ type evm_version = Shanghai | Cancun | Prague | Osaka
 
 (** [make ~boostrap_balance ?bootstrap_accounts ... ~output ()]
     generates a configuration file located at [output], where
-    [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
+    [bootstrap_accounts] are provisioned with [bootstrap_balance].
+
+    @param storage_version the version of the kernel that reads the
+    configuration. It selects the path of each entry. *)
 val make :
-  ?kernel_compat:Constants.kernel ->
+  storage_version:int ->
   eth_bootstrap_balance:Z.t ->
   ?l2_chain_ids:L2_types.chain_id list ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->
@@ -60,9 +63,11 @@ val make :
 
 (** [make_l2 ~boostrap_balance ?bootstrap_accounts ... ~l2_chain_id ~output ()]
     generates a configuration file located at [output] for the chain [l2_chain_id],
-    where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
+    where [bootstrap_accounts] are provisioned with [bootstrap_balance].
+
+    @param storage_version as in {!val:make}. *)
 val make_l2 :
-  ?kernel_compat:Constants.kernel ->
+  storage_version:int ->
   eth_bootstrap_balance:Z.t ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->
