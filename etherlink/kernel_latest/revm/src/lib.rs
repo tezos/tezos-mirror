@@ -1030,6 +1030,28 @@ mod test {
                 }
             }
 
+            fn check_is_native_address<Host, KS>(
+                &self,
+                rk: &RuntimeKeyspaces<'_, Host, KS>,
+                addr_runtime: RuntimeId,
+                address: &str,
+                public_key: Option<&str>,
+                budget: &mut tezosx_interfaces::Gas,
+            ) -> Result<(), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+                KS: KeySpace,
+            {
+                match addr_runtime {
+                    RuntimeId::Tezos => self
+                        .mock_tezos
+                        .check_is_native_address(rk, address, public_key, budget),
+                    RuntimeId::Ethereum => self
+                        .ethereum
+                        .check_is_native_address(rk, address, public_key, budget),
+                }
+            }
+
             fn serve<Host, KS>(
                 &self,
                 rk: &mut RuntimeKeyspaces<'_, Host, KS>,
@@ -1305,6 +1327,7 @@ mod test {
             where
                 Host: StorageV1,
             {
+                // Every address is native, for free.
                 Ok(())
             }
         }

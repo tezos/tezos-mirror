@@ -144,6 +144,29 @@ pub trait Registry {
         Host: StorageV1,
         KS: KeySpace;
 
+    /// Check that `address` is provably native to `addr_runtime`, i.e. that
+    /// it is not an alias, by dispatching to that runtime's
+    /// [`RuntimeInterface::check_is_native_address`].
+    ///
+    /// `public_key`, when given, must be the public key of `address`. Each
+    /// runtime decides when a key is required or refused.
+    ///
+    /// Fails with [`TezosXRuntimeError::CheckNativeAddressError`] when
+    /// `address` is not provably native or `public_key` is rejected, and with
+    /// [`TezosXRuntimeError::OutOfGas`] when `budget` runs out. The cost of
+    /// the check is consumed from `budget`, even when it fails.
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        addr_runtime: RuntimeId,
+        address: &str,
+        public_key: Option<&str>,
+        budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace;
+
     /// Route an HTTP request to the appropriate runtime based on the URL host.
     fn serve<Host, KS>(
         &self,
@@ -244,6 +267,17 @@ pub trait RuntimeInterface {
         Host: StorageV1,
         KS: KeySpace;
 
+    /// Check that `address` is provably native to this runtime, i.e. that it
+    /// is not an alias, consuming the cost of the check from `budget`, even
+    /// when it fails.
+    ///
+    /// - Michelson runtime: an implicit account is native; its `public_key`
+    ///   is required and must match it. A contract is native if it is
+    ///   classified so, or unclassified with code; no `public_key` must be
+    ///   given. Enshrined contracts are rejected.
+    /// - EVM runtime: precompiles are rejected. An address is native if it is
+    ///   classified so, has a positive nonce or code other than an alias's;
+    ///   otherwise `public_key` must be given and hash to it.
     fn check_is_native_address<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,

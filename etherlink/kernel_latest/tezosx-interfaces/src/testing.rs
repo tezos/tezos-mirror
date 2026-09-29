@@ -85,6 +85,21 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
 
+    fn check_is_native_address<Host, KS>(
+        &self,
+        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _addr_runtime: RuntimeId,
+        _address: &str,
+        _public_key: Option<&str>,
+        _budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        unimplemented!("UnimplementedRegistry::check_is_native_address")
+    }
+
     fn serve<Host, KS>(
         &self,
         _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
@@ -159,6 +174,21 @@ impl Registry for NotWiredRegistry {
         _addr: &str,
         _gas: Gas,
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        addr_runtime: RuntimeId,
+        _address: &str,
+        _public_key: Option<&str>,
+        _budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: KeySpace,
@@ -324,6 +354,21 @@ impl Registry for MockRegistry {
         KS: KeySpace,
     {
         Ok((crate::Classification::Unknown, Gas::ZERO))
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _addr_runtime: RuntimeId,
+        _address: &str,
+        _public_key: Option<&str>,
+        _budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        Ok(())
     }
 
     fn serve<Host, KS>(
@@ -509,6 +554,21 @@ impl Registry for StubRegistry {
                 .unwrap_or_else(|| self.classification.clone())
         };
         Ok((classification, Gas::ZERO))
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _addr_runtime: RuntimeId,
+        _address: &str,
+        _public_key: Option<&str>,
+        _budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        Ok(())
     }
 
     fn serve<Host, KS>(
