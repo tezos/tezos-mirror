@@ -72,7 +72,19 @@ let pkh_encoding =
              | Pkh_with_version ((Bls _ as x), version) -> Some (x, version)
              | _ -> None)
            (function x, version -> Pkh_with_version (x, version));
+         case
+           (Tag 4)
+           ~title:"Mldsa44"
+           Tezos_crypto.Signature.Mldsa44.Public_key_hash.encoding
+           (function Pkh (Mldsa44 x) -> Some x | _ -> None)
+           (function x -> Pkh (Mldsa44 x));
        ]
+
+let request_pkh ?version (pkh : Tezos_crypto.Signature.Public_key_hash.t) =
+  match (pkh, version) with
+  | _, None -> Pkh pkh
+  | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _ -> Pkh pkh
+  | Bls _, Some version -> Pkh_with_version (pkh, version)
 
 module type Authenticated_signing_request = sig
   type t = {
