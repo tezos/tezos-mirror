@@ -39,8 +39,10 @@ let tezosx_single_tx ~storage_version = storage_version >= 53
 
 let governance_config_moved_to_base ~storage_version = storage_version >= 54
 
+let michelson_runtime_paths_moved_to_world_state_version = 57
+
 let michelson_runtime_paths_moved_to_world_state ~storage_version =
-  storage_version >= 57
+  storage_version >= michelson_runtime_paths_moved_to_world_state_version
 
 let evm_config_moved_to_world_state ~storage_version = storage_version >= 58
 
@@ -66,3 +68,9 @@ let michelson_blocks_at_world_state_root ~storage_version =
 let tezosx_michelson_entrypoints ~storage_version = storage_version >= 51
 
 let tezosx_run_code ~storage_version = storage_version >= 64
+
+let michelson_runtime_target_sunrise_level_moved_to_base_version = 66
+
+let michelson_runtime_target_sunrise_level_moved_to_base ~storage_version =
+  storage_version
+  >= michelson_runtime_target_sunrise_level_moved_to_base_version

@@ -22,9 +22,14 @@ let feature_flag kernel = function
 let michelson_runtime_paths_in_world_state kernel =
   Kernel.storage_version kernel >= 57
 
+(* V66 moved the target sunrise level into the /base keyspace. *)
+let target_sunrise_level_in_base kernel = Kernel.storage_version kernel >= 66
+
 let target_sunrise_level kernel = function
   | Tezos ->
-      if michelson_runtime_paths_in_world_state kernel then
+      if target_sunrise_level_in_base kernel then
+        "/base/michelson_runtime_target_sunrise_level"
+      else if michelson_runtime_paths_in_world_state kernel then
         "/tez/world_state/michelson_runtime/target_sunrise_level"
       else "/evm/michelson_runtime/target_sunrise_level"
 

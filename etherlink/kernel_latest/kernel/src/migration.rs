@@ -546,6 +546,28 @@ where
             // whether the traces a kernel produces need correcting.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V66 => {
+            // The Michelson-runtime activation level moves into the `/base`
+            // keyspace, so `ExperimentalFeatures::read_from_storage` can
+            // read it alongside the other feature flags without a raw
+            // `StorageV1` host. Gated on `enable_tezos_runtime`, like the
+            // other Michelson-runtime migrations above (V57, V61): a no-op
+            // wherever that flag isn't set.
+            let tezos_runtime_enabled = legacy::migration_enable_tezos_runtime(host);
+            if tezos_runtime_enabled {
+                allow_path_not_found(host.store_move(
+                    &RefPath::assert_from(
+                        b"/tez/world_state/michelson_runtime/target_sunrise_level",
+                    ),
+                    &RefPath::assert_from(
+                        b"/base/michelson_runtime_target_sunrise_level",
+                    ),
+                ))?;
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 
@@ -985,5 +1007,62 @@ mod tests {
         let mut host = MockKernelHost::default();
         let status = migrate_to(&mut host, StorageVersion::V58).unwrap();
         assert!(matches!(status, MigrationStatus::Done));
+    }
+
+    /// V66 must move the target-sunrise-level activation slot from
+    /// `/tez/world_state/michelson_runtime/target_sunrise_level` into the
+    /// `/base` keyspace on TezosX networks.
+    #[test]
+    fn v66_migration_moves_target_sunrise_level_on_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        let legacy_target = RefPath::assert_from(
+            b"/tez/world_state/michelson_runtime/target_sunrise_level",
+        );
+        let new_target =
+            RefPath::assert_from(b"/base/michelson_runtime_target_sunrise_level");
+
+        let target_bytes = [0xCC; 32];
+        host.store_write_all(&legacy_target, &target_bytes).unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V66).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        assert!(matches!(
+            host.store_read_all(&legacy_target),
+            Err(RuntimeError::PathNotFound)
+        ));
+        assert_eq!(host.store_read_all(&new_target).unwrap(), target_bytes);
+    }
+
+    /// V66 is a no-op on networks where `enable_tezos_runtime` isn't set.
+    #[test]
+    fn v66_migration_is_a_no_op_on_non_tezosx_networks() {
+        let mut host = MockKernelHost::default();
+        // Do NOT set ENABLE_TEZOS_RUNTIME.
+
+        let status = migrate_to(&mut host, StorageVersion::V66).unwrap();
+        assert!(matches!(status, MigrationStatus::None));
+    }
+
+    /// V66 is safe on a fresh TezosX network where the slot was never
+    /// written (covers the `allow_path_not_found` idempotency contract).
+    #[test]
+    fn v66_migration_is_safe_when_path_is_absent() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&crate::storage::ENABLE_TEZOS_RUNTIME, &[1u8])
+            .unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V66).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/base/michelson_runtime_target_sunrise_level"
+            ))
+            .unwrap()
+            .is_none());
     }
 }
