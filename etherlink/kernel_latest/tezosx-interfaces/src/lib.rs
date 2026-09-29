@@ -122,6 +122,14 @@ pub trait Registry {
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
+    /// Binary encoding of `public_key`, a public key of `runtime_id` in its
+    /// human-readable form, as aliases store it.
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
     /// Read the classification of `addr` in `addr_runtime`.
     ///
     /// `addr_runtime` is the dispatch key: the request is forwarded to the
@@ -240,6 +248,13 @@ pub trait RuntimeInterface {
     fn address_from_string(
         &self,
         address_str: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
+    /// Binary encoding of `public_key`, a public key of this runtime in its
+    /// human-readable form, as aliases store it.
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     /// Read the classification of `addr` in this runtime.

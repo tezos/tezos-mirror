@@ -71,6 +71,14 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::address_from_string")
     }
 
+    fn public_key_from_string(
+        &self,
+        _public_key: &str,
+        _runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        unimplemented!("UnimplementedRegistry::public_key_from_string")
+    }
+
     fn read_origin<Host, KS>(
         &self,
         _rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -162,6 +170,14 @@ impl Registry for NotWiredRegistry {
     fn address_from_string(
         &self,
         _address_str: &str,
+        runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+    }
+
+    fn public_key_from_string(
+        &self,
+        _public_key: &str,
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
@@ -340,6 +356,14 @@ impl Registry for MockRegistry {
         _runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         Ok(address_str.as_bytes().to_vec())
+    }
+
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        _runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        Ok(public_key.as_bytes().to_vec())
     }
 
     fn read_origin<Host, KS>(
@@ -531,6 +555,14 @@ impl Registry for StubRegistry {
         } else {
             Ok(address_str.as_bytes().to_vec())
         }
+    }
+
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        _runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        Ok(public_key.as_bytes().to_vec())
     }
 
     fn read_origin<Host, KS>(

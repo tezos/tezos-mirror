@@ -27,7 +27,7 @@ use tezosx_types::{mutez_to_evm_gas, Mutez};
 use crate::{
     database::EtherlinkVMDB,
     helpers::legacy::alloy_to_u256,
-    journal::{CrossRuntimeCall, Journal},
+    journal::{CrossRuntimeCall, Journal, MaterializedAlias},
     precompiles::{
         constants::{
             DERIVE_ALIAS_STRING_COST, HEADER_VALIDATION_PER_HEADER,
@@ -35,7 +35,7 @@ use crate::{
             RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PER_WORD_COST,
             RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, VALUE_TRANSFER_SURCHARGE,
         },
-        guard::charge,
+        guard::{charge, with_revm_gas_budget},
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
@@ -87,6 +87,20 @@ sol! {
             uint8 sourceRuntime,
         ) external view returns (uint8 kind, uint8 homeRuntime, string nativeAddress);
 
+        /// Materialize the EVM alias of `nativeAddress`, native to
+        /// `nativeRuntime` (the runtime host name, e.g. "tezos").
+        ///
+        /// `nativePublicKey` is the public key of `nativeAddress`, in its
+        /// runtime's format (e.g. "edpk..."). It is mandatory for an implicit
+        /// account and must be empty for a contract. When given, it is
+        /// checked against the address and stored in the alias. Idempotent:
+        /// an existing alias is returned untouched.
+        function materializeAlias(
+            string nativeRuntime,
+            string nativeAddress,
+            string nativePublicKey,
+        ) external returns (address aliasAddress);
+
         error InvalidRuntimeId(uint8 received);
     }
 
@@ -98,6 +112,13 @@ sol! {
         string targetRuntime,
         string targetAddress,
         uint256 amount
+    );
+
+    /// Emitted when `materializeAlias` materializes a new EVM alias.
+    event AliasMaterialized(
+        string nativeRuntime,
+        string nativeAddress,
+        address aliasAddress
     );
 }
 
@@ -764,6 +785,33 @@ where
     Ok(source)
 }
 
+fn emit_alias_materialized<'j, 'host, CTX, Host, KS, R>(
+    context: &mut CTX,
+    native_runtime: String,
+    native_address: String,
+    alias_address: Address,
+) where
+    'host: 'j,
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace + 'j,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
+        Journal = Journal<'j, 'host, Host, KS, R>,
+    >,
+{
+    let log = Log {
+        address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+        data: AliasMaterialized {
+            nativeRuntime: native_runtime,
+            nativeAddress: native_address,
+            aliasAddress: alias_address,
+        }
+        .into_log_data(),
+    };
+    super::log(context, log);
+}
+
 /// Resolves sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss. OOG propagates as
 /// `Err(CustomPrecompileError::OutOfGas(..))`.
@@ -1293,6 +1341,124 @@ where
                 result: InstructionResult::Return,
                 gas,
                 output: output.into(),
+            });
+        }
+        RuntimeGatewayCalls::materializeAlias(call) => {
+            if inputs.is_static {
+                return Err(CustomPrecompileError::Revert(
+                    "runtime gateway: STATICCALL not allowed on materializeAlias".into(),
+                    gas,
+                ));
+            }
+            if !inputs.value.get().is_zero() {
+                return Err(CustomPrecompileError::Revert(
+                    "materializeAlias: non-payable selector".into(),
+                    gas,
+                ));
+            }
+            // No per-word payload cost: the parameters are a runtime name, an
+            // address and a public key, all of bounded size, and anything
+            // longer is rejected below.
+            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+
+            let native_runtime =
+                RuntimeId::from_host(&call.nativeRuntime).ok_or_else(|| {
+                    CustomPrecompileError::Revert(
+                        "materializeAlias: unknown native runtime".into(),
+                        gas,
+                    )
+                })?;
+            // An EVM account has no EVM alias.
+            reject_same_runtime_target(native_runtime, gas)?;
+            let native_address =
+                canonicalize_native_address(native_runtime, &call.nativeAddress);
+            // The public key is optional so that contracts can have an alias.
+            let native_public_key = (!call.nativePublicKey.is_empty())
+                .then_some(call.nativePublicKey.as_str());
+
+            // Refuse to materialize the alias of an alias. What the check
+            // consumed is charged even when it fails.
+            let is_native = with_revm_gas_budget(&mut gas, |budget| {
+                context.db().registry.check_is_native_address(
+                    context.db().rk,
+                    native_runtime,
+                    &native_address,
+                    native_public_key,
+                    budget,
+                )
+            })?;
+            is_native.map_err(|e| match e {
+                TezosXRuntimeError::OutOfGas => CustomPrecompileError::OutOfGas,
+                e => CustomPrecompileError::Revert(format!("materializeAlias: {e}"), gas),
+            })?;
+            // Without a public key, the alias stores empty bytes: signature
+            // checks such as EIP-1271 then always fail.
+            let native_public_key = match native_public_key {
+                Some(public_key) => context
+                    .db()
+                    .registry
+                    .public_key_from_string(public_key, native_runtime)
+                    .map_err(|e| {
+                        CustomPrecompileError::Revert(
+                            format!("materializeAlias: {e}"),
+                            gas,
+                        )
+                    })?,
+                None => Vec::new(),
+            };
+
+            // The lookup and the materialization are charged even when they
+            // fail.
+            let materialized = with_revm_gas_budget(&mut gas, |budget| {
+                context.journal_mut().tezosx_materialize_evm_alias(
+                    AliasInfo {
+                        runtime: native_runtime,
+                        native_address: native_address.clone(),
+                    },
+                    &native_public_key,
+                    budget,
+                )
+            })?
+            .map_err(|e| match e {
+                TezosXRuntimeError::OutOfGas => CustomPrecompileError::OutOfGas,
+                e => CustomPrecompileError::Revert(
+                    format!("materializeAlias: failed to materialize alias: {e}"),
+                    gas,
+                ),
+            })?;
+            let (alias, created) = match materialized {
+                MaterializedAlias::Existing(alias) => (alias, None),
+                MaterializedAlias::Created {
+                    alias,
+                    delegated_storage_cost,
+                } => (alias, Some(delegated_storage_cost)),
+            };
+            let alias_address = Address::from_hex(&alias).map_err(|_| {
+                CustomPrecompileError::Revert(
+                    format!("materializeAlias: invalid alias {alias}"),
+                    gas,
+                )
+            })?;
+            if let Some(delegated_storage_cost) = created {
+                let storage_cost =
+                    narrow_delegated_storage_cost(&gas, delegated_storage_cost)?;
+                charge_delegated_storage_cost(
+                    &mut gas,
+                    storage_cost,
+                    context.block().basefee(),
+                )?;
+                emit_alias_materialized(
+                    context,
+                    call.nativeRuntime,
+                    native_address,
+                    alias_address,
+                );
+            }
+
+            return Ok(InterpreterResult {
+                result: InstructionResult::Return,
+                gas,
+                output: alias_address.abi_encode().into(),
             });
         }
         // View-only: no log, no balance touch, no journal write — safe under STATICCALL.

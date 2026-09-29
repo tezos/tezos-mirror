@@ -1374,6 +1374,19 @@ impl RuntimeInterface for TezosRuntime {
         })
     }
 
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        let public_key = PublicKey::from_b58check(public_key)
+            .map_err(|_| CheckNativeAddressError::MalformedPublicKey)?;
+        let mut bytes = Vec::new();
+        public_key
+            .bin_write(&mut bytes)
+            .map_err(|_| CheckNativeAddressError::MalformedPublicKey)?;
+        Ok(bytes)
+    }
+
     fn read_origin<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -3614,6 +3627,31 @@ mod tests {
                 &mut budget,
             )?;
             Ok(budget)
+        }
+
+        // The binary encoding is the curve tag followed by the key: the one
+        // an alias materialized by a NAC stores.
+        #[test]
+        fn public_key_from_string_returns_the_binary_encoding() {
+            let bytes = TezosRuntime::new(ChainId::default())
+                .public_key_from_string(PUBLIC_KEY)
+                .unwrap();
+            let mut expected = Vec::new();
+            PublicKey::from_b58check(PUBLIC_KEY)
+                .unwrap()
+                .bin_write(&mut expected)
+                .unwrap();
+            assert_eq!(bytes, expected);
+            assert_eq!(bytes.len(), 33);
+            assert_eq!(bytes[0], 0, "ed25519 tag");
+        }
+
+        #[test]
+        fn public_key_from_string_rejects_a_malformed_key() {
+            let err = TezosRuntime::new(ChainId::default())
+                .public_key_from_string("edpk-not-a-key")
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedPublicKey.into());
         }
 
         #[test]

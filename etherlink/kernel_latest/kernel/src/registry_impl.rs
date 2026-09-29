@@ -133,6 +133,21 @@ impl Registry for RegistryImpl {
         }
     }
 
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        runtime_id: tezosx_interfaces::RuntimeId,
+    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+        match runtime_id {
+            tezosx_interfaces::RuntimeId::Tezos => {
+                self.tezos.public_key_from_string(public_key)
+            }
+            tezosx_interfaces::RuntimeId::Ethereum => {
+                self.ethereum.public_key_from_string(public_key)
+            }
+        }
+    }
+
     fn read_origin<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,
