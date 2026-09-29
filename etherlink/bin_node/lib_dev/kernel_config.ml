@@ -88,17 +88,13 @@ let make_l2 ~storage_version ~eth_bootstrap_balance ~tez_bootstrap_balance
     ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?da_fee_per_byte
     ?sequencer_pool_address ?maximum_gas_per_transaction ?set_account_code
     ?world_state_path ~l2_chain_id ~l2_chain_family ~output () =
-  let chain_configurations_root =
-    if Storage_version.governance_config_moved_to_base ~storage_version then
-      "base"
-    else "evm"
-  in
   let make_l2_config_instr ?convert ~l2_chain_id config =
-    make_l2_config_instr
-      ?convert
-      ~root:chain_configurations_root
-      ~l2_chain_id
-      config
+    let root =
+      if Storage_version.governance_config_moved_to_base ~storage_version then
+        "base"
+      else "evm"
+    in
+    make_l2_config_instr ?convert ~root ~l2_chain_id config
   in
   let world_state_prefix =
     match world_state_path with
@@ -436,37 +432,38 @@ let make ~storage_version ~eth_bootstrap_balance ?l2_chain_ids
           | Osaka -> Z.of_int 3 ))
       evm_version
   in
-  let governance_in_base =
-    Storage_version.governance_config_moved_to_base ~storage_version
-  in
-  let feature_flags_in_base =
-    Storage_version.feature_flags_moved_to_base ~storage_version
-  in
-  let evm_config_in_world_state =
-    Storage_version.evm_config_moved_to_world_state ~storage_version
-  in
-  let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
-  let evm_config_prefix =
-    if evm_config_in_world_state then ["evm"; "world_state"] else ["evm"]
-  in
   let make_governance_instr ?convert arg =
-    make_instr ?convert ~path_prefix:base_or_evm_prefix arg
+    let path_prefix =
+      if Storage_version.governance_config_moved_to_base ~storage_version then
+        ["base"]
+      else ["evm"]
+    in
+    make_instr ?convert ~path_prefix arg
   in
   let make_evm_config_instr ?convert arg =
-    make_instr ?convert ~path_prefix:evm_config_prefix arg
+    let path_prefix =
+      if Storage_version.evm_config_moved_to_world_state ~storage_version then
+        ["evm"; "world_state"]
+      else ["evm"]
+    in
+    make_instr ?convert ~path_prefix arg
   in
   (* Path prefix for feature flags according to the target kernel's version. *)
   let feature_flag_prefix_base = ["base"; "feature_flags"] in
   let feature_flag_prefix_evm = ["evm"; "feature_flags"] in
-  let feature_flag_prefix_world_state =
-    ["evm"; "world_state"; "feature_flags"]
-  in
   let feature_flag_prefix_tezlink = ["tezlink"; "feature_flags"] in
   let make_feature_flag_instr ?convert ~legacy_prefix arg =
     let path_prefix =
-      if feature_flags_in_base then feature_flag_prefix_base else legacy_prefix
+      if Storage_version.feature_flags_moved_to_base ~storage_version then
+        feature_flag_prefix_base
+      else legacy_prefix
     in
     make_instr ?convert ~path_prefix arg
+  in
+  (* A flag that only the kernels with the legacy feature flag layout read. *)
+  let make_legacy_feature_flag_instr arg =
+    if Storage_version.feature_flags_moved_to_base ~storage_version then []
+    else make_instr ~path_prefix:["evm"; "world_state"; "feature_flags"] arg
   in
   let with_runtimes =
     List.concat_map
@@ -552,8 +549,7 @@ let make ~storage_version ~eth_bootstrap_balance ?l2_chain_ids
         enable_fa_bridge
     (* enable_revm is only consumed by pre-V54 kernels — V54+ kernels
        unconditionally enable revm and ignore the flag. *)
-    @ (if feature_flags_in_base then []
-       else make_instr ~path_prefix:feature_flag_prefix_world_state enable_revm)
+    @ make_legacy_feature_flag_instr enable_revm
     @ make_feature_flag_instr ~legacy_prefix:feature_flag_prefix_evm enable_dal
     @ make_feature_flag_instr
         ~legacy_prefix:feature_flag_prefix_evm
@@ -561,18 +557,10 @@ let make ~storage_version ~eth_bootstrap_balance ?l2_chain_ids
     (* enable_fast_withdrawal and enable_fast_fa_withdrawal are only
        consumed by pre-Farfadet kernels — Farfadet+ kernels run the
        corresponding code paths unconditionally and ignore these flags. *)
-    @ (if feature_flags_in_base then []
-       else
-         make_instr
-           ~path_prefix:feature_flag_prefix_world_state
-           enable_fast_withdrawal)
-    @ (if feature_flags_in_base then []
-       else
-         make_instr
-           ~path_prefix:feature_flag_prefix_world_state
-           enable_fast_fa_withdrawal)
+    @ make_legacy_feature_flag_instr enable_fast_withdrawal
+    @ make_legacy_feature_flag_instr enable_fast_fa_withdrawal
     @ make_governance_instr ~convert:decimal_list_to_bytes dal_slots
-    @ make_instr
+    @ make_governance_instr
         ~convert:(fun s ->
           let open Evm_node_lib_dev_encoding.Rlp in
           let pkh_list =
@@ -599,7 +587,6 @@ let make ~storage_version ~eth_bootstrap_balance ?l2_chain_ids
           (* RLP-encode the list *)
           let rlp_item = List encoded_list in
           Bytes.to_string (encode rlp_item))
-        ~path_prefix:base_or_evm_prefix
         dal_publishers_whitelist
     @ make_feature_flag_instr
         ~legacy_prefix:feature_flag_prefix_evm
