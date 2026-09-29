@@ -96,11 +96,26 @@ let site_catalog =
     };
   ]
 
-(* [render_site ?only ~bucket ~path ~url ~output_dir] renders the release site
-   from [site_catalog] into [output_dir], mirroring the site layout: octez at
-   the root, each other component under its subpath. If [only] is given, only
-   that component's tab is (re-)rendered instead of the whole site. *)
-let render_site ?only ~bucket ~path ~url ~output_dir () =
+(* [needs_storage_listing asset_type] is [true] for asset types whose content
+   is obtained by listing the assets (and downloading their checksums) from the
+   storage bucket, as opposed to being derived from versions.json alone. *)
+let needs_storage_listing = function
+  | Binaries | Dashboards -> true
+  | Changelog | Packages -> false
+
+(* [render_site ?only ?versions_dir ~no_remote_assets ~bucket ~path ~url
+   ~output_dir ()] renders the release site from [site_catalog] into
+   [output_dir], mirroring the site layout: octez at the root, each other
+   component under its subpath. If [only] is given, only that component's tab
+   is (re-)rendered instead of the whole site.
+
+   If [versions_dir] is given, each component's versions.json is read from
+   [versions_dir], using the same layout as [output_dir], instead of being
+   downloaded from the storage bucket. If [no_remote_assets] is [true], asset
+   types that require listing the storage bucket are omitted. Together, they
+   allow rendering the site without any access to the storage bucket. *)
+let render_site ?only ?versions_dir ~no_remote_assets ~bucket ~path ~url
+    ~output_dir () =
   let components =
     match only with
     | None -> site_catalog
@@ -116,8 +131,20 @@ let render_site ?only ~bucket ~path ~url ~output_dir () =
   List.iter
     (fun {component_name; subpath; asset_types; pages; emits_rss} ->
       let component = make_component ~name:component_name ~bucket ~path ~url in
-      let dir =
-        if subpath = "" then output_dir else Filename.concat output_dir subpath
+      let in_site_layout root =
+        if subpath = "" then root else Filename.concat root subpath
+      in
+      let dir = in_site_layout output_dir in
+      let file =
+        Option.map
+          (fun versions_dir ->
+            Filename.concat (in_site_layout versions_dir) "versions.json")
+          versions_dir
+      in
+      let asset_types =
+        if no_remote_assets then
+          List.filter (fun a -> not (needs_storage_listing a)) asset_types
+        else asset_types
       in
       if Sys.command (sf "mkdir -p %s" (Filename.quote dir)) <> 0 then
         failwith (sf "Failed to create output directory %s" dir) ;
@@ -133,11 +160,11 @@ let render_site ?only ~bucket ~path ~url ~output_dir () =
             ~filter_active:filter
             ~title:page_title
             ~path
-            ~file:None
+            ~file
             ~output:(Filename.concat dir (basename ^ ".md")))
         pages ;
       if emits_rss then
-        let versions = get_versions ~component ~file:None in
+        let versions = get_versions ~component ~file in
         let page_url =
           if subpath = "" then sf "https://%s%s" url path
           else sf "https://%s%s/%s" url path subpath
@@ -153,7 +180,8 @@ let render_site ?only ~bucket ~path ~url ~output_dir () =
    tab is rendered from its published versions.json in [BUCKET]/[PATH], written
    into [--output-dir] mirroring the site layout (octez at the root, each other
    component under its own subdirectory). With [--only COMPONENT], only that
-   component's tab is re-rendered. *)
+   component's tab is re-rendered. With [--versions-dir] and
+   [--no-remote-assets], the site can be rendered without storage access. *)
 let () =
   Clap.description
     "Renders the whole Octez release site from every component's published \
@@ -216,5 +244,34 @@ let () =
       ~placeholder:"COMPONENT"
       ()
   in
+  let versions_dir =
+    Clap.optional_string
+      ~long:"versions-dir"
+      ~description:
+        "Read each component's versions.json from DIR instead of downloading \
+         it from `BUCKET/PATH`. DIR uses the same layout as the rendered site: \
+         `DIR/versions.json` for octez and `DIR/COMPONENT/versions.json` for \
+         each other component. Useful to render the site locally, together \
+         with [--no-remote-assets]."
+      ~placeholder:"DIR"
+      ()
+  in
+  let no_remote_assets =
+    Clap.flag
+      ~set_long:"no-remote-assets"
+      ~description:
+        "Omit the asset types that require listing `BUCKET/PATH` (binaries and \
+         dashboards). Together with [--versions-dir], this renders the site \
+         without any access to the storage bucket."
+      false
+  in
   Clap.close () ;
-  render_site ?only ~bucket ~path ~url ~output_dir ()
+  render_site
+    ?only
+    ?versions_dir
+    ~no_remote_assets
+    ~bucket
+    ~path
+    ~url
+    ~output_dir
+    ()

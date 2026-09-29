@@ -60,6 +60,22 @@ catalog with `--only`:
 release_site --only octez-smart-rollup-node --bucket BUCKET --path PATH --output-dir DIR
 ```
 
+To render the site locally, without access to the storage bucket, provide the
+`versions.json` files from a local directory with `--versions-dir` and omit the
+asset types that require listing the bucket (binaries and dashboards) with
+`--no-remote-assets`:
+
+```shell
+release_site --bucket BUCKET --versions-dir VERSIONS_DIR --no-remote-assets --output-dir DIR
+```
+
+`VERSIONS_DIR` uses the same layout as the rendered site:
+`VERSIONS_DIR/versions.json` for octez and `VERSIONS_DIR/COMPONENT/versions.json`
+for each other component. Such files can be created or edited with
+`version_manager` (see below). `--versions-dir` can also be used without
+`--no-remote-assets`, to render local `versions.json` files against the assets
+of the bucket.
+
 Rendering is owned by `release_site` and always operates on the catalog, as
 described in the vocabulary section above; components only deploy their own
 assets. The page mechanism itself (rendering one tab from a `versions.json`,
