@@ -5,6 +5,10 @@
 use cryptoxide::hashing::sha256;
 use thiserror::Error;
 
+// When updating this constant, keep in mind b58check decoding is O(n²) (n being the input size).
+// This constant should remain within the same order of magnitude.
+pub const B58CHECK_ENCODED_MAX_SIZE: usize = 150;
+
 /// Possible errors for base58checked
 #[derive(Debug, Error)]
 pub enum FromBase58CheckError {
@@ -17,6 +21,9 @@ pub enum FromBase58CheckError {
     /// The input is missing checksum.
     #[error("missing checksum")]
     MissingChecksum,
+    /// The input is too long
+    #[error("input is {actual} long but cannot exceed {B58CHECK_ENCODED_MAX_SIZE}")]
+    InputTooLong { actual: usize },
     #[error("mismatched data length: expected {expected}, actual {actual}")]
     MismatchedLength { expected: usize, actual: usize },
     /// Prefix does not match expected.
@@ -60,6 +67,10 @@ impl ToBase58Check for [u8] {
 
 impl FromBase58Check for str {
     fn from_base58check(&self) -> Result<Vec<u8>, FromBase58CheckError> {
+        if self.len() > B58CHECK_ENCODED_MAX_SIZE {
+            return Err(FromBase58CheckError::InputTooLong { actual: self.len() });
+        }
+
         match bs58::decode(self).into_vec() {
             Ok(mut payload) => {
                 if payload.len() >= Self::CHECKSUM_BYTE_SIZE {
@@ -105,5 +116,27 @@ mod tests {
         assert_eq!(expected, decoded);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decode_max_size_roundtrip() -> Result<(), anyhow::Error> {
+        // BLS signature-shaped value: 4-byte prefix + 96-byte payload, the
+        // largest supported decoded content.
+        let data = [42u8; 100];
+        let decoded = data.to_base58check().from_base58check()?;
+        assert_eq!(data.to_vec(), decoded);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_too_long() {
+        // Each leading '1' decodes to one zero byte, so this input decodes
+        // to one byte more than the buffer can hold.
+        let input = "1".repeat(B58CHECK_ENCODED_MAX_SIZE + 1);
+        assert!(matches!(
+            input.from_base58check(),
+            Err(FromBase58CheckError::InputTooLong { .. })
+        ));
     }
 }
