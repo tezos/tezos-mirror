@@ -492,10 +492,70 @@ let signer_bls_proof_command_test () =
     ~error_msg:"Expected proof with override to differ from default proof" ;
   unit
 
+let signer_mldsa44_test ~authenticate =
+  register_signer_test
+    ~__FILE__
+    ~title:
+      (if authenticate then "signer tz5 keys with authentication test"
+       else "signer tz5 keys test")
+    ~tags:
+      ([team; "signer"; "mldsa44"]
+      @ if authenticate then ["authentication"] else [])
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun launch_mode protocol ->
+  let* _node, client = Client.init_with_protocol ~protocol `Client () in
+  (* Generate the key in a throwaway client, so that [client] only knows it
+     as a remote key. *)
+  let keygen_client = Client.create () in
+  let alias = "remote_mldsa44" in
+  let* _ = Client.gen_keys ~alias ~sig_alg:"mldsa44" keygen_client in
+  let* key = Client.show_address ~alias keygen_client in
+  let* signer =
+    Signer.init ~launch_mode ~keys:[key] ~require_authentication:authenticate ()
+  in
+  let* () =
+    Client.import_signer_key
+      client
+      ~alias
+      ~public_key_hash:key.public_key_hash
+      ~signer:(Signer.uri signer)
+  in
+  (* Importing a remote key makes the client fetch its public key from the
+     signer. *)
+  let* output =
+    Client.spawn_show_address ~alias client |> Process.check_and_read_stdout
+  in
+  let imported_public_key = output =~* rex "Public Key: ?(\\w*)" in
+  Check.(
+    (imported_public_key = Some key.public_key)
+      (option string)
+      ~error_msg:
+        "Expected the public key fetched from the signer to be %R, got %L") ;
+  let message = "signed by " ^ key.public_key_hash in
+  (* With authentication, [client] signs its requests with a local tz5 key
+     that the signer authorizes. Signing fails until the key is authorized. *)
+  let* () =
+    if authenticate then
+      let auth_alias = "auth_mldsa44" in
+      let* _ = Client.gen_keys ~alias:auth_alias ~sig_alg:"mldsa44" client in
+      let* auth_key = Client.show_address ~alias:auth_alias client in
+      let* () =
+        Client.spawn_sign_message client message ~src:alias
+        |> Process.check_error
+             ~msg:(rex "no authorized key was found in the wallet")
+      in
+      Signer.add_authorized_key signer auth_key
+    else unit
+  in
+  let* signature = Client.sign_message client message ~src:alias in
+  Client.check_message client ~src:alias ~signature message
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
   signer_bls_test protocols ;
+  signer_mldsa44_test ~authenticate:false protocols ;
+  signer_mldsa44_test ~authenticate:true protocols ;
   signer_known_remote_keys_test protocols ;
   signer_prove_possession_test
     (List.filter (fun p -> Protocol.number p > 022) protocols) ;
