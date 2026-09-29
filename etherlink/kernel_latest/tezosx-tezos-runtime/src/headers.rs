@@ -82,11 +82,7 @@ pub fn parse_request_headers(
     check_crac_depth(crac_depth)?;
 
     Ok(MichelsonHeaders {
-        amount: Mutez::try_from(parse_tez_to_mutez(&require_str(
-            headers,
-            X_TEZOS_AMOUNT,
-        )?)?)
-        .map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))?,
+        amount: parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?,
         gas_limit: require_gas(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
@@ -319,11 +315,9 @@ mod tests {
         assert_eq!(parsed.amount, Mutez::try_from(1u64).unwrap());
     }
 
-    /// An amount in `(i64::MAX, u64::MAX]` mutez parses as a valid `u64`
-    /// (`parse_tez_to_mutez`'s own cap) but is outside the mutez domain: a
-    /// caller-supplied value the header parse rejects directly as a
-    /// `BadRequest` (400, catchable — not a `HeaderError`/500 gateway-bug
-    /// signal).
+    /// An amount outside the mutez domain is a caller-supplied value the
+    /// header parse rejects as a `BadRequest` (400, catchable — not a
+    /// `HeaderError`/500 gateway-bug signal).
     #[test]
     fn amount_above_mutez_domain_returns_bad_request() {
         let mut hdrs = required_headers();

@@ -1239,7 +1239,7 @@ fn inject_context_headers_raw(
     );
     headers.insert(
         X_TEZOS_AMOUNT,
-        parse_value(&format_tez_from_mutez(amount_mutez.as_u64()))?,
+        parse_value(&format_tez_from_mutez(amount_mutez))?,
     );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&gas_limit.to_string())?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
