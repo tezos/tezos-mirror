@@ -36,6 +36,7 @@ module Parameters = struct
     check_highwatermark : bool;
     allow_list_known_keys : bool;
     allow_to_prove_possession : bool;
+    require_authentication : bool;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -114,6 +115,12 @@ let spawn_import_secret_key signer (key : Account.key) =
 let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
+let add_authorized_key signer (key : Account.key) =
+  spawn_command
+    signer
+    ["add"; "authorized"; "key"; key.public_key; "--name"; key.alias]
+  |> Process.check
+
 let id = Atomic.make 0
 
 let fresh_alias () = sf "signer_%d" (Atomic.fetch_and_add id 1)
@@ -158,7 +165,8 @@ let bls_prove_possession ?override_pk ~sk_uri signer =
 
 let create ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner
     ?(check_highwatermark = true) ?magic_byte ?(allow_list_known_keys = false)
-    ?(allow_to_prove_possession = false) ?(keys = [Constant.bootstrap1]) () =
+    ?(allow_to_prove_possession = false) ?(require_authentication = false)
+    ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -190,6 +198,7 @@ let create ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner
         magic_byte;
         allow_list_known_keys;
         allow_to_prove_possession;
+        require_authentication;
       }
   in
   on_event signer (handle_readiness signer) ;
@@ -202,6 +211,11 @@ let run signer =
   | Running _ -> Test.fail "signer %s is already running" signer.name) ;
   let runner = signer.persistent_state.runner in
   let base_dir_arg = ["--base-dir"; signer.persistent_state.base_dir] in
+  let require_authentication_args =
+    if signer.persistent_state.require_authentication then
+      ["--require-authentication"]
+    else []
+  in
   let host_args =
     match Uri.host signer.persistent_state.uri with
     | None -> []
@@ -245,8 +259,8 @@ let run signer =
     else []
   in
   let arguments =
-    base_dir_arg @ launch_mode_args @ check_highwatermark_args
-    @ magic_bytes_args @ allow_list_known_keys_args
+    base_dir_arg @ require_authentication_args @ launch_mode_args
+    @ check_highwatermark_args @ magic_bytes_args @ allow_list_known_keys_args
     @ allow_to_prove_possession_args
   in
   let arguments =
@@ -279,7 +293,7 @@ let wait_for_ready signer =
 
 let init ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner ?keys
     ?check_highwatermark ?magic_byte ?allow_list_known_keys
-    ?allow_to_prove_possession () =
+    ?allow_to_prove_possession ?require_authentication () =
   let* signer =
     create
       ?name
@@ -294,6 +308,7 @@ let init ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner ?keys
       ?magic_byte
       ?allow_list_known_keys
       ?allow_to_prove_possession
+      ?require_authentication
       ()
   in
   let* () = run signer in
