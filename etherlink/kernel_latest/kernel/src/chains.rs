@@ -913,9 +913,8 @@ impl TezosXChainConfig {
 }
 
 fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> {
-    let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
-        error::Error::NomReadError(format!("{decode_error:?}"))
-    })?;
+    let operation = Operation::nom_read_exact(bytes)
+        .map_err(|decode_error| error::Error::NomReadError(decode_error.to_string()))?;
     let tx_hash = operation.hash()?.into();
     Ok(TezlinkOperation {
         tx_hash,
