@@ -146,7 +146,6 @@ impl EvmJournal {
     pub fn clear(&mut self) {
         let _ = self.inner.finalize();
         let _ = self.layered_state.finalize();
-        self.crac_tx_info = None;
         self.access_list = None;
         self.crac_chain_depth = 0;
         self.revm_call_depth = None;

@@ -4816,7 +4816,8 @@ let test_crac_call_tracer_incoming_withlog_off () =
     (only the EVM→Michelson receipt error attribution changed there). *)
 let test_crac_call_tracer_incoming_backtrack_no_fake_tx () =
   register_crac_runner_test
-    ~title:"CRAC callTracer: backtracked incoming NAC emits no fake tx"
+    ~title:
+      "CRAC callTracer: backtracked incoming NAC emits synthetic transactions"
     ~tags:["crac_tx"; "trace"; "crac_trace"; "incoming"; "revert"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
@@ -4835,10 +4836,11 @@ let test_crac_call_tracer_incoming_backtrack_no_fake_tx () =
     | Block.Empty -> 0
   in
   Check.(
-    (tx_count = 0)
+    (tx_count = 1)
       int
       ~error_msg:
-        (prefix ^ ": a backtracked incoming NAC must emit no fake tx, got %L")) ;
+        (prefix
+       ^ ": a backtracked incoming NAC must emit a synthetic tx, got %L")) ;
   (* The recipe hash for the would-be crossing resolves to no transaction. *)
   let* michelson_op_hash = TezContract.get_michelson_op_hash sequencer in
   let fake_hash = compute_crac_fake_tx_hash ~michelson_op_hash in
@@ -4846,12 +4848,12 @@ let test_crac_call_tracer_incoming_backtrack_no_fake_tx () =
     Rpc.get_transaction_by_hash ~transaction_hash:fake_hash sequencer
   in
   (match obj with
-  | None -> ()
-  | Some _ ->
+  | None ->
       Test.fail
-        "%s: backtracked incoming NAC must have no fake tx at %s"
+        "%s: backtracked incoming NAC must have fake tx at %s"
         prefix
-        fake_hash) ;
+        fake_hash
+  | Some _ -> ()) ;
   unit
 
 (** Example B of the cross-runtime tracing RFC
