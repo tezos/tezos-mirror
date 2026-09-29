@@ -3375,8 +3375,9 @@ let test_kernel_upgrade_activates_michelson_runtime =
   unit
 
 (* Previewnet counterpart of [test_kernel_storage_version_matches_constant] in
-   [evm_sequencer.ml]: assert the previewnet kernel's baked STORAGE_VERSION
-   matches what [Kernel.storage_version Previewnet] reports. Lives here (not
+   [kernel_upgrades.ml]: assert the previewnet kernel's baked STORAGE_VERSION
+   matches what [Kernel.storage_version Previewnet] and the table of the EVM
+   node report. Lives here (not
    alongside the latest+mainnet check) because the default [register_all]
    fixture cannot boot the previewnet kernel — a fresh install writes V56
    verbatim, skipping the V50–V56 migrations that move [/evm/sequencer] to
@@ -3473,6 +3474,34 @@ let test_previewnet_storage_version_matches_constant =
             reports V%%R — update [storage_version] in \
             etherlink/tezt/lib/kernel.ml to match the rebaked kernel."
            key)) ;
+  (* The table of the EVM node must agree with the kernel too. *)
+  (match Kernel.name_of kernel with
+  | None -> ()
+  | Some name ->
+      let kernel_enum =
+        match Evm_node_lib_dev.Constants.kernel_from_string name with
+        | Some k -> k
+        | None ->
+            Test.fail
+              ~__LOC__
+              "Kernel.name_of returned %S, which Constants.kernel_from_string \
+               does not recognize"
+              name
+      in
+      let node_expected =
+        Evm_node_lib_dev.Storage_version.storage_version_of_kernel kernel_enum
+      in
+      Check.(
+        (actual = node_expected)
+          int
+          ~error_msg:
+            (Printf.sprintf
+               "Kernel %s wrote V%%L to %s but \
+                Storage_version.storage_version_of_kernel reports V%%R, update \
+                the table in etherlink/bin_node/lib_dev/storage_version.ml to \
+                match the rebaked kernel."
+               name
+               key))) ;
   unit
 
 let test_sequencer_and_kernel_upgrade_via_kernel_admin =
