@@ -7,6 +7,57 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.67 (2026-09-29)
+
+This new release notably speeds up kernel downloads and improves their
+reliability, while bringing several RPC fixes for both the EVM and Michelson
+runtime.
+
+This release will not apply any migration to the node's store (version
+24), meaning it is possible to downgrade to previous versions.
+
+### Configuration changes
+
+- Add `kernel_execution.preimages_download_concurrency` (8 by default, between
+  1 and 256): the number of preimages fetched at a time when the node downloads
+  a kernel it has seen an upgrade announced for, and by `download kernel` when
+  `--parallel-download` is not given. (!22910)
+
+### RPCs changes
+
+- Accept bare hashes as a valid input block parameter. (!22903)
+- The node for Michelson runtime now returns a meaningful error
+  (`counter_in_the_future`) when a counter greater than the expected one is
+  submitted by the user. (!22869)
+- The Michelson runtime now correctly returns an error with the next counter to
+  be used when a past counter is submitted by the user. (!22863)
+
+### Command-line interface changes
+
+- Add support for the `ganesha-r2` kernel: it can be downloaded by name with
+  `download kernel ganesha-r2`, and named through `--kernel-compat ganesha-r2`.
+  Native execution is not included. (!22901)
+- The `download kernel` command now downloads the preimages of a kernel over a
+  pool of persistent connections. On a kernel of ~2200 preimages this takes the
+  command from about eighty seconds to about three. The new
+  `--parallel-download` option sets how many preimages are fetched at a time,
+  and how many connections are opened (8 by default). (!22862)
+- A preimage the endpoint cannot provide is now reported as an error naming the
+  hash and the status code, instead of aborting the command with `Too many
+  tries, aborting.`. (!22862)
+
+### Execution changes
+
+- The kernel the node downloads in the background when it sees a kernel upgrade
+  announcement is now fetched using a persistent connections pool, like with
+  `download kernel`. (!22909)
+- A node restarted between the announcement of a kernel upgrade and its
+  activation downloads the preimages of the announced kernel again if it is
+  still missing them. Previously the preemptive download was only started when
+  the upgrade was announced, and was lost on restart. (!22884)
+- Dry-run predownloaded kernels as a best-effort attempt to assess the node
+  compatibility. Emit a warning in case of failure. (!22830)
+
 ## Version 0.66 (2026-09-10)
 
 This new release notably upgrades the Wasmer runtime version from 3.3.0 to 7.2.1,
