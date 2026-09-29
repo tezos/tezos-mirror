@@ -59,7 +59,7 @@ pub enum StorageError {
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
     #[error(transparent)]
-    KeySpaceWrite(#[from] KeySpaceWriteError),
+    KeySpace(#[from] KeySpaceWriteError),
     #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
 }
@@ -180,7 +180,7 @@ impl From<RuntimeError> for Error {
 
 impl From<KeySpaceWriteError> for Error {
     fn from(e: KeySpaceWriteError) -> Self {
-        Self::Storage(StorageError::KeySpaceWrite(e))
+        Self::Storage(StorageError::KeySpace(e))
     }
 }
 
@@ -262,8 +262,8 @@ impl From<IndexableStorageError> for Error {
                 Error::TryFromBigIntError(msg)
             }
             IndexableStorageError::Internal(msg) => Error::Internal(msg),
-            IndexableStorageError::KeySpaceWrite(e) => {
-                Error::Storage(StorageError::KeySpaceWrite(e))
+            IndexableStorageError::KeySpace(e) => {
+                Error::Storage(StorageError::KeySpace(e))
             }
             IndexableStorageError::KeySpaceKey(e) => {
                 Error::Storage(StorageError::KeySpaceKey(e))

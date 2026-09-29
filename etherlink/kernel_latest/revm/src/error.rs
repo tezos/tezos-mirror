@@ -28,7 +28,7 @@ pub enum EvmDbError {
     #[error(transparent)]
     Key(#[from] KeyError),
     #[error(transparent)]
-    KeySpaceWrite(#[from] KeySpaceWriteError),
+    KeySpace(#[from] KeySpaceWriteError),
     #[error("Bytecode at {hash} failed validation: {source}")]
     InvalidBytecode {
         hash: B256,

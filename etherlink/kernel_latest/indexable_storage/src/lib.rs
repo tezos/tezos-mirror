@@ -56,7 +56,7 @@ pub enum IndexableStorageError {
     #[error("Internal invariant violation: {0}")]
     Internal(String),
     #[error(transparent)]
-    KeySpaceWrite(#[from] KeySpaceWriteError),
+    KeySpace(#[from] KeySpaceWriteError),
     #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
 }
