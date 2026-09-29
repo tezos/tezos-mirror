@@ -387,6 +387,8 @@ pub enum CheckNativeAddressError {
     MissingPublicKey,
     #[error("Public key mismatch")]
     PublicKeyMismatch,
+    #[error("Unexpected public key for a contract")]
+    UnexpectedPublicKey,
     #[error("Malformed public key")]
     MalformedPublicKey,
     #[error("Malformed address")]

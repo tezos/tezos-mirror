@@ -1438,6 +1438,10 @@ impl RuntimeInterface for TezosRuntime {
                     Err(CheckNativeAddressError::PublicKeyMismatch.into())
                 };
             }
+            // A contract has no public key: none must be given.
+            Contract::Originated(_) if public_key.is_some() => {
+                return Err(CheckNativeAddressError::UnexpectedPublicKey.into())
+            }
             Contract::Originated(kt1) => kt1,
         };
         // Enshrined contracts, like the gateway, have no account behind them
@@ -3687,6 +3691,19 @@ mod tests {
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
             assert_eq!(remaining, milligas(BUDGET_MILLIGAS - lookup_cost()));
+        }
+
+        #[test]
+        fn kt1_with_public_key_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"native_kt1_with_key");
+            let account = context::originated_from_kt1(&kt1).unwrap();
+            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+
+            let err = check(&rk, &kt1.to_base58_check(), Some(PUBLIC_KEY), budget())
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::UnexpectedPublicKey.into());
         }
 
         #[test]
