@@ -59,9 +59,10 @@ let pkh_encoding =
          case
            (Tag 3)
            ~title:"Bls"
-           (conv
-              (fun (pkh, version) -> (pkh, version))
-              (fun (pkh, version) -> (pkh, version))
+           (with_decoding_guard
+              (function
+                | (Bls _ : Tezos_crypto.Signature.Public_key_hash.t), _ -> Ok ()
+                | _ -> Error "expected a BLS public key hash")
               (obj2
                  (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
                  (req "version" Tezos_crypto.Signature.version_encoding)))
