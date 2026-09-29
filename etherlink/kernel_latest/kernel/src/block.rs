@@ -2910,7 +2910,7 @@ mod tests {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),
-                da_fee_per_byte_mutez: 0,
+                da_fee_per_byte_mutez: tezosx_types::Mutez::ZERO,
                 michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
                 safe_roots: vec![],
             },

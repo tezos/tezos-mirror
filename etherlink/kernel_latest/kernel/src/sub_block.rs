@@ -160,8 +160,7 @@ fn block_constants(
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
     let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
         .to_mutez_exact()
-        .map_err(|_| Error::InvalidConversion)?
-        .as_u64();
+        .map_err(|_| Error::InvalidConversion)?;
     let michelson_to_evm_gas_multiplier =
         read_michelson_to_evm_gas_multiplier(evm_world_state)
             .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);

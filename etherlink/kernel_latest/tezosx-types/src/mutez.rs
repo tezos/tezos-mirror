@@ -58,6 +58,16 @@ impl Mutez {
             .ok_or(MutezError::Overflow)
     }
 
+    /// Checked multiplication by a count; errs on overflow past
+    /// [`Mutez::MAX`].
+    pub fn checked_mul(self, factor: u64) -> Result<Mutez, MutezError> {
+        self.0
+            .checked_mul(factor)
+            .filter(|&product| product <= Self::MAX.0)
+            .map(Mutez)
+            .ok_or(MutezError::Overflow)
+    }
+
     /// Checked subtraction; errs on underflow below zero.
     pub fn checked_sub(self, other: Mutez) -> Result<Mutez, MutezError> {
         self.0
@@ -222,6 +232,23 @@ mod tests {
         let a = Mutez(u64::MAX);
         let b = Mutez::try_from(1u64).unwrap();
         assert_eq!(a.checked_add(b), Err(MutezError::Overflow));
+    }
+
+    #[test]
+    fn checked_mul_within_domain() {
+        let a = Mutez::try_from(4u64).unwrap();
+        assert_eq!(a.checked_mul(250), Ok(Mutez::try_from(1_000u64).unwrap()));
+    }
+
+    #[test]
+    fn checked_mul_rejects_overflow_past_max() {
+        assert_eq!(Mutez::MAX.checked_mul(2), Err(MutezError::Overflow));
+    }
+
+    #[test]
+    fn checked_mul_rejects_u64_overflow() {
+        let a = Mutez::try_from(1u64 << 62).unwrap();
+        assert_eq!(a.checked_mul(8), Err(MutezError::Overflow));
     }
 
     #[test]

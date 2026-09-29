@@ -2912,7 +2912,7 @@ pub enum DaFeesError {
 
 pub fn get_required_da_fees(
     operation: &Operation,
-    da_fee_per_byte_mutez: u64,
+    da_fee_per_byte_mutez: Mutez,
 ) -> Result<Mutez, DaFeesError> {
     let op_raw_size = operation
         .to_bytes()
@@ -2922,8 +2922,9 @@ pub fn get_required_da_fees(
     // It is needed for the fees to be updated but without
     // a proper gas system 'à-la-Ethereum' we can't use for `FeeUpdates`
     // for now.
-    let raw_fee = da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64);
-    Mutez::try_from(raw_fee).map_err(DaFeesError::OutOfDomain)
+    da_fee_per_byte_mutez
+        .checked_mul(op_raw_size as u64)
+        .map_err(DaFeesError::OutOfDomain)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -11761,7 +11762,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
@@ -11815,7 +11816,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
@@ -11870,7 +11871,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: for any operation > 0 bytes, 1 mutez is insufficient.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
