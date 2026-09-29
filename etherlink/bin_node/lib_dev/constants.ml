@@ -82,45 +82,6 @@ let kernel_from_string = function
   | "latest" -> Some Latest
   | _ -> None
 
-(* Release order across both trains, mainnet and previewnet. This is not
-   decoration: [kernel_config] gates the installer layout on
-   [kernel_is_newer ~than:Previewnet02/04/05], so an ordinal decides whether
-   a kernel gets the legacy /evm governance paths and the pre-isolation
-   eth_accounts path, or the /base + world-state ones. The Ganesha kernels
-   ship storage version 65 and need the latter, hence their place after the
-   Previewnet block; moving them up among the Farfadets would silently emit
-   the wrong installer config, with no error. *)
-let kernel_to_ordinal = function
-  | Mainnet_beta -> 0
-  | Mainnet_gamma -> 1
-  | Bifrost -> 2
-  | Calypso -> 3
-  | Calypso2 -> 4
-  | Dionysus -> 5
-  | DionysusR1 -> 6
-  | Ebisu -> 7
-  | Farfadet -> 8
-  | FarfadetR1 -> 9
-  | FarfadetR2 -> 10
-  | FarfadetR3 -> 11
-  | FarfadetR4 -> 12
-  | FarfadetR5 -> 13
-  | FarfadetR6 -> 14
-  | Previewnet02 -> 15
-  | Previewnet04 -> 16
-  | Previewnet05 -> 17
-  | Previewnet06 -> 18
-  | Ganesha -> 19
-  | GaneshaR1 -> 20
-  | GaneshaR2 -> 21
-  | Latest -> Int.max_int
-
-let compare_kernel a b = Int.compare (kernel_to_ordinal a) (kernel_to_ordinal b)
-
-let kernel_is_older a ~than:b = compare_kernel a b < 0
-
-let kernel_is_newer a ~than:b = compare_kernel a b > 0
-
 let root_hash_from_released_kernel = function
   | Mainnet_beta ->
       Some
