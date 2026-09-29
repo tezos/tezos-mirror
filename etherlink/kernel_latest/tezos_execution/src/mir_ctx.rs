@@ -27,6 +27,7 @@ use mir::{
     gas::{interpret_cost, Gas, OutOfGas},
 };
 use num_bigint::{BigInt, BigUint};
+use num_traits::Zero;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::types::{Narith, Zarith};
@@ -1373,7 +1374,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue<'a>,
         value: Option<&TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError> {
+    ) -> Result<Zarith, LazyStorageError> {
         let parser = Parser::new();
         let micheline_expr = key.clone_into_micheline_optimized_legacy(
             &parser.arena,
@@ -1389,24 +1390,22 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         match value {
             None => {
                 consume_storage_write_milligas(self.operation_gas, 1, 0)?;
+                let mut lazy_storage_size_diff = Zarith(BigInt::from(0));
                 if self.rk.host().store_has(&value_path)?.is_some() {
                     let previous_value_size: BigInt =
                         self.rk.host().store_value_size(&value_path)?.into();
-                    let current = total_bytes(self.rk.host_mut(), id)?;
                     self.rk.host_mut().store_delete(&value_path)?;
 
-                    let lazy_storage_size_diff = Zarith(
+                    lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
                     );
-                    let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                    set_total_bytes(self.rk.host_mut(), id, &new_total_bytes)?;
                     self.interpret_context
                         .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
                 }
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(&id.value, key_hashed, key_encoded, None);
-                Ok(())
+                Ok(lazy_storage_size_diff)
             }
             Some(v) => {
                 let arena = Arena::new();
@@ -1418,7 +1417,6 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     )?
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
-                let current = total_bytes(self.rk.host_mut(), id)?;
                 let lazy_storage_size_diff =
                     match self.rk.host().store_value_size(&value_path) {
                         Err(RuntimeError::PathNotFound) => {
@@ -1430,8 +1428,6 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                         }
                         Err(err) => return Err(err.into()),
                     };
-                let new_total_bytes = Zarith(current.0 + &lazy_storage_size_diff.0);
-                set_total_bytes(self.rk.host_mut(), id, &new_total_bytes)?;
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
 
@@ -1450,9 +1446,24 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     key_encoded,
                     Some(encoded),
                 );
-                Ok(())
+                Ok(lazy_storage_size_diff)
             }
         }
+    }
+
+    /// One read-modify-write of the counter per big map per batch, matching
+    /// L1's `Lazy_storage_diff.apply_updates` — which also skips the
+    /// round-trip entirely when the batch nets to zero.
+    fn big_map_add_total_bytes(
+        &mut self,
+        id: &BigMapId,
+        delta: &Zarith,
+    ) -> Result<(), LazyStorageError> {
+        if delta.0.is_zero() {
+            return Ok(());
+        }
+        let current = total_bytes(self.rk.host_mut(), id)?;
+        set_total_bytes(self.rk.host_mut(), id, &Zarith(current.0 + &delta.0))
     }
 
     fn big_map_new(

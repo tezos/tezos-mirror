@@ -371,22 +371,35 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key and value types must match the type of key of the stored map.
+    ///
+    /// Returns the change in the big map's stored byte count, and does *not*
+    /// itself persist that change: it is the responsibility of the caller to
+    /// persist it with [LazyStorage::big_map_add_total_bytes].
     fn big_map_update_ref(
         &mut self,
         id: &BigMapId,
         key: &TypedValue<'a>,
         value: Option<&TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError>;
+    ) -> Result<Zarith, LazyStorageError>;
 
-    /// Owned-value convenience wrapper over [LazyStorage::big_map_update_ref].
+    /// Owned-value convenience wrapper over [LazyStorage::big_map_update_ref],
+    /// for the single-entry case.
     fn big_map_update(
         &mut self,
         id: &BigMapId,
         key: TypedValue<'a>,
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
-        self.big_map_update_ref(id, &key, value.as_ref())
+        let delta = self.big_map_update_ref(id, &key, value.as_ref())?;
+        self.big_map_add_total_bytes(id, &delta)
     }
+
+    /// Add `delta` to the big map's persisted byte counter.
+    fn big_map_add_total_bytes(
+        &mut self,
+        id: &BigMapId,
+        delta: &Zarith,
+    ) -> Result<(), LazyStorageError>;
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -450,10 +463,11 @@ pub trait LazyStorageBulkUpdate<'a>: LazyStorage<'a> {
     where
         'a: 'b,
     {
+        let mut delta = Zarith(BigInt::zero());
         for (k, v) in entries_iter {
-            self.big_map_update_ref(id, k, v)?
+            delta.0 += self.big_map_update_ref(id, k, v)?.0;
         }
-        Ok(())
+        self.big_map_add_total_bytes(id, &delta)
     }
 }
 
@@ -597,7 +611,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         id: &BigMapId,
         key: &TypedValue<'a>,
         value: Option<&TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError> {
+    ) -> Result<Zarith, LazyStorageError> {
         let info = self.access_big_map_mut(id)?;
         match value {
             None => {
@@ -610,7 +624,9 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
                 );
             }
         }
-        Ok(())
+        // No persisted byte counter in the in-memory storage, so nothing to
+        // report to `big_map_add_total_bytes`.
+        Ok(Zarith(BigInt::zero()))
     }
 
     fn big_map_new(
@@ -653,6 +669,15 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         let info = self.access_big_map(copied_id)?.clone();
         self.big_maps.insert(id.clone(), info);
         Ok(id)
+    }
+
+    fn big_map_add_total_bytes(
+        &mut self,
+        _id: &BigMapId,
+        _delta: &Zarith,
+    ) -> Result<(), LazyStorageError> {
+        // No-op, as this implementations does not keep a persisted counter.
+        Ok(())
     }
 }
 
@@ -2421,7 +2446,7 @@ mod review_verification {
             id: &BigMapId,
             key: &TypedValue<'a>,
             value: std::option::Option<&TypedValue<'a>>,
-        ) -> Result<(), LazyStorageError> {
+        ) -> Result<Zarith, LazyStorageError> {
             self.inner.big_map_update_ref(id, key, value)
         }
 
@@ -2444,6 +2469,15 @@ mod review_verification {
 
         fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
             self.inner.big_map_remove(id)
+        }
+
+        fn big_map_add_total_bytes(
+            &mut self,
+            _id: &BigMapId,
+            _delta: &Zarith,
+        ) -> Result<(), LazyStorageError> {
+            // No-op, as this implementations does not keep a persisted counter.
+            Ok(())
         }
     }
 
