@@ -14,7 +14,7 @@ use revm::{
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezosx_interfaces::{
     canonicalize_native_address,
-    headers::{format_tez_from_wei, parse_u64_opt},
+    headers::{format_tez_from_wei, parse_mutez_opt, MutezHeaderError},
     translate_original_source, AliasInfo, Classification, EvmGas, Gas as TezosXGas,
     Origin, Registry, RuntimeId, TezosXRuntimeError, ALIAS_LOOKUP_COST,
     ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
@@ -298,10 +298,17 @@ fn classify_and_charge_crac_response(
         };
         charge(gas, evm_consumed)?;
         let delegated_storage_cost_mutez =
-            parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
-                .map_err(|e| CustomPrecompileError::Revert(e.to_string(), *gas))?;
-        let delegated_storage_cost_mutez =
-            narrow_delegated_storage_cost(gas, delegated_storage_cost_mutez)?;
+            parse_mutez_opt(response.headers(), X_TEZOS_STORAGE_COST).map_err(
+                |e| match e {
+                    MutezHeaderError::OutOfDomain(_) => CustomPrecompileError::Revert(
+                        "delegated storage cost out of the mutez domain".into(),
+                        *gas,
+                    ),
+                    MutezHeaderError::Malformed(e) => {
+                        CustomPrecompileError::Revert(e.to_string(), *gas)
+                    }
+                },
+            )?;
         charge_delegated_storage_cost(
             gas,
             delegated_storage_cost_mutez,
@@ -331,24 +338,6 @@ fn classify_and_charge_crac_response(
             ),
         )))
     }
-}
-
-/// Narrow a raw mutez-denominated storage-delegation cost read off the
-/// `X-Tezos-Storage-Cost` header to the mutez domain.
-///
-/// Out-of-domain values are economically unreachable (storage costs are far
-/// below `i64::MAX` mutez); surfaced as a catchable revert rather than
-/// silently truncated.
-fn narrow_delegated_storage_cost(
-    gas: &Gas,
-    cost_mutez: Option<u64>,
-) -> Result<Option<Mutez>, CustomPrecompileError> {
-    cost_mutez.map(Mutez::try_from).transpose().map_err(|_| {
-        CustomPrecompileError::Revert(
-            "delegated storage cost out of the mutez domain".into(),
-            *gas,
-        )
-    })
 }
 
 /// Charge the EVM caller, in gas, for the storage-fee cost (in mutez)
@@ -2825,31 +2814,6 @@ mod tests {
     }
 
     #[test]
-    fn test_narrow_delegated_storage_cost_reverts_out_of_domain() {
-        // A cost past the mutez domain (i64::MAX) must revert rather than
-        // silently truncate.
-        let gas = Gas::new(1_000_000);
-        let result = narrow_delegated_storage_cost(&gas, Some(u64::MAX));
-        assert!(
-            matches!(
-                result,
-                Err(CustomPrecompileError::Revert(ref msg, _))
-                if msg.contains("delegated storage cost out of the mutez domain")
-            ),
-            "expected a Revert naming the out-of-domain cost, got: {result:?}"
-        );
-    }
-
-    #[test]
-    fn test_narrow_delegated_storage_cost_accepts_none() {
-        let gas = Gas::new(1_000_000);
-        assert!(matches!(
-            narrow_delegated_storage_cost(&gas, None),
-            Ok(None)
-        ));
-    }
-
-    #[test]
     fn test_charge_delegated_storage_cost_converts_mutez_to_wei() {
         // 1 mutez = 10^12 wei; base_fee = 1 GWei = 10^9 wei/gas.
         // g2 = ceil(1 * 10^12 / 10^9) = 1000. Guards against the
@@ -3143,6 +3107,27 @@ mod tests {
                     if msg.contains(X_TEZOS_STORAGE_COST)
             ),
             "a malformed storage-cost header must revert with a parse error, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_classify_and_charge_crac_response_storage_cost_out_of_domain_reverts() {
+        // 2xx + a storage cost past the mutez domain → catchable revert.
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, u64::MAX.to_string())
+            .body(vec![])
+            .unwrap();
+        let mut gas = Gas::new(1_000_000);
+        let result = classify_and_charge_crac_response(response, &mut gas, 1_000_000_000);
+        assert!(
+            matches!(
+                result,
+                Err(CustomPrecompileError::Revert(ref msg, _))
+                    if msg.contains("delegated storage cost out of the mutez domain")
+            ),
+            "an out-of-domain storage cost must revert, got: {result:?}"
         );
     }
 

@@ -7,7 +7,7 @@
 //! Each runtime re-uses these low-level extractors when building its own
 //! typed `parse_request_headers` function.
 
-use crate::{Gas, Mutez, TezosXRuntimeError, MAX_CRAC_DEPTH};
+use crate::{Gas, Mutez, MutezError, TezosXRuntimeError, MAX_CRAC_DEPTH};
 use primitive_types::U256;
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -108,19 +108,34 @@ pub fn parse_u32_default(
     }
 }
 
-/// Extract an optional `u64` header. Returns `None` when the header
-/// is absent, `Some(value)` when it is present and well-formed. Parse
-/// failure (header present but malformed) surfaces as `HeaderError`.
-pub fn parse_u64_opt(
+/// Failure to read a mutez header with [`parse_mutez_opt`].
+#[derive(Debug, thiserror::Error)]
+pub enum MutezHeaderError {
+    /// The value is not a `u64`, or the header cannot be read.
+    #[error(transparent)]
+    Malformed(TezosXRuntimeError),
+    /// The value is a `u64` outside the mutez domain.
+    #[error(transparent)]
+    OutOfDomain(MutezError),
+}
+
+/// Extract an optional mutez header. Returns `None` when the header is
+/// absent, `Some(amount)` when it holds an amount of the mutez domain.
+pub fn parse_mutez_opt(
     headers: &http::HeaderMap,
     name: &str,
-) -> Result<Option<u64>, TezosXRuntimeError> {
-    match parse_str(headers, name)? {
-        Some(s) => s.parse::<u64>().map(Some).map_err(|_| {
-            TezosXRuntimeError::HeaderError(format!(
-                "Invalid {name} header value: expected u64, got {s:?}"
-            ))
-        }),
+) -> Result<Option<Mutez>, MutezHeaderError> {
+    match parse_str(headers, name).map_err(MutezHeaderError::Malformed)? {
+        Some(s) => {
+            let value = s.parse::<u64>().map_err(|_| {
+                MutezHeaderError::Malformed(TezosXRuntimeError::HeaderError(format!(
+                    "Invalid {name} header value: expected u64, got {s:?}"
+                )))
+            })?;
+            Mutez::try_from(value)
+                .map(Some)
+                .map_err(MutezHeaderError::OutOfDomain)
+        }
         None => Ok(None),
     }
 }
@@ -300,6 +315,44 @@ mod tests {
 
     fn mutez(value: u64) -> Mutez {
         Mutez::try_from(value).unwrap()
+    }
+
+    #[test]
+    fn parse_mutez_opt_returns_none_for_absent_header() {
+        let map = http::HeaderMap::new();
+        assert_eq!(parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap(), None);
+    }
+
+    #[test]
+    fn parse_mutez_opt_parses_domain_amount() {
+        let mut map = http::HeaderMap::new();
+        map.insert(X_TEZOS_AMOUNT, http::HeaderValue::from_static("1500000"));
+        assert_eq!(
+            parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap(),
+            Some(mutez(1_500_000))
+        );
+    }
+
+    #[test]
+    fn parse_mutez_opt_rejects_malformed_as_malformed() {
+        let mut map = http::HeaderMap::new();
+        map.insert(X_TEZOS_AMOUNT, http::HeaderValue::from_static("1.5"));
+        let err = parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap_err();
+        assert!(matches!(
+            err,
+            MutezHeaderError::Malformed(TezosXRuntimeError::HeaderError(_))
+        ));
+    }
+
+    #[test]
+    fn parse_mutez_opt_rejects_out_of_domain_as_out_of_domain() {
+        let mut map = http::HeaderMap::new();
+        map.insert(
+            X_TEZOS_AMOUNT,
+            http::HeaderValue::from_static("9223372036854775808"),
+        );
+        let err = parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap_err();
+        assert!(matches!(err, MutezHeaderError::OutOfDomain(_)));
     }
 
     #[test]

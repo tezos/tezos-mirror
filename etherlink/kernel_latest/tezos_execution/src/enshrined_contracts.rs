@@ -33,7 +33,7 @@ use tezos_tezlink::operation_result::{
 use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_interfaces::{
     canonicalize_native_address,
-    headers::{format_tez_from_mutez, parse_u64_opt},
+    headers::{format_tez_from_mutez, parse_mutez_opt, MutezHeaderError},
     resolve_routing, translate_original_source, AliasInfo, Classification,
     CrossRuntimeContext, Gas, Milligas, Registry, RoutingDecision, RuntimeId,
     ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
@@ -2287,14 +2287,16 @@ fn classify_and_charge_crac_response(
             )
             .into());
         }
-        let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
-            .map_err(|e| {
-                CracError::Operation(TransferError::GatewayError(e.to_string()))
+        let storage_cost = parse_mutez_opt(response.headers(), X_TEZOS_STORAGE_COST)
+            .map_err(|e| match e {
+                MutezHeaderError::OutOfDomain(e) => CracError::Operation(
+                    TransferError::StorageFeesConversion(e.to_string()),
+                ),
+                MutezHeaderError::Malformed(e) => {
+                    CracError::Operation(TransferError::GatewayError(e.to_string()))
+                }
             })?;
         if let Some(v) = storage_cost {
-            let v = Mutez::try_from(v).map_err(|e| {
-                CracError::Operation(TransferError::StorageFeesConversion(e.to_string()))
-            })?;
             ctx.add_delegated_storage_cost(v).map_err(|e| {
                 CracError::Operation(TransferError::StorageFeesConversion(e.to_string()))
             })?;
