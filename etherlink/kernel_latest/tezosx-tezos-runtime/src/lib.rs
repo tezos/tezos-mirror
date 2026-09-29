@@ -298,7 +298,7 @@ fn build_crac_receipt(
     null_pkh: &PublicKeyHash,
     source_contract: &Contract,
     sender_contract: &Contract,
-    amount: &Narith,
+    amount: Mutez,
     destination: &Contract,
     parameters: &Parameters,
     target: TransferTarget,
@@ -341,7 +341,7 @@ fn build_crac_receipt(
         sender: sender_contract.clone(),
         nonce: transfer_nonce,
         content: TransferContent {
-            amount: amount.clone(),
+            amount: amount.to_narith(),
             destination: destination.clone(),
             parameters: parameters.clone(),
         },
@@ -444,7 +444,7 @@ fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
     source_contract: &Contract,
     sender_contract: &Contract,
-    amount: &Narith,
+    amount: Mutez,
     destination: &Contract,
     parameters: &Parameters,
     error: TransferError,
@@ -511,7 +511,7 @@ fn build_failed_crac_receipt(
             sender: sender_contract.clone(),
             nonce: transfer_nonce,
             content: TransferContent {
-                amount: amount.clone(),
+                amount: amount.to_narith(),
                 destination: destination.clone(),
                 parameters: parameters.clone(),
             },
@@ -962,7 +962,7 @@ where
                         &source_pkh,
                         source_contract,
                         &hdrs.sender,
-                        &hdrs.amount.to_narith(),
+                        hdrs.amount,
                         &parsed.destination,
                         &parameters,
                         te,
@@ -1009,7 +1009,7 @@ where
             &source_pkh,
             source_contract,
             &hdrs.sender,
-            &hdrs.amount.to_narith(),
+            hdrs.amount,
             &parsed.destination,
             &parameters,
             result.target,
@@ -2189,7 +2189,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(50_000_000u64.into()); // 50 tez in mutez
+        let amount = Mutez::try_from(50_000_000u64).unwrap(); // 50 tez in mutez
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
@@ -2204,7 +2204,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             target,
@@ -2282,7 +2282,8 @@ mod tests {
             "internal destination must be M_1"
         );
         assert_eq!(
-            internal.content.amount, amount,
+            internal.content.amount,
+            amount.to_narith(),
             "internal amount must match"
         );
 
@@ -2351,7 +2352,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(100_000_000u64.into());
+        let amount = Mutez::try_from(100_000_000u64).unwrap();
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::default(),
             value: mir::ast::micheline::Micheline::from(())
@@ -2365,7 +2366,7 @@ mod tests {
             &null_pkh,
             &alias, // source_contract = alias(E_0)
             &alias, // sender_contract = alias(E_1) = alias(E_0) when direct call
-            &amount,
+            amount,
             &destination,
             &parameters,
             target,
@@ -2431,7 +2432,8 @@ mod tests {
             "internal destination must be the target contract"
         );
         assert_eq!(
-            internal.content.amount, amount,
+            internal.content.amount,
+            amount.to_narith(),
             "internal amount must match"
         );
         assert!(
@@ -2479,7 +2481,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(50_000_000u64.into());
+        let amount = Mutez::try_from(50_000_000u64).unwrap();
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
@@ -2494,7 +2496,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             error,
@@ -2591,7 +2593,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(0u64.into());
+        let amount = Mutez::ZERO;
         let parameters = Parameters::default();
 
         // A distinctive, attacker-shaped payload that won't otherwise appear
@@ -2605,7 +2607,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             error,
@@ -2693,7 +2695,7 @@ mod tests {
             &null_pkh,
             &kt1("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"),
             &kt1("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2"),
-            &Narith(0u64.into()),
+            Mutez::ZERO,
             &kt1("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"),
             &Parameters::default(),
             TransferError::FailedToExecuteInternalOperation("test failure".into()),
@@ -2757,7 +2759,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(0u64.into());
+        let amount = Mutez::ZERO;
         let parameters = Parameters::default();
 
         // The wrapper error passed to the builder — present because the
@@ -2801,7 +2803,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             wrapper_error,
