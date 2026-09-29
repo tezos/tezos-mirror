@@ -76,6 +76,10 @@ Client
 Signer
 ------
 
+- Fixed remote signing with tz5 (ML-DSA-44) keys over the TCP and Unix
+  socket signers: the client failed to encode the request with
+  ``Data_encoding.Write_error(No case matched)``. (MR :gl:`!22917`)
+
 Baker
 -----
 
