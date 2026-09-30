@@ -439,11 +439,17 @@ impl BlockInProgress {
                     .list
                     .extend(pending_crac_receipts);
             }
-            RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
-                op: operation_and_receipt,
-                cross_runtime_effects,
-                consumed_milligas,
-            }) => {
+            RuntimeExecutionInfo::Tezos(info) => {
+                let status = if info.is_success() {
+                    TransactionStatus::Success
+                } else {
+                    TransactionStatus::Failure
+                };
+                let TezosExecutionInfo {
+                    op: operation_and_receipt,
+                    cross_runtime_effects,
+                    consumed_milligas,
+                } = info;
                 let cumulative_execution_gas =
                     crate::chains::michelson_milligas_to_evm_gas(
                         consumed_milligas,
@@ -459,7 +465,7 @@ impl BlockInProgress {
                 for effect in cross_runtime_effects {
                     match effect {
                         CrossRuntimeEffect::Evm(evm_effect) => {
-                            self.register_crac_evm_transaction(evm_effect)?;
+                            self.register_crac_evm_transaction(evm_effect, status)?;
                         }
                     }
                 }
@@ -668,6 +674,7 @@ impl BlockInProgress {
     fn register_crac_evm_transaction(
         &mut self,
         effect: EvmCracEffect,
+        status: TransactionStatus,
     ) -> Result<(), anyhow::Error> {
         let hash_bytes = effect.tx_hash;
 
@@ -718,7 +725,7 @@ impl BlockInProgress {
             logs_bloom,
             logs,
             type_: TransactionType::Legacy,
-            status: TransactionStatus::Success,
+            status,
         };
 
         let tx_object = TransactionObject {
@@ -946,8 +953,11 @@ mod tests {
         // effects.
         bip.cumulative_execution_gas = U256::from(50u64);
 
-        bip.register_crac_evm_transaction(dummy_crac_effect(7))
-            .expect("CRAC registration should succeed");
+        bip.register_crac_evm_transaction(
+            dummy_crac_effect(7),
+            super::TransactionStatus::Success,
+        )
+        .expect("CRAC registration should succeed");
 
         assert_eq!(
             bip.cumulative_receipts[0].cumulative_gas_used,
@@ -956,8 +966,11 @@ mod tests {
         );
 
         // A second CRAC must keep the staircase monotonic.
-        bip.register_crac_evm_transaction(dummy_crac_effect(13))
-            .expect("CRAC registration should succeed");
+        bip.register_crac_evm_transaction(
+            dummy_crac_effect(13),
+            super::TransactionStatus::Success,
+        )
+        .expect("CRAC registration should succeed");
 
         assert_eq!(
             bip.cumulative_receipts[1].cumulative_gas_used,
@@ -992,8 +1005,11 @@ mod tests {
         let mut bip =
             BlockInProgress::new(U256::from(1), Default::default(), U256::one());
 
-        bip.register_crac_evm_transaction(dummy_crac_effect(7))
-            .expect("CRAC registration should succeed");
+        bip.register_crac_evm_transaction(
+            dummy_crac_effect(7),
+            super::TransactionStatus::Success,
+        )
+        .expect("CRAC registration should succeed");
 
         assert!(
             bip.cumulative_tx_objects

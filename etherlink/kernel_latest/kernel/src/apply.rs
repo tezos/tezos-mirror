@@ -1095,6 +1095,12 @@ pub struct TezosExecutionInfo {
 }
 
 impl TezosExecutionInfo {
+    /// Whether every operation in the batch was applied successfully.
+    pub fn is_success(&self) -> bool {
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            self.op.op_and_receipt;
+        batch.operations.iter().all(|op| op.receipt.is_applied())
+    }
     /// Build the EVM [`revm::context::result::ExecutionResult`] describing this applied Tezos
     /// operation, to feed the journal-owned tracer in [`crate::journal::close_tezosx_journal`].
     pub fn to_execution_result(
@@ -1102,15 +1108,11 @@ impl TezosExecutionInfo {
         michelson_to_evm_gas_multiplier: u64,
     ) -> revm::context::result::ExecutionResult {
         use revm::context::result::{ExecutionResult, Output, ResultGas, SuccessReason};
-        use tezos_tezlink::operation_result::OperationDataAndMetadata;
         let gas_used = crate::chains::michelson_milligas_to_evm_gas(
             self.consumed_milligas,
             michelson_to_evm_gas_multiplier,
         );
-        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
-            self.op.op_and_receipt;
-        let is_success = batch.operations.iter().all(|op| op.receipt.is_applied());
-        if is_success {
+        if self.is_success() {
             ExecutionResult::Success {
                 reason: SuccessReason::Stop,
                 gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
