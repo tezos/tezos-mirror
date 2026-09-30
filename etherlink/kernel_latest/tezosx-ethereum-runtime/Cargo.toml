@@ -16,6 +16,7 @@ alloy-sol-types.workspace = true
 primitive-types.workspace = true
 hex.workspace = true
 revm.workspace = true
+revm-interpreter.workspace = true
 revm-etherlink.workspace = true
 rlp.workspace = true
 
@@ -23,6 +24,7 @@ tezos_ethereum.workspace = true
 tezosx-interfaces.workspace = true
 tezos-evm-logging.workspace = true
 tezosx-journal.workspace = true
+tezosx-types.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-keyspace.workspace = true

@@ -12,6 +12,7 @@ use tezos_crypto_rs::{
     hash::{BlockHash, ChainId, ContractKt1Hash, OperationHash, UnknownSignature},
 };
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezosx_types::CheckNativeAddressError;
 // UnknownSignature has a private constructor; use try_from to build one.
 const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
 use tezos_data_encoding::{enc::BinWriter, types::Narith};
@@ -19,7 +20,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_execution::{
     account_storage::TezosAccount,
     context, cross_runtime_transfer,
-    enshrined_contracts::CracError,
+    enshrined_contracts::{self, CracError},
     mir_ctx::{InterpretContext, OperationCtx, TcCtx},
     originate_contract, storage_fees, typecheck_code_and_storage, CracTransferError,
     TezlinkOperationGas,
@@ -1399,6 +1400,58 @@ impl RuntimeInterface for TezosRuntime {
         };
         let origin = context::read_origin_for_address(host, &address_hash)?;
         Ok((Classification::from(origin), consumed))
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        address: &str,
+        _public_key: Option<&str>,
+        budget: &mut TezosXGas,
+    ) -> Result<(), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        let host = rk.host();
+        let contract = Contract::from_b58check(address)
+            .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
+        // if it's not a contract
+        let kt1 = match contract {
+            Contract::Implicit(_) => return Ok(()),
+            Contract::Originated(kt1) => kt1,
+        };
+        // Enshrined contracts, like the gateway, have no account behind them
+        // that could own an alias. Their code is synthetic, so the code check
+        // below would wrongly accept them.
+        if enshrined_contracts::is_enshrined(&kt1) {
+            return Err(CheckNativeAddressError::Precompile.into());
+        }
+        budget.consume(ALIAS_LOOKUP_COST)?;
+        // if it's already classified as origin
+        let origin =
+            context::read_origin_for_address(host, &AddressHash::Kt1(kt1.clone()))?;
+        match origin {
+            Some(Origin::Native) => return Ok(()),
+            Some(Origin::Alias(_)) => {
+                return Err(CheckNativeAddressError::NotProvablyNative.into())
+            }
+            _ => {}
+        }
+        // An unclassified KT1 is native only if a contract was actually
+        // originated there, i.e. it has code (enshrined contracts are
+        // rejected above). We don't compare that code with
+        // the aliases one because aliases are, by construction, tagged as
+        // aliases in their `Origin` (handled above). A code comparison would
+        // bring no new cases, and would not be future proof when upgrading
+        // aliases code.
+        budget.consume(ALIAS_LOOKUP_COST)?;
+        let account = context::originated_from_kt1(&kt1)?;
+        if account.exists(host)? {
+            Ok(())
+        } else {
+            Err(CheckNativeAddressError::NotProvablyNative.into())
+        }
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
@@ -3482,6 +3535,182 @@ mod tests {
             let (class, consumed) = runtime.read_origin(&rk, &kt1_b58, budget).unwrap();
             assert_eq!(class, Classification::Native);
             assert_eq!(consumed, ALIAS_LOOKUP_COST);
+        }
+    }
+
+    // ── TezosRuntime::check_is_native_address tests ──────────────────────
+
+    mod check_is_native_address_tests {
+        use super::*;
+        use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash};
+        use tezosx_interfaces::{
+            AliasInfo, Gas as TezosXGas, Origin, RuntimeInterface, TezosXRuntimeError,
+            ALIAS_LOOKUP_COST,
+        };
+        use tezosx_types::CheckNativeAddressError;
+
+        const IMPLICIT: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+        const BUDGET_MILLIGAS: u64 = 100_000_000;
+
+        fn budget() -> TezosXGas {
+            TezosXGas::new(BUDGET_MILLIGAS, RuntimeId::Tezos)
+        }
+
+        fn milligas(gas: u64) -> TezosXGas {
+            TezosXGas::new(gas, RuntimeId::Tezos)
+        }
+
+        fn lookup_cost() -> u64 {
+            ALIAS_LOOKUP_COST.as_runtime(RuntimeId::Tezos)
+        }
+
+        fn kt1(seed: &[u8]) -> ContractKt1Hash {
+            ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(seed))
+        }
+
+        fn check<KS: KeySpace>(
+            rk: &RuntimeKeyspaces<'_, MockKernelHost, KS>,
+            address: &str,
+            budget: TezosXGas,
+        ) -> Result<TezosXGas, TezosXRuntimeError> {
+            let mut budget = budget;
+            TezosRuntime::new(ChainId::default()).check_is_native_address(
+                rk,
+                address,
+                None,
+                &mut budget,
+            )?;
+            Ok(budget)
+        }
+
+        // Implicit addresses need no durable read, so even an empty budget
+        // is enough.
+        #[test]
+        fn implicit_address_with_empty_budget_is_native() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let remaining = check(&rk, IMPLICIT, TezosXGas::ZERO).unwrap();
+            assert_eq!(remaining, TezosXGas::ZERO);
+        }
+
+        #[test]
+        fn malformed_address_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+
+            let err = check(&rk, "not-a-tezos-address", budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedAddress.into());
+        }
+
+        #[test]
+        fn kt1_recorded_native_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"native_kt1");
+            let account = context::originated_from_kt1(&kt1).unwrap();
+            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+
+            let remaining = check(&rk, &kt1.to_base58_check(), budget()).unwrap();
+            assert_eq!(remaining, milligas(BUDGET_MILLIGAS - lookup_cost()));
+        }
+
+        #[test]
+        fn kt1_recorded_alias_is_not_provably_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"alias_kt1");
+            let account = context::originated_from_kt1(&kt1).unwrap();
+            let origin = Origin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string(),
+            });
+            account.set_origin(rk.host_mut(), &origin).unwrap();
+
+            let err = check(&rk, &kt1.to_base58_check(), budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
+        }
+
+        // A contract originated before classification existed carries no
+        // `/origin` record: its code is what proves it is native.
+        #[test]
+        fn unclassified_kt1_with_code_is_native() {
+            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"unclassified_kt1_with_code");
+            let account = context::originated_from_kt1(&kt1).unwrap();
+            account
+                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .unwrap();
+
+            let remaining = check(&rk, &kt1.to_base58_check(), budget()).unwrap();
+            assert_eq!(remaining, milligas(BUDGET_MILLIGAS - 2 * lookup_cost()));
+        }
+
+        // An unclassified KT1 without code is either not originated yet or
+        // the address of an alias not materialized yet: it is not a proof.
+        #[test]
+        fn unclassified_kt1_without_code_is_not_provably_native() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"unclassified_kt1_without_code");
+
+            let err = check(&rk, &kt1.to_base58_check(), budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
+        }
+
+        // A failure after a charge keeps it: the caller is billed for the
+        // two reads done before the error.
+        #[test]
+        fn unclassified_kt1_without_code_still_consumes_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"unclassified_kt1_consumes_gas");
+            let mut budget = budget();
+
+            let err = TezosRuntime::new(ChainId::default())
+                .check_is_native_address(&rk, &kt1.to_base58_check(), None, &mut budget)
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
+            assert_eq!(budget, milligas(BUDGET_MILLIGAS - 2 * lookup_cost()));
+        }
+
+        // Enshrined contracts, like the gateway, have no account behind them
+        // that could own an alias.
+        #[test]
+        fn enshrined_contract_is_rejected() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let gateway = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+
+            let err = check(&rk, gateway, budget()).unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::Precompile.into());
+        }
+
+        #[test]
+        fn kt1_with_budget_below_origin_lookup_is_out_of_gas() {
+            let mut host = MockKernelHost::default();
+            let rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"oog_origin_lookup");
+
+            let err = check(&rk, &kt1.to_base58_check(), milligas(lookup_cost() - 1))
+                .unwrap_err();
+            assert_eq!(err, TezosXRuntimeError::OutOfGas);
+        }
+
+        #[test]
+        fn unclassified_kt1_with_budget_below_code_lookup_is_out_of_gas() {
+            let mut host = MockKernelHost::default();
+            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let kt1 = kt1(b"oog_code_lookup");
+            let account = context::originated_from_kt1(&kt1).unwrap();
+            account
+                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .unwrap();
+
+            let err = check(&rk, &kt1.to_base58_check(), milligas(2 * lookup_cost() - 1))
+                .unwrap_err();
+            assert_eq!(err, TezosXRuntimeError::OutOfGas);
         }
     }
 }

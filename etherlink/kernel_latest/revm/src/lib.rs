@@ -1294,6 +1294,19 @@ mod test {
                     Err(e) => Err(TezosXRuntimeError::Runtime(e)),
                 }
             }
+
+            fn check_is_native_address<Host, KS>(
+                &self,
+                _rk: &RuntimeKeyspaces<'_, Host, KS>,
+                _address: &str,
+                _public_key: Option<&str>,
+                _budget: &mut tezosx_types::Gas,
+            ) -> Result<(), tezosx_types::TezosXRuntimeError>
+            where
+                Host: StorageV1,
+            {
+                Ok(())
+            }
         }
 
         sol!("contracts/tests/create_and_revert.sol");

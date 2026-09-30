@@ -3688,6 +3688,7 @@ dependencies = [
  "primitive-types",
  "revm",
  "revm-etherlink",
+ "revm-interpreter",
  "rlp",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
@@ -3697,6 +3698,7 @@ dependencies = [
  "tezos_ethereum_latest",
  "tezosx-interfaces",
  "tezosx-journal",
+ "tezosx-types",
 ]
 
 [[package]]
@@ -3762,6 +3764,7 @@ dependencies = [
  "tezos_tezlink_latest",
  "tezosx-interfaces",
  "tezosx-journal",
+ "tezosx-types",
 ]
 
 [[package]]

@@ -18,7 +18,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::RuntimeId;
+use crate::{RuntimeId, TezosXRuntimeError};
 use tezosx_constants::EVM_GAS_TO_MILLIGAS;
 
 /// Convert `gas` from `source` runtime units to `target` runtime units.
@@ -88,6 +88,22 @@ impl Gas {
         } else {
             convert_ceil(self.runtime, runtime, self.gas)
         }
+    }
+
+    /// Consume `cost` from this budget.
+    ///
+    /// The cost is converted into the budget's unit, rounding *up* like
+    /// [`Gas::as_runtime`], so a charge never under-covers what was
+    /// consumed and the budget keeps its own unit.
+    ///
+    /// Fails with [`TezosXRuntimeError::OutOfGas`] when the budget can't
+    /// cover the cost, and then leaves the budget untouched.
+    pub fn consume(&mut self, cost: Gas) -> Result<(), TezosXRuntimeError> {
+        self.gas = self
+            .gas
+            .checked_sub(cost.as_runtime(self.runtime))
+            .ok_or(TezosXRuntimeError::OutOfGas)?;
+        Ok(())
     }
 
     /// Exact value in the finest unit (Tezos milligas).
@@ -465,6 +481,44 @@ mod gas_type_tests {
         let spent = budget - Gas::new(0, ETH);
         assert_eq!(spent.as_runtime(TEZ), 46 * EVM_GAS_TO_MILLIGAS);
         assert!(spent > budget);
+    }
+
+    #[test]
+    fn consume_in_the_same_unit() {
+        let mut budget = Gas::new(100, ETH);
+        budget.consume(Gas::new(30, ETH)).unwrap();
+        assert_eq!(budget.as_runtime(ETH), 70);
+    }
+
+    #[test]
+    fn consume_keeps_the_budget_unit() {
+        let mut budget = Gas::new(100 * EVM_GAS_TO_MILLIGAS, TEZ);
+        budget.consume(Gas::new(30, ETH)).unwrap();
+        assert_eq!(budget.as_runtime(TEZ), 70 * EVM_GAS_TO_MILLIGAS);
+    }
+
+    // A cost in a finer unit rounds up, so the charge never under-covers
+    // what was consumed.
+    #[test]
+    fn consume_rounds_a_finer_cost_up() {
+        let mut budget = Gas::new(100, ETH);
+        budget.consume(Gas::new(1, TEZ)).unwrap();
+        assert_eq!(budget.as_runtime(ETH), 99);
+    }
+
+    #[test]
+    fn consume_the_whole_budget() {
+        let mut budget = Gas::new(100, ETH);
+        budget.consume(Gas::new(100, ETH)).unwrap();
+        assert_eq!(budget, Gas::ZERO);
+    }
+
+    #[test]
+    fn consume_beyond_the_budget_is_out_of_gas_and_leaves_it_untouched() {
+        let mut budget = Gas::new(100, ETH);
+        let err = budget.consume(Gas::new(101, ETH)).unwrap_err();
+        assert_eq!(err, TezosXRuntimeError::OutOfGas);
+        assert_eq!(budget.as_runtime(ETH), 100);
     }
 
     #[test]

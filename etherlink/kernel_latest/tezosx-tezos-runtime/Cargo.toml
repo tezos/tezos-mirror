@@ -19,6 +19,7 @@ num-bigint.workspace = true
 
 tezosx-interfaces.workspace = true
 tezosx-journal.workspace = true
+tezosx-types.workspace = true
 
 tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
