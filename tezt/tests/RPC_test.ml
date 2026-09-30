@@ -1785,17 +1785,14 @@ let test_rpc_max_request_body_keeps_connection () =
        was received in full leaves the connection usable" ;
   unit
 
-(* Sends a POST that declares [content_length] but writes only [body], then
-   optionally half-closes, and returns whatever the server answers.
-
-   Headers and [body] go out in a single write so that the server cannot reset
-   the connection between the two, which would raise [EPIPE] here.
+(* Writes [request] as is, then optionally half-closes, and returns the first
+   bytes the server answers.
 
    Reading the response on a raw socket rather than through [curl] is the whole
    point: once the server stops reading a body the client is still uploading,
    the connection is reset, and curl reports the send failure and discards the
    response bytes it had already received. The 413 does reach the socket. *)
-let raw_post_truncated node ~content_length ~body ~half_close =
+let raw_exchange node ~request ~half_close =
   let socket = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
   Lwt.finalize
     (fun () ->
@@ -1804,18 +1801,6 @@ let raw_post_truncated node ~content_length ~body ~half_close =
           socket
           (Unix.ADDR_INET
              (Unix.inet_addr_of_string Constant.default_host, Node.rpc_port node))
-      in
-      let request =
-        Printf.sprintf
-          "POST /version HTTP/1.1\r\n\
-           Host: %s\r\n\
-           Content-Type: application/json\r\n\
-           Content-Length: %d\r\n\
-           \r\n\
-           %s"
-          Constant.default_host
-          content_length
-          body
       in
       let bytes = Bytes.of_string request in
       let rec write offset =
@@ -1839,6 +1824,121 @@ let raw_post_truncated node ~content_length ~body ~half_close =
       in
       Lwt.return (String.lowercase_ascii (Bytes.sub_string buffer 0 len)))
     (fun () -> Lwt.catch (fun () -> Lwt_unix.close socket) (fun _ -> unit))
+
+(* Sends a POST that declares [content_length] but writes only [body], then
+   optionally half-closes, and returns whatever the server answers.
+
+   Headers and [body] go out in a single write so that the server cannot reset
+   the connection between the two, which would raise [EPIPE] here. *)
+let raw_post_truncated node ~content_length ~body ~half_close =
+  raw_exchange
+    node
+    ~request:
+      (Printf.sprintf
+         "POST /version HTTP/1.1\r\n\
+          Host: %s\r\n\
+          Content-Type: application/json\r\n\
+          Content-Length: %d\r\n\
+          \r\n\
+          %s"
+         Constant.default_host
+         content_length
+         body)
+    ~half_close
+
+(* Sends a chunked POST whose body is [chunks], written as is, and returns
+   whatever the server answers. *)
+let raw_post_chunked node ~chunks =
+  raw_exchange
+    node
+    ~request:
+      (Printf.sprintf
+         "POST /version HTTP/1.1\r\n\
+          Host: %s\r\n\
+          Content-Type: application/json\r\n\
+          Transfer-Encoding: chunked\r\n\
+          \r\n\
+          %s"
+         Constant.default_host
+         chunks)
+    ~half_close:false
+
+let chunk data = Printf.sprintf "%x\r\n%s\r\n" (String.length data) data
+
+let last_chunk = "0\r\n\r\n"
+
+(* Cohttp does not give us the length of a chunked body, so the end of the
+   stream is all the server has to go on -- and [Cohttp.Transfer] also ends the
+   stream on a malformed chunk header. Each scenario below ends the body
+   differently, and the server must tell apart a body received in full from
+   one it could not make sense of. *)
+let test_rpc_max_request_body_chunked () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap on chunked bodies"
+    ~tags:["rpc"; "body"; "limit"; "chunked"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let is_413 response = String.starts_with ~prefix:"http/1.1 413" response in
+  let closes response = response =~ rex "connection: *close" in
+  let over_cap = String.make (max_request_body * 3 / 2) 'a' in
+  (* Within the cap, well-formed: served. *)
+  let* response =
+    raw_post_chunked
+      node
+      ~chunks:(chunk (String.make 1_000 'a') ^ chunk "a" ^ last_chunk)
+  in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 " response && not (is_413 response))
+    ~error_msg:
+      (Printf.sprintf
+         "a well-formed chunked body under the cap got %S: it must be served, \
+          not rejected by the size cap"
+         response) ;
+  (* Over the cap, well-formed and within the lingering read's ceiling: 413 on a
+     connection that stays reusable. *)
+  let* response = raw_post_chunked node ~chunks:(chunk over_cap ^ last_chunk) in
+  Check.is_true
+    (is_413 response && not (closes response))
+    ~error_msg:
+      (Printf.sprintf
+         "a well-formed chunked body over the cap got %S, expected a 413 \
+          without [Connection: close]"
+         response) ;
+  (* Over the cap in a single chunk, then a chunk size that does not parse.
+     Whatever follows cannot be framed, so the connection must be closed: were
+     it kept, the bytes after the bad chunk header would be read as the next
+     request.
+
+     FIXME: #8428
+     Known failure, so this checks the current behaviour instead: the server
+     answers 413 *without* [Connection: close] and keeps the connection.
+     [Cohttp.Transfer] ends the stream on the bad chunk size exactly as on the
+     last chunk, and with no declared length to compare against,
+     [bounded_drain] takes it for a body received in full. Once fixed, this
+     check fails: expect [closes response] instead. *)
+  let* response = raw_post_chunked node ~chunks:(chunk over_cap ^ "zz\r\n") in
+  Check.is_true
+    (is_413 response && not (closes response))
+    ~error_msg:
+      (Printf.sprintf
+         "a chunked body over the cap followed by a malformed chunk header got \
+          %S, expected the known-buggy 413 without [Connection: close]. If the \
+          connection is now closed, the bug is fixed: update this check"
+         response) ;
+  (* Over the cap, then stalls without the last chunk: the idle timeout ends
+     the lingering read, and the connection must be closed. *)
+  let* response = raw_post_chunked node ~chunks:(chunk over_cap) in
+  Check.is_true
+    (is_413 response && closes response)
+    ~error_msg:
+      (Printf.sprintf
+         "a chunked body over the cap that stalled got %S, expected a 413 with \
+          [Connection: close]"
+         response) ;
+  unit
 
 (* The 413 sent on the shutdown path is not covered by the tests above: they
    either exercise the reusable-connection path, or -- for an endless body --
@@ -2303,6 +2403,7 @@ let register protocols =
   test_rpc_max_request_body () ;
   test_rpc_max_request_body_keeps_connection () ;
   test_rpc_max_request_body_closes_connection () ;
+  test_rpc_max_request_body_chunked () ;
   test_rpc_max_request_body_under_cap_stall () ;
   test_rpc_max_request_body_endless () ;
   test_rpc_max_request_body_no_slot_exhaustion () ;
