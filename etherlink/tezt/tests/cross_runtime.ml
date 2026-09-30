@@ -6054,6 +6054,145 @@ let test_crac_l2_1212_multi_michelson_block () =
     prefix ;
   unit
 
+(** A read-only crossing still registers a synthetic EVM transaction. Its
+    STATICCALL child must retain a root, including when a later operation
+    backtracks the batch. Trace a normal EVM transfer in the same block to
+    detect frames being attached to the wrong transaction. *)
+let test_crac_call_tracer_static_crossing ~backtracked () =
+  register_crac_runner_test
+    ~title:
+      (sf
+         "CRAC callTracer: read-only crossing in mixed block (%s)"
+         (if backtracked then "backtracked" else "applied"))
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "block"; "static_crossing"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TRACE-STATIC" in
+  (* Return 0x42 for any calldata, without modifying EVM state. *)
+  let* evm_target =
+    EvmContract.deploy_contract
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~init_code:"0x600a80600b6000396000f3604260005260206000f3"
+      ()
+  in
+  let* _, view_contract =
+    TezContract.originate_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~script_name:["mini_scenarios"; "staticcall_evm_on_chain"]
+      ~init_storage_data:(sf {|Pair None "%s"|} evm_target)
+      Michelson_contracts.tezlink_protocol
+  in
+  let* (`Tez_runner (_, failing_contract)) = TezAlwaysFailsUnit.originate () in
+  let* arg = Client.convert_data_to_json ~data:"Unit" client in
+  let make_call dest =
+    Operation.Manager.(
+      make
+        ~source
+        ~counter:(tez_counter ())
+        ~fee:100_000
+        ~gas_limit:100_000
+        ~storage_limit:1000
+        (call ~dest ~arg ~amount:0 ()))
+  in
+  let crossing = make_call view_contract in
+  let contents =
+    if backtracked then [crossing; make_call failing_contract] else [crossing]
+  in
+  let* branch = tez_branch client_tezlink in
+  let* operation = Operation.Manager.operation ~branch contents client in
+  let* normal_hash =
+    send_evm_transfer_no_block ~address:sender.Eth_account.address ()
+  in
+  let* receipt =
+    TezContract.inject_op_and_produce_block ~client_tezlink ~sequencer operation
+  in
+  Check.(
+    (JSON.(
+       receipt |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+       |-> "status" |> as_string)
+    = if backtracked then "backtracked" else "applied")
+      string
+      ~error_msg:"Expected crossing status %R, got %L") ;
+  let michelson_op_hash = JSON.(receipt |-> "hash" |> as_string) in
+  let synthetic_hash = compute_crac_fake_tx_hash ~michelson_op_hash in
+  let expected_hashes =
+    List.sort String.compare [normal_hash; synthetic_hash]
+  in
+  let*@ block = latest_block ~sequencer in
+  let hashes =
+    match block.transactions with
+    | Block.Hash hashes -> List.sort String.compare hashes
+    | _ -> Test.fail "%s: expected transaction hashes" prefix
+  in
+  Check.(
+    (hashes = expected_hashes)
+      (list string)
+      ~error_msg:"Expected normal and synthetic transactions %R, got %L") ;
+  Lwt_list.iter_s
+    (fun only_top_call ->
+      let tracer_config = [("onlyTopCall", `Bool only_top_call)] in
+      let*@ traces =
+        Rpc.trace_block
+          ~block:(Number (Int32.to_int block.number))
+          ~tracer_config
+          sequencer
+      in
+      Check.(
+        (List.sort
+           String.compare
+           (List.map (fun t -> JSON.(t |-> "txHash" |> as_string)) traces)
+        = expected_hashes)
+          (list string)
+          ~error_msg:"Expected one trace for each transaction %R, got %L") ;
+      let* () =
+        assert_block_matches_per_tx ~sequencer ~prefix ~tracer_config traces
+      in
+      Lwt_list.iter_s
+        (fun entry ->
+          let hash = JSON.(entry |-> "txHash" |> as_string) in
+          let root = JSON.(entry |-> "result") in
+          if hash = normal_hash then (
+            Check.(
+              (trace_subcalls root = [])
+                (list json)
+                ~error_msg:"Normal transfer must have no child frames, got %L") ;
+            unit)
+          else
+            let* () =
+              assert_root_mirrors_tx_object
+                ~sequencer
+                ~prefix
+                ~tx_hash:synthetic_hash
+                root
+            in
+            Check.(
+              (JSON.(root |-> "error" |> as_opt |> Option.map as_string)
+              = if backtracked then Some "Reverted" else None)
+                (option string)
+                ~error_msg:"Expected synthetic root error %R, got %L") ;
+            match (only_top_call, trace_subcalls root) with
+            | true, [] -> unit
+            | false, [child] ->
+                Check.(
+                  (( trace_field_lc child "type",
+                     trace_field_lc child "to",
+                     trace_field_lc child "output" )
+                  = ( "staticcall",
+                      String.lowercase_ascii evm_target,
+                      "0x" ^ String.make 62 '0' ^ "42" ))
+                    (tuple3 string string string)
+                    ~error_msg:"Expected the read-only crossing %R, got %L") ;
+                unit
+            | _ -> Test.fail "%s: unexpected synthetic root children" prefix)
+        traces)
+    [false; true]
+
 (** Example E (block trace) of the cross-runtime tracing RFC
     (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
     as a block ⇄ transaction CONSISTENCY proof for
@@ -19221,6 +19360,8 @@ let () =
   test_crac_debug_trace_block () ;
   test_crac_debug_trace_normal_tx_in_crac_block () ;
   test_crac_l2_1212_multi_michelson_block () ;
+  test_crac_call_tracer_static_crossing ~backtracked:false () ;
+  test_crac_call_tracer_static_crossing ~backtracked:true () ;
   test_crac_debug_trace_block_consistency_mixed () ;
   test_crac_debug_trace_call_with_nac () ;
   test_http_trace_nested_crac () ;
