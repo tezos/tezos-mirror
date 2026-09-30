@@ -1081,7 +1081,7 @@ end
 module Evm_migration = Sqlite.Migration.Make (struct
   let table_name = "migrations"
 
-  let version = 24
+  let version = 25
 
   let all_migrations = Evm_node_migrations.all
 end)
