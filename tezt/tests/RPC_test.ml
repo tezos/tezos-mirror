@@ -2043,6 +2043,37 @@ let test_rpc_max_request_body_under_cap_stall () =
        seconds: the server must stop waiting for it" ;
   unit
 
+(* Shutting the read half down wakes cohttp's EOF monitor, which cancels the
+   request handler, and with it possibly the write of the response. The monitor
+   is certain to be parked on its read by the time a 10s idle timeout fires,
+   so this is where losing the response would show: the client must still
+   read the 408, and be told the connection is closing. *)
+let test_rpc_max_request_body_timeout_response () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body read timeout still answers"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let* response =
+    raw_post_truncated
+      node
+      ~content_length:(max_request_body - 1)
+      ~body:"a"
+      ~half_close:false
+  in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 408" response
+    && response =~ rex "connection: *close")
+    ~error_msg:
+      (Printf.sprintf
+         "a stalled request body got %S, expected a 408 with [Connection: \
+          close]: shutting the connection down must not lose the response"
+         response) ;
+  unit
+
 (* The regression test for the unbounded drain. Before the bounded lingering
    close, the server kept reading this body for ever and the request never
    completed. Note that we do not assert on the status: once we stop reading,
@@ -2405,6 +2436,7 @@ let register protocols =
   test_rpc_max_request_body_closes_connection () ;
   test_rpc_max_request_body_chunked () ;
   test_rpc_max_request_body_under_cap_stall () ;
+  test_rpc_max_request_body_timeout_response () ;
   test_rpc_max_request_body_endless () ;
   test_rpc_max_request_body_no_slot_exhaustion () ;
   test_rpc_max_request_body_under_cap_truncated ()
