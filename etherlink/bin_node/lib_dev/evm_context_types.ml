@@ -52,7 +52,7 @@ module Request = struct
         tx : Broadcast.transaction;
         hash : Ethereum_types.hash;
       }
-        -> (L2_types.single_tx_receipt option, tztrace) t
+        -> (Transaction_receipt.t option, tztrace) t
 
   let name (type a b) (t : (a, b) t) =
     match t with

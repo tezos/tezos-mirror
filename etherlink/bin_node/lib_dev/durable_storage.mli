@@ -111,6 +111,7 @@ type ('a, 'cap) path =
   | Tezosx_tezos_current_block :
       (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
   | Current_receipts : (Transaction_receipt.t, ro) path
+  | Current_receipt_at : int -> (Transaction_receipt.t option, ro) path
   | Backlog : (int64, ro) path
   | Minimum_base_fee_per_gas : (Z.t, ro) path
   | Da_fee_per_byte : (Ethereum_types.quantity, ro) path

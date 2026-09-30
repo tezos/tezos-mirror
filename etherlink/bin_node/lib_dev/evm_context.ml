@@ -51,6 +51,9 @@ type parameters = {
 type future_block_info = {
   timestamp : Time.Protocol.t;
   next_tx_index : int32;
+  receipts_count : int;
+      (** Number of EVM receipts produced so far in the block in progress,
+          including synthetic receipts of cross-runtime calls. *)
   applied_sequencer_upgrade : bool;
   da_fee_per_byte : Ethereum_types.quantity;
   base_fee_per_gas : Z.t;
@@ -1225,6 +1228,7 @@ module State = struct
          {
            timestamp;
            next_tx_index = 0l;
+           receipts_count = 0;
            applied_sequencer_upgrade;
            da_fee_per_byte;
            base_fee_per_gas;
@@ -1291,8 +1295,14 @@ module State = struct
     let open Lwt_result_syntax in
     match ctxt.session.future_block_info with
     | Executing
-        ({timestamp; next_tx_index; da_fee_per_byte; base_fee_per_gas; _} as
-         future_block_info) ->
+        ({
+           timestamp;
+           next_tx_index;
+           receipts_count;
+           da_fee_per_byte;
+           base_fee_per_gas;
+           _;
+         } as future_block_info) ->
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
@@ -1308,35 +1318,37 @@ module State = struct
               timestamp;
               number = ctxt.session.next_blueprint_number;
               transactions_count = next_tx_index;
+              receipts_count;
             }
             hash
             tx
         in
-        let otel_attrs () =
-          let common =
-            [Telemetry.Attributes.Transaction.receipt_type receipt]
-          in
-          match receipt with
-          | L2_types.Ethereum r ->
-              let (Ethereum_types.Qty gas_used) = r.gasUsed in
-              let execution_gas =
-                compute_execution_gas
-                  ~tx
-                  ~da_fee_per_byte
-                  ~base_fee_per_gas
-                  ~gas_used
-              in
-              Telemetry.Attributes.Transaction.execution_gas execution_gas
-              :: common
-          | L2_types.Tezos -> common
-        in
-        Octez_telemetry.Trace.add_attrs otel_attrs ;
         ctxt.session.evm_state <- evm_state ;
         ctxt.session.future_block_info <-
           Executing
-            {future_block_info with next_tx_index = Int32.succ next_tx_index} ;
+            {
+              future_block_info with
+              next_tx_index = Int32.succ next_tx_index;
+              receipts_count =
+                (if Option.is_some receipt then receipts_count + 1
+                 else receipts_count);
+            } ;
+        Option.iter
+          (fun (r : Transaction_receipt.t) ->
+            let (Ethereum_types.Qty gas_used) = r.gasUsed in
+            let gas =
+              compute_execution_gas
+                ~tx
+                ~da_fee_per_byte
+                ~base_fee_per_gas
+                ~gas_used
+            in
+            Octez_telemetry.Trace.add_attrs (fun () ->
+                Telemetry.Attributes.Transaction.
+                  [receipt_type tx; execution_gas gas]))
+          receipt ;
         let*! () = Events.single_tx_execution_done hash in
-        return_some receipt
+        return receipt
     | Disabled -> return_none
     | Awaiting_next_block_info ->
         let*! () = Evm_context_events.ic_execute_skipped hash in

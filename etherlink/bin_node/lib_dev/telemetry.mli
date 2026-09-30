@@ -43,9 +43,8 @@ module Attributes : sig
     (** Integer representation of the execution gas (gas_used minus DA fees gas) *)
     val execution_gas : Z.t -> Opentelemetry.key_value
 
-    (** String representation of the receipt type *)
-    val receipt_type :
-      L2_types.single_tx_receipt -> string * [> `String of string]
+    (** String representation of the runtime executing the transaction *)
+    val receipt_type : Broadcast.transaction -> string * [> `String of string]
   end
 
   (** Tags to add to a span or event handling a given block.  *)

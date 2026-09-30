@@ -112,12 +112,20 @@ type block_in_progress = {
   timestamp : Time.Protocol.t;
   number : Ethereum_types.quantity;
   transactions_count : int32;
+  receipts_count : int;
+      (** Number of EVM receipts already produced in the block in progress,
+          including synthetic receipts of cross-runtime calls. *)
 }
 
 (** [execute_single_transaction ~data_dir ~pool ~native_execution ~config
     evm_state block_in_progress hash txn] calls the kernel entrypoint allowing
     to execute [txn] on top of [evm_state], where [txn] is the
-    [block_in_progress.transactions_count]th transaction of the next block. *)
+    [block_in_progress.transactions_count]th transaction of the next block.
+
+    Returns the EVM receipt produced by [txn], if any: the receipt at index
+    [block_in_progress.receipts_count] of the block in progress. It is either
+    the receipt of an EVM transaction, or the receipt of the synthetic EVM
+    transaction of a Michelson operation calling into the EVM. *)
 val execute_single_transaction :
   storage_version:int ->
   data_dir:string ->
@@ -128,7 +136,7 @@ val execute_single_transaction :
   block_in_progress ->
   Ethereum_types.hash ->
   Broadcast.transaction ->
-  (L2_types.single_tx_receipt * t) tzresult Lwt.t
+  (Transaction_receipt.t option * t) tzresult Lwt.t
 
 (** [execute_entrypoint ~data_dir ~pool ~native_execution ~config evm_state
     ~input_path ~input ~output_path ~entrypoint] writes [input] to
