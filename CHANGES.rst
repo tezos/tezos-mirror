@@ -64,6 +64,16 @@ General
   twice the cap when its request is rejected may see its connection reset
   instead of reading the 413 response. (MR :gl:`!22629`)
 
+- An RPC request body within the cap must now arrive within 60 seconds, with
+  no pause over 10 seconds, or the server answers with HTTP 408 and closes the
+  connection. Sending a body at the default cap thus takes an upload rate of at
+  least about 273 KiB/s on the node and the DAL node (16 MiB cap), and 546 KiB/s
+  on the smart rollup node (32 MiB cap). (MR :gl:`!22629`)
+
+- An RPC request whose body ends before the length declared in its
+  ``Content-Length`` is now answered with HTTP 400, where the truncated body
+  used to be handed to the RPC as if complete. (MR :gl:`!22629`)
+
 Node
 ----
 

@@ -408,7 +408,76 @@ let bounded_drain ?expected ~max_bytes stream =
              as not fully received so that the caller stops trusting it. *)
           Lwt.return_false)
 
-let request_entity_too_large_response ~connection_closing () =
+(* Bounds on reading a body we mean to accept, i.e. one within the cap. Without
+   them a client that declares a length under the cap and then sends nothing
+   holds its connection, and hence one of the [max_active_rpc_connections]
+   slots, for ever and at no cost.
+
+   Much looser than the lingering read's: this is a legitimate request, and a
+   client uploading a body of up to the cap over a slow link must be served.
+   The idle timeout cuts off a client that stalls; the total one, a client that
+   dribbles a byte just often enough to stay under the idle timeout. *)
+let body_read_idle_timeout = 10.
+
+let body_read_total_timeout = 60.
+
+type body_read = Received of string | Too_large | Timed_out
+
+(* [Some (received, declared)] if [contents], read to the end of the stream,
+   falls short of the length [req] declared. Only a [Content-Length] declares
+   one: the end of a chunked body is all cohttp tells us about it.
+
+   Only a body cohttp reads can fall short. For [GET], [HEAD], [CONNECT] and
+   [TRACE], [Request.has_body] is [`No] whatever the headers say, and
+   [Cohttp_lwt.Server.read_body] hands over an empty body: an empty [contents]
+   there is not a truncation, and such requests have always been served. *)
+let truncation req contents =
+  match (Cohttp_lwt_unix.Request.has_body req, Cohttp.Request.encoding req) with
+  | `Yes, Cohttp.Transfer.Fixed declared ->
+      let received = Int64.of_int (String.length contents) in
+      if Int64.equal received declared then None else Some (received, declared)
+  | (`Yes | `No | `Unknown), _ -> None
+
+(* Reads [stream] in full, within the bounds above and up to [max_body_size]
+   bytes. Reads with [Lwt_stream.get] for the same reasons as
+   {!bounded_drain}: cancelling it is safe, and it holds no chunk already
+   consumed.
+
+   Unlike {!bounded_drain}, a failing read is not caught: the exception
+   reaches cohttp's [handle_request], which logs it as an error and answers
+   500, as it did when resto read the body itself. On a connection that broke
+   while the request was still coming in, that 500 does not reach the client:
+   writing it fails and the connection ends. *)
+let read_body_within_bounds ~max_body_size stream =
+  let open Lwt_syntax in
+  let buf = Buffer.create 4096 in
+  let rec loop () =
+    let* read =
+      Lwt.pick
+        [
+          (let* chunk = Lwt_stream.get stream in
+           Lwt.return (`Read chunk));
+          (let* () = Lwt_unix.sleep body_read_idle_timeout in
+           Lwt.return `Idle);
+        ]
+    in
+    match read with
+    | `Idle -> Lwt.return Timed_out
+    | `Read None -> Lwt.return (Received (Buffer.contents buf))
+    | `Read (Some chunk) ->
+        Buffer.add_string buf chunk ;
+        if Int64.of_int (Buffer.length buf) > max_body_size then
+          Lwt.return Too_large
+        else loop ()
+  in
+  Lwt.pick
+    [
+      (let* () = Lwt_unix.sleep body_read_total_timeout in
+       Lwt.return Timed_out);
+      loop ();
+    ]
+
+let error_response ~status ~connection_closing () =
   let headers =
     if connection_closing then
       (* We did not read the request out in full, so the connection is
@@ -423,8 +492,7 @@ let request_entity_too_large_response ~connection_closing () =
       Cohttp.Header.init ()
   in
   let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
-  ( Cohttp.Response.make ~status:`Request_entity_too_large ~encoding ~headers (),
-    body )
+  (Cohttp.Response.make ~status ~encoding ~headers (), body)
 
 (* Answers 413 after a bounded lingering read, so that a client which is done
    sending still gets a readable response on a reusable connection, while an
@@ -457,17 +525,22 @@ let reject_oversized_body ?expected ~max_body_size conn stream =
      {!shutdown_read}. *)
   if connection_closing then shutdown_read conn ;
   Lwt.return
-    (`Response (request_entity_too_large_response ~connection_closing ()))
+    (`Response
+       (error_response ~status:`Request_entity_too_large ~connection_closing ()))
 
 (* Rejects a request whose body exceeds [max_body_size] before the wrapped
    [callback] runs. A declared [Content-Length] over the cap is rejected
-   without the body ever being buffered; a chunked or unknown-length body is
-   read and capped as it streams in. Either way the remainder is disposed of by
-   {!reject_oversized_body} rather than left for cohttp's unbounded drain.
+   without the body ever being buffered; any other body is read, within
+   {!read_body_within_bounds}, before [callback] runs. An oversized remainder
+   is disposed of by {!reject_oversized_body} rather than left for cohttp's
+   unbounded drain, and a body that does not arrive in time is answered with
+   408 and its connection shut down.
 
    Not buffering is not the same as not reading: the remainder still goes
    through the bounded lingering read, which is what lets the client read the
-   413 before the connection goes away. *)
+   413 before the connection goes away. Buffering a body within the cap, on the
+   other hand, costs nothing: resto reads it in full before dispatching
+   anyway. *)
 let limit_body_size ~max_body_size callback conn req body =
   let open Lwt_syntax in
   match Cohttp.Request.encoding req with
@@ -477,33 +550,52 @@ let limit_body_size ~max_body_size callback conn req body =
         ~max_body_size
         conn
         (Cohttp_lwt.Body.to_stream body)
-  | Cohttp.Transfer.Fixed _ -> callback conn req body
-  | Cohttp.Transfer.Chunked | Cohttp.Transfer.Unknown ->
-      (* [Unknown] cannot actually carry a body: [Request.has_body] maps it to
-         [`Unknown], which [Cohttp_lwt.Server.read_body] turns into [`Empty].
-         It is grouped here for safety only. *)
+  | Cohttp.Transfer.Fixed 0L | Cohttp.Transfer.Unknown ->
+      (* No body to bound. [Unknown] -- neither [Content-Length] nor
+         [Transfer-Encoding], as on most GETs -- cannot carry one:
+         [Request.has_body] maps it to [`Unknown], which
+         [Cohttp_lwt.Server.read_body] turns into [`Empty]. Passing these
+         straight through keeps the common case free of the buffer and timers
+         below. *)
+      callback conn req body
+  | Cohttp.Transfer.Fixed _ | Cohttp.Transfer.Chunked -> (
       let stream = Cohttp_lwt.Body.to_stream body in
-      let buf = Buffer.create 4096 in
-      let exception Body_too_large in
-      Lwt.catch
-        (fun () ->
-          let* () =
-            Lwt_stream.iter_s
-              (fun chunk ->
-                Buffer.add_string buf chunk ;
-                if Int64.of_int (Buffer.length buf) > max_body_size then
-                  raise Body_too_large
-                else Lwt.return_unit)
-              stream
-          in
-          callback conn req (Cohttp_lwt.Body.of_string (Buffer.contents buf)))
-        (function
-          | Body_too_large ->
-              (* No [expected]: cohttp does not tell us the length of a chunked
-                 body, so the end of the stream is the only completion signal
-                 available. *)
-              reject_oversized_body ~max_body_size conn stream
-          | exn -> Lwt.reraise exn)
+      let* read = read_body_within_bounds ~max_body_size stream in
+      match read with
+      | Received contents -> (
+          match truncation req contents with
+          | None -> callback conn req (Cohttp_lwt.Body.of_string contents)
+          | Some _ ->
+              (* The client half-closed, or went away, before sending all it
+                 declared: [Cohttp.Transfer] ends the stream on that end of
+                 file exactly as on a complete body. Passing the prefix on
+                 would have resto decode it, and a prefix can decode -- [12]
+                 out of [123] -- to a value the client never sent. Nothing is
+                 left to read, so the connection only needs to be announced as
+                 closing. *)
+              Lwt.return
+                (`Response
+                   (error_response
+                      ~status:`Bad_request
+                      ~connection_closing:true
+                      ())))
+      | Too_large ->
+          (* Only a chunked body gets here: a fixed-length one within the cap
+             cannot exceed it. No [expected]: cohttp does not tell us the length
+             of a chunked body, so the end of the stream is the only completion
+             signal available. *)
+          reject_oversized_body ~max_body_size conn stream
+      | Timed_out ->
+          (* The request was not received in full, so the connection is not
+             reusable, and leaving the remainder to cohttp's drain would hold
+             the connection for as long as the client cares to. *)
+          shutdown_read conn ;
+          Lwt.return
+            (`Response
+               (error_response
+                  ~status:`Request_timeout
+                  ~connection_closing:true
+                  ())))
 
 let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarder_resources
     forwarding_endpoint =
