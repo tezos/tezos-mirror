@@ -98,4 +98,6 @@ CREATE TABLE sequencer_upgrades (
 CREATE UNIQUE INDEX unapplied_sequencer_upgrade
 ON sequencer_upgrades (
   COALESCE(applied_before, -1)
-)
+);
+
+CREATE INDEX block_tez_hash_index ON blocks (tez_hash) WHERE tez_hash IS NOT NULL
