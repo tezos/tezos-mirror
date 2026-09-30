@@ -13577,6 +13577,219 @@ let test_crac_callback_receives_result_bytes () =
     ~expected_bytes:(Some abi_encoded_uint256_42)
     caller
 
+(** Check the complete execution order, including each transfer's source and
+    destination. Balanced markers alone do not detect nested frames emitted
+    as siblings. Nonces must follow the same order. *)
+let check_crac_receipt_order ~prefix ~expected_crac_id ~expected internals =
+  check_crac_brackets ~prefix internals ;
+  let actual =
+    List.mapi
+      (fun nonce iop ->
+        Check.(
+          (JSON.(iop |-> "nonce" |> as_int) = nonce)
+            int
+            ~error_msg:(prefix ^ ": expected receipt nonce %R, got %L")) ;
+        let source = JSON.(iop |-> "source" |> as_string) in
+        let status = JSON.(iop |-> "result" |-> "status" |> as_string) in
+        let kind, destination =
+          match JSON.(iop |-> "kind" |> as_string) with
+          | "event" ->
+              let tag = JSON.(iop |-> "tag" |> as_string) in
+              (match tag with
+              | "cross_runtime_call" ->
+                  check_crac_event ~prefix ~expected_crac_id iop
+              | "cross_runtime_call_end" ->
+                  check_crac_end_event ~prefix ~expected_crac_id iop
+              | _ -> Test.fail "%s: unexpected event %s" prefix tag) ;
+              (tag, None)
+          | "transaction" ->
+              ( JSON.(iop |-> "parameters" |-> "entrypoint" |> as_string),
+                Some JSON.(iop |-> "destination" |> as_string) )
+          | kind -> Test.fail "%s: unexpected internal operation %s" prefix kind
+        in
+        (kind, (source, destination, status)))
+      internals
+  in
+  Check.(
+    (actual = expected)
+      (list (tuple2 string (tuple3 string (option string) string)))
+      ~error_msg:(prefix ^ ": expected receipt execution order %R, got %L"))
+
+(** A manager operation calls the gateway directly. The re-entrant frame
+    must precede the callback even when the callback backtracks the group. *)
+let test_crac_top_level_gateway_receipt_order ~failing_callback () =
+  register_crac_runner_test
+    ~title:
+      (sf
+         "CRAC: top-level gateway frame precedes callback (%s)"
+         (if failing_callback then "backtracked" else "applied"))
+    ~tags:["crac_receipt"; "receipt_order"; "callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TOP-GATEWAY-ORDER" in
+  let* leaf = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, leaf_address)) = leaf in
+  let* bridge = EvmCrossRuntimeRunnerTez.deploy_and_init leaf in
+  let (`Evm_runner bridge_address) = bridge in
+  (* Materialize aliases before the operation under test so its receipt
+     consists only of the frame, transfers and callback. *)
+  let* _ = EvmRunner.call_run bridge in
+  let* callback =
+    TezCallbackRunnerEvm.originate
+      ~failing:failing_callback
+      ~method_sig:"run()"
+      ~abi_params:""
+      bridge
+  in
+  let (`Tez_runner (_, callback_address)) = callback in
+  let* () =
+    TezContract.call_contract_via_tezlink
+      ~client
+      ~client_tezlink
+      ~sequencer
+      ~source
+      ~counter:(tez_counter ())
+      ~dest:gateway_address
+      ~entrypoint:"call_evm"
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair "run()" (Pair 0x (Some "%s%%on_result")))|}
+           bridge_address
+           callback_address)
+      ~gas_limit:400_000
+      ()
+  in
+  let* ops = fetch_michelson_manager_ops ~block:"head" sequencer in
+  let top =
+    match JSON.as_list ops with
+    | [op] -> JSON.(op |-> "contents" |=> 0)
+    | _ -> Test.fail "%s: expected one manager operation" prefix
+  in
+  let status = if failing_callback then "backtracked" else "applied" in
+  Check.(
+    (JSON.(top |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+    = status)
+      string
+      ~error_msg:"Expected top-level gateway status %R, got %L") ;
+  let*@ bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_address sequencer
+  in
+  check_crac_receipt_order
+    ~prefix
+    ~expected_crac_id:"0-0"
+    ~expected:
+      [
+        ("cross_runtime_call", (handler_address, None, status));
+        ("run", (bridge_alias, Some leaf_address, status));
+        ("_incrementWitness", (leaf_address, Some leaf_address, status));
+        ("cross_runtime_call_end", (handler_address, None, status));
+        ( "on_result",
+          ( gateway_address,
+            Some callback_address,
+            if failing_callback then "failed" else "applied" ) );
+      ]
+    JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list) ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter
+      ~expected_counter:(if failing_callback then 0 else 1)
+      callback
+  in
+  TezMultiRunCaller.check_storage
+    ~expected_counter:(if failing_callback then 1 else 2)
+    leaf
+
+(** The outer CRAC transfer itself targets the gateway, without an
+    intermediate Michelson contract. Its re-entrant frame must stay inside
+    the outer frame, immediately after that transfer, including on failure. *)
+let test_crac_direct_gateway_receipt_order ~revert () =
+  register_crac_runner_test
+    ~title:
+      (sf
+         "CRAC: direct gateway transfer nests re-entrant frame (%s)"
+         (if revert then "reverted" else "applied"))
+    ~tags:["crac_receipt"; "receipt_order"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-DIRECT-GATEWAY-ORDER" in
+  let* leaf = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, leaf_address)) = leaf in
+  let* bridge = EvmCrossRuntimeRunnerTez.deploy_and_init leaf in
+  let (`Evm_runner bridge_address) = bridge in
+  let* _ = EvmRunner.call_run bridge in
+  (* Revert after the inner CRAC has succeeded, so its receipts must still
+     be nested under the failed outer gateway transfer. *)
+  let* (`Evm_runner target) =
+    if revert then
+      EvmMultiRunCaller.deploy_and_init
+        ~revert:true
+        ~callees:[(bridge, false)]
+        ()
+    else return bridge
+  in
+  let* parameter =
+    Client.convert_data
+      ~data:(sf {|Pair "%s" (Pair "run()" (Pair 0x None))|} target)
+      ~src_format:`Michelson
+      ~dst_format:`Binary
+      client
+  in
+  let* receipt =
+    EvmContract.craft_and_send_transaction
+      ~sequencer
+      ~sender
+      ~nonce:(evm_nonce ())
+      ~value:Wei.zero
+      ~address:gateway_precompile_address
+      ~abi_signature:"callMichelson(string,string,bytes)"
+      ~arguments:[gateway_address; "call_evm"; String.trim parameter]
+      ~expected_status:(not revert)
+      ~gas:5_000_000
+      ()
+  in
+  let* ops =
+    fetch_michelson_manager_ops
+      ~block:(Int32.to_string receipt.blockNumber)
+      sequencer
+  in
+  let top =
+    match JSON.as_list ops with
+    | [op] -> JSON.(op |-> "contents" |=> 0)
+    | _ -> Test.fail "%s: expected one synthetic manager operation" prefix
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_address sequencer
+  in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:(if revert then "failed" else "applied")
+      top
+  in
+  let status = if revert then "backtracked" else "applied" in
+  check_crac_receipt_order
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected:
+      [
+        ("cross_runtime_call", (handler_address, None, status));
+        ( "call_evm",
+          (sender_alias, Some gateway_address, if revert then "failed" else "applied")
+        );
+        ("cross_runtime_call", (handler_address, None, status));
+        ("run", (bridge_alias, Some leaf_address, status));
+        ("_incrementWitness", (leaf_address, Some leaf_address, status));
+        ("cross_runtime_call_end", (handler_address, None, status));
+        ("cross_runtime_call_end", (handler_address, None, status));
+      ]
+    internals ;
+  TezMultiRunCaller.check_storage
+    ~expected_counter:(if revert then 1 else 2)
+    leaf
+
 (** The synthetic cross-runtime-call frame is ordered before the result callback.
  *
  * EVM[evm_outer_bridge] ~CRAC~> TEZ[callback_runner] --%run-->
@@ -19371,6 +19584,10 @@ let () =
   test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
   test_crac_callback_fire_and_forget () ;
   test_crac_callback_receives_result_bytes () ;
+  test_crac_top_level_gateway_receipt_order ~failing_callback:false () ;
+  test_crac_top_level_gateway_receipt_order ~failing_callback:true () ;
+  test_crac_direct_gateway_receipt_order ~revert:false () ;
+  test_crac_direct_gateway_receipt_order ~revert:true () ;
   test_crac_callback_frame_precedes_on_result () ;
   test_crac_callback_frame_precedes_on_result_revert () ;
   test_crac_callback_failure_reverts_all () ;
