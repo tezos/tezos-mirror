@@ -879,6 +879,7 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
     Setup.run_new_observer_node
       ?patch_config
       ?fail_on_divergence
+      ?websockets
       ~sc_rollup_node:None
       sandbox
   in

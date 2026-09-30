@@ -3847,6 +3847,134 @@ let test_instant_confirmations ~runtime () =
       ~error_msg:"ETH balances should match: IC=%L, non-IC=%R") ;
   unit
 
+(** With instant confirmations, the observer must stream on
+    [newPreconfirmedReceipts] exactly the EVM receipts produced by each
+    transaction: the receipt of an EVM transaction, nothing for a Michelson
+    operation without cross-runtime call, and the synthetic receipt of a
+    Michelson operation calling into the EVM. The streamed receipts must match
+    the EVM transactions of the produced block. *)
+let test_instant_confirmations_synthetic_receipts () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"Instant confirmations stream synthetic EVM receipts of NACs"
+    ~tags:["observer"; "instant_confirmations"; "cross_runtime"; "websocket"]
+    ~with_runtimes:[Tezos]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+    ~genesis_timestamp:Test_helpers.genesis_timestamp
+    ~websockets:true
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+  @@ fun {sandbox; observer} ->
+  let timestamp = Test_helpers.get_timestamp 0 in
+  let* websocket = Evm_node.open_websocket observer in
+  let* _id = Rpc.subscribe ~websocket ~kind:NewPreconfirmedReceipts observer in
+  let recv_receipt () =
+    let* json = Websocket.recv ~timeout:10. websocket in
+    return
+      JSON.(
+        json |-> "params" |-> "result"
+        |> Transaction.transaction_receipt_of_json)
+  in
+  let check_no_receipt ~error_msg =
+    Lwt.catch
+      (fun () ->
+        let* json = Websocket.recv ~timeout:2. websocket in
+        Test.fail "%s, got %s" error_msg (JSON.encode json))
+      (function Websocket.Timeout _ -> unit | exn -> Lwt.reraise exn)
+  in
+  let*@ () = Rpc.propose_next_block_timestamp ~timestamp sandbox in
+  (* 1. An EVM transaction streams its own receipt. *)
+  let* raw_eth_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~value:Wei.one
+      ()
+  in
+  let wait_for_eth_ic = Evm_node.wait_for_single_tx_execution_done observer in
+  let*@ eth_hash = Rpc.send_raw_transaction ~raw_tx:raw_eth_tx observer in
+  let* _ = wait_for_eth_ic in
+  let* eth_receipt = recv_receipt () in
+  Check.((eth_receipt.transactionHash = eth_hash) string)
+    ~error_msg:"Expected the receipt of the EVM transaction %R, got %L" ;
+  (* 2. A Michelson operation without cross-runtime call produces no EVM
+     receipt: the receipt of the previous transaction must not be streamed
+     again. *)
+  let* tez_client = tezlink_client sandbox in
+  let wait_for_tez_ic = Evm_node.wait_for_single_tx_execution_done observer in
+  let* () =
+    Client.transfer
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap3.alias
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let* _ = wait_for_tez_ic in
+  let* () =
+    check_no_receipt
+      ~error_msg:"No receipt expected for a Michelson operation without NAC"
+  in
+  (* 3. A Michelson operation calling into the EVM streams the receipt of
+     the synthetic EVM transaction. *)
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  (* Use another source: the previous operation is not included yet, the
+     client would reuse its counter. *)
+  let wait_for_nac_ic = Evm_node.wait_for_single_tx_execution_done observer in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:gateway_address
+      ~entrypoint:"call_evm"
+      ~arg:(sf {|Pair "%s" (Pair "" (Pair 0x None))|} evm_destination)
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let* _ = wait_for_nac_ic in
+  let* synthetic_receipt = recv_receipt () in
+  let* () =
+    check_no_receipt ~error_msg:"Only one synthetic receipt expected for a NAC"
+  in
+  (* The streamed receipts are the EVM transactions of the block. *)
+  let*@ _ = Rpc.produce_block ~timestamp sandbox in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sandbox in
+  let block_hashes =
+    match block.transactions with
+    | Block.Hash hashes -> hashes
+    | Block.Full objects ->
+        List.map (fun (o : Transaction.transaction_object) -> o.hash) objects
+    | Block.Empty -> []
+  in
+  Check.(
+    (block_hashes = [eth_hash; synthetic_receipt.transactionHash])
+      (list string)
+      ~error_msg:"Expected the EVM transactions of the block to be %R, got %L") ;
+  let*@ block_synthetic_receipt =
+    Rpc.get_transaction_receipt
+      ~tx_hash:synthetic_receipt.transactionHash
+      sandbox
+  in
+  let block_synthetic_receipt =
+    match block_synthetic_receipt with
+    | Some r -> r
+    | None -> Test.fail "Synthetic receipt not found in the produced block"
+  in
+  Check.(
+    (List.length synthetic_receipt.logs
+    = List.length block_synthetic_receipt.logs)
+      int
+      ~error_msg:"Streamed synthetic receipt has %L logs, block receipt has %R") ;
+  (* The observer applies the block without diverging. *)
+  Evm_node.wait_for_blueprint_applied observer (Int32.to_int block.number)
+
 (** Blueprint-uniqueness invariant for EVM [state_root].
 
     Two different blueprints at the same level must produce different
@@ -7626,6 +7754,7 @@ let () =
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
   test_manager_key_on_block_hash () ;
   test_instant_confirmations ~runtime:Tezos () ;
+  test_instant_confirmations_synthetic_receipts () ;
   test_state_root_blueprint_uniqueness ~runtime:Tezos () ;
   test_state_root_pure_michelson_divergence () ;
   test_nested_crac () ;
