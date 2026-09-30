@@ -1909,6 +1909,40 @@ let test_rpc_max_request_body_closes_connection () =
   check ~scenario:"half-closed below the byte ceiling" response ;
   unit
 
+(* A body within the cap is not rejected, so it never reaches the lingering
+   read: before its read was bounded too, a client that declared such a body
+   and then sent a single byte of it held its connection, and one of the
+   [max_active_rpc_connections] slots, for ever. The server must now give up
+   on it after the 10s idle timeout. *)
+let test_rpc_max_request_body_under_cap_stall () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap on a stalled body under the cap"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let start = Unix.gettimeofday () in
+  let* (_ : string) =
+    Lwt.pick
+      [
+        raw_post_truncated
+          node
+          ~content_length:(max_request_body - 1)
+          ~body:"a"
+          ~half_close:false;
+        (let* () = Lwt_unix.sleep 30. in
+         Lwt.return "");
+      ]
+  in
+  let elapsed = Unix.gettimeofday () -. start in
+  Check.((elapsed < 20.) float)
+    ~error_msg:
+      "a stalled request body under the cap still held its connection after %L \
+       seconds: the server must stop waiting for it" ;
+  unit
+
 (* The regression test for the unbounded drain. Before the bounded lingering
    close, the server kept reading this body for ever and the request never
    completed. Note that we do not assert on the status: once we stop reading,
@@ -1994,6 +2028,55 @@ let test_rpc_max_request_body_no_slot_exhaustion () =
       "a normal RPC returned %L while oversized uploads were in flight: the \
        rejected connections are still holding their slots" ;
   let* (_ : string list) = Lwt.all abusers in
+  unit
+
+(* A client that half-closes before sending the body it declared ends the
+   body stream exactly as a complete body does, so the server must compare what
+   it read with the declared length. Otherwise the RPC gets the prefix, which
+   may well decode to a value the client never sent. *)
+let test_rpc_max_request_body_under_cap_truncated () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body under the cap cut short by the client"
+    ~tags:["rpc"; "body"; "limit"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let* node = Node.init [Node.Max_request_body max_request_body] in
+  let* response =
+    raw_post_truncated
+      node
+      ~content_length:(max_request_body / 2)
+      ~body:"a"
+      ~half_close:true
+  in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 400" response
+    && response =~ rex "connection: *close")
+    ~error_msg:
+      (Printf.sprintf
+         "a request body shorter than its Content-Length got %S, expected a \
+          400 with [Connection: close]"
+         response) ;
+  (* cohttp never reads the body of a [GET], whatever its headers declare, so
+     the body the server sees is empty and must not be taken for a truncated
+     one: such a request was served before the check and still must be. *)
+  let* response =
+    raw_exchange
+      node
+      ~request:
+        (Printf.sprintf
+           "GET /version HTTP/1.1\r\nHost: %s\r\nContent-Length: 5\r\n\r\nhello"
+           Constant.default_host)
+      ~half_close:false
+  in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 200" response)
+    ~error_msg:
+      (Printf.sprintf
+         "a GET declaring a body got %S, expected a 200: cohttp does not read \
+          the body of a GET, so it cannot be truncated"
+         response) ;
   unit
 
 let binary_regression_test () =
@@ -2220,5 +2303,7 @@ let register protocols =
   test_rpc_max_request_body () ;
   test_rpc_max_request_body_keeps_connection () ;
   test_rpc_max_request_body_closes_connection () ;
+  test_rpc_max_request_body_under_cap_stall () ;
   test_rpc_max_request_body_endless () ;
-  test_rpc_max_request_body_no_slot_exhaustion ()
+  test_rpc_max_request_body_no_slot_exhaustion () ;
+  test_rpc_max_request_body_under_cap_truncated ()
