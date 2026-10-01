@@ -16,17 +16,6 @@ pub fn ceil_div(a: U256, b: U256) -> U256 {
     }
 }
 
-/// EVM gas equivalent of a wei amount at the given base fee (ceiling).
-///
-/// Returns `None` when `base_fee_per_gas` is zero or the gas amount
-/// overflows `u64`.
-pub fn gas_from_wei(wei: U256, base_fee_per_gas: U256) -> Option<u64> {
-    if base_fee_per_gas.is_zero() {
-        return None;
-    }
-    u64::try_from(ceil_div(wei, base_fee_per_gas)).ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,33 +31,5 @@ mod tests {
             U256::from(3u64)
         );
         assert_eq!(ceil_div(U256::zero(), U256::from(2u64)), U256::zero());
-    }
-
-    #[test]
-    fn gas_from_wei_ceils() {
-        // 3e12 wei / 2e12 (wei/gas) → 1.5, ceil → 2.
-        assert_eq!(
-            gas_from_wei(
-                U256::exp10(12) * U256::from(3u64),
-                U256::exp10(12) * U256::from(2u64)
-            ),
-            Some(2)
-        );
-        // exact: 2e12 / 1e12 → 2.
-        assert_eq!(
-            gas_from_wei(U256::exp10(12) * U256::from(2u64), U256::exp10(12)),
-            Some(2)
-        );
-    }
-
-    #[test]
-    fn gas_from_wei_overflow_is_none() {
-        // U256::MAX / 1 overflows u64.
-        assert_eq!(gas_from_wei(U256::MAX, U256::one()), None);
-    }
-
-    #[test]
-    fn gas_from_wei_zero_base_fee_is_none() {
-        assert_eq!(gas_from_wei(U256::exp10(12), U256::zero()), None);
     }
 }

@@ -22,7 +22,7 @@ use revm_etherlink::precompiles::send_outbox_message::{
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::{
-    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    helpers::legacy::{h160_to_alloy, u256_to_alloy, wei_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
 use revm_etherlink::{GasData, RevmTxRefusal, TxValidation};
@@ -245,11 +245,10 @@ pub fn is_valid_ethereum_transaction_common(
         // The DA fee is debited before the run (see
         // `apply_ethereum_transaction_common`). `InvalidPrePay` above
         // ensures it does not exceed the balance.
-        info.balance
-            .saturating_sub(u256_to_alloy(&transaction_da_fee(
-                transaction,
-                block_constant,
-            )))
+        info.balance.saturating_sub(wei_to_alloy(transaction_da_fee(
+            transaction,
+            block_constant,
+        )))
     };
     let gas_data = revm_gas_data(
         capped_gas_limit,
@@ -287,7 +286,7 @@ pub fn is_valid_ethereum_transaction_common(
 fn transaction_da_fee(
     transaction: &EthereumTransactionCommon,
     block_constants: &BlockConstants,
-) -> U256 {
+) -> Wei {
     fees::da_fee(
         block_constants.block_fees.da_fee_per_byte(),
         &transaction.data,
@@ -742,9 +741,7 @@ where
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
-        if let Err(e) =
-            caller_account.sub_balance(rk.eth_accounts_mut(), Wei::from_u256(cost))
-        {
+        if let Err(e) = caller_account.sub_balance(rk.eth_accounts_mut(), cost) {
             return Err(anyhow::anyhow!(
                 "Failed to charge {caller} additional fees of {}: {}",
                 cost,
@@ -1716,7 +1713,7 @@ pub(crate) mod tests {
                 (balance, EvmLimits::default().maximum_gas_limit)
             } else {
                 let da_fee = transaction_da_fee(&valid_tx(gas_limit), &block_constants);
-                (balance - da_fee, 21000)
+                (balance - da_fee.as_u256(), 21000)
             };
             // One wei more than what the balance covers.
             let value_above = available - U256::from(execution_gas) * gas_price + 1;

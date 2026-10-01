@@ -3387,7 +3387,8 @@ mod tests {
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
         let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[], 0);
-        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee;
+        let expected_fees =
+            dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee.as_u256();
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
 

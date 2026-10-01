@@ -158,6 +158,7 @@ fn block_constants(
         base_fee_per_gas(evm_world_state, timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
+    // The fee per byte is read as the amount one byte costs.
     let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
         .to_mutez_exact()
         .map_err(|_| Error::InvalidConversion)?;

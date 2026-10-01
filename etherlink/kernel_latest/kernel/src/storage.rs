@@ -35,6 +35,7 @@ use tezos_smart_rollup_keyspace::extensions::{
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_storage::keyspace::KeySpaceExtB58;
 use tezosx_types::StorageReadErrorKind;
+use tezosx_types::Wei;
 
 use crate::error::{ChunkedTransactionError, Error};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
@@ -701,21 +702,33 @@ pub fn read_da_fee(evm_world_state: &impl KeySpace) -> Option<U256> {
     evm_world_state.get_u256_le(&EVM_DA_FEE_KEY)
 }
 
+fn read_wei(evm_world_state: &impl KeySpace, key: &Key) -> Option<Wei> {
+    evm_world_state.get_u256_le(key).map(Wei::from_u256)
+}
+
+fn write_wei(
+    evm_world_state: &mut impl KeySpace,
+    key: &Key,
+    value: Wei,
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_u256_le(key, value.as_u256())
+}
+
 /// Adds `burned_fee` to the burned-fees total of the `/evm/world_state`
 /// keyspace, with saturation. A total that is absent or shorter than 32 bytes
 /// counts as zero. Errors when the write fails.
 pub fn update_burned_fees(
     evm_world_state: &mut impl KeySpace,
-    burned_fee: U256,
+    burned_fee: Wei,
 ) -> Result<(), KeySpaceError> {
-    let current = evm_world_state.get_u256_le_or(&EVM_BURNED_FEES_KEY, U256::zero());
+    let current = read_wei(evm_world_state, &EVM_BURNED_FEES_KEY).unwrap_or(Wei::ZERO);
     let new = current.saturating_add(burned_fee);
-    evm_world_state.store_u256_le(&EVM_BURNED_FEES_KEY, new)
+    write_wei(evm_world_state, &EVM_BURNED_FEES_KEY, new)
 }
 
 #[cfg(test)]
-pub fn read_burned_fees(evm_world_state: &impl KeySpace) -> U256 {
-    evm_world_state.get_u256_le_or(&EVM_BURNED_FEES_KEY, U256::zero())
+pub fn read_burned_fees(evm_world_state: &impl KeySpace) -> Wei {
+    read_wei(evm_world_state, &EVM_BURNED_FEES_KEY).unwrap_or(Wei::ZERO)
 }
 
 /// Reads the sequencer pool address from the `/evm/world_state` keyspace.
@@ -1139,6 +1152,7 @@ mod tests {
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
     use tezosx_journal::{CracId, TezosXJournal};
+    use tezosx_types::Wei;
 
     use crate::storage::DAL_SLOTS_KEY;
     use crate::storage::ENABLE_DAL_KEY;
@@ -1572,8 +1586,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let fst = 17.into();
-        let snd = 19.into();
+        let fst = Wei::from_u256(17.into());
+        let snd = Wei::from_u256(19.into());
 
         // Act
         let result_fst = super::update_burned_fees(rk.evm_world_state_mut(), fst);
@@ -1584,7 +1598,7 @@ mod tests {
         assert!(result_snd.is_ok());
 
         let burned = super::read_burned_fees(rk.evm_world_state());
-        assert_eq!(fst + snd, burned);
+        assert_eq!(fst.saturating_add(snd), burned);
     }
 
     #[test]
@@ -1832,12 +1846,12 @@ mod tests {
     fn evm_burned_fees_key_keeps_its_durable_path() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let burned = primitive_types::U256::from(23);
+        let burned = Wei::from_u256(primitive_types::U256::from(23));
 
         super::update_burned_fees(rk.evm_world_state_mut(), burned).unwrap();
 
         let mut bytes = [0u8; 32];
-        burned.to_little_endian(&mut bytes);
+        burned.as_u256().to_little_endian(&mut bytes);
         assert_eq!(
             rk.host()
                 .store_read_all(&RefPath::assert_from(b"/evm/world_state/fees/burned"))

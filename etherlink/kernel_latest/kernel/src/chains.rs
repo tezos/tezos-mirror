@@ -472,6 +472,7 @@ impl TezosXChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<TezosXBlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
+        // The fee per byte is read as the amount one byte costs.
         let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
             .to_mutez_exact()
             .map_err(|_| crate::Error::InvalidConversion)?;

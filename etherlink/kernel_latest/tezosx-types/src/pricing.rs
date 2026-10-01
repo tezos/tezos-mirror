@@ -43,6 +43,22 @@ fn ceil_div(a: U256, b: U256) -> U256 {
     }
 }
 
+/// Convert a wei cost to EVM gas at the given base fee, with ceiling
+/// division.
+///
+/// Units: `cost` (wei) / `base_fee_per_gas` (wei/evm_gas) = evm_gas.
+///
+/// Returns `None` when `base_fee_per_gas` is zero or the gas amount
+/// overflows `u64`.
+pub fn wei_to_evm_gas(cost: Wei, base_fee_per_gas: U256) -> Option<EvmGas> {
+    if base_fee_per_gas.is_zero() {
+        return None;
+    }
+    u64::try_from(ceil_div(cost.as_u256(), base_fee_per_gas))
+        .ok()
+        .map(EvmGas::new)
+}
+
 /// Convert a mutez cost to EVM gas at the given base fee, with ceiling
 /// division.
 ///
@@ -52,12 +68,7 @@ fn ceil_div(a: U256, b: U256) -> U256 {
 /// Returns `None` when `base_fee_per_gas` is zero or the gas amount
 /// overflows `u64`.
 pub fn mutez_to_evm_gas(cost: Mutez, base_fee_per_gas: U256) -> Option<EvmGas> {
-    if base_fee_per_gas.is_zero() {
-        return None;
-    }
-    u64::try_from(ceil_div(cost.to_wei().as_u256(), base_fee_per_gas))
-        .ok()
-        .map(EvmGas::new)
+    wei_to_evm_gas(cost.to_wei(), base_fee_per_gas)
 }
 
 #[cfg(test)]
@@ -158,5 +169,36 @@ mod tests {
     fn mutez_to_evm_gas_overflow_is_none() {
         // Mutez::MAX wei / 1 overflows u64.
         assert_eq!(mutez_to_evm_gas(Mutez::MAX, U256::one()), None);
+    }
+
+    #[test]
+    fn wei_to_evm_gas_ceils() {
+        assert_eq!(
+            wei_to_evm_gas(
+                Wei::from_u256(U256::exp10(12) * U256::from(3u64)),
+                U256::exp10(12) * U256::from(2u64)
+            ),
+            Some(EvmGas::new(2))
+        );
+        assert_eq!(
+            wei_to_evm_gas(
+                Wei::from_u256(U256::exp10(12) * U256::from(2u64)),
+                U256::exp10(12)
+            ),
+            Some(EvmGas::new(2))
+        );
+    }
+
+    #[test]
+    fn wei_to_evm_gas_overflow_is_none() {
+        assert_eq!(wei_to_evm_gas(Wei::from_u256(U256::MAX), U256::one()), None);
+    }
+
+    #[test]
+    fn wei_to_evm_gas_zero_base_fee_is_none() {
+        assert_eq!(
+            wei_to_evm_gas(Wei::from_u256(U256::exp10(12)), U256::zero()),
+            None
+        );
     }
 }
