@@ -40,6 +40,16 @@ General
 Node
 ----
 
+- **Breaking change** A block is now invalid if it contains a smart-rollup
+  refutation ``Move`` from a player other than the one whose turn it is at the
+  start of the block, or on a refutation game that does not exist yet, and if
+  it contains an operation that both opens a refutation game and plays a
+  ``Proof`` move in it. None of these could have been checked against the
+  state the block started from, and their senders can inject them again in a
+  later block. In exchange the node no longer limits a refutation game to a
+  single operation per block, so both players can try to open the same game in
+  the same block.
+
 Client
 ------
 
