@@ -14,6 +14,7 @@ use std::str::FromStr;
 
 use tezos_smart_rollup_host::storage::v2;
 
+pub mod error;
 pub mod extensions;
 #[cfg(feature = "irmin-compat")]
 pub mod irmin_ds;
@@ -24,6 +25,8 @@ pub mod wasm_nds;
 /// The budget a caller building names has to stay within.
 #[cfg(feature = "irmin-compat")]
 pub use irmin_path_validator::{MAX_KEYSPACE_NAME_SIZE, MAX_KEY_SIZE};
+
+pub use error::{ErrorKind, KeySpaceError, WriteKind};
 
 /// Key creation error
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -219,21 +222,6 @@ impl TryFrom<String> for Name {
     }
 }
 
-/// Errors that can occur when writing to a [`KeySpace`].
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum KeySpaceWriteError {
-    /// Attempted to write more than the maximum allowed bytes at a given key.
-    #[error("value size exceeded the maximum allowed")]
-    ValueSizeExceeded,
-    /// The write offset exceeds the current length of the stored value.
-    #[error("write offset exceeds the current length of the stored value")]
-    InvalidOffset,
-    /// The value does not encode, so nothing was written.
-    #[cfg(feature = "tezos-encoding")]
-    #[error("value does not encode: {0}")]
-    Encode(#[from] tezos_data_encoding::enc::BinError),
-}
-
 /// A key space in the durable storage.
 ///
 /// A `KeySpace` is a flat key-value store. Instances are created via
@@ -286,13 +274,9 @@ pub trait KeySpace {
     ///
     /// # Errors
     ///
-    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when `value` exceeds the
-    ///   largest value the key space accepts.
-    fn set(
-        &mut self,
-        key: &Key,
-        value: impl AsRef<[u8]>,
-    ) -> Result<(), KeySpaceWriteError>;
+    /// - [`WriteKind::ValueSizeExceeded`] when `value` exceeds the largest
+    ///   value the key space accepts.
+    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>) -> Result<(), KeySpaceError>;
 
     /// Overwrites the `data.len()` bytes of the value at `key` that start at
     /// `offset`, and returns `data.len()`.
@@ -307,16 +291,16 @@ pub trait KeySpace {
     ///
     /// # Errors
     ///
-    /// - [`KeySpaceWriteError::InvalidOffset`] when `offset` is past the
-    ///   current length of the value, an absent key counting as length 0.
-    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when the write would push
-    ///   the value past the largest the key space accepts.
+    /// - [`WriteKind::InvalidOffset`] when `offset` is past the current
+    ///   length of the value, an absent key counting as length 0.
+    /// - [`WriteKind::ValueSizeExceeded`] when the write would push the
+    ///   value past the largest the key space accepts.
     fn write(
         &mut self,
         key: &Key,
         offset: usize,
         data: impl AsRef<[u8]>,
-    ) -> Result<usize, KeySpaceWriteError>;
+    ) -> Result<usize, KeySpaceError>;
 
     /// Retrieve the length of the value associated with the key.
     /// Returns `None` if the key does not exist.
@@ -360,11 +344,7 @@ impl<KS: KeySpace> KeySpace for &mut KS {
         (**self).read(key, offset, buffer)
     }
 
-    fn set(
-        &mut self,
-        key: &Key,
-        value: impl AsRef<[u8]>,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>) -> Result<(), KeySpaceError> {
         (**self).set(key, value)
     }
 
@@ -373,7 +353,7 @@ impl<KS: KeySpace> KeySpace for &mut KS {
         key: &Key,
         offset: usize,
         data: impl AsRef<[u8]>,
-    ) -> Result<usize, KeySpaceWriteError> {
+    ) -> Result<usize, KeySpaceError> {
         (**self).write(key, offset, data)
     }
 

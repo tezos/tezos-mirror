@@ -8,7 +8,7 @@
 //! key. Bringing one into scope makes its accessors available on any key
 //! space handle. The ones that need an encoding crate sit behind a feature.
 
-use crate::{Key, KeySpace, KeySpaceWriteError};
+use crate::{Key, KeySpace, KeySpaceError};
 use num_traits::{FromBytes, ToBytes};
 #[cfg(feature = "tezos-encoding")]
 use tezos_data_encoding::nom::error::NomReadExactError;
@@ -58,20 +58,12 @@ pub trait KeySpaceExtNum: KeySpace {
     }
 
     /// Writes `value` little-endian at `key`.
-    fn store_le<T: ToBytes>(
-        &mut self,
-        key: &Key,
-        value: T,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn store_le<T: ToBytes>(&mut self, key: &Key, value: T) -> Result<(), KeySpaceError> {
         self.set(key, value.to_le_bytes())
     }
 
     /// The big-endian counterpart of [`Self::store_le`].
-    fn store_be<T: ToBytes>(
-        &mut self,
-        key: &Key,
-        value: T,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn store_be<T: ToBytes>(&mut self, key: &Key, value: T) -> Result<(), KeySpaceError> {
         self.set(key, value.to_be_bytes())
     }
 }
@@ -86,7 +78,7 @@ pub trait KeySpaceExtRlp: KeySpace {
         &mut self,
         key: &Key,
         value: &T,
-    ) -> Result<(), KeySpaceWriteError> {
+    ) -> Result<(), KeySpaceError> {
         self.set(key, value.rlp_bytes())
     }
 
@@ -143,16 +135,18 @@ pub trait KeySpaceExtBin: KeySpace {
     ///
     /// # Errors
     ///
-    /// - [`KeySpaceWriteError::Encode`] when `value` does not encode.
-    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when the encoding exceeds
-    ///   the largest value the key space accepts.
+    /// - [`WriteKind::Encode`](crate::WriteKind::Encode) when `value` does not encode.
+    /// - [`WriteKind::ValueSizeExceeded`](crate::WriteKind::ValueSizeExceeded) when the encoding exceeds the
+    ///   largest value the key space accepts.
     fn store_bin(
         &mut self,
         key: &Key,
         value: &impl tezos_data_encoding::enc::BinWriter,
-    ) -> Result<(), KeySpaceWriteError> {
+    ) -> Result<(), KeySpaceError> {
         let mut bytes = Vec::new();
-        value.bin_write(&mut bytes)?;
+        value
+            .bin_write(&mut bytes)
+            .map_err(|err| KeySpaceError::write(self.name(), key, err.into()))?;
         self.set(key, bytes)
     }
 

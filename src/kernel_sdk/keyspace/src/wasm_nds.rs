@@ -14,7 +14,7 @@
 
 use std::{mem::MaybeUninit, num::NonZeroUsize, rc::Rc};
 
-use crate::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, KeySpaceWriteError};
+use crate::{KeySpace, KeySpaceError, KeySpaceLoader, KeySpaceLoaderError, WriteKind};
 
 use tezos_smart_rollup_constants::core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::{
@@ -226,7 +226,7 @@ impl<Handle: WasmNds> WasmNdsKeySpace<Handle> {
         key: &crate::Key,
         mut offset: usize,
         mut buffer: &[u8],
-    ) -> Result<(), KeySpaceWriteError> {
+    ) -> Result<(), WriteKind> {
         while !buffer.is_empty() {
             let num_bytes = buffer.len().min(MAX_FILE_CHUNK_SIZE);
             let (to_write, rest) = buffer.split_at(num_bytes);
@@ -243,10 +243,10 @@ impl<Handle: WasmNds> WasmNdsKeySpace<Handle> {
                     continue;
                 }
                 Err(NdsError::OffsetTooLarge) => {
-                    return Err(KeySpaceWriteError::InvalidOffset);
+                    return Err(WriteKind::InvalidOffset);
                 }
                 Err(NdsError::StoreValueSizeExceeded) => {
-                    return Err(KeySpaceWriteError::ValueSizeExceeded)
+                    return Err(WriteKind::ValueSizeExceeded)
                 }
                 Err(NdsError::NdsDisabled) => {
                     unreachable!("Nds guaranteed to be enabled")
@@ -314,7 +314,7 @@ impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
         &mut self,
         key: &crate::Key,
         value: impl AsRef<[u8]>,
-    ) -> Result<(), crate::KeySpaceWriteError> {
+    ) -> Result<(), KeySpaceError> {
         let value = value.as_ref();
         let (initial_set, rest) = value.split_at(value.len().min(MAX_FILE_CHUNK_SIZE));
 
@@ -339,6 +339,7 @@ impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
         }
 
         self.write_from(key, initial_set.len(), rest)
+            .map_err(|kind| KeySpaceError::write(self.name(), key, kind))
     }
 
     fn write(
@@ -346,10 +347,12 @@ impl<Handle: WasmNds> KeySpace for WasmNdsKeySpace<Handle> {
         key: &crate::Key,
         offset: usize,
         data: impl AsRef<[u8]>,
-    ) -> Result<usize, crate::KeySpaceWriteError> {
+    ) -> Result<usize, KeySpaceError> {
         let data = data.as_ref();
 
-        self.write_from(key, offset, data).map(|()| data.len())
+        self.write_from(key, offset, data)
+            .map(|()| data.len())
+            .map_err(|kind| KeySpaceError::write(self.name(), key, kind))
     }
 
     fn value_length(&self, key: &crate::Key) -> Option<usize> {

@@ -21,7 +21,7 @@ use tezos_smart_rollup_host::{
     Error as HostError,
 };
 
-use crate::{Key, KeySpace, KeySpaceLoaderError, KeySpaceWriteError, Name};
+use crate::{Key, KeySpace, KeySpaceError, KeySpaceLoaderError, Name, WriteKind};
 
 /// Blake2B hash of an empty irmin tree (`Context.Tree.empty` in OCaml).
 const EMPTY_TREE_HASH: [u8; 32] =
@@ -97,18 +97,16 @@ impl From<RuntimeError> for StorageV1ReadError {
 }
 
 /// Convert a [`RuntimeError`] from a write operation directly into
-/// [`KeySpaceWriteError`], panicking on variants that cannot occur.
-fn classify_write_error(e: RuntimeError) -> KeySpaceWriteError {
+/// [`WriteKind`], panicking on variants that cannot occur.
+fn classify_write_error(e: RuntimeError) -> WriteKind {
     match e {
         // Value exceeds the ~2GB durable storage limit.
         RuntimeError::HostErr(HostError::StoreValueSizeExceeded) => {
-            KeySpaceWriteError::ValueSizeExceeded
+            WriteKind::ValueSizeExceeded
         }
         // Offset out of bounds: durable.ml raises Out_of_bounds when
         // write offset > value length, mapped to StoreInvalidAccess.
-        RuntimeError::HostErr(HostError::StoreInvalidAccess) => {
-            KeySpaceWriteError::InvalidOffset
-        }
+        RuntimeError::HostErr(HostError::StoreInvalidAccess) => WriteKind::InvalidOffset,
         RuntimeError::PathNotFound
         | RuntimeError::HostErr(HostError::StoreNotANode | HostError::StoreNotAValue) => {
             unreachable!("Only returned on read, not write; path is created implicitly on write: {e:?}")
@@ -198,15 +196,11 @@ impl<Storage: StorageV1> KeySpace for StorageV1KeySpaceCompat<Storage> {
             .ok()
     }
 
-    fn set(
-        &mut self,
-        key: &Key,
-        value: impl AsRef<[u8]>,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>) -> Result<(), KeySpaceError> {
         let path = self.full_path(key);
         self.storage
             .store_write_all(&path, value.as_ref())
-            .map_err(classify_write_error)
+            .map_err(|e| KeySpaceError::write(self.name(), key, classify_write_error(e)))
     }
 
     fn write(
@@ -214,11 +208,11 @@ impl<Storage: StorageV1> KeySpace for StorageV1KeySpaceCompat<Storage> {
         key: &Key,
         offset: usize,
         data: impl AsRef<[u8]>,
-    ) -> Result<usize, KeySpaceWriteError> {
+    ) -> Result<usize, KeySpaceError> {
         let path = self.full_path(key);
         self.storage
             .store_write(&path, data.as_ref(), offset)
-            .map_err(classify_write_error)
+            .map_err(|e| KeySpaceError::write(self.name(), key, classify_write_error(e)))
             .map(|()| data.as_ref().len())
     }
 
@@ -601,6 +595,24 @@ mod tests {
         ks.set(&key(b"/a"), b"hello").unwrap();
 
         assert!(ks.write(&key(b"/a"), 100, b"data").is_err());
+    }
+
+    #[test]
+    fn write_errors_name_the_key_and_the_key_space() {
+        let mut ks = make_ks(MockHost::default(), "/errors");
+        let k = key(b"/short");
+        ks.set(&k, b"abc").unwrap();
+
+        let err = ks.write(&k, 4, b"x").unwrap_err();
+        assert_eq!(
+            err,
+            KeySpaceError::write(ks.name(), &k, WriteKind::InvalidOffset)
+        );
+        assert_eq!(
+            err.to_string(),
+            "at key /short of key space /errors: \
+             write offset exceeds the current length of the stored value"
+        );
     }
 
     #[test]

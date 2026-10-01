@@ -10,7 +10,7 @@ use tezos_evm_logging::Level::Error;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceWriteError};
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_smart_rollup_storage::StorageError;
 use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
 use thiserror::Error;
@@ -56,7 +56,7 @@ pub enum IndexableStorageError {
     #[error("Internal invariant violation: {0}")]
     Internal(String),
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceWriteError),
+    KeySpace(#[from] KeySpaceError),
     #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
 }

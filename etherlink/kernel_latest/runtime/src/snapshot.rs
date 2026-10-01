@@ -29,8 +29,7 @@ use trait_set::trait_set;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{
-    Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError, KeySpaceWriteError, Name,
-    NameError,
+    Key, KeySpace, KeySpaceError, KeySpaceLoader, KeySpaceLoaderError, Name, NameError,
 };
 
 #[derive(Debug, PartialEq, Eq, Error)]
@@ -38,7 +37,7 @@ pub enum SnapshotError {
     #[error(transparent)]
     Loader(#[from] KeySpaceLoaderError),
     #[error(transparent)]
-    MarkerWrite(#[from] KeySpaceWriteError),
+    MarkerWrite(#[from] KeySpaceError),
     /// A `commit_inner` or `revert_inner` with no frame open.
     #[error("no open frame to close")]
     NoOpenFrame,
@@ -401,11 +400,7 @@ impl<KS: KeySpace> KeySpace for SnapshottedKeySpace<KS> {
         self.live.read(key, offset, buffer)
     }
 
-    fn set(
-        &mut self,
-        key: &Key,
-        value: impl AsRef<[u8]>,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>) -> Result<(), KeySpaceError> {
         self.live.set(key, value)
     }
 
@@ -414,7 +409,7 @@ impl<KS: KeySpace> KeySpace for SnapshottedKeySpace<KS> {
         key: &Key,
         offset: usize,
         data: impl AsRef<[u8]>,
-    ) -> Result<usize, KeySpaceWriteError> {
+    ) -> Result<usize, KeySpaceError> {
         self.live.write(key, offset, data)
     }
 

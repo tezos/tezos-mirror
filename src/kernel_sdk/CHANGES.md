@@ -14,6 +14,9 @@
   `read_nom` and `read_nom_or` for every `KeySpace`.
 - Remove `StoreBinError`: `store_bin` reports a value that does not encode as
   a write error.
+- Add `KeySpaceError`, the error of every fallible `KeySpace` write, typed
+  writers included. It names the key space and the key where the write failed,
+  and replaces `KeySpaceWriteError`.
 - Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
 - Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
