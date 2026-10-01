@@ -7143,10 +7143,10 @@ end = struct
               octez_stdlib_unix;
               main |> open_;
               (* The unit tests use the block-validation plugin (the
-                 [test_sc_rollup_game] cases) starting from alpha/026;
-                 older protocols have no such test, so the dependency is
-                 scoped by protocol number. *)
-              plugin |> if_some |> if_ N.(number >= 026) |> open_;
+                 [test_sc_rollup_game] cases) starting from 025; older
+                 protocols have no such test, so the dependency is scoped by
+                 protocol number. *)
+              plugin |> if_some |> if_ N.(number >= 025) |> open_;
               (* The inbox unit tests check the index proofs of
                  [Inbox_index_proof], which only 025 defines. *)
               octez_sc_rollup |> if_some |> if_ N.(number == 025) |> open_;
