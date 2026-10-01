@@ -11,9 +11,46 @@
    It centralizes the EVM node's gates so it becomes easy to identify breaking
    changes. *)
 
+(** [storage_version_of_kernel kernel] is the storage version that [kernel]
+    bakes. For [Latest], it is [Int.max_int]: above every version, so it
+    passes every gate. *)
+let storage_version_of_kernel : Constants.kernel -> int = function
+  (* Each value is the [STORAGE_VERSION] of the kernel source that its
+     comment names: a tree vendored under [etherlink/], or a commit and a
+     path in it. *)
+  | Mainnet_beta -> 11 (* b9f6c91:etherlink/kernel_evm/kernel/src/storage.rs *)
+  | Mainnet_gamma -> 12 (* 4f4457e:etherlink/kernel_evm/kernel/src/storage.rs *)
+  | Bifrost -> 22 (* etherlink/kernel_bifrost/kernel/src/storage.rs *)
+  | Calypso -> 26 (* etherlink/kernel_calypso/kernel/src/storage.rs *)
+  | Calypso2 -> 26 (* etherlink/kernel_calypso2/kernel/src/storage.rs *)
+  | Dionysus -> 33 (* etherlink/kernel_dionysus/kernel/src/storage.rs *)
+  | DionysusR1 -> 36 (* etherlink/kernel_dionysus_r1/kernel/src/storage.rs *)
+  | Ebisu -> 38 (* etherlink/kernel_ebisu/kernel/src/storage.rs *)
+  | Farfadet -> 44 (* etherlink/kernel_farfadet/kernel/src/storage.rs *)
+  | FarfadetR1 -> 45 (* etherlink/kernel_farfadet_r1/kernel/src/storage.rs *)
+  | FarfadetR2 -> 45 (* etherlink/kernel_farfadet_r2_su/kernel/src/storage.rs *)
+  | FarfadetR3 -> 46 (* etherlink/kernel_farfadet_r3_su/kernel/src/storage.rs *)
+  | FarfadetR4 -> 47 (* etherlink/kernel_farfadet_r4_su/kernel/src/storage.rs *)
+  | FarfadetR5 -> 47 (* etherlink/kernel_farfadet_r5_su/kernel/src/storage.rs *)
+  | FarfadetR6 -> 47 (* etherlink/kernel_farfadet_r6_su/kernel/src/storage.rs *)
+  | Previewnet02 ->
+      54 (* 017753c8:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | Previewnet04 ->
+      56 (* 7e580654:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | Previewnet05 ->
+      57 (* 3038e37e:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | Previewnet06 ->
+      60 (* ae3d7318:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | Ganesha -> 65 (* 6d47b6a1:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | GaneshaR1 -> 65 (* da2977ec:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | GaneshaR2 -> 65 (* 54a7b092:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | Latest -> Int.max_int
+
 let simulation_v0 ~storage_version = storage_version < 12
 
 let simulation_v2 ~storage_version = storage_version > 12
+
+let ticketer_moved_to_world_state ~storage_version = storage_version >= 12
 
 let populate_delayed_inbox_disabled ~storage_version = storage_version < 15
 
@@ -38,6 +75,8 @@ let ipc_paths_moved_to_base ~storage_version = storage_version >= 52
 let tezosx_single_tx ~storage_version = storage_version >= 53
 
 let governance_config_moved_to_base ~storage_version = storage_version >= 54
+
+let feature_flags_moved_to_base ~storage_version = storage_version >= 55
 
 let michelson_runtime_paths_moved_to_world_state_version = 57
 

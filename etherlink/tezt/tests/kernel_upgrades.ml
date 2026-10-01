@@ -784,12 +784,12 @@ let test_patch_kernel =
   unit
 
 (* Guard against [Kernel.storage_version] in [etherlink/tezt/lib/kernel.ml]
-   drifting from the [STORAGE_VERSION] constant baked into each kernel binary.
-   Boot the kernel, then assert the value the kernel itself wrote to its
-   durable-storage [storage_version] path matches what [Kernel.storage_version]
-   reports for that kernel. If a kernel is rebaked with a new [STORAGE_VERSION]
-   and tezt's table isn't bumped, this test fails with a pointer to the file to
-   fix.
+   and [Storage_version.storage_version_of_kernel] in the EVM node drifting
+   from the [STORAGE_VERSION] constant baked into each kernel binary. Boot the
+   kernel, then assert the value the kernel itself wrote to its durable-storage
+   [storage_version] path matches what each table reports for that kernel. If
+   a kernel is rebaked with a new [STORAGE_VERSION] and a table isn't bumped,
+   this test fails with a pointer to the file to fix.
 
    Coverage here is limited to [etherlink_all] (Mainnet + Latest) — Previewnet
    cannot be booted by the default [register_all] fixture and is covered by
@@ -837,6 +837,34 @@ let test_kernel_storage_version_matches_constant =
             match the rebaked kernel."
            (Kernel.to_tag kernel)
            key)) ;
+  (* The table of the EVM node must agree with the kernel too. *)
+  (match Kernel.name_of kernel with
+  | None -> ()
+  | Some name ->
+      let kernel_enum =
+        match Evm_node_lib_dev.Constants.kernel_from_string name with
+        | Some k -> k
+        | None ->
+            Test.fail
+              ~__LOC__
+              "Kernel.name_of returned %S, which Constants.kernel_from_string \
+               does not recognize"
+              name
+      in
+      let node_expected =
+        Evm_node_lib_dev.Storage_version.storage_version_of_kernel kernel_enum
+      in
+      Check.(
+        (actual = node_expected)
+          int
+          ~error_msg:
+            (Printf.sprintf
+               "Kernel %s wrote V%%L to %s but \
+                Storage_version.storage_version_of_kernel reports V%%R, update \
+                the table in etherlink/bin_node/lib_dev/storage_version.ml to \
+                match the rebaked kernel."
+               name
+               key))) ;
   unit
 
 let protocols = [Protocol.Alpha]
