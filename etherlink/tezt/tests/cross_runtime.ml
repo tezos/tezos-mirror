@@ -13777,8 +13777,9 @@ let test_crac_direct_gateway_receipt_order ~revert () =
       [
         ("cross_runtime_call", (handler_address, None, status));
         ( "call_evm",
-          (sender_alias, Some gateway_address, if revert then "failed" else "applied")
-        );
+          ( sender_alias,
+            Some gateway_address,
+            if revert then "failed" else "applied" ) );
         ("cross_runtime_call", (handler_address, None, status));
         ("run", (bridge_alias, Some leaf_address, status));
         ("_incrementWitness", (leaf_address, Some leaf_address, status));
