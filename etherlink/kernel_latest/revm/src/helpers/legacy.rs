@@ -11,6 +11,7 @@ use revm::primitives::{alloy_primitives::Keccak256, Address, Log, B256, U256};
 use rlp::{Encodable, RlpDecodable, RlpEncodable};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
+use tezosx_types::Wei;
 
 /// Deposit structure parsed from the inbox message
 #[derive(Debug, PartialEq, Clone, RlpEncodable, RlpDecodable)]
@@ -161,6 +162,16 @@ pub fn alloy_to_u256(value: &U256) -> PU256 {
     PU256(value.into_limbs())
 }
 
+/// Converts a kernel-authored wei amount to the EVM execution's integer type.
+pub fn wei_to_alloy(value: Wei) -> U256 {
+    u256_to_alloy(&value.as_u256())
+}
+
+/// Reads an EVM execution's value as a kernel-authored wei amount.
+pub fn alloy_to_wei(value: &U256) -> Wei {
+    Wei::from_u256(alloy_to_u256(value))
+}
+
 pub fn alloy_to_h160(value: &Address) -> H160 {
     H160::from_slice(value.as_slice())
 }
@@ -212,4 +223,27 @@ fn bigint_to_u256(value: &BigInt) -> Result<PU256, primitive_types::Error> {
         return Err(primitive_types::Error::Overflow);
     }
     Ok(PU256::from_little_endian(&bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wei_round_trips_through_alloy() {
+        let wei = Wei::from_u256(PU256::MAX - PU256::from(7u64));
+        assert_eq!(alloy_to_wei(&wei_to_alloy(wei)), wei);
+    }
+
+    #[test]
+    fn alloy_round_trips_through_wei() {
+        let value = U256::MAX - U256::from(7u64);
+        assert_eq!(wei_to_alloy(alloy_to_wei(&value)), value);
+    }
+
+    #[test]
+    fn wei_to_alloy_keeps_the_value() {
+        let wei = Wei::from_u256(PU256::from(42u64));
+        assert_eq!(wei_to_alloy(wei), U256::from(42u64));
+    }
 }
