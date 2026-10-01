@@ -106,17 +106,21 @@ pub enum KeySpaceLoaderError {
     #[cfg(feature = "irmin-compat")]
     #[error("key space name overlaps an already-loaded key space")]
     Overlapping,
+
     /// A key space with this exact name is already loaded and has not been
     /// dropped yet.
     #[error("a key space with this name is already loaded")]
     AlreadyLoaded,
+
     /// The requested name is not a valid key space name.
     #[error("invalid key space name: {0}")]
     InvalidName(#[from] NameError),
+
     /// Invalid/Inconsistent storage detected
     #[cfg(not(feature = "irmin-compat"))]
     #[error("KeySpaceLoader encountered a malformed name mapping for {0}")]
     InconsistentNameMapping(Name),
+
     /// Only up to `i32::MAX` databases are supported.
     #[cfg(not(feature = "irmin-compat"))]
     #[error("Could not allocated database for the given name - ran out of db indices.")]
