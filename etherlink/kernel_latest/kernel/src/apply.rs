@@ -46,6 +46,7 @@ use tezos_tezlink::operation_result::{
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
+use tezosx_types::Wei;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{
@@ -742,7 +743,7 @@ where
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
         if let Err(e) =
-            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&cost))
+            caller_account.sub_balance(rk.eth_accounts_mut(), Wei::from_u256(cost))
         {
             return Err(anyhow::anyhow!(
                 "Failed to charge {caller} additional fees of {}: {}",
@@ -874,7 +875,7 @@ where
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit
     // this top-level transaction needs.
-    caller_account.add_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+    caller_account.add_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
@@ -918,7 +919,7 @@ where
                 // Refund an EVM revert before closing, as on the previous success path.
                 if !execution_outcome.result.is_success() {
                     caller_account
-                        .sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+                        .sub_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
                 }
             }
             // Keep a runtime error as the value so its prefund refund runs after closing.
@@ -929,7 +930,7 @@ where
         Ok(outcome) => Ok(outcome),
         Err(err) => {
             // Something went wrong, remove the XTZ deposit's prefund.
-            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+            caller_account.sub_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
             Err(err)
         }
     }

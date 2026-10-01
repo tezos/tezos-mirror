@@ -21,7 +21,7 @@ use crate::simulation::SimulationOutcome;
 use crate::transaction::TransactionContent;
 
 use primitive_types::{H160, H256, U256};
-use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
+use revm_etherlink::helpers::legacy::h160_to_alloy;
 use revm_etherlink::{storage::world_state_handler::StorageAccount, EvmKernelError};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
@@ -30,6 +30,7 @@ use tezos_ethereum::wei::{ceil_div, gas_from_wei};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezosx_types::Wei;
 
 use std::mem::size_of;
 
@@ -211,7 +212,7 @@ impl FeeUpdates {
         let mut account = StorageAccount::from_address(&h160_to_alloy(&sequencer))?;
         if let Err(e) = account.add_balance(
             rk.eth_accounts_mut(),
-            u256_to_alloy(&self.compensate_sequencer_amount),
+            Wei::from_u256(self.compensate_sequencer_amount),
         ) {
             return Err(anyhow::anyhow!(
                 "Failed to compensate sequencer {sequencer} of {}: {}",
@@ -335,7 +336,7 @@ mod tests {
     use alloy_primitives::Bytes;
     use primitive_types::{H160, U256};
     use revm::context::result::{ExecutionResult, Output, ResultGas};
-    use revm_etherlink::helpers::legacy::alloy_to_u256;
+    use revm_etherlink::helpers::legacy::{alloy_to_u256, u256_to_alloy};
     use revm_etherlink::ExecutionOutcome;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
@@ -542,7 +543,7 @@ mod tests {
     ) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
         account
-            .sub_balance(eth_accounts, u256_to_alloy(&charge_amount))
+            .sub_balance(eth_accounts, Wei::from_u256(charge_amount))
             .unwrap();
     }
 
