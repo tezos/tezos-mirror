@@ -454,33 +454,35 @@ let test_first_move_with_invalid_ancestor () =
 
 (* ------------------------------------------------------------------------ *)
 (* The plugin checks refutation moves against the context at the START of the
-   block, which is not updated as operations are applied. At most one
-   refutation operation per game is therefore allowed per block ([seen_games]),
-   so that a move is never checked against a state an earlier operation has
-   changed.
+   block, which is not updated as operations are applied. A check on a game is
+   therefore only meaningful while no earlier operation in the block has moved
+   that game.
 
-   That slot is claimed on the operation's shape alone, before anything
-   establishes that the operation can succeed. The protocol rejects a doomed
-   refutation only at APPLICATION ([game_move]'s [Sc_rollup_wrong_turn],
-   [start_game]'s [Sc_rollup_game_already_started], [get_game]'s
-   [Sc_rollup_no_game]), so such an operation validates, is included, pays its
-   fee, fails, and leaves the game untouched while the opponent's legitimate
-   move is excluded from the block. Only the other player in the game can
-   produce one -- the key is the unordered pair of stakers and the source of an
-   operation is signed -- and it is cheaper than the move it displaces, so the
-   baker's fee-weighted selection prefers it. Repeated in every block it runs
-   the opponent out of the refutation clock, or out of the challenge window
-   before the game starts.
+   The rule that buys it, with no state threaded through the block: a [Move] is
+   accepted only from the player the game expects at the start of the block.
+   Every move [play] accepts flips the turn, so once one has applied, every
+   later [Move] on that game fails the protocol's own [Sc_rollup_wrong_turn]
+   check before reaching [play] — at most one of them can change anything, and
+   it is the one the start-of-block context describes.
 
-   The tests below say what must hold of any fix rather than how one works: the
-   honest move must reach the block, both players must be able to open a game
-   in the same block, and a move the plugin cannot check against the
-   start-of-block state must stay out of it.
+   Refusing the others costs them nothing they cannot recover. A move played
+   out of turn can only fail at APPLICATION ([game_move]'s
+   [Sc_rollup_wrong_turn], [get_game]'s [Sc_rollup_no_game]), so its sender
+   loses one block out of the [timeout_period_in_blocks] their clock is
+   measured in, and may inject it again once the turn is theirs.
 
-   Inclusion is checked by replaying the rule the baker applies to the plugin's
-   verdict ([lib_delegate/operation_selection.ml]) rather than by asserting the
-   verdict itself, so that it holds however a fix keeps the poison out of the
-   way. No baker runs. *)
+   [Start] is left alone. It has no turn to be out of, no check here reads the
+   state for it, and before the game exists both players may legitimately open
+   it — the one window in which two operations on a game genuinely compete, and
+   the one the plugin must not arbitrate.
+
+   The tests below are in three groups: what the rule must refuse, what it must
+   not, and the checks it keeps sound. Each one that turns on a refusal first
+   establishes at the protocol level what the refused operation could have
+   done. Inclusion is checked by replaying the rule the baker applies to the
+   plugin's verdict — an operation the plugin refuses is left out of the block
+   ([lib_delegate/operation_selection.ml]) — rather than by asserting the
+   verdict itself. No baker runs. *)
 
 (* The [Sc_rollup_refute] contents carrying [repr_refutation] (given at the
    [Sc_rollup_game_repr] level). *)
@@ -775,12 +777,14 @@ let test_out_of_turn_move_does_not_exclude_the_honest_move () =
     select_block_operations ~ctxt_before [("honest", honest_op)]
   in
   let* () = assert_in_block ~loc:__LOC__ ~scenario selection "honest" in
-  (* The attack: the attacker's cheaper operation is selected first. *)
+  (* The attacker's cheaper operation is selected first. It is refused -- it is
+     not the move the game expects -- and the honest move still gets in. *)
   let* selection =
     select_block_operations
       ~ctxt_before
       [("poison", poison_op); ("honest", honest_op)]
   in
+  let* () = assert_not_in_block ~loc:__LOC__ ~scenario selection "poison" in
   assert_in_block ~loc:__LOC__ ~scenario selection "honest"
 
 (* Shape 2 — a [Start] for a game that is already started
@@ -896,6 +900,9 @@ let test_start_on_started_game_does_not_exclude_the_honest_move () =
       ~ctxt_before
       [("poison", poison_op); ("honest", honest_op)]
   in
+  (* The rule reaches [Move]s only, so the [Start] is kept -- it changes
+     nothing when it fails, and keeping it costs the honest move nothing. *)
+  let* () = assert_in_block ~loc:__LOC__ ~scenario selection "poison" in
   assert_in_block ~loc:__LOC__ ~scenario selection "honest"
 
 (* Shape 3 — a [Move] for a game that does not exist yet
@@ -992,13 +999,18 @@ let test_move_on_absent_game_does_not_exclude_the_honest_start () =
       ~ctxt_before
       [("poison", poison_op); ("honest", honest_op)]
   in
+  (* With no game there is no player to expect the move from, so it is
+     refused; the honest [Start] is a [Start], and never is. *)
+  let* () = assert_not_in_block ~loc:__LOC__ ~scenario selection "poison" in
   assert_in_block ~loc:__LOC__ ~scenario selection "honest"
 
-(* A refutation operation naming a rollup that does not exist is includable and
-   fails at application on the missing rollup, so the plugin has no reason to
-   refuse it -- and a fix that starts reading the game state must not change
-   that. It is the cheapest shape that reaches such a read. *)
-let test_refutation_for_unknown_rollup_does_not_reject_block () =
+(* A refutation naming a rollup that does not exist reads as a [Move] on a game
+   that does not exist, so the rule refuses it. That is not a quirk of unknown
+   rollups: [Sc_rollup_refutation_storage.find_game] answers [Ok None] rather
+   than an error for a missing rollup, so this is the same verdict a [Move] on
+   any absent game gets. It is the cheapest shape that reaches it -- anyone can
+   sign one, for any address. *)
+let test_move_on_an_unknown_rollup_is_refused () =
   let open Lwt_result_wrap_syntax in
   let* ctxt_before, rollup, refuter, defender, _staker3, _, _ =
     two_stakers_in_conflict ()
@@ -1020,7 +1032,7 @@ let test_refutation_for_unknown_rollup_does_not_reject_block () =
   let* selection =
     select_block_operations ~ctxt_before [("unknown rollup", op)]
   in
-  assert_in_block
+  assert_not_in_block
     ~loc:__LOC__
     ~scenario:"Move naming an unknown rollup"
     selection
@@ -1165,7 +1177,10 @@ let test_competing_starts_are_both_included () =
    dissection is looked up in a section list that does not contain it --
    [find_section_around_choice] finds no section, and both the multi-tick and
    the missing-start-state checks fall through. Applied, it would anchor the
-   game on a section no single-tick proof can span. *)
+   game on a section no single-tick proof can span.
+
+   The rule closes it without looking at what came before: the dissection move
+   is from the player the game expects, the answering [Proof] is not. *)
 let test_opponent_proof_on_a_refreshed_dissection_is_refused () =
   let open Lwt_result_wrap_syntax in
   let* ( ctxt,
@@ -1243,7 +1258,8 @@ let test_opponent_proof_on_a_refreshed_dissection_is_refused () =
    The [1M] rule gives a manager one operation per block, so a batch is the
    only way a player can both open a game and play in it in the same block --
    and [start_game] puts its own sender on turn, so that [Move] is on turn when
-   it applies. *)
+   it applies. The start-of-block context has no game to check it against, so
+   the rule refuses a [Move] whose game does not exist yet. *)
 let test_move_batched_after_a_start_is_refused () =
   let open Lwt_result_wrap_syntax in
   let* ( ctxt_before,
@@ -1323,9 +1339,10 @@ let test_move_batched_after_a_start_is_refused () =
     selection
     "batch"
 
-(* A [Proof] the plugin can check is checked against the start-of-block state
-   and kept or refused on its own merits: kept on the single-tick section,
-   refused on the 10000-tick one. *)
+(* The move the game expects is still checked against the start-of-block state,
+   and kept or refused on its own merits. If the rule replaced the check, the
+   second [Proof] below would be kept although the section it plays on is 10000
+   ticks wide. *)
 let test_proof_is_checked_against_the_block_state () =
   let open Lwt_result_wrap_syntax in
   let* ( ctxt,
@@ -1344,7 +1361,8 @@ let test_proof_is_checked_against_the_block_state () =
       ~player:(refuter, refuter_commitment_hash)
       ~opponent:(defender, defender_commitment_hash)
   in
-  (* The refuter is next to play. *)
+  (* The refuter is next to play, so its moves are the ones the rule lets
+     through. *)
   let* proof = build_proof_step () in
   let mk_proof_op choice =
     mk_refute_op
@@ -1401,25 +1419,24 @@ let tests =
       `Quick
       test_first_move_with_invalid_ancestor;
     Tztest.tztest
-      "a Move played out of turn does not keep the honest move out of the \
-       block."
+      "a Move played out of turn is refused and does not keep the honest move \
+       out of the block."
       `Quick
       test_out_of_turn_move_does_not_exclude_the_honest_move;
     Tztest.tztest
-      "a Start on an already-started game does not keep the honest move out of \
-       the block."
+      "a Start on an already-started game is kept and does not keep the honest \
+       move out of the block."
       `Quick
       test_start_on_started_game_does_not_exclude_the_honest_move;
     Tztest.tztest
-      "a Move on a game that does not exist yet does not keep the honest Start \
-       out of the block."
+      "a Move on a game that does not exist yet is refused and does not keep \
+       the honest Start out of the block."
       `Quick
       test_move_on_absent_game_does_not_exclude_the_honest_start;
     Tztest.tztest
-      "A refutation operation naming an unknown rollup does not make the block \
-       invalid."
+      "a Move naming an unknown rollup is refused."
       `Quick
-      test_refutation_for_unknown_rollup_does_not_reject_block;
+      test_move_on_an_unknown_rollup_is_refused;
     Tztest.tztest
       "Two players racing to Start the same game are both included in the \
        block."

@@ -4992,7 +4992,14 @@ let test_multitick_proof_rejected_by_plugin =
     move from the opponent whose [choice] tick only exists in the refreshed
     dissection — invisible to the start-of-block guard, yet stored as
     an indefensible [Final_move] if it were applied. The plugin must include
-    the first operation and filter out the second at block construction. *)
+    the first operation and filter out the second at block construction.
+
+    In 025 the rule is stated differently: a Move is accepted only from the
+    player whose turn it is at the start of the block
+    ([Sc_rollup_refute_move_out_of_turn] in
+    [src/proto_025_PsUshuai/lib_plugin/block_validation.ml]). The second
+    operation here is the opponent answering the first, hence out of turn at
+    the start of the block, so the test holds either way. *)
 let test_one_refutation_operation_per_game_per_block =
   test_forking_scenario
     ~variant:"at most one refutation operation per game per block"
