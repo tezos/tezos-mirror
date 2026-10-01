@@ -26,7 +26,7 @@ use tezosx_types::{mutez_to_evm_gas, Mutez};
 
 use crate::{
     database::EtherlinkVMDB,
-    helpers::legacy::alloy_to_u256,
+    helpers::legacy::alloy_to_wei,
     journal::{CrossRuntimeCall, Journal, MaterializedAlias},
     precompiles::{
         constants::{
@@ -897,7 +897,7 @@ fn inject_tezos_headers(
     // The receiving runtime truncates to its own precision (ADR L2-1004).
     headers.insert(
         X_TEZOS_AMOUNT,
-        parse_value(&format_tez_from_wei(alloy_to_u256(&amount)))?,
+        parse_value(&format_tez_from_wei(alloy_to_wei(&amount)))?,
     );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&gas_limit.to_string())?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);

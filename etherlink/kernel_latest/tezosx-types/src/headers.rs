@@ -7,7 +7,7 @@
 //! Each runtime re-uses these low-level extractors when building its own
 //! typed `parse_request_headers` function.
 
-use crate::{Gas, Mutez, MutezError, TezosXRuntimeError, MAX_CRAC_DEPTH};
+use crate::{Gas, Mutez, MutezError, TezosXRuntimeError, Wei, MAX_CRAC_DEPTH};
 use primitive_types::U256;
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -162,17 +162,14 @@ pub fn check_crac_depth(depth: u32) -> Result<(), TezosXRuntimeError> {
 // ---------------------------------------------------------------------------
 // TEZ decimal-string formatting and parsing
 // ---------------------------------------------------------------------------
-// TODO: https://linear.app/tezos/issue/L2-2021
-//   Retype the wei side of this amount seam on the crate's `Wei` (in the
-//   signatures instead of raw `U256`).
 
 /// Format a wei amount (`10^-18 TEZ`) as a canonical TEZ decimal string.
 ///
 /// Examples: `0` → `"0"`, `10^18` → `"1"`, `1.5 * 10^18` → `"1.5"`.
 /// Trailing fractional zeros are stripped; the decimal point is omitted for
 /// whole amounts.
-pub fn format_tez_from_wei(wei: U256) -> String {
-    format_tez_amount(wei, 18)
+pub fn format_tez_from_wei(wei: Wei) -> String {
+    format_tez_amount(wei.as_u256(), 18)
 }
 
 /// Format a mutez amount (`10^-6 TEZ`) as a canonical TEZ decimal string.
@@ -185,8 +182,9 @@ pub fn format_tez_from_mutez(mutez: Mutez) -> String {
 /// Parse a TEZ decimal string into wei (`10^-18 TEZ`).
 ///
 /// Accepts up to 18 decimal places.
-pub fn parse_tez_to_wei(s: &str) -> Result<U256, TezosXRuntimeError> {
+pub fn parse_tez_to_wei(s: &str) -> Result<Wei, TezosXRuntimeError> {
     parse_tez_amount(s, 18)
+        .map(Wei::from_u256)
         .map_err(|e| TezosXRuntimeError::HeaderError(format!("Invalid TEZ amount: {e}")))
 }
 
@@ -311,7 +309,9 @@ pub fn headers_from(pairs: &[(&str, &str)]) -> http::HeaderMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_TIMESTAMP};
+    use crate::{
+        Mutez, ONE_MUTEZ_WEI, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_TIMESTAMP,
+    };
 
     fn mutez(value: u64) -> Mutez {
         Mutez::try_from(value).unwrap()
@@ -418,37 +418,46 @@ mod tests {
 
     #[test]
     fn format_wei_zero() {
-        assert_eq!(format_tez_from_wei(U256::zero()), "0");
+        assert_eq!(format_tez_from_wei(Wei::ZERO), "0");
     }
 
     #[test]
     fn format_wei_one_tez() {
-        assert_eq!(format_tez_from_wei(U256::exp10(18)), "1");
+        assert_eq!(format_tez_from_wei(Wei::from_u256(U256::exp10(18))), "1");
     }
 
     #[test]
     fn format_wei_fractional() {
         // 1.5 TEZ
-        let wei = U256::exp10(18) + U256::exp10(17) * 5;
+        let wei = Wei::from_u256(U256::exp10(18) + U256::exp10(17) * 5);
         assert_eq!(format_tez_from_wei(wei), "1.5");
     }
 
     #[test]
     fn format_wei_small_fraction() {
         // 0.001 TEZ = 10^15 wei
-        assert_eq!(format_tez_from_wei(U256::exp10(15)), "0.001");
+        assert_eq!(
+            format_tez_from_wei(Wei::from_u256(U256::exp10(15))),
+            "0.001"
+        );
     }
 
     #[test]
     fn format_wei_one_wei() {
         // Smallest unit: 0.000000000000000001 TEZ
-        assert_eq!(format_tez_from_wei(U256::from(1)), "0.000000000000000001");
+        assert_eq!(
+            format_tez_from_wei(Wei::from_u256(U256::from(1))),
+            "0.000000000000000001"
+        );
     }
 
     #[test]
     fn format_wei_one_mutez_equivalent() {
         // 0.000001 TEZ = 10^12 wei
-        assert_eq!(format_tez_from_wei(U256::exp10(12)), "0.000001");
+        assert_eq!(
+            format_tez_from_wei(Wei::from_u256(U256::exp10(12))),
+            "0.000001"
+        );
     }
 
     #[test]
@@ -477,17 +486,20 @@ mod tests {
 
     #[test]
     fn parse_wei_zero() {
-        assert_eq!(parse_tez_to_wei("0").unwrap(), U256::zero());
+        assert_eq!(parse_tez_to_wei("0").unwrap(), Wei::ZERO);
     }
 
     #[test]
     fn parse_wei_one_tez() {
-        assert_eq!(parse_tez_to_wei("1").unwrap(), U256::exp10(18));
+        assert_eq!(
+            parse_tez_to_wei("1").unwrap(),
+            Wei::from_u256(U256::exp10(18))
+        );
     }
 
     #[test]
     fn parse_wei_fractional() {
-        let expected = U256::exp10(18) + U256::exp10(17) * 5;
+        let expected = Wei::from_u256(U256::exp10(18) + U256::exp10(17) * 5);
         assert_eq!(parse_tez_to_wei("1.5").unwrap(), expected);
     }
 
@@ -495,20 +507,26 @@ mod tests {
     fn parse_wei_full_precision() {
         assert_eq!(
             parse_tez_to_wei("0.000000000000000001").unwrap(),
-            U256::from(1)
+            Wei::from_u256(U256::from(1))
         );
     }
 
     #[test]
     fn parse_wei_trailing_decimal() {
         // "1." is treated as "1"
-        assert_eq!(parse_tez_to_wei("1.").unwrap(), U256::exp10(18));
+        assert_eq!(
+            parse_tez_to_wei("1.").unwrap(),
+            Wei::from_u256(U256::exp10(18))
+        );
     }
 
     #[test]
     fn parse_wei_leading_decimal() {
         // ".5" is treated as "0.5"
-        assert_eq!(parse_tez_to_wei(".5").unwrap(), U256::exp10(17) * 5);
+        assert_eq!(
+            parse_tez_to_wei(".5").unwrap(),
+            Wei::from_u256(U256::exp10(17) * 5)
+        );
     }
 
     #[test]
@@ -551,7 +569,9 @@ mod tests {
             U256::exp10(18),
             U256::exp10(18) + U256::exp10(17) * 5,
             U256::from(123_456_789_000_000_000_000u128),
-        ] {
+        ]
+        .map(Wei::from_u256)
+        {
             let s = format_tez_from_wei(wei);
             assert_eq!(
                 parse_tez_to_wei(&s).unwrap(),
@@ -592,6 +612,29 @@ mod tests {
     fn parse_mutez_above_u64_is_bad_request() {
         let err = parse_tez_to_mutez("18446744073709.551616").unwrap_err();
         assert!(matches!(err, TezosXRuntimeError::BadRequest(_)));
+    }
+
+    #[test]
+    fn wei_header_parsed_as_mutez_floors() {
+        let one_mutez = U256::from(ONE_MUTEZ_WEI);
+        for wei in [
+            U256::zero(),
+            U256::from(1),
+            one_mutez - 1,
+            one_mutez,
+            one_mutez + 1,
+            U256::exp10(18) + U256::exp10(17) * 5 + 7,
+            Mutez::MAX.to_wei().as_u256() + one_mutez - 1,
+        ]
+        .map(Wei::from_u256)
+        {
+            let s = format_tez_from_wei(wei);
+            assert_eq!(
+                parse_tez_to_mutez(&s).unwrap(),
+                wei.to_mutez_floor().unwrap(),
+                "floor mismatch for {s}"
+            );
+        }
     }
 
     // --- Error cases ---

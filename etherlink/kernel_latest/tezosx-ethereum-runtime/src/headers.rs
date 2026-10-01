@@ -18,6 +18,7 @@ pub use tezosx_interfaces::{
 
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
 use primitive_types::U256;
+use revm_etherlink::helpers::legacy::wei_to_alloy;
 use tezosx_interfaces::headers::{
     check_crac_depth, parse_str, parse_tez_to_wei, parse_u32_default, require_gas,
     require_str, require_u32, require_u64,
@@ -114,9 +115,7 @@ fn require_tez_as_wei(
     name: &str,
 ) -> Result<AlloyU256, TezosXRuntimeError> {
     let s = require_str(headers, name)?;
-    let wei = parse_tez_to_wei(&s)?;
-    // Convert primitive_types::U256 to alloy U256 via limbs.
-    Ok(AlloyU256::from_limbs(wei.0))
+    Ok(wei_to_alloy(parse_tez_to_wei(&s)?))
 }
 
 fn require_address(
