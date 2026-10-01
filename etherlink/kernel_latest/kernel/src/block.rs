@@ -2040,6 +2040,224 @@ mod tests {
     ///
     /// Fail-on-revert guard: with the base forced back to 0 the call below
     /// stays `Applied` even when seeded at 65_535, so this test goes red.
+    /// A Michelson operation calling the gateway's `%materialize_alias`, with
+    /// the real runtimes: the alias is created, its origination lands in the
+    /// operation's receipt, the operation pays for its storage, and no
+    /// snapshot of the accounts is left behind.
+    #[test]
+    fn materialize_alias_from_a_michelson_operation() {
+        use crate::apply::RuntimeExecutionInfo;
+        use crate::block_in_progress::BlockInProgress;
+        use mir::gas::Gas;
+        use revm_etherlink::storage::world_state_handler::AccountInfo;
+        use std::collections::VecDeque;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_execution::account_storage::{
+            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
+        };
+        use tezos_tezlink::operation_result::{
+            Balance, BalanceUpdate, ContentResult, InternalOperationSum,
+            OperationDataAndMetadata, OperationResultSum, TransferTarget, UpdateOrigin,
+        };
+        use tezosx_interfaces::{AliasInfo, Origin, Registry, RuntimeId};
+
+        let mut host = MockKernelHost::default();
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        context::implicit_from_public_key_hash(&bootstrap2().pkh)
+            .unwrap()
+            .allocate(&mut host)
+            .unwrap();
+        let mut base_ks = load_base(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base_ks);
+
+        let bootstrap = bootstrap1();
+        set_tezos_account_info(
+            &mut host,
+            &bootstrap.pkh,
+            TezosAccountInfo {
+                balance: U256::from(500_000u64),
+                nonce: 0,
+                pub_key: Some(bootstrap.pk.clone()),
+            },
+        )
+        .unwrap();
+        // An EVM account provably native: it has sent a transaction.
+        let native = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
+        {
+            let mut eth_accounts = host
+                .load_or_create(
+                    tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_KEYSPACE_NAME,
+                )
+                .unwrap();
+            let mut account = StorageAccount::from_address(&h160_to_alloy(
+                &address_from_str(&native[2..]).unwrap(),
+            ))
+            .unwrap();
+            account
+                .set_info(
+                    &mut eth_accounts,
+                    AccountInfo {
+                        nonce: 1,
+                        ..AccountInfo::default()
+                    },
+                )
+                .unwrap();
+        }
+
+        let parser = mir::parser::Parser::new();
+        let parameter = parser
+            .parse(&format!(r#"Pair "ethereum" (Pair "{native}" None)"#))
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let call = make_transaction_operation(
+            1,
+            1,
+            10_000,
+            1_000,
+            bootstrap.clone(),
+            0.into(),
+            Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw",
+                )
+                .unwrap(),
+            ),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::try_from("materialize_alias").unwrap(),
+                value: parameter,
+            },
+        );
+        let transaction = TezosXTransaction::Ethereum(Box::new(Transaction {
+            tx_hash: call.hash().unwrap().into(),
+            content: TransactionContent::TezosDelayed(call),
+        }));
+
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut block_constants = first_block(&mut rk, &base_ks);
+        block_constants.michelson_runtime_block_constants.safe_roots =
+            chain_config.world_states(U256::zero());
+        let block_in_progress = BlockInProgress::new(
+            block_constants.evm_runtime_block_constants.number,
+            VecDeque::new(),
+            U256::from(MINIMUM_BASE_FEE_PER_GAS),
+        );
+        let registry = RegistryImpl::default();
+        let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
+        let result = chain_config
+            .apply_transaction(
+                &block_in_progress,
+                &mut rk,
+                &registry,
+                &outbox_queue,
+                &block_constants,
+                transaction,
+                0,
+                None,
+                None,
+                false,
+                true,
+                false,
+            )
+            .expect("apply_transaction must not raise a kernel error");
+        let ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(info)) = result else {
+            panic!("the operation must be valid");
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            info.op.op_and_receipt;
+        let OperationResultSum::Transfer(transfer) = &batch.operations[0].receipt else {
+            panic!("expected a transfer receipt");
+        };
+        // The origination of the alias, then the event announcing it.
+        let [InternalOperationSum::Origination(origination), InternalOperationSum::Event(event)] =
+            transfer.internal_operation_results.as_slice()
+        else {
+            panic!(
+                "expected the alias origination then the event, got {:?}",
+                transfer.internal_operation_results
+            );
+        };
+        let alias = registry
+            .compute_alias(&AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: native.to_string(),
+            })
+            .unwrap();
+        let kt1 = ContractKt1Hash::from_base58_check(&alias).unwrap();
+        let ContentResult::Applied(originated) = &origination.result else {
+            panic!("the alias origination must be applied");
+        };
+        assert_eq!(
+            originated
+                .originated_contracts
+                .iter()
+                .map(|originated| originated.contract.clone())
+                .collect::<Vec<_>>(),
+            vec![kt1.clone()]
+        );
+        assert_eq!(
+            event.content.tag.as_ref().map(|tag| tag.to_string()),
+            Some("alias_materialized".to_string())
+        );
+
+        // The alias is classified as the alias of the EVM account.
+        assert_eq!(
+            context::originated_from_kt1(&kt1)
+                .unwrap()
+                .origin(rk.host())
+                .unwrap(),
+            Some(Origin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: native.to_string(),
+            }))
+        );
+
+        // The operation pays for the storage of the alias.
+        let storage_cost: i64 =
+            tezos_execution::storage_fees::compute_internal_op_storage_fees(
+                &transfer.internal_operation_results[0],
+            )
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert!(storage_cost > 0);
+        let ContentResult::Applied(TransferTarget::ToContract(success)) =
+            &transfer.result
+        else {
+            panic!("the operation must be applied, got {:?}", transfer.result);
+        };
+        assert_eq!(
+            success.balance_updates,
+            vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(bootstrap.pkh.clone())),
+                    changes: -storage_cost,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::StorageFees,
+                    changes: storage_cost,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ]
+        );
+        // 1 mutez of fees, and the storage.
+        assert_eq!(
+            get_tezos_account_info(rk.host(), &bootstrap.pkh)
+                .unwrap()
+                .map(|info| info.balance),
+            Some(U256::from(500_000 - 1 - storage_cost))
+        );
+
+        // No snapshot of the accounts is left behind.
+        let snapshot =
+            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
+        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
+    }
+
     #[test]
     fn delayed_internal_op_cap_is_cumulative() {
         use crate::apply::tests::{dummy_crac_receipt, make_transfer};

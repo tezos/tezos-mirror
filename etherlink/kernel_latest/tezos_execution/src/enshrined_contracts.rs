@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::{
-    Address, AddressHash, BinWriter, ByteReprTrait, Operation, OperationInfo,
-    RcTypedValue, TransferTokens, TypedValue,
+    annotations::FieldAnnotation, Address, AddressHash, BinWriter, ByteReprTrait, Emit,
+    Operation, OperationInfo, Or, RcTypedValue, TransferTokens, TypedValue,
 };
 use mir::ast::{PublicKeyHash, Type};
 use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
@@ -325,6 +325,8 @@ where
                         TransferError::GatewayError(format!("collect_result: {e}"))
                     })?;
                 Ok(vec![])
+            } else if entrypoint.as_str() == Some("materialize_alias") {
+                materialize_alias(ctx, typed).map_err(Into::into)
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
@@ -768,6 +770,253 @@ pub(crate) fn drain_reentrant_crac_ops(
         }
     }
     ops
+}
+
+/// Longest parameter `%materialize_alias` accepts, in bytes. The longest
+/// valid one, an uncompressed EVM public key in hexadecimal with its `0x04`
+/// prefix, takes 132 bytes.
+const MATERIALIZE_ALIAS_MAX_PARAMETER_LEN: usize = 256;
+
+/// Tag of the event `%materialize_alias` emits when it creates an alias.
+pub const ALIAS_MATERIALIZED_EVENT_TAG: &str = "alias_materialized";
+
+/// `%materialize_alias`: materialize the Michelson alias of `native_address`,
+/// an account native to `native_runtime` (the runtime host name, e.g.
+/// "ethereum"), as described in RFC-26049.
+///
+/// The address must be provably native, so that the alias of an alias is
+/// never materialized. `native_public_key` is the account's public key in its
+/// runtime's format; when given, it is verified against the address.
+///
+/// Idempotent: an existing alias is left untouched. A new one is announced by
+/// an `%alias_materialized` event holding
+/// `(native_runtime, (native_address, alias))`.
+fn materialize_alias<'a, 'host, Host, KS>(
+    ctx: &mut (impl CtxTrait<'a>
+              + HasHost<Host>
+              + HasOperationGas
+              + HasCrossRuntime<'host, Host, KS>
+              + HasDelegatedStorageCost),
+    typed: TypedValue<'a>,
+) -> Result<Vec<OperationInfo<'a>>, TransferError>
+where
+    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
+    KS: KeySpace,
+{
+    let to_transfer_error = |e: TezosXRuntimeError| match e {
+        TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(OutOfGas),
+        e => TransferError::GatewayError(format!("materialize_alias: {e}")),
+    };
+    // Nothing receives the tez: it would be lost.
+    if ctx.amount() != 0 {
+        return Err(TransferError::GatewayError(
+            "materialize_alias: amount must be 0".into(),
+        ));
+    }
+    let (native_runtime, native_address, native_public_key) =
+        extract_materialize_alias_params(typed)?;
+    // No per-word payload cost: the parameters are a runtime name, an address
+    // and a public key, whose valid values are short, and longer ones are
+    // rejected before any work on them.
+    charge_gateway_base_cost(ctx)?;
+    if [
+        native_runtime.len(),
+        native_address.len(),
+        native_public_key.as_ref().map_or(0, String::len),
+    ]
+    .into_iter()
+    .any(|len| len > MATERIALIZE_ALIAS_MAX_PARAMETER_LEN)
+    {
+        return Err(TransferError::GatewayError(
+            "materialize_alias: parameter too long".into(),
+        ));
+    }
+
+    let runtime = RuntimeId::from_host(&native_runtime).ok_or_else(|| {
+        TransferError::GatewayError("materialize_alias: unknown native runtime".into())
+    })?;
+    // A Michelson account has no Michelson alias.
+    if runtime == RuntimeId::Tezos {
+        return Err(TransferError::GatewayError(ERR_SAME_RUNTIME_NAC.into()));
+    }
+    let native_address = canonicalize_native_address(runtime, &native_address);
+
+    // Refuse to materialize the alias of an alias. What the check consumed is
+    // charged even when it fails.
+    with_milligas_budget(ctx, |ctx, budget| {
+        let (rk, _, registry) = ctx.cross_runtime_split();
+        registry.check_is_native_address(
+            rk,
+            runtime,
+            &native_address,
+            native_public_key.as_deref(),
+            budget,
+        )
+    })?
+    .map_err(to_transfer_error)?;
+
+    // Without a public key, the alias stores empty bytes.
+    let native_public_key = match native_public_key {
+        Some(public_key) => {
+            let (_, _, registry) = ctx.cross_runtime_split();
+            registry
+                .public_key_from_string(&public_key, runtime)
+                .map_err(to_transfer_error)?
+        }
+        None => Vec::new(),
+    };
+
+    let context = cross_runtime_ctx_from_ctx(ctx)?;
+    // The lookup and the materialization are charged even when they fail.
+    let materialized = with_milligas_budget(ctx, |ctx, budget| {
+        budget.consume(ALIAS_LOOKUP_COST)?;
+        let (rk, journal, registry) = ctx.cross_runtime_split();
+        let alias = registry.compute_alias(&AliasInfo {
+            runtime: RuntimeId::Tezos,
+            native_address: native_address.clone(),
+        })?;
+        if registry.alias_exists(rk, journal, RuntimeId::Tezos, &alias)? {
+            return Ok(None);
+        }
+        // The alias is materialized under a world-state snapshot, which no
+        // EVM frame releases here.
+        let snapshots = journal.michelson.snapshot_count();
+        let resolution = registry.ensure_alias(
+            rk,
+            journal,
+            AliasInfo {
+                runtime,
+                native_address: native_address.clone(),
+            },
+            Some(&native_public_key),
+            RuntimeId::Tezos,
+            context,
+            *budget,
+        );
+        // Released on success; on failure, the state is restored from them,
+        // without relying on a rollback of the enclosing operation.
+        if resolution.is_ok() {
+            journal
+                .michelson
+                .release_snapshots_from(rk.host_mut(), snapshots)
+        } else {
+            journal
+                .michelson
+                .revert_snapshots_from(rk.host_mut(), snapshots)
+        }
+        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+        let (alias, resolution) = resolution?;
+        budget.consume(*budget - resolution.gas_remaining)?;
+        Ok(Some((alias, resolution.delegated_storage_cost)))
+    })?
+    .map_err(to_transfer_error)?;
+    let Some((alias, delegated_storage_cost)) = materialized else {
+        return Ok(vec![]);
+    };
+    if let Some(v) = delegated_storage_cost {
+        ctx.add_delegated_storage_cost(v);
+    }
+
+    let kt1 = ContractKt1Hash::from_base58_check(&alias).map_err(|e| {
+        TransferError::GatewayError(format!(
+            "materialize_alias: invalid alias {alias}: {e}"
+        ))
+    })?;
+    let value = TypedValue::new_pair(
+        TypedValue::String(native_runtime),
+        TypedValue::new_pair(
+            TypedValue::String(native_address),
+            TypedValue::Address(Address {
+                hash: AddressHash::Kt1(kt1),
+                entrypoint: Entrypoint::default(),
+            }),
+        ),
+    );
+    let counter = ctx.operation_counter();
+    Ok(vec![OperationInfo {
+        operation: Operation::Emit(Emit {
+            tag: Some(FieldAnnotation::from_str_unchecked(
+                ALIAS_MATERIALIZED_EVENT_TAG,
+            )),
+            value: RcTypedValue::new(value),
+            arg_ty: Or::Left(Type::new_pair(
+                Type::String,
+                Type::new_pair(Type::String, Type::Address),
+            )),
+        }),
+        counter,
+    }])
+}
+
+/// Run `f` with a cross-runtime [`Gas`] budget holding the operation's
+/// remaining milligas, then charge the operation for what `f` consumed from
+/// it. Counterpart of the EVM gateway's `with_revm_gas_budget`.
+///
+/// The charge happens whatever `f` returns, so the work done before a failure
+/// is still paid for: `f`'s result, error included, is returned for the caller
+/// to handle.
+fn with_milligas_budget<C: HasOperationGas, T>(
+    ctx: &mut C,
+    f: impl FnOnce(&mut C, &mut Gas) -> T,
+) -> Result<T, TransferError> {
+    let budget = Gas::new(
+        ctx.operation_gas()
+            .remaining
+            .milligas()
+            .ok_or(TransferError::OutOfGas(OutOfGas))?
+            .into(),
+        RuntimeId::Tezos,
+    );
+    let mut remaining = budget;
+    let result = f(ctx, &mut remaining);
+    ctx.operation_gas()
+        .cast_and_consume_milligas(budget - remaining)
+        .map_err(TransferError::OutOfGas)?;
+    Ok(result)
+}
+
+/// Extract (native_runtime, native_address, native_public_key) from a typed
+/// Pair(String, Pair(String, Option(String))) value.
+fn extract_materialize_alias_params(
+    typed: TypedValue<'_>,
+) -> Result<(String, String, Option<String>), TransferError> {
+    let malformed = || {
+        TransferError::GatewayError(
+            "materialize_alias: expected pair (native_runtime, (native_address, native_public_key))"
+                .into(),
+        )
+    };
+    let (runtime, rest) = take_payload!(
+        typed,
+        TypedValue::Pair(runtime, rest),
+        return Err(malformed())
+    );
+    let runtime = take_payload!(
+        runtime.unwrap_or_clone(),
+        TypedValue::String(runtime),
+        return Err(malformed())
+    );
+    let (address, public_key) = take_payload!(
+        rest.unwrap_or_clone(),
+        TypedValue::Pair(address, public_key),
+        return Err(malformed())
+    );
+    let address = take_payload!(
+        address.unwrap_or_clone(),
+        TypedValue::String(address),
+        return Err(malformed())
+    );
+    let mut public_key = public_key.unwrap_or_clone();
+    let public_key = match &mut public_key {
+        TypedValue::Option(None) => None,
+        TypedValue::Option(Some(rc)) => Some(take_payload!(
+            std::mem::take(rc).unwrap_or_clone(),
+            TypedValue::String(public_key),
+            return Err(malformed())
+        )),
+        _ => return Err(malformed()),
+    };
+    Ok((runtime, address, public_key))
 }
 
 /// Extract (destination, method_signature, abi_parameters, callback) from a typed
@@ -2128,6 +2377,17 @@ pub(crate) fn get_enshrined_contract_entrypoint(
             //   `set_dispatch_result` in the entrypoint handler and
             //   surfaced by `serve` as the HTTP response body.
             entrypoints.insert(Entrypoint::try_from("collect_result").ok()?, Type::Bytes);
+            // %materialize_alias: pair string (pair string (option string))
+            //   (native_runtime, (native_address, native_public_key))
+            //   Materialize the Michelson alias of an account native to
+            //   another runtime (RFC-26049).
+            entrypoints.insert(
+                Entrypoint::try_from("materialize_alias").ok()?,
+                Type::new_pair(
+                    Type::String,
+                    Type::new_pair(Type::String, Type::new_option(Type::String)),
+                ),
+            );
             Some(entrypoints)
         }
     }
@@ -6083,6 +6343,327 @@ pub(crate) mod tests {
             ops.is_empty(),
             "a stale watermark must yield no ops, not a trap"
         );
+    }
+
+    // --- %materialize_alias ---
+
+    const EVM_NATIVE_ADDRESS: &str = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
+    // A valid KT1, so that the event can carry it as an address.
+    const MOCK_KT1_ALIAS: &str = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
+
+    fn materialize_alias_micheline<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        native_runtime: &str,
+        native_address: &str,
+        native_public_key: Option<&str>,
+    ) -> Micheline<'a> {
+        let mut gas = Gas::default();
+        let public_key = match native_public_key {
+            Some(public_key) => Micheline::prim1(
+                arena,
+                Prim::Some,
+                public_key.to_string().into(),
+                &mut gas,
+            )
+            .unwrap(),
+            None => Micheline::prim0(Prim::None, &mut gas).unwrap(),
+        };
+        let address_and_key = Micheline::prim2(
+            arena,
+            Prim::Pair,
+            native_address.to_string().into(),
+            public_key,
+            &mut gas,
+        )
+        .unwrap();
+        Micheline::prim2(
+            arena,
+            Prim::Pair,
+            native_runtime.to_string().into(),
+            address_and_key,
+            &mut gas,
+        )
+        .unwrap()
+    }
+
+    fn materialize_alias_journal() -> TezosXJournal {
+        TezosXJournal::new(
+            CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        )
+    }
+
+    fn materialize_alias_source() -> AddressHash {
+        AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]))
+    }
+
+    #[test]
+    fn with_milligas_budget_charges_what_was_consumed() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let mut ctx = MockCtx::new(
+            &mut rk,
+            &mut journal,
+            &registry,
+            materialize_alias_source(),
+            0,
+        );
+        let before = ctx.operation_gas.remaining.milligas().unwrap();
+
+        let result = with_milligas_budget(&mut ctx, |_, budget| {
+            budget.consume(tezosx_interfaces::Gas::new(300, RuntimeId::Tezos))
+        })
+        .unwrap();
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            before - ctx.operation_gas.remaining.milligas().unwrap(),
+            300
+        );
+    }
+
+    // The work done before a failure is charged, and the failure returned.
+    #[test]
+    fn with_milligas_budget_charges_even_when_f_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let mut ctx = MockCtx::new(
+            &mut rk,
+            &mut journal,
+            &registry,
+            materialize_alias_source(),
+            0,
+        );
+        let before = ctx.operation_gas.remaining.milligas().unwrap();
+
+        let result = with_milligas_budget(&mut ctx, |_, budget| {
+            budget.consume(tezosx_interfaces::Gas::new(300, RuntimeId::Tezos))?;
+            budget.consume(tezosx_interfaces::Gas::new(u64::MAX, RuntimeId::Tezos))
+        })
+        .unwrap();
+        assert_eq!(result, Err(TezosXRuntimeError::OutOfGas));
+        assert_eq!(
+            before - ctx.operation_gas.remaining.milligas().unwrap(),
+            300
+        );
+    }
+
+    #[test]
+    fn test_gateway_has_materialize_alias_entrypoint() {
+        let entrypoints =
+            get_enshrined_contract_entrypoint(EnshrinedContracts::TezosXGateway).unwrap();
+        let ep = Entrypoint::try_from("materialize_alias").unwrap();
+        assert_eq!(
+            entrypoints[&ep],
+            Type::new_pair(
+                Type::String,
+                Type::new_pair(Type::String, Type::new_option(Type::String)),
+            )
+        );
+    }
+
+    #[test]
+    fn test_materialize_alias_emits_an_event_for_a_new_alias() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let registry =
+            MockRegistry::new(MOCK_KT1_ALIAS).with_alias_delegated_storage_cost(42);
+        let mut ctx = MockCtx::new(
+            &mut rk,
+            &mut journal,
+            &registry,
+            materialize_alias_source(),
+            0,
+        );
+        let arena = typed_arena::Arena::new();
+        let value =
+            materialize_alias_micheline(&arena, "ethereum", EVM_NATIVE_ADDRESS, None);
+
+        let ops = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("materialize_alias").unwrap(),
+            value,
+            &mut ctx,
+        )
+        .unwrap();
+        let delegated_storage_cost = ctx.delegated_storage_cost;
+
+        // The address is canonicalized before the alias is derived.
+        let native_address = EVM_NATIVE_ADDRESS.to_lowercase();
+        assert_eq!(
+            *registry.ensure_alias_calls.borrow(),
+            vec![(
+                AliasInfo {
+                    runtime: RuntimeId::Ethereum,
+                    native_address: native_address.clone(),
+                },
+                RuntimeId::Tezos
+            )]
+        );
+        assert_eq!(delegated_storage_cost, 42);
+        let [OperationInfo {
+            operation: Operation::Emit(emit),
+            ..
+        }] = ops.as_slice()
+        else {
+            panic!("expected a single event, got {ops:?}");
+        };
+        assert_eq!(
+            emit.tag.as_ref().map(FieldAnnotation::as_str),
+            Some(ALIAS_MATERIALIZED_EVENT_TAG)
+        );
+        assert_eq!(
+            *emit.value,
+            TypedValue::new_pair(
+                TypedValue::String("ethereum".to_string()),
+                TypedValue::new_pair(
+                    TypedValue::String(native_address),
+                    TypedValue::Address(Address {
+                        hash: AddressHash::Kt1(
+                            ContractKt1Hash::from_base58_check(MOCK_KT1_ALIAS).unwrap()
+                        ),
+                        entrypoint: Entrypoint::default(),
+                    }),
+                ),
+            )
+        );
+    }
+
+    // An existing alias is left untouched, and no event is emitted.
+    #[test]
+    fn test_materialize_alias_is_a_no_op_for_an_existing_alias() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let arena = typed_arena::Arena::new();
+        for expected_ops in [1, 0] {
+            let mut ctx = MockCtx::new(
+                &mut rk,
+                &mut journal,
+                &registry,
+                materialize_alias_source(),
+                0,
+            );
+            let value =
+                materialize_alias_micheline(&arena, "ethereum", EVM_NATIVE_ADDRESS, None);
+            let ops = execute_enshrined_contract(
+                EnshrinedContracts::TezosXGateway,
+                &Entrypoint::try_from("materialize_alias").unwrap(),
+                value,
+                &mut ctx,
+            )
+            .unwrap();
+            assert_eq!(ops.len(), expected_ops);
+        }
+        assert_eq!(registry.ensure_alias_calls.borrow().len(), 1);
+    }
+
+    fn materialize_alias_error(
+        registry: &MockRegistry,
+        amount: i64,
+        native_runtime: &str,
+        native_public_key: Option<&str>,
+    ) -> (CracError, u64) {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let mut ctx = MockCtx::new(
+            &mut rk,
+            &mut journal,
+            registry,
+            materialize_alias_source(),
+            amount,
+        );
+        let before = ctx.operation_gas.remaining.milligas().unwrap();
+        let arena = typed_arena::Arena::new();
+        let value = materialize_alias_micheline(
+            &arena,
+            native_runtime,
+            EVM_NATIVE_ADDRESS,
+            native_public_key,
+        );
+        let err = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("materialize_alias").unwrap(),
+            value,
+            &mut ctx,
+        )
+        .unwrap_err();
+        let consumed =
+            u64::from(before - ctx.operation_gas.remaining.milligas().unwrap());
+        (err, consumed)
+    }
+
+    #[test]
+    fn test_materialize_alias_rejects_a_too_long_parameter() {
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let long_key = "a".repeat(MATERIALIZE_ALIAS_MAX_PARAMETER_LEN + 1);
+        let (err, _) = materialize_alias_error(&registry, 0, "ethereum", Some(&long_key));
+        assert!(
+            err.to_string()
+                .contains("materialize_alias: parameter too long"),
+            "{err}"
+        );
+        assert!(registry.ensure_alias_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_materialize_alias_rejects_a_nonzero_amount() {
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let (err, _) = materialize_alias_error(&registry, 1, "ethereum", None);
+        assert!(
+            err.to_string()
+                .contains("materialize_alias: amount must be 0"),
+            "{err}"
+        );
+        assert!(registry.ensure_alias_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_materialize_alias_rejects_an_unknown_runtime() {
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let (err, _) = materialize_alias_error(&registry, 0, "bitcoin", None);
+        assert!(
+            err.to_string()
+                .contains("materialize_alias: unknown native runtime"),
+            "{err}"
+        );
+        assert!(registry.ensure_alias_calls.borrow().is_empty());
+    }
+
+    // A Michelson account has no Michelson alias.
+    #[test]
+    fn test_materialize_alias_rejects_the_michelson_runtime() {
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS);
+        let (err, _) = materialize_alias_error(&registry, 0, "tezos", None);
+        assert!(err.to_string().contains(ERR_SAME_RUNTIME_NAC), "{err}");
+        assert!(registry.ensure_alias_calls.borrow().is_empty());
+    }
+
+    // The alias of an alias is never materialized, and the check is paid for
+    // even though it fails.
+    #[test]
+    fn test_materialize_alias_rejects_an_address_not_provably_native() {
+        let check_cost = 3_000;
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS).with_native_address_rejected(
+            tezosx_interfaces::Gas::new(check_cost, RuntimeId::Tezos),
+        );
+        let (err, consumed) = materialize_alias_error(&registry, 0, "ethereum", None);
+        assert!(err.to_string().contains("Not provably native"), "{err}");
+        assert!(registry.ensure_alias_calls.borrow().is_empty());
+
+        let control = MockRegistry::new(MOCK_KT1_ALIAS).with_native_address_rejected(
+            tezosx_interfaces::Gas::new(0, RuntimeId::Tezos),
+        );
+        let (_, control_consumed) =
+            materialize_alias_error(&control, 0, "ethereum", None);
+        assert_eq!(consumed - control_consumed, check_cost);
     }
 
     /// A CRAC receipt with no operation in its batch. Enough to occupy a slot

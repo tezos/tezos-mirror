@@ -563,4 +563,140 @@ mod tests {
             tezosx_types::CheckNativeAddressError::Precompile.into()
         );
     }
+
+    // `%materialize_alias` reached through an inbound cross-runtime call, as
+    // the EVM gateway sends it, with the real runtimes.
+    #[test]
+    fn materialize_alias_through_an_inbound_cross_runtime_call() {
+        use mir::gas::Gas as MirGas;
+        use tezos_tezlink::operation_result::{
+            ContentResult, InternalOperationSum, OperationDataAndMetadata,
+            OperationResultSum,
+        };
+        use tezosx_interfaces::{
+            AliasInfo, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
+            X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+        };
+
+        let registry = RegistryImpl::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(rk.host_mut())
+            .unwrap();
+        // An EVM account provably native: it has sent a transaction.
+        let native = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
+        StorageAccount::from_address(&Address::from_hex(native).unwrap())
+            .unwrap()
+            .set_info(
+                rk.eth_accounts_mut(),
+                AccountInfo {
+                    nonce: 1,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+        let parser = mir::parser::Parser::new();
+        let parameter = parser
+            .parse(&format!(r#"Pair "ethereum" (Pair "{native}" None)"#))
+            .unwrap()
+            .encode(&mut MirGas::default())
+            .unwrap()
+            .unwrap();
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri("http://tezos/KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw/materialize_alias")
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, "600000000")
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2")
+            .header(X_TEZOS_SOURCE, "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2")
+            .body(parameter)
+            .unwrap();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        // As inside the EVM frame of the calling transaction.
+        journal.michelson.push_external_checkpoint();
+
+        let response = registry.serve(&mut rk, &mut journal, request);
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        // The alias is classified as the alias of the EVM account.
+        let alias = registry
+            .compute_alias(&AliasInfo {
+                runtime: RuntimeId::Tezos,
+                native_address: native.to_string(),
+            })
+            .unwrap();
+        let kt1 = ContractKt1Hash::from_base58_check(&alias).unwrap();
+        assert_eq!(
+            context::originated_from_kt1(&kt1)
+                .unwrap()
+                .origin(rk.host())
+                .unwrap(),
+            Some(Origin::Alias(AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: native.to_string(),
+            }))
+        );
+
+        // In the receipt of the cross-runtime call, the alias origination
+        // comes right after the call to the gateway, ahead of the event.
+        let [(_, receipt)] = journal.michelson.pending_crac_receipts.as_slice() else {
+            panic!("expected one cross-runtime call receipt");
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            &receipt.op_and_receipt;
+        let OperationResultSum::Transfer(transfer) = &batch.operations[0].receipt else {
+            panic!("expected a transfer receipt");
+        };
+        let tag = |op: &InternalOperationSum| match op {
+            InternalOperationSum::Event(event) => event
+                .content
+                .tag
+                .as_ref()
+                .map(|tag| tag.to_string())
+                .unwrap_or_default(),
+            InternalOperationSum::Transfer(_) => "transfer".to_string(),
+            InternalOperationSum::Origination(_) => "origination".to_string(),
+        };
+        assert_eq!(
+            transfer
+                .internal_operation_results
+                .iter()
+                .map(tag)
+                .collect::<Vec<_>>(),
+            vec![
+                "cross_runtime_call",
+                "transfer",
+                "origination",
+                "alias_materialized",
+                "cross_runtime_call_end"
+            ]
+        );
+        let InternalOperationSum::Origination(origination) =
+            &transfer.internal_operation_results[2]
+        else {
+            unreachable!()
+        };
+        let ContentResult::Applied(origination) = &origination.result else {
+            panic!("the alias origination must be applied");
+        };
+        assert_eq!(
+            origination
+                .originated_contracts
+                .iter()
+                .map(|originated| originated.contract.clone())
+                .collect::<Vec<_>>(),
+            vec![kt1]
+        );
+
+        // Only the call's own snapshot is left for its EVM frame, which
+        // releases it when it commits.
+        assert_eq!(journal.michelson.snapshot_count(), 1);
+        journal.michelson.commit_frame(rk.host_mut()).unwrap();
+        assert_eq!(journal.michelson.snapshot_count(), 0);
+        let snapshot =
+            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
+        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
+    }
 }

@@ -249,6 +249,10 @@ pub struct MockRegistry {
     /// so tests can exercise the caller-side accumulation of
     /// `delegated_storage_cost`. Default `None` (no delegation).
     pub alias_delegated_storage_cost: Option<u64>,
+    /// When `Some(cost)`, `check_is_native_address` consumes `cost` and
+    /// rejects the address as not provably native. Default `None` (every
+    /// address is native, for free).
+    pub native_address_rejection_cost: Option<Gas>,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
 }
@@ -260,9 +264,17 @@ impl MockRegistry {
             serve_override: None,
             injective_aliases: false,
             alias_delegated_storage_cost: None,
+            native_address_rejection_cost: None,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Have `check_is_native_address` consume `cost` and reject the address
+    /// as not provably native, so tests can drive the rejection path.
+    pub fn with_native_address_rejected(mut self, cost: Gas) -> Self {
+        self.native_address_rejection_cost = Some(cost);
+        self
     }
 
     /// Replace the default 200 OK `serve()` response with a caller-
@@ -386,13 +398,21 @@ impl Registry for MockRegistry {
         _addr_runtime: RuntimeId,
         _address: &str,
         _public_key: Option<&str>,
-        _budget: &mut Gas,
+        budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: KeySpace,
     {
-        Ok(())
+        match self.native_address_rejection_cost {
+            Some(cost) => {
+                budget.consume(cost)?;
+                Err(TezosXRuntimeError::CheckNativeAddressError(
+                    tezosx_types::CheckNativeAddressError::NotProvablyNative,
+                ))
+            }
+            None => Ok(()),
+        }
     }
 
     fn serve<Host, KS>(
