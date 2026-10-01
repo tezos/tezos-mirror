@@ -50,10 +50,15 @@ module Parameters = struct
   let default_tcp_uri () =
     Uri.make ~scheme:"tcp" ~host:Constant.default_host ~port:(Port.fresh ()) ()
 
+  let unix_socket_id = Atomic.make 0
+
   let default_unix_uri () =
+    (* [Temp.file] returns the same path for the same base name, so the
+       counter is needed to separate signers running in the same test.
+       Keep the base name short: the resulting path must fit in the
+       [sockaddr_un] limit of 108 bytes. *)
     let path =
-      Temp.file
-        (Filename.temp_file ~temp_dir:Filename.current_dir_name "" "socket")
+      Temp.file (sf "%d.socket" (Atomic.fetch_and_add unix_socket_id 1))
     in
     Uri.make ~scheme:"unix" ~path ()
 
