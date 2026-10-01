@@ -690,9 +690,10 @@ struct PendingParent {
     receipt_at: usize,
     /// Storage cost the transfer delegated, dropped if the subtree raises.
     delegated_storage_cost: u64,
-    /// `(pending, failed, backtracked)` CRAC list lengths captured before the
-    /// subtree ran; see [`splice_reentrant_crac_ops`].
-    crac_watermarks: (usize, usize, usize),
+    /// `(pending, failed, backtracked)` CRAC list lengths, and the number of
+    /// pending alias originations, captured before the subtree ran; see
+    /// [`splice_reentrant_crac_ops`].
+    crac_watermarks: (usize, usize, usize, usize),
 }
 
 /// Drain the re-entrant CRAC ops accumulated while the operation whose receipt
@@ -705,8 +706,14 @@ fn splice_reentrant_crac_ops(
     journal: &mut TezosXJournal,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     receipt_at: usize,
-    (pending, failed, backtracked): (usize, usize, usize),
+    (pending, failed, backtracked, alias_originations): (usize, usize, usize, usize),
 ) {
+    // Aliases the operation materialized itself, e.g. through the gateway's
+    // `%materialize_alias`, come first: they were materialized before
+    // anything the operation emitted ran.
+    let alias_originations = journal
+        .michelson
+        .take_pending_alias_origination_internals_from(alias_originations);
     let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
         journal,
         pending,
@@ -716,7 +723,10 @@ fn splice_reentrant_crac_ops(
     let frame_at = receipt_at + 1;
     all_internal_receipts.splice(
         frame_at..frame_at,
-        reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+        alias_originations
+            .into_iter()
+            .chain(reentrant_ops)
+            .map(TaggedInternalOp::from_crac),
     );
 }
 
@@ -948,6 +958,7 @@ where
             journal.michelson.pending_crac_receipts.len(),
             journal.michelson.failed_crac_receipts.len(),
             journal.michelson.backtracked_crac_receipts.len(),
+            journal.michelson.pending_alias_origination_count(),
         );
         tc_ctx
             .operation_gas
@@ -1345,6 +1356,7 @@ where
     let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
     let backtracked_crac_receipts_before =
         journal.michelson.backtracked_crac_receipts.len();
+    let alias_originations_before = journal.michelson.pending_alias_origination_count();
 
     let step_result = transfer_step(
         tc_ctx,
@@ -1360,6 +1372,11 @@ where
         skip_sender_debit,
         allow_forged_lazy_storage_id,
     );
+    // Aliases the gateway materialized itself, through `%materialize_alias`,
+    // were materialized before anything it emitted ran: they come first.
+    let alias_originations = journal
+        .michelson
+        .take_pending_alias_origination_internals_from(alias_originations_before);
     // A direct gateway call may re-enter Michelson even without emitting a
     // callback. Nest its CRAC frames before callbacks, including on failure.
     let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
@@ -1368,8 +1385,12 @@ where
         failed_crac_receipts_before,
         backtracked_crac_receipts_before,
     );
-    all_internal_receipts
-        .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
+    all_internal_receipts.extend(
+        alias_originations
+            .into_iter()
+            .chain(reentrant_ops)
+            .map(TaggedInternalOp::from_crac),
+    );
     let TransferStep {
         success,
         delegated_storage_cost,
