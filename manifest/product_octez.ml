@@ -6974,10 +6974,10 @@ end = struct
               octez_stdlib_unix;
               main |> open_;
               (* The unit tests use the block-validation plugin (the
-                 [test_sc_rollup_game] cases) starting from alpha/026;
-                 older protocols have no such test, so the dependency is
-                 scoped by protocol number. *)
-              plugin |> if_some |> if_ N.(number >= 026) |> open_;
+                 [test_sc_rollup_game] cases) starting from 025; older
+                 protocols have no such test, so the dependency is scoped by
+                 protocol number. *)
+              plugin |> if_some |> if_ N.(number >= 025) |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotezt;

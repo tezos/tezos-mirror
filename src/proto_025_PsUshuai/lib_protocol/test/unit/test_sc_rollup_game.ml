@@ -452,6 +452,163 @@ let test_first_move_with_invalid_ancestor () =
        (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
           (player_commitment_hash, player, opponent_commitment_hash, opponent)))
 
+(* ------------------------------------------------------------------------ *)
+(* The block-validation plugin decides, before a block is applied, whether to
+   accept each of its operations, and the baker applies the same verdict when
+   it builds one ([lib_delegate/operation_selection.ml]): an operation the
+   plugin refuses is left out of the block. [select_block_operations] replays
+   that rule and reports, per operation, whether it made it in. No baker runs.
+
+   A refutation operation naming a rollup that does not exist is includable --
+   a [Move] gets no validate-time check at all -- and fails at application on
+   the missing rollup. It must not make the block invalid. *)
+
+(* The [Sc_rollup_refute] contents carrying [repr_refutation] (given at the
+   [Sc_rollup_game_repr] level). *)
+let mk_refute_contents ?(counter = 0) ~source ~opponent ~rollup ~repr_refutation
+    () =
+  Alpha_context.Manager_operation
+    {
+      source;
+      fee = Alpha_context.Tez.zero;
+      counter = Alpha_context.Manager_counter.Internal_for_tests.of_int counter;
+      operation =
+        Alpha_context.Sc_rollup_refute
+          {
+            rollup;
+            opponent;
+            refutation =
+              (* Carry the refutation across the .mli seal between
+                 [Sc_rollup_game_repr] and [Alpha_context.Sc_rollup.Game]
+                 through the byte-identical wire encoding. *)
+              Data_encoding.Binary.of_bytes_exn
+                Alpha_context.Sc_rollup.Game.refutation_encoding
+              @@ Data_encoding.Binary.to_bytes_exn
+                   Sc_rollup_game_repr.refutation_encoding
+                   repr_refutation;
+          };
+      gas_limit = Alpha_context.Gas.Arith.zero;
+      storage_limit = Z.zero;
+    }
+
+let mk_packed contents_list : Alpha_context.packed_operation =
+  let shell = Tezos_base.Operation.{branch = Block_hash.zero} in
+  let protocol_data =
+    Alpha_context.Operation_data {contents = contents_list; signature = None}
+  in
+  {shell; protocol_data}
+
+let mk_refute_op ~source ~opponent ~rollup ~repr_refutation =
+  mk_packed
+    (Single (mk_refute_contents ~source ~opponent ~rollup ~repr_refutation ()))
+
+(* The plugin state a node starts a block from, built on [ctxt_before] — the
+   start-of-block context. *)
+let init_plugin_state ctxt_before =
+  let open Lwt_result_wrap_syntax in
+  let chain_id = Chain_id.zero in
+  (* The repr-level game functions thread a [Raw_context.t]; the plugin and
+     [Validate] take [Alpha_context.t]. The .mli seals these apart on purpose
+     ([raw_context.mli]: "Alpha_context.t is actually implemented as
+     Raw_context.t [...] not exposed"). The legitimate bridge is to recover the
+     underlying disk [Context.t] (which carries the persisted game storage) and
+     re-prepare an [Alpha_context.t] from it. *)
+  let disk_ctxt = Raw_context.recover ctxt_before in
+  let level =
+    Raw_level_repr.to_int32 (Raw_context.current_level ctxt_before).level
+  in
+  let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt_before in
+  let timestamp = Raw_context.current_timestamp ctxt_before in
+  let*@ alpha_ctxt, _, _ =
+    Alpha_context.prepare disk_ctxt ~level ~predecessor_timestamp ~timestamp
+  in
+  let level = Alpha_context.Level.current alpha_ctxt in
+  let validation_state =
+    Validate.begin_partial_construction
+      alpha_ctxt
+      chain_id
+      ~predecessor_level:level
+      ~predecessor_round:Alpha_context.Round.zero
+  in
+  return (Block_validation.init_block_validation_state validation_state)
+
+(* Replay what the baker does with the plugin's verdict
+   ([operation_selection.ml]): an operation the plugin refuses is left out of
+   the block, and the plugin state is kept as it was. Returns, for each
+   labelled operation and in order, whether it made it into the block. *)
+let select_block_operations ~ctxt_before labelled_ops =
+  let open Lwt_result_wrap_syntax in
+  let* plugin_state = init_plugin_state ctxt_before in
+  let*! selection =
+    let open Lwt_syntax in
+    let* _plugin_state, selection =
+      List.fold_left_s
+        (fun (plugin_state, selection) (label, op) ->
+          let* res = Block_validation.check_block_operation plugin_state op in
+          match res with
+          | Ok plugin_state -> return (plugin_state, (label, true) :: selection)
+          | Error _ -> return (plugin_state, (label, false) :: selection))
+        (plugin_state, [])
+        labelled_ops
+    in
+    return (List.rev selection)
+  in
+  return selection
+
+let assert_in_block ~loc ~scenario selection label =
+  let open Lwt_result_syntax in
+  match List.assoc ~equal:String.equal label selection with
+  | Some true -> return_unit
+  | Some false ->
+      Test.fail
+        ~__LOC__:loc
+        "%s: the %s operation was refused by the block validation plugin, so \
+         the baker leaves it out of the block"
+        scenario
+        label
+  | None -> Test.fail ~__LOC__:loc "%s: no verdict for %s" scenario label
+
+(* A stub refutation [Move]: every operation built from it fails before the
+   step is examined, so its contents do not matter. *)
+let stub_move ~start_hash =
+  G.Move
+    {
+      choice = Sc_rollup_tick_repr.initial;
+      step = G.Dissection (init_dissection ~size:4 start_hash);
+    }
+
+(* A refutation operation naming a rollup that does not exist is includable and
+   fails at application on the missing rollup, so the plugin has no reason to
+   refuse it -- and a fix that starts reading the game state must not change
+   that. It is the cheapest shape that reaches such a read. *)
+let test_refutation_for_unknown_rollup_does_not_reject_block () =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt_before, rollup, refuter, defender, _staker3, _, _ =
+    two_stakers_in_conflict ()
+  in
+  let unknown_rollup = Sc_rollup_repr.Address.zero in
+  let* () =
+    Assert.equal_bool
+      ~loc:__LOC__
+      (Sc_rollup_repr.Address.equal unknown_rollup rollup)
+      false
+  in
+  let op =
+    mk_refute_op
+      ~source:refuter
+      ~opponent:defender
+      ~rollup:unknown_rollup
+      ~repr_refutation:(stub_move ~start_hash:(hash_string "foo"))
+  in
+  let* selection =
+    select_block_operations ~ctxt_before [("unknown rollup", op)]
+  in
+  assert_in_block
+    ~loc:__LOC__
+    ~scenario:"Move naming an unknown rollup"
+    selection
+    "unknown rollup"
+
 let tests =
   [
     Tztest.tztest
@@ -482,6 +639,11 @@ let tests =
       "start a game with commitment hash that are not the first conflict."
       `Quick
       test_first_move_with_invalid_ancestor;
+    Tztest.tztest
+      "A refutation operation naming an unknown rollup does not make the block \
+       invalid."
+      `Quick
+      test_refutation_for_unknown_rollup_does_not_reject_block;
   ]
 
 let () =
