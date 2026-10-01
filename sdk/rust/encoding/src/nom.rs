@@ -171,8 +171,10 @@ pub mod error {
         let end = start + error.input.len();
         let _ = write!(res, "Error decoding bytes [{start}..{end}]");
         let _ = match error.kind {
-            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{kind:?}`"),
-            DecodeErrorKind::Utf8(kind, e) => write!(res, " by nom parser `{kind:?}`: {e}"),
+            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{}`", kind.description()),
+            DecodeErrorKind::Utf8(kind, e) => {
+                write!(res, " by nom parser `{}`: {e}", kind.description())
+            }
             DecodeErrorKind::Boundary(kind) => {
                 write!(res, " caused by boundary violation of encoding `{kind:?}`")
             }
