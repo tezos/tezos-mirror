@@ -14,10 +14,10 @@ pub use tezos_data_encoding_derive::NomReader;
 
 use crate::types::{Narith, Zarith};
 
-use self::error::{BoundedEncodingKind, DecodeError, DecodeErrorKind};
+use self::error::{BoundedEncodingKind, DecodeError, DecodeErrorKind, NomReadExactError};
 
 pub mod error {
-    use std::{fmt::Write, str::Utf8Error};
+    use std::{fmt, ops::Range, str::Utf8Error};
 
     use nom::{
         error::{ErrorKind, FromExternalError},
@@ -70,6 +70,12 @@ pub mod error {
         Signature,
     }
 
+    impl fmt::Display for BoundedEncodingKind {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{self:?}")
+        }
+    }
+
     impl<'a> DecodeError<NomInput<'a>> {
         pub(crate) fn add_field(self, name: &'static str) -> Self {
             Self {
@@ -116,6 +122,43 @@ pub mod error {
                 DecodeErrorKind::UnknownTag(ref tag) => Some(tag),
                 _ => None,
             }
+        }
+    }
+
+    /// Error of [`NomReader::nom_read_exact`]: the input is not exactly one
+    /// encoding of the type, because the decoder stopped early or because
+    /// bytes remain after the value.
+    ///
+    /// [`NomReader::nom_read_exact`]: super::NomReader::nom_read_exact
+    #[derive(Debug, PartialEq, Eq)]
+    pub struct NomReadExactError {
+        /// Byte range of the input the decoder stopped on.
+        range: Range<usize>,
+        /// What went wrong there.
+        kind: DecodeErrorKind,
+        /// The error the decoder hit inside this one, if any.
+        other: Option<Box<NomReadExactError>>,
+    }
+
+    impl NomReadExactError {
+        /// Detaches `error` from `input`, the slice the decoder started on.
+        pub(super) fn new(input: NomInput, error: DecodeError<NomInput>) -> Self {
+            let start = input.offset(error.input);
+            Self {
+                range: start..start + error.input.len(),
+                kind: error.kind,
+                other: error.other.map(|other| Box::new(Self::new(input, *other))),
+            }
+        }
+    }
+
+    impl fmt::Display for NomReadExactError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let other = self
+                .other
+                .as_deref()
+                .map(|other| other as &dyn fmt::Display);
+            write_error(f, &self.range, &self.kind, other)
         }
     }
 
@@ -166,34 +209,46 @@ pub mod error {
     }
 
     pub fn convert_error(input: NomInput, error: DecodeError<NomInput>) -> String {
-        let mut res = String::new();
         let start = input.offset(error.input);
-        let end = start + error.input.len();
-        let _ = write!(res, "Error decoding bytes [{start}..{end}]");
-        let _ = match error.kind {
-            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{}`", kind.description()),
+        let other = error.other.map(|other| convert_error(input, *other));
+        let mut res = String::new();
+        // Writing to a `String` cannot fail.
+        let _ = write_error(
+            &mut res,
+            &(start..start + error.input.len()),
+            &error.kind,
+            other.as_ref().map(|other| other as &dyn fmt::Display),
+        );
+        res
+    }
+
+    /// Writes the description of a decoding error that stopped on `range`,
+    /// followed by `other`, the error found inside it, when there is one.
+    fn write_error(
+        f: &mut impl fmt::Write,
+        Range { start, end }: &Range<usize>,
+        kind: &DecodeErrorKind,
+        other: Option<&dyn fmt::Display>,
+    ) -> fmt::Result {
+        write!(f, "Error decoding bytes [{start}..{end}]")?;
+        match kind {
+            DecodeErrorKind::Nom(kind) => write!(f, " by nom parser `{}`", kind.description())?,
             DecodeErrorKind::Utf8(kind, e) => {
-                write!(res, " by nom parser `{}`: {e}", kind.description())
+                write!(f, " by nom parser `{}`: {e}", kind.description())?
             }
             DecodeErrorKind::Boundary(kind) => {
-                write!(res, " caused by boundary violation of encoding `{kind:?}`")
+                write!(f, " caused by boundary violation of encoding `{kind}`")?
             }
-            DecodeErrorKind::Field(name) => {
-                write!(res, " while decoding field `{name}`")
-            }
-            DecodeErrorKind::Variant(name) => {
-                write!(res, " while decoding variant `{name}`")
-            }
-            DecodeErrorKind::Bits(e) => write!(res, " while performing bits operation: {e}"),
-            DecodeErrorKind::UnknownTag(tag) => write!(res, " caused by unsupported tag `{tag}`"),
-            DecodeErrorKind::InvalidTag(tag) => write!(res, " caused by invalid tag `{tag}`"),
-        };
-
-        if let Some(other) = error.other {
-            let _ = write!(res, "\n\nNext error:\n{}", convert_error(input, *other));
+            DecodeErrorKind::Field(name) => write!(f, " while decoding field `{name}`")?,
+            DecodeErrorKind::Variant(name) => write!(f, " while decoding variant `{name}`")?,
+            DecodeErrorKind::Bits(e) => write!(f, " while performing bits operation: {e}")?,
+            DecodeErrorKind::UnknownTag(tag) => write!(f, " caused by unsupported tag `{tag}`")?,
+            DecodeErrorKind::InvalidTag(tag) => write!(f, " caused by invalid tag `{tag}`")?,
         }
-
-        res
+        if let Some(other) = other {
+            write!(f, "\n\nNext error:\n{other}")?;
+        }
+        Ok(())
     }
 }
 
@@ -223,16 +278,20 @@ pub trait NomReader<'a>: Sized {
     /// exact parsing only.
     ///
     /// Use the underlying `nom_read` function if you need composability within `nom`.
-    fn nom_read_exact(input: &'a [u8]) -> Result<Self, NomError<'a>> {
-        let (_, parsed) = all_consuming(Self::nom_read)(input).map_err(|err| match err {
-            Err::Error(e) | Err::Failure(e) => e,
-            Err::Incomplete(_) => DecodeError {
-                input,
-                kind: DecodeErrorKind::Nom(ErrorKind::Eof),
-                other: None,
-            },
-        })?;
-        Ok(parsed)
+    fn nom_read_exact(input: &'a [u8]) -> Result<Self, NomReadExactError> {
+        all_consuming(Self::nom_read)(input)
+            .map(|(_, parsed)| parsed)
+            .map_err(|err| match err {
+                Err::Error(e) | Err::Failure(e) => NomReadExactError::new(input, e),
+                Err::Incomplete(_) => NomReadExactError::new(
+                    input,
+                    DecodeError {
+                        input,
+                        kind: DecodeErrorKind::Nom(ErrorKind::Eof),
+                        other: None,
+                    },
+                ),
+            })
     }
 }
 
@@ -936,5 +995,36 @@ mod test {
 
         let result = bool::nom_read_exact(&[0x00]);
         assert_eq!(result, Ok(false));
+    }
+
+    #[test]
+    fn nom_read_exact_error_names_the_bytes_the_kind_and_the_cause() {
+        let short = TestStruct::nom_read_exact(&[0xff, 0x00, 0x00]).unwrap_err();
+        assert_eq!(
+            short.to_string(),
+            "Error decoding bytes [1..3] by nom parser `End of file`"
+        );
+
+        let long = TestStruct::nom_read_exact(&[0xff, 0x00, 0x00, 0x00, 0x42, 0x00]).unwrap_err();
+        assert_eq!(
+            long.to_string(),
+            "Error decoding bytes [5..6] by nom parser `End of file`"
+        );
+
+        let input: &[u8] = &[0xff, 0x00, 0x00];
+        let chain = DecodeError {
+            input: &input[1..],
+            kind: DecodeErrorKind::Field("value"),
+            other: Some(Box::new(DecodeError {
+                input: &input[3..],
+                kind: DecodeErrorKind::Nom(ErrorKind::Eof),
+                other: None,
+            })),
+        };
+        assert_eq!(
+            error::NomReadExactError::new(input, chain).to_string(),
+            "Error decoding bytes [1..3] while decoding field `value`\n\n\
+             Next error:\nError decoding bytes [3..3] by nom parser `End of file`"
+        );
     }
 }

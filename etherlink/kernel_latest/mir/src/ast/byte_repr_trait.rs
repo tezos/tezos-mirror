@@ -37,8 +37,8 @@ impl From<FromBytesError> for ByteReprError {
     }
 }
 
-impl From<tezos_data_encoding::nom::error::DecodeError<&[u8]>> for ByteReprError {
-    fn from(value: tezos_data_encoding::nom::error::DecodeError<&[u8]>) -> Self {
+impl From<tezos_data_encoding::nom::error::NomReadExactError> for ByteReprError {
+    fn from(value: tezos_data_encoding::nom::error::NomReadExactError) -> Self {
         Self::DecodeError(format!("{value:?}"))
     }
 }
