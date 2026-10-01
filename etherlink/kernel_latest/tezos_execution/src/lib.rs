@@ -1342,11 +1342,12 @@ fn transfer<'a, Host>(
 where
     Host: KeySpaceLoader + StorageV1,
 {
-    let TransferStep {
-        success,
-        delegated_storage_cost,
-        emitted,
-    } = transfer_step(
+    let pending_crac_receipts_before = journal.michelson.pending_crac_receipts.len();
+    let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
+    let backtracked_crac_receipts_before =
+        journal.michelson.backtracked_crac_receipts.len();
+
+    let step_result = transfer_step(
         tc_ctx,
         operation_ctx,
         registry,
@@ -1359,9 +1360,24 @@ where
         parser,
         skip_sender_debit,
         allow_forged_lazy_storage_id,
-    )?;
+    );
+    // A direct gateway call may re-enter Michelson even without emitting a
+    // callback. Nest its CRAC frames before callbacks, including on failure.
+    let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+        journal,
+        pending_crac_receipts_before,
+        failed_crac_receipts_before,
+        backtracked_crac_receipts_before,
+    );
+    all_internal_receipts
+        .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
+    let TransferStep {
+        success,
+        delegated_storage_cost,
+        emitted,
+    } = step_result?;
     let subtree = match emitted {
-        // No code ran, or nothing was emitted: nothing could have failed.
+        // No emitted operations to execute; CRAC status is combined below.
         None => SubtreeStatus::AllApplied,
         Some((callee, internal_operations)) => match execute_internal_operations(
             tc_ctx,
@@ -3198,21 +3214,6 @@ where
                 crac_origin: None,
                 delegated_storage_cost: 0,
             };
-            // Watermarks for `drain_reentrant_crac_ops`: a top-level
-            // manager op whose destination is the gateway enters EVM
-            // directly (no intermediate Michelson contract), so
-            // `execute_internal_operations` never runs and its drain
-            // never fires.  Capture watermarks here so that any nested
-            // EVM→Michelson CRAC receipts are folded into
-            // `internal_operations_receipts` after the call returns,
-            // mirroring what `execute_internal_operations` does per
-            // internal operation.
-            let pending_crac_receipts_before =
-                journal.michelson.pending_crac_receipts.len();
-            let failed_crac_receipts_before =
-                journal.michelson.failed_crac_receipts.len();
-            let backtracked_crac_receipts_before =
-                journal.michelson.backtracked_crac_receipts.len();
             let (transfer_result, top_level_delegated_delta, internals) =
                 match transfer_external(
                     &mut tc_ctx,
@@ -3231,16 +3232,6 @@ where
                     // backtracks every internal receipt regardless.
                     Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
                 };
-            // Drain any re-entrant CRAC ops that accumulated during the
-            // top-level gateway call, mirroring `execute_internal_operations`.
-            let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
-                journal,
-                pending_crac_receipts_before,
-                failed_crac_receipts_before,
-                backtracked_crac_receipts_before,
-            );
-            internal_operations_receipts
-                .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
                 Err(CracError::BlockAbort(msg)) => {
