@@ -7,7 +7,7 @@ use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use thiserror::Error;
 
 /// Failures raised while the inspectors persist their output to durable storage.
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum InspectorError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),

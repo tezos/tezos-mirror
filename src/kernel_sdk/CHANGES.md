@@ -12,6 +12,8 @@
   `read_rlp_or` for every `KeySpace`.
 - Add `KeySpaceExtBin` behind the `tezos-encoding` feature, `store_bin`,
   `read_nom` and `read_nom_or` for every `KeySpace`.
+- Remove `StoreBinError`: `store_bin` reports a value that does not encode as
+  a write error.
 - Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
 - Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.

@@ -19,7 +19,7 @@ use tezosx_interfaces::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
 /// Failures from the EVM database when reading or writing storage
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum EvmDbError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
@@ -68,7 +68,7 @@ impl IntoWithRemainder for EvmDbError {
 /// - parsing
 /// - encoding
 /// - validation
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum EvmKernelError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
@@ -101,7 +101,7 @@ pub enum EvmKernelError {
 }
 
 /// Top-level error from an EVM transaction run
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum EvmRunError {
     #[error(transparent)]
     Kernel(#[from] EvmKernelError),

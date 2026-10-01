@@ -117,18 +117,6 @@ pub trait KeySpaceExtRlp: KeySpace {
 #[cfg(feature = "rlp")]
 impl<KS: KeySpace> KeySpaceExtRlp for KS {}
 
-/// Error returned by [`KeySpaceExtBin::store_bin`].
-#[cfg(feature = "tezos-encoding")]
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum StoreBinError {
-    /// The value could not be encoded.
-    #[error("value does not encode: {0}")]
-    Encode(#[from] tezos_data_encoding::enc::BinError),
-    /// The encoded value could not be written at the key.
-    #[error(transparent)]
-    Write(#[from] KeySpaceWriteError),
-}
-
 /// Error returned by [`KeySpaceExtBin::read_nom`]: the bytes at the key are
 /// not exactly one encoding of the requested type, whether they fall short of
 /// one or leave bytes over.
@@ -155,17 +143,17 @@ pub trait KeySpaceExtBin: KeySpace {
     ///
     /// # Errors
     ///
-    /// - [`StoreBinError::Encode`] when `value` does not encode.
-    /// - [`StoreBinError::Write`] when the encoding exceeds the largest value
-    ///   the key space accepts.
+    /// - [`KeySpaceWriteError::Encode`] when `value` does not encode.
+    /// - [`KeySpaceWriteError::ValueSizeExceeded`] when the encoding exceeds
+    ///   the largest value the key space accepts.
     fn store_bin(
         &mut self,
         key: &Key,
         value: &impl tezos_data_encoding::enc::BinWriter,
-    ) -> Result<(), StoreBinError> {
+    ) -> Result<(), KeySpaceWriteError> {
         let mut bytes = Vec::new();
         value.bin_write(&mut bytes)?;
-        Ok(self.set(key, bytes)?)
+        self.set(key, bytes)
     }
 
     /// Returns the value whose binary encoding is stored at `key`, or `None`

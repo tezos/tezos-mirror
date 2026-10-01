@@ -220,7 +220,7 @@ impl TryFrom<String> for Name {
 }
 
 /// Errors that can occur when writing to a [`KeySpace`].
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum KeySpaceWriteError {
     /// Attempted to write more than the maximum allowed bytes at a given key.
     #[error("value size exceeded the maximum allowed")]
@@ -228,6 +228,10 @@ pub enum KeySpaceWriteError {
     /// The write offset exceeds the current length of the stored value.
     #[error("write offset exceeds the current length of the stored value")]
     InvalidOffset,
+    /// The value does not encode, so nothing was written.
+    #[cfg(feature = "tezos-encoding")]
+    #[error("value does not encode: {0}")]
+    Encode(#[from] tezos_data_encoding::enc::BinError),
 }
 
 /// A key space in the durable storage.
