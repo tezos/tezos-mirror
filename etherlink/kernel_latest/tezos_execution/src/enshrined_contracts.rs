@@ -83,11 +83,8 @@ impl From<TransferError> for CracError {
             // apply.rs:716-721).
             //
             // The cause discarded by .map_err(|_| TransferError::FailedTo*)?
-            // at each construction site is a tezos_storage::error::Error
-            // (Path / Runtime / Storage / RlpDecoderError / NomReadError /
-            // BinWriteError / InvalidLoadValue / ImplicitToOriginated /
-            // OriginatedToImplicit / TcError / TryFromBigIntError) — none
-            // of these are recoverable user input. A non-existent
+            // at each construction site is a tezos_storage::error::Error,
+            // none of whose variants is recoverable user input. A non-existent
             // originated destination is caught upstream by the
             // `dest_account.exists(host)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist

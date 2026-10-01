@@ -67,6 +67,7 @@ impl From<GenStorageError> for IndexableStorageError {
             GenStorageError::Path(e) => IndexableStorageError::Path(e),
             GenStorageError::Runtime(e) => IndexableStorageError::Runtime(e),
             GenStorageError::Storage(e) => IndexableStorageError::Storage(e),
+            GenStorageError::KeySpace(e) => IndexableStorageError::KeySpace(e),
             GenStorageError::RlpDecoderError(e) => {
                 IndexableStorageError::RlpDecoderError(e)
             }

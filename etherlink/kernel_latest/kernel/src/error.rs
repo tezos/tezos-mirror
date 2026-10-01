@@ -277,6 +277,7 @@ impl From<GenStorageError> for Error {
         match e {
             GenStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
             GenStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
+            GenStorageError::KeySpace(e) => Error::Storage(StorageError::KeySpace(e)),
             GenStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             GenStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
             GenStorageError::InvalidLoadValue { expected, actual } => {
