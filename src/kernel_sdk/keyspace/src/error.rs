@@ -10,6 +10,9 @@ use crate::{Key, Name};
 
 /// An operation at a key of a [`KeySpace`] that failed, and where.
 ///
+/// Every fallible operation of a key space and of its extension traits
+/// returns this error.
+///
 /// [`KeySpace`]: crate::KeySpace
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("at key {key} of key space {keyspace}: {kind}")]
@@ -20,6 +23,12 @@ pub struct KeySpaceError {
 }
 
 impl KeySpaceError {
+    /// Builds the error of a typed read that failed on `kind` at `key` of the
+    /// key space named `keyspace`.
+    pub fn read(keyspace: &Name, key: &Key, kind: ReadKind) -> Self {
+        Self::new(keyspace, key, ErrorKind::Read(kind))
+    }
+
     /// Builds the error of a write that failed on `kind` at `key` of the key
     /// space named `keyspace`.
     pub fn write(keyspace: &Name, key: &Key, kind: WriteKind) -> Self {
@@ -38,9 +47,30 @@ impl KeySpaceError {
 /// What the operation behind a [`KeySpaceError`] failed on, by family.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ErrorKind {
+    /// A typed read found bytes that do not decode as the requested type.
+    #[error(transparent)]
+    Read(#[from] ReadKind),
+
     /// A write did not reach the storage, or the storage refused it.
     #[error(transparent)]
     Write(#[from] WriteKind),
+}
+
+/// What a typed read from a [`KeySpace`] can fail on.
+///
+/// [`KeySpace`]: crate::KeySpace
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ReadKind {
+    /// The bytes at the key are not the rlp encoding of the requested type.
+    #[cfg(feature = "rlp")]
+    #[error("value does not decode as rlp: {0}")]
+    Rlp(#[from] rlp::DecoderError),
+
+    /// The bytes at the key are not exactly one binary encoding of the
+    /// requested type.
+    #[cfg(feature = "tezos-encoding")]
+    #[error("value does not decode: {0}")]
+    Nom(#[from] tezos_data_encoding::nom::error::NomReadExactError),
 }
 
 /// What a write to a [`KeySpace`] can fail on.

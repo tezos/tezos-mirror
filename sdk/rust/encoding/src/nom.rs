@@ -162,6 +162,8 @@ pub mod error {
         }
     }
 
+    impl std::error::Error for NomReadExactError {}
+
     impl<I> nom::error::ParseError<I> for DecodeError<I> {
         fn from_error_kind(input: I, kind: ErrorKind) -> Self {
             Self {

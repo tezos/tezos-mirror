@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `NomReader::nom_read_exact` returns `nom::error::NomReadExactError`, an error that owns its data,
   instead of a `NomError` that borrows the input. Its `Display` renders the same text as `convert_error`.
 - Add `Display` for `BoundedEncodingKind`.
+- `nom::error::NomReadExactError` implements `std::error::Error`.
 
 ### Fixed
 

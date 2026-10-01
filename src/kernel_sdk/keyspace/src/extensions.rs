@@ -10,8 +10,6 @@
 
 use crate::{Key, KeySpace, KeySpaceError};
 use num_traits::{FromBytes, ToBytes};
-#[cfg(feature = "tezos-encoding")]
-use tezos_data_encoding::nom::error::NomReadExactError;
 
 /// Typed integer reads and writes over a [`KeySpace`].
 pub trait KeySpaceExtNum: KeySpace {
@@ -83,13 +81,12 @@ pub trait KeySpaceExtRlp: KeySpace {
     }
 
     /// Returns the rlp value at `key`, or `None` when the key is absent.
-    /// Bytes that do not decode into `T` are a [`rlp::DecoderError`].
-    fn read_rlp<T: rlp::Decodable>(
-        &self,
-        key: &Key,
-    ) -> Result<Option<T>, rlp::DecoderError> {
+    /// Bytes that do not decode into `T` are a [`ReadKind::Rlp`](crate::ReadKind::Rlp).
+    fn read_rlp<T: rlp::Decodable>(&self, key: &Key) -> Result<Option<T>, KeySpaceError> {
         match self.get(key) {
-            Some(bytes) => rlp::decode(&bytes).map(Some),
+            Some(bytes) => rlp::decode(&bytes)
+                .map(Some)
+                .map_err(|err| KeySpaceError::read(self.name(), key, err.into())),
             None => Ok(None),
         }
     }
@@ -101,28 +98,13 @@ pub trait KeySpaceExtRlp: KeySpace {
         &self,
         key: &Key,
         default: T,
-    ) -> Result<T, rlp::DecoderError> {
+    ) -> Result<T, KeySpaceError> {
         Ok(self.read_rlp(key)?.unwrap_or(default))
     }
 }
 
 #[cfg(feature = "rlp")]
 impl<KS: KeySpace> KeySpaceExtRlp for KS {}
-
-/// Error returned by [`KeySpaceExtBin::read_nom`]: the bytes at the key are
-/// not exactly one encoding of the requested type, whether they fall short of
-/// one or leave bytes over.
-#[cfg(feature = "tezos-encoding")]
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("value does not decode: {0}")]
-pub struct NomReadError(String);
-
-#[cfg(feature = "tezos-encoding")]
-impl From<NomReadExactError> for NomReadError {
-    fn from(err: NomReadExactError) -> Self {
-        NomReadError(format!("{err:?}"))
-    }
-}
 
 /// Binary reads and writes over a [`KeySpace`], through the
 /// `tezos_data_encoding` [`BinWriter`] and [`NomReader`] traits.
@@ -154,15 +136,17 @@ pub trait KeySpaceExtBin: KeySpace {
     /// when the key is absent.
     ///
     /// The decoder consumes the whole value: bytes left over are a
-    /// [`NomReadError`], not a shorter value.
+    /// [`ReadKind::Nom`](crate::ReadKind::Nom), not a shorter value.
     fn read_nom<T: for<'a> tezos_data_encoding::nom::NomReader<'a>>(
         &self,
         key: &Key,
-    ) -> Result<Option<T>, NomReadError> {
+    ) -> Result<Option<T>, KeySpaceError> {
         let Some(bytes) = self.get(key) else {
             return Ok(None);
         };
-        Ok(Some(T::nom_read_exact(&bytes)?))
+        T::nom_read_exact(&bytes)
+            .map(Some)
+            .map_err(|err| KeySpaceError::read(self.name(), key, err.into()))
     }
 
     /// [`Self::read_nom`], falling back to `default` when the key is absent.
@@ -172,7 +156,7 @@ pub trait KeySpaceExtBin: KeySpace {
         &self,
         key: &Key,
         default: T,
-    ) -> Result<T, NomReadError> {
+    ) -> Result<T, KeySpaceError> {
         Ok(self.read_nom(key)?.unwrap_or(default))
     }
 }
@@ -246,7 +230,11 @@ mod tests {
         assert_eq!(ks.read_rlp::<Vec<u8>>(&missing).unwrap(), None);
         assert_eq!(ks.read_rlp_or(&missing, vec![9u8]).unwrap(), vec![9]);
         ks.set(&k, [0xc0, 0xff]).unwrap();
-        assert!(ks.read_rlp::<Vec<u8>>(&k).is_err());
+        let decode_err = rlp::decode::<Vec<u8>>(&[0xc0, 0xff]).unwrap_err();
+        assert_eq!(
+            ks.read_rlp::<Vec<u8>>(&k).unwrap_err(),
+            KeySpaceError::read(ks.name(), &k, decode_err.into())
+        );
         assert!(ks.read_rlp_or(&k, vec![9u8]).is_err());
     }
 
@@ -277,7 +265,13 @@ mod tests {
         // A value the decoder cannot finish is an error, and so is one it
         // finishes with bytes to spare. The default does not cover either.
         ks.set(&k, [0x80]).unwrap();
-        assert!(ks.read_nom::<Narith>(&k).is_err());
+        let decode_err =
+            <Narith as tezos_data_encoding::nom::NomReader>::nom_read_exact(&[0x80])
+                .unwrap_err();
+        assert_eq!(
+            ks.read_nom::<Narith>(&k).unwrap_err(),
+            KeySpaceError::read(ks.name(), &k, decode_err.into())
+        );
         assert!(ks.read_nom_or(&k, fallback.clone()).is_err());
         ks.set(&k, [0x01, 0x01]).unwrap();
         assert!(ks.read_nom::<Narith>(&k).is_err());
