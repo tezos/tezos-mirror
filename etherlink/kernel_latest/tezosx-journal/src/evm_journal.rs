@@ -33,11 +33,6 @@ pub struct CracTransactionInfo {
     /// EVM address (alias) of the top-level transaction originator
     /// (`X-Tezos-Source`). Invariant across all crossings in the op.
     pub source: Address,
-    /// Whether any *mutating* (POST / `%call_evm`) crossing occurred.
-    /// A foreign-runtime op that only issued read-only `staticcall_evm`
-    /// (GET) crossings produces no EVM-observable effect, so no fake tx
-    /// is built for it.
-    pub has_mutating: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -233,15 +228,10 @@ impl EvmJournal {
     /// leading read-only `staticcall_evm` can no longer latch the slot
     /// and suppress a later value-bearing crossing (the L2-1408
     /// poisoning bug).
-    pub fn record_crac_crossing(&mut self, source: Address, is_mutating: bool) {
+    pub fn record_crac_crossing(&mut self, source: Address) {
         match &mut self.crac_tx_info {
-            Some(info) => info.has_mutating |= is_mutating,
-            None => {
-                self.crac_tx_info = Some(CracTransactionInfo {
-                    source,
-                    has_mutating: is_mutating,
-                })
-            }
+            Some(_) => (),
+            None => self.crac_tx_info = Some(CracTransactionInfo { source }),
         }
     }
 
@@ -251,8 +241,7 @@ impl EvmJournal {
     /// was a read-only `staticcall_evm` (`!has_mutating`): such an op
     /// left no EVM-observable effect, so no fake tx is emitted for it.
     pub fn take_crac_data(&mut self) -> Option<CracTransactionInfo> {
-        let info = self.crac_tx_info.take()?;
-        info.has_mutating.then_some(info)
+        self.crac_tx_info.take()
     }
 
     /// Whether an incoming CRAC has been received.
@@ -299,8 +288,8 @@ mod tests {
         let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
         // The originator is invariant across crossings, so the first
         // one fixes `source` and later crossings never change it.
-        journal.record_crac_crossing(Address::from([0x11; 20]), true);
-        journal.record_crac_crossing(Address::from([0x33; 20]), true);
+        journal.record_crac_crossing(Address::from([0x11; 20]));
+        journal.record_crac_crossing(Address::from([0x33; 20]));
         let info = journal.take_crac_data().unwrap();
         assert_eq!(info.source, Address::from([0x11; 20]));
     }
@@ -312,32 +301,9 @@ mod tests {
     }
 
     #[test]
-    fn test_static_only_crossing_is_suppressed() {
-        // A read-only `staticcall_evm` crossing leaves no EVM-observable
-        // effect, so no fake tx is built even though a CRAC was serviced.
-        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
-        journal.record_crac_crossing(Address::from([0x11; 20]), false);
-        assert!(journal.has_crac_data());
-        assert!(journal.take_crac_data().is_none());
-        assert!(!journal.has_crac_data());
-    }
-
-    #[test]
-    fn test_mutating_after_static_is_not_suppressed() {
-        // L2-1408 regression: a leading static crossing must not latch
-        // the slot and suppress a later mutating crossing.
-        let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
-        journal.record_crac_crossing(Address::from([0x11; 20]), false);
-        journal.record_crac_crossing(Address::from([0x11; 20]), true);
-        let info = journal.take_crac_data().unwrap();
-        assert!(info.has_mutating);
-        assert_eq!(info.source, Address::from([0x11; 20]));
-    }
-
-    #[test]
     fn test_take_crac_data_consumes() {
         let mut journal = EvmJournal::new(BlockConstants::dummy(), B256::ZERO);
-        journal.record_crac_crossing(Address::from([0x11; 20]), true);
+        journal.record_crac_crossing(Address::from([0x11; 20]));
 
         let _ = journal.take_crac_data().unwrap();
         assert!(journal.take_crac_data().is_none());

@@ -366,7 +366,7 @@ where
         // Entering a frame: its depth is the current stack height, before it
         // is pushed.
         let depth = self.call_trace.len() as u16;
-        self.saw_call = self.saw_call || inputs.scheme != CallScheme::StaticCall;
+        self.saw_call = true;
 
         // Only the top-level frame accounts the transaction's intrinsic gas.
         let initial_gas = if depth == 0 {
