@@ -59,9 +59,9 @@ pub enum StorageError {
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
     #[error(transparent)]
-    KeySpaceWrite(KeySpaceWriteError),
+    KeySpaceWrite(#[from] KeySpaceWriteError),
     #[error("Invalid keyspace key: {0}")]
-    KeySpaceKey(KeyError),
+    KeySpaceKey(#[from] KeyError),
 }
 
 #[derive(Error, Debug)]
@@ -164,18 +164,6 @@ impl From<PathError> for StorageError {
 impl From<RuntimeError> for StorageError {
     fn from(e: RuntimeError) -> Self {
         Self::Runtime(e)
-    }
-}
-
-impl From<KeySpaceWriteError> for StorageError {
-    fn from(e: KeySpaceWriteError) -> Self {
-        Self::KeySpaceWrite(e)
-    }
-}
-
-impl From<KeyError> for StorageError {
-    fn from(e: KeyError) -> Self {
-        Self::KeySpaceKey(e)
     }
 }
 
