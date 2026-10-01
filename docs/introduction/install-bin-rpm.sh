@@ -48,22 +48,22 @@ if [ "$RELEASETYPE" = "Master" ]; then
   # [end add repository]
 
   if [ "$distroname" = "rockylinux" ]; then
-    dnf -y config-manager --set-enabled devel
+    dnf_retry -y config-manager --set-enabled devel
   fi
-  dnf -y update
+  dnf_retry -y update
 
 else
   # Update and install the config-mananger plugin
-  dnf -y update
-  dnf -y install dnf-plugins-core
+  dnf_retry -y update
+  dnf_retry -y install dnf-plugins-core
 
   # Add the repository
-  dnf -y config-manager --add-repo "https://storage.googleapis.com/$bucket/$distribution/dists/$release/"
+  dnf_retry -y config-manager --add-repo "https://storage.googleapis.com/$bucket/$distribution/dists/$release/"
 
   if [ "$distroname" = "rockylinux" ]; then
-    dnf -y config-manager --set-enabled devel
+    dnf_retry -y config-manager --set-enabled devel
   fi
-  dnf -y update
+  dnf_retry -y update
 
   # Install public key
   rpm --import "https://storage.googleapis.com/$bucket/$distribution/octez.asc"
