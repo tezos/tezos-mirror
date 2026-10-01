@@ -870,12 +870,12 @@ where
     let mut caller_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR)?;
     let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
     let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
-    let value = deposit.amount;
+    let value = Wei::from_u256(deposit.amount);
     // Prefund the feeder address, refunded on every !is_success() exit
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit
     // this top-level transaction needs.
-    caller_account.add_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
+    caller_account.add_balance(rk.eth_accounts_mut(), value)?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
@@ -904,7 +904,7 @@ where
                 Some(transaction_hash),
                 caller,
                 to,
-                value,
+                value.as_u256(),
                 call_data,
                 gas_limit,
                 effective_gas_price,
@@ -918,8 +918,7 @@ where
             if let Ok(execution_outcome) = &outcome {
                 // Refund an EVM revert before closing, as on the previous success path.
                 if !execution_outcome.result.is_success() {
-                    caller_account
-                        .sub_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
+                    caller_account.sub_balance(rk.eth_accounts_mut(), value)?;
                 }
             }
             // Keep a runtime error as the value so its prefund refund runs after closing.
@@ -930,7 +929,7 @@ where
         Ok(outcome) => Ok(outcome),
         Err(err) => {
             // Something went wrong, remove the XTZ deposit's prefund.
-            caller_account.sub_balance(rk.eth_accounts_mut(), Wei::from_u256(value))?;
+            caller_account.sub_balance(rk.eth_accounts_mut(), value)?;
             Err(err)
         }
     }
