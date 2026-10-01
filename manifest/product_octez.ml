@@ -7891,13 +7891,14 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
       tezt
-        [
-          "helpers";
-          "test_conflict_handler";
-          "test_consensus_filter";
-          "test_fee_needed_to_overtake";
-          "test_fee_needed_to_replace_by_fee";
-        ]
+        ([
+           "helpers";
+           "test_conflict_handler";
+           "test_consensus_filter";
+           "test_fee_needed_to_overtake";
+           "test_fee_needed_to_replace_by_fee";
+         ]
+        @ if N.(number == 025) then ["test_relabelled_inbox_proof"] else [])
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
@@ -7916,6 +7917,9 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             main |> open_ |> open_ ~m:"Protocol";
             parameters |> if_some |> open_;
             test_helpers |> open_;
+            (* [test_relabelled_inbox_proof] builds the index proofs of
+               [Inbox_index_proof], which only 025 defines. *)
+            octez_sc_rollup |> if_some |> if_ N.(number == 025);
           ]
     in
     let _client_tests =
