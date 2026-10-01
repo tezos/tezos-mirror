@@ -15,6 +15,7 @@ use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{EVMError, ExecutionResult, HaltReason, Output};
 use revm::primitives::KECCAK_EMPTY;
+use revm_etherlink::helpers::legacy::alloy_to_wei;
 use revm_etherlink::precompiles::constants::{
     alias_forwarder_delegation_code_hash, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
 };
@@ -517,7 +518,7 @@ where
         // `ERR_SAME_RUNTIME_NAC` — but the round-trip keeps this needed.)
         true,
         TransactionOrigin::CrossRuntime {
-            credit: Some((hdrs.sender, hdrs.amount)),
+            credit: Some((hdrs.sender, alloy_to_wei(&hdrs.amount))),
         },
     );
     // Restore the outer frame's per-call depth and originator now that

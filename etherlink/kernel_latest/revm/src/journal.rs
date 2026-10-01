@@ -26,9 +26,11 @@ use std::vec::Vec;
 
 use evm_inspectors::{Tracer, TracerContainer};
 use tezosx_journal::{LayeredStateError, OriginalSource, TezosXJournal};
+use tezosx_types::Wei;
 
 use crate::database::EtherlinkVMDB;
 use crate::error::{EvmDbError, EvmRunError};
+use crate::helpers::legacy::wei_to_alloy;
 use crate::precompiles::send_outbox_message::{
     check_outbox_message_size, SendOutboxRevertReason,
 };
@@ -1079,7 +1081,7 @@ pub fn commit_evm_journal_from_external<Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     journal: &mut TezosXJournal,
-    sequencer_credit: Option<(Address, U256)>,
+    sequencer_credit: Option<(Address, Wei)>,
 ) -> Result<Vec<Withdrawal>, EvmRunError>
 where
     Host: StorageV1 + KeySpaceLoader,
@@ -1090,7 +1092,7 @@ where
     let mut journal = Journal::new_with_inner(db, journal);
     // Credit the sequencer through the journal so the payment joins the state this commit writes.
     if let Some((address, amount)) = sequencer_credit {
-        journal.balance_incr(address, amount)?;
+        journal.balance_incr(address, wei_to_alloy(amount))?;
     }
     let state = journal.finalize();
     DatabaseCommit::commit(journal.db_mut(), state);
