@@ -247,16 +247,15 @@ fn finalize_statuses<M: OperationKind>(
 ) -> ContentResult<M> {
     match result {
         Ok(success) => {
-            // A top-level Applied stays Applied iff nothing in its
-            // internal-operation subtree failed. Two signals, both
-            // necessary: `internals`, the verdict carried out of
-            // `execute_internal_operations` — an operation that raised
-            // left no receipt to read (L2-1863) — and the last receipt,
-            // which catches a failure recorded without passing through a
-            // frame at all (a re-entrant CRAC receipt).
+            // Keep the parent Applied if its own internal operations succeeded.
+            // Check `internals` because some failures leave no receipt (L2-1863).
+            // Also check the last Own receipt. Ignore CRAC receipts here:
+            // EVM can catch their failures and let the parent succeed.
             let all_internal_succeeded = internals.all_applied()
                 && internal_operation_results
-                    .last()
+                    .iter()
+                    .rev()
+                    .find(|t| t.is_own())
                     .is_none_or(|t| t.op.is_applied());
             if all_internal_succeeded {
                 ContentResult::Applied(success)
