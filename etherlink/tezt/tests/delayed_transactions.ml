@@ -1325,6 +1325,181 @@ let test_produce_block_with_no_delayed_transactions =
 
   unit
 
+(** With instant confirmations, the sequencer streams the delayed
+    transactions of the block in progress as included without validating
+    them: their validity is only checked by the kernel when they are
+    executed, and the kernel skips an invalid delayed transaction without
+    producing a receipt. The observer must survive executing such a
+    transaction, stream no receipt for it, and still apply the produced
+    block. *)
+let test_invalid_delayed_transaction_with_instant_confirmations =
+  register_test
+    ~__FILE__
+    ~kernel:Latest
+    ~enable_dal:false
+      (* Unlike the other delayed inbox tests, this one also sends a public
+         transaction, which must remain affordable. *)
+    ~da_fee:Wei.zero
+    ~enable_fa_bridge:false
+    ~time_between_blocks:Nothing
+    ~websockets:true
+    ~tags:
+      [
+        "evm";
+        "sequencer";
+        "observer";
+        "delayed_inbox";
+        "invalid";
+        "instant_confirmations";
+        "websocket";
+      ]
+    ~title:
+      "Observer survives an invalid delayed transaction with instant \
+       confirmations"
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        observer;
+        _;
+      }
+      _protocol
+    ->
+  (* Produce a block so that the sequencer proposes the timestamp of the next
+     one: the next preconfirmation round then selects the pending delayed
+     transactions before validating the public ones. *)
+  let*@ _ = produce_block sequencer in
+  let*@ level = Rpc.block_number sequencer in
+  let* _ = Evm_node.wait_for_blueprint_applied observer (Int32.to_int level) in
+  (* An invalid nonce makes the kernel skip the transaction without a
+     receipt, see [test_invalid_delayed_transaction]. *)
+  let* invalid_raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:16
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  (* Watch the observer before the sequencer can stream the delayed
+     transaction: it must announce its inclusion, execute it, execute the
+     public transaction sent below, and stream only the receipt of the
+     latter. *)
+  let* websocket = Evm_node.open_websocket observer in
+  let* _id = Rpc.subscribe ~websocket ~kind:NewPreconfirmedReceipts observer in
+  let first_inclusion = Evm_node.wait_for_inclusion observer in
+  let executed = ref [] in
+  let both_executed =
+    Evm_node.wait_for_event observer ~event:"single_tx_execution_done.v0"
+    @@ fun json ->
+    executed := JSON.as_string json :: !executed ;
+    match !executed with [_; _] -> Some (List.rev !executed) | _ -> None
+  in
+  let observer_shutdown =
+    Evm_node.wait_for_shutdown_event ~can_terminate:true observer
+  in
+  let delayed_tx_seen =
+    Evm_node.wait_for_evm_event New_delayed_transaction sequencer
+  in
+  let* delayed_hash =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~amount:Tez.one
+      invalid_raw_tx
+  in
+  let* () =
+    Delayed_inbox.assert_mem (Sc_rollup_node sc_rollup_node) delayed_hash
+  in
+  (* Bake until the sequencer sees the delayed transaction. *)
+  let* () =
+    bake_until
+      ~bake:(fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+      ~result_f:(fun () ->
+        if Lwt.is_sleeping delayed_tx_seen then return None
+        else return (Some ()))
+      ()
+  in
+  (* A public transaction triggers the preconfirmation round: the sequencer
+     streams the pending delayed transaction first, then the public one. *)
+  let* public_raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(2).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ public_hash =
+    Rpc.send_raw_transaction ~raw_tx:public_raw_tx sequencer
+  in
+  let* included_hash = first_inclusion in
+  Check.((included_hash = add_0x delayed_hash) string)
+    ~error_msg:
+      "The observer first announced the inclusion of %L, expected the delayed \
+       transaction %R" ;
+  (* The observer must survive executing the invalid delayed transaction. *)
+  let* executed =
+    Lwt.pick
+      [
+        both_executed;
+        (let* _ = observer_shutdown in
+         Test.fail
+           "The observer shut down after executing the invalid delayed \
+            transaction %s"
+           delayed_hash);
+      ]
+  in
+  Check.((executed = [add_0x delayed_hash; public_hash]) (list string))
+    ~error_msg:"The observer executed %L, expected %R" ;
+  (* The invalid delayed transaction has no receipt: the first streamed
+     receipt is the one of the public transaction. *)
+  let* json = Websocket.recv ~timeout:10. websocket in
+  let receipt =
+    JSON.(json |-> "params" |-> "result" |> transaction_receipt_of_json)
+  in
+  Check.((receipt.transactionHash = public_hash) string)
+    ~error_msg:"Streamed the receipt of %L, expected the one of %R" ;
+  (* The produced block holds only the public transaction (the blueprint
+     carries both, the kernel drops the invalid delayed one), the observer
+     applies it, and the delayed inbox is drained. *)
+  let*@ _ = produce_block sequencer in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let block_hashes =
+    match block.transactions with
+    | Block.Hash hashes -> hashes
+    | Block.Full objects ->
+        List.map (fun (o : Transaction.transaction_object) -> o.hash) objects
+    | Block.Empty -> []
+  in
+  Check.((block_hashes = [public_hash]) (list string))
+    ~error_msg:"Expected the transactions of the block to be %R, got %L" ;
+  let* _ =
+    Evm_node.wait_for_blueprint_applied observer (Int32.to_int block.number)
+  in
+  let*@ delayed_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:(add_0x delayed_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none delayed_receipt)
+    ~error_msg:"The invalid delayed transaction should not have a receipt" ;
+  (* Read the delayed inbox of the sequencer: the rollup node only drains
+     its own once the blueprint is published on L1. *)
+  Delayed_inbox.assert_empty (Evm_node sequencer)
+
 let protocols = [Protocol.Alpha]
 
 let () =
@@ -1344,4 +1519,5 @@ let () =
   test_forced_blueprint_takes_l1_timestamp protocols ;
   test_delayed_inbox_flushing protocols ;
   test_blueprint_limit_with_delayed_inbox protocols ;
-  test_produce_block_with_no_delayed_transactions protocols
+  test_produce_block_with_no_delayed_transactions protocols ;
+  test_invalid_delayed_transaction_with_instant_confirmations protocols
