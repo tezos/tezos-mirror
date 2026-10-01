@@ -27,6 +27,7 @@
   -open Tezos_test_helpers
   -open Octez_alcotezt)
  (modules
+  test_atomic_write
   test_key_value_store
   test_key_value_store_fuzzy
   test_log_config_rules))

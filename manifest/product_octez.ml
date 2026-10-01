@@ -1608,6 +1608,7 @@ let octez_stdlib_unix =
 let _octez_stdlib_unix_test =
   tezt
     [
+      "test_atomic_write";
       "test_key_value_store";
       "test_key_value_store_fuzzy";
       "test_log_config_rules";

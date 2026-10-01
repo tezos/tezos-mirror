@@ -249,6 +249,11 @@ DAL node
 Miscellaneous
 -------------
 
+- Fixed two leaks in the atomic file writer shared by the node, the client and
+  the DAL node: when the write it wraps failed or was cancelled, the temporary
+  ``.tmp`` file was left behind in the destination directory and the file
+  descriptor it had opened was never closed.
+
 - The recommended Rust version was bumped from 1.88.0 to 1.94.0.
 
 - Teztale archiver: ``--backup-dir`` now backs up **every** failed POST,

@@ -179,8 +179,8 @@ val tzfail_of_io_error :
 (** [with_open_file ~flags ~perm filename f] opens the given file
    using {!Lwt_unix.open_file} and passes the resulting file-descriptor
    to [f]. [with_open_file] ensures that the file-descriptor is closed
-   when the promise returned by [f] resolves, or if [f] raises an
-   exception.
+   when the promise returned by [f] resolves, and also when [f] raises
+   an exception or is cancelled.
 
    See {!Lwt_unix.openfile} for a description of the arguments,
    warnings, and other notes. Default values for [perm] is [0o640].
@@ -223,8 +223,12 @@ val with_open_out :
    {!with_open_file} for a description of the other errors. In that
    case, no write have been done on [filename].
 
-   The default value of [temp_dir] is the same as
-   [Filename.temp_file]. *)
+   The default value of [temp_dir] is the directory of [filename], so
+   that the temporary file sits on the same partition as its
+   destination.
+
+   The temporary file is removed on every path that does not rename it
+   onto [filename], including when [f] raises or is cancelled. *)
 val with_atomic_open_out :
   ?overwrite:bool ->
   string ->
