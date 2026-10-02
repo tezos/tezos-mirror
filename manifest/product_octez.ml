@@ -5047,6 +5047,20 @@ let octez_signer_services =
       ]
     ~linkall:true
 
+let _octez_signer_services_tests =
+  tezt
+    ["test_signer_messages"]
+    ~path:"src/lib_signer_services/test"
+    ~opam:"octez-shell-libs"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto;
+        octez_signer_services |> open_;
+        alcotezt;
+      ]
+
 let octez_signer_backends =
   octez_shell_lib
     "signer-backends"
