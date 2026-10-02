@@ -26,7 +26,7 @@ pub mod wasm_nds;
 #[cfg(feature = "irmin-compat")]
 pub use irmin_path_validator::{MAX_KEYSPACE_NAME_SIZE, MAX_KEY_SIZE};
 
-pub use error::{ErrorKind, KeySpaceError, ReadKind, WriteKind};
+pub use error::{ErrorKind, KeySpaceError, KeySpaceLoaderError, ReadKind, WriteKind};
 
 /// Key creation error
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -384,32 +384,6 @@ impl<KS: KeySpace> KeySpace for &mut KS {
     fn hash(&self) -> Vec<u8> {
         (**self).hash()
     }
-}
-
-/// Error returned by [`KeySpaceLoader::load_or_create`].
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum KeySpaceLoaderError {
-    /// A key space whose name overlaps (is a prefix of, or has as prefix) the
-    /// requested name is already loaded. Only meaningful when names form a
-    /// hierarchical path, which is why this variant is gated on `irmin-compat`.
-    #[cfg(feature = "irmin-compat")]
-    #[error("key space name overlaps an already-loaded key space")]
-    Overlapping,
-    /// A key space with this exact name is already loaded and has not been
-    /// dropped yet.
-    #[error("a key space with this name is already loaded")]
-    AlreadyLoaded,
-    /// The requested name is not a valid key space name.
-    #[error("invalid key space name: {0}")]
-    InvalidName(#[from] NameError),
-    /// Invalid/Inconsistent storage detected
-    #[cfg(not(feature = "irmin-compat"))]
-    #[error("KeySpaceLoader encountered a malformed name mapping for {0}")]
-    InconsistentNameMapping(Name),
-    /// Only up to `i32::MAX` databases are supported.
-    #[cfg(not(feature = "irmin-compat"))]
-    #[error("Could not allocated database for the given name - ran out of db indices.")]
-    TooManyDatabases,
 }
 
 /// A loader for [`KeySpace`] instances backed by a specific storage implementation.

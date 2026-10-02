@@ -2,11 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Errors of a loaded [`KeySpace`].
+//! Errors of a loaded [`KeySpace`] and of its loader.
+//!
+//! The errors of key and name construction live next to [`Key`] and
+//! [`Name`] in the crate root.
 //!
 //! [`KeySpace`]: crate::KeySpace
 
-use crate::{Key, Name};
+use crate::{Key, Name, NameError};
 
 /// An operation at a key of a [`KeySpace`] that failed, and where.
 ///
@@ -90,4 +93,36 @@ pub enum WriteKind {
     #[cfg(feature = "tezos-encoding")]
     #[error("value does not encode: {0}")]
     Encode(#[from] tezos_data_encoding::enc::BinError),
+}
+
+/// Error returned by [`KeySpaceLoader::load_or_create`].
+///
+/// [`KeySpaceLoader::load_or_create`]: crate::KeySpaceLoader::load_or_create
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum KeySpaceLoaderError {
+    /// A key space whose name overlaps (is a prefix of, or has as prefix) the
+    /// requested name is already loaded. Only meaningful when names form a
+    /// hierarchical path, which is why this variant is gated on `irmin-compat`.
+    #[cfg(feature = "irmin-compat")]
+    #[error("key space name overlaps an already-loaded key space")]
+    Overlapping,
+
+    /// A key space with this exact name is already loaded and has not been
+    /// dropped yet.
+    #[error("a key space with this name is already loaded")]
+    AlreadyLoaded,
+
+    /// The requested name is not a valid key space name.
+    #[error("invalid key space name: {0}")]
+    InvalidName(#[from] NameError),
+
+    /// Invalid/Inconsistent storage detected
+    #[cfg(not(feature = "irmin-compat"))]
+    #[error("KeySpaceLoader encountered a malformed name mapping for {0}")]
+    InconsistentNameMapping(Name),
+
+    /// Only up to `i32::MAX` databases are supported.
+    #[cfg(not(feature = "irmin-compat"))]
+    #[error("Could not allocated database for the given name - ran out of db indices.")]
+    TooManyDatabases,
 }
