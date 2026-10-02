@@ -6,9 +6,7 @@
 
 //! Account addressing, construction, and origin classification helpers.
 
-use crate::account_storage::{
-    path_to_tezos_account, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
-};
+use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
@@ -25,12 +23,7 @@ use tezosx_interfaces::Origin;
 pub fn implicit_from_public_key_hash(
     pkh: &PublicKeyHash,
 ) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
-    let path = path_to_tezos_account(pkh)
-        .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-    Ok(TezosImplicitAccount {
-        path,
-        pkh: pkh.clone(),
-    })
+    Ok(TezosImplicitAccount { pkh: pkh.clone() })
 }
 
 /// Resolve the implicit account backing a [`Contract`]. Errors on an
@@ -127,7 +120,7 @@ pub mod contracts {
     pub fn balance_path(
         account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &BALANCE_PATH)
+        concat(&account.path, &BALANCE_PATH)
     }
 }
 
@@ -226,21 +219,21 @@ pub mod code {
     const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
     pub fn info_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &INFO_PATH)
+        concat(&account.path, &INFO_PATH)
     }
 
     pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &CODE_PATH)
+        concat(&account.path, &CODE_PATH)
     }
 
     pub fn storage_path(
         account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &STORAGE_PATH)
+        concat(&account.path, &STORAGE_PATH)
     }
 
     pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &ORIGIN_PATH)
+        concat(&account.path, &ORIGIN_PATH)
     }
 }
 

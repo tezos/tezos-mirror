@@ -76,7 +76,6 @@ pub enum Manager {
 }
 
 pub trait TezosAccount {
-    fn path(&self) -> &OwnedPath;
     fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
@@ -122,10 +121,6 @@ pub struct TezosOriginatedAccount {
 }
 
 impl TezosAccount for TezosOriginatedAccount {
-    #[inline]
-    fn path(&self) -> &OwnedPath {
-        &self.path
-    }
     fn contract(&self) -> Contract {
         Contract::Originated(self.kt1.clone())
     }
@@ -822,14 +817,9 @@ pub fn set_tezos_account_info(
 
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
-    pub(crate) path: OwnedPath,
 }
 
 impl TezosAccount for TezosImplicitAccount {
-    fn path(&self) -> &OwnedPath {
-        &self.path
-    }
-
     fn contract(&self) -> Contract {
         Contract::Implicit(self.pkh.clone())
     }
