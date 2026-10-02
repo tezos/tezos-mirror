@@ -92,6 +92,7 @@ pub fn mutez_to_evm_gas(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ONE_MUTEZ_WEI;
 
     #[test]
     fn michelson_gas_to_mutez_floors() {
@@ -102,7 +103,7 @@ mod tests {
 
     #[test]
     fn michelson_gas_to_mutez_exact() {
-        let mutez = michelson_gas_to_mutez(U256::exp10(12), 1, 3).unwrap();
+        let mutez = michelson_gas_to_mutez(U256::from(ONE_MUTEZ_WEI), 1, 3).unwrap();
         assert_eq!(mutez, Mutez::try_from(3u64).unwrap());
     }
 
@@ -145,14 +146,17 @@ mod tests {
     #[test]
     fn mutez_to_evm_gas_exact_division() {
         let cost = Mutez::try_from(1u64).unwrap();
-        assert_eq!(mutez_to_evm_gas(cost, U256::exp10(12)), Ok(EvmGas::new(1)));
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::from(ONE_MUTEZ_WEI)),
+            Ok(EvmGas::new(1))
+        );
     }
 
     #[test]
     fn mutez_to_evm_gas_rounds_up() {
         let cost = Mutez::try_from(3u64).unwrap();
         assert_eq!(
-            mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(2u64)),
+            mutez_to_evm_gas(cost, U256::from(2 * ONE_MUTEZ_WEI)),
             Ok(EvmGas::new(2))
         );
     }
@@ -161,7 +165,7 @@ mod tests {
     fn mutez_to_evm_gas_sub_base_fee_rounds_up_to_one() {
         let cost = Mutez::try_from(1u64).unwrap();
         assert_eq!(
-            mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(3u64)),
+            mutez_to_evm_gas(cost, U256::from(3 * ONE_MUTEZ_WEI)),
             Ok(EvmGas::new(1))
         );
     }

@@ -1456,6 +1456,7 @@ pub(crate) mod tests {
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
+    use tezosx_types::ONE_MUTEZ_WEI;
 
     const CHAIN_ID: u32 = 1337;
 
@@ -1463,7 +1464,7 @@ pub(crate) mod tests {
         let block_fees = BlockFees::new(
             U256::from(12345),
             U256::from(12345),
-            U256::from(2_000_000_000_000u64),
+            U256::from(2 * ONE_MUTEZ_WEI),
         );
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),

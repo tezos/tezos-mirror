@@ -936,7 +936,7 @@ mod test {
     use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
     use tezosx_journal::TezosXJournal;
-    use tezosx_types::Wei;
+    use tezosx_types::{Wei, ONE_MUTEZ_WEI};
     use utilities::MOCK_TEZOS_GAS_CONSUMED;
 
     use tezos_ethereum::block::BlockConstants;
@@ -1808,7 +1808,7 @@ mod test {
                 tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .unwrap();
-        let value_sent = U256::from(5000000000000u64);
+        let value_sent = U256::from(5 * ONE_MUTEZ_WEI);
         let caller_info = AccountInfo {
             balance: U256::MAX,
             nonce: 0,
@@ -2367,7 +2367,7 @@ mod test {
         // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
 
         let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
-        let withdrawn_amount = U256::from(1_000_000_000_000u64);
+        let withdrawn_amount = U256::from(ONE_MUTEZ_WEI);
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -6706,11 +6706,6 @@ mod test {
         );
     }
 
-    // One mutez expressed in wei (10^12), mirroring the forwarder's own
-    // `ONE_MUTEZ_IN_WEI` gate. Amounts below this are left resident instead
-    // of being forwarded.
-    const ONE_MUTEZ_WEI: u128 = 1_000_000_000_000;
-
     /// Compute the deterministic Ethereum alias address for `native_address`,
     /// mirroring `ensure_alias`'s `keccak256(native_address)[0..20]` scheme.
     fn alias_address_for(native_address: &str) -> Address {
@@ -7075,7 +7070,7 @@ mod test {
         let native_address = "tz1ResidueZeroPoke";
         let alias = alias_address_for(native_address);
 
-        let residue = U256::from(3_000_000_000_000u128); // 3 mutez, no dust
+        let residue = U256::from(3 * ONE_MUTEZ_WEI); // 3 mutez, no dust
         set_balance(rk.eth_accounts_mut(), alias, residue);
 
         let (_, registry, mut journal) =

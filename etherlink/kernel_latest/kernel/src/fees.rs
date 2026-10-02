@@ -30,7 +30,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
-use tezosx_types::{wei_to_evm_gas, Wei};
+use tezosx_types::{wei_to_evm_gas, Wei, ONE_MUTEZ_WEI};
 
 use std::mem::size_of;
 
@@ -70,7 +70,7 @@ const ASSUMED_TX_ENCODED_SIZE: usize = 150;
 // Since multiple messages are grouped up into a single operation of
 // 'add smart rollup messages', together they will cover the larger base
 // fee for this operation.
-pub(crate) const DA_FEE_PER_BYTE: u64 = 4 * 10_u64.pow(12);
+pub(crate) const DA_FEE_PER_BYTE: u64 = 4 * ONE_MUTEZ_WEI;
 
 /// Instructions for 'balancing the books'.
 #[derive(Debug)]

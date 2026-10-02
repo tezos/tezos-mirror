@@ -1615,6 +1615,7 @@ mod tests {
     use tezos_protocol::contract::Contract;
     use tezosx_interfaces::testing::StubRegistry;
     use tezosx_interfaces::{AliasInfo, Classification, RuntimeId};
+    use tezosx_types::ONE_MUTEZ_WEI;
 
     use super::*;
 
@@ -3071,7 +3072,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(1u64).unwrap()),
-            1_000_000_000_000,
+            ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(
@@ -3089,7 +3090,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(3u64).unwrap()),
-            2_000_000_000_000,
+            2 * ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(
@@ -3108,7 +3109,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(1u64).unwrap()),
-            3_000_000_000_000,
+            3 * ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(
