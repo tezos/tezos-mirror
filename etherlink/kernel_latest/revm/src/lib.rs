@@ -843,7 +843,7 @@ mod test {
         use revm::primitives::{hardfork::SpecId, Address, U256};
         use tezos_ethereum::keyspace::KeySpaceExtU256;
         use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-        use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+        use tezos_smart_rollup_host::storage::StorageV1;
         use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceLoader};
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
@@ -1114,13 +1114,13 @@ mod test {
         // Every mock Tezos balance is under this key of the accounts keyspace.
         const MOCK_TEZOS_BALANCES_KEY: Key = Key::from_static(b"/mock_tezos/balances");
 
-        // Paths where the mock Tezos runtime records the last inbound
+        // Keys where the mock Tezos runtime records the last inbound
         // `X-Tezos-Source` / `X-Tezos-Sender` header values, so a test
         // can assert what an outgoing CRAC actually forwarded.
-        const MOCK_TEZOS_LAST_SOURCE_PATH: RefPath =
-            RefPath::assert_from(b"/mock_tezos/last_source");
-        const MOCK_TEZOS_LAST_SENDER_PATH: RefPath =
-            RefPath::assert_from(b"/mock_tezos/last_sender");
+        const MOCK_TEZOS_LAST_SOURCE_KEY: Key =
+            Key::from_static(b"/mock_tezos/last_source");
+        const MOCK_TEZOS_LAST_SENDER_KEY: Key =
+            Key::from_static(b"/mock_tezos/last_sender");
 
         /// Returns the key that holds the mock Tezos balance of `address`.
         ///
@@ -1143,19 +1143,40 @@ mod test {
             );
         }
 
+        /// The mock records the headers under `/tez/tez_accounts/mock_tezos`.
+        #[test]
+        fn mock_tezos_header_keys_keep_their_durable_paths() {
+            for (key, path) in [
+                (
+                    &MOCK_TEZOS_LAST_SOURCE_KEY,
+                    &b"/tez/tez_accounts/mock_tezos/last_source"[..],
+                ),
+                (
+                    &MOCK_TEZOS_LAST_SENDER_KEY,
+                    &b"/tez/tez_accounts/mock_tezos/last_sender"[..],
+                ),
+            ] {
+                assert_eq!([b"/tez/tez_accounts", key.as_bytes()].concat(), path);
+            }
+        }
+
         /// Read back the `X-Tezos-Source` header recorded by the last
         /// CRAC the mock Tezos runtime served.
-        pub(crate) fn last_recorded_source(host: &impl StorageV1) -> Option<String> {
-            host.store_read_all(&MOCK_TEZOS_LAST_SOURCE_PATH)
-                .ok()
+        pub(crate) fn last_recorded_source(
+            tez_accounts: &impl KeySpace,
+        ) -> Option<String> {
+            tez_accounts
+                .get(&MOCK_TEZOS_LAST_SOURCE_KEY)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
         }
 
         /// Read back the `X-Tezos-Sender` header recorded by the last
         /// CRAC the mock Tezos runtime served.
-        pub(crate) fn last_recorded_sender(host: &impl StorageV1) -> Option<String> {
-            host.store_read_all(&MOCK_TEZOS_LAST_SENDER_PATH)
-                .ok()
+        pub(crate) fn last_recorded_sender(
+            tez_accounts: &impl KeySpace,
+        ) -> Option<String> {
+            tez_accounts
+                .get(&MOCK_TEZOS_LAST_SENDER_KEY)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
         }
 
@@ -1261,22 +1282,20 @@ mod test {
 
                 // Record the trusted identity headers so a test can
                 // assert what the outgoing CRAC actually forwarded.
-                for (header, path) in [
+                for (header, key) in [
                     (
                         tezosx_interfaces::X_TEZOS_SOURCE,
-                        &MOCK_TEZOS_LAST_SOURCE_PATH,
+                        &MOCK_TEZOS_LAST_SOURCE_KEY,
                     ),
                     (
                         tezosx_interfaces::X_TEZOS_SENDER,
-                        &MOCK_TEZOS_LAST_SENDER_PATH,
+                        &MOCK_TEZOS_LAST_SENDER_KEY,
                     ),
                 ] {
                     if let Some(value) =
                         request.headers().get(header).and_then(|v| v.to_str().ok())
                     {
-                        rk.host_mut()
-                            .store_write_all(path, value.as_bytes())
-                            .unwrap();
+                        rk.tez_accounts_mut().set(key, value.as_bytes()).unwrap();
                     }
                 }
 
@@ -4422,12 +4441,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(rk.host()).as_deref(),
+                last_recorded_source(rk.tez_accounts()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(rk.host()).as_deref(),
+                last_recorded_sender(rk.tez_accounts()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -4461,12 +4480,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(rk.host()).as_deref(),
+                last_recorded_source(rk.tez_accounts()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(rk.host()).as_deref(),
+                last_recorded_sender(rk.tez_accounts()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -6429,7 +6448,7 @@ mod test {
         // Materialization must not have triggered a gateway subcall: the
         // mock Tezos runtime never recorded an incoming CRAC.
         assert!(
-            utilities::last_recorded_source(rk.host()).is_none(),
+            utilities::last_recorded_source(rk.tez_accounts()).is_none(),
             "materialization must not forward any balance to the gateway"
         );
 
@@ -6508,7 +6527,7 @@ mod test {
         // Materializing with a zero balance must not trigger a gateway
         // subcall either.
         assert!(
-            utilities::last_recorded_source(rk.host()).is_none(),
+            utilities::last_recorded_source(rk.tez_accounts()).is_none(),
             "materialization with zero balance must not forward anything"
         );
 
