@@ -22,7 +22,7 @@ use revm_etherlink::precompiles::send_outbox_message::{
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::{
-    helpers::legacy::{h160_to_alloy, u256_to_alloy, wei_to_alloy},
+    helpers::legacy::{alloy_to_wei, h160_to_alloy, u256_to_alloy, wei_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
 use revm_etherlink::{GasData, RevmTxRefusal, TxValidation};
@@ -204,11 +204,13 @@ pub fn is_valid_ethereum_transaction_common(
 
     // The sender account balance contains at least the cost.
     let total_gas_limit = U256::from(transaction.gas_limit_with_fees());
-    let cost = total_gas_limit.saturating_mul(effective_gas_price);
+    let cost = Wei::from_u256(total_gas_limit.saturating_mul(effective_gas_price));
     // The sender can afford the max gas fee he set, see EIP-1559
-    let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
+    let max_fee =
+        Wei::from_u256(total_gas_limit.saturating_mul(transaction.max_fee_per_gas));
+    let balance = alloy_to_wei(&info.balance);
 
-    if info.balance < u256_to_alloy(&cost) || info.balance < u256_to_alloy(&max_fee) {
+    if balance < cost || balance < max_fee {
         log!(Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
