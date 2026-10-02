@@ -27,6 +27,7 @@ use tezos_smart_rollup::{
 };
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::Key;
 use tezos_storage::{
     read_optional_nom_value, read_optional_nom_value_bounded,
     read_optional_nom_value_bounded_with_len, store_bin,
@@ -116,8 +117,11 @@ pub trait TezosAccount {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TezosOriginatedAccount {
-    pub(crate) path: OwnedPath,
     pub(crate) kt1: ContractKt1Hash,
+    /// The key of the account in the accounts keyspace. Every key of the
+    /// account starts with it. It must equal [`contracts::account_key`] of
+    /// the originated contract `kt1`.
+    pub(crate) key: Key,
 }
 
 impl TezosAccount for TezosOriginatedAccount {

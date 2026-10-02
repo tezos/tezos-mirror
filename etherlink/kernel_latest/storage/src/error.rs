@@ -8,7 +8,7 @@ use tezos_data_encoding::enc::BinError;
 use tezos_data_encoding::nom::error::DecodeError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_keyspace::KeySpaceError;
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use tezosx_types::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
@@ -25,6 +25,9 @@ pub enum StorageReadErrorKind {
 pub enum Error {
     #[error(transparent)]
     Path(PathError),
+    /// A keyspace key is not valid, as [`KeyError`] describes.
+    #[error(transparent)]
+    Key(#[from] KeyError),
     /// An operation at a keyspace key failed, as [`KeySpaceError`] describes:
     /// a failure of the SDK, or a [`StorageReadErrorKind`] of this crate.
     #[error(transparent)]

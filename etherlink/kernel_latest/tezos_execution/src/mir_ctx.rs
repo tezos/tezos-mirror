@@ -468,10 +468,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         mir::context::LookupViewError,
     > {
         use mir::context::LookupViewError;
-        // `originated_from_kt1` only builds the contract's durable path
-        // from the index; it does not check existence. Failures here
-        // mean a path/index corruption (or some host-layer issue) and
-        // are surfaced as host errors.
+        // `originated_from_kt1` only builds the key of the contract. It does
+        // not make sure that the contract exists. A failure here means that
+        // `originated_from_kt1` cannot build the key. This function reports
+        // the failure as a host error.
         let account = crate::context::originated_from_kt1(contract)
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         // L1 VIEW semantics push `None` when the target KT1 does not
