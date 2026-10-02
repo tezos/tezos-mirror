@@ -111,6 +111,22 @@ dnf_with_retries() {
 # Wrapper function for dnf with retry logic.
 dnf_retry() { dnf_with_retries "$@"; }
 
+# Mirror a package repository published for an unprotected ref from
+# the GCS bucket into a local directory, so that apt can install from
+# it with a [file:] source. The download is authenticated with the GCP
+# identity of the job, the same one the publishing jobs rely on (see
+# scripts/ci/gcp_auth.sh), through gsutil. The files are made
+# world-readable because apt fetches [file:] sources as the
+# unprivileged _apt user. Usage: gcs_mirror gs://bucket/prefix
+# destination-directory
+gcs_mirror() {
+  src="$1"
+  dst="$2"
+  mkdir -p "$dst"
+  gsutil -m -q rsync -r "$src" "$dst"
+  chmod -R a+rX "$dst"
+}
+
 get_node_version() {
   url="http://localhost:8732/version"
   max_attempts=100
