@@ -15,7 +15,7 @@ use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_keyspace::{KeyError, KeySpaceWriteError};
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use tezos_storage::error::Error as GenStorageError;
 use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
@@ -59,9 +59,9 @@ pub enum StorageError {
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
     #[error(transparent)]
-    KeySpaceWrite(KeySpaceWriteError),
-    #[error("Invalid keyspace key: {0}")]
-    KeySpaceKey(KeyError),
+    KeySpace(#[from] KeySpaceError),
+    #[error(transparent)]
+    KeySpaceKey(#[from] KeyError),
 }
 
 #[derive(Error, Debug)]
@@ -167,18 +167,6 @@ impl From<RuntimeError> for StorageError {
     }
 }
 
-impl From<KeySpaceWriteError> for StorageError {
-    fn from(e: KeySpaceWriteError) -> Self {
-        Self::KeySpaceWrite(e)
-    }
-}
-
-impl From<KeyError> for StorageError {
-    fn from(e: KeyError) -> Self {
-        Self::KeySpaceKey(e)
-    }
-}
-
 impl From<PathError> for Error {
     fn from(e: PathError) -> Self {
         Self::Storage(StorageError::Path(e))
@@ -190,9 +178,9 @@ impl From<RuntimeError> for Error {
     }
 }
 
-impl From<KeySpaceWriteError> for Error {
-    fn from(e: KeySpaceWriteError) -> Self {
-        Self::Storage(StorageError::KeySpaceWrite(e))
+impl From<KeySpaceError> for Error {
+    fn from(e: KeySpaceError) -> Self {
+        Self::Storage(StorageError::KeySpace(e))
     }
 }
 
@@ -274,8 +262,8 @@ impl From<IndexableStorageError> for Error {
                 Error::TryFromBigIntError(msg)
             }
             IndexableStorageError::Internal(msg) => Error::Internal(msg),
-            IndexableStorageError::KeySpaceWrite(e) => {
-                Error::Storage(StorageError::KeySpaceWrite(e))
+            IndexableStorageError::KeySpace(e) => {
+                Error::Storage(StorageError::KeySpace(e))
             }
             IndexableStorageError::KeySpaceKey(e) => {
                 Error::Storage(StorageError::KeySpaceKey(e))
@@ -289,6 +277,7 @@ impl From<GenStorageError> for Error {
         match e {
             GenStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
             GenStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
+            GenStorageError::KeySpace(e) => Error::Storage(StorageError::KeySpace(e)),
             GenStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             GenStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
             GenStorageError::InvalidLoadValue { expected, actual } => {

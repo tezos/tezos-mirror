@@ -8,8 +8,7 @@ use tezos_data_encoding::enc::BinError;
 use tezos_data_encoding::nom::error::DecodeError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_host::Error as HostError;
-use tezos_smart_rollup_keyspace::KeySpaceWriteError;
+use tezos_smart_rollup_keyspace::KeySpaceError;
 use tezosx_types::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
@@ -17,6 +16,9 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     Path(PathError),
+    /// An operation at a keyspace key failed, as [`KeySpaceError`] describes.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
     #[error(transparent)]
     Runtime(RuntimeError),
     #[error(transparent)]
@@ -87,22 +89,5 @@ impl From<Error> for KernelStorageError {
 impl From<Error> for TezosXRuntimeError {
     fn from(e: Error) -> Self {
         TezosXRuntimeError::Storage(KernelStorageError(e.to_string()))
-    }
-}
-
-// KeySpace write failures are surfaced through the existing `Runtime`
-// representation so the KeySpace-based helpers stay error-compatible with the
-// StorageV1-based ones: the irmin-backed KeySpace produces these from the very
-// same host errors.
-impl From<KeySpaceWriteError> for Error {
-    fn from(value: KeySpaceWriteError) -> Self {
-        match value {
-            KeySpaceWriteError::ValueSizeExceeded => {
-                Self::Runtime(RuntimeError::HostErr(HostError::StoreValueSizeExceeded))
-            }
-            KeySpaceWriteError::InvalidOffset => {
-                Self::Runtime(RuntimeError::HostErr(HostError::StoreInvalidAccess))
-            }
-        }
     }
 }

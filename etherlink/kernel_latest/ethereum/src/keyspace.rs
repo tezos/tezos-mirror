@@ -13,7 +13,7 @@
 
 use primitive_types::U256;
 use revm::primitives::U256 as EvmU256;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceWriteError};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 /// Reads and writes 256-bit integers at a key.
 ///
@@ -42,20 +42,12 @@ pub trait KeySpaceExtU256: KeySpace {
     }
 
     /// Writes `value` least significant first.
-    fn store_u256_le(
-        &mut self,
-        key: &Key,
-        value: U256,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn store_u256_le(&mut self, key: &Key, value: U256) -> Result<(), KeySpaceError> {
         store_le_array(self, key, value.0)
     }
 
     /// Writes `value` most significant first.
-    fn store_u256_be(
-        &mut self,
-        key: &Key,
-        value: U256,
-    ) -> Result<(), KeySpaceWriteError> {
+    fn store_u256_be(&mut self, key: &Key, value: U256) -> Result<(), KeySpaceError> {
         store_be_array(self, key, value.0)
     }
 
@@ -85,7 +77,7 @@ pub trait KeySpaceExtU256: KeySpace {
         &mut self,
         key: &Key,
         value: EvmU256,
-    ) -> Result<(), KeySpaceWriteError> {
+    ) -> Result<(), KeySpaceError> {
         store_le_array(self, key, value.into_limbs())
     }
 
@@ -94,7 +86,7 @@ pub trait KeySpaceExtU256: KeySpace {
         &mut self,
         key: &Key,
         value: EvmU256,
-    ) -> Result<(), KeySpaceWriteError> {
+    ) -> Result<(), KeySpaceError> {
         store_be_array(self, key, value.into_limbs())
     }
 }
@@ -127,7 +119,7 @@ fn store_le_array<KS: KeySpace + ?Sized, const N: usize>(
     ks: &mut KS,
     key: &Key,
     values: [u64; N],
-) -> Result<(), KeySpaceWriteError> {
+) -> Result<(), KeySpaceError> {
     let chunks = values.map(u64::to_le_bytes);
     ks.set(key, chunks.as_flattened())
 }
@@ -137,7 +129,7 @@ fn store_be_array<KS: KeySpace + ?Sized, const N: usize>(
     ks: &mut KS,
     key: &Key,
     values: [u64; N],
-) -> Result<(), KeySpaceWriteError> {
+) -> Result<(), KeySpaceError> {
     let mut chunks = values.map(u64::to_be_bytes);
     chunks.reverse();
     ks.set(key, chunks.as_flattened())
