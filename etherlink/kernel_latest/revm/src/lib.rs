@@ -4936,6 +4936,45 @@ mod test {
                 assert_reverts(&res, "materializeAlias: non-payable selector");
             }
 
+            // An alias init that runs out of gas used the whole budget it was
+            // given: the call is charged for it, not only for the lookups done
+            // before, so a failed materialization can't be retried for cheap.
+            #[test]
+            fn an_init_out_of_gas_is_charged_the_whole_budget() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                // Enough for the gateway's own charges, not for the init.
+                let limit = 100_000;
+                let registry = Registry::new();
+                let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let res = run_transaction(
+                    &mut rk,
+                    &registry,
+                    &mut journal,
+                    &block_constants(),
+                    None,
+                    caller,
+                    Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                    payload("tezos", TZ1, EDPK),
+                    GasData::new(limit, 1, limit),
+                    U256::ZERO,
+                    None,
+                    false,
+                    TransactionOrigin::UserInput {
+                        access_list: AccessList::default(),
+                    },
+                )
+                .unwrap();
+
+                assert!(!res.result.is_success(), "{:?}", res.result);
+                assert_eq!(res.result.gas_used(), limit);
+                let info = StorageAccount::from_address(&expected_alias())
+                    .unwrap()
+                    .info(rk.eth_accounts_mut())
+                    .unwrap();
+                assert_eq!(info.origin, AccountOrigin::Unclassified);
+            }
+
             #[test]
             fn rejects_an_address_that_is_not_native() {
                 let mut host = MockKernelHost::default();

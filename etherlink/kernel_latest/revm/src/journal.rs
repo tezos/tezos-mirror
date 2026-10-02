@@ -965,8 +965,8 @@ impl<
         );
         self.journal.evm.set_revm_call_depth(saved);
         // TODO: https://linear.app/tezos/issue/L2-2188
-        // On failure, the gas used by the alias creation (e.g. its nested
-        // init transaction) is not reported, so it is not charged.
+        // Only an alias creation running out of gas reports what it used (the
+        // whole budget); on another failure, the gas used is not charged.
         let (
             alias,
             AliasResolution {

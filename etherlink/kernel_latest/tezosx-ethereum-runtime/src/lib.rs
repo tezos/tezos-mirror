@@ -173,6 +173,12 @@ impl EthereumRuntime {
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
+            // Running out of gas means the whole budget was used: reported as
+            // such, so the caller charges it rather than dropping it.
+            ExecutionResult::Halt {
+                reason: HaltReason::OutOfGas(_),
+                ..
+            } => Err(TezosXRuntimeError::OutOfGas),
             ExecutionResult::Halt { reason, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias halted: {reason:?}"),
             )),
