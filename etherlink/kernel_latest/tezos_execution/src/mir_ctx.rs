@@ -237,10 +237,7 @@ impl ExecCtx {
                 TransferError::MirAmountToNarithError(err.to_string())
             },
         )?;
-        let contract_account = TezosOriginatedAccount {
-            path: dest_account.path().clone(),
-            kt1: dest_account.kt1().clone(),
-        };
+        let contract_account = dest_account.clone();
         Ok(Self {
             sender,
             amount,
@@ -2399,10 +2396,9 @@ pub mod tests {
     /// missing-`code` durable read as a `LookupViewError::HostError`.
     #[test]
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
-        use crate::account_storage::TezosImplicitAccount;
-        use crate::account_storage::TezosOriginatedAccount;
+        use crate::context::implicit_from_public_key_hash;
+        use crate::context::originated_from_kt1;
         use mir::ast::michelson_address::AddressHash;
-        use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -2414,10 +2410,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezosImplicitAccount {
-            path: RefPath::assert_from(b"/mock_source").into(),
-            pkh: bootstrap_pkh.clone(),
-        };
+        let source = implicit_from_public_key_hash(&bootstrap_pkh).unwrap();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -2442,10 +2435,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezosOriginatedAccount {
-                path: RefPath::assert_from(b"/mock_self").into(),
-                kt1: placeholder_kt1,
-            },
+            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
         };
 
         // The test exercises `lookup_view_storage_balance` directly,
@@ -3064,12 +3054,11 @@ pub mod tests {
     /// into a hard test failure.
     #[test]
     fn enshrined_synthetic_views_dispatch_in_sync() {
-        use crate::account_storage::TezosImplicitAccount;
-        use crate::account_storage::TezosOriginatedAccount;
+        use crate::context::implicit_from_public_key_hash;
+        use crate::context::originated_from_kt1;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
         use tezos_crypto_rs::hash::HashTrait;
-        use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -3081,10 +3070,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezosImplicitAccount {
-            path: RefPath::assert_from(b"/mock_source").into(),
-            pkh: bootstrap_pkh.clone(),
-        };
+        let source = implicit_from_public_key_hash(&bootstrap_pkh).unwrap();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -3109,10 +3095,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezosOriginatedAccount {
-                path: RefPath::assert_from(b"/mock_self").into(),
-                kt1: placeholder_kt1,
-            },
+            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
         };
 
         let mut journal = tezosx_journal::TezosXJournal::new(
@@ -3459,11 +3442,11 @@ pub mod tests {
 #[cfg(test)]
 pub(crate) mod mock {
     use super::*;
+    use crate::context::originated_from_kt1;
     use mir::ast::{ByteReprTrait, Entrypoint};
     use num_bigint::BigInt;
     use std::collections::HashMap;
     use tezos_crypto_rs::hash::HashTrait;
-    use tezos_smart_rollup_host::path::RefPath;
 
     /// Mock execution context for testing enshrined contracts.
     /// Implements CtxTrait and HasHost with configurable values.
@@ -3512,10 +3495,8 @@ pub(crate) mod mock {
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 operation_gas: crate::gas::TezlinkOperationGas::default(),
                 operation_counter: 0,
-                contract_account: TezosOriginatedAccount {
-                    path: RefPath::assert_from(b"/mock").into(),
-                    kt1: ContractKt1Hash::from([0u8; 20]),
-                },
+                contract_account: originated_from_kt1(&ContractKt1Hash::from([0u8; 20]))
+                    .unwrap(),
                 crac_chain_depth: 0,
                 crac_origin: None,
                 delegated_storage_cost: 0,

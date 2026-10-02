@@ -1022,7 +1022,7 @@ mod tests {
 
     #[test]
     fn set_manager_public_key_reveals_manager() {
-        use super::{Manager, TezosImplicitAccount};
+        use super::Manager;
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -1033,11 +1033,7 @@ mod tests {
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .unwrap();
-        let path = super::path_to_tezos_account(&pkh).unwrap();
-        let account = TezosImplicitAccount {
-            pkh: pkh.clone(),
-            path,
-        };
+        let account = crate::context::implicit_from_public_key_hash(&pkh).unwrap();
 
         // Reveal records the public key as the account's manager. It writes no
         // `/origin` record — an implicit account is Native by construction.

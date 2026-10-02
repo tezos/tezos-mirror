@@ -2095,10 +2095,7 @@ where
             .clone()
             .map_or_else(|| self_address.clone(), AddressHash::Implicit)
     });
-    let contract_account = account_storage::TezosOriginatedAccount {
-        path: account.path().clone(),
-        kt1: account.kt1().clone(),
-    };
+    let contract_account = account.clone();
 
     let mut counter = 0u128;
 
