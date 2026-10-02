@@ -127,6 +127,24 @@ gcs_mirror() {
   chmod -R a+rX "$dst"
 }
 
+# Select where a test script reads the ref's apt repository from, given REPO
+# (bucket URL of the ref) and DISTRO:
+#   REPO_URL        apt source URL ([file:/dir] or [https://...])
+#   REPO_FETCH_URL  base URL for curl ([file:///dir] or [https://...])
+# The local mirror handed over by systemd-docker-test.sh through OCTEZ_REPO_DIR
+# wins when set (typically for unprotected refs) otherwise the bucket over
+# https, which protected refs use.
+# shellcheck disable=SC2034 # both variables are consumed by the sourcing script
+set_octez_repo_urls() {
+  if [ -n "${OCTEZ_REPO_DIR:-}" ]; then
+    REPO_URL="file:$OCTEZ_REPO_DIR"
+    REPO_FETCH_URL="file://$OCTEZ_REPO_DIR"
+  else
+    REPO_URL="$REPO/$DISTRO"
+    REPO_FETCH_URL="$REPO_URL"
+  fi
+}
+
 get_node_version() {
   url="http://localhost:8732/version"
   max_attempts=100
