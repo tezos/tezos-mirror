@@ -44,8 +44,8 @@ use tezos_tezlink::{
         ApplyOperationError, ApplyOperationErrors, BacktrackedResult, ContentResult,
         EventContent, EventSuccess, InternalContentWithMetadata, InternalOperationSum,
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, OriginationSuccess, TransferError,
-        TransferSuccess, TransferTarget,
+        OperationResultSum, OperationWithMetadata, OriginationError, OriginationSuccess,
+        TransferError, TransferSuccess, TransferTarget,
     },
 };
 use tezosx_interfaces::{
@@ -1127,12 +1127,26 @@ impl RuntimeInterface for TezosRuntime {
         // `TezlinkOperationGas::start_milligas` below.
         let mut remaining = gas_remaining.as_runtime(RuntimeId::Tezos);
         fn consume(remaining: &mut u64, cost: u64) -> Result<(), TezosXRuntimeError> {
-            *remaining = remaining.checked_sub(cost).ok_or_else(|| {
-                TezosXRuntimeError::Custom(
-                    "Out of gas during alias generation".to_string(),
-                )
-            })?;
+            *remaining = remaining
+                .checked_sub(cost)
+                .ok_or(TezosXRuntimeError::OutOfGas)?;
             Ok(())
+        }
+        // Running out of gas means the whole budget was used: reported as
+        // such, so the caller charges it rather than dropping it. The
+        // typechecker reports it as text, hence the look at the counter.
+        fn origination_error(
+            gas: &TezlinkOperationGas,
+            context: &str,
+            e: OriginationError,
+        ) -> TezosXRuntimeError {
+            if gas.remaining.milligas().is_none()
+                || matches!(e, OriginationError::OutOfGas(_))
+            {
+                TezosXRuntimeError::OutOfGas
+            } else {
+                TezosXRuntimeError::Custom(format!("{context}: {e:?}"))
+            }
         }
 
         let kt1 = ContractKt1Hash::from_base58_check(alias).map_err(|err| {
@@ -1226,9 +1240,11 @@ impl RuntimeInterface for TezosRuntime {
             let parser = mir::parser::Parser::new();
             let typed_storage = typecheck_code_and_storage(&mut tc_ctx, &parser, &script)
                 .map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to typecheck forwarder script: {e:?}"
-                    ))
+                    origination_error(
+                        tc_ctx.operation_gas,
+                        "Failed to typecheck forwarder script",
+                        e,
+                    )
                 })?;
             // L2-1529: materialize the alias *code-less*. Passing `None` writes
             // no `/data/code`, so the alias resolves to the single shared
@@ -1246,9 +1262,11 @@ impl RuntimeInterface for TezosRuntime {
                 &origin,
             )
             .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to originate alias forwarder: {e:?}"
-                ))
+                origination_error(
+                    tc_ctx.operation_gas,
+                    "Failed to originate alias forwarder",
+                    e,
+                )
             })?
         };
         let consumed: u64 = (&receipt.consumed_milligas.0).try_into().map_err(|_| {
@@ -1895,6 +1913,52 @@ mod tests {
             alias.starts_with("KT1"),
             "Alias should be a KT1 address: {alias}"
         );
+    }
+
+    // An alias creation that runs out of gas reports `OutOfGas`, so the
+    // caller knows the whole budget was used: with half the budget it needs,
+    // which runs out while originating the forwarder, and with one
+    // unit short of it.
+    #[test]
+    fn create_alias_out_of_gas_is_reported_as_such() {
+        let evm_address = "0x1234567890abcdef1234567890abcdef12345678";
+        let create = |budget: u64| {
+            let mut host = MockKernelHost::default();
+            let mut rk = test_rk(&mut host);
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            let runtime = test_runtime();
+            let alias = runtime.compute_alias(evm_address.as_bytes()).unwrap();
+            runtime
+                .create_alias(
+                    &NotWiredRegistry,
+                    &mut rk,
+                    &mut journal,
+                    &alias,
+                    evm_alias_info(evm_address),
+                    None,
+                    test_context(),
+                    TezosXGas::new(budget, RuntimeId::Tezos),
+                )
+                .map(|_| ())
+        };
+        // The budget the creation needs: the smallest that succeeds.
+        let (mut lo, mut hi) = (0u64, 5_000_000u64);
+        assert_eq!(create(hi), Ok(()));
+        while lo + 1 < hi {
+            let mid = (lo + hi) / 2;
+            if create(mid).is_ok() {
+                hi = mid
+            } else {
+                lo = mid
+            }
+        }
+        for budget in [hi / 2, hi - 1] {
+            assert_eq!(
+                create(budget),
+                Err(TezosXRuntimeError::OutOfGas),
+                "budget {budget} of the {hi} needed"
+            );
+        }
     }
 
     #[test]

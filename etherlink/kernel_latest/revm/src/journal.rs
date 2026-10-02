@@ -908,11 +908,15 @@ impl<
                 context,
                 target_gas_budget,
             )
-            .map_err(|e| {
-                CustomPrecompileError::Revert(
+            .map_err(|e| match e {
+                // Running out of gas means the alias creation used the whole
+                // budget: charged as such, so that a caller catching the
+                // failure can't retry it for cheap.
+                TezosXRuntimeError::OutOfGas => CustomPrecompileError::OutOfGas,
+                e => CustomPrecompileError::Revert(
                     format!("Failed to generate alias for source address: {e:?}"),
                     remaining,
-                )
+                ),
             })?;
         let consumed_gas = target_gas_budget - gas_remaining;
         Ok((

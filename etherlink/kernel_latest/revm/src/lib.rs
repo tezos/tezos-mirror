@@ -886,6 +886,8 @@ mod test {
         pub(crate) struct Registry {
             mock_tezos: MockTezosRuntime,
             ethereum: EthereumRuntime,
+            /// When `true`, materializing a Michelson alias runs out of gas.
+            tezos_alias_creation_out_of_gas: bool,
         }
 
         impl Registry {
@@ -893,7 +895,14 @@ mod test {
                 Self {
                     mock_tezos: MockTezosRuntime,
                     ethereum: EthereumRuntime::default(),
+                    tezos_alias_creation_out_of_gas: false,
                 }
+            }
+
+            /// Have the materialization of a Michelson alias run out of gas.
+            pub(crate) fn with_tezos_alias_creation_out_of_gas(mut self) -> Self {
+                self.tezos_alias_creation_out_of_gas = true;
+                self
             }
 
             pub(crate) fn get_balance(
@@ -936,6 +945,11 @@ mod test {
                 })?;
                 let result = if !self.alias_exists(rk, journal, target_runtime, &alias)? {
                     match target_runtime {
+                        tezosx_interfaces::RuntimeId::Tezos
+                            if self.tezos_alias_creation_out_of_gas =>
+                        {
+                            Err(TezosXRuntimeError::OutOfGas)
+                        }
                         tezosx_interfaces::RuntimeId::Tezos => {
                             self.mock_tezos.create_alias(
                                 self,
@@ -4631,6 +4645,41 @@ mod test {
                 typed_target, generic_target,
                 "targetAddress must not depend on the ABI surface"
             );
+        }
+
+        // A cross-runtime call whose Michelson alias creation runs out of gas
+        // used the whole budget: it is charged for it, so that a caller
+        // catching the failure can't retry it for cheap.
+        #[test]
+        fn source_alias_creation_out_of_gas_is_charged_the_whole_budget() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let caller = Address::from([1u8; 20]);
+            fund(rk.eth_accounts_mut(), caller);
+            let limit = 200_000;
+            let registry = Registry::new().with_tezos_alias_creation_out_of_gas();
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+            let res = run_transaction(
+                &mut rk,
+                &registry,
+                &mut journal,
+                &block_constants(),
+                None,
+                caller,
+                Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                call_michelson_payload(),
+                GasData::new(limit, 1, limit),
+                U256::ZERO,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap();
+
+            assert!(!res.result.is_success(), "{:?}", res.result);
+            assert_eq!(res.result.gas_used(), limit);
         }
 
         // --- materializeAlias ------------------------------------------------

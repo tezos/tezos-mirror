@@ -253,6 +253,9 @@ pub struct MockRegistry {
     /// rejects the address as not provably native. Default `None` (every
     /// address is native, for free).
     pub native_address_rejection_cost: Option<Gas>,
+    /// When `true`, `ensure_alias` runs out of gas, as an alias creation
+    /// given too small a budget does. Default `false`.
+    pub alias_creation_out_of_gas: bool,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
 }
@@ -265,6 +268,7 @@ impl MockRegistry {
             injective_aliases: false,
             alias_delegated_storage_cost: None,
             native_address_rejection_cost: None,
+            alias_creation_out_of_gas: false,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
         }
@@ -274,6 +278,12 @@ impl MockRegistry {
     /// as not provably native, so tests can drive the rejection path.
     pub fn with_native_address_rejected(mut self, cost: Gas) -> Self {
         self.native_address_rejection_cost = Some(cost);
+        self
+    }
+
+    /// Have `ensure_alias` run out of gas.
+    pub fn with_alias_creation_out_of_gas(mut self) -> Self {
+        self.alias_creation_out_of_gas = true;
         self
     }
 
@@ -322,6 +332,9 @@ impl Registry for MockRegistry {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
+        if self.alias_creation_out_of_gas {
+            return Err(TezosXRuntimeError::OutOfGas);
+        }
         self.ensure_alias_calls
             .borrow_mut()
             .push((alias_info, target_runtime));

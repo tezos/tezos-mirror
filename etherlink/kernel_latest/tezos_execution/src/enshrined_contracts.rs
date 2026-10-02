@@ -905,7 +905,15 @@ where
                 .revert_snapshots_from(rk.host_mut(), snapshots)
         }
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-        let (alias, resolution) = resolution?;
+        let (alias, resolution) = match resolution {
+            Ok(resolution) => resolution,
+            // Running out of gas means the creation used the whole budget.
+            Err(TezosXRuntimeError::OutOfGas) => {
+                budget.consume(*budget)?;
+                return Err(TezosXRuntimeError::OutOfGas);
+            }
+            Err(e) => return Err(e),
+        };
         budget.consume(*budget - resolution.gas_remaining)?;
         Ok(Some((alias, resolution.delegated_storage_cost)))
     })?
@@ -6598,6 +6606,40 @@ pub(crate) mod tests {
         let consumed =
             u64::from(before - ctx.operation_gas.remaining.milligas().unwrap());
         (err, consumed)
+    }
+
+    // An alias creation that runs out of gas used the whole budget it was
+    // given: the call is charged for it, not only for the lookups done before,
+    // so that a caller able to catch the failure can't retry it for cheap.
+    #[test]
+    fn test_materialize_alias_out_of_gas_is_charged_the_whole_budget() {
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS).with_alias_creation_out_of_gas();
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = materialize_alias_journal();
+        let mut ctx = MockCtx::new(
+            &mut rk,
+            &mut journal,
+            &registry,
+            materialize_alias_source(),
+            0,
+        );
+        let arena = typed_arena::Arena::new();
+        let value =
+            materialize_alias_micheline(&arena, "ethereum", EVM_NATIVE_ADDRESS, None);
+
+        let err = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("materialize_alias").unwrap(),
+            value,
+            &mut ctx,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, CracError::Operation(TransferError::OutOfGas(_))),
+            "{err}"
+        );
+        assert_eq!(ctx.operation_gas.remaining.milligas(), Some(0));
     }
 
     #[test]
