@@ -16,7 +16,7 @@ use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
-use tezos_storage::error::Error as GenStorageError;
+use tezos_storage::error::{Error as GenStorageError, StorageReadErrorKind};
 use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
 
@@ -59,9 +59,15 @@ pub enum StorageError {
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceError),
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
     KeySpaceKey(#[from] KeyError),
+}
+
+impl From<KeySpaceError> for StorageError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -180,7 +186,7 @@ impl From<RuntimeError> for Error {
 
 impl From<KeySpaceError> for Error {
     fn from(e: KeySpaceError) -> Self {
-        Self::Storage(StorageError::KeySpace(e))
+        Self::Storage(e.into())
     }
 }
 

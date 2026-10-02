@@ -12,13 +12,23 @@ use tezos_smart_rollup_keyspace::KeySpaceError;
 use tezosx_types::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
 
+/// What a read of this crate can fail on, on top of the read failures of the
+/// SDK.
+#[derive(Error, Debug, Eq, PartialEq)]
+pub enum StorageReadErrorKind {
+    /// The key holds no value, and the caller requires one.
+    #[error("no value at the key")]
+    NotFound,
+}
+
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum Error {
     #[error(transparent)]
     Path(PathError),
-    /// An operation at a keyspace key failed, as [`KeySpaceError`] describes.
+    /// An operation at a keyspace key failed, as [`KeySpaceError`] describes:
+    /// a failure of the SDK, or a [`StorageReadErrorKind`] of this crate.
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceError),
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
     Runtime(RuntimeError),
     #[error(transparent)]
@@ -41,6 +51,12 @@ pub enum Error {
     TryFromBigIntError(TryFromBigIntError<BigUint>),
     #[error("Internal invariant violation: {0}")]
     Internal(String),
+}
+
+impl From<KeySpaceError> for Error {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 impl From<TryFromBigIntError<BigUint>> for Error {
