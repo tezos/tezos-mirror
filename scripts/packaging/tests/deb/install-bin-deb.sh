@@ -8,6 +8,7 @@ RELEASE=$2
 
 # include apt_get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
+set_octez_repo_urls
 
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
@@ -15,10 +16,10 @@ export DEBIAN_FRONTEND=noninteractive
 apt_get update
 apt_get install -y sudo gpg curl apt-utils debconf-utils procps jq
 
-sudo curl "$REPO/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+sudo curl "$REPO_FETCH_URL/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
 
 # [add next repository]
-repository="deb $REPO/$DISTRO $RELEASE main"
+repository="deb $REPO_URL $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
 apt_get update
 

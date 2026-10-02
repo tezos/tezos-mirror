@@ -39,7 +39,18 @@ trap 'echo "Stopping and removing container systemd" && \
   (docker rm -f systemd || true) && (docker rmi systemd || true)' INT TERM EXIT
 
 # Run the container in the background and capture the PID of the background process
-screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd -v $PWD/$TESTFILE:/$TESTFILE -v $PWD/scripts/packaging/tests/tests-common.inc.sh:/scripts/packaging/tests/tests-common.inc.sh $IMAGE"
+# Unprotected refs publish to a bucket used with GCP identity.
+# Protected refs publish to a bucket used over https.
+REPO_MOUNT=""
+OCTEZ_REPO_DIR=""
+if [ "$CI_COMMIT_REF_PROTECTED" != "true" ]; then
+  . scripts/packaging/tests/tests-common.inc.sh
+  gcs_mirror "gs://$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME/$DISTRIBUTION" "$PWD/octez-repo"
+  OCTEZ_REPO_DIR=/octez-repo
+  REPO_MOUNT="-v $PWD/octez-repo:$OCTEZ_REPO_DIR"
+fi
+
+screen -d -m /bin/sh -c "docker run -i --rm --privileged --name systemd -v $PWD/$TESTFILE:/$TESTFILE -v $PWD/scripts/packaging/tests/tests-common.inc.sh:/scripts/packaging/tests/tests-common.inc.sh $REPO_MOUNT $IMAGE"
 
 timeout=30
 elapsed=0
@@ -71,6 +82,7 @@ docker exec \
   -e "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE" \
   -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA" \
   -e "GCP_LINUX_PACKAGES_BUCKET=$GCP_LINUX_PACKAGES_BUCKET" \
+  -e "OCTEZ_REPO_DIR=$OCTEZ_REPO_DIR" \
   -i systemd \
   /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE $ARGS"
 
