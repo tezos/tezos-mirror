@@ -14,10 +14,7 @@ use tezos_crypto_rs::{
     },
     public_key_hash::PublicKeyHash,
 };
-use tezos_data_encoding::{
-    enc::BinWriter,
-    nom::{error::convert_error, NomReader},
-};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 
 macro_rules! address_hash_type_and_impls {
     ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
@@ -174,10 +171,7 @@ impl ByteReprTrait for AddressHash {
             // implicit addresses
             TAG_IMPLICIT => {
                 Implicit(PublicKeyHash::nom_read_exact(&bytes[1..]).map_err(|err| {
-                    ByteReprError::WrongFormat(format!(
-                        "public key hash : {0}",
-                        convert_error(&bytes[1..], err)
-                    ))
+                    ByteReprError::WrongFormat(format!("public key hash : {err}"))
                 })?)
             }
             TAG_KT1 => {

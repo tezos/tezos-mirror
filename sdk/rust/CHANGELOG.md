@@ -38,6 +38,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   [Serializer::serialize_newtype_struct](https://docs.rs/serde/latest/serde/trait.Serializer.html#tymethod.serialize_newtype_struct).
 - Refactor `blake2b` digest methods to return fixed-size arrays for improved consistency and type safety
 - Refactor `Hasher` trait to use fixed-size arrays for hash outputs and update `TezosHasher` implementation
+- `convert_error` displays a nom error kind in user-facing form, by its `description()`, not by its `Debug` name.
+- `NomReader::nom_read_exact` returns `nom::error::NomReadExactError`, an error that owns its data,
+  instead of a `NomError` that borrows the input. Its `Display` renders the same text as `convert_error`.
+- Add `Display` for `BoundedEncodingKind`.
 
 ### Fixed
 

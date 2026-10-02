@@ -15,7 +15,7 @@ use std::rc::Rc;
 use tezos_crypto_rs::{
     base58::FromBase58CheckError, hash::FromBytesError, public_key::PublicKey,
 };
-use tezos_data_encoding::nom::{error::convert_error, NomReader};
+use tezos_data_encoding::nom::NomReader;
 use tezos_protocol::entrypoint;
 
 pub mod type_props;
@@ -5898,8 +5898,7 @@ fn visit_value<'a, 'b>(
                     TcError::ByteReprError(
                         T::KeyHash,
                         ByteReprError::WrongFormat(format!(
-                            "public key hash, optimized {}",
-                            convert_error(bs, err)
+                            "public key hash, optimized {err}"
                         )),
                     )
                 },

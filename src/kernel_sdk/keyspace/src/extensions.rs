@@ -10,6 +10,8 @@
 
 use crate::{Key, KeySpace, KeySpaceWriteError};
 use num_traits::{FromBytes, ToBytes};
+#[cfg(feature = "tezos-encoding")]
+use tezos_data_encoding::nom::error::NomReadExactError;
 
 /// Typed integer reads and writes over a [`KeySpace`].
 pub trait KeySpaceExtNum: KeySpace {
@@ -135,11 +137,9 @@ pub enum StoreBinError {
 #[error("value does not decode: {0}")]
 pub struct NomReadError(String);
 
-/// The decoder's error borrows the bytes it stopped on, so it is rendered
-/// here to outlive the read.
 #[cfg(feature = "tezos-encoding")]
-impl From<tezos_data_encoding::nom::NomError<'_>> for NomReadError {
-    fn from(err: tezos_data_encoding::nom::NomError<'_>) -> Self {
+impl From<NomReadExactError> for NomReadError {
+    fn from(err: NomReadExactError) -> Self {
         NomReadError(format!("{err:?}"))
     }
 }

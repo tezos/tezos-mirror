@@ -766,9 +766,8 @@ where
 {
     use tezos_execution::RunCodeError;
 
-    let input = RunCodeInput::nom_read_exact(payload).map_err(|e| {
-        RunCodeError::Execution(format!("cannot decode the input: {e:?}"))
-    })?;
+    let input = RunCodeInput::nom_read_exact(payload)
+        .map_err(|e| RunCodeError::Execution(format!("cannot decode the input: {e}")))?;
 
     let chain_config = fetch_tezosx_configuration(host, base);
 
