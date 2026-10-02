@@ -10,35 +10,64 @@
 //! [`KeySpace`]: crate::KeySpace
 
 use crate::{Key, Name, NameError};
+use core::convert::Infallible;
 
 /// An operation at a key of a [`KeySpace`] that failed, and where.
 ///
 /// Every fallible operation of a key space and of its extension traits
-/// returns this error.
+/// returns this error with both parameters [`Infallible`]: no value of that
+/// type exists, so the error holds only the failures that the SDK defines.
+///
+/// A crate outside the SDK that adds its own reads or writes over a key space
+/// can report its own failures in this error. It sets `R` to its read
+/// failures, `W` to its write failures, or both, and builds them with
+/// [`ReadKind::Ext`] or [`WriteKind::Ext`]. [`KeySpaceError::widen`] carries
+/// the failures of the SDK into that error. A crate error that holds the
+/// extended error in one variant implements `From<KeySpaceError>` with
+/// [`KeySpaceError::widen`], so that `?` takes both kinds of failure:
+///
+/// ```ignore
+/// #[derive(Debug, thiserror::Error)]
+/// enum Error {
+///     #[error(transparent)]
+///     KeySpace(#[from] KeySpaceError<MyReadKind>),
+/// }
+///
+/// impl From<KeySpaceError> for Error {
+///     fn from(e: KeySpaceError) -> Self {
+///         Self::KeySpace(e.widen())
+///     }
+/// }
+/// ```
 ///
 /// [`KeySpace`]: crate::KeySpace
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("at key {key} of key space {keyspace}: {kind}")]
-pub struct KeySpaceError {
+pub struct KeySpaceError<R = Infallible, W = Infallible> {
     keyspace: Name,
     key: Key,
-    kind: ErrorKind,
+    kind: ErrorKind<R, W>,
 }
 
-impl KeySpaceError {
+impl<R, W> KeySpaceError<R, W> {
     /// Builds the error of a typed read that failed on `kind` at `key` of the
     /// key space named `keyspace`.
-    pub fn read(keyspace: &Name, key: &Key, kind: ReadKind) -> Self {
+    pub fn read(keyspace: &Name, key: &Key, kind: ReadKind<R>) -> Self {
         Self::new(keyspace, key, ErrorKind::Read(kind))
     }
 
     /// Builds the error of a write that failed on `kind` at `key` of the key
     /// space named `keyspace`.
-    pub fn write(keyspace: &Name, key: &Key, kind: WriteKind) -> Self {
+    pub fn write(keyspace: &Name, key: &Key, kind: WriteKind<W>) -> Self {
         Self::new(keyspace, key, ErrorKind::Write(kind))
     }
 
-    fn new(keyspace: &Name, key: &Key, kind: ErrorKind) -> Self {
+    /// Returns what the operation failed on.
+    pub fn kind(&self) -> &ErrorKind<R, W> {
+        &self.kind
+    }
+
+    fn new(keyspace: &Name, key: &Key, kind: ErrorKind<R, W>) -> Self {
         Self {
             keyspace: keyspace.clone(),
             key: key.clone(),
@@ -47,23 +76,39 @@ impl KeySpaceError {
     }
 }
 
+impl KeySpaceError {
+    /// Returns the same failure, at the same key, as an error whose read and
+    /// write failures an extension extends.
+    pub fn widen<R, W>(self) -> KeySpaceError<R, W> {
+        let kind = match self.kind {
+            ErrorKind::Read(kind) => ErrorKind::Read(kind.widen()),
+            ErrorKind::Write(kind) => ErrorKind::Write(kind.widen()),
+        };
+        KeySpaceError {
+            keyspace: self.keyspace,
+            key: self.key,
+            kind,
+        }
+    }
+}
+
 /// What the operation behind a [`KeySpaceError`] failed on, by family.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ErrorKind {
+pub enum ErrorKind<R = Infallible, W = Infallible> {
     /// A typed read found bytes that do not decode as the requested type.
     #[error(transparent)]
-    Read(#[from] ReadKind),
+    Read(#[from] ReadKind<R>),
 
     /// A write did not reach the storage, or the storage refused it.
     #[error(transparent)]
-    Write(#[from] WriteKind),
+    Write(#[from] WriteKind<W>),
 }
 
 /// What a typed read from a [`KeySpace`] can fail on.
 ///
 /// [`KeySpace`]: crate::KeySpace
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ReadKind {
+pub enum ReadKind<E = Infallible> {
     /// The bytes at the key are not the rlp encoding of the requested type.
     #[cfg(feature = "rlp")]
     #[error("value does not decode as rlp: {0}")]
@@ -74,13 +119,28 @@ pub enum ReadKind {
     #[cfg(feature = "tezos-encoding")]
     #[error("value does not decode: {0}")]
     Nom(#[from] tezos_data_encoding::nom::error::NomReadExactError),
+
+    /// A read failure that an extension outside the SDK defines.
+    #[error(transparent)]
+    Ext(E),
+}
+
+impl ReadKind {
+    fn widen<E>(self) -> ReadKind<E> {
+        match self {
+            #[cfg(feature = "rlp")]
+            Self::Rlp(err) => ReadKind::Rlp(err),
+            #[cfg(feature = "tezos-encoding")]
+            Self::Nom(err) => ReadKind::Nom(err),
+        }
+    }
 }
 
 /// What a write to a [`KeySpace`] can fail on.
 ///
 /// [`KeySpace`]: crate::KeySpace
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum WriteKind {
+pub enum WriteKind<E = Infallible> {
     /// Attempted to write more than the maximum allowed bytes at a given key.
     #[error("value size exceeded the maximum allowed")]
     ValueSizeExceeded,
@@ -93,6 +153,21 @@ pub enum WriteKind {
     #[cfg(feature = "tezos-encoding")]
     #[error("value does not encode: {0}")]
     Encode(#[from] tezos_data_encoding::enc::BinError),
+
+    /// A write failure that an extension outside the SDK defines.
+    #[error(transparent)]
+    Ext(E),
+}
+
+impl WriteKind {
+    fn widen<E>(self) -> WriteKind<E> {
+        match self {
+            Self::ValueSizeExceeded => WriteKind::ValueSizeExceeded,
+            Self::InvalidOffset => WriteKind::InvalidOffset,
+            #[cfg(feature = "tezos-encoding")]
+            Self::Encode(err) => WriteKind::Encode(err),
+        }
+    }
 }
 
 /// Error returned by [`KeySpaceLoader::load_or_create`].

@@ -415,6 +415,7 @@ impl IrminKeySpaceRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ReadKind;
     use tezos_smart_rollup_mock::MockHost;
 
     fn make_ks(host: MockHost, name: &str) -> StorageV1KeySpaceCompat<MockHost> {
@@ -612,6 +613,36 @@ mod tests {
             err.to_string(),
             "at key /short of key space /errors: \
              write offset exceeds the current length of the stored value"
+        );
+    }
+
+    #[test]
+    fn an_extension_reports_its_own_failures_next_to_the_sdk_ones() {
+        #[derive(Debug, PartialEq, Eq, thiserror::Error)]
+        enum BoundedReadKind {
+            #[error("value longer than {0} bytes")]
+            TooLong(usize),
+        }
+        type BoundedReadError = KeySpaceError<BoundedReadKind>;
+
+        let mut ks = make_ks(MockHost::default(), "/errors");
+        let k = key(b"/short");
+        ks.set(&k, b"abc").unwrap();
+
+        let own: BoundedReadError = KeySpaceError::read(
+            ks.name(),
+            &k,
+            ReadKind::Ext(BoundedReadKind::TooLong(2)),
+        );
+        assert_eq!(
+            own.to_string(),
+            "at key /short of key space /errors: value longer than 2 bytes"
+        );
+
+        let sdk: BoundedReadError = ks.write(&k, 4, b"x").unwrap_err().widen();
+        assert_eq!(
+            sdk,
+            KeySpaceError::write(ks.name(), &k, WriteKind::InvalidOffset)
         );
     }
 
