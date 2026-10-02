@@ -118,9 +118,11 @@ pub use tezos_execution::context::TEZOS_ACCOUNTS_ROOT;
 /// [Operation::touches_only_accounts]), narrow the snapshot to the two
 /// account roots; otherwise keep the full conservative set.
 ///
-/// [ETH_ACCOUNTS_ROOT_PATH] always stays in: the `RuntimeKeyspaces` built
-/// inside the snapshot loads its keyspace under the mirror, and a root the
-/// mirror did not copy reads empty and loses its writes at `promote`.
+/// Both account roots always stay in the snapshot. The [`RuntimeKeyspaces`]
+/// value built inside the snapshot loads its keyspaces in the `/tmp` copy
+/// (the temporary copy that the snapshot writes to). A root that this copy
+/// does not hold reads as empty, and it loses its writes at
+/// [`SafeStorage::promote`](tezos_evm_runtime::safe_storage::SafeStorage::promote).
 fn operation_safe_roots(
     operation: &Operation,
     full_roots: &[OwnedPath],
