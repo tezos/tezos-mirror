@@ -11100,6 +11100,67 @@ let test_crac_receipt_tez_gateway_direct_evm_tez_revert () =
   check_crac_brackets ~prefix internals ;
   unit
 
+(** Regression: a direct manager call to the gateway enters EVM, which catches
+    a failed Michelson crossing and returns successfully. The failed re-entrant
+    receipts must remain nested without backtracking the successful manager op.
+    With no callback, this exercises [transfer]'s CRAC drain directly; combining
+    [reentrant_failed] with its subtree verdict incorrectly backtracks the op. *)
+let test_crac_direct_gateway_caught_tez_failure () =
+  register_crac_runner_test
+    ~title:"CRAC: direct gateway preserves success after caught TEZ failure"
+    ~tags:["crac_receipt"; "revert"; "direct_gateway_caught_failure"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-GWDIRECT-CATCH" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+  let* () =
+    Gateway.call_evm ~evm_target:evm_main ~method_sig:"run()" ~abi_params:"" ()
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  Check.(
+    (JSON.(ops |> as_list |> List.length) = 1)
+      int
+      ~error_msg:"Expected one gateway manager operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  Check.(
+    (JSON.(top |-> "destination" |> as_string) = gateway_address)
+      string
+      ~error_msg:"Expected gateway destination %R, got %L") ;
+  let metadata = JSON.(top |-> "metadata") in
+  Check.(
+    (JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+    = "applied")
+      string
+      ~error_msg:"Caught TEZ failure must leave gateway %R, got %L") ;
+  let internals = JSON.(metadata |-> "internal_operation_results" |> as_list) in
+  check_crac_brackets ~prefix internals ;
+  let internal_operation_is_consistent =
+    List.exists
+      (fun op ->
+        JSON.(op |-> "kind" |> as_string) = "transaction"
+        && JSON.(op |-> "parameters" |-> "entrypoint" |> as_string) = "_revert"
+        && JSON.(op |-> "result" |-> "status" |> as_string) = "failed")
+      internals
+  in
+  Check.(
+    (internal_operation_is_consistent = true)
+      bool
+      ~error_msg:"Expected a preserved failed Michelson internal operation (%R)") ;
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_main
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
+  in
+  TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter
+
 (* EVM→TEZ→EVM→TEZ triple crossing — nested CRAC that re-enters TEZ.
  * Mirrors test_crac_receipt_tez_evm_tez but starts from EVM, exercising
  * a nested CRAC within the same runtime (TEZ appears twice).
@@ -19534,6 +19595,7 @@ let () =
   test_crac_receipt_tez_evm_tez () ;
   test_crac_receipt_tez_gateway_direct_evm_tez () ;
   test_crac_receipt_tez_gateway_direct_evm_tez_revert () ;
+  test_crac_direct_gateway_caught_tez_failure () ;
   test_crac_receipt_evm_tez_evm_tez () ;
   test_crac_receipt_evm_to_tez_revert () ;
   test_crac_receipt_two_failed_independent () ;
