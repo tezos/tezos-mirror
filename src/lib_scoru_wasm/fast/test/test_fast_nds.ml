@@ -38,7 +38,11 @@ module Dual = Tezos_smart_rollup_wasm_in_memory_dual
    Every command records the [i32] the host function answers under
    [/r/<command>], and [r] (read) and [h] (hash) also record the bytes
    they received under [/r/<command>d], so a divergence between the two
-   engines shows up in the durable storage as well as in the NDS. *)
+   engines shows up in the durable storage as well as in the NDS.
+
+   The wide commands [I], [X], [J], [K] and [Z] pass the [i64] values of
+   the table at 20300 ({!wide_values}) one after the other.  They record
+   the answer for the value at index [i] under [/r/<command><i>]. *)
 let kernel =
   {|
 (module
@@ -74,6 +78,14 @@ let kernel =
   (export "memory" (memory 0))
   (data (i32.const 20000) "/r/")
   (data (i32.const 20100) "/kernel/env/activate_nds")
+  ;; The wide values, little-endian: -1, Int64.min_int, Int64.max_int,
+  ;; 1 lsl 40 and -(1 lsl 40).
+  (data (i32.const 20300)
+    "\ff\ff\ff\ff\ff\ff\ff\ff"
+    "\00\00\00\00\00\00\00\80"
+    "\ff\ff\ff\ff\ff\ff\ff\7f"
+    "\00\00\00\00\00\01\00\00"
+    "\00\00\00\00\00\ff\ff\ff")
 
   (func $cmd (result i32) (i32.load8_u (i32.const 1001)))
   (func $db (result i64) (i64.load8_u (i32.const 1002)))
@@ -105,10 +117,55 @@ let kernel =
     (if (i32.ge_s (local.get $n) (i32.const 0))
       (then (call $publish (i32.const 8000) (local.get $n)))))
 
+  ;; Record [code] under /r/<cmd><i>, with [i] as an ASCII digit.
+  (func $record_at (param $i i32) (param $code i32)
+    (i32.store8 (i32.const 20003) (call $cmd))
+    (i32.store8 (i32.const 20004) (i32.add (i32.const 48) (local.get $i)))
+    (i32.store (i32.const 20200) (local.get $code))
+    (drop (call $store_write
+      (i32.const 20000) (i32.const 5) (i32.const 0) (i32.const 20200) (i32.const 4))))
+
+  ;; Call the wide command [c] with the wide value [v].
+  (func $wide_call (param $c i32) (param $v i64) (result i32)
+    ;; I: store_exists, db index = v
+    (if (i32.eq (local.get $c) (i32.const 73))
+      (then (return (call $nds_store_exists
+        (local.get $v) (i32.const 1010) (call $key_len)))))
+    ;; X: registry_clear, db index = v
+    (if (i32.eq (local.get $c) (i32.const 88))
+      (then (return (call $nds_registry_clear (local.get $v)))))
+    ;; J: store_read db key -> 8000, offset = v, max_bytes = len
+    (if (i32.eq (local.get $c) (i32.const 74))
+      (then (return (call $nds_store_read
+        (call $db) (i32.const 1010) (call $key_len) (local.get $v) (i32.const 8000) (call $len)))))
+    ;; K: store_write db key <- value, offset = v, num_bytes = len
+    (if (i32.eq (local.get $c) (i32.const 75))
+      (then (return (call $nds_store_write
+        (call $db) (i32.const 1010) (call $key_len) (local.get $v) (i32.const 1300) (call $len)))))
+    ;; Z: registry_resize, diff = v
+    (call $nds_registry_resize (local.get $v)))
+
   (func $handle
     (local $code i32)
     (local $c i32)
+    (local $i i32)
     (local.set $c (call $cmd))
+    ;; I, X, J, K, Z: one call per wide value.  Z starts at index 1,
+    ;; because a diff of -1 is a valid shrink.
+    (if (i32.or
+          (i32.or (i32.eq (local.get $c) (i32.const 73)) (i32.eq (local.get $c) (i32.const 88)))
+          (i32.or
+            (i32.or (i32.eq (local.get $c) (i32.const 74)) (i32.eq (local.get $c) (i32.const 75)))
+            (i32.eq (local.get $c) (i32.const 90))))
+      (then
+        (local.set $i (i32.eq (local.get $c) (i32.const 90)))
+        (loop $next
+          (call $record_at (local.get $i)
+            (call $wide_call (local.get $c)
+              (i64.load (i32.add (i32.const 20300) (i32.shl (local.get $i) (i32.const 3))))))
+          (local.set $i (i32.add (local.get $i) (i32.const 1)))
+          (br_if $next (i32.lt_u (local.get $i) (i32.const 5))))
+        (return)))
     ;; A: request the NDS activation
     (if (i32.eq (local.get $c) (i32.const 65))
       (then
@@ -171,6 +228,12 @@ let kernel =
       (then
         (call $record (call $nds_store_value_size (call $db) (i32.const 1010) (call $key_len)))
         (return)))
+    ;; M: store_exists with a negative key length
+    (if (i32.eq (local.get $c) (i32.const 77))
+      (then
+        (call $record (call $nds_store_exists
+          (call $db) (i32.const 1010) (i32.const -1)))
+        (return)))
     ;; N: database_get_hash with a negative max_bytes
     (if (i32.eq (local.get $c) (i32.const 78))
       (then
@@ -184,6 +247,27 @@ let kernel =
         (call $record (call $nds_store_read
           (call $db) (i32.const 1010) (call $key_len) (call $offset) (i32.const 65534) (call $len)))
         (call $publish (i32.const 65530) (i32.const 6))
+        (return)))
+    ;; H: database_get_hash into the last two bytes of the memory, then
+    ;; publish the tail of the memory
+    (if (i32.eq (local.get $c) (i32.const 72))
+      (then
+        (call $record (call $nds_database_get_hash
+          (call $db) (i32.const 65534) (call $len)))
+        (call $publish (i32.const 65530) (i32.const 6))
+        (return)))
+    ;; R: store_read with max_bytes = -1
+    (if (i32.eq (local.get $c) (i32.const 82))
+      (then
+        (call $record (call $nds_store_read
+          (call $db) (i32.const 1010) (call $key_len) (call $offset) (i32.const 8000) (i32.const -1)))
+        (return)))
+    ;; S: store_read with max_bytes = Int32.min_int
+    (if (i32.eq (local.get $c) (i32.const 83))
+      (then
+        (call $record (call $nds_store_read
+          (call $db) (i32.const 1010) (call $key_len) (call $offset) (i32.const 8000)
+          (i32.const -2147483648)))
         (return)))
     ;; O: store_set with a zero key length and a key offset past the end
     ;; of the memory
@@ -253,6 +337,10 @@ let clear db = message ~db 'x'
 
 let db_hash ?(db = 0) ~len () = message ~db ~len 'h'
 
+(* The other commands read their key length with [i32.load16_u], so a
+   dedicated command is the only way to pass a negative one. *)
+let exists_negative_key_len () = message 'M'
+
 (* A negative [max_bytes] is neither a truncation request nor a valid
    destination size. *)
 let db_hash_negative_max_bytes () = message 'N'
@@ -268,6 +356,50 @@ let set_empty_key_out_of_bounds value =
   message ~len:(String.length value) ~value 'O'
 
 let grow_then_panic = message 'P'
+
+(* [database_get_hash] into the last two bytes of the memory. *)
+let db_hash_into_last_bytes ~len () = message ~len 'H'
+
+(* [store_read] with [max_bytes = -1] ([R]) and [max_bytes =
+   Int32.min_int] ([S]).  The layout reads [len] with [i32.load16_u], so
+   only a dedicated command passes a negative [max_bytes]. *)
+let read_negative_max_bytes key = message ~key 'R'
+
+let read_min_int_max_bytes key = message ~key 'S'
+
+(** The values of the table at 20300 in the kernel.  The wide commands
+    pass them in this order as an [i64] argument. *)
+let wide_values =
+  [
+    -1L;
+    Int64.min_int;
+    Int64.max_int;
+    Int64.shift_left 1L 40;
+    Int64.neg (Int64.shift_left 1L 40);
+  ]
+
+(* [store_exists] with each wide value as the db index. *)
+let wide_db_exists key = message ~key 'I'
+
+(* [registry_clear] with each wide value as the db index. *)
+let wide_db_clear = message 'X'
+
+(* [store_read] with each wide value as the offset. *)
+let wide_offset_read ~len key = message ~key ~len 'J'
+
+(* [store_write] with each wide value as the offset. *)
+let wide_offset_write key value =
+  message ~key ~len:(String.length value) ~value 'K'
+
+(* [registry_resize] with each wide value except -1 as the diff. *)
+let wide_resize = message 'Z'
+
+(* [store_write] and [store_set] with [num_bytes = len].  [len] is a
+   [u16], so it can exceed [Aux.input_output_max_size] (4096).  The
+   message carries no value bytes. *)
+let write_oversized ~len key = message ~key ~len 'w'
+
+let set_oversized ~len key = message ~key ~len 's'
 
 (* -------------------------------------------------------------------- *)
 (* Driving both engines                                                 *)
@@ -411,13 +543,17 @@ let durable_value (state : Dual.Dual_state.state) key =
   let* durable = Dual.Dual_state.Encoding_runner.decode_durable_storage state in
   Durable.find_value_as_bytes durable (Durable.key_of_string_exn key)
 
-(** The [i32] the kernel recorded for [cmd]. *)
-let recorded_code state cmd =
+(** The [i32] the kernel recorded for [cmd].  With [index], the [i32] a
+    wide command recorded for the wide value at [index]. *)
+let recorded_code ?index state cmd =
   let open Lwt.Syntax in
-  let+ value = durable_value state ("/r/" ^ String.make 1 cmd) in
+  let name =
+    String.make 1 cmd ^ Option.fold ~none:"" ~some:string_of_int index
+  in
+  let+ value = durable_value state ("/r/" ^ name) in
   match value with
   | Some b when Bytes.length b = 4 -> Bytes.get_int32_le b 0
-  | _ -> Stdlib.failwith (Printf.sprintf "no code recorded for command %c" cmd)
+  | _ -> Stdlib.failwith (Printf.sprintf "no code recorded for command %s" name)
 
 (** The bytes the kernel received for [cmd] ([r] or [h]). *)
 let recorded_data state cmd =
@@ -436,12 +572,26 @@ let registry_size (state : Dual.Dual_state.state) =
   | Active nds -> Octez_riscv_nds_common.Nds.size nds
   | Inactive -> Stdlib.failwith "the NDS is not active"
 
-let check_code state cmd expected =
+let check_code ?index state cmd expected =
   let open Lwt.Syntax in
-  let+ code = recorded_code state cmd in
+  let+ code = recorded_code ?index state cmd in
   if not (Int32.equal code expected) then
     Stdlib.failwith
-      (Printf.sprintf "command %c answered %ld, expected %ld" cmd code expected)
+      (Printf.sprintf
+         "command %c%s answered %ld, expected %ld"
+         cmd
+         (Option.fold ~none:"" ~some:(Printf.sprintf " (wide value %d)") index)
+         code
+         expected)
+
+(** Check that the wide command [cmd] answered [expected] for each wide
+    value from index [from]. *)
+let check_wide_codes ?(from = 0) state cmd expected =
+  List.iteri_s
+    (fun index _ ->
+      if index < from then Lwt.return_unit
+      else check_code ~index state cmd expected)
+    wide_values
 
 let check_data state cmd expected =
   let open Lwt.Syntax in
@@ -643,8 +793,87 @@ let test_engines_agree ~fallback () =
   let*! () = check_data slow 'Q' (String.make 6 '\000') in
   (* Level 7: a negative destination size, which must be answered and
      not raised. *)
-  let* slow, _fast = run ~level:7l [db_hash_negative_max_bytes ()] slow fast in
+  let* slow, fast = run ~level:7l [db_hash_negative_max_bytes ()] slow fast in
   let*! () = check_code slow 'N' (error Memory_invalid_access) in
+  (* Level 8: answers that end exactly at the end of the memory.  Both
+     host functions write them in full. *)
+  let* slow, fast =
+    run
+      ~level:8l
+      [
+        set "k3" "hi";
+        read_into_last_bytes ~len:2 "k3";
+        db_hash ~len:32 ();
+        db_hash_into_last_bytes ~len:2 ();
+      ]
+      slow
+      fast
+  in
+  let*! () = check_code slow 'Q' 2l in
+  let*! () = check_data slow 'Q' "\000\000\000\000hi" in
+  let*! hash = recorded_data slow 'h' in
+  let*! () = check_code slow 'H' 2l in
+  let*! () = check_data slow 'H' ("\000\000\000\000" ^ String.sub hash 0 2) in
+  (* Level 9: a negative [max_bytes] for [store_read], on a key that
+     exists.  The host function answers [Memory_invalid_access] before
+     it reads the NDS. *)
+  let* slow, fast =
+    run
+      ~level:9l
+      [read_negative_max_bytes "k2"; read_min_int_max_bytes "k2"]
+      slow
+      fast
+  in
+  let*! () = check_code slow 'R' (error Memory_invalid_access) in
+  let*! () = check_code slow 'S' (error Memory_invalid_access) in
+  (* Level 10: wide db indexes.  The registry holds one database, so
+     each index is out of bounds. *)
+  let* slow, fast =
+    run ~level:10l [wide_db_exists "k2"; wide_db_clear] slow fast
+  in
+  let*! () = check_wide_codes slow 'I' (error Nds_database_out_of_bounds) in
+  let*! () = check_wide_codes slow 'X' (error Nds_database_out_of_bounds) in
+  (* Level 11: wide offsets on the 5-byte value of "k2".  A read past the
+     end of the value answers [Store_invalid_access].  A write past the
+     maximum value size answers [Store_value_size_exceeded], before any
+     allocation.  The value stays the same. *)
+  let* slow, fast =
+    run
+      ~level:11l
+      [
+        wide_offset_read ~len:5 "k2";
+        wide_offset_write "k2" "x";
+        read ~len:5 "k2";
+      ]
+      slow
+      fast
+  in
+  let*! () = check_wide_codes slow 'J' (error Store_invalid_access) in
+  let*! () = check_wide_codes slow 'K' (error Store_value_size_exceeded) in
+  let*! () = check_data slow 'r' "hello" in
+  (* Level 12: wide resize diffs.  Each new size is negative or larger
+     than [Int32.max_int], so the registry keeps its size. *)
+  let* slow, fast = run ~level:12l [wide_resize] slow fast in
+  let*! () = check_wide_codes ~from:1 slow 'Z' (error Nds_resize_invalid) in
+  if
+    not
+      (Int64.equal (registry_size slow) 1L
+      && Int64.equal (registry_size fast) 1L)
+  then Stdlib.failwith "a wide resize diff changed the size of the registry" ;
+  (* Level 13: [num_bytes] over [Aux.input_output_max_size] (4096).  The
+     NDS stores nothing. *)
+  let* slow, _fast =
+    run
+      ~level:13l
+      [
+        write_oversized ~len:5000 "k4"; set_oversized ~len:5000 "k4"; exists "k4";
+      ]
+      slow
+      fast
+  in
+  let*! () = check_code slow 'w' (error Input_output_too_large) in
+  let*! () = check_code slow 's' (error Input_output_too_large) in
+  let*! () = check_code slow 'e' 0l in
   return_unit
 
 (** When NDS is not activated on chain, both engines answer
@@ -679,6 +908,39 @@ let test_nds_not_activated_on_chain () =
   check_active fast false ;
   let*! () = check_code slow 'z' Host_funcs.nds_disabled_code in
   let*! () = check_code slow 'e' Host_funcs.nds_disabled_code in
+  return_unit
+
+(** When NDS is not activated on chain, a negative key length raises in
+    the tick computation on both engines. The interpreter commits
+    [Stuck]. The fast engine raises, and the interpreter fallback replays
+    the [kernel_run], so both engines end in the same state. *)
+let test_negative_key_len_not_activated_on_chain () =
+  let open Lwt_result_syntax in
+  let*! kernel =
+    Tezos_scoru_wasm_helpers_functor.Wasm_utils_functor.wat2wasm kernel
+  in
+  let completed = ref 0 and panics = ref 0 in
+  let slow_hooks = Hooks.no_hooks in
+  let fast_hooks =
+    Hooks.(
+      fast_hooks ~fallback:true completed
+      |> on_fast_exec_panicked (fun _exn ->
+             incr panics ;
+             Lwt.return_unit))
+  in
+  let*! slow = Slow_not_activated.boot ~hooks:slow_hooks kernel in
+  let*! fast = Fast_not_activated.boot ~hooks:fast_hooks kernel in
+  let payloads = [exists_negative_key_len ()] in
+  let*! slow =
+    Slow_not_activated.run_level ~hooks:slow_hooks ~level:1l payloads slow
+  in
+  let*! fast =
+    Fast_not_activated.run_level ~hooks:fast_hooks ~level:1l payloads fast
+  in
+  let*! () = check_agree ~level:1l slow fast in
+  if !panics <> 1 then
+    Stdlib.failwith
+      (Printf.sprintf "expected one fast-engine panic, got %d" !panics) ;
   return_unit
 
 (** When NDS is activated on chain but the storage is still
@@ -788,6 +1050,10 @@ let tests =
       "NDS not activated on chain: both engines answer Nds_not_enabled"
       `Quick
       test_nds_not_activated_on_chain;
+    Tztest.tztest
+      "NDS not activated on chain: a negative key length raises on both engines"
+      `Quick
+      test_negative_key_len_not_activated_on_chain;
     Tztest.tztest
       "NDS call on Durable_only storage raises on both engines"
       `Quick
