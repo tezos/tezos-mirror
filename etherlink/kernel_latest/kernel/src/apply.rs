@@ -1251,9 +1251,11 @@ where
             let tx_type = transaction.type_();
             let gas_used = execution_outcome.result.tx_gas_used();
 
+            // The validation and the u64 gas used and base fee ensure the fee
+            // amounts stay in bounds. Fails only if the base fee is zero.
             let fee_updates = transaction
                 .content
-                .fee_updates(&block_constants.block_fees, gas_used.into());
+                .fee_updates(&block_constants.block_fees, gas_used.into())?;
 
             log!(
                 Debug,
