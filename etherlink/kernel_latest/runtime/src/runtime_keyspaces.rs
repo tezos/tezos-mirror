@@ -37,6 +37,10 @@ const TEZ_ACCOUNTS_ROOT: &str = "/tez/tez_accounts";
 /// the Michelson runtime.
 pub const TEZ_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(TEZ_ACCOUNTS_ROOT);
 
+/// The durable path of [`TEZ_ACCOUNTS_KEYSPACE_NAME`].
+pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
+    RefPath::assert_from(TEZ_ACCOUNTS_ROOT.as_bytes());
+
 /// Storage handle threaded through kernel execution.
 ///
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back
@@ -117,7 +121,6 @@ mod tests {
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
-    const TEZ_ROOT: RefPath = RefPath::assert_from(b"/tez/tez_accounts");
     const PROBE: Key = Key::from_static(b"/probe");
 
     #[test]
@@ -126,12 +129,13 @@ mod tests {
         // `start` copies the roots, so they have to exist.
         host.store_write_all(&ETH_ACCOUNTS_ROOT_PATH, b"root")
             .unwrap();
-        host.store_write_all(&TEZ_ROOT, b"root").unwrap();
+        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"root")
+            .unwrap();
         let mut safe = SafeStorage {
             host: &mut host,
             world_states: vec![
                 OwnedPath::from(ETH_ACCOUNTS_ROOT_PATH),
-                OwnedPath::from(TEZ_ROOT),
+                OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH),
             ],
         };
         safe.start().unwrap();
@@ -148,9 +152,10 @@ mod tests {
             );
             rk.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
         }
-        let probe_path =
-            OwnedPath::try_from([TEZ_ROOT.as_bytes(), PROBE.as_bytes()].concat())
-                .unwrap();
+        let probe_path = OwnedPath::try_from(
+            [TEZ_ACCOUNTS_ROOT_PATH.as_bytes(), PROBE.as_bytes()].concat(),
+        )
+        .unwrap();
         assert!(safe.host.store_has(&probe_path).unwrap().is_none());
         assert_eq!(
             safe.host

@@ -2314,8 +2314,9 @@ where
         .map_err(|oog: OutOfGas| CracTransferError::from(TransferError::from(oog)))?
         .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
-    let world_state =
-        tezos_smart_rollup_host::path::OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
+    let world_state = tezos_smart_rollup_host::path::OwnedPath::from(
+        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+    );
     let checkpoint_index = journal
         .michelson
         .checkpoint(tc_ctx.rk.host_mut(), &world_state)
@@ -3439,7 +3440,7 @@ mod tests {
     /// Test-only SafeStorage root matching the production Michelson accounts
     /// root, used to build the account/big-map paths in tests.
     fn test_root() -> OwnedPath {
-        OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT)
+        OwnedPath::from(&tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH)
     }
 
     /// Pins [`run_code`](crate::run_code)'s step-constant semantics where
@@ -3566,7 +3567,7 @@ mod tests {
                 let mut safe_host = SafeStorage {
                     host: rk.host_mut(),
                     world_states: vec![OwnedPath::from(
-                        crate::context::TEZOS_ACCOUNTS_ROOT,
+                        tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
                     )],
                 };
                 safe_host.start().expect("the snapshot is taken");
@@ -11752,7 +11753,9 @@ mod tests {
                 .michelson
                 .checkpoint(
                     rk.host_mut(),
-                    &OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT),
+                    &OwnedPath::from(
+                        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+                    ),
                 )
                 .unwrap();
             journal

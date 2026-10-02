@@ -11,15 +11,12 @@ use crate::account_storage::{
 };
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Origin;
-
-/// SafeStorage root for the Michelson account state. Re-exported as
-/// `chains::TEZOS_ACCOUNTS_ROOT`.
-pub const TEZOS_ACCOUNTS_ROOT: RefPath = RefPath::assert_from(b"/tez/tez_accounts");
 
 // Account resolution helpers.
 
@@ -101,7 +98,7 @@ pub mod contracts {
     const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
     pub fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
+        concat(&TEZ_ACCOUNTS_ROOT_PATH, &ROOT)
     }
 
     pub fn index() -> Result<OwnedPath, PathError> {
@@ -149,7 +146,7 @@ pub mod big_maps {
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
 
     fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &BIG_MAP_PATH)
+        concat(&TEZ_ACCOUNTS_ROOT_PATH, &BIG_MAP_PATH)
     }
 
     pub fn next_id_path() -> Result<OwnedPath, PathError> {
@@ -194,7 +191,7 @@ pub mod address_registry {
     const COUNTER: RefPath = RefPath::assert_from(b"/counter");
 
     fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
+        concat(&TEZ_ACCOUNTS_ROOT_PATH, &ROOT)
     }
 
     pub fn entry_path(address: &AddressHash) -> Result<OwnedPath, PathError> {

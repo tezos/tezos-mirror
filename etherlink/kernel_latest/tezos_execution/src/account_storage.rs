@@ -6,7 +6,7 @@
 
 //! Tezos account state and storage
 
-use crate::context::{self, code, contracts};
+use crate::context::{code, contracts};
 use crate::enshrined_contracts::{self, EnshrinedContracts};
 use num_bigint::BigInt;
 use primitive_types::U256;
@@ -769,7 +769,10 @@ pub fn path_to_implicit_account_prefix(
     let address_path: Vec<u8> = format!("/tezosx/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    Ok(concat(&context::TEZOS_ACCOUNTS_ROOT, &address_path)?)
+    Ok(concat(
+        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+        &address_path,
+    )?)
 }
 
 pub fn path_to_tezos_account(

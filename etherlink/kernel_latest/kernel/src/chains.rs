@@ -49,7 +49,9 @@ use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 
 use tezos_evm_runtime::{
     extensions::WithGas,
-    runtime_keyspaces::{RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH},
+    runtime_keyspaces::{
+        RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH, TEZ_ACCOUNTS_ROOT_PATH,
+    },
 };
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
@@ -99,22 +101,15 @@ pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
     Ok(false)
 }
 
-/// Unified SafeStorage root for all Tezos account state. Holds Michelson
-/// contract / big_map state directly (ex `/tezlink/context/`) and TezosX
-/// projected accounts under `tezosx/`. Re-exported from `tezos_execution` so
-/// the account path-builders and the SafeStorage root enumeration share a
-/// single source of truth.
-pub use tezos_execution::context::TEZOS_ACCOUNTS_ROOT;
-
 /// Choose the SafeStorage roots to snapshot for a single Tezos operation.
 ///
 /// [validate_and_apply_operation] wraps each operation in a transactional
 /// snapshot of every root in `full_roots` (one `store_copy` + `store_move`
 /// per root, twice — once for validation, once for application). Most
 /// operations only read or write account state under
-/// [TEZOS_ACCOUNTS_ROOT]; snapshotting the EVM world state and the Tez
-/// block/global-state root just to roll them back on failure is pure
-/// overhead. For batches that provably touch nothing else (see
+/// [`TEZ_ACCOUNTS_ROOT_PATH`]. For these operations, a snapshot of the EVM
+/// world state and of the Tez block/global-state root is pure overhead. For
+/// batches that provably touch nothing else (see
 /// [Operation::touches_only_accounts]), narrow the snapshot to the two
 /// account roots; otherwise keep the full conservative set.
 ///
@@ -133,7 +128,7 @@ fn operation_safe_roots(
     full_roots
         .iter()
         .filter(|root| {
-            root.as_bytes() == TEZOS_ACCOUNTS_ROOT.as_bytes()
+            root.as_bytes() == TEZ_ACCOUNTS_ROOT_PATH.as_bytes()
                 || root.as_bytes() == ETH_ACCOUNTS_ROOT_PATH.as_bytes()
         })
         .cloned()
@@ -743,7 +738,7 @@ impl TezosXChainConfig {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 TEZ_SAFE_STORAGE_ROOT_PATH,
-                TEZOS_ACCOUNTS_ROOT,
+                TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
             ]
         } else {

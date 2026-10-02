@@ -191,8 +191,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         // Aliases resolve under the production Michelson accounts path
-        // `/tez/tez_accounts`, pinned by the `TEZOS_ACCOUNTS_ROOT` constant the
-        // account helpers use, so this pins the real composition rather than a
+        // `/tez/tez_accounts`, so this pins the real composition rather than a
         // mixed layout that never ships.
 
         // Seed the shared slot with the real forwarder code.
