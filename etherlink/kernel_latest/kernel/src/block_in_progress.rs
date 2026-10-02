@@ -554,7 +554,7 @@ impl BlockInProgress {
                 )
             })?;
             let tez_state_root = crate::state_hash::tez_accounts_state_hash(
-                rk.host_mut(),
+                rk.tez_accounts(),
                 &blueprint_hash,
             )
             .try_into()
