@@ -38,7 +38,9 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError, KeySpaceLoader, ReadKind};
+use tezos_smart_rollup_keyspace::{
+    Key, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
+};
 use tezos_storage::error::StorageReadErrorKind;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
@@ -1223,18 +1225,15 @@ fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStora
 /// Charge for and read a big_map entry value, returning `None` when absent.
 fn read_big_map_value_metered(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
-    host: &impl StorageV1,
-    path: &impl tezos_smart_rollup_host::path::Path,
+    tez_accounts: &impl KeySpace,
+    key: &Key,
 ) -> Result<Option<Vec<u8>>, LazyStorageError> {
     consume_storage_read_milligas(operation_gas, 1, 0)?; // mem
-    match host.store_value_size(path) {
-        Ok(size) => {
-            consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
-            Ok(Some(host.store_read_all(path)?))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(e) => Err(e.into()),
-    }
+    let Some(size) = tez_accounts.value_length(key) else {
+        return Ok(None);
+    };
+    consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
+    Ok(tez_accounts.get(key))
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
@@ -1360,9 +1359,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         key: &TypedValue,
         value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(id, &hash_key(key.clone(), self.gas())?)?;
-        let Some(encoded_value) =
-            read_big_map_value_metered(self.operation_gas, self.rk.host(), &value_path)?
+        let value_key = value_key(id, &hash_key(key.clone(), self.gas())?)?;
+        let Some(encoded_value) = read_big_map_value_metered(
+            self.operation_gas,
+            self.rk.tez_accounts(),
+            &value_key,
+        )?
         else {
             return Ok(None);
         };
@@ -1388,10 +1390,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
         let key_hashed = hash_key(key.clone(), self.gas())?;
-        let path = value_path(id, &key_hashed)?;
+        let key = value_key(id, &key_hashed)?;
         // Mirrors L1's carbonated `Big_map.Contents.mem`.
         consume_storage_read_milligas(self.operation_gas, 1, 0)?;
-        Ok(self.rk.host().store_has(&path)?.is_some())
+        Ok(self.rk.tez_accounts().contains(&key))
     }
 
     fn big_map_update_ref(
@@ -1411,15 +1413,16 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
         let key_hashed = hash_micheline_expr(&micheline_expr, self.gas())?;
-        let value_path = value_path(id, &key_hashed)?;
+        let value_key = value_key(id, &key_hashed)?;
         match value {
             None => {
                 consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                 let mut lazy_storage_size_diff = Zarith(BigInt::from(0));
-                if self.rk.host().store_has(&value_path)?.is_some() {
-                    let previous_value_size: BigInt =
-                        self.rk.host().store_value_size(&value_path)?.into();
-                    self.rk.host_mut().store_delete(&value_path)?;
+                if let Some(previous_value_size) =
+                    self.rk.tez_accounts().value_length(&value_key)
+                {
+                    let previous_value_size: BigInt = previous_value_size.into();
+                    self.rk.tez_accounts_mut().delete(&value_key);
 
                     lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
@@ -1443,15 +1446,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
                 let lazy_storage_size_diff =
-                    match self.rk.host().store_value_size(&value_path) {
-                        Err(RuntimeError::PathNotFound) => {
-                            Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
-                        }
-                        Ok(previous_value_size) => {
+                    match self.rk.tez_accounts().value_length(&value_key) {
+                        None => Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size),
+                        Some(previous_value_size) => {
                             let previous_value_size: BigInt = previous_value_size.into();
                             Zarith(new_value_size - previous_value_size)
                         }
-                        Err(err) => return Err(err.into()),
                     };
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
@@ -1462,7 +1462,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     1,
                     encoded.len() as u64,
                 )?;
-                self.rk.host_mut().store_write_all(&value_path, &encoded)?;
+                self.rk
+                    .tez_accounts_mut()
+                    .set(&value_key, &encoded)
+                    .map_err(storage_error_to_lazy)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
