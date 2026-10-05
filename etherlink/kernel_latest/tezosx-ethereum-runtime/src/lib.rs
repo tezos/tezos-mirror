@@ -173,6 +173,12 @@ impl EthereumRuntime {
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
+            // Running out of gas means the whole budget was used: reported as
+            // such, so the caller charges it rather than dropping it.
+            ExecutionResult::Halt {
+                reason: HaltReason::OutOfGas(_),
+                ..
+            } => Err(TezosXRuntimeError::OutOfGas),
             ExecutionResult::Halt { reason, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias halted: {reason:?}"),
             )),
@@ -772,6 +778,14 @@ impl RuntimeInterface for EthereumRuntime {
         Ok(address.0.to_vec())
     }
 
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        hex::decode(public_key.strip_prefix("0x").unwrap_or(public_key))
+            .map_err(|_| CheckNativeAddressError::MalformedPublicKey.into())
+    }
+
     fn read_origin<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -882,8 +896,7 @@ impl RuntimeInterface for EthereumRuntime {
         let Some(public_key) = public_key else {
             return Err(CheckNativeAddressError::NotProvablyNative.into());
         };
-        let public_key = hex::decode(public_key.strip_prefix("0x").unwrap_or(public_key))
-            .map_err(|_| CheckNativeAddressError::MalformedPublicKey)?;
+        let public_key = self.public_key_from_string(public_key)?;
         if public_key_matches(&addr, &public_key, budget)? {
             Ok(())
         } else {
@@ -2918,6 +2931,30 @@ mod tests {
                 &mut budget,
             )?;
             Ok(budget)
+        }
+
+        #[test]
+        fn public_key_from_string_decodes_hex_with_or_without_prefix() {
+            let runtime = EthereumRuntime::default();
+            let expected = hex::decode(PUBLIC_KEY).unwrap();
+            assert_eq!(
+                runtime.public_key_from_string(PUBLIC_KEY).unwrap(),
+                expected
+            );
+            assert_eq!(
+                runtime
+                    .public_key_from_string(&format!("0x{PUBLIC_KEY}"))
+                    .unwrap(),
+                expected
+            );
+        }
+
+        #[test]
+        fn public_key_from_string_rejects_non_hex() {
+            let err = EthereumRuntime::default()
+                .public_key_from_string("not-hex")
+                .unwrap_err();
+            assert_eq!(err, CheckNativeAddressError::MalformedPublicKey.into());
         }
 
         #[test]

@@ -122,6 +122,14 @@ pub trait Registry {
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
+    /// Binary encoding of `public_key`, a public key of `runtime_id` in its
+    /// human-readable form, as aliases store it.
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
     /// Read the classification of `addr` in `addr_runtime`.
     ///
     /// `addr_runtime` is the dispatch key: the request is forwarded to the
@@ -140,6 +148,29 @@ pub trait Registry {
         addr: &str,
         budget: Gas,
     ) -> Result<(Classification, Gas /* consumed */), TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace;
+
+    /// Check that `address` is provably native to `addr_runtime`, i.e. that
+    /// it is not an alias, by dispatching to that runtime's
+    /// [`RuntimeInterface::check_is_native_address`].
+    ///
+    /// `public_key`, when given, must be the public key of `address`. Each
+    /// runtime decides when a key is required or refused.
+    ///
+    /// Fails with [`TezosXRuntimeError::CheckNativeAddressError`] when
+    /// `address` is not provably native or `public_key` is rejected, and with
+    /// [`TezosXRuntimeError::OutOfGas`] when `budget` runs out. The cost of
+    /// the check is consumed from `budget`, even when it fails.
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        addr_runtime: RuntimeId,
+        address: &str,
+        public_key: Option<&str>,
+        budget: &mut Gas,
+    ) -> Result<(), TezosXRuntimeError>
     where
         Host: StorageV1,
         KS: KeySpace;
@@ -219,6 +250,13 @@ pub trait RuntimeInterface {
         address_str: &str,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
+    /// Binary encoding of `public_key`, a public key of this runtime in its
+    /// human-readable form, as aliases store it.
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
     /// Read the classification of `addr` in this runtime.
     ///
     /// `budget` carries its own unit; `consumed` is returned in this
@@ -244,6 +282,17 @@ pub trait RuntimeInterface {
         Host: StorageV1,
         KS: KeySpace;
 
+    /// Check that `address` is provably native to this runtime, i.e. that it
+    /// is not an alias, consuming the cost of the check from `budget`, even
+    /// when it fails.
+    ///
+    /// - Michelson runtime: an implicit account is native; its `public_key`
+    ///   is required and must match it. A contract is native if it is
+    ///   classified so, or unclassified with code; no `public_key` must be
+    ///   given. Enshrined contracts are rejected.
+    /// - EVM runtime: precompiles are rejected. An address is native if it is
+    ///   classified so, has a positive nonce or code other than an alias's;
+    ///   otherwise `public_key` must be given and hash to it.
     fn check_is_native_address<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,

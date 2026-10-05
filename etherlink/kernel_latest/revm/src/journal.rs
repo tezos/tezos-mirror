@@ -47,6 +47,7 @@ use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{
     canonicalize_native_address, resolve_routing, AliasInfo, AliasResolution,
     CrossRuntimeContext, Gas as TezosXGas, Registry, RoutingDecision, RuntimeId,
+    TezosXRuntimeError, ALIAS_LOOKUP_COST,
 };
 
 /// A journal of state changes internal to the EVM
@@ -682,6 +683,21 @@ impl<
     }
 }
 
+/// Outcome of [`CrossRuntimeCall::tezosx_materialize_evm_alias`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum MaterializedAlias {
+    /// The alias exists already and is left untouched. Holds its address.
+    Existing(String),
+    /// The alias is created by this call.
+    Created {
+        /// The address of the created alias.
+        alias: String,
+        /// Storage cost in mutez that the creation delegates to the caller,
+        /// or `None` when it delegates none.
+        delegated_storage_cost: Option<u64>,
+    },
+}
+
 /// Outcome of resolving a source alias for an outgoing CRAC: what the
 /// caller must charge for the resolution.
 ///
@@ -744,6 +760,19 @@ pub trait CrossRuntimeCall {
         target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError>;
+
+    /// Materialize the EVM alias of the native account `alias_info`
+    /// describes, storing `native_public_key` in it. The caller must have
+    /// checked that the account is native.
+    ///
+    /// The lookup of the alias, and its materialization when it doesn't
+    /// exist yet, are consumed from `budget`.
+    fn tezosx_materialize_evm_alias(
+        &mut self,
+        alias_info: AliasInfo,
+        native_public_key: &[u8],
+        budget: &mut TezosXGas,
+    ) -> Result<MaterializedAlias, TezosXRuntimeError>;
 
     /// Dispatch a cross-runtime HTTP call by invoking the runtime
     /// registry's `serve` synchronously.
@@ -893,6 +922,63 @@ impl<
                 delegated_storage_cost,
             },
         ))
+    }
+
+    fn tezosx_materialize_evm_alias(
+        &mut self,
+        alias_info: AliasInfo,
+        native_public_key: &[u8],
+        budget: &mut TezosXGas,
+    ) -> Result<MaterializedAlias, TezosXRuntimeError> {
+        let registry = self.database.registry;
+        budget.consume(ALIAS_LOOKUP_COST)?;
+        let alias = registry.compute_alias(&AliasInfo {
+            runtime: RuntimeId::Ethereum,
+            native_address: alias_info.native_address.clone(),
+        })?;
+        if registry.alias_exists(
+            self.database.rk,
+            self.journal,
+            RuntimeId::Ethereum,
+            &alias,
+        )? {
+            return Ok(MaterializedAlias::Existing(alias));
+        }
+        let context = CrossRuntimeContext {
+            timestamp: self.database.block.timestamp,
+            block_number: self.database.block.number,
+        };
+        // The alias is initialized by a nested EVM transaction: seed its
+        // call depth from the current frame, as a re-entrant CRAC does (see
+        // `tezosx_call_http`).
+        let revm_depth = self.depth().try_into().unwrap_or(u32::MAX);
+        let saved = self.journal.evm.revm_call_depth();
+        self.journal.evm.set_revm_call_depth(Some(revm_depth));
+        let result = registry.ensure_alias(
+            self.database.rk,
+            self.journal,
+            alias_info,
+            Some(native_public_key),
+            RuntimeId::Ethereum,
+            context,
+            *budget,
+        );
+        self.journal.evm.set_revm_call_depth(saved);
+        // TODO: https://linear.app/tezos/issue/L2-2188
+        // Only an alias creation running out of gas reports what it used (the
+        // whole budget); on another failure, the gas used is not charged.
+        let (
+            alias,
+            AliasResolution {
+                gas_remaining,
+                delegated_storage_cost,
+            },
+        ) = result?;
+        budget.consume(*budget - gas_remaining)?;
+        Ok(MaterializedAlias::Created {
+            alias,
+            delegated_storage_cost,
+        })
     }
 
     fn tezosx_resolve_source_alias_readonly(

@@ -997,6 +997,21 @@ mod test {
                 }
             }
 
+            fn public_key_from_string(
+                &self,
+                public_key: &str,
+                runtime_id: RuntimeId,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => {
+                        self.mock_tezos.public_key_from_string(public_key)
+                    }
+                    RuntimeId::Ethereum => {
+                        self.ethereum.public_key_from_string(public_key)
+                    }
+                }
+            }
+
             fn address_from_string(
                 &self,
                 address_str: &str,
@@ -1027,6 +1042,28 @@ mod test {
                 match addr_runtime {
                     RuntimeId::Tezos => self.mock_tezos.read_origin(rk, addr, budget),
                     RuntimeId::Ethereum => self.ethereum.read_origin(rk, addr, budget),
+                }
+            }
+
+            fn check_is_native_address<Host, KS>(
+                &self,
+                rk: &RuntimeKeyspaces<'_, Host, KS>,
+                addr_runtime: RuntimeId,
+                address: &str,
+                public_key: Option<&str>,
+                budget: &mut tezosx_interfaces::Gas,
+            ) -> Result<(), TezosXRuntimeError>
+            where
+                Host: StorageV1,
+                KS: KeySpace,
+            {
+                match addr_runtime {
+                    RuntimeId::Tezos => self
+                        .mock_tezos
+                        .check_is_native_address(rk, address, public_key, budget),
+                    RuntimeId::Ethereum => self
+                        .ethereum
+                        .check_is_native_address(rk, address, public_key, budget),
                 }
             }
 
@@ -1229,6 +1266,23 @@ mod test {
                 "stub"
             }
 
+            fn public_key_from_string(
+                &self,
+                public_key: &str,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                use tezos_data_encoding::enc::BinWriter;
+                let public_key =
+                    tezos_crypto_rs::public_key::PublicKey::from_b58check(public_key)
+                        .map_err(|e| {
+                            TezosXRuntimeError::ConversionError(e.to_string())
+                        })?;
+                let mut bytes = Vec::new();
+                public_key
+                    .bin_write(&mut bytes)
+                    .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))?;
+                Ok(bytes)
+            }
+
             fn address_from_string(
                 &self,
                 address_str: &str,
@@ -1298,16 +1352,25 @@ mod test {
             fn check_is_native_address<Host, KS>(
                 &self,
                 _rk: &RuntimeKeyspaces<'_, Host, KS>,
-                _address: &str,
+                address: &str,
                 _public_key: Option<&str>,
                 _budget: &mut tezosx_types::Gas,
             ) -> Result<(), tezosx_types::TezosXRuntimeError>
             where
                 Host: StorageV1,
             {
+                // Every address but `MOCK_NOT_NATIVE` is native, for free.
+                if address == MOCK_NOT_NATIVE {
+                    return Err(
+                        tezosx_types::CheckNativeAddressError::NotProvablyNative.into()
+                    );
+                }
                 Ok(())
             }
         }
+
+        /// The only address that [`MockTezosRuntime`] reports as not native.
+        pub(crate) const MOCK_NOT_NATIVE: &str = "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4";
 
         sol!("contracts/tests/create_and_revert.sol");
         sol!("contracts/tests/call_and_revert.sol");
@@ -4568,6 +4631,391 @@ mod test {
                 typed_target, generic_target,
                 "targetAddress must not depend on the ABI surface"
             );
+        }
+
+        // --- materializeAlias ------------------------------------------------
+
+        mod materialize_alias {
+            use super::*;
+            use crate::precompiles::{
+                constants::alias_forwarder_delegation_code_hash,
+                initializer::init_precompile_bytecodes,
+                runtime_gateway::{
+                    AliasMaterialized, RuntimeGateway::materializeAliasCall,
+                },
+            };
+            use crate::storage::world_state_handler::{AccountOrigin, StorageAccount};
+            use alloy_sol_types::SolValue;
+            use tezos_crypto_rs::public_key::PublicKey;
+            use tezos_data_encoding::enc::BinWriter;
+
+            sol! {
+                contract AliasForwarder {
+                    function nativeAddress() external view returns (string);
+                    function nativePublicKey() external view returns (bytes);
+                }
+            }
+
+            // Sandbox `bootstrap1` account and its public key.
+            const TZ1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+            const EDPK: &str = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+
+            fn payload(runtime: &str, address: &str, public_key: &str) -> Bytes {
+                RuntimeGatewayCalls::materializeAlias(materializeAliasCall {
+                    nativeRuntime: runtime.to_string(),
+                    nativeAddress: address.to_string(),
+                    nativePublicKey: public_key.to_string(),
+                })
+                .abi_encode()
+                .into()
+            }
+
+            fn alias_of(native_address: &str) -> Address {
+                let alias = Registry::new()
+                    .compute_alias(&AliasInfo {
+                        runtime: RuntimeId::Ethereum,
+                        native_address: native_address.to_string(),
+                    })
+                    .unwrap();
+                Address::from_hex(alias).unwrap()
+            }
+
+            fn expected_alias() -> Address {
+                alias_of(TZ1)
+            }
+
+            fn output(outcome: &ExecutionOutcome) -> Bytes {
+                match &outcome.result {
+                    ExecutionResult::Success { output, .. } => output.data().clone(),
+                    other => panic!("expected success, got {other:?}"),
+                }
+            }
+
+            fn materialized_logs(
+                outcome: &ExecutionOutcome,
+            ) -> Vec<(String, String, Address)> {
+                outcome
+                    .result
+                    .logs()
+                    .iter()
+                    .filter(|l| l.address == RUNTIME_GATEWAY_PRECOMPILE_ADDRESS)
+                    .filter_map(|l| AliasMaterialized::decode_log_data(&l.data).ok())
+                    .map(|e| (e.nativeRuntime, e.nativeAddress, e.aliasAddress))
+                    .collect()
+            }
+
+            fn assert_reverts(outcome: &ExecutionOutcome, reason: &str) {
+                match &outcome.result {
+                    ExecutionResult::Revert { output, .. } => {
+                        assert_eq!(String::from_utf8_lossy(output), reason)
+                    }
+                    other => panic!("should revert with {reason:?}, got {other:?}"),
+                }
+            }
+
+            fn setup(host: &mut MockKernelHost) -> (MockRuntimeKeyspaces<'_>, Address) {
+                let mut rk = RuntimeKeyspaces::init(host).unwrap();
+                // Install the alias forwarder code, as the kernel does at startup.
+                init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
+                let caller = Address::from([1u8; 20]);
+                fund(rk.eth_accounts_mut(), caller);
+                (rk, caller)
+            }
+
+            #[test]
+            fn materializes_the_evm_alias_of_a_tezos_account() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let alias = expected_alias();
+
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, EDPK),
+                );
+
+                assert_eq!(Address::abi_decode(&output(&res)).unwrap(), alias);
+                assert_eq!(
+                    materialized_logs(&res),
+                    vec![("tezos".to_string(), TZ1.to_string(), alias)]
+                );
+                // The alias is classified and delegates to the forwarder.
+                let info = StorageAccount::from_address(&alias)
+                    .unwrap()
+                    .info(rk.eth_accounts_mut())
+                    .unwrap();
+                assert_eq!(
+                    info.origin,
+                    AccountOrigin::Alias(AliasInfo {
+                        runtime: RuntimeId::Tezos,
+                        native_address: TZ1.to_string(),
+                    })
+                );
+                assert_eq!(info.code_hash, alias_forwarder_delegation_code_hash());
+            }
+
+            // The forwarder stores the native address, and the public key in
+            // its binary encoding: the same as an alias materialized by a NAC.
+            #[test]
+            fn materialized_alias_stores_the_native_address_and_public_key() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let alias = expected_alias();
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, EDPK),
+                );
+                assert!(res.result.is_success(), "{:?}", res.result);
+
+                let address = call_into(
+                    &mut rk,
+                    caller,
+                    alias,
+                    AliasForwarder::nativeAddressCall {}.abi_encode().into(),
+                );
+                assert_eq!(
+                    String::abi_decode(&output(&address)).unwrap(),
+                    TZ1.to_string()
+                );
+
+                let public_key = call_into(
+                    &mut rk,
+                    caller,
+                    alias,
+                    AliasForwarder::nativePublicKeyCall {}.abi_encode().into(),
+                );
+                let mut expected = Vec::new();
+                PublicKey::from_b58check(EDPK)
+                    .unwrap()
+                    .bin_write(&mut expected)
+                    .unwrap();
+                assert_eq!(
+                    Bytes::abi_decode(&output(&public_key)).unwrap(),
+                    Bytes::from(expected)
+                );
+            }
+
+            // A contract has no public key: its alias stores empty bytes. The
+            // mock runtime takes this KT1 as native; the real one would need a
+            // contract originated there.
+            #[test]
+            fn materialized_alias_without_public_key_stores_empty_bytes() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let kt1 = "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", kt1, ""),
+                );
+                assert_eq!(Address::abi_decode(&output(&res)).unwrap(), alias_of(kt1));
+
+                let public_key = call_into(
+                    &mut rk,
+                    caller,
+                    alias_of(kt1),
+                    AliasForwarder::nativePublicKeyCall {}.abi_encode().into(),
+                );
+                assert_eq!(
+                    Bytes::abi_decode(&output(&public_key)).unwrap(),
+                    Bytes::new()
+                );
+            }
+
+            // Materializing an existing alias returns it, without emitting a
+            // new event.
+            #[test]
+            fn materializing_an_existing_alias_is_a_no_op() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let first = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, EDPK),
+                );
+                assert!(first.result.is_success(), "{:?}", first.result);
+
+                let second = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, EDPK),
+                );
+
+                assert_eq!(
+                    Address::abi_decode(&output(&second)).unwrap(),
+                    expected_alias()
+                );
+                assert_eq!(materialized_logs(&second), vec![]);
+                assert!(
+                    second.result.gas_used() < first.result.gas_used(),
+                    "an existing alias must not be initialized again"
+                );
+            }
+
+            #[test]
+            fn rejects_an_ethereum_native_runtime() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("ethereum", &caller.to_string(), ""),
+                );
+                assert_reverts(&res, tezosx_interfaces::ERR_SAME_RUNTIME_NAC);
+            }
+
+            #[test]
+            fn rejects_an_unknown_native_runtime() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("bitcoin", TZ1, EDPK),
+                );
+                assert_reverts(&res, "materializeAlias: unknown native runtime");
+            }
+
+            #[test]
+            fn rejects_a_malformed_public_key() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, "edpk-not-a-key"),
+                );
+                assert_reverts(
+                    &res,
+                    "materializeAlias: Conversion error: invalid base58",
+                );
+                let info = StorageAccount::from_address(&expected_alias())
+                    .unwrap()
+                    .info(rk.eth_accounts_mut())
+                    .unwrap();
+                assert_eq!(info.origin, AccountOrigin::Unclassified);
+            }
+
+            #[test]
+            fn rejects_value() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+
+                let registry = Registry::new();
+                let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let res = run_transaction(
+                    &mut rk,
+                    &registry,
+                    &mut journal,
+                    &block_constants(),
+                    None,
+                    caller,
+                    Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                    payload("tezos", TZ1, EDPK),
+                    GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                    U256::from(1),
+                    None,
+                    false,
+                    TransactionOrigin::UserInput {
+                        access_list: AccessList::default(),
+                    },
+                )
+                .unwrap();
+                assert_reverts(&res, "materializeAlias: non-payable selector");
+            }
+
+            // An alias init that runs out of gas used the whole budget it was
+            // given: the call is charged for it, not only for the lookups done
+            // before, so a failed materialization can't be retried for cheap.
+            #[test]
+            fn an_init_out_of_gas_is_charged_the_whole_budget() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                // Enough for the gateway's own charges, not for the init.
+                let limit = 100_000;
+                let registry = Registry::new();
+                let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+                let res = run_transaction(
+                    &mut rk,
+                    &registry,
+                    &mut journal,
+                    &block_constants(),
+                    None,
+                    caller,
+                    Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                    payload("tezos", TZ1, EDPK),
+                    GasData::new(limit, 1, limit),
+                    U256::ZERO,
+                    None,
+                    false,
+                    TransactionOrigin::UserInput {
+                        access_list: AccessList::default(),
+                    },
+                )
+                .unwrap();
+
+                assert!(!res.result.is_success(), "{:?}", res.result);
+                assert_eq!(res.result.gas_used(), limit);
+                let info = StorageAccount::from_address(&expected_alias())
+                    .unwrap()
+                    .info(rk.eth_accounts_mut())
+                    .unwrap();
+                assert_eq!(info.origin, AccountOrigin::Unclassified);
+            }
+
+            #[test]
+            fn rejects_an_address_that_is_not_native() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let res = call_into(
+                    &mut rk,
+                    caller,
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", crate::test::utilities::MOCK_NOT_NATIVE, ""),
+                );
+                assert_reverts(&res, "materializeAlias: Native address verification error: Not provably native");
+                let info = StorageAccount::from_address(&alias_of(
+                    crate::test::utilities::MOCK_NOT_NATIVE,
+                ))
+                .unwrap()
+                .info(rk.eth_accounts_mut())
+                .unwrap();
+                assert_eq!(info.origin, AccountOrigin::Unclassified);
+            }
+
+            #[test]
+            fn rejects_static_call() {
+                let mut host = MockKernelHost::default();
+                let (mut rk, caller) = setup(&mut host);
+                let static_caller = deploy(&mut rk, caller, STATIC_CALLER_BYTECODE);
+
+                let outer = makeStaticCallCall::new((
+                    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    payload("tezos", TZ1, EDPK),
+                ))
+                .abi_encode()
+                .into();
+
+                let res = call_into(&mut rk, caller, static_caller, outer);
+                match res.result {
+                    ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {}
+                    other => panic!(
+                        "STATICCALL on materializeAlias should revert, got {other:?}"
+                    ),
+                }
+            }
         }
     }
 

@@ -133,6 +133,21 @@ impl Registry for RegistryImpl {
         }
     }
 
+    fn public_key_from_string(
+        &self,
+        public_key: &str,
+        runtime_id: tezosx_interfaces::RuntimeId,
+    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+        match runtime_id {
+            tezosx_interfaces::RuntimeId::Tezos => {
+                self.tezos.public_key_from_string(public_key)
+            }
+            tezosx_interfaces::RuntimeId::Ethereum => {
+                self.ethereum.public_key_from_string(public_key)
+            }
+        }
+    }
+
     fn read_origin<Host, KS>(
         &self,
         rk: &RuntimeKeyspaces<'_, Host, KS>,
@@ -154,6 +169,28 @@ impl Registry for RegistryImpl {
             tezosx_interfaces::RuntimeId::Ethereum => {
                 self.ethereum.read_origin(rk, addr, budget)
             }
+        }
+    }
+
+    fn check_is_native_address<Host, KS>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        addr_runtime: tezosx_interfaces::RuntimeId,
+        address: &str,
+        public_key: Option<&str>,
+        budget: &mut tezosx_interfaces::Gas,
+    ) -> Result<(), tezosx_interfaces::TezosXRuntimeError>
+    where
+        Host: StorageV1,
+        KS: KeySpace,
+    {
+        match addr_runtime {
+            tezosx_interfaces::RuntimeId::Tezos => self
+                .tezos
+                .check_is_native_address(rk, address, public_key, budget),
+            tezosx_interfaces::RuntimeId::Ethereum => self
+                .ethereum
+                .check_is_native_address(rk, address, public_key, budget),
         }
     }
 
@@ -474,5 +511,56 @@ mod tests {
             .unwrap();
         assert_eq!(first.0, second.0);
         assert_eq!(second.1.gas_remaining, budget);
+    }
+
+    // `check_is_native_address` dispatches on the runtime of the address: each
+    // runtime applies its own rules, and meters in its own unit.
+
+    #[test]
+    fn check_is_native_address_dispatches_tezos_addresses_to_the_michelson_runtime() {
+        let registry = RegistryImpl::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut budget = Gas::new(1_000_000, RuntimeId::Tezos);
+
+        // Sandbox `bootstrap1` account and its public key.
+        registry
+            .check_is_native_address(
+                &rk,
+                RuntimeId::Tezos,
+                "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                Some("edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"),
+                &mut budget,
+            )
+            .unwrap();
+        assert_eq!(
+            budget,
+            Gas::new(
+                1_000_000 - u64::from(mir::gas::interpret_cost::HASH_KEY),
+                RuntimeId::Tezos
+            )
+        );
+    }
+
+    #[test]
+    fn check_is_native_address_dispatches_ethereum_addresses_to_the_evm_runtime() {
+        let registry = RegistryImpl::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        // ecrecover: only the EVM runtime knows it is a precompile.
+        let err = registry
+            .check_is_native_address(
+                &rk,
+                RuntimeId::Ethereum,
+                "0x0000000000000000000000000000000000000001",
+                None,
+                &mut Gas::new(100_000, RuntimeId::Ethereum),
+            )
+            .unwrap_err();
+        assert_eq!(
+            err,
+            tezosx_types::CheckNativeAddressError::Precompile.into()
+        );
     }
 }
