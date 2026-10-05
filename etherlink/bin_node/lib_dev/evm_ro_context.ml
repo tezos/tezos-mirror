@@ -556,10 +556,10 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
                     hash))
         txns
     in
-    let* evm_state, _ =
+    let* evm_state, _, _ =
       List.fold_left_es
-        (fun (evm_state, idx) (hash, txn) ->
-          let* _, evm_state =
+        (fun (evm_state, idx, receipts_count) (hash, txn) ->
+          let* receipt, evm_state =
             Evm_state.execute_single_transaction
               ~storage_version
               ~data_dir:ctxt.data_dir
@@ -571,12 +571,17 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
                 timestamp = blueprint.blueprint.timestamp;
                 number = blueprint.blueprint.number;
                 transactions_count = idx;
+                receipts_count;
               }
               hash
               txn
           in
-          return (evm_state, Int32.succ idx))
-        (evm_state, 0l)
+          return
+            ( evm_state,
+              Int32.succ idx,
+              if Option.is_some receipt then receipts_count + 1
+              else receipts_count ))
+        (evm_state, 0l, 0)
         txns
     in
 

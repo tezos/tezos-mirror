@@ -277,6 +277,7 @@ type ('a, 'cap) path =
   | Tezosx_tezos_current_block :
       (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
   | Current_receipts : (Transaction_receipt.t, ro) path
+  | Current_receipt_at : int -> (Transaction_receipt.t option, ro) path
   | Backlog : (int64, ro) path
   | Minimum_base_fee_per_gas : (Z.t, ro) path
   | Da_fee_per_byte : (Ethereum_types.quantity, ro) path
@@ -463,6 +464,11 @@ let block_ro_codec (type f) ~path ~(chain_family : f L2_types.chain_family) :
     path;
     decode = (fun bytes -> Ok (L2_types.block_from_bytes ~chain_family bytes));
   }
+
+(** Placeholder block hash used to decode the receipts of the block in
+    progress, whose hash is not known yet. *)
+let block_in_progress_hash =
+  Ethereum_types.(Block_hash (Hex (String.make 64 '0')))
 
 (** Smart constructors for [resolve] arms — wrap the [ro_resolved] /
     [rw_resolved] records into a [resolution], hiding the
@@ -706,8 +712,18 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               ~root:Durable_storage_path.etherlink_safe_root;
           decode =
             infallible_decode
-              (Transaction_receipt.decode_last_from_list
-                 Ethereum_types.(Block_hash (Hex (String.make 64 '0'))));
+              (Transaction_receipt.decode_last_from_list block_in_progress_hash);
+        }
+  | Current_receipt_at index ->
+      static_ro
+        {
+          path =
+            Durable_storage_path.Block.current_receipts
+              ~root:Durable_storage_path.etherlink_safe_root;
+          decode =
+            Transaction_receipt.decode_nth_from_list
+              ~index
+              block_in_progress_hash;
         }
   | Backlog -> static_ro (int64_le_ro_codec ~path:Durable_storage_path.backlog)
   | Minimum_base_fee_per_gas ->

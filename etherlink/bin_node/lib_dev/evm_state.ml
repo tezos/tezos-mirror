@@ -313,6 +313,7 @@ type block_in_progress = {
   timestamp : Time.Protocol.t;
   number : Ethereum_types.quantity;
   transactions_count : int32;
+  receipts_count : int;
 }
 
 let encode ~tezos_x_tag inner =
@@ -363,10 +364,24 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
       evm_state
       (`Inbox [])
   in
-  if read_receipt then
+  if tezosx then
+    (* The kernel stores the receipts of the whole block in progress, in
+       order, so the receipt of this transaction, if any, is the one after
+       the [receipts_count] receipts already produced. A Michelson operation
+       produces an EVM receipt only if it calls into the EVM (the receipt of
+       the synthetic EVM transaction), hence reading the last receipt could
+       return the one of a previous transaction. *)
+    let* receipt =
+      Durable_storage.read_or_default
+        ~default:None
+        (Current_receipt_at block_in_progress.receipts_count)
+        evm_state
+    in
+    return (receipt, evm_state)
+  else if read_receipt then
     let* receipt = Durable_storage.read Current_receipts evm_state in
-    return (L2_types.Ethereum receipt, evm_state)
-  else return (L2_types.Tezos, evm_state)
+    return (Some receipt, evm_state)
+  else return (None, evm_state)
 
 let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
     evm_state ~input_path ~input ~output_path ~entrypoint =

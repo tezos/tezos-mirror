@@ -192,3 +192,15 @@ let decode_last_from_list block_hash bytes =
       | None ->
           raise (Invalid_argument "At least one receipt should be available"))
   | _ -> raise (Invalid_argument "Expected a List of receipts")
+
+let decode_nth_from_list ~index block_hash bytes =
+  let open Result_syntax in
+  let* rlp = Rlp.decode bytes in
+  match rlp with
+  | Rlp.List receipts -> (
+      match List.nth_opt receipts index with
+      | None -> return_none
+      | Some item -> (
+          try return_some (of_rlp_item block_hash item)
+          with Invalid_argument msg -> error_with "Invalid receipt: %s" msg))
+  | Rlp.Value _ -> error_with "Expected a list of receipts"
