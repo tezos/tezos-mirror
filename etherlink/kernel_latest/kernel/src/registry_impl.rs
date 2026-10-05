@@ -235,7 +235,7 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-    use tezos_execution::{context, NULL_PKH};
+    use tezos_execution::{account_storage, context, NULL_PKH};
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezosx_interfaces::{Classification, Gas, Origin, RuntimeId, ALIAS_LOOKUP_COST};
     use tezosx_journal::TezosXJournal;
@@ -487,7 +487,7 @@ mod tests {
         // The first call materialized the alias: the KT1 carries the
         // classification record pointing back at the EVM address.
         let kt1 = ContractKt1Hash::from_base58_check(&first.0).unwrap();
-        let account = context::originated_from_kt1(&kt1).unwrap();
+        let account = account_storage::TezosOriginatedAccount::from_kt1(&kt1).unwrap();
         assert_eq!(
             account.origin(rk.tez_accounts()).unwrap(),
             Some(Origin::Alias(alias_info.clone()))
@@ -629,7 +629,7 @@ mod tests {
             .unwrap();
         let kt1 = ContractKt1Hash::from_base58_check(&alias).unwrap();
         assert_eq!(
-            context::originated_from_kt1(&kt1)
+            account_storage::TezosOriginatedAccount::from_kt1(&kt1)
                 .unwrap()
                 .origin(rk.tez_accounts())
                 .unwrap(),

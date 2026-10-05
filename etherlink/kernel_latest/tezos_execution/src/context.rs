@@ -8,7 +8,6 @@
 
 use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
 use mir::ast::{big_map::BigMapId, AddressHash};
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
@@ -40,24 +39,13 @@ pub fn implicit_from_contract(
     }
 }
 
-/// Resolve the originated (`KT1`) account under the Tezos accounts root.
-pub fn originated_from_kt1(
-    kt1: &ContractKt1Hash,
-) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
-    let key = contracts::account_key(&Contract::Originated(kt1.clone()))?;
-    Ok(TezosOriginatedAccount {
-        kt1: kt1.clone(),
-        key,
-    })
-}
-
 /// Resolve the originated account backing a [`Contract`] under the Tezos
 /// accounts root. Errors on an implicit contract.
 pub fn originated_from_contract(
     contract: &Contract,
 ) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     match contract {
-        Contract::Originated(kt1) => originated_from_kt1(kt1),
+        Contract::Originated(kt1) => TezosOriginatedAccount::from_kt1(kt1),
         _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
     }
 }
@@ -74,7 +62,7 @@ pub fn read_origin_for_address(
         // construction, with no durable read and no stored `/origin` record.
         AddressHash::Implicit(_) => Ok(Some(Origin::Native)),
         AddressHash::Kt1(kt1) => {
-            let originated = originated_from_kt1(kt1)?;
+            let originated = TezosOriginatedAccount::from_kt1(kt1)?;
             originated.origin(tez_accounts)
         }
         AddressHash::Sr1(_) => Ok(None),
@@ -86,7 +74,7 @@ pub mod contracts {
 
     use super::*;
 
-    const BALANCE: Key = Key::from_static(b"/balance");
+    pub(crate) const BALANCE: Key = Key::from_static(b"/balance");
 
     /// The contract index, as a key of the accounts keyspace.
     const INDEX_KEY: Key = Key::from_static(b"/contracts/index");
@@ -117,19 +105,6 @@ pub mod contracts {
     /// path or key is invalid (for example, too long).
     pub fn account_key(contract: &Contract) -> Result<Key, tezos_storage::error::Error> {
         Ok(INDEX_KEY.concat(account_path(contract)?.as_bytes())?)
-    }
-
-    /// Returns the key of `account`'s mutez balance in the accounts keyspace.
-    ///
-    /// Implicit accounts keep their balance in their RLP `/info` record
-    /// instead.
-    ///
-    /// Fails with [`Error::Key`](tezos_storage::error::Error::Key) when the
-    /// resulting key is invalid (for example, too long).
-    pub fn balance_key(
-        account: &TezosOriginatedAccount,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        Ok(account.key.concat(&BALANCE)?)
     }
 }
 
@@ -255,76 +230,19 @@ pub mod address_registry {
 pub mod code {
     use super::*;
 
-    const CODE: Key = Key::from_static(b"/data/code");
+    pub(crate) const CODE: Key = Key::from_static(b"/data/code");
 
-    const STORAGE: Key = Key::from_static(b"/data/storage");
+    pub(crate) const STORAGE: Key = Key::from_static(b"/data/storage");
 
     /// Segment of the classification record ([`Origin`]) under the key of an
     /// originated account.
-    const ORIGIN: Key = Key::from_static(b"/origin");
+    pub(crate) const ORIGIN: Key = Key::from_static(b"/origin");
 
     /// Aggregated storage-accounting record: holds [code_size],
     /// [storage_size], [used_bytes] and [paid_bytes] in a single value, so
     /// they can be read and written with one host call. The code and storage
     /// *blobs* (`/data/code`, `/data/storage`) stay separate.
-    const INFO: Key = Key::from_static(b"/info");
-
-    /// Returns the key of `segment` under the key of `account`, relative to the
-    /// accounts keyspace.
-    ///
-    /// Fails when the joined key exceeds the maximum key size or is not a valid
-    /// path.
-    fn segment_key(
-        account: &TezosOriginatedAccount,
-        segment: &Key,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        Ok(account.key.concat(segment)?)
-    }
-
-    /// Returns the key of the accounting record of `account`
-    /// ([`crate::account_storage::OriginatedContractInfo`]), `/info` under the
-    /// key of `account`, relative to the accounts keyspace.
-    ///
-    /// Fails when the joined key exceeds the maximum key size or is not a valid
-    /// path.
-    pub fn info_key(
-        account: &TezosOriginatedAccount,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        segment_key(account, &INFO)
-    }
-
-    /// Returns the key of the code of `account`, `/data/code` under the key of
-    /// `account`, relative to the accounts keyspace.
-    ///
-    /// Fails when the joined key exceeds the maximum key size or is not a valid
-    /// path.
-    pub fn code_key(
-        account: &TezosOriginatedAccount,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        segment_key(account, &CODE)
-    }
-
-    /// Returns the key of the storage of `account`, `/data/storage` under the
-    /// key of `account`, relative to the accounts keyspace.
-    ///
-    /// Fails when the joined key exceeds the maximum key size or is not a valid
-    /// path.
-    pub fn storage_key(
-        account: &TezosOriginatedAccount,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        segment_key(account, &STORAGE)
-    }
-
-    /// Returns the key of the classification record ([`Origin`]) of `account`,
-    /// `/origin` under the key of `account`, relative to the accounts keyspace.
-    ///
-    /// Fails when the joined key exceeds the maximum key size or is not a valid
-    /// path.
-    pub fn origin_key(
-        account: &TezosOriginatedAccount,
-    ) -> Result<Key, tezos_storage::error::Error> {
-        segment_key(account, &ORIGIN)
-    }
+    pub(crate) const INFO: Key = Key::from_static(b"/info");
 }
 
 #[cfg(test)]
@@ -332,6 +250,7 @@ mod tests {
     use super::*;
     use mir::ast::{BinWriter, ByteReprTrait};
     use tezos_crypto_rs::blake2b;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_crypto_rs::hash::ScriptExprHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
@@ -427,54 +346,20 @@ mod tests {
         );
     }
 
-    /// Returns an originated contract, its account and the durable path of the
-    /// account.
-    fn sample_originated() -> (Contract, TezosOriginatedAccount, String) {
-        let contract =
-            Contract::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap();
-        let account = originated_from_kt1(match &contract {
-            Contract::Originated(kt1) => kt1,
-            _ => unreachable!("KT1 parses as originated"),
-        })
-        .unwrap();
-        let index = format!(
-            "/tez/tez_accounts/contracts/index/{}",
-            hex::encode({
-                let mut bytes = Vec::new();
-                contract.bin_write(&mut bytes).unwrap();
-                bytes
-            })
-        );
-        (contract, account, index)
-    }
-
-    /// Makes sure that every key of the state of an originated account
-    /// resolves to its durable path under
-    /// `/tez/tez_accounts/contracts/index/<hex>`.
-    #[test]
-    fn originated_state_keys_keep_their_durable_paths() {
-        let (_, account, index) = sample_originated();
-        for (key, segment) in [
-            (code::info_key(&account).unwrap(), "/info"),
-            (code::code_key(&account).unwrap(), "/data/code"),
-            (code::storage_key(&account).unwrap(), "/data/storage"),
-            (code::origin_key(&account).unwrap(), "/origin"),
-        ] {
-            assert_eq!(durable(&key), format!("{index}{segment}").into_bytes());
-        }
-    }
-
     /// Makes sure that the key of a contract resolves to
     /// `/tez/tez_accounts/contracts/index/<hex>`, for an originated contract
     /// and for an implicit one.
     #[test]
     fn account_key_keeps_its_durable_path() {
-        let (contract, account, index) = sample_originated();
+        let contract =
+            Contract::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap();
+        let mut bytes = Vec::new();
+        contract.bin_write(&mut bytes).unwrap();
         assert_eq!(
             durable(&contracts::account_key(&contract).unwrap()),
-            index.clone().into_bytes()
+            format!("/tez/tez_accounts/contracts/index/{}", hex::encode(bytes))
+                .into_bytes()
         );
-        assert_eq!(durable(&account.key), index.into_bytes());
 
         let implicit =
             Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
@@ -496,17 +381,6 @@ mod tests {
         assert_eq!(
             durable(&crate::account_storage::key_to_tezos_account(&pkh).unwrap()),
             b"/tez/tez_accounts/tezosx/tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx/info"
-        );
-    }
-
-    /// The balance of an originated account resolves to `/balance` under the
-    /// durable path of the account.
-    #[test]
-    fn balance_key_keeps_its_durable_path() {
-        let (_, account, index) = sample_originated();
-        assert_eq!(
-            durable(&contracts::balance_key(&account).unwrap()),
-            format!("{index}/balance").into_bytes()
         );
     }
 
@@ -539,7 +413,7 @@ mod tests {
             .is_none());
 
         // Native: returns Native.
-        originated_from_kt1(&kt1)
+        TezosOriginatedAccount::from_kt1(&kt1)
             .unwrap()
             .set_origin(rk.tez_accounts_mut(), &Origin::Native)
             .unwrap();

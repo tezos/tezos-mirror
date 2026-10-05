@@ -29,7 +29,7 @@ use mir::typechecker::{
     typecheck_value, typecheck_view, AllowForgedLazyStorageId, TcError,
 };
 use tezos_data_encoding::types::Narith;
-use tezos_execution::account_storage::TezosAccount;
+use tezos_execution::account_storage::{TezosAccount, TezosOriginatedAccount};
 use tezos_execution::context;
 use tezos_execution::mir_ctx::{Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx};
 use tezos_execution::TezlinkOperationGas;
@@ -164,11 +164,12 @@ where
     let destination_kt1 = parsed.destination;
     let view_name = parsed.view_name;
 
-    let dest_account = context::originated_from_kt1(&destination_kt1).map_err(|e| {
-        TezosXRuntimeError::NotFound(format!(
-            "destination contract {destination_kt1:?} not found: {e:?}"
-        ))
-    })?;
+    let dest_account =
+        TezosOriginatedAccount::from_kt1(&destination_kt1).map_err(|e| {
+            TezosXRuntimeError::NotFound(format!(
+                "destination contract {destination_kt1:?} not found: {e:?}"
+            ))
+        })?;
 
     // Read the destination's balance once (before `tc_ctx` takes a
     // mutable borrow on `host`) and feed it straight into
