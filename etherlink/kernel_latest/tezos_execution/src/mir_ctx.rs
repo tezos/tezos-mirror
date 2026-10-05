@@ -40,7 +40,6 @@ use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError, KeySpaceLoader, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
-use tezos_storage::{read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
@@ -1320,11 +1319,11 @@ const BYTES_SIZE_FOR_EMPTY: u64 = 33;
 
 /// Read the `total_bytes` counter persisted for a big-map.
 fn total_bytes(
-    host: &mut impl StorageV1,
+    tez_accounts: &impl KeySpace,
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
-    let path = total_bytes_path(id)?;
-    match read_optional_nom_value::<Zarith>(host, &path) {
+    let key = total_bytes_key(id)?;
+    match tez_accounts.read_nom::<Zarith>(&key) {
         Ok(Some(total)) => Ok(total),
         Ok(None) => Err(LazyStorageError::MissingTotalBytes(id.clone())),
         Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
@@ -1333,12 +1332,14 @@ fn total_bytes(
 
 /// Write the `total_bytes` counter persisted for a big-map.
 fn set_total_bytes(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     id: &BigMapId,
     value: &Zarith,
 ) -> Result<(), LazyStorageError> {
-    let path = total_bytes_path(id)?;
-    store_bin(value, host, &path).map_err(storage_error_to_lazy)?;
+    let key = total_bytes_key(id)?;
+    tez_accounts
+        .store_bin(&key, value)
+        .map_err(storage_error_to_lazy)?;
     Ok(())
 }
 
@@ -1486,8 +1487,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         if delta.0.is_zero() {
             return Ok(());
         }
-        let current = total_bytes(self.rk.host_mut(), id)?;
-        set_total_bytes(self.rk.host_mut(), id, &Zarith(current.0 + &delta.0))
+        let current = total_bytes(self.rk.tez_accounts(), id)?;
+        set_total_bytes(
+            self.rk.tez_accounts_mut(),
+            id,
+            &Zarith(current.0 + &delta.0),
+        )
     }
 
     fn big_map_new(
@@ -1514,7 +1519,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .tez_accounts_mut()
             .set(&key_type_key, &key_type_encoded)
             .map_err(storage_error_to_lazy)?;
-        set_total_bytes(self.rk.host_mut(), &id, &Zarith(BigInt::from(0)))?;
+        set_total_bytes(self.rk.tez_accounts_mut(), &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
             &id,
@@ -1538,7 +1543,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
 
         // The copy is paid for in *storage burn*, via the `total_bytes(src) + bytes_size_for_empty`
         // returned by `apply_init`
-        let source_total_bytes = total_bytes(self.rk.host_mut(), id)?;
+        let source_total_bytes = total_bytes(self.rk.tez_accounts(), id)?;
 
         // The keyspace cannot copy every key under a path, so this uses the raw host.
         self.rk.host_mut().store_copy(&src_path, &dest_path)?;
@@ -1562,7 +1567,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let total = total_bytes(self.rk.host_mut(), id)?;
+        let total = total_bytes(self.rk.tez_accounts(), id)?;
         self.interpret_context.record_lazy_storage_size_diff(
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
@@ -2492,7 +2497,7 @@ pub mod tests {
 
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0.into());
+        assert_eq!(total_bytes(ctx.rk.tez_accounts(), &id).unwrap(), 0.into());
     }
 
     /// Makes sure that `big_map_new` fails on a next-ID counter that does not
@@ -2519,13 +2524,13 @@ pub mod tests {
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2542,7 +2547,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(small))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2551,7 +2556,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + big_size - small_size).into()
         );
     }
@@ -2568,7 +2573,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(big))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2577,7 +2582,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + small_size - big_size).into()
         );
     }
@@ -2594,12 +2599,12 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2610,12 +2615,12 @@ pub mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(42), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             old_total_bytes
         );
     }
@@ -2638,11 +2643,14 @@ pub mod tests {
             Some(TypedValue::String("bb".into())),
         )
         .unwrap();
-        let src_total = total_bytes(ctx.rk.host_mut(), &src).unwrap();
+        let src_total = total_bytes(ctx.rk.tez_accounts(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &dest).unwrap(), src_total);
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
+            src_total
+        );
     }
 
     /// `big_map_copy` duplicates the whole subtree with one `store_copy`
@@ -2713,7 +2721,10 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
+            0u64.into()
+        );
     }
 
     #[test]
@@ -2738,7 +2749,7 @@ pub mod tests {
         }
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             Zarith(expected)
         );
     }
@@ -2756,7 +2767,7 @@ pub mod tests {
         )
         .unwrap();
         let dest = ctx.big_map_copy(&src, false).unwrap();
-        let dest_total_after_copy = total_bytes(ctx.rk.host_mut(), &dest).unwrap();
+        let dest_total_after_copy = total_bytes(ctx.rk.tez_accounts(), &dest).unwrap();
 
         ctx.big_map_update(
             &src,
@@ -2767,7 +2778,7 @@ pub mod tests {
         ctx.big_map_update(&src, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
             dest_total_after_copy
         );
     }
@@ -2788,7 +2799,7 @@ pub mod tests {
             ctx.big_map_update(&src, TypedValue::int(*k), Some(v.clone()))
                 .unwrap();
         }
-        let src_total_after_inserts = total_bytes(ctx.rk.host_mut(), &src).unwrap();
+        let src_total_after_inserts = total_bytes(ctx.rk.tez_accounts(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
@@ -2801,7 +2812,7 @@ pub mod tests {
         let extra = encoded_size(&TypedValue::String("xx".into()))
             - encoded_size(&TypedValue::String("x".into()));
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &src).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &src).unwrap(),
             Zarith(src_total_after_inserts.0.clone() + extra)
         );
 
@@ -2814,15 +2825,15 @@ pub mod tests {
         let added =
             BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(&TypedValue::String("wwww".into()));
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
             Zarith(src_total_after_inserts.0 + added)
         );
 
         ctx.big_map_remove(&src).unwrap();
-        let src_path = total_bytes_path(&src).unwrap();
-        assert!(ctx.rk.host().store_has(&src_path).unwrap().is_none());
+        let src_total_bytes_key = total_bytes_key(&src).unwrap();
+        assert!(!ctx.rk.tez_accounts().contains(&src_total_bytes_key));
 
-        assert!(total_bytes(ctx.rk.host_mut(), &dest).unwrap().0 > 0u64.into());
+        assert!(total_bytes(ctx.rk.tez_accounts(), &dest).unwrap().0 > 0u64.into());
     }
 
     #[test]
@@ -2846,11 +2857,14 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
+            0u64.into()
+        );
     }
 
     #[test]
-    fn big_map_remove_clears_total_bytes_path() {
+    fn big_map_remove_clears_total_bytes_key() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
@@ -2861,12 +2875,12 @@ pub mod tests {
             Some(TypedValue::String("hello".into())),
         )
         .unwrap();
-        let path = total_bytes_path(&id).unwrap();
-        assert!(ctx.rk.host().store_has(&path).unwrap().is_some());
+        let total_bytes_key = total_bytes_key(&id).unwrap();
+        assert!(ctx.rk.tez_accounts().contains(&total_bytes_key));
 
         ctx.big_map_remove(&id).unwrap();
 
-        assert!(ctx.rk.host().store_has(&path).unwrap().is_none());
+        assert!(!ctx.rk.tez_accounts().contains(&total_bytes_key));
     }
 
     #[test]
@@ -2882,12 +2896,12 @@ pub mod tests {
         )
         .unwrap();
 
-        let path = total_bytes_path(&id).unwrap();
-        ctx.rk.host_mut().store_delete(&path).unwrap();
+        let total_bytes_key = total_bytes_key(&id).unwrap();
+        ctx.rk.tez_accounts_mut().delete(&total_bytes_key);
 
         assert!(
             matches!(
-                total_bytes(ctx.rk.host_mut(), &id),
+                total_bytes(ctx.rk.tez_accounts(), &id),
                 Err(LazyStorageError::MissingTotalBytes(_))
             ),
             "an absent counter must surface as MissingTotalBytes"
@@ -2913,16 +2927,16 @@ pub mod tests {
             Some(TypedValue::String("world".into())),
         )
         .unwrap();
-        let path1 = total_bytes_path(&temp1).unwrap();
-        let path2 = total_bytes_path(&temp2).unwrap();
-        assert!(ctx.rk.host().store_has(&path1).unwrap().is_some());
-        assert!(ctx.rk.host().store_has(&path2).unwrap().is_some());
+        let key1 = total_bytes_key(&temp1).unwrap();
+        let key2 = total_bytes_key(&temp2).unwrap();
+        assert!(ctx.rk.tez_accounts().contains(&key1));
+        assert!(ctx.rk.tez_accounts().contains(&key2));
 
         clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
             .unwrap();
 
-        assert!(ctx.rk.host().store_has(&path1).unwrap().is_none());
-        assert!(ctx.rk.host().store_has(&path2).unwrap().is_none());
+        assert!(!ctx.rk.tez_accounts().contains(&key1));
+        assert!(!ctx.rk.tez_accounts().contains(&key2));
     }
 
     /// The frames of one operation share its allocator, so a second frame must
