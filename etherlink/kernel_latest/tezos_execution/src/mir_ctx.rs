@@ -271,14 +271,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         id: &BigMapId,
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         let arena = Arena::new();
-        let key_type_path = key_type_path(id)?;
+        let key_type_key = key_type_key(id)?;
         let value_type_path = value_type_path(id)?;
 
-        let encoded_key_type = match self.rk.host().store_read_all(&key_type_path) {
-            Ok(key_type) => Ok(key_type),
-            Err(RuntimeError::PathNotFound) => return Ok(None),
-            Err(err) => Err(err),
-        }?;
+        let Some(encoded_key_type) = self.rk.tez_accounts().get(&key_type_key) else {
+            return Ok(None);
+        };
 
         let key_type = Micheline::decode_raw(
             &arena,
@@ -1168,6 +1166,7 @@ fn remove_big_map<Host: StorageV1>(
     host: &mut Host,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
+    // The keyspace cannot delete every key under a path, so this uses the raw host.
     host.store_delete(&big_map_path(id)?)?;
 
     Ok(())
@@ -1501,7 +1500,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
         let id = self.generate_id(temporary)?;
-        let key_type_path = key_type_path(&id)?;
+        let key_type_key = key_type_key(&id)?;
         let value_type_path = value_type_path(&id)?;
         let key_type_encoded = key_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
@@ -1513,8 +1512,9 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .host_mut()
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.rk
-            .host_mut()
-            .store_write_all(&key_type_path, &key_type_encoded)?;
+            .tez_accounts_mut()
+            .set(&key_type_key, &key_type_encoded)
+            .map_err(storage_error_to_lazy)?;
         set_total_bytes(self.rk.host_mut(), &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -1541,6 +1541,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         // returned by `apply_init`
         let source_total_bytes = total_bytes(self.rk.host_mut(), id)?;
 
+        // The keyspace cannot copy every key under a path, so this uses the raw host.
         self.rk.host_mut().store_copy(&src_path, &dest_path)?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -1698,9 +1699,9 @@ pub mod tests {
         ctx: &TcCtx<'a, '_, Host>,
         id: &BigMapId,
     ) {
-        let key_type_path = key_type_path(id).unwrap();
+        let key_type_key = key_type_key(id).unwrap();
         assert!(
-            ctx.rk.host().store_has(&key_type_path).unwrap().is_none(),
+            !ctx.rk.tez_accounts().contains(&key_type_key),
             "Key type should have been removed",
         );
 

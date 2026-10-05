@@ -152,11 +152,15 @@ pub mod big_maps {
 
     const BIG_MAP_PATH: RefPath = RefPath::assert_from(b"/big_map");
 
-    const KEY_TYPE_PATH: RefPath = RefPath::assert_from(b"/key_type");
+    const KEY_TYPE: Key = Key::from_static(b"/key_type");
 
     const VALUE_TYPE_PATH: RefPath = RefPath::assert_from(b"/value_type");
 
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
+
+    /// The prefix of every big-map key in the accounts keyspace. It must name
+    /// the same segment as [`BIG_MAP_PATH`].
+    const BIG_MAP_KEY: Key = Key::from_static(b"/big_map");
 
     fn root() -> Result<OwnedPath, PathError> {
         concat(&TEZ_ACCOUNTS_ROOT_PATH, &BIG_MAP_PATH)
@@ -170,8 +174,32 @@ pub mod big_maps {
         concat(&root()?, &OwnedPath::try_from(format!("/{id}"))?)
     }
 
-    pub fn key_type_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
-        concat(&big_map_path(id)?, &KEY_TYPE_PATH)
+    /// Converts a [`KeyError`] into a [`PathError`]: a [`KeyError::PathError`]
+    /// passes through unchanged, and [`KeyError::KeyTooLarge`] becomes
+    /// [`PathError::PathTooLong`].
+    fn path_error(error: KeyError) -> PathError {
+        match error {
+            KeyError::PathError(error) => error,
+            KeyError::KeyTooLarge => PathError::PathTooLong,
+        }
+    }
+
+    /// Returns the prefix of every key of big map `id`, relative to the
+    /// accounts keyspace.
+    ///
+    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// a key.
+    fn big_map_key(id: &BigMapId) -> Result<Key, PathError> {
+        BIG_MAP_KEY.concat(format!("/{id}")).map_err(path_error)
+    }
+
+    /// Returns the key of big map `id`'s key type, relative to the accounts
+    /// keyspace.
+    ///
+    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// a key.
+    pub fn key_type_key(id: &BigMapId) -> Result<Key, PathError> {
+        big_map_key(id)?.concat(&KEY_TYPE).map_err(path_error)
     }
 
     pub fn value_type_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
@@ -298,6 +326,25 @@ mod tests {
         assert_eq!(
             durable(&big_maps::NEXT_ID_KEY),
             b"/tez/tez_accounts/big_map/next_id"
+        );
+    }
+
+    /// Makes sure that [`big_maps::big_map_path`] returns
+    /// `/tez/tez_accounts/big_map/<id>`, the parent path of every key of the big
+    /// map. The copy and the removal of a whole big map use this path.
+    #[test]
+    fn big_map_path_keeps_its_durable_path() {
+        let path = big_maps::big_map_path(&BigMapId::from(7)).unwrap();
+        assert_eq!(path.as_bytes(), b"/tez/tez_accounts/big_map/7");
+    }
+
+    /// Makes sure that the key of a big map's key type resolves to its durable
+    /// path. The test writes the path in full, so it fails if the key changes.
+    #[test]
+    fn big_map_key_type_key_keeps_its_durable_path() {
+        assert_eq!(
+            durable(&big_maps::key_type_key(&BigMapId::from(7)).unwrap()),
+            b"/tez/tez_accounts/big_map/7/key_type"
         );
     }
 
