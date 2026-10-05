@@ -1151,8 +1151,11 @@ impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
             Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
             let next_id_path = next_id_path()?;
-            let id: BigMapId =
-                read_nom_value(self.rk.host(), &next_id_path).unwrap_or(0.into());
+            let id: BigMapId = match read_nom_value(self.rk.host(), &next_id_path) {
+                Ok(id) => id,
+                Err(tezos_storage::error::Error::Runtime(_)) => 0.into(),
+                Err(e) => return Err(LazyStorageError::NomReadError(e.to_string())),
+            };
             store_bin(&id.succ(), self.rk.host_mut(), &next_id_path)
                 .map_err(storage_error_to_lazy)?;
             Ok(id)
@@ -2490,6 +2493,26 @@ pub mod tests {
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
         assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0.into());
+    }
+
+    /// Makes sure that `big_map_new` fails on a next-ID counter that does not
+    /// decode, and leaves the counter unchanged.
+    #[test]
+    fn big_map_new_rejects_an_undecodable_next_id() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        make_default_ctx!(ctx, rk);
+        let next_id = next_id_path().unwrap();
+        ctx.rk
+            .host_mut()
+            .store_write_all(&next_id, &[0xff])
+            .unwrap();
+
+        assert!(matches!(
+            ctx.big_map_new(&Type::Int, &Type::String, false),
+            Err(LazyStorageError::NomReadError(_))
+        ));
+        assert_eq!(ctx.rk.host().store_read_all(&next_id).unwrap(), vec![0xff]);
     }
 
     #[test]
