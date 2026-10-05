@@ -9,7 +9,7 @@
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, ReadKind};
 
-use crate::error::{Error, StorageReadErrorKind};
+use crate::error::StorageReadErrorKind;
 
 /// Binary reads over a [`KeySpace`] that read at most a given number of
 /// bytes.
@@ -27,16 +27,15 @@ pub trait KeySpaceExtBounded: KeySpace + Sized {
     ///
     /// # Errors
     ///
-    /// - [`Error::KeySpace`] with [`StorageReadErrorKind::ValueExceedsBound`] when
-    ///   the bytes read do not decode as `T` and the value at `key` is longer
-    ///   than `max_bytes`.
-    /// - [`Error::KeySpace`] with a [`ReadKind::Nom`] when the bytes read are
-    ///   not exactly one encoding of `T` and the value fits in `max_bytes`.
+    /// - [`StorageReadErrorKind::ValueExceedsBound`] when the bytes read do not
+    ///   decode as `T` and the value at `key` is longer than `max_bytes`.
+    /// - [`ReadKind::Nom`] when the bytes read are not exactly one encoding of
+    ///   `T` and the value fits in `max_bytes`.
     fn read_nom_bounded<T: for<'a> NomReader<'a>>(
         &self,
         key: &Key,
         max_bytes: usize,
-    ) -> Result<Option<T>, Error> {
+    ) -> Result<Option<T>, KeySpaceError<StorageReadErrorKind>> {
         Ok(self
             .read_nom_bounded_with_len(key, max_bytes)?
             .map(|(value, _len)| value))
@@ -48,7 +47,7 @@ pub trait KeySpaceExtBounded: KeySpace + Sized {
         &self,
         key: &Key,
         max_bytes: usize,
-    ) -> Result<Option<(T, usize)>, Error> {
+    ) -> Result<Option<(T, usize)>, KeySpaceError<StorageReadErrorKind>> {
         let mut buffer = vec![0; max_bytes];
         let Some(len) = self.read(key, 0, &mut buffer) else {
             return Ok(None);
@@ -137,14 +136,14 @@ mod tests {
         let read: Result<Option<Narith>, _> = ks.read_nom_bounded(&k, 1);
         assert_eq!(
             read,
-            Err(Error::KeySpace(KeySpaceError::read(
+            Err(KeySpaceError::read(
                 ks.name(),
                 &k,
                 ReadKind::Ext(StorageReadErrorKind::ValueExceedsBound {
                     length: 2,
                     max_bytes: 1,
                 }),
-            )))
+            ))
         );
         assert_eq!(
             read.unwrap_err().to_string(),
