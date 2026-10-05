@@ -3717,6 +3717,7 @@ dependencies = [
  "tezos-smart-rollup-keyspace",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "tezosx-types",
  "thiserror 1.0.69",
  "typed-arena",
 ]
