@@ -13,7 +13,7 @@ use primitive_types::U256;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{
-    enc::BinWriter,
+    enc::{BinError, BinWriter},
     nom::NomReader,
     types::{Narith, Zarith},
 };
@@ -23,7 +23,9 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
+use tezos_smart_rollup_keyspace::{
+    Key, KeyError, KeySpace, KeySpaceError, ReadKind, WriteKind,
+};
 use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::keyspace::KeySpaceExtBounded;
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
@@ -79,17 +81,23 @@ pub trait TezosAccount {
     /// Each account kind reads it from its own storage layout (RLP `/info`
     /// for implicit accounts, the `/balance` key for originated ones), so
     /// there is no shared default.
+    ///
+    /// Fails with a read error at the key that holds the balance when the stored value
+    /// does not decode.
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, tezos_storage::error::Error>;
+    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>>;
 
     /// Set the **balance** of an account in Mutez held by the account.
+    ///
+    /// Fails with a write error at the key that holds the balance when `balance` does not
+    /// encode.
     fn set_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
         balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error>;
+    ) -> Result<(), KeySpaceError>;
 
     /// Add amount (in Mutez) to the **balance** held by the account.
     ///
@@ -101,13 +109,16 @@ pub trait TezosAccount {
     /// (one in balance(), one in set_balance()). If add_balance becomes
     /// a hot path, TezosX should override it with a single
     /// read-modify-write on the RLP blob.
+    ///
+    /// Fails as [`Self::balance`] and [`Self::set_balance`] do.
     fn add_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
         amount: u64,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError<StorageReadErrorKind>> {
         let current = self.balance(tez_accounts)?;
-        self.set_balance(tez_accounts, &Narith(current.0 + amount))
+        self.set_balance(tez_accounts, &Narith(current.0 + amount))?;
+        Ok(())
     }
 }
 
@@ -136,10 +147,11 @@ impl TezosAccount for TezosOriginatedAccount {
         Contract::Originated(self.kt1.clone())
     }
 
+    /// Reads as [`KeySpaceExtBounded::read_nom_bounded`] does, with a bound of 32 bytes.
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, tezos_storage::error::Error> {
+    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>> {
         Ok(tez_accounts
             .read_nom_bounded(&self.balance_key, NARITH_FIELD_MAX_BYTES)?
             .unwrap_or(0_u64.into()))
@@ -149,10 +161,8 @@ impl TezosAccount for TezosOriginatedAccount {
         &self,
         tez_accounts: &mut impl KeySpace,
         balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        tez_accounts
-            .store_bin(&self.balance_key, balance)
-            .map_err(tezos_storage::error::Error::from)
+    ) -> Result<(), KeySpaceError> {
+        tez_accounts.store_bin(&self.balance_key, balance)
     }
 }
 #[derive(Debug, PartialEq)]
@@ -184,12 +194,14 @@ pub fn read_alias_implementation(tez_accounts: &impl KeySpace) -> Option<Vec<u8>
 /// Overwrite the shared alias implementation with `code`. A single write here
 /// changes the behaviour of every existing and future alias at once — the O(1)
 /// upgrade primitive.
+///
+/// Fails with a write error when `code` is larger than the largest value that the
+/// keyspace accepts.
 pub fn write_alias_implementation(
     tez_accounts: &mut impl KeySpace,
     code: &[u8],
-) -> Result<(), tezos_storage::error::Error> {
-    tez_accounts.set(&ALIAS_IMPLEMENTATION_KEY, code)?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    tez_accounts.set(&ALIAS_IMPLEMENTATION_KEY, code)
 }
 
 /// Snapshot of a contract's storage-space.
@@ -338,10 +350,17 @@ impl TezosOriginatedAccount {
         &self.kt1
     }
 
+    /// Returns the code of the contract: its own script, the shared alias
+    /// implementation for an alias, or the enshrined contract for its address.
+    ///
+    /// Fails with a read error at the `/data/code` key of the account when a
+    /// contract that is not an alias has no code, at the shared alias
+    /// implementation key when an alias has no implementation to share, and at
+    /// the `/origin` key when the origin record does not decode.
     pub fn code(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Code, tezos_storage::error::Error> {
+    ) -> Result<Code, KeySpaceError<StorageReadErrorKind>> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
@@ -360,13 +379,16 @@ impl TezosOriginatedAccount {
                     // can exist: `ensure_alias` seeds it before materializing
                     // an alias (L2-1529), and migration / runtime activation
                     // seed it on existing networks. So an unseeded slot here is
-                    // a should-never-happen invariant violation, surfaced as an
-                    // internal error rather than silently substituting code.
+                    // a should-never-happen invariant violation, surfaced as a
+                    // `NotSeeded` read error at the slot key rather than
+                    // silently substituting code.
                     read_alias_implementation(tez_accounts)
                         .map(Code::Code)
                         .ok_or_else(|| {
-                            tezos_storage::error::Error::Internal(
-                                "alias implementation slot is not seeded".to_string(),
+                            KeySpaceError::read(
+                                tez_accounts.name(),
+                                &ALIAS_IMPLEMENTATION_KEY,
+                                ReadKind::Ext(StorageReadErrorKind::NotSeeded),
                             )
                         })
                 } else {
@@ -374,8 +396,7 @@ impl TezosOriginatedAccount {
                         tez_accounts.name(),
                         &self.code_key,
                         ReadKind::Ext(StorageReadErrorKind::NotFound),
-                    )
-                    .into())
+                    ))
                 }
             }
         }
@@ -388,30 +409,27 @@ impl TezosOriginatedAccount {
     pub fn origin(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Option<Origin>, tezos_storage::error::Error> {
-        tez_accounts
-            .read_nom(&self.origin_key)
-            .map_err(tezos_storage::error::Error::from)
+    ) -> Result<Option<Origin>, KeySpaceError> {
+        tez_accounts.read_nom(&self.origin_key)
     }
 
     /// Write the classification record (`Origin`) at the account's `/origin`
     /// key.
+    ///
+    /// Fails with a write error when `origin` does not encode.
     pub fn set_origin(
         &self,
         tez_accounts: &mut impl KeySpace,
         origin: &Origin,
-    ) -> Result<(), tezos_storage::error::Error> {
-        tez_accounts
-            .store_bin(&self.origin_key, origin)
-            .map_err(tezos_storage::error::Error::from)
+    ) -> Result<(), KeySpaceError> {
+        tez_accounts.store_bin(&self.origin_key, origin)
     }
 
     /// Whether this originated account is a Tezos X alias (classified
     /// [`Origin::Alias`]), whose script resolves to the shared implementation.
-    pub fn is_alias(
-        &self,
-        tez_accounts: &impl KeySpace,
-    ) -> Result<bool, tezos_storage::error::Error> {
+    ///
+    /// Fails as [`Self::origin`] does.
+    pub fn is_alias(&self, tez_accounts: &impl KeySpace) -> Result<bool, KeySpaceError> {
         Ok(matches!(self.origin(tez_accounts)?, Some(Origin::Alias(_))))
     }
 
@@ -425,10 +443,9 @@ impl TezosOriginatedAccount {
     /// so a Transaction to a never-originated KT1 produces a typed
     /// user-level error instead of falling through to a kernel-internal
     /// `code()` failure.
-    pub fn exists(
-        &self,
-        tez_accounts: &impl KeySpace,
-    ) -> Result<bool, tezos_storage::error::Error> {
+    ///
+    /// Fails as [`Self::origin`] does, for a contract with no code.
+    pub fn exists(&self, tez_accounts: &impl KeySpace) -> Result<bool, KeySpaceError> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
@@ -449,7 +466,7 @@ impl TezosOriginatedAccount {
     pub fn read_info(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<OriginatedContractInfo, tezos_storage::error::Error> {
+    ) -> Result<OriginatedContractInfo, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info_with_len(tez_accounts)?.0)
     }
 
@@ -461,7 +478,7 @@ impl TezosOriginatedAccount {
     pub fn read_info_with_len(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
+    ) -> Result<(OriginatedContractInfo, u64), KeySpaceError<StorageReadErrorKind>> {
         Ok(tez_accounts
             .read_nom_bounded_with_len(&self.info_key, INFO_MAX_BYTES)?
             .map_or_else(
@@ -481,26 +498,29 @@ impl TezosOriginatedAccount {
     }
 
     /// Persist the aggregated record in a single host write.
+    ///
+    /// Fails with a write error when `info` does not encode.
     pub fn write_info(
         &self,
         tez_accounts: &mut impl KeySpace,
         info: &OriginatedContractInfo,
-    ) -> Result<(), tezos_storage::error::Error> {
-        tez_accounts
-            .store_bin(&self.info_key, info)
-            .map_err(tezos_storage::error::Error::from)
+    ) -> Result<(), KeySpaceError> {
+        tez_accounts.store_bin(&self.info_key, info)
     }
 
     /// Only the test suite writes the code blob in isolation: `init`
     /// inlines its own `/data/code` write and refreshes the aggregated
     /// record in one shot, so there is no production caller. Gated to
     /// `test` so it doesn't masquerade as production API.
+    ///
+    /// Fails as [`Self::read_info`] and [`Self::write_info`] do, and with a write error
+    /// when `data` is larger than the largest value that the keyspace accepts.
     #[cfg(test)]
     pub fn set_code(
         &self,
         tez_accounts: &mut impl KeySpace,
         data: &[u8],
-    ) -> Result<Zarith, tezos_storage::error::Error> {
+    ) -> Result<Zarith, KeySpaceError<StorageReadErrorKind>> {
         tez_accounts.set(&self.code_key, data)?;
         let code_size = data.len() as u64;
         let mut info = self.read_info(tez_accounts)?;
@@ -509,10 +529,15 @@ impl TezosOriginatedAccount {
         Ok(code_size.into())
     }
 
+    /// Returns the storage blob of the contract, or an empty blob for an enshrined
+    /// contract.
+    ///
+    /// Fails with a read error at the `/data/storage` key of the account when the
+    /// contract has no storage.
     pub fn storage(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+    ) -> Result<Vec<u8>, KeySpaceError<StorageReadErrorKind>> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(vec![]);
         }
@@ -522,39 +547,48 @@ impl TezosOriginatedAccount {
                 &self.storage_key,
                 ReadKind::Ext(StorageReadErrorKind::NotFound),
             )
-            .into()
         })
     }
 
+    /// Returns the code size that the `/info` record of the contract holds.
+    ///
+    /// Fails as [`Self::read_info`] does.
     pub fn code_size(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Zarith, tezos_storage::error::Error> {
+    ) -> Result<Zarith, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info(tez_accounts)?.code_size.into())
     }
 
+    /// Returns the storage size that the `/info` record of the contract holds.
+    ///
+    /// Fails as [`Self::read_info`] does.
     pub fn storage_size(
         &self,
         tez_accounts: &mut impl KeySpace,
-    ) -> Result<Narith, tezos_storage::error::Error> {
+    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info(tez_accounts)?.storage_size)
     }
 
     /// Returns the contract's `used_bytes` watermark, or `0` if nothing
     /// has been written yet.
+    ///
+    /// Fails as [`Self::read_info`] does.
     pub fn used_bytes(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Zarith, tezos_storage::error::Error> {
+    ) -> Result<Zarith, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info(tez_accounts)?.used_bytes)
     }
 
     /// Returns the contract's `paid_bytes` watermark, or `0` if nothing
     /// has been written yet.
+    ///
+    /// Fails as [`Self::read_info`] does.
     pub fn paid_bytes(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Zarith, tezos_storage::error::Error> {
+    ) -> Result<Zarith, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info(tez_accounts)?.paid_bytes)
     }
 
@@ -571,12 +605,15 @@ impl TezosOriginatedAccount {
     /// pure [OriginatedContractInfo::with_storage_size] and commits it via
     /// [Self::write_storage_and_info]. Gated to `test` so it doesn't
     /// masquerade as production API.
+    ///
+    /// Fails as [`Self::read_info`] and [`Self::write_info`] do, and with a write error
+    /// when `data` is larger than the largest value that the keyspace accepts.
     #[cfg(test)]
     pub fn set_storage(
         &self,
         tez_accounts: &mut impl KeySpace,
         data: &[u8],
-    ) -> Result<StorageDelta, tezos_storage::error::Error> {
+    ) -> Result<StorageDelta, KeySpaceError<StorageReadErrorKind>> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(0.into());
         }
@@ -597,13 +634,16 @@ impl TezosOriginatedAccount {
     /// single shared alias implementation. A zero code size is still recorded
     /// in the aggregated `/info` record so storage-space accounting reads a
     /// definite code size of `0` — the shared code is not charged per alias.
+    ///
+    /// Fails with a write error when `code` or `storage` is larger than the largest value
+    /// that the keyspace accepts, or as [`Self::write_info`] does.
     pub fn init(
         &self,
         tez_accounts: &mut impl KeySpace,
         code: Option<&[u8]>,
         storage: &[u8],
         lazy_storage_size_diff: Zarith,
-    ) -> Result<StorageSpace, tezos_storage::error::Error> {
+    ) -> Result<StorageSpace, KeySpaceError> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(StorageSpace {
                 used_bytes: 0.into(),
@@ -653,13 +693,15 @@ impl TezosOriginatedAccount {
     /// `storage_size` alone (the test sequences [Self::set_storage] first,
     /// which already refreshes it), so it intentionally does not route
     /// through `with_storage_size` — that would re-apply the storage delta.
+    ///
+    /// Fails as [`Self::read_info`] and [`Self::write_info`] do.
     #[cfg(test)]
     pub fn update_storage_space(
         &self,
         tez_accounts: &mut impl KeySpace,
         storage_size_diff: StorageDelta,
         lazy_storage_size_diff: Zarith,
-    ) -> Result<StorageSpace, tezos_storage::error::Error> {
+    ) -> Result<StorageSpace, KeySpaceError<StorageReadErrorKind>> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(StorageSpace {
                 used_bytes: 0.into(),
@@ -694,12 +736,15 @@ impl TezosOriginatedAccount {
     /// [OriginatedContractInfo::with_storage_size] and charges gas for the
     /// blob and the record *before* calling this, so the durable writes
     /// happen only once their cost is secured.
+    ///
+    /// Fails with a write error when `data` is larger than the largest value that the
+    /// keyspace accepts, or as [`Self::write_info`] does.
     pub fn write_storage_and_info(
         &self,
         tez_accounts: &mut impl KeySpace,
         data: &[u8],
         info: &OriginatedContractInfo,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(());
         }
@@ -854,25 +899,29 @@ impl TezosAccount for TezosImplicitAccount {
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        match get_tezos_account_info_at(tez_accounts, &self.key) {
-            Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
-            Ok(None) => Ok(Narith::from(0u64)),
-            Err(e) => Err(tezos_storage::error::Error::TcError(format!("{e}"))),
+    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>> {
+        match get_tezos_account_info_at(tez_accounts, &self.key)? {
+            Some(info) => Ok(u256_to_narith(&info.balance)),
+            None => Ok(Narith::from(0u64)),
         }
     }
 
+    /// Also fails with a read error when the record of the account does not decode, and
+    /// with a write error when `balance` does not fit in 256 bits.
     fn set_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
         balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
-        info.balance = narith_to_u256(balance)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
+    ) -> Result<(), KeySpaceError> {
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)?;
+        info.balance = narith_to_u256(balance).map_err(|e| {
+            KeySpaceError::write(
+                tez_accounts.name(),
+                &self.key,
+                WriteKind::Encode(BinError::custom(e.to_string())),
+            )
+        })?;
         set_tezos_account_info_at(tez_accounts, &self.key, info)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
     }
 }
 
@@ -881,40 +930,48 @@ impl TezosImplicitAccount {
         &self.pkh
     }
 
-    pub fn counter(
-        &self,
-        tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        match get_tezos_account_info_at(tez_accounts, &self.key) {
-            Ok(Some(info)) => Ok(Narith::from(info.nonce)),
-            Ok(None) => Ok(Narith::from(0u64)),
-            Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
+    /// Returns the counter of the account, or zero when the account has no record.
+    ///
+    /// Fails with a read error when the record of the account does not decode.
+    pub fn counter(&self, tez_accounts: &impl KeySpace) -> Result<Narith, KeySpaceError> {
+        match get_tezos_account_info_at(tez_accounts, &self.key)? {
+            Some(info) => Ok(Narith::from(info.nonce)),
+            None => Ok(Narith::from(0u64)),
         }
     }
 
+    /// Sets the counter of the account to `counter`, and creates the record of the
+    /// account when it is absent.
+    ///
+    /// Fails with a read error when the record of the account does not decode, and with a
+    /// write error when `counter` does not fit in a `u64`.
     pub fn set_counter(
         &self,
         tez_accounts: &mut impl KeySpace,
         counter: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-        info.nonce = counter
-            .0
-            .clone()
-            .try_into()
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+    ) -> Result<(), KeySpaceError> {
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)?;
+        info.nonce = counter.0.clone().try_into().map_err(
+            |e: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                KeySpaceError::write(
+                    tez_accounts.name(),
+                    &self.key,
+                    WriteKind::Encode(BinError::custom(e.to_string())),
+                )
+            },
+        )?;
         set_tezos_account_info_at(tez_accounts, &self.key, info)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
     }
 
+    /// Returns the manager of the account: its public key once revealed, its public key
+    /// hash before.
+    ///
+    /// Fails with a read error when the record of the account does not decode.
     pub fn manager(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Manager, tezos_storage::error::Error> {
-        let info = get_tezos_account_info_at(tez_accounts, &self.key)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-        match info {
+    ) -> Result<Manager, KeySpaceError> {
+        match get_tezos_account_info_at(tez_accounts, &self.key)? {
             Some(info) => match info.pub_key {
                 Some(pk) => Ok(Manager::Revealed(pk)),
                 None => Ok(Manager::NotRevealed(self.pkh.clone())),
@@ -923,81 +980,85 @@ impl TezosImplicitAccount {
         }
     }
 
+    /// Does nothing, and never fails.
     pub fn set_manager_pk_hash_internal(
         &self,
         _tez_accounts: &mut impl KeySpace,
         _public_key_hash: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError> {
         // In TezosX, we do not need this function which is used in Tezlink
         // only for backward compatibility.
         Ok(())
     }
 
+    /// Records `public_key` as the revealed public key of the account, and creates the
+    /// record of the account when it is absent.
+    ///
+    /// Fails with a read error when the record of the account does not decode.
     pub fn set_manager_public_key(
         &self,
         tez_accounts: &mut impl KeySpace,
         public_key: &tezos_smart_rollup::types::PublicKey,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
+    ) -> Result<(), KeySpaceError> {
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)?;
         info.pub_key = Some(public_key.clone());
         set_tezos_account_info_at(tez_accounts, &self.key, info)
-            .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-        Ok(())
     }
 
-    pub fn allocated(
-        &self,
-        tez_accounts: &impl KeySpace,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        match get_tezos_account_info_at(tez_accounts, &self.key) {
-            Ok(Some(_)) => Ok(true),
-            Ok(None) => Ok(false),
-            Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
-        }
+    /// Returns whether the account has a record.
+    ///
+    /// Fails with a read error when the record of the account does not decode.
+    pub fn allocated(&self, tez_accounts: &impl KeySpace) -> Result<bool, KeySpaceError> {
+        Ok(get_tezos_account_info_at(tez_accounts, &self.key)?.is_some())
     }
 
     /// Set the **counter** for the Tezos account to the successor of the current value.
+    ///
+    /// Fails as [`Self::counter`] and [`Self::set_counter`] do.
     pub fn increment_counter(
         &self,
         tez_accounts: &mut impl KeySpace,
         validated_operations_count: usize,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError> {
         self.set_counter(
             tez_accounts,
             &Narith(self.counter(tez_accounts)?.0 + validated_operations_count),
         )
     }
 
+    /// Does nothing, and never fails.
     pub fn set_manager_public_key_hash(
         &self,
         tez_accounts: &mut impl KeySpace,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError> {
         self.set_manager_pk_hash_internal(tez_accounts, self.pkh())
     }
 
     /// This function is used to test a situation in which we have an
     /// inconsistent manager pkh for an implicit account.
+    ///
+    /// Never fails.
     #[cfg(test)]
     pub fn force_set_manager_public_key_hash(
         &self,
         tez_accounts: &mut impl KeySpace,
         pkh: &PublicKeyHash,
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<(), KeySpaceError> {
         self.set_manager_pk_hash_internal(tez_accounts, pkh)
     }
 
     /// Allocate an account in the durable storage. Does nothing if account was
     /// already allocated.
+    ///
+    /// Fails as [`Self::allocated`] does.
     pub fn allocate(
         &self,
         tez_accounts: &mut impl KeySpace,
-    ) -> Result<bool, tezos_storage::error::Error> {
+    ) -> Result<bool, KeySpaceError> {
         if self.allocated(tez_accounts)? {
             return Ok(true);
         }
-        set_tezos_account_info_at(tez_accounts, &self.key, TezosAccountInfo::default())
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
+        set_tezos_account_info_at(tez_accounts, &self.key, TezosAccountInfo::default())?;
         // TODO: use a global counter instead of initializing counter at 0
         self.set_counter(tez_accounts, &0u64.into())?;
         self.set_manager_public_key_hash(tez_accounts)?;
@@ -1897,12 +1958,16 @@ mod test {
         let account = originated(&contract);
 
         classify_as_alias(rk.tez_accounts_mut(), &account);
-        // Pin the error type: an unseeded slot is an internal invariant breach,
-        // not a generic/typecheck error (so it can't silently change meaning).
-        assert!(matches!(
+        // Pin the error: an unseeded slot is a `NotSeeded` error at the slot
+        // key, not a missing contract.
+        assert_eq!(
             account.code(rk.tez_accounts()),
-            Err(tezos_storage::error::Error::Internal(_))
-        ));
+            Err(KeySpaceError::read(
+                rk.tez_accounts().name(),
+                &ALIAS_IMPLEMENTATION_KEY,
+                ReadKind::Ext(StorageReadErrorKind::NotSeeded),
+            ))
+        );
         // Still classified, so it exists.
         assert!(account.exists(rk.tez_accounts()).unwrap());
     }
@@ -1919,15 +1984,14 @@ mod test {
 
         // Pin the variant: a code-less non-alias must surface as the plain
         // missing-value error, and must not go through the alias branch (which
-        // yields `Internal`).
+        // yields the error at the slot key).
         assert_eq!(
             account.code(rk.tez_accounts()),
             Err(KeySpaceError::read(
                 rk.tez_accounts().name(),
                 &account.code_key,
                 ReadKind::Ext(StorageReadErrorKind::NotFound),
-            )
-            .into())
+            ))
         );
         assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
@@ -1953,8 +2017,7 @@ mod test {
                 rk.tez_accounts().name(),
                 &account.code_key,
                 ReadKind::Ext(StorageReadErrorKind::NotFound),
-            )
-            .into())
+            ))
         );
         assert!(!account.exists(rk.tez_accounts()).unwrap());
     }

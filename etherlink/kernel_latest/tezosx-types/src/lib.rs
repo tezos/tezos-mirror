@@ -131,7 +131,14 @@ pub enum StorageReadErrorKind {
     /// The key holds no value, and the caller requires one.
     #[error("no value at the key")]
     NotFound,
+
+    /// The key holds no value, but the kernel writes one before any read of
+    /// it. This error is a kernel bug, not a user error.
+    #[error("no value at a key that the kernel writes before any read")]
+    NotSeeded,
 }
+
+impl tezos_smart_rollup_keyspace::ExtensionError for StorageReadErrorKind {}
 
 // TODO: L2-971
 // cleanup this, and remove use of Custom for more specific errors

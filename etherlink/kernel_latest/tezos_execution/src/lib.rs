@@ -1905,7 +1905,8 @@ pub fn upgrade_alias_implementation(
     }
 
     // One write upgrades every alias.
-    account_storage::write_alias_implementation(tez_accounts, new_code)?;
+    account_storage::write_alias_implementation(tez_accounts, new_code)
+        .map_err(StorageError::from)?;
     Ok(())
 }
 
