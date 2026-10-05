@@ -2260,7 +2260,7 @@ mod tests {
         assert_eq!(
             context::originated_from_kt1(&kt1)
                 .unwrap()
-                .origin(rk.host())
+                .origin(rk.tez_accounts())
                 .unwrap(),
             Some(Origin::Alias(AliasInfo {
                 runtime: RuntimeId::Ethereum,

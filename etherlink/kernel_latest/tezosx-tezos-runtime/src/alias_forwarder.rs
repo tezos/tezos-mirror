@@ -203,7 +203,7 @@ mod tests {
         originated_from_kt1(&kt1)
             .unwrap()
             .set_origin(
-                rk.host_mut(),
+                rk.tez_accounts_mut(),
                 &Origin::Alias(AliasInfo {
                     runtime: RuntimeId::Ethereum,
                     native_address: "0xabc".to_string(),

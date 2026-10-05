@@ -482,7 +482,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         //   `VIEW addr "name"; IF_NONE { ... }`
         // against a possibly-missing KT1.
         if !account
-            .exists(self.tc_ctx.rk.host(), self.tc_ctx.rk.tez_accounts())
+            .exists(self.tc_ctx.rk.tez_accounts())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?
         {
             return Ok(None);
@@ -1008,7 +1008,7 @@ impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasOr
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(self.tc_ctx.rk.host(), address)
+        crate::context::read_origin_for_address(self.tc_ctx.rk.tez_accounts(), address)
     }
 }
 
@@ -1050,7 +1050,7 @@ impl<'operation, 'host, Host: KeySpaceLoader + StorageV1> HasOriginLookup
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(self.rk.host(), address)
+        crate::context::read_origin_for_address(self.rk.tez_accounts(), address)
     }
 }
 
@@ -3611,7 +3611,7 @@ pub(crate) mod mock {
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            crate::context::read_origin_for_address(self.rk.host(), address)
+            crate::context::read_origin_for_address(self.rk.tez_accounts(), address)
         }
     }
 

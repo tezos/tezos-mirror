@@ -1546,7 +1546,7 @@ where
             // Reject a transfer to a never-originated KT1 before any write, as
             // Tezos does. Otherwise the NotFound error of `code()` aborts the block.
             if !dest_account
-                .exists(tc_ctx.rk.host(), tc_ctx.rk.tez_accounts())
+                .exists(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
             {
                 return Err(TransferError::ContractDoesNotExist(Contract::Originated(
@@ -2720,7 +2720,7 @@ where
     // writer of the origin path for a freshly created KT1, so write it
     // unconditionally.
     smart_contract
-        .set_origin(ctx.rk.host_mut(), origin)
+        .set_origin(ctx.rk.tez_accounts_mut(), origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -3835,7 +3835,7 @@ mod tests {
     #[test]
     fn alias_entrypoints_resolve_via_shared_implementation() {
         use crate::account_storage::write_alias_implementation;
-        use crate::context::code::origin_path;
+        use crate::context::code::origin_key;
         use crate::get_contract_entrypoint;
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
@@ -3862,8 +3862,8 @@ mod tests {
         });
         let mut buf = vec![];
         origin.bin_write(&mut buf).unwrap();
-        rk.host_mut()
-            .store_write_all(&origin_path(&account).unwrap(), &buf)
+        rk.tez_accounts_mut()
+            .set(&origin_key(&account).unwrap(), &buf)
             .unwrap();
 
         let entrypoints = get_contract_entrypoint(
@@ -8596,9 +8596,7 @@ mod tests {
         let originated_account = context::originated_from_kt1(&expected_kt1)
             .expect("originated account handle");
         assert!(
-            !originated_account
-                .exists(rk.host(), rk.tez_accounts())
-                .unwrap(),
+            !originated_account.exists(rk.tez_accounts()).unwrap(),
             "originated contract must be rolled back"
         );
 
@@ -9015,9 +9013,7 @@ mod tests {
         let originated_account = context::originated_from_kt1(&l1_canonical)
             .expect("originated account handle");
         assert!(
-            originated_account
-                .exists(rk.host(), rk.tez_accounts())
-                .unwrap(),
+            originated_account.exists(rk.tez_accounts()).unwrap(),
             "Contract must be stored at the L1-canonical KT1"
         );
     }

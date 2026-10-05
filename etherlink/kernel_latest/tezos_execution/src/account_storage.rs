@@ -31,7 +31,6 @@ use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::keyspace::KeySpaceExtBounded;
-use tezos_storage::{read_optional_nom_value, store_bin};
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
 // Key of the RLP info record, under `key_to_implicit_account_prefix`. The
@@ -344,7 +343,7 @@ impl TezosOriginatedAccount {
             // accounts (which are never `TezosOriginatedAccount` values) are
             // untouched.
             None => {
-                if self.is_alias(host)? {
+                if self.is_alias(tez_accounts)? {
                     // The slot is guaranteed seeded before any code-less alias
                     // can exist: `ensure_alias` seeds it before materializing
                     // an alias (L2-1529), and migration / runtime activation
@@ -370,34 +369,38 @@ impl TezosOriginatedAccount {
         }
     }
 
-    /// Read the classification record (`Origin`) at the account's `/origin`
-    /// path. `None` when the account carries no classification.
-    /// `read_optional_nom_value` maps a missing path to `None` and rejects
-    /// incomplete / trailing bytes.
+    /// Reads the classification record ([`Origin`]) at the account's `/origin`
+    /// key. Returns `None` when the account carries no classification, or when
+    /// the host fails to read it. Fails when the bytes are not exactly one
+    /// [`Origin`] encoding.
     pub fn origin(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
-        read_optional_nom_value(host, &code::origin_path(self)?)
+        tez_accounts
+            .read_nom(&code::origin_key(self)?)
+            .map_err(tezos_storage::error::Error::from)
     }
 
     /// Write the classification record (`Origin`) at the account's `/origin`
-    /// path.
+    /// key.
     pub fn set_origin(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         origin: &Origin,
     ) -> Result<(), tezos_storage::error::Error> {
-        store_bin(origin, host, &code::origin_path(self)?)
+        tez_accounts
+            .store_bin(&code::origin_key(self)?, origin)
+            .map_err(tezos_storage::error::Error::from)
     }
 
     /// Whether this originated account is a Tezos X alias (classified
     /// [`Origin::Alias`]), whose script resolves to the shared implementation.
     pub fn is_alias(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
-        Ok(matches!(self.origin(host)?, Some(Origin::Alias(_))))
+        Ok(matches!(self.origin(tez_accounts)?, Some(Origin::Alias(_))))
     }
 
     /// Whether the originated contract exists in durable storage. A regular
@@ -412,7 +415,6 @@ impl TezosOriginatedAccount {
     /// `code()` failure.
     pub fn exists(
         &self,
-        host: &impl StorageV1,
         tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
@@ -422,7 +424,7 @@ impl TezosOriginatedAccount {
             return Ok(true);
         }
         // A code-less KT1 exists iff it is an alias.
-        self.is_alias(host)
+        self.is_alias(tez_accounts)
     }
 
     /// Reads the aggregated [`OriginatedContractInfo`] for this contract.
@@ -1111,7 +1113,6 @@ mod test {
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-    use tezos_smart_rollup_host::storage::StorageV1;
 
     /// Build the live implicit account for `pkh` (RLP `/info` layout).
     fn implicit(pkh: &PublicKeyHash) -> TezosImplicitAccount {
@@ -1578,7 +1579,7 @@ mod test {
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated KT1 with no code blob in storage must report
@@ -1592,7 +1593,7 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// After `set_code` writes a code blob at `/data/code`, `exists`
@@ -1606,11 +1607,11 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
         account
             .set_code(rk.tez_accounts_mut(), &[0xab_u8; 4])
             .unwrap();
-        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// `used_bytes` and `paid_bytes` default to zero on a contract that
@@ -1832,13 +1833,16 @@ mod test {
             .starts_with(b"/tez/tez_accounts"));
     }
 
-    fn classify_as_alias(host: &mut impl StorageV1, account: &TezosOriginatedAccount) {
+    fn classify_as_alias(
+        tez_accounts: &mut impl KeySpace,
+        account: &TezosOriginatedAccount,
+    ) {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,
             native_address: "0xabc".to_string(),
         });
-        account.set_origin(host, &origin).unwrap();
+        account.set_origin(tez_accounts, &origin).unwrap();
     }
 
     /// The `Origin` classification round-trips through `set_origin` / `origin`:
@@ -1849,23 +1853,29 @@ mod test {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
 
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         // An account with no `/origin` record carries no classification.
-        assert!(account.origin(&host).unwrap().is_none());
+        assert!(account.origin(rk.tez_accounts()).unwrap().is_none());
 
         // The native variant round-trips.
-        account.set_origin(&mut host, &Origin::Native).unwrap();
-        assert_eq!(account.origin(&host).unwrap(), Some(Origin::Native));
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
+        assert_eq!(
+            account.origin(rk.tez_accounts()).unwrap(),
+            Some(Origin::Native)
+        );
 
         // The alias variant round-trips.
         let alias = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Tezos,
             native_address: "tz1...".to_string(),
         });
-        account.set_origin(&mut host, &alias).unwrap();
-        assert_eq!(account.origin(&host).unwrap(), Some(alias));
+        account.set_origin(rk.tez_accounts_mut(), &alias).unwrap();
+        assert_eq!(account.origin(rk.tez_accounts()).unwrap(), Some(alias));
     }
 
     /// A KT1 classified `Origin::Alias` and carrying no `/data/code` resolves to
@@ -1877,7 +1887,7 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(rk.host_mut(), &account);
+        classify_as_alias(rk.tez_accounts_mut(), &account);
         let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
         write_alias_implementation(rk.host_mut(), &implementation).unwrap();
 
@@ -1885,7 +1895,7 @@ mod test {
             account.code(rk.host(), rk.tez_accounts()).unwrap(),
             Code::Code(implementation)
         );
-        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// An alias whose shared implementation has not been seeded is an error, not
@@ -1897,7 +1907,7 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(rk.host_mut(), &account);
+        classify_as_alias(rk.tez_accounts_mut(), &account);
         // Pin the error type: an unseeded slot is an internal invariant breach,
         // not a generic/typecheck error (so it can't silently change meaning).
         assert!(matches!(
@@ -1905,7 +1915,7 @@ mod test {
             Err(tezos_storage::error::Error::Internal(_))
         ));
         // Still classified, so it exists.
-        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 that is not an alias is a genuinely missing contract:
@@ -1931,7 +1941,7 @@ mod test {
             )
             .into())
         );
-        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 classified `Origin::Native` is not an alias either:
@@ -1945,7 +1955,9 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
 
         let code_key = code::code_key(&account).unwrap();
         assert_eq!(
@@ -1957,7 +1969,7 @@ mod test {
             )
             .into())
         );
-        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated contract (with `/data/code`) is unaffected: its own
@@ -1976,7 +1988,7 @@ mod test {
             account.code(rk.host(), rk.tez_accounts()).unwrap(),
             Code::Code(own_code)
         );
-        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// The `OriginatedContractInfo` binary layout is a fixed cross-language

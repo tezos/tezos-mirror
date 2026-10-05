@@ -489,7 +489,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from_base58_check(&first.0).unwrap();
         let account = context::originated_from_kt1(&kt1).unwrap();
         assert_eq!(
-            account.origin(rk.host()).unwrap(),
+            account.origin(rk.tez_accounts()).unwrap(),
             Some(Origin::Alias(alias_info.clone()))
         );
 
@@ -629,7 +629,7 @@ mod tests {
         assert_eq!(
             context::originated_from_kt1(&kt1)
                 .unwrap()
-                .origin(rk.host())
+                .origin(rk.tez_accounts())
                 .unwrap(),
             Some(Origin::Alias(AliasInfo {
                 runtime: RuntimeId::Ethereum,

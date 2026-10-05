@@ -1322,7 +1322,7 @@ impl RuntimeInterface for TezosRuntime {
         })?;
         let account = context::originated_from_kt1(&kt1)?;
 
-        match account.origin(rk.host())? {
+        match account.origin(rk.tez_accounts())? {
             Some(Origin::Alias(_)) => Ok(true),
             Some(Origin::Native) => Err(TezosXRuntimeError::Custom(format!(
                 "alias_exists: account {alias} is recorded as Native"
@@ -1411,7 +1411,6 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let host = rk.host();
         // Malformed → Unknown, no charge.
         let contract = match Contract::from_b58check(addr) {
             Ok(c) => c,
@@ -1426,7 +1425,7 @@ impl RuntimeInterface for TezosRuntime {
             Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
             Contract::Originated(kt1) => AddressHash::Kt1(kt1),
         };
-        let origin = context::read_origin_for_address(host, &address_hash)?;
+        let origin = context::read_origin_for_address(rk.tez_accounts(), &address_hash)?;
         Ok((Classification::from(origin), consumed))
     }
 
@@ -1440,7 +1439,6 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let host = rk.host();
         let contract = Contract::from_b58check(address)
             .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
         let kt1 = match contract {
@@ -1478,8 +1476,10 @@ impl RuntimeInterface for TezosRuntime {
         }
         budget.consume(ALIAS_LOOKUP_COST)?;
         // if it's already classified as origin
-        let origin =
-            context::read_origin_for_address(host, &AddressHash::Kt1(kt1.clone()))?;
+        let origin = context::read_origin_for_address(
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1.clone()),
+        )?;
         match origin {
             Some(Origin::Native) => return Ok(()),
             Some(Origin::Alias(_)) => {
@@ -1496,7 +1496,7 @@ impl RuntimeInterface for TezosRuntime {
         // aliases code.
         budget.consume(ALIAS_LOOKUP_COST)?;
         let account = context::originated_from_kt1(&kt1)?;
-        if account.exists(host, rk.tez_accounts())? {
+        if account.exists(rk.tez_accounts())? {
             Ok(())
         } else {
             Err(CheckNativeAddressError::NotProvablyNative.into())
@@ -2010,7 +2010,7 @@ mod tests {
         // It is classified as an alias, so once the shared slot is seeded its
         // code resolves to the forwarder.
         assert!(matches!(
-            account.origin(rk.host()).unwrap(),
+            account.origin(rk.tez_accounts()).unwrap(),
             Some(Origin::Alias(_))
         ));
         crate::alias_forwarder::init_alias_implementation(rk.host_mut()).unwrap();
@@ -2126,7 +2126,9 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
 
         // `alias_exists` takes the alias in its own runtime's canonical
         // form (base58 KT1). Passing the EVM address would fail the
@@ -3693,7 +3695,9 @@ mod tests {
             ));
             let kt1_b58 = kt1.to_base58_check();
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let budget = TezosXGas::new(1_000_000, RuntimeId::Tezos);
             let (class, consumed) = runtime.read_origin(&rk, &kt1_b58, budget).unwrap();
@@ -3853,7 +3857,9 @@ mod tests {
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1");
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
             assert_eq!(remaining, milligas(BUDGET_MILLIGAS - lookup_cost()));
@@ -3865,7 +3871,9 @@ mod tests {
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1_with_key");
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let err = check(&rk, &kt1.to_base58_check(), Some(PUBLIC_KEY), budget())
                 .unwrap_err();
@@ -3882,7 +3890,7 @@ mod tests {
                 runtime: RuntimeId::Ethereum,
                 native_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string(),
             });
-            account.set_origin(rk.host_mut(), &origin).unwrap();
+            account.set_origin(rk.tez_accounts_mut(), &origin).unwrap();
 
             let err = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
