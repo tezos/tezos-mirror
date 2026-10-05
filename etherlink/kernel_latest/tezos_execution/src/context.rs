@@ -11,16 +11,18 @@ use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
 use tezosx_interfaces::Origin;
 
 // Account resolution helpers.
 
 /// Resolve the implicit (`tz1`/`tz2`/`tz3`) account for a public key hash.
+///
+/// Fails with a [`KeyError`] when a key of the account is not a valid key.
 pub fn implicit_from_public_key_hash(
     pkh: &PublicKeyHash,
-) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
+) -> Result<TezosImplicitAccount, KeyError> {
     let key = crate::account_storage::key_to_tezos_account(pkh)?;
     Ok(TezosImplicitAccount {
         pkh: pkh.clone(),
@@ -34,7 +36,7 @@ pub fn implicit_from_contract(
     contract: &Contract,
 ) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
     match contract {
-        Contract::Implicit(pkh) => implicit_from_public_key_hash(pkh),
+        Contract::Implicit(pkh) => Ok(implicit_from_public_key_hash(pkh)?),
         _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
     }
 }
@@ -45,7 +47,7 @@ pub fn originated_from_contract(
     contract: &Contract,
 ) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
     match contract {
-        Contract::Originated(kt1) => TezosOriginatedAccount::from_kt1(kt1),
+        Contract::Originated(kt1) => Ok(TezosOriginatedAccount::from_kt1(kt1)?),
         _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
     }
 }
@@ -70,7 +72,7 @@ pub fn read_origin_for_address(
 }
 
 pub mod contracts {
-    use mir::ast::BinWriter;
+    use mir::ast::ByteReprTrait;
 
     use super::*;
 
@@ -79,32 +81,16 @@ pub mod contracts {
     /// The contract index, as a key of the accounts keyspace.
     const INDEX_KEY: Key = Key::from_static(b"/contracts/index");
 
-    /// Returns the path segment `/<hex>` that identifies `contract` under the
-    /// contract index. `<hex>` is the hex form of the binary encoding that the
-    /// context of the octez node uses (see
-    /// `octez-codec describe alpha.contract binary schema`).
-    ///
-    /// Fails with a decoding error if `contract` cannot be binary-encoded, or
-    /// with a path error if the result is not a valid storage path.
-    pub fn account_path(
-        contract: &Contract,
-    ) -> Result<OwnedPath, tezos_storage::error::Error> {
-        let mut contract_encoded = Vec::new();
-        contract
-            .bin_write(&mut contract_encoded)
-            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-
-        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
-        Ok(OwnedPath::try_from(path_string)?)
-    }
-
     /// Returns the key of `contract` under the contract index of the accounts
-    /// keyspace. Every key of an originated account starts with this key.
+    /// keyspace, `/contracts/index/<hex>`. `<hex>` is the hex form of the
+    /// binary encoding that the context of the octez node uses (see
+    /// `octez-codec describe alpha.contract binary schema`). Every key of an
+    /// originated account starts with this key.
     ///
-    /// Fails when `contract` cannot be binary-encoded, or when the resulting
-    /// path or key is invalid (for example, too long).
-    pub fn account_key(contract: &Contract) -> Result<Key, tezos_storage::error::Error> {
-        Ok(INDEX_KEY.concat(account_path(contract)?.as_bytes())?)
+    /// Fails when the resulting key is invalid (for example, too long).
+    pub fn account_key(contract: &Contract) -> Result<Key, KeyError> {
+        let encoded = crate::address_from_contract(contract.clone()).to_bytes_vec();
+        INDEX_KEY.concat(format!("/{}", hex::encode(encoded)))
     }
 }
 
@@ -254,6 +240,7 @@ mod tests {
     use tezos_crypto_rs::hash::ScriptExprHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_smart_rollup_host::path::Path;
 
     /// Returns the durable path that `key` resolves to in the accounts
     /// keyspace, which prepends its name to every key. This function writes

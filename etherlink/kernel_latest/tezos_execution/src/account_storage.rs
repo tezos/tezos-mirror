@@ -322,7 +322,9 @@ impl OriginatedContractInfo {
 
 impl TezosOriginatedAccount {
     /// Resolve the originated (`KT1`) account under the Tezos accounts root.
-    pub fn from_kt1(kt1: &ContractKt1Hash) -> Result<Self, tezos_storage::error::Error> {
+    ///
+    /// Fails with a [`KeyError`] when a key of the account is not a valid key.
+    pub fn from_kt1(kt1: &ContractKt1Hash) -> Result<Self, KeyError> {
         let key = contracts::account_key(&Contract::Originated(kt1.clone()))?;
         Ok(Self {
             kt1: kt1.clone(),

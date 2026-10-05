@@ -2087,7 +2087,9 @@ where
     let parser = Parser::new();
     let arena = &parser.arena;
 
-    let host_err = |e: tezos_storage::error::Error| RunCodeError::Host(e.to_string());
+    fn host_err(e: impl std::fmt::Display) -> RunCodeError {
+        RunCodeError::Host(e.to_string())
+    }
 
     let account = account_storage::TezosOriginatedAccount::from_kt1(&params.self_address)
         .map_err(host_err)?;
