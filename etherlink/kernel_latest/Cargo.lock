@@ -1955,6 +1955,7 @@ dependencies = [
  "strum_macros 0.26.4",
  "tezos-protocol",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-keyspace",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror 1.0.69",
