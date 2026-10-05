@@ -876,7 +876,7 @@ end
 module External_global_pipeline = struct
   type t = {
     name : string;
-    rule : Gitlab_ci.If.t;
+    rule : Gitlab_ci.If.t Lazy.t;
     description : string;
     variables : Gitlab_ci.Types.variables option;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
@@ -897,19 +897,7 @@ type global_pipeline =
   | Before_merging
   | Merge_train
   | Master
-  (* Release tag pipelines *)
-  | Major_release_tag
-  | Major_release_tag_test
-  | Minor_release_tag
-  | Minor_release_tag_test
-  | Beta_release_tag
-  | Beta_release_tag_test
-  | Non_release_tag
-  | Non_release_tag_test
-  | Packaging_revision
-  | Packaging_revision_test
-  | Octez_latest_release
-  | Octez_latest_release_test
+(* Release tag pipelines *)
 (* Debian packaging pipelines *)
 (* Homebrew packaging pipelines *)
 (* Security scan pipelines *)
@@ -995,14 +983,6 @@ let register_merge_request_jobs jobs =
   let non_manual_jobs = List.filter (fun x -> not (is_manual x)) jobs in
   register_jobs Merge_train non_manual_jobs
 
-let register_release_jobs jobs =
-  register_jobs Major_release_tag jobs ;
-  register_jobs Beta_release_tag jobs
-
-let register_test_release_jobs jobs =
-  register_jobs Major_release_tag_test jobs ;
-  register_jobs Beta_release_tag_test jobs
-
 (* Defined at the end of this module. *)
 let job_trigger : job option ref = ref None
 
@@ -1050,7 +1030,6 @@ let get_jobs pipeline =
           convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
       | Merge_train -> convert_jobs ~with_condition:true jobs
       | Master -> convert_jobs ~interruptible_publish:true jobs
-      | Packaging_revision_test -> convert_jobs ~interruptible_publish:true jobs
       | _ -> convert_jobs jobs)
 
 (* Register all pipelines that were defined with [new_global_pipeline] with CIAO.
@@ -1070,7 +1049,7 @@ let close () =
     ~description:pipeline.description
     ~jobs:(get_jobs (External pipeline))
     pipeline.name
-    pipeline.rule
+    (Lazy.force pipeline.rule)
 
 let release_tag_rexes = ref String_set.empty
 

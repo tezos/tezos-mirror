@@ -38,10 +38,240 @@ open Tezos_ci
    Instead of modifying the definition of each job, we override the value
    by passing [~interruptible_pipeline:false] to [new_global_pipeline]. *)
 
+(* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
+let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/"
+
+(* Matches Octez minor release tags, e.g. [octez-v1.2]. *)
+let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/"
+
+(* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
+let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/"
+
+(* Matches Octez packaging revision tags, e.g. [octez-v1.0-2]. *)
+let octez_packaging_revision_tag_re = "/^octez-v\\d+\\.\\d+\\-\\d+$/"
+
+(* Matches either Octez release tags or Octez beta release tags,
+   e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
+let octez_release_tags =
+  [
+    octez_major_release_tag_re;
+    octez_minor_release_tag_re;
+    octez_beta_release_tag_re;
+  ]
+
+let has_any_tag tags =
+  match List.map Rules.has_tag_match tags with
+  | [] ->
+      (* We could return [Rules.never], but this looks like a programming mistake. *)
+      invalid_arg "has_any_tag: empty list"
+  | [tag] -> tag
+  | head :: tail -> List.fold_left If.( || ) head tail
+
+(* Lazy: [Cacio.get_release_tag_rexes] only knows all release tags once every
+   component has declared its release pipelines. *)
+let has_non_release_tag =
+  lazy
+    (let release_tags =
+       octez_release_tags
+       @ [octez_packaging_revision_tag_re]
+       @ Cacio.get_release_tag_rexes ()
+     in
+     If.(
+       Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags)))
+
+let release_description =
+  "\n\n\
+   For more information on Octez' release system, see: \
+   https://octez.tezos.com/docs/releases/releases.html"
+
+(* TODO: rename 'octez_docker_latest_release' ?? *)
+let octez_latest_release =
+  Cacio.new_global_pipeline
+    "octez_latest_release"
+    (lazy Rules.(If.(on_tezos_namespace && push && on_branch "latest-release")))
+    ~description:
+      ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
+        This pipeline is created on each push to the 'latest-release' branch \
+        of 'tezos/tezos', typically performed by the release manager. On each \
+        release, the 'latest-release' branch is updated to point to the git \
+        tag of the release. This resulting pipeline then updates the Docker \
+        tag 'latest' of the Octez Docker distribution published to Docker hub \
+        (https://hub.docker.com/r/tezos/tezos) to point to the Docker release \
+        associated with the git tag pushed to the 'latest-release' branch."
+     ^ release_description)
+
+let octez_latest_release_test =
+  Cacio.new_global_pipeline
+    "octez_latest_release_test"
+    (lazy
+      Rules.(
+        If.(not_on_tezos_namespace && push && on_branch "latest-release-test")))
+    ~description:
+      "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
+       This pipeline is used to dry run the 'octez_latest_release' pipeline, \
+       checking that it works as intended, without updating any Docker tags. \
+       Developers or release managers trigger it manually by pushing to the \
+       branch 'latest-release-test' of a fork of 'tezos/tezos', e.g. to the \
+       'nomadic-labs/tezos' project."
+
+(* TODO: simplify dry run pipelines by having them all be on tezos/tezos? *)
+let octez_major_release_tag =
+  Cacio.new_global_pipeline
+    "octez_major_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for major Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.0(-rcN).\n\
+        Publishes release assets for all the components of Octez."
+     ^ release_description)
+
+let octez_minor_release_tag =
+  Cacio.new_global_pipeline
+    "octez_minor_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for minor Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.Y.\n\
+        Publishes release assets for Octez L1 only." ^ release_description)
+
+let octez_beta_release_tag =
+  Cacio.new_global_pipeline
+    "octez_beta_release_tag"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)))
+    ~description:
+      ("Beta release tag pipelines for Octez.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.Y(-betaN). It is as Octez release tag pipelines, but \
+        does not publish to opam." ^ release_description)
+
+let octez_major_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_major_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_major_release_tag_re)))
+    ~description:
+      "Dry-run pipeline for 'octez_major_release_tag'.\n\n\
+       This pipeline checks that 'octez_major_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_minor_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_minor_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_minor_release_tag_re)))
+    ~description:
+      "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
+       This pipeline checks that 'octez_minor_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_beta_release_tag_test =
+  Cacio.new_global_pipeline
+    "octez_beta_release_tag_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && has_tag_match octez_beta_release_tag_re)))
+    ~description:
+      "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
+       This pipeline checks that 'octez_beta_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let octez_packaging_revision =
+  Cacio.new_global_pipeline
+    "octez_packaging_revision"
+    (lazy
+      Rules.(
+        If.(
+          on_tezos_namespace && push
+          && Rules.has_tag_match octez_packaging_revision_tag_re)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Packaging revision pipeline for Octez.\n\n\
+       This pipeline is created when a packaging revision tag in the format \
+       octez-vX.Y-N is pushed to tezos/tezos."
+
+let octez_packaging_revision_test =
+  Cacio.new_global_pipeline
+    "octez_packaging_revision_test"
+    (lazy
+      Rules.(
+        If.(
+          not_on_tezos_namespace && push
+          && Rules.has_tag_match octez_packaging_revision_tag_re)))
+    ~interruptible_publish:true
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      "Dry run pipeline for 'octez_packaging_revision_tag'.\n\n\
+       This pipeline checks that 'octez_packaging_revision_tag' pipelines work \
+       as intended, without publishing any assets. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project."
+
+let non_release_tag =
+  Cacio.new_global_pipeline
+    "non_release_tag"
+    (lazy
+      Rules.(If.(on_tezos_namespace && push && Lazy.force has_non_release_tag)))
+    ~description:
+      ("Tag pipeline for non-release tags.\n\n\
+        Created on each push of a tag that does not match e.g. \
+        octez(-evm-node)-vX.Y(-rcN). This pipeline creates a release on GitLab \
+        and associated artifacts, like 'octez_release_tag' pipelines, but does \
+        not publish it." ^ release_description)
+
+let non_release_tag_test =
+  Cacio.new_global_pipeline
+    "non_release_tag_test"
+    (lazy
+      Rules.(
+        If.(not_on_tezos_namespace && push && Lazy.force has_non_release_tag)))
+    ~description:
+      "Dry-run pipeline for 'non_release_tag'.\n\n\
+       This pipeline checks that 'non_release_tag' pipelines work as intended, \
+       without publishing any release. Developers, or release managers, can \
+       create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
+       to the 'nomadic-labs/tezos' project."
+
+(* Add jobs to the release pipelines of all components. *)
+let register_release_jobs jobs =
+  Cacio.register_jobs octez_major_release_tag jobs ;
+  Cacio.register_jobs octez_beta_release_tag jobs
+
+(* Add jobs to the test release pipelines of all components. *)
+let register_test_release_jobs jobs =
+  Cacio.register_jobs octez_major_release_tag_test jobs ;
+  Cacio.register_jobs octez_beta_release_tag_test jobs
+
 let schedule_extended_test =
   Cacio.new_global_pipeline
     "schedule_extended_test"
-    Rules.schedule_extended_tests
+    (lazy Rules.schedule_extended_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
@@ -54,14 +284,14 @@ let schedule_extended_test =
 let debian_daily =
   Cacio.new_global_pipeline
     "debian.daily"
-    Rules.debian_daily
+    (lazy Rules.debian_daily)
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)."
 
 let homebrew_daily =
   Cacio.new_global_pipeline
     "homebrew.daily"
-    Rules.homebrew_daily
+    (lazy Rules.homebrew_daily)
     ~interruptible_pipeline:false
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)."
@@ -77,7 +307,7 @@ let homebrew_daily =
 let base_images_refresh =
   Cacio.new_global_pipeline
     "base_images.refresh"
-    Rules.base_images_refresh
+    (lazy Rules.base_images_refresh)
     ~interruptible_pipeline:false
     ~variables:
       [("CI_COMMIT_REF_SLUG", "master"); ("DOCKER_FORCE_BUILD", "true")]
@@ -88,7 +318,7 @@ let base_images_refresh =
 let base_images_daily =
   Cacio.new_global_pipeline
     "base_images.daily"
-    Rules.base_images_daily
+    (lazy Rules.base_images_daily)
     ~interruptible_pipeline:false
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)."
@@ -96,7 +326,7 @@ let base_images_daily =
 let schedule_extended_rpc_test =
   Cacio.new_global_pipeline
     "schedule_extended_rpc_test"
-    Rules.schedule_extended_rpc_tests
+    (lazy Rules.schedule_extended_rpc_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
@@ -107,7 +337,7 @@ let schedule_extended_rpc_test =
 let schedule_extended_validation_test =
   Cacio.new_global_pipeline
     "schedule_extended_validation_test"
-    Rules.schedule_extended_validation_tests
+    (lazy Rules.schedule_extended_validation_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
@@ -118,7 +348,7 @@ let schedule_extended_validation_test =
 let schedule_extended_baker_remote_mode_test =
   Cacio.new_global_pipeline
     "schedule_extended_baker_remote_mode_test"
-    Rules.schedule_extended_baker_remote_mode_tests
+    (lazy Rules.schedule_extended_baker_remote_mode_tests)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with baker using remote node, weekly on \
@@ -128,7 +358,7 @@ let schedule_extended_baker_remote_mode_test =
 let schedule_extended_dal_use_baker =
   Cacio.new_global_pipeline
     "schedule_extended_dal_use_baker"
-    Rules.schedule_extended_dal_use_baker
+    (lazy Rules.schedule_extended_dal_use_baker)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
@@ -153,7 +383,7 @@ let register_custom_extended_test_jobs jobs =
 let schedule_test_release =
   Cacio.new_global_pipeline
     "schedule_test_release"
-    Rules.schedule_test_release
+    (lazy Rules.schedule_test_release)
     ~description:
       "Scheduled pipeline that runs a test release pipeline. The jobs are the \
        same as a release pipeline but run in dry-mode."
@@ -161,7 +391,7 @@ let schedule_test_release =
 let schedule_security_scans =
   Cacio.new_global_pipeline
     "schedule_security_scans"
-    Rules.schedule_security_scans
+    (lazy Rules.schedule_security_scans)
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images"
@@ -169,7 +399,7 @@ let schedule_security_scans =
 let schedule_docker_master_snapshot =
   Cacio.new_global_pipeline
     "schedule_docker_master_snapshot"
-    Rules.schedule_docker_master_snapshot
+    (lazy Rules.schedule_docker_master_snapshot)
     ~interruptible_pipeline:false
     ~description:
       "Scheduled pipeline publishing a dated master Docker image to Docker \
@@ -182,7 +412,7 @@ let schedule_docker_master_snapshot =
 let schedule_docker_build_pipeline =
   Cacio.new_global_pipeline
     "schedule_docker_build_pipeline"
-    Rules.schedule_docker_build
+    (lazy Rules.schedule_docker_build)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
@@ -192,11 +422,11 @@ let schedule_docker_build_pipeline =
 let publish_test_release_page =
   Cacio.new_global_pipeline
     "publish_test_release_page"
-    Rules.(If.(api_release_page && not_on_tezos_namespace))
+    (lazy Rules.(If.(api_release_page && not_on_tezos_namespace)))
     ~description:"Pipeline that updates and publishes the test release page."
 
 let publish_release_page =
   Cacio.new_global_pipeline
     "publish_release_page"
-    Rules.(If.(api_release_page && on_tezos_namespace))
+    (lazy Rules.(If.(api_release_page && on_tezos_namespace)))
     ~description:"Pipeline that updates and publishes the release page."

@@ -105,14 +105,15 @@ let register () =
     "daily"
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
-  Cacio.register_release_jobs [(Manual, job_deploy_release_page_assets `real)] ;
-  Cacio.register_test_release_jobs
+  Tezos_ci_pipelines.register_release_jobs
+    [(Manual, job_deploy_release_page_assets `real)] ;
+  Tezos_ci_pipelines.register_test_release_jobs
     [(Manual, job_deploy_release_page_assets `test)] ;
   Cacio.register_jobs
-    Non_release_tag
+    Tezos_ci_pipelines.non_release_tag
     [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
   Cacio.register_jobs
-    Non_release_tag_test
+    Tezos_ci_pipelines.non_release_tag_test
     [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_test_release

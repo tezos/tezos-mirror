@@ -433,19 +433,7 @@ type global_pipeline =
   | Before_merging
   | Merge_train
   | Master
-  (* Release tag pipelines *)
-  | Major_release_tag
-  | Major_release_tag_test
-  | Minor_release_tag
-  | Minor_release_tag_test
-  | Beta_release_tag
-  | Beta_release_tag_test
-  | Non_release_tag
-  | Non_release_tag_test
-  | Packaging_revision
-  | Packaging_revision_test
-  | Octez_latest_release
-  | Octez_latest_release_test
+(* Release tag pipelines *)
 (* Debian packaging pipelines *)
 (* Homebrew packaging pipelines *)
 (* Security scan pipelines *)
@@ -463,6 +451,12 @@ type global_pipeline =
     named [name], that GitLab creates when [rule] holds. Components can then
     add jobs to it with {!register_jobs}, and {!close} registers it with CIAO
     once all jobs have been added.
+
+    [rule] is lazy because it is only forced by {!close}, i.e. once all
+    components have been initialized. Some rules need this: the rule of the
+    [non_release_tag] pipelines is defined from the release tags of all
+    components (see {!get_release_tag_rexes}), which are only all known once
+    every component has declared its release pipelines.
 
     [description] is printed by [ci/bin/main.exe --list-pipelines].
     Its first sentence should be short (<= 80 characters) and be followed by
@@ -499,7 +493,7 @@ val new_global_pipeline :
   ?allow_manual_jobs:bool ->
   description:string ->
   string ->
-  Gitlab_ci.If.t ->
+  Gitlab_ci.If.t Lazy.t ->
   global_pipeline
 
 (** Add jobs to a given global pipeline. *)
@@ -512,22 +506,6 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
 
     If a job is [Manual], this function only registers it into [Before_merging]. *)
 val register_merge_request_jobs : (trigger * job) list -> unit
-
-(** Register jobs to be included in release pipelines.
-
-    This registers jobs into:
-    - [Major_release_tag]
-    - [Beta_release_tag]
-    - [Non_release_tag] *)
-val register_release_jobs : (trigger * job) list -> unit
-
-(** Register jobs to be included in test release pipelines.
-
-    This registers jobs into:
-    - [Major_release_tag_test]
-    - [Beta_release_tag_test]
-    - [Non_release_tag_test] *)
-val register_test_release_jobs : (trigger * job) list -> unit
 
 (** {2 Listing registered jobs and more} *)
 

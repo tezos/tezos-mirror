@@ -10,6 +10,54 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Updates the 'latest' tag of the Octez Docker distribution on Docker Hub. *)
+val octez_latest_release : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!octez_latest_release}. *)
+val octez_latest_release_test : Cacio.global_pipeline
+
+(** Publishes a major Octez release, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
+val octez_major_release_tag : Cacio.global_pipeline
+
+(** Publishes a minor Octez release, e.g. [octez-v1.2]. *)
+val octez_minor_release_tag : Cacio.global_pipeline
+
+(** Publishes a beta Octez release, e.g. [octez-v1.2-beta5]. *)
+val octez_beta_release_tag : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!octez_major_release_tag}. *)
+val octez_major_release_tag_test : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!octez_minor_release_tag}. *)
+val octez_minor_release_tag_test : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!octez_beta_release_tag}. *)
+val octez_beta_release_tag_test : Cacio.global_pipeline
+
+(** Publishes a new revision of the packages of an Octez release. *)
+val octez_packaging_revision : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!octez_packaging_revision}. *)
+val octez_packaging_revision_test : Cacio.global_pipeline
+
+(** Pipeline for tags that are not release tags. *)
+val non_release_tag : Cacio.global_pipeline
+
+(** Dry-run pipeline for {!non_release_tag}. *)
+val non_release_tag_test : Cacio.global_pipeline
+
+(** Add jobs to the release pipelines.
+
+    This is equivalent to registering the jobs into both
+    {!octez_major_release_tag} and {!octez_beta_release_tag}. *)
+val register_release_jobs : (Cacio.trigger * Cacio.job) list -> unit
+
+(** Add jobs to the test release pipelines.
+
+    This is equivalent to registering the jobs into both
+    {!octez_major_release_tag_test} and {!octez_beta_release_tag_test}. *)
+val register_test_release_jobs : (Cacio.trigger * Cacio.job) list -> unit
+
 (** Scheduled, full version of 'before_merging', daily on 'master'. *)
 val schedule_extended_test : Cacio.global_pipeline
 
