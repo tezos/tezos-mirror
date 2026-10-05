@@ -100,7 +100,9 @@ let to_list field =
       let acc = if Z.testbit field 0 then pos :: acc else acc in
       to_list (pos + 1) acc (Z.shift_right field 1)
   in
-  to_list 0 [] field |> List.rev
+  (* A negative integer is not a valid bitset: [Z.shift_right] on it never
+     reaches zero, so the loop above would not terminate. *)
+  if Z.sign field < 0 then [] else to_list 0 [] field |> List.rev
 
 let fill ~length =
   let open Result_syntax in

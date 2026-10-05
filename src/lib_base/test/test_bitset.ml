@@ -125,6 +125,21 @@ let test_cardinal_negative () =
                z)))
     [-1; -2; -42; -1000]
 
+(* [to_list] must terminate on a negative bitset: [Z.shift_right] of a negative
+   integer never reaches zero. *)
+let test_to_list_negative () =
+  List.iter
+    (fun z ->
+      Check.(
+        (to_list (bitset_of_z (Z.of_int z)) = [])
+          (list int)
+          ~__LOC__
+          ~error_msg:
+            (Format.sprintf
+               "to_list of the negative bitset %d must be %%R, got %%L"
+               z)))
+    [-1; -2; -42; -1000]
+
 let () =
   Alcotest.run
     ~__FILE__
@@ -133,6 +148,8 @@ let () =
       ( "cardinal",
         [Alcotest.test_case "negative is total" `Quick test_cardinal_negative]
       );
+      ( "to_list",
+        [Alcotest.test_case "negative is total" `Quick test_to_list_negative] );
       ( "quantity",
         qcheck_wrap
           [
