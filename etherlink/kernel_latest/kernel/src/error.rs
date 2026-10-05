@@ -61,7 +61,7 @@ pub enum StorageError {
     #[error(transparent)]
     KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
-    KeySpaceKey(#[from] KeyError),
+    Key(#[from] KeyError),
 }
 
 impl From<KeySpaceError> for StorageError {
@@ -192,7 +192,7 @@ impl From<KeySpaceError> for Error {
 
 impl From<KeyError> for Error {
     fn from(e: KeyError) -> Self {
-        Self::Storage(StorageError::KeySpaceKey(e))
+        Self::Storage(StorageError::Key(e))
     }
 }
 
@@ -271,9 +271,7 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::KeySpace(e) => {
                 Error::Storage(StorageError::KeySpace(e))
             }
-            IndexableStorageError::KeySpaceKey(e) => {
-                Error::Storage(StorageError::KeySpaceKey(e))
-            }
+            IndexableStorageError::Key(e) => Error::Storage(StorageError::Key(e)),
         }
     }
 }
@@ -283,7 +281,7 @@ impl From<GenStorageError> for Error {
         match e {
             GenStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
             GenStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
-            GenStorageError::Key(e) => Error::Storage(StorageError::KeySpaceKey(e)),
+            GenStorageError::Key(e) => Error::Storage(StorageError::Key(e)),
             GenStorageError::KeySpace(e) => Error::Storage(StorageError::KeySpace(e)),
             GenStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             GenStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),

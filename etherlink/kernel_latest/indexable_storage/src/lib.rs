@@ -61,7 +61,7 @@ pub enum IndexableStorageError {
     #[error(transparent)]
     KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
-    KeySpaceKey(#[from] KeyError),
+    Key(#[from] KeyError),
 }
 
 impl From<KeySpaceError> for IndexableStorageError {
@@ -76,7 +76,7 @@ impl From<GenStorageError> for IndexableStorageError {
             GenStorageError::Path(e) => IndexableStorageError::Path(e),
             GenStorageError::Runtime(e) => IndexableStorageError::Runtime(e),
             GenStorageError::Storage(e) => IndexableStorageError::Storage(e),
-            GenStorageError::Key(e) => IndexableStorageError::KeySpaceKey(e),
+            GenStorageError::Key(e) => IndexableStorageError::Key(e),
             GenStorageError::KeySpace(e) => IndexableStorageError::KeySpace(e),
             GenStorageError::RlpDecoderError(e) => {
                 IndexableStorageError::RlpDecoderError(e)
