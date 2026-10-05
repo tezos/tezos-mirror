@@ -29,7 +29,10 @@ use tezos_smart_rollup::{
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::{
+    Key, KeyError, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
+};
+use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::keyspace::KeySpaceExtBounded;
 use tezos_storage::{read_optional_nom_value, store_bin};
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
@@ -495,14 +498,20 @@ impl TezosOriginatedAccount {
 
     pub fn storage(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(vec![]);
         }
-        let storage_path = code::storage_path(self)?;
-        let storage = host.store_read_all(&storage_path)?;
-        Ok(storage)
+        let key = code::storage_key(self)?;
+        tez_accounts.get(&key).ok_or_else(|| {
+            KeySpaceError::read(
+                tez_accounts.name(),
+                &key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into()
+        })
     }
 
     pub fn code_size(
@@ -553,19 +562,19 @@ impl TezosOriginatedAccount {
     #[cfg(test)]
     pub fn set_storage(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, impl StorageV1 + KeySpaceLoader>,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
     ) -> Result<StorageDelta, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(0.into());
         }
-        let path = code::storage_path(self)?;
-        rk.host_mut().store_write_all(&path, data)?;
-        let mut info = self.read_info(rk.tez_accounts())?;
+        let path = code::storage_key(self)?;
+        tez_accounts.set(&path, data)?;
+        let mut info = self.read_info(tez_accounts)?;
         let new_storage_size = data.len() as u64;
         let prev_storage_size = Zarith::from(info.storage_size.clone()).0;
         info.storage_size = new_storage_size.into();
-        self.write_info(rk.tez_accounts_mut(), &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok((BigInt::from(new_storage_size) - prev_storage_size).into())
     }
 
@@ -607,8 +616,8 @@ impl TezosOriginatedAccount {
             }
             None => 0,
         };
-        let storage_path = code::storage_path(self)?;
-        rk.host_mut().store_write_all(&storage_path, storage)?;
+        let storage_key = code::storage_key(self)?;
+        rk.tez_accounts_mut().set(&storage_key, storage)?;
         let storage_size = storage.len() as u64;
         let info = OriginatedContractInfo::for_new_contract(
             code_size,
@@ -678,16 +687,16 @@ impl TezosOriginatedAccount {
     /// happen only once their cost is secured.
     pub fn write_storage_and_info(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, impl StorageV1 + KeySpaceLoader>,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
         info: &OriginatedContractInfo,
     ) -> Result<(), tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(());
         }
-        let path = code::storage_path(self)?;
-        rk.host_mut().store_write_all(&path, data)?;
-        self.write_info(rk.tez_accounts_mut(), info)
+        let path = code::storage_key(self)?;
+        tez_accounts.set(&path, data)?;
+        self.write_info(tez_accounts, info)
     }
 }
 
@@ -1432,7 +1441,9 @@ mod test {
             Zarith::from(initial_size)
         );
 
-        let diff = account.set_storage(&mut rk, &larger_storage).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &larger_storage)
+            .unwrap();
         let StorageSpace {
             allocated_bytes, ..
         } = account
@@ -1468,7 +1479,9 @@ mod test {
             .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
 
-        let diff = account.set_storage(&mut rk, &smaller_storage).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &smaller_storage)
+            .unwrap();
         let StorageSpace {
             allocated_bytes, ..
         } = account
@@ -1493,16 +1506,24 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        let first = account.set_storage(&mut rk, &[0u8; 30]).unwrap();
+        let first = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 30])
+            .unwrap();
         assert_eq!(first, 30.into(), "first write reports new_len");
 
-        let grow = account.set_storage(&mut rk, &[0u8; 50]).unwrap();
+        let grow = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 50])
+            .unwrap();
         assert_eq!(grow, 20.into(), "grow reports new_len - prev_len");
 
-        let shrink = account.set_storage(&mut rk, &[0u8; 5]).unwrap();
+        let shrink = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 5])
+            .unwrap();
         assert_eq!(shrink, (-45).into(), "shrink reports the negative delta");
 
-        let same = account.set_storage(&mut rk, &[1u8; 5]).unwrap();
+        let same = account
+            .set_storage(rk.tez_accounts_mut(), &[1u8; 5])
+            .unwrap();
         assert_eq!(same, 0.into(), "same-size overwrite reports zero delta");
     }
 
@@ -1519,7 +1540,9 @@ mod test {
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
 
-        let diff = account.set_storage(&mut rk, &[0xef_u8; 15]).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &[0xef_u8; 15])
+            .unwrap();
         assert_eq!(
             diff,
             0.into(),
@@ -1534,9 +1557,9 @@ mod test {
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
 
-        let storage_path = code::storage_path(&account).unwrap();
+        let storage_key = code::storage_key(&account).unwrap();
         let info_key = code::info_key(&account).unwrap();
-        assert_eq!(rk.host().store_has(&storage_path).unwrap(), None);
+        assert!(!rk.tez_accounts().contains(&storage_key));
         assert!(!rk.tez_accounts().contains(&info_key));
     }
 

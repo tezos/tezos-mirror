@@ -277,7 +277,7 @@ pub mod code {
 
     const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
 
-    const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
+    const STORAGE: Key = Key::from_static(b"/data/storage");
 
     /// Classification record (`Origin`) of an originated account, read here to
     /// resolve a code-less alias to the shared implementation. This is the
@@ -320,10 +320,15 @@ pub mod code {
         originated_path(account, &CODE_PATH)
     }
 
-    pub fn storage_path(
+    /// Returns the key of the storage of `account`, `/data/storage` under the
+    /// key of `account`, relative to the accounts keyspace.
+    ///
+    /// Fails when the joined key exceeds the maximum key size or is not a valid
+    /// path.
+    pub fn storage_key(
         account: &TezosOriginatedAccount,
-    ) -> Result<OwnedPath, PathError> {
-        originated_path(account, &STORAGE_PATH)
+    ) -> Result<Key, tezos_storage::error::Error> {
+        segment_key(account, &STORAGE)
     }
 
     pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
@@ -457,10 +462,12 @@ mod tests {
     #[test]
     fn originated_state_keys_keep_their_durable_paths() {
         let (_, account, index) = sample_originated();
-        assert_eq!(
-            durable(&code::info_key(&account).unwrap()),
-            format!("{index}/info").into_bytes()
-        );
+        for (key, segment) in [
+            (code::info_key(&account).unwrap(), "/info"),
+            (code::storage_key(&account).unwrap(), "/data/storage"),
+        ] {
+            assert_eq!(durable(&key), format!("{index}{segment}").into_bytes());
+        }
     }
 
     /// Makes sure that the key of a contract resolves to

@@ -2065,7 +2065,7 @@ mod tests {
 
         let stored = context::originated_from_contract(&generated_contract)
             .expect("originated account interface should be correct")
-            .storage(&host)
+            .storage(&tez_accounts)
             .expect("contract storage should be readable");
 
         assert_eq!(

@@ -515,7 +515,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     code: view.code.clone(),
                 };
                 let storage = account
-                    .storage(self.tc_ctx.rk.host())
+                    .storage(self.tc_ctx.rk.tez_accounts())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
                 let balance = account
                     .balance(self.tc_ctx.rk.tez_accounts())

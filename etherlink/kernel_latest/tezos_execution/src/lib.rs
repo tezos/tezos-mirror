@@ -1587,7 +1587,7 @@ where
             )
             .map_err(TransferError::OutOfGas)?;
             let storage = dest_account
-                .storage(tc_ctx.rk.host())
+                .storage(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
                 .map_err(TransferError::OutOfGas)?;
@@ -1719,7 +1719,11 @@ where
             // their gas has been charged (no-op for enshrined contracts).
             if let Some(info) = &info_to_write {
                 dest_account
-                    .write_storage_and_info(tc_ctx.rk, &new_storage, info)
+                    .write_storage_and_info(
+                        tc_ctx.rk.tez_accounts_mut(),
+                        &new_storage,
+                        info,
+                    )
                     .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             }
             let StorageSpace {
@@ -5500,7 +5504,7 @@ mod tests {
         );
 
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            destination.storage(rk.tez_accounts()).unwrap(),
             storage_value,
             "Storage has not been updated"
         )
@@ -5698,7 +5702,7 @@ mod tests {
             (48_u64 - 15).into()
         );
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            destination.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -6029,7 +6033,7 @@ mod tests {
         );
 
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            destination.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -6580,7 +6584,7 @@ mod tests {
 
         // Storage must have reverted
         assert!(
-            succ_account.storage(rk.host()).unwrap()
+            succ_account.storage(rk.tez_accounts()).unwrap()
                 == Micheline::from("initial")
                     .encode(&mut Gas::default())
                     .unwrap()
@@ -6790,7 +6794,7 @@ mod tests {
             "Current code for smart contract is not the same as the one originated"
         );
         let smart_contract_storage = smart_contract_account
-            .storage(rk.host())
+            .storage(rk.tez_accounts())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_storage, storage,
@@ -6941,7 +6945,7 @@ mod tests {
         // The state effect the `Applied` status used to commit: the callee's
         // storage write is rolled back with the rest of the operation.
         assert_eq!(
-            raising_account.storage(rk.host()).unwrap(),
+            raising_account.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8284,7 +8288,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             Micheline::from(i128::from(transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8359,7 +8363,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             Micheline::from(i128::from(initial_balance + transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8436,7 +8440,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             micheline_address
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -10396,7 +10400,7 @@ mod tests {
         let receiver_contract = result.receiver;
 
         if let Some(expected_sender_big_map) = expected_sender_big_map {
-            let storage = sender_contract.storage(ctx.rk.host()).unwrap();
+            let storage = sender_contract.storage(ctx.rk.tez_accounts()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -10422,7 +10426,7 @@ mod tests {
         }
 
         if let Some(expected_receiver_big_map) = expected_receiver_big_map {
-            let storage = receiver_contract.storage(ctx.rk.host()).unwrap();
+            let storage = receiver_contract.storage(ctx.rk.tez_accounts()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -10716,7 +10720,7 @@ mod tests {
             .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for originator");
         let mich_storage_originator = Micheline::decode_raw(
             &parser.arena,
@@ -10750,7 +10754,7 @@ mod tests {
         println!("Originator OK");
 
         let storage_0 = created_acount_0
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #0");
         let mich_storage_0 =
             Micheline::decode_raw(&parser.arena, &storage_0, &mut Gas::default())
@@ -10781,7 +10785,7 @@ mod tests {
         println!("Created_0 OK");
 
         let storage_1 = created_acount_1
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #1");
         let mich_storage_1 =
             Micheline::decode_raw(&parser.arena, &storage_1, &mut Gas::default())
@@ -10812,7 +10816,7 @@ mod tests {
         println!("Created_1 OK");
 
         let storage_2 = created_acount_2
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #2");
         let mich_storage_2 =
             Micheline::decode_raw(&parser.arena, &storage_2, &mut Gas::default())
@@ -11112,7 +11116,7 @@ mod tests {
 
         // Checks that the storage of the receiver is true
         let storage = receiver
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -11183,7 +11187,7 @@ mod tests {
 
         // Checks that the storage of the receiver contract is 'False'
         let storage = receiver
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -13572,7 +13576,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            account.storage(rk.host()).unwrap(),
+            account.storage(rk.tez_accounts()).unwrap(),
             first_storage,
             "contract storage must record the registered address index"
         );

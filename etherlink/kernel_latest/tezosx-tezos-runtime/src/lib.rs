@@ -1993,7 +1993,7 @@ mod tests {
         // code is not charged per alias), and used/paid bytes account for the
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
-        let storage_len = account.storage(rk.host()).unwrap().len() as u64;
+        let storage_len = account.storage(rk.tez_accounts()).unwrap().len() as u64;
         assert_eq!(
             account.code_size(rk.tez_accounts()).unwrap(),
             Zarith::from(0u64)
@@ -2051,7 +2051,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        let storage = account.storage(rk.host()).unwrap();
+        let storage = account.storage(rk.tez_accounts()).unwrap();
         let expected =
             alias_forwarder::forwarder_storage(evm_address, &mut Gas::default())
                 .unwrap()
