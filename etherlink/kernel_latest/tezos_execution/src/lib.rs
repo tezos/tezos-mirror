@@ -7342,7 +7342,7 @@ mod tests {
                         result: ContentResult::Applied(_),
                         internal_operation_results,
                         ..
-                    }) => internal_operation_results.clone(),
+                    }) => internal_operation_results,
                     other => panic!(
                         "Top-level operation should be an applied transfer but is {other:?}"
                     ),

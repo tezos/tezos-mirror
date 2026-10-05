@@ -716,6 +716,7 @@ where
 mod tests {
     #![allow(clippy::disallowed_methods)]
     use super::*;
+    use crate::apply::tests::make_transfer_with_contract;
     use crate::apply::TezosExecutionInfo;
     use crate::block_in_progress::BlockInProgress;
     use crate::block_storage::internal_for_tests::{
@@ -751,9 +752,9 @@ mod tests {
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use sha3::{Digest, Keccak256};
     use std::str::FromStr;
-    use tezos_crypto_rs::hash::ChainId;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
+    use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash};
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_ethereum::transaction::{
@@ -2308,7 +2309,7 @@ mod tests {
 
     #[test]
     fn delayed_internal_op_cap_is_cumulative() {
-        use crate::apply::tests::{dummy_crac_receipt, make_transfer};
+        use crate::apply::tests::dummy_crac_receipt;
         use crate::apply::RuntimeExecutionInfo;
         use crate::block_in_progress::BlockInProgress;
         use mir::gas::Gas;
@@ -2325,6 +2326,11 @@ mod tests {
         // EMITs exactly one internal operation, with the block's prior
         // internal-op count seeded to `base`. Returns whether the top-level
         // operation was `Applied`.
+        let contract = tezos_protocol::contract::Contract::Originated(
+            ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
+        );
+
         let run = |base: u128| {
             let mut host = MockKernelHost::default();
             let mut tez_accounts = host
@@ -2437,10 +2443,11 @@ mod tests {
             );
             block_in_progress.cumulative_tezos_operation_receipts =
                 OperationsWithReceipts {
-                    list: vec![dummy_crac_receipt(vec![
-                        make_transfer(0, 0);
-                        base as usize
-                    ])],
+                    list: vec![dummy_crac_receipt(
+                        (0..base)
+                            .map(|_| make_transfer_with_contract(contract.clone(), 0, 0))
+                            .collect(),
+                    )],
                 };
 
             let registry = RegistryImpl::default();

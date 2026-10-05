@@ -381,7 +381,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -1155,7 +1155,7 @@ impl Default for TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -1177,7 +1177,7 @@ impl From<ApplyOperationError> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -1185,7 +1185,7 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(BacktrackedResult<M>),
 }
 
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct BacktrackedResult<M: OperationKind> {
     pub errors: Option<ApplyOperationErrors>,
     pub result: M::Success,
@@ -1290,7 +1290,7 @@ impl<M: OperationKind> OperationResult<M> {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
     pub nonce: u16,
@@ -1327,7 +1327,7 @@ pub struct EventContent {
     pub payload: Option<MichelineExpr>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
