@@ -51,6 +51,10 @@ type Environment.Error_monad.error +=
       rollup : Sr.Address.t;
       stakers : Game.Index.t;
     }
+  | Sc_rollup_proof_on_game_started_in_same_operation of {
+      rollup : Sr.Address.t;
+      stakers : Game.Index.t;
+    }
   | Invalid_double_baking_evidence of {level : Int32.t}
   | Sc_rollup_inbox_proof_claimed_level_mismatch of {
       claimed_level : Raw_level.t;
@@ -169,6 +173,37 @@ let () =
       Sc_rollup_refute_move_on_absent_game {rollup; stakers}) ;
   register_error_kind
     `Permanent
+    ~id:
+      "block_validation_plugin.sc_rollup_proof_on_game_started_in_same_operation"
+    ~title:"Refutation Proof move on a game opened by the same operation"
+    ~description:
+      "A block contains an operation that both opens a smart rollup refutation \
+       game and plays a Proof move in it. That move is applied to a game the \
+       block did not start from, so it cannot be checked against the state the \
+       block started from, and it is rejected."
+    ~pp:(fun ppf (rollup, stakers) ->
+      Format.fprintf
+        ppf
+        "Refutation Proof move on the game between %a and %a on rollup %a, \
+         opened by the same operation"
+        Sr.Staker.pp
+        stakers.Game.Index.alice
+        Sr.Staker.pp
+        stakers.Game.Index.bob
+        Sr.Address.pp
+        rollup)
+    Data_encoding.(
+      obj2
+        (req "rollup" Sr.Address.encoding)
+        (req "stakers" Game.Index.encoding))
+    (function
+      | Sc_rollup_proof_on_game_started_in_same_operation {rollup; stakers} ->
+          Some (rollup, stakers)
+      | _ -> None)
+    (fun (rollup, stakers) ->
+      Sc_rollup_proof_on_game_started_in_same_operation {rollup; stakers}) ;
+  register_error_kind
+    `Permanent
     ~id:"block_validation_plugin.invalid_double_baking_evidence"
     ~title:"invalid double baking evidence"
     ~description:"Invalid double baking evidence."
@@ -268,6 +303,36 @@ let () =
     (function
       | Sc_rollup_inbox_proof_unreadable_cells {head} -> Some head | _ -> None)
     (fun head -> Sc_rollup_inbox_proof_unreadable_cells {head})
+
+(* The refutation games a [Start] in this operation opens.
+
+   A game can be destroyed and reopened under the same key inside one block --
+   [Sc_rollup_timeout] removes it, a [Start] creates a new one -- and the two
+   are then different games with the same stakers. [start_game] puts its own
+   sender on turn, so only that sender can play in the game it just opened, and
+   [1M] gives a manager one operation per block: the [Start] and the move that
+   exploits it are necessarily contents of the same operation. Looking no
+   further than this operation is therefore enough. *)
+let games_started_in_operation contents =
+  List.filter_map
+    (function
+      | Contents
+          (Manager_operation
+             {
+               source;
+               operation = Sc_rollup_refute {rollup; opponent; refutation};
+               _;
+             }) -> (
+          match refutation with
+          | Game.Start _ -> Some (rollup, Game.Index.make source opponent)
+          | Game.Move _ -> None)
+      | _ -> None)
+    contents
+
+let game_key_equal (rollup1, stakers1) (rollup2, stakers2) =
+  Sr.Address.equal rollup1 rollup2
+  && Sr.Staker.equal stakers1.Game.Index.alice stakers2.Game.Index.alice
+  && Sr.Staker.equal stakers1.Game.Index.bob stakers2.Game.Index.bob
 
 (* [check_refute_move_expected] accepts a refutation [Move] only from the player
    the game expects at the start of the block.
@@ -870,6 +935,7 @@ let check_block_operation {context}
       packed_operation) :
     block_validation_state Environment.Error_monad.shell_tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let contents_list = Operation.to_list (Contents_list contents) in
   let current_level = (Level.current context).level in
   (* Reject un-appliable smart-rollup refutations (see
      [find_future_dal_refute]) before the protocol-specific checks below. *)
@@ -897,10 +963,11 @@ let check_block_operation {context}
             in
             return_unit
         | _ -> return_unit)
-      (Operation.to_list (Contents_list contents))
+      contents_list
   in
   (* Only a batch with a refutation Proof move needs its index proofs. *)
   let index_proofs = lazy (index_proofs_of_batch packed_op) in
+  let games_started = games_started_in_operation contents_list in
   let* () =
     List.iter_es
       (function
@@ -922,18 +989,31 @@ let check_block_operation {context}
                 let* () =
                   check_refute_move_expected context rollup stakers source
                 in
-                (* The move is the one the game expects, so the start-of-block
-                   state is the state it will be applied to. *)
                 match step with
                 | Game.Proof proof ->
-                    check_refute_proof
-                      context
-                      ~rollup
-                      ~stakers
-                      ~choice
-                      ~index_proofs:(Lazy.force index_proofs)
-                      ~proof
-                    |> Lwt.map Environment.wrap_tzresult
+                    if
+                      List.exists
+                        (game_key_equal (rollup, stakers))
+                        games_started
+                    then
+                      (* This operation also opens the game, so the move is
+                         applied to one the start-of-block context never
+                         held. *)
+                      shell_fail
+                        (Sc_rollup_proof_on_game_started_in_same_operation
+                           {rollup; stakers})
+                    else
+                      (* The move is the one the game expects, and it is that
+                         same game, so the start-of-block state is the state it
+                         will be applied to. *)
+                      check_refute_proof
+                        context
+                        ~rollup
+                        ~stakers
+                        ~choice
+                        ~index_proofs:(Lazy.force index_proofs)
+                        ~proof
+                      |> Lwt.map Environment.wrap_tzresult
                 | Game.Dissection _ -> return_unit))
         | Contents
             (Double_baking_evidence {bh1 : Block_header.t; bh2 : Block_header.t})
@@ -979,6 +1059,6 @@ let check_block_operation {context}
                   Delegate_cannot_stake_during_finalization_of_slashed_period
               else return_unit
         | _ -> return_unit)
-      (Operation.to_list (Contents_list contents))
+      contents_list
   in
   return {context}
