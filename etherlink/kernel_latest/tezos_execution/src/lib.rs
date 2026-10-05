@@ -1670,7 +1670,7 @@ where
                     )
                 } else {
                     let (prev_info, info_bytes_read) = dest_account
-                        .read_info_with_len(tc_ctx.rk.host())
+                        .read_info_with_len(tc_ctx.rk.tez_accounts())
                         .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
                     let (new_info, space) = prev_info.with_storage_size(
                         new_storage.len() as u64,
@@ -1719,7 +1719,7 @@ where
             // their gas has been charged (no-op for enshrined contracts).
             if let Some(info) = &info_to_write {
                 dest_account
-                    .write_storage_and_info(tc_ctx.rk.host_mut(), &new_storage, info)
+                    .write_storage_and_info(tc_ctx.rk, &new_storage, info)
                     .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             }
             let StorageSpace {
@@ -2669,12 +2669,7 @@ where
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
-        .init(
-            ctx.rk.host_mut(),
-            script_code,
-            &new_storage,
-            lazy_storage_size_diff,
-        )
+        .init(ctx.rk, script_code, &new_storage, lazy_storage_size_diff)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -4309,7 +4304,7 @@ mod tests {
 
         account
             .init(
-                rk.host_mut(),
+                rk,
                 Some(
                     &script_micheline
                         .encode(&mut Gas::default())
@@ -5570,11 +5565,17 @@ mod tests {
         // is `code_size + |encoded("Hello world")|`. Read `code_size`
         // from durable storage — the invariant under test is exactly
         // `used == code_size + storage_size`.
-        let code_size = destination.code_size(rk.host()).unwrap();
+        let code_size = destination.code_size(rk.tez_accounts()).unwrap();
         let expected_used = Zarith(code_size.0 + new_storage_size);
 
-        assert_eq!(destination.used_bytes(rk.host()).unwrap(), expected_used);
-        assert_eq!(destination.paid_bytes(rk.host()).unwrap(), expected_used);
+        assert_eq!(
+            destination.used_bytes(rk.tez_accounts()).unwrap(),
+            expected_used
+        );
+        assert_eq!(
+            destination.paid_bytes(rk.tez_accounts()).unwrap(),
+            expected_used
+        );
     }
 
     #[test]

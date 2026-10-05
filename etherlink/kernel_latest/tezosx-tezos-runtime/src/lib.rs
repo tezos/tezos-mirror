@@ -1994,13 +1994,16 @@ mod tests {
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
         let storage_len = account.storage(rk.host()).unwrap().len() as u64;
-        assert_eq!(account.code_size(rk.host()).unwrap(), Zarith::from(0u64));
         assert_eq!(
-            account.used_bytes(rk.host()).unwrap(),
+            account.code_size(rk.tez_accounts()).unwrap(),
+            Zarith::from(0u64)
+        );
+        assert_eq!(
+            account.used_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(storage_len)
         );
         assert_eq!(
-            account.paid_bytes(rk.host()).unwrap(),
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(storage_len)
         );
 
@@ -2961,7 +2964,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            &mut rk,
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3031,7 +3034,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            &mut rk,
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3095,7 +3098,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            &mut rk,
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3165,7 +3168,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            &mut rk,
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3383,7 +3386,7 @@ mod tests {
             .unwrap();
         receiver
             .init(
-                rk.host_mut(),
+                &mut rk,
                 Some(
                     &receiver_script
                         .encode(&mut Gas::default())
@@ -3425,7 +3428,7 @@ mod tests {
             .unwrap();
         parent
             .init(
-                rk.host_mut(),
+                &mut rk,
                 Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                 &Micheline::from(())
                     .encode(&mut Gas::default())
@@ -3533,7 +3536,7 @@ mod tests {
                 .unwrap();
             receiver
                 .init(
-                    rk.host_mut(),
+                    &mut rk,
                     Some(
                         &receiver_script
                             .encode(&mut Gas::default())
@@ -3572,7 +3575,7 @@ mod tests {
                 .unwrap();
             parent
                 .init(
-                    rk.host_mut(),
+                    &mut rk,
                     Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                     &Micheline::from(())
                         .encode(&mut Gas::default())
@@ -3894,7 +3897,7 @@ mod tests {
             let kt1 = kt1(b"unclassified_kt1_with_code");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(&mut rk, Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
                 .unwrap();
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
@@ -3964,7 +3967,7 @@ mod tests {
             let kt1 = kt1(b"oog_code_lookup");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(&mut rk, Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
                 .unwrap();
 
             let err = check(

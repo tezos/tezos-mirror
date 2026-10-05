@@ -290,10 +290,30 @@ pub mod code {
     /// [storage_size], [used_bytes] and [paid_bytes] in a single value, so
     /// they can be read and written with one host call. The code and storage
     /// *blobs* (`/data/code`, `/data/storage`) stay separate.
-    const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+    const INFO: Key = Key::from_static(b"/info");
 
-    pub fn info_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        originated_path(account, &INFO_PATH)
+    /// Returns the key of `segment` under the key of `account`, relative to the
+    /// accounts keyspace.
+    ///
+    /// Fails when the joined key exceeds the maximum key size or is not a valid
+    /// path.
+    fn segment_key(
+        account: &TezosOriginatedAccount,
+        segment: &Key,
+    ) -> Result<Key, tezos_storage::error::Error> {
+        Ok(account.key.concat(segment)?)
+    }
+
+    /// Returns the key of the accounting record of `account`
+    /// ([`crate::account_storage::OriginatedContractInfo`]), `/info` under the
+    /// key of `account`, relative to the accounts keyspace.
+    ///
+    /// Fails when the joined key exceeds the maximum key size or is not a valid
+    /// path.
+    pub fn info_key(
+        account: &TezosOriginatedAccount,
+    ) -> Result<Key, tezos_storage::error::Error> {
+        segment_key(account, &INFO)
     }
 
     pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
@@ -429,6 +449,18 @@ mod tests {
             })
         );
         (contract, account, index)
+    }
+
+    /// Makes sure that every key of the state of an originated account
+    /// resolves to its durable path under
+    /// `/tez/tez_accounts/contracts/index/<hex>`.
+    #[test]
+    fn originated_state_keys_keep_their_durable_paths() {
+        let (_, account, index) = sample_originated();
+        assert_eq!(
+            durable(&code::info_key(&account).unwrap()),
+            format!("{index}/info").into_bytes()
+        );
     }
 
     /// Makes sure that the key of a contract resolves to
