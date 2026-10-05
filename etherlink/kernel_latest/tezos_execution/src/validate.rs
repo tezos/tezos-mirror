@@ -8,9 +8,11 @@ use tezos_crypto_rs::{PublicKeySignatureVerifier, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
@@ -98,8 +100,8 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: StorageV1>(
-    host: &Host,
+fn get_revealed_key(
+    tez_accounts: &impl KeySpace,
     account: &TezosImplicitAccount,
     first_content: &ManagerOperationContent,
 ) -> Result<PublicKey, ValidityError> {
@@ -119,7 +121,7 @@ fn get_revealed_key<Host: StorageV1>(
         }
         _ => {
             let manager = account
-                .manager(host)
+                .manager(tez_accounts)
                 .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
             match manager {
                 Manager::Revealed(public_key) => Ok(public_key),
@@ -143,8 +145,8 @@ fn check_storage_limit(
     }
 }
 
-fn validate_source<Host: StorageV1>(
-    host: &Host,
+fn validate_source(
+    tez_accounts: &impl KeySpace,
     content: &[ManagerOperationContent],
 ) -> Result<(PublicKey, TezosImplicitAccount), ValidityError> {
     let source = &content[0].source()?;
@@ -160,13 +162,13 @@ fn validate_source<Host: StorageV1>(
 
     // Account must exist in the durable storage
     if !account
-        .allocated(host)
+        .allocated(tez_accounts)
         .map_err(|_| ValidityError::FailedToFetchBalance)?
     {
         return Err(ValidityError::EmptyImplicitContract);
     }
 
-    let pk = get_revealed_key(host, &account, &content[0])?;
+    let pk = get_revealed_key(tez_accounts, &account, &content[0])?;
 
     Ok((pk, account))
 }
@@ -254,15 +256,12 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host>(
-    host: &mut Host,
+pub fn execute_validation<Host: StorageV1, KS: KeySpace>(
+    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
     required_fees: Option<u64>,
-) -> Result<ValidatedBatch, ValidityError>
-where
-    Host: StorageV1,
-{
+) -> Result<ValidatedBatch, ValidityError> {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }
@@ -272,7 +271,7 @@ where
         TezlinkOperationGas::start(operation.content[0].gas_limit()?)
             .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
 
-    let (pk, source_account) = validate_source(host, &operation.content)?;
+    let (pk, source_account) = validate_source(rk.tez_accounts(), &operation.content)?;
 
     match verify_signature(
         &operation.content,
@@ -301,10 +300,10 @@ where
         .collect::<Result<_, _>>()?;
 
     let mut source_balance = source_account
-        .balance(host)
+        .balance(rk.host())
         .map_err(|_| ValidityError::FailedToFetchBalance)?;
     let mut source_counter = source_account
-        .counter(host)
+        .counter(rk.tez_accounts())
         .map_err(|_| ValidityError::FailedToFetchCounter)?;
 
     let mut validated_operations = Vec::new();
@@ -352,11 +351,11 @@ where
     }
 
     source_account
-        .set_balance(host, &source_balance)
+        .set_balance(rk.host_mut(), &source_balance)
         .map_err(|_| ValidityError::FailedToUpdateBalance)?;
 
     source_account
-        .increment_counter(host, validated_operations.len())
+        .increment_counter(rk.tez_accounts_mut(), validated_operations.len())
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
     let mut source_public_key = Vec::new();

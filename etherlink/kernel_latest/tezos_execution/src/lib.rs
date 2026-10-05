@@ -472,7 +472,7 @@ where
 {
     log!(Debug, "Applying a reveal operation");
     let manager = source_account
-        .manager(tc_ctx.rk.host())
+        .manager(tc_ctx.rk.tez_accounts())
         .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
@@ -505,7 +505,7 @@ where
 
     // Set the public key as the manager
     source_account
-        .set_manager_public_key(tc_ctx.rk.host_mut(), public_key)
+        .set_manager_public_key(tc_ctx.rk.tez_accounts_mut(), public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
 
     log!(Debug, "Reveal operation succeed");
@@ -1512,9 +1512,10 @@ where
 
             let dest_account = context::implicit_from_public_key_hash(pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let already_allocated = dest_account
-                .allocate(tc_ctx.rk.host_mut())
-                .map_err(|_| TransferError::FailedToAllocateDestination)?;
+            let already_allocated =
+                dest_account
+                    .allocate(tc_ctx.rk.tez_accounts_mut())
+                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.host_mut(),
@@ -2957,12 +2958,18 @@ where
 
     log!(Debug, "Verifying that the batch is valid");
 
-    let validation_info = match validate::execute_validation(
-        &mut safe_host,
-        operation,
-        skip_signature_check,
-        required_fees,
-    ) {
+    // The validation writes the counter and the balance of the source on `safe_host`.
+    // When the batch is invalid, `safe_host.revert()` below drops these writes.
+    let validation = {
+        let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
+        validate::execute_validation(
+            &mut rk,
+            operation,
+            skip_signature_check,
+            required_fees,
+        )
+    };
+    let validation_info = match validation {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(Debug, "Reverting the changes because the batch is invalid.");
@@ -4255,7 +4262,7 @@ mod tests {
 
     // This function setups an account that will pass the validity checks
     fn init_account(
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         src: &PublicKeyHash,
         amount: u64,
     ) -> TezosImplicitAccount {
@@ -4268,21 +4275,25 @@ mod tests {
 
         // Allocate the account
         account
-            .allocate(host)
+            .allocate(tez_accounts)
             .expect("Account allocation should have succeed");
 
         // Setting the balance to pass the validity check
-        account
-            .set_balance(host, &amount.into())
+        let mut info = account_storage::get_tezos_account_info_or_init(tez_accounts, src)
+            .expect("Account info read should have succeed");
+        info.balance = amount.into();
+        account_storage::set_tezos_account_info(tez_accounts, src, info)
             .expect("Set balance should have succeed");
 
         account
     }
 
-    fn reveal_account(host: &mut impl StorageV1, source: &Bootstrap) {
+    fn reveal_account(tez_accounts: &mut impl KeySpace, source: &Bootstrap) {
         let account = context::implicit_from_public_key_hash(&source.pkh)
             .expect("Account creation should have succeed");
-        account.set_manager_public_key(host, &source.pk).unwrap()
+        account
+            .set_manager_public_key(tez_accounts, &source.pk)
+            .unwrap()
     }
 
     // This function sets up an account that will pass the validity checks
@@ -4354,7 +4365,7 @@ mod tests {
         // to avoid getting an error when initializing the safe_storage
         let other = bootstrap2();
 
-        let src_account = init_account(rk.host_mut(), &other.pkh, 50);
+        let src_account = init_account(rk.tez_accounts_mut(), &other.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source);
 
@@ -4374,7 +4385,7 @@ mod tests {
             OperationError::Validation(ValidityError::EmptyImplicitContract);
 
         assert_eq!(
-            src_account.counter(rk.host()).unwrap(),
+            src_account.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -4390,7 +4401,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let src_account = init_account(rk.host_mut(), &source.pkh, 50);
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 1000, 5, source);
@@ -4411,7 +4422,7 @@ mod tests {
             OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
 
         assert_eq!(
-            src_account.counter(rk.host()).unwrap(),
+            src_account.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -4427,7 +4438,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let src_account = init_account(rk.host_mut(), &source.pkh, 50);
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 1000, 5, source);
@@ -4451,7 +4462,7 @@ mod tests {
             }));
 
         assert_eq!(
-            src_account.counter(rk.host()).unwrap(),
+            src_account.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -4468,7 +4479,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let account = init_account(rk.host_mut(), &source.pkh, 50);
+        let account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         // Setting the manager key of this account to its public_key, this account
         // will be considered as revealed and the reveal operation should fail
@@ -4478,7 +4489,7 @@ mod tests {
         .expect("Public key creation should have succeed");
 
         account
-            .set_manager_public_key(rk.host_mut(), &pk)
+            .set_manager_public_key(rk.tez_accounts_mut(), &pk)
             .expect("Setting manager field should have succeed");
 
         // Applying the operation
@@ -4527,7 +4538,7 @@ mod tests {
         }];
 
         assert_eq!(
-            account.counter(rk.host()).unwrap(),
+            account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4550,7 +4561,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let account = init_account(rk.host_mut(), &source.pkh, 50);
+        let account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         // Attempting to plant an inconsistent manager pkh is a no-op on the
         // live account: the manager stays `NotRevealed(source.pkh)`.
@@ -4559,11 +4570,11 @@ mod tests {
                 .expect("PublicKeyHash b58 conversion should have succeed");
 
         account
-            .force_set_manager_public_key_hash(rk.host_mut(), &inconsistent_pkh)
+            .force_set_manager_public_key_hash(rk.tez_accounts_mut(), &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
         assert_eq!(
-            account.manager(rk.host()).unwrap(),
+            account.manager(rk.tez_accounts()).unwrap(),
             Manager::NotRevealed(source.pkh.clone()),
             "live account manager is derived from its own pkh, stays consistent"
         );
@@ -4610,12 +4621,12 @@ mod tests {
 
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
-            account.manager(rk.host()).unwrap(),
+            account.manager(rk.tez_accounts()).unwrap(),
             Manager::Revealed(source.pk),
             "reveal records the source's public key as the manager"
         );
         assert_eq!(
-            account.counter(rk.host()).unwrap(),
+            account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4636,7 +4647,7 @@ mod tests {
         let source = Bootstrap { pk, ..bootstrap1() };
 
         // Even if we don't use it we need to init the account
-        let account = init_account(rk.host_mut(), &source.pkh, 50);
+        let account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
@@ -4659,7 +4670,7 @@ mod tests {
         );
 
         assert_eq!(
-            account.counter(rk.host()).unwrap(),
+            account.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Counter should not have been incremented"
         );
@@ -4680,7 +4691,7 @@ mod tests {
         let victim = bootstrap1();
         let attacker = bootstrap2();
 
-        let account = init_account(rk.host_mut(), &victim.pkh, 50);
+        let account = init_account(rk.tez_accounts_mut(), &victim.pkh, 50);
 
         // source = victim, but the Reveal payload key is the attacker's, and the
         // whole batch is signed by the attacker (so the signature check against
@@ -4732,7 +4743,7 @@ mod tests {
             "Victim balance must not be debited"
         );
         assert_eq!(
-            account.counter(rk.host()).unwrap(),
+            account.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Victim counter must not be incremented"
         );
@@ -4746,10 +4757,10 @@ mod tests {
 
         let source = bootstrap1();
 
-        let account = init_account(rk.host_mut(), &source.pkh, 50);
+        let account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
 
         let manager = account
-            .manager(rk.host())
+            .manager(rk.tez_accounts())
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::NotRevealed(source.pkh.clone()));
@@ -4802,13 +4813,13 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         let manager = account
-            .manager(rk.host())
+            .manager(rk.tez_accounts())
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::Revealed(pk));
 
         assert_eq!(
-            account.counter(rk.host()).unwrap(),
+            account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4825,10 +4836,10 @@ mod tests {
         let dest = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance
-        let source_account = init_account(rk.host_mut(), &source.pkh, 50);
-        reveal_account(rk.host_mut(), &source);
+        let source_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
 
-        let destination_account = init_account(rk.host_mut(), &dest.pkh, 50);
+        let destination_account = init_account(rk.tez_accounts_mut(), &dest.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -4895,7 +4906,7 @@ mod tests {
         );
 
         assert_eq!(
-            source_account.counter(rk.host()).unwrap(),
+            source_account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -4912,10 +4923,10 @@ mod tests {
         let dst = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance and reveal the source
-        let source = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
-        let destination = init_account(rk.host_mut(), &dst.pkh, 50);
+        let destination = init_account(rk.tez_accounts_mut(), &dst.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -4995,7 +5006,7 @@ mod tests {
 
         // Verify that the source's counter has been incremented
         assert_eq!(
-            source.counter(rk.host()).unwrap(),
+            source.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -5012,8 +5023,8 @@ mod tests {
         let dest = src.clone();
 
         // Setup account with 50 mutez in its balance
-        let source = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5093,7 +5104,7 @@ mod tests {
 
         // Verify that the source's counter has been incremented
         assert_eq!(
-            source.counter(rk.host()).unwrap(),
+            source.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -5109,8 +5120,8 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
         // Setup accounts with 50 mutez in their balance
-        let requester = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let requester = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let (code, storage) = (
             r#"
                         parameter (mutez %fund);
@@ -5263,7 +5274,7 @@ mod tests {
         ); // The faucet should have transferred 100 mutez to the source
 
         assert_eq!(
-            requester.counter(rk.host()).unwrap(),
+            requester.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -5289,8 +5300,8 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
 
-        let requester = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let requester = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5353,7 +5364,7 @@ mod tests {
         // Source paid the manager fee but not the transfer amount.
         assert_eq!(requester.balance(rk.host()).unwrap(), (50_u64 - 15).into());
         assert_eq!(
-            requester.counter(rk.host()).unwrap(),
+            requester.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -5373,8 +5384,8 @@ mod tests {
 
         // Source funded with 54 mutez: 15 fee + 30 transfer + 4
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
-        let source = init_account(rk.host_mut(), &src.pkh, 54);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 54);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let destination =
             init_contract(&mut rk, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
@@ -5483,7 +5494,7 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         assert_eq!(
-            source.counter(rk.host()).unwrap(),
+            source.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -5511,8 +5522,8 @@ mod tests {
         let initial_storage = Micheline::from("initial");
         // Source funded with 1050 mutez: 15 fee + 30 transfer + 1000
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
-        init_account(rk.host_mut(), &src.pkh, 1050);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1050);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let destination =
             init_contract(&mut rk, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
@@ -5573,8 +5584,8 @@ mod tests {
         // Fund the source with 48 mutez: 15 fee + 30 transfer + 3
         // left.  The storage burn (4 × COST_PER_BYTES = 4 mutez)
         // does not fit; the operation must Backtrack.
-        let source = init_account(rk.host_mut(), &src.pkh, 48);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 48);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let destination = init_contract(
             &mut rk,
             &dest,
@@ -5695,8 +5706,8 @@ mod tests {
         let dest = bootstrap2();
         // Source funded for: 15 fee + 30 transfer + 257 slot burn
         // (ORIGINATION_SIZE × COST_PER_BYTES) + 5 mutez change.
-        let source = init_account(rk.host_mut(), &src.pkh, 307);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 307);
+        reveal_account(rk.tez_accounts_mut(), &src);
         // Note: dest is NOT pre-allocated (no init_account call).
 
         let operation = make_transfer_operation(
@@ -5804,8 +5815,8 @@ mod tests {
         let dest = bootstrap2();
         // 50 mutez covers fee (15) + transfer (30) but NOT the slot
         // burn (257).
-        let source = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -5901,7 +5912,7 @@ mod tests {
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert!(
-            !dest_account.allocated(rk.host()).unwrap(),
+            !dest_account.allocated(rk.tez_accounts()).unwrap(),
             "implicit allocation must be rolled back"
         );
     }
@@ -5918,8 +5929,8 @@ mod tests {
 
         let initial_storage = Micheline::from(());
 
-        let source = init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let destination = init_contract(
             &mut rk,
@@ -5994,7 +6005,7 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         assert_eq!(
-            source.counter(rk.host()).unwrap(),
+            source.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
         );
@@ -6018,8 +6029,8 @@ mod tests {
 
         let dest = bootstrap2();
 
-        init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -6091,8 +6102,8 @@ mod tests {
 
         let dest = bootstrap2();
 
-        init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let operation = make_transfer_operation(
             15,
@@ -6168,8 +6179,8 @@ mod tests {
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(rk.host_mut(), &src.pkh, 50);
-        let dest_acc = init_account(rk.host_mut(), &dest.pkh, 50);
+        let src_acc = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        let dest_acc = init_account(rk.tez_accounts_mut(), &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -6351,7 +6362,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_acc.counter(rk.host()).unwrap(),
+            src_acc.counter(rk.tez_accounts()).unwrap(),
             3.into(),
             "Counter should have been incremented three times."
         );
@@ -6366,8 +6377,8 @@ mod tests {
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(rk.host_mut(), &src.pkh, 50);
-        let _dst_acc = init_account(rk.host_mut(), &dest.pkh, 50);
+        let src_acc = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        let _dst_acc = init_account(rk.tez_accounts_mut(), &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -6419,13 +6430,13 @@ mod tests {
         assert_eq!(
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .manager(rk.host())
+                .manager(rk.tez_accounts())
                 .unwrap(),
             Manager::NotRevealed(src.pkh.clone())
         );
 
         assert_eq!(
-            src_acc.counter(rk.host()).unwrap(),
+            src_acc.counter(rk.tez_accounts()).unwrap(),
             0.into(),
             "Counter should not have been incremented."
         );
@@ -6441,7 +6452,7 @@ mod tests {
         // (= 2) + storage burn for the second op (4 × COST_PER_BYTES = 1000) +
         // 18 mutez change. The batch reverts via FAILWITH; only the
         // fees survive, so final balance is 1050 - 30 = 1020.
-        let src_acc = init_account(rk.host_mut(), &src.pkh, 1050);
+        let src_acc = init_account(rk.tez_accounts_mut(), &src.pkh, 1050);
 
         let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
@@ -6559,7 +6570,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_acc.counter(rk.host()).unwrap(),
+            src_acc.counter(rk.tez_accounts()).unwrap(),
             3.into(),
             "Counter should have been incremented three times."
         );
@@ -6579,8 +6590,8 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1000000_u64);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000000_u64);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let src_account = context::implicit_from_public_key_hash(&src.pkh)
             .expect("Should have succeeded to create an account");
@@ -6804,8 +6815,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Fans out a single transfer to the contract below.
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -6931,8 +6942,8 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 50000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let code =
             hex::decode("02000000170500036805010368050202000000080316053d036d0342")
@@ -6997,7 +7008,7 @@ mod tests {
         let src = bootstrap1();
 
         // Initialize accounts with higher balances for the test
-        init_account(rk.host_mut(), &src.pkh, 100);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100);
 
         // Create a script that emits internal operations to multiple targets
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -7242,8 +7253,8 @@ mod tests {
                 let mut host = test_host();
                 let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
                 let src = bootstrap1();
-                init_account(rk.host_mut(), &src.pkh, 1_000_000);
-                reveal_account(rk.host_mut(), &src);
+                init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+                reveal_account(rk.tez_accounts_mut(), &src);
 
                 let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
                     .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7340,8 +7351,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7502,8 +7513,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Fans out to [set-delegate emitter, benign contract].
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -7661,8 +7672,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -7818,8 +7829,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Parent: build one internal transfer, DUP the resulting
         // `operation`, and emit both copies in the returned list.
@@ -7957,8 +7968,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Parent: one internal origination, DUP the `operation`, emit
         // both copies; store the (single) child address.
@@ -8077,8 +8088,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Parent: build one internal EMIT operation, DUP the resulting
         // `operation`, and return both copies in the operation list.
@@ -8206,8 +8217,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -8282,8 +8293,8 @@ mod tests {
         let src = bootstrap1();
         // Fund source for fee + transfer + storage burn for
         // recording the contract balance into its storage.
-        init_account(rk.host_mut(), &src.pkh, 5_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 5_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -8355,8 +8366,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 50);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
@@ -8438,8 +8449,8 @@ mod tests {
         // (code 28 bytes + storage 10 bytes = 38 bytes × COST_PER_BYTES)
         // + 200 leftover, insufficient for the 257 slot burn that follows.
         let funded = 283_u64;
-        init_account(rk.host_mut(), &src.pkh, funded);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, funded);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let fee = 15u64;
         let smart_contract_balance = 30u64;
@@ -8580,8 +8591,8 @@ mod tests {
         let src = bootstrap1();
         let init_src_balance = 100000;
         let expected_init_contract_balance = 1000000;
-        init_account(rk.host_mut(), &src.pkh, 100000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let mut gas = Gas::default();
 
         let originated_code = "CDR;
@@ -8781,8 +8792,8 @@ mod tests {
             let mut host = test_host();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
             let src = bootstrap1();
-            init_account(rk.host_mut(), &src.pkh, 100000);
-            reveal_account(rk.host_mut(), &src);
+            init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+            reveal_account(rk.tez_accounts_mut(), &src);
             let mut gas = Gas::default();
             let originated_script =
                 make_create_contract_block("unit", "unit", "CDR; NIL operation; PAIR;");
@@ -8865,8 +8876,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let mut gas = Gas::default();
 
         // A contract whose code performs exactly one CREATE_CONTRACT.
@@ -8994,8 +9005,8 @@ mod tests {
         let mut gas = Gas::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1000000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let originated_code = "CDR;
                         NIL operation;
@@ -9231,7 +9242,7 @@ mod tests {
         let src = bootstrap1();
 
         // src & dest each credited with 400000ꜩ
-        let src_acc = init_account(rk.host_mut(), &src.pkh, 400000);
+        let src_acc = init_account(rk.tez_accounts_mut(), &src.pkh, 400000);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -9558,7 +9569,7 @@ mod tests {
 
         // Check the counters
         assert_eq!(
-            src_acc.counter(rk.host()).unwrap(),
+            src_acc.counter(rk.tez_accounts()).unwrap(),
             5.into(),
             "Source account counter should be 4 after the operations"
         );
@@ -9584,8 +9595,8 @@ mod tests {
 
         let src = bootstrap1();
 
-        init_account(rk.host_mut(), &src.pkh, 50000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let balance = 10.into();
 
@@ -9653,8 +9664,8 @@ mod tests {
 
         let src = bootstrap1();
 
-        init_account(rk.host_mut(), &src.pkh, 50000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let code = vec![1u8; crate::MICHELSON_MAXIMUM_SCRIPT_SIZE + 1];
         let storage = vec![];
@@ -9717,8 +9728,8 @@ mod tests {
 
         let src = bootstrap1();
 
-        init_account(rk.host_mut(), &src.pkh, 50000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // 1001 `or` levels => 2003 type nodes > 2001 cap, but only ~8 kB.
         let mut param = String::from("unit");
@@ -9800,8 +9811,8 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
         // Setup accounts with 50 mutez in their balance
-        init_account(rk.host_mut(), &src.pkh, 1000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let (code, storage) = (
             r#"
                         parameter (or (unit %default) (address %call));
@@ -10039,8 +10050,8 @@ mod tests {
 
         let arena = Arena::new();
 
-        init_account(rk.host_mut(), &src.pkh, 1000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let (code_view, storage_view) = (
             r#"
                 parameter unit ;
@@ -10137,8 +10148,8 @@ mod tests {
 
         let arena = Arena::new();
 
-        init_account(rk.host_mut(), &src.pkh, 1000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Contract with a view that returns its BALANCE
         let view_balance = 500;
@@ -10262,8 +10273,8 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
-        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
-        reveal_account(ctx.rk.host_mut(), tz1);
+        init_account(ctx.rk.tez_accounts_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.tez_accounts_mut(), tz1);
 
         let parser = Parser::new();
 
@@ -10596,8 +10607,8 @@ mod tests {
 
         let script_originator = read_script("originator.tz");
 
-        init_account(ctx.rk.host_mut(), &tz1.pkh, 100_000_000);
-        reveal_account(ctx.rk.host_mut(), &tz1);
+        init_account(ctx.rk.tez_accounts_mut(), &tz1.pkh, 100_000_000);
+        reveal_account(ctx.rk.tez_accounts_mut(), &tz1);
         let parser = Parser::new();
 
         let originator_contract = init_contract(
@@ -10833,8 +10844,8 @@ mod tests {
         make_default_ctx!(ctx, rk);
 
         let tz1 = bootstrap1();
-        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
-        reveal_account(ctx.rk.host_mut(), &tz1);
+        init_account(ctx.rk.tez_accounts_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.tez_accounts_mut(), &tz1);
 
         // Victim: a contract owning a `big_map nat string` initialised with
         // `0 -> "genesis-42"`. We allocate the big_map directly in the lazy
@@ -10946,8 +10957,8 @@ mod tests {
         make_default_ctx!(ctx, rk);
 
         let tz1 = bootstrap1();
-        init_account(ctx.rk.host_mut(), &tz1.pkh, 10_000_000);
-        reveal_account(ctx.rk.host_mut(), &tz1);
+        init_account(ctx.rk.tez_accounts_mut(), &tz1.pkh, 10_000_000);
+        reveal_account(ctx.rk.tez_accounts_mut(), &tz1);
 
         // Victim big_map { 0 -> "genesis-42" } owned by an existing contract.
         let victim_id = ctx
@@ -11201,8 +11212,8 @@ mod tests {
                 .expect("Gateway KT1 address should be valid");
 
         // Set up source with enough balance (100 mutez: 15 for fees + 50 for transfer + some extra)
-        let source_account = init_account(rk.host_mut(), &src.pkh, 100);
-        reveal_account(rk.host_mut(), &src);
+        let source_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Create Micheline parameters for the generic %call entrypoint:
         // a POST to the destination Ethereum address with an empty body.
@@ -11294,9 +11305,9 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let _src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
-        let _dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
-        reveal_account(rk.host_mut(), &source);
+        let _src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 1_000_000);
+        let _dst_account = init_account(rk.tez_accounts_mut(), &dest.pkh, 0);
+        reveal_account(rk.tez_accounts_mut(), &source);
 
         // Transfer with fee = 0 mutez.
         let operation = make_transfer_operation(
@@ -11336,8 +11347,8 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
-        let dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 1_000_000);
+        let dst_account = init_account(rk.tez_accounts_mut(), &dest.pkh, 0);
 
         let reveal_content = OperationContent::Reveal(RevealContent {
             pk: source.pk.clone(),
@@ -11398,9 +11409,9 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
-        let src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
-        let dst_account = init_account(rk.host_mut(), &dest.pkh, 0);
-        reveal_account(rk.host_mut(), &source);
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 1_000_000);
+        let dst_account = init_account(rk.tez_accounts_mut(), &dest.pkh, 0);
+        reveal_account(rk.tez_accounts_mut(), &source);
 
         // Transfer with fee = 10_000 mutez, well above DA cost for any reasonable op size.
         let operation = make_transfer_operation(
@@ -11454,8 +11465,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
-        let _src_account = init_account(rk.host_mut(), &source.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &source);
+        let _src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &source);
 
         // Transfer with fee = 1 mutez, well below DA cost.
         let operation = make_transfer_operation(
@@ -11505,8 +11516,8 @@ mod tests {
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(rk.host_mut(), &src.pkh, 100);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let arena = Arena::new();
         let operation = make_transfer_operation(
@@ -11577,8 +11588,8 @@ mod tests {
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(rk.host_mut(), &src.pkh, 100);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Encode Pair(dest, Pair(method_sig, abi_params)) for the call entrypoint
         let arena = Arena::new();
@@ -11667,8 +11678,8 @@ mod tests {
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .expect("Gateway KT1 address should be valid");
-        init_account(rk.host_mut(), &src.pkh, 100);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_revert")
             .with_serve_response(400, b"reverted".to_vec());
@@ -11843,8 +11854,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let emitter = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
             &mut rk,
@@ -11946,7 +11957,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
+        let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
 
         let parser = Parser::new();
         let mut operation_gas = TezlinkOperationGas::start_milligas(10_000_000)
@@ -12218,8 +12229,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap();
@@ -12371,8 +12382,8 @@ mod tests {
 
         // Set up a source account with funds
         let src = bootstrap1();
-        let _src_account = init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        let _src_account = init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Transfer 50 mutez to the alias KT1
         let transfer_amount = 50_u64;
@@ -12469,8 +12480,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 100_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         // Chapo contract: emits internal transfers to each address in param
         let chapo = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
@@ -12523,7 +12534,7 @@ mod tests {
          -> Vec<ProcessedOperation> {
             let counter = context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .counter(rk.host())
+                .counter(rk.tez_accounts())
                 .unwrap()
                 .0
                 .to_u64()
@@ -12755,7 +12766,7 @@ mod tests {
 
         // Sender: an implicit account (tz1).
         let src = bootstrap1();
-        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
+        let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
 
         // Destination: a KT1 contract with `PUSH string; FAILWITH`.
         let dest_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
@@ -12976,7 +12987,7 @@ mod tests {
 
         // Sender: implicit account.
         let src = bootstrap1();
-        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
+        let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
 
         // Outer contract: issues TRANSFER_TOKENS to a list of addresses.
         // Balance 100 mutez so it can forward 10 mutez per internal op.
@@ -13267,9 +13278,9 @@ mod tests {
         let src = bootstrap1();
         let dst = bootstrap2();
 
-        let source = init_account(rk.host_mut(), &src.pkh, initial_src_balance);
-        reveal_account(rk.host_mut(), &src);
-        let destination = init_account(rk.host_mut(), &dst.pkh, 50);
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, initial_src_balance);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        let destination = init_account(rk.tez_accounts_mut(), &dst.pkh, 50);
 
         let operation = make_transfer_operation(
             fee,
@@ -13485,8 +13496,8 @@ mod tests {
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         let account = init_contract(
@@ -13683,8 +13694,8 @@ mod tests {
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
@@ -13818,8 +13829,8 @@ mod tests {
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
@@ -13959,8 +13970,8 @@ mod tests {
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         let parser = mir::parser::Parser::new();
@@ -14083,8 +14094,8 @@ mod tests {
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 1_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         init_contract(
@@ -14185,8 +14196,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 10_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 10_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let parser = mir::parser::Parser::new();
         let code = parser
@@ -14243,8 +14254,8 @@ mod tests {
         let mut host2 = test_host();
         let mut rk2 = RuntimeKeyspaces::init(&mut host2).unwrap();
         let src2 = bootstrap2();
-        init_account(rk2.host_mut(), &src2.pkh, 10_000_000);
-        reveal_account(rk2.host_mut(), &src2);
+        init_account(rk2.tez_accounts_mut(), &src2.pkh, 10_000_000);
+        reveal_account(rk2.tez_accounts_mut(), &src2);
 
         let operation2 = make_origination_operation(
             15,
@@ -14294,8 +14305,8 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
-        init_account(rk.host_mut(), &src.pkh, 20_000_000);
-        reveal_account(rk.host_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &src.pkh, 20_000_000);
+        reveal_account(rk.tez_accounts_mut(), &src);
 
         let parser = mir::parser::Parser::new();
         let code = parser
@@ -14383,7 +14394,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(rk.host_mut(), &pkh, 10_000_000);
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 10_000_000);
         let internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -14438,7 +14449,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(rk.host_mut(), &pkh, 10_000_000);
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 10_000_000);
         let make_internal = || {
             TaggedInternalOp::own(
                 InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -14507,7 +14518,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
-        let payer = init_account(rk.host_mut(), &pkh, 100_000);
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 100_000);
 
         let own_op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),

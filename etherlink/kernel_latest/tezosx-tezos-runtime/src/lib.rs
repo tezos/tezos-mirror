@@ -1532,16 +1532,16 @@ impl TezosRuntime {
     }
 
     pub fn add_balance(
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         pub_key_hash: &PublicKeyHash,
         amount: U256,
     ) -> Result<(), TezosXRuntimeError> {
-        let mut info = get_tezos_account_info_or_init(host, pub_key_hash)?;
+        let mut info = get_tezos_account_info_or_init(tez_accounts, pub_key_hash)?;
         info.balance = info
             .balance
             .checked_add(amount)
             .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        set_tezos_account_info(host, pub_key_hash, info)
+        set_tezos_account_info(tez_accounts, pub_key_hash, info)
     }
 
     // Used for debug while we don't have our own originated account implementation.
@@ -1561,7 +1561,7 @@ mod tests {
     use tezos_data_encoding::types::Zarith;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
     use tezosx_journal::TezosXHashes;
 
     use super::*;
@@ -1897,7 +1897,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(host).unwrap();
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&null_pkh).unwrap();
-        account.allocate(rk.host_mut()).unwrap();
+        account.allocate(rk.tez_accounts_mut()).unwrap();
         rk
     }
 

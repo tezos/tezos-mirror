@@ -1286,7 +1286,7 @@ where
         TezlinkContent::Deposit(deposit) => {
             log!(Debug, "Execute Tezlink deposit: {deposit:?}");
 
-            let deposit_result = execute_tezlink_deposit(rk.host_mut(), &deposit)?;
+            let deposit_result = execute_tezlink_deposit(rk, &deposit)?;
 
             let source = PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 

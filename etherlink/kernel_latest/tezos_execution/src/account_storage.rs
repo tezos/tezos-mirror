@@ -25,18 +25,19 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::Key;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
 use tezos_storage::{
     read_optional_nom_value, read_optional_nom_value_bounded,
-    read_optional_nom_value_bounded_with_len, store_bin,
+    read_optional_nom_value_bounded_with_len, read_optional_rlp, store_bin, store_rlp,
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
-// Path where all the infos of a Tezos contract are stored under the same key.
-// This path must contains balance, nonce and optionally a revealed public key.
-const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+// Key of the RLP info record, under `key_to_implicit_account_prefix`. The
+// record holds the balance, the counter and, after a reveal, the public key.
+const INFO_KEY: Key = Key::from_static(b"/info");
 
 /// Upper bound, in bytes, on a `Narith`-encoded balance or counter.
 /// Both hold values that fit in a `u64` in practice — balance is bounded
@@ -759,68 +760,115 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-/// Path of the durable storage subtree for an implicit account. The
-/// info RLP record sits under this prefix at the info segment; the
-/// classification record sits at the origin segment.
-pub fn path_to_implicit_account_prefix(
+/// Returns the key under which every key of the implicit account
+/// `pub_key_hash` sits, relative to the accounts keyspace.
+///
+/// The RLP info record of the account is at `/info` under this key. Returns a
+/// [`KeyError`] if the bytes do not form a valid keyspace key.
+pub fn key_to_implicit_account_prefix(
     pub_key_hash: &PublicKeyHash,
-) -> Result<OwnedPath, TezosXRuntimeError> {
-    let address_path: Vec<u8> = format!("/tezosx/{pub_key_hash}").into();
-    let address_path = OwnedPath::try_from(address_path)
-        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    Ok(concat(
-        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-        &address_path,
-    )?)
+) -> Result<Key, KeyError> {
+    Key::from_bytes(format!("/tezosx/{pub_key_hash}").as_bytes())
 }
 
-pub fn path_to_tezos_account(
-    pub_key_hash: &PublicKeyHash,
-) -> Result<OwnedPath, TezosXRuntimeError> {
-    let prefix = path_to_implicit_account_prefix(pub_key_hash)?;
-    Ok(concat(&prefix, &INFO_PATH)?)
+/// Returns the key of the RLP info record of the implicit account
+/// `pub_key_hash`, under [`key_to_implicit_account_prefix`] in the accounts
+/// keyspace.
+///
+/// Returns a [`KeyError`] if the resulting bytes are not a valid keyspace key.
+pub fn key_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<Key, KeyError> {
+    key_to_implicit_account_prefix(pub_key_hash)?.concat(&INFO_KEY)
 }
 
+/// Reads the info record at `key` as [`get_tezos_account_info`] does. `key`
+/// must come from [`key_to_tezos_account`].
+fn get_tezos_account_info_at(
+    tez_accounts: &impl KeySpace,
+    key: &Key,
+) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
+    Ok(tez_accounts
+        .read_rlp(key)
+        .map_err(|_| RuntimeError::DecodingError)?)
+}
+
+/// Returns the info record of the implicit account `pub_key_hash` in
+/// `tez_accounts`.
+///
+/// Returns `None` when the record is absent or when the host fails to read it.
+///
+/// Fails with [`TezosXRuntimeError::Key`] when the key of `pub_key_hash` is
+/// invalid. Fails with [`RuntimeError::DecodingError`] inside
+/// [`TezosXRuntimeError::Runtime`] when the stored bytes do not decode into a
+/// [`TezosAccountInfo`].
 pub fn get_tezos_account_info(
-    host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     pub_key_hash: &PublicKeyHash,
 ) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
-    let path =
-        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
-                .map_err(|_| RuntimeError::DecodingError)?;
-            Ok(Some(account_info))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
-    }
+    let key = key_to_tezos_account(pub_key_hash)?;
+    get_tezos_account_info_at(tez_accounts, &key)
 }
 
+/// Reads the implicit-account info record at `key`, as
+/// [`get_tezos_account_info_at`] does, and returns the default record when it
+/// is absent or when the host fails to read it.
+fn get_tezos_account_info_or_init_at(
+    tez_accounts: &impl KeySpace,
+    key: &Key,
+) -> Result<TezosAccountInfo, TezosXRuntimeError> {
+    Ok(get_tezos_account_info_at(tez_accounts, key)?.unwrap_or_default())
+}
+
+/// Returns the info record of `pub_key_hash` as [`get_tezos_account_info`]
+/// does, or the default record when the record is absent or unreadable.
 pub fn get_tezos_account_info_or_init(
-    host: &mut impl StorageV1,
+    tez_accounts: &impl KeySpace,
     pub_key_hash: &PublicKeyHash,
 ) -> Result<TezosAccountInfo, TezosXRuntimeError> {
-    match get_tezos_account_info(host, pub_key_hash)? {
-        Some(info) => Ok(info),
-        None => Ok(TezosAccountInfo::default()),
-    }
+    Ok(get_tezos_account_info(tez_accounts, pub_key_hash)?.unwrap_or_default())
 }
 
+/// Writes `info` at `key` as [`set_tezos_account_info`] does. `key` must come
+/// from [`key_to_tezos_account`].
+fn set_tezos_account_info_at(
+    tez_accounts: &mut impl KeySpace,
+    key: &Key,
+    info: TezosAccountInfo,
+) -> Result<(), TezosXRuntimeError> {
+    tez_accounts
+        .store_rlp(key, &info)
+        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    Ok(())
+}
+
+/// Replaces the info record of the implicit account `pub_key_hash` in
+/// `tez_accounts` with the RLP encoding of `info`.
+///
+/// Fails with [`TezosXRuntimeError::Key`] when the key of `pub_key_hash` is
+/// invalid, and with [`TezosXRuntimeError::Custom`] when the write fails.
 pub fn set_tezos_account_info(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     pub_key_hash: &PublicKeyHash,
     info: TezosAccountInfo,
 ) -> Result<(), TezosXRuntimeError> {
-    let path =
-        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    let value = &info.rlp_bytes();
-    Ok(host.store_write(&path, value, 0)?)
+    let key = key_to_tezos_account(pub_key_hash)?;
+    set_tezos_account_info_at(tez_accounts, &key, info)
 }
 
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
+    /// Key of the account's RLP info record in the accounts keyspace, as
+    /// [`key_to_tezos_account`] derives it from `pkh`.
+    pub(crate) key: Key,
+}
+
+/// Returns the durable path of the RLP info record of `account`.
+///
+/// Fails with a [`PathError`] when the path is invalid.
+fn info_record_path(account: &TezosImplicitAccount) -> Result<OwnedPath, PathError> {
+    concat(
+        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+        &account.key,
+    )
 }
 
 impl TezosAccount for TezosImplicitAccount {
@@ -832,7 +880,7 @@ impl TezosAccount for TezosImplicitAccount {
         &self,
         host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        match get_tezos_account_info(host, &self.pkh) {
+        match read_optional_rlp::<TezosAccountInfo>(host, &info_record_path(self)?) {
             Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
             Ok(None) => Ok(Narith::from(0u64)),
             Err(e) => Err(tezos_storage::error::Error::TcError(format!("{e}"))),
@@ -844,12 +892,13 @@ impl TezosAccount for TezosImplicitAccount {
         host: &mut impl StorageV1,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
+        let path = info_record_path(self)?;
+        let mut info: TezosAccountInfo = read_optional_rlp(host, &path)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?
+            .unwrap_or_default();
         info.balance = narith_to_u256(balance)
             .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
-        set_tezos_account_info(host, &self.pkh, info)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
+        store_rlp(&info, host, &path)
     }
 }
 
@@ -860,9 +909,9 @@ impl TezosImplicitAccount {
 
     pub fn counter(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        match get_tezos_account_info(host, &self.pkh) {
+        match get_tezos_account_info_at(tez_accounts, &self.key) {
             Ok(Some(info)) => Ok(Narith::from(info.nonce)),
             Ok(None) => Ok(Narith::from(0u64)),
             Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
@@ -871,25 +920,25 @@ impl TezosImplicitAccount {
 
     pub fn set_counter(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         info.nonce = counter
             .0
             .clone()
             .try_into()
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-        set_tezos_account_info(host, &self.pkh, info)
+        set_tezos_account_info_at(tez_accounts, &self.key, info)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))
     }
 
     pub fn manager(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let info = get_tezos_account_info(host, &self.pkh)
+        let info = get_tezos_account_info_at(tez_accounts, &self.key)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         match info {
             Some(info) => match info.pub_key {
@@ -902,7 +951,7 @@ impl TezosImplicitAccount {
 
     pub fn set_manager_pk_hash_internal(
         &self,
-        _host: &mut impl StorageV1,
+        _tez_accounts: &mut impl KeySpace,
         _public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
         // In TezosX, we do not need this function which is used in Tezlink
@@ -912,22 +961,22 @@ impl TezosImplicitAccount {
 
     pub fn set_manager_public_key(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         public_key: &tezos_smart_rollup::types::PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let mut info = get_tezos_account_info_or_init(host, &self.pkh)
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         info.pub_key = Some(public_key.clone());
-        set_tezos_account_info(host, &self.pkh, info)
+        set_tezos_account_info_at(tez_accounts, &self.key, info)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
         Ok(())
     }
 
     pub fn allocated(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
-        match get_tezos_account_info(host, &self.pkh) {
+        match get_tezos_account_info_at(tez_accounts, &self.key) {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
             Err(e) => Err(tezos_storage::error::Error::NomReadError(format!("{e}"))),
@@ -937,20 +986,20 @@ impl TezosImplicitAccount {
     /// Set the **counter** for the Tezos account to the successor of the current value.
     pub fn increment_counter(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         validated_operations_count: usize,
     ) -> Result<(), tezos_storage::error::Error> {
         self.set_counter(
-            host,
-            &Narith(self.counter(host)?.0 + validated_operations_count),
+            tez_accounts,
+            &Narith(self.counter(tez_accounts)?.0 + validated_operations_count),
         )
     }
 
     pub fn set_manager_public_key_hash(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
     ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, self.pkh())
+        self.set_manager_pk_hash_internal(tez_accounts, self.pkh())
     }
 
     /// This function is used to test a situation in which we have an
@@ -958,25 +1007,26 @@ impl TezosImplicitAccount {
     #[cfg(test)]
     pub fn force_set_manager_public_key_hash(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         pkh: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        self.set_manager_pk_hash_internal(host, pkh)
+        self.set_manager_pk_hash_internal(tez_accounts, pkh)
     }
 
     /// Allocate an account in the durable storage. Does nothing if account was
     /// already allocated.
     pub fn allocate(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
-        if self.allocated(host)? {
+        if self.allocated(tez_accounts)? {
             return Ok(true);
         }
-        self.set_balance(host, &0_u64.into())?;
+        set_tezos_account_info_at(tez_accounts, &self.key, TezosAccountInfo::default())
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
         // TODO: use a global counter instead of initializing counter at 0
-        self.set_counter(host, &0u64.into())?;
-        self.set_manager_public_key_hash(host)?;
+        self.set_counter(tez_accounts, &0u64.into())?;
+        self.set_manager_public_key_hash(tez_accounts)?;
         Ok(false)
     }
 }
@@ -1019,8 +1069,10 @@ mod tests {
         use super::Manager;
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let public_key = PublicKey::from_b58check(
@@ -1032,10 +1084,10 @@ mod tests {
         // Reveal records the public key as the account's manager. It writes no
         // `/origin` record — an implicit account is Native by construction.
         account
-            .set_manager_public_key(&mut host, &public_key)
+            .set_manager_public_key(rk.tez_accounts_mut(), &public_key)
             .unwrap();
         assert_eq!(
-            account.manager(&host).unwrap(),
+            account.manager(rk.tez_accounts()).unwrap(),
             Manager::Revealed(public_key)
         );
     }
@@ -1053,7 +1105,7 @@ mod test {
     use primitive_types::U256;
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     /// Build the live implicit account for `pkh` (RLP `/info` layout).
     fn implicit(pkh: &PublicKeyHash) -> TezosImplicitAccount {
@@ -1079,11 +1131,11 @@ mod test {
     /// storage helper, bypassing the account API, so the read tests below
     /// verify that the account reads from the right path / layout.
     fn seed_account_info(
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         pkh: &PublicKeyHash,
         info: TezosAccountInfo,
     ) {
-        set_tezos_account_info(host, pkh, info)
+        set_tezos_account_info(tez_accounts, pkh, info)
             .expect("seeding the account info should succeed");
     }
 
@@ -1092,6 +1144,7 @@ mod test {
     #[test]
     fn test_read_balance() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let balance: Narith = 2944_u64.into();
 
@@ -1099,7 +1152,7 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         seed_account_info(
-            &mut host,
+            rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
                 balance: narith_to_u256(&balance).unwrap(),
@@ -1111,7 +1164,7 @@ mod test {
         let account = implicit(&pkh);
 
         let read_balance = account
-            .balance(&host)
+            .balance(rk.host())
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
@@ -1120,6 +1173,7 @@ mod test {
     #[test]
     fn test_read_counter() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let counter: Narith = 3u64.into();
 
@@ -1127,7 +1181,7 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         seed_account_info(
-            &mut host,
+            rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
                 balance: U256::zero(),
@@ -1139,7 +1193,7 @@ mod test {
         let account = implicit(&pkh);
 
         let read_counter = account
-            .counter(&host)
+            .counter(rk.tez_accounts())
             .expect("read_counter should have succeeded");
 
         assert_eq!(counter, read_counter);
@@ -1170,6 +1224,7 @@ mod test {
     #[test]
     fn test_set_and_read_counter() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let counter: Narith = 6u64.into();
 
@@ -1179,11 +1234,11 @@ mod test {
         let account = implicit_of(&contract);
 
         let () = account
-            .set_counter(&mut host, &counter)
+            .set_counter(rk.tez_accounts_mut(), &counter)
             .expect("set_counter should have succeeded");
 
         let read_counter = account
-            .counter(&host)
+            .counter(rk.tez_accounts())
             .expect("read_counter should have succeeded");
 
         assert_eq!(counter, read_counter);
@@ -1192,13 +1247,14 @@ mod test {
     #[test]
     fn test_read_manager() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
 
         seed_account_info(
-            &mut host,
+            rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
                 balance: U256::zero(),
@@ -1209,7 +1265,9 @@ mod test {
 
         let account = implicit(&pkh);
 
-        let manager = account.manager(&host).expect("Can't read manager");
+        let manager = account
+            .manager(rk.tez_accounts())
+            .expect("Can't read manager");
 
         let read_pkh = match manager {
             Manager::NotRevealed(pkh) => {
@@ -1224,6 +1282,7 @@ mod test {
     #[test]
     fn test_set_read_manager_public_key() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Create an account for bootstrap1
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -1234,13 +1293,13 @@ mod test {
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
 
         let () = account
-            .set_manager_public_key(&mut host, &public_key)
+            .set_manager_public_key(rk.tez_accounts_mut(), &public_key)
             .expect("set_manager_public_key should have succeeded");
 
         let manager = Manager::Revealed(public_key);
 
         let read_manager = account
-            .manager(&host)
+            .manager(rk.tez_accounts())
             .expect("read_manager should have succeeded");
 
         assert_eq!(manager, read_manager);
@@ -1249,6 +1308,7 @@ mod test {
     #[test]
     fn test_set_read_manager_public_key_hash() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
@@ -1261,13 +1321,13 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let () = account
-            .set_manager_public_key_hash(&mut host)
+            .set_manager_public_key_hash(rk.tez_accounts_mut())
             .expect("set_manager_public_key_hash should have succeeded");
 
         let manager = Manager::NotRevealed(pkh);
 
         let read_manager = account
-            .manager(&host)
+            .manager(rk.tez_accounts())
             .expect("read_manager should have succeeded");
 
         assert_eq!(manager, read_manager);
@@ -1276,6 +1336,7 @@ mod test {
     #[test]
     fn test_account_initialization() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
@@ -1285,17 +1346,17 @@ mod test {
         let account = implicit_of(&contract);
 
         let exist = account
-            .allocated(&host)
+            .allocated(rk.tez_accounts())
             .expect("Exist account should have succeeded");
 
         assert!(!exist);
 
         account
-            .allocate(&mut host)
+            .allocate(rk.tez_accounts_mut())
             .expect("Account initialization should have succeeded");
 
         let exist = account
-            .allocated(&host)
+            .allocated(rk.tez_accounts())
             .expect("Exist account should have succeeded");
 
         assert!(exist);
@@ -1303,17 +1364,17 @@ mod test {
         let test_balance = 1999_u64.into();
 
         account
-            .set_balance(&mut host, &test_balance)
+            .set_balance(rk.host_mut(), &test_balance)
             .expect("Set balance should have succeeded");
 
         // Calling init on a contract already initialized will do nothing
         // So the balance should not change and still be 1999
         account
-            .allocate(&mut host)
+            .allocate(rk.tez_accounts_mut())
             .expect("Account initialization should have succeeded");
 
         let read_balance = account
-            .balance(&host)
+            .balance(rk.host())
             .expect("Read balance should have succeeded");
 
         assert_eq!(test_balance, read_balance);

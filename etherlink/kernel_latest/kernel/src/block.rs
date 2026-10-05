@@ -756,7 +756,9 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        TEZ_ACCOUNTS_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH,
+    };
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -1369,12 +1371,15 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeed");
 
         let mut base = load_base(&mut host).unwrap();
@@ -1390,7 +1395,7 @@ mod tests {
             nonce: 0,
             pub_key: None,
         };
-        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+        set_tezos_account_info(&mut tez_accounts, &bootstrap.pkh, account_info)
             .expect("Should have set account info");
 
         // Create a Tezos reveal operation wrapped as TezosDelayed for EVM chain
@@ -1434,12 +1439,15 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeed");
 
         let mut base = load_base(&mut host).unwrap();
@@ -1453,7 +1461,7 @@ mod tests {
             nonce: 0,
             pub_key: None,
         };
-        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+        set_tezos_account_info(&mut tez_accounts, &bootstrap.pkh, account_info)
             .expect("Should have set account info");
 
         // Block 0: reveal operation
@@ -1614,6 +1622,9 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
         // Disable DA fees so the low-fee reveal operation is not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
@@ -1621,7 +1632,7 @@ mod tests {
         // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
         let mut base = load_base(&mut host).unwrap();
@@ -1636,7 +1647,7 @@ mod tests {
         // Seed bootstrap1 in the TezosX storage with a small balance and no
         // revealed public key.
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &pkh,
             TezosAccountInfo {
                 balance: U256::from(10000),
@@ -1647,7 +1658,7 @@ mod tests {
         .expect("Should have set bootstrap1 account info");
 
         // Before the reveal, the manager is not revealed.
-        let info_before = get_tezos_account_info(&host, &pkh)
+        let info_before = get_tezos_account_info(&tez_accounts, &pkh)
             .expect("account info read should succeed")
             .expect("bootstrap1 should be allocated");
         assert_eq!(
@@ -1671,7 +1682,7 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // After the reveal, the manager is the bootstrap's public key.
-        let info_after = get_tezos_account_info(&host, &pkh)
+        let info_after = get_tezos_account_info(&tez_accounts, &pkh)
             .expect("account info read should succeed")
             .expect("bootstrap1 should still be allocated");
         assert_eq!(
@@ -1693,6 +1704,9 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
         // Disable DA fees so the low-fee operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
@@ -1712,7 +1726,7 @@ mod tests {
         // (bootstrap2's TezosX balance is established below.)
         context::implicit_from_public_key_hash(&dst_pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
         // Seed bootstrap1 with enough mutez to cover both fees and the
@@ -1721,7 +1735,7 @@ mod tests {
         // bootstrap1 pays 1000 (reveal fee) + 1000 (transfer fee) + 35 (transfer).
         let initial_balance = 10000_u64;
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &src_pkh,
             TezosAccountInfo {
                 balance: U256::from(initial_balance),
@@ -1733,7 +1747,7 @@ mod tests {
 
         // bootstrap2 starts with a zero balance.
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &dst_pkh,
             TezosAccountInfo {
                 balance: U256::zero(),
@@ -1744,7 +1758,7 @@ mod tests {
         .expect("Should have set bootstrap2 account info");
 
         // bootstrap1 is not revealed yet.
-        let info_before = get_tezos_account_info(&host, &src_pkh)
+        let info_before = get_tezos_account_info(&tez_accounts, &src_pkh)
             .expect("account info read should succeed")
             .expect("bootstrap1 should be allocated");
         assert_eq!(info_before.pub_key, None);
@@ -1783,7 +1797,7 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // bootstrap1 should be revealed.
-        let src_info = get_tezos_account_info(&host, &src_pkh)
+        let src_info = get_tezos_account_info(&tez_accounts, &src_pkh)
             .expect("account info read should succeed")
             .expect("bootstrap1 should be allocated");
         assert_eq!(
@@ -1802,7 +1816,7 @@ mod tests {
         );
 
         // bootstrap2 received exactly the transferred amount.
-        let dst_info = get_tezos_account_info(&host, &dst_pkh)
+        let dst_info = get_tezos_account_info(&tez_accounts, &dst_pkh)
             .expect("account info read should succeed")
             .expect("bootstrap2 should be allocated");
         assert_eq!(
@@ -1825,6 +1839,9 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         let mut base = load_base(&mut host).unwrap();
@@ -1838,12 +1855,12 @@ mod tests {
 
         context::implicit_from_public_key_hash(&dst_pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
         let initial_balance = 10000_u64;
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &src_pkh,
             TezosAccountInfo {
                 balance: U256::from(initial_balance),
@@ -1853,7 +1870,7 @@ mod tests {
         )
         .expect("Should have set bootstrap1 account info");
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &dst_pkh,
             TezosAccountInfo {
                 balance: U256::zero(),
@@ -1900,7 +1917,7 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // The foreign-branch transfer was force-included and applied.
-        let dst_info = get_tezos_account_info(&host, &dst_pkh)
+        let dst_info = get_tezos_account_info(&tez_accounts, &dst_pkh)
             .expect("account info read should succeed")
             .expect("bootstrap2 should be allocated");
         assert_eq!(
@@ -1926,6 +1943,9 @@ mod tests {
         };
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
         // Disable DA fees so the test operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
@@ -1933,7 +1953,7 @@ mod tests {
         // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
         let mut base = load_base(&mut host).unwrap();
@@ -1968,7 +1988,7 @@ mod tests {
         // Seed bootstrap1 with mutez and a revealed manager so it can
         // originate and call without a separate reveal operation.
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &src_pkh,
             TezosAccountInfo {
                 balance: U256::from(500_000u64),
@@ -2088,11 +2108,14 @@ mod tests {
         use tezosx_interfaces::{AliasInfo, Origin, Registry, RuntimeId};
 
         let mut host = MockKernelHost::default();
+        let mut tez_accounts = host
+            .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+            .expect("the accounts keyspace loads on a fresh host");
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .unwrap()
-            .allocate(&mut host)
+            .allocate(&mut tez_accounts)
             .unwrap();
         let mut base_ks = load_base(&mut host).unwrap();
         let chain_config =
@@ -2100,7 +2123,7 @@ mod tests {
 
         let bootstrap = bootstrap1();
         set_tezos_account_info(
-            &mut host,
+            &mut tez_accounts,
             &bootstrap.pkh,
             TezosAccountInfo {
                 balance: U256::from(500_000u64),
@@ -2162,6 +2185,9 @@ mod tests {
             content: TransactionContent::TezosDelayed(call),
         }));
 
+        // `RuntimeKeyspaces::init` below loads the same keyspace. Drop
+        // `tez_accounts` first.
+        drop(tez_accounts);
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut block_constants = first_block(&mut rk, &base_ks);
         block_constants.michelson_runtime_block_constants.safe_roots =
@@ -2272,7 +2298,7 @@ mod tests {
         );
         // 1 mutez of fees, and the storage.
         assert_eq!(
-            get_tezos_account_info(rk.host(), &bootstrap.pkh)
+            get_tezos_account_info(rk.tez_accounts(), &bootstrap.pkh)
                 .unwrap()
                 .map(|info| info.balance),
             Some(U256::from(500_000 - 1 - storage_cost))
@@ -2307,6 +2333,9 @@ mod tests {
         // operation was `Applied`.
         let run = |base: u128| {
             let mut host = MockKernelHost::default();
+            let mut tez_accounts = host
+                .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+                .expect("the accounts keyspace loads on a fresh host");
             storage::store_da_fee(&mut host, U256::zero()).unwrap();
             store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
@@ -2314,7 +2343,7 @@ mod tests {
             // accounts root succeeds.
             context::implicit_from_public_key_hash(&bootstrap2().pkh)
                 .unwrap()
-                .allocate(&mut host)
+                .allocate(&mut tez_accounts)
                 .unwrap();
 
             let mut base_ks = load_base(&mut host).unwrap();
@@ -2324,7 +2353,7 @@ mod tests {
 
             let bootstrap = bootstrap1();
             set_tezos_account_info(
-                &mut host,
+                &mut tez_accounts,
                 &bootstrap.pkh,
                 TezosAccountInfo {
                     balance: U256::from(500_000u64),
@@ -2394,6 +2423,9 @@ mod tests {
                 content: TransactionContent::TezosDelayed(call),
             }));
 
+            // `RuntimeKeyspaces::init` below loads the same keyspace. Drop
+            // `tez_accounts` first.
+            drop(tez_accounts);
             let base_ks = load_base(&mut host).unwrap();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
             let mut block_constants = first_block(&mut rk, &base_ks);
@@ -2985,7 +3017,7 @@ mod tests {
         // mirroring `test_tezblock_stored_after_tezos_operation`.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
-            .allocate(rk.host_mut())
+            .allocate(rk.tez_accounts_mut())
             .expect("Contract initialization should have succeeded");
 
         let chain_config = {
@@ -3001,7 +3033,7 @@ mod tests {
         // cover fees for both ops.
         let bootstrap = bootstrap1();
         set_tezos_account_info(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &bootstrap.pkh,
             TezosAccountInfo {
                 balance: U256::from(1_000_000),
