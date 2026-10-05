@@ -74,7 +74,8 @@ val shift_right : t -> offset:int -> t tzresult
     [positions]. *)
 val from_list : int list -> t tzresult
 
-(** [to_list t] returns the list of integers in the bitset. *)
+(** [to_list t] returns the list of integers in the bitset. Returns [[]] on
+    an (invalid) negative bitset. *)
 val to_list : t -> int list
 
 (** [fill ~length] is equivalent to setting all bits for positions in [0, length
