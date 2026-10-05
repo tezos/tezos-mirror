@@ -40,7 +40,7 @@ use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError, KeySpaceLoader, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
-use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
+use tezos_storage::{read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
@@ -1150,13 +1150,14 @@ impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
         if temporary {
             Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
-            let next_id_path = next_id_path()?;
-            let id: BigMapId = match read_nom_value(self.rk.host(), &next_id_path) {
-                Ok(id) => id,
-                Err(tezos_storage::error::Error::Runtime(_)) => 0.into(),
-                Err(e) => return Err(LazyStorageError::NomReadError(e.to_string())),
-            };
-            store_bin(&id.succ(), self.rk.host_mut(), &next_id_path)
+            let id: BigMapId = self
+                .rk
+                .tez_accounts()
+                .read_nom_or(&NEXT_ID_KEY, 0.into())
+                .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+            self.rk
+                .tez_accounts_mut()
+                .store_bin(&NEXT_ID_KEY, &id.succ())
                 .map_err(storage_error_to_lazy)?;
             Ok(id)
         }
@@ -1212,15 +1213,14 @@ fn hash_micheline_expr(
     Ok(digest_256(&bytes).into())
 }
 
-/// Adapter for the legacy `tezos_storage::Error → LazyStorageError`
-/// stringification path. `tezos_storage::Error` is not a `BinError`, so
-/// the new `From<BinError>` impl on `LazyStorageError` does not apply
-/// here; keep the explicit conversion isolated in one helper instead of
-/// inlining `.map_err(|e| LazyStorageError::BinWriteError(...))` at
-/// each call site.
-fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
+/// Converts a storage failure into a [`LazyStorageError::BinWriteError`]
+/// that holds its message.
+///
+/// [`LazyStorageError`] has no `From` impl for this conversion, because it
+/// belongs to `mir`, and `mir` does not depend on `tezos-storage-latest`.
+fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStorageError {
     LazyStorageError::BinWriteError(std::rc::Rc::new(
-        tezos_data_encoding::enc::BinError::custom(e.to_string()),
+        tezos_data_encoding::enc::BinError::custom(e.into().to_string()),
     ))
 }
 
@@ -2502,17 +2502,13 @@ pub mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
-        let next_id = next_id_path().unwrap();
-        ctx.rk
-            .host_mut()
-            .store_write_all(&next_id, &[0xff])
-            .unwrap();
+        ctx.rk.tez_accounts_mut().set(&NEXT_ID_KEY, [0xff]).unwrap();
 
         assert!(matches!(
             ctx.big_map_new(&Type::Int, &Type::String, false),
             Err(LazyStorageError::NomReadError(_))
         ));
-        assert_eq!(ctx.rk.host().store_read_all(&next_id).unwrap(), vec![0xff]);
+        assert_eq!(ctx.rk.tez_accounts().get(&NEXT_ID_KEY), Some(vec![0xff]));
     }
 
     #[test]

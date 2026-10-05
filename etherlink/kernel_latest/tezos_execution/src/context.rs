@@ -156,17 +156,15 @@ pub mod big_maps {
 
     const VALUE_TYPE_PATH: RefPath = RefPath::assert_from(b"/value_type");
 
-    const NEXT_ID_PATH: RefPath = RefPath::assert_from(b"/next_id");
-
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
 
     fn root() -> Result<OwnedPath, PathError> {
         concat(&TEZ_ACCOUNTS_ROOT_PATH, &BIG_MAP_PATH)
     }
 
-    pub fn next_id_path() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &NEXT_ID_PATH)
-    }
+    /// The key, in the accounts keyspace, of the counter that holds the next
+    /// permanent big-map ID.
+    pub const NEXT_ID_KEY: Key = Key::from_static(b"/big_map/next_id");
 
     pub fn big_map_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
         concat(&root()?, &OwnedPath::try_from(format!("/{id}"))?)
@@ -290,6 +288,16 @@ mod tests {
                 hex::encode(zero.to_bytes_vec())
             )
             .into_bytes()
+        );
+    }
+
+    /// Makes sure that the key of the next-ID counter resolves to its durable
+    /// path. The test writes the path in full, so it fails if the key changes.
+    #[test]
+    fn big_map_next_id_key_keeps_its_durable_path() {
+        assert_eq!(
+            durable(&big_maps::NEXT_ID_KEY),
+            b"/tez/tez_accounts/big_map/next_id"
         );
     }
 
