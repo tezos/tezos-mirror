@@ -1569,7 +1569,7 @@ where
                 )?
             };
             let code = dest_account
-                .code(tc_ctx.rk.host(), tc_ctx.rk.tez_accounts())
+                .code(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let (code_read_count, code_size) = match &code {
                 Code::Code(code_bytes) => (1, code_bytes.len() as u64),
@@ -1789,14 +1789,13 @@ fn get_originated_contract_entrypoint(
 }
 
 pub fn get_contract_entrypoint(
-    host: &impl StorageV1,
     tez_accounts: &impl KeySpace,
     address: &AddressHash,
     gas: &mut Gas,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host, tez_accounts).ok()?;
+    let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(code) => get_originated_contract_entrypoint(code, gas),
         Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
@@ -1832,13 +1831,13 @@ impl From<StorageError> for AliasUpgradeError {
 }
 
 /// Atomically upgrade the single shared Michelson alias implementation (see
-/// [`account_storage::ALIAS_IMPLEMENTATION_PATH`]). A single durable-storage
+/// [`account_storage::write_alias_implementation`]). A single durable-storage
 /// write here changes the behaviour of **every** existing and future alias at
 /// once — O(1) in the number of aliases.
 ///
 /// `new_code` must be a typeable Michelson script. To protect downstream
-/// callers, the upgrade enforces two invariants against the currently-installed
-/// implementation:
+/// callers, the upgrade enforces two invariants against the current
+/// implementation, when the host holds one that it can read:
 ///
 /// - **Entrypoint monotonicity:** every entrypoint exposed today must still be
 ///   present, with the same type, in `new_code` (new entrypoints may be added).
@@ -1846,6 +1845,9 @@ impl From<StorageError> for AliasUpgradeError {
 /// - **Storage-type invariance:** the storage type must not change. Each alias
 ///   keeps its own `/data/storage` typed against the shared code, so a
 ///   storage-type change would brick every alias at its next execution.
+///
+/// An absent or unreadable implementation leaves nothing to compare, so the
+/// upgrade writes `new_code` without these two checks.
 ///
 /// Note on widening the parameter while keeping the implicit `default`
 /// entrypoint: in Michelson the `default` entrypoint's type is the *whole* root
@@ -1861,8 +1863,8 @@ impl From<StorageError> for AliasUpgradeError {
 // governance decision reaches the kernel is out of scope for L2-1528. When a
 // metered caller is wired, revisit gas accounting and distinguishing
 // out-of-gas from a genuinely invalid script.
-pub fn upgrade_alias_implementation<Host: StorageV1>(
-    host: &mut Host,
+pub fn upgrade_alias_implementation(
+    tez_accounts: &mut impl KeySpace,
     new_code: &[u8],
     gas: &mut Gas,
 ) -> Result<(), AliasUpgradeError> {
@@ -1871,8 +1873,9 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
         .ok_or(AliasUpgradeError::InvalidScript)?;
 
     // Check invariants against the currently-installed implementation. An
-    // absent slot (not seeded yet) means there is nothing to preserve.
-    if let Some(current_code) = account_storage::read_alias_implementation(host)? {
+    // absent implementation (not set up yet, or unreadable) means there is
+    // nothing to preserve.
+    if let Some(current_code) = account_storage::read_alias_implementation(tez_accounts) {
         // The current implementation is already installed and trusted; typecheck
         // it with a fresh budget (it is small and known-good) so `new_code`'s
         // gas consumption cannot starve this check and misreport it as corrupt.
@@ -1902,7 +1905,7 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
     }
 
     // One write upgrades every alias.
-    account_storage::write_alias_implementation(host, new_code)?;
+    account_storage::write_alias_implementation(tez_accounts, new_code)?;
     Ok(())
 }
 
@@ -1916,13 +1919,12 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
 /// [`crate::mir_ctx::enshrined_synthetic_views`] for the source of
 /// truth.
 pub fn get_enshrined_contract_views(
-    host: &impl StorageV1,
     tez_accounts: &impl KeySpace,
     address: &AddressHash,
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host, tez_accounts).ok()?;
+    let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(_) => None,
         Code::Enshrined(contract) => {
@@ -3851,7 +3853,7 @@ mod tests {
             .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
-        write_alias_implementation(rk.host_mut(), &code).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &code).unwrap();
 
         // A code-less KT1 classified as an alias.
         let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
@@ -3867,7 +3869,6 @@ mod tests {
             .unwrap();
 
         let entrypoints = get_contract_entrypoint(
-            rk.host(),
             rk.tez_accounts(),
             &AddressHash::Kt1(kt1),
             &mut Gas::default(),
@@ -3901,16 +3902,20 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let superset = encode_script(UPGRADE_SUPERSET_SCRIPT);
-        upgrade_alias_implementation(rk.host_mut(), &superset, &mut Gas::default())
-            .expect("adding an entrypoint while keeping `default` must be accepted");
+        upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &superset,
+            &mut Gas::default(),
+        )
+        .expect("adding an entrypoint while keeping `default` must be accepted");
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(superset)
         );
     }
@@ -3921,20 +3926,23 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Start from the superset (default + foo)...
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
 
         // ...then try to drop `foo` by going back to the bare default script.
         let dropped = encode_script(UPGRADE_BASE_SCRIPT);
-        let err =
-            upgrade_alias_implementation(rk.host_mut(), &dropped, &mut Gas::default())
-                .expect_err("dropping an exposed entrypoint must be rejected");
+        let err = upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &dropped,
+            &mut Gas::default(),
+        )
+        .expect_err("dropping an exposed entrypoint must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointRemoved(_)));
         // The slot is left untouched.
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(encode_script(UPGRADE_SUPERSET_SCRIPT))
         );
     }
@@ -3944,7 +3952,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -3953,9 +3961,12 @@ mod tests {
         let retyped = encode_script(
             "parameter string; storage unit; code { CDR; NIL operation; PAIR }",
         );
-        let err =
-            upgrade_alias_implementation(rk.host_mut(), &retyped, &mut Gas::default())
-                .expect_err("changing an entrypoint's type must be rejected");
+        let err = upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &retyped,
+            &mut Gas::default(),
+        )
+        .expect_err("changing an entrypoint's type must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointTypeChanged(_)));
     }
 
@@ -3965,7 +3976,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Base storage is `string` (like the forwarder).
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
@@ -3977,7 +3988,7 @@ mod tests {
              NIL operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &retyped_storage,
             &mut Gas::default(),
         )
@@ -3995,7 +4006,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -4005,7 +4016,7 @@ mod tests {
              operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &widened_no_default,
             &mut Gas::default(),
         )
@@ -4018,13 +4029,13 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             b"not a michelson script",
             &mut Gas::default(),
         )
@@ -4032,7 +4043,7 @@ mod tests {
         assert!(matches!(err, AliasUpgradeError::InvalidScript));
         // The core safety property: the slot is left untouched on rejection.
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(encode_script(UPGRADE_BASE_SCRIPT))
         );
     }
@@ -4042,10 +4053,11 @@ mod tests {
         // A non-typeable slot means the current implementation is corrupt.
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        account_storage::write_alias_implementation(rk.host_mut(), b"garbage").unwrap();
+        account_storage::write_alias_implementation(rk.tez_accounts_mut(), b"garbage")
+            .unwrap();
 
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
             &mut Gas::default(),
         )
@@ -4062,10 +4074,10 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let code = encode_script(UPGRADE_BASE_SCRIPT);
-        upgrade_alias_implementation(rk.host_mut(), &code, &mut Gas::default())
+        upgrade_alias_implementation(rk.tez_accounts_mut(), &code, &mut Gas::default())
             .expect("seeding an empty slot has no monotonicity constraint");
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(code)
         );
     }
@@ -6789,7 +6801,7 @@ mod tests {
 
         // Verify code and storage
         let smart_contract_code = smart_contract_account
-            .code(rk.host(), rk.tez_accounts())
+            .code(rk.tez_accounts())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_code,
@@ -9607,7 +9619,7 @@ mod tests {
             ))
             .unwrap();
             assert!(
-                account.code(rk.host(), rk.tez_accounts()).is_err(),
+                account.code(rk.tez_accounts()).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
             );
         }

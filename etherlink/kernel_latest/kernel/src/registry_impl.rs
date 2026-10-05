@@ -579,8 +579,10 @@ mod tests {
         let registry = RegistryImpl::default();
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(rk.host_mut())
-            .unwrap();
+        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
+            rk.tez_accounts_mut(),
+        )
+        .unwrap();
         // An EVM account provably native: it has sent a transaction.
         let native = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
         StorageAccount::from_address(&Address::from_hex(native).unwrap())

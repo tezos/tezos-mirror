@@ -261,7 +261,6 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         get_contract_entrypoint(
-            self.rk.host(),
             self.rk.tez_accounts(),
             address,
             &mut self.operation_gas.remaining,
@@ -475,7 +474,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // L1 VIEW semantics push `None` when the target KT1 does not
         // exist at all (cf. `script_interpreter.ml::iview`). Probe
         // existence explicitly here — if we skipped this and went
-        // straight to `account.code(host)`, a never-originated KT1
+        // straight to `account.code(tez_accounts)`, a never-originated KT1
         // would error out on the missing `code` path and we would
         // propagate that as a hard `HostError`, breaking parity with
         // L1 for any contract doing
@@ -492,7 +491,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // I/O on a known contract and must surface as an error rather
         // than impersonate "view not found".
         let serialized_script = account
-            .code(self.tc_ctx.rk.host(), self.tc_ctx.rk.tez_accounts())
+            .code(self.tc_ctx.rk.tez_accounts())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {

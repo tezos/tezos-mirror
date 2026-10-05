@@ -648,7 +648,7 @@ where
                 // The write is the same on every replica, and a second run
                 // changes nothing.
                 tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
-                    rk.host_mut(),
+                    rk.tez_accounts_mut(),
                 )
                 .map_err(|e| {
                     anyhow::anyhow!("seeding alias implementation failed: {e}")

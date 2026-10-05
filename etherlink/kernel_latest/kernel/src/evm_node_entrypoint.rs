@@ -554,7 +554,7 @@ where
     else {
         return;
     };
-    tezosx_michelson_entrypoints_fn(&kernel_host, &tez_accounts, &mut base);
+    tezosx_michelson_entrypoints_fn(&tez_accounts, &mut base);
 }
 
 /// Answers a contract entrypoints query from the node.
@@ -568,7 +568,6 @@ where
 /// not decode, the function logs an error and leaves the result key untouched.
 #[allow(dead_code)]
 pub fn tezosx_michelson_entrypoints_fn(
-    host: &impl StorageV1,
     tez_accounts: &impl KeySpace,
     base: &mut impl KeySpace,
 ) {
@@ -580,7 +579,6 @@ pub fn tezosx_michelson_entrypoints_fn(
         }
     };
     handle_query_entrypoints_to(
-        host,
         tez_accounts,
         base,
         &input,
@@ -880,7 +878,6 @@ where
 ///
 /// Input: binary-encoded contract AddressHash (22 bytes).
 fn handle_query_entrypoints_to(
-    host: &impl StorageV1,
     tez_accounts: &impl KeySpace,
     base: &mut impl KeySpace,
     payload: &[u8],
@@ -905,14 +902,12 @@ fn handle_query_entrypoints_to(
     // would reject RPC calls that would succeed in an operation. Use
     // Gas::unmetered() instead.
     let entrypoints = tezos_execution::get_contract_entrypoint(
-        host,
         tez_accounts,
         &address,
         &mut Gas::unmetered(),
     );
-    let views =
-        tezos_execution::get_enshrined_contract_views(host, tez_accounts, &address)
-            .unwrap_or_default();
+    let views = tezos_execution::get_enshrined_contract_views(tez_accounts, &address)
+        .unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -1635,7 +1630,7 @@ mod tests {
         base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
             .expect("write input");
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        tezosx_michelson_entrypoints_fn(rk.host(), rk.tez_accounts(), &mut base);
+        tezosx_michelson_entrypoints_fn(rk.tez_accounts(), &mut base);
         base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }

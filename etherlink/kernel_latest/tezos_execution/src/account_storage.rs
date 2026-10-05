@@ -25,8 +25,6 @@ use tezos_smart_rollup::{
     host::RuntimeError,
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
@@ -157,40 +155,34 @@ pub enum Code {
     Enshrined(EnshrinedContracts),
 }
 
-/// Durable-storage path of the single shared Michelson implementation that
-/// backs every Tezos X alias. An alias `KT1` carries no script of its own;
-/// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
-/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
+/// Key, in the `/tez/tez_accounts` keyspace, of the single shared Michelson
+/// implementation that backs every Tezos X alias. An alias `KT1` carries no
+/// script of its own. When its `/data/code` is absent and its classification
+/// is [`Origin::Alias`], its code resolves to the bytes stored here (see
+/// [`TezosOriginatedAccount::code`]).
 ///
-/// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
-/// (`__system__` is not a valid base58 account address, so it cannot collide
-/// with a per-account directory) and, being rooted under `/tez/tez_accounts`,
-/// is covered by the Michelson state-hash commitment `h(/tez/tez_accounts)`:
-/// replicas that disagree on the implementation diverge on the Michelson block
-/// `state_root`.
-pub(crate) const ALIAS_IMPLEMENTATION_PATH: RefPath =
-    RefPath::assert_from(b"/tez/tez_accounts/tezosx/__system__/alias_implementation");
+/// The key is under `__system__` in the `tezosx/` account namespace. No
+/// account key can collide with it, because `__system__` is not a valid
+/// base58 account address. The key is in the accounts keyspace, so the
+/// Michelson state hash covers it. Replicas with different implementations
+/// get different Michelson block `state_root` values.
+pub(crate) const ALIAS_IMPLEMENTATION_KEY: Key =
+    Key::from_static(b"/tezosx/__system__/alias_implementation");
 
-/// Read the shared alias implementation. Returns `None` when the slot has not
-/// been seeded yet.
-pub fn read_alias_implementation(
-    host: &impl StorageV1,
-) -> Result<Option<Vec<u8>>, tezos_storage::error::Error> {
-    match host.store_read_all(&ALIAS_IMPLEMENTATION_PATH) {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
-    }
+/// Returns the shared alias implementation, or `None` when it is absent or
+/// when the host fails to read it.
+pub fn read_alias_implementation(tez_accounts: &impl KeySpace) -> Option<Vec<u8>> {
+    tez_accounts.get(&ALIAS_IMPLEMENTATION_KEY)
 }
 
 /// Overwrite the shared alias implementation with `code`. A single write here
 /// changes the behaviour of every existing and future alias at once — the O(1)
 /// upgrade primitive.
 pub fn write_alias_implementation(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     code: &[u8],
 ) -> Result<(), tezos_storage::error::Error> {
-    host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, code)?;
+    tez_accounts.set(&ALIAS_IMPLEMENTATION_KEY, code)?;
     Ok(())
 }
 
@@ -326,7 +318,6 @@ impl TezosOriginatedAccount {
 
     pub fn code(
         &self,
-        host: &impl StorageV1,
         tez_accounts: &impl KeySpace,
     ) -> Result<Code, tezos_storage::error::Error> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
@@ -350,7 +341,7 @@ impl TezosOriginatedAccount {
                     // seed it on existing networks. So an unseeded slot here is
                     // a should-never-happen invariant violation, surfaced as an
                     // internal error rather than silently substituting code.
-                    read_alias_implementation(host)?
+                    read_alias_implementation(tez_accounts)
                         .map(Code::Code)
                         .ok_or_else(|| {
                             tezos_storage::error::Error::Internal(
@@ -1405,7 +1396,7 @@ mod test {
             .expect("Setting code of the KT1 should succeed");
 
         let read_code = account
-            .code(rk.host(), rk.tez_accounts())
+            .code(rk.tez_accounts())
             .expect("Read the code of the KT1 should succeed");
 
         assert_eq!(
@@ -1822,15 +1813,15 @@ mod test {
         assert_eq!(allocated_bytes, Zarith::from(0u64));
     }
 
-    /// The shared alias-implementation slot must stay under `/tez/tez_accounts`
-    /// so it remains covered by the `h(/tez/tez_accounts)` state-hash
-    /// commitment. Nothing enforces this at compile time, so guard it here.
+    /// The alias implementation key resolves to
+    /// `/tez/tez_accounts/tezosx/__system__/alias_implementation`, under the
+    /// root that the Michelson state hash commits to.
     #[test]
-    fn alias_implementation_path_is_under_the_accounts_root() {
-        use tezos_smart_rollup_host::path::Path;
-        assert!(ALIAS_IMPLEMENTATION_PATH
-            .as_bytes()
-            .starts_with(b"/tez/tez_accounts"));
+    fn alias_implementation_key_keeps_its_durable_path() {
+        assert_eq!(
+            [b"/tez/tez_accounts", ALIAS_IMPLEMENTATION_KEY.as_bytes()].concat(),
+            b"/tez/tez_accounts/tezosx/__system__/alias_implementation"
+        );
     }
 
     fn classify_as_alias(
@@ -1889,10 +1880,10 @@ mod test {
 
         classify_as_alias(rk.tez_accounts_mut(), &account);
         let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
-        write_alias_implementation(rk.host_mut(), &implementation).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &implementation).unwrap();
 
         assert_eq!(
-            account.code(rk.host(), rk.tez_accounts()).unwrap(),
+            account.code(rk.tez_accounts()).unwrap(),
             Code::Code(implementation)
         );
         assert!(account.exists(rk.tez_accounts()).unwrap());
@@ -1911,7 +1902,7 @@ mod test {
         // Pin the error type: an unseeded slot is an internal invariant breach,
         // not a generic/typecheck error (so it can't silently change meaning).
         assert!(matches!(
-            account.code(rk.host(), rk.tez_accounts()),
+            account.code(rk.tez_accounts()),
             Err(tezos_storage::error::Error::Internal(_))
         ));
         // Still classified, so it exists.
@@ -1933,7 +1924,7 @@ mod test {
         // yields `Internal`).
         let code_key = code::code_key(&account).unwrap();
         assert_eq!(
-            account.code(rk.host(), rk.tez_accounts()),
+            account.code(rk.tez_accounts()),
             Err(KeySpaceError::read(
                 rk.tez_accounts().name(),
                 &code_key,
@@ -1961,7 +1952,7 @@ mod test {
 
         let code_key = code::code_key(&account).unwrap();
         assert_eq!(
-            account.code(rk.host(), rk.tez_accounts()),
+            account.code(rk.tez_accounts()),
             Err(KeySpaceError::read(
                 rk.tez_accounts().name(),
                 &code_key,
@@ -1985,7 +1976,7 @@ mod test {
         account.set_code(rk.tez_accounts_mut(), &own_code).unwrap();
 
         assert_eq!(
-            account.code(rk.host(), rk.tez_accounts()).unwrap(),
+            account.code(rk.tez_accounts()).unwrap(),
             Code::Code(own_code)
         );
         assert!(account.exists(rk.tez_accounts()).unwrap());
