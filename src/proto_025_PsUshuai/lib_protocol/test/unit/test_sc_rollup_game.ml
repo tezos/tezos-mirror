@@ -85,7 +85,7 @@ let init_refutation ~size ?init_tick start_hash =
   let step = G.Dissection (init_dissection ~size ?init_tick start_hash) in
   (choice, step)
 
-let two_stakers_in_conflict () =
+let two_stakers_in_conflict_with_commitments () =
   let open Lwt_result_wrap_syntax in
   let* ctxt, rollup, genesis_hash, refuter, defender, staker3 =
     T.originate_rollup_and_deposit_with_three_stakers ()
@@ -144,7 +144,29 @@ let two_stakers_in_conflict () =
       defender,
       staker3,
       refuter_commitment_hash,
-      defender_commitment_hash )
+      defender_commitment_hash,
+      (child2, child1) )
+
+(* The same, without the commitment records: most tests only need the hashes. *)
+let two_stakers_in_conflict () =
+  let open Lwt_result_syntax in
+  let+ ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash,
+         _commitments ) =
+    two_stakers_in_conflict_with_commitments ()
+  in
+  ( ctxt,
+    rollup,
+    refuter,
+    defender,
+    staker3,
+    refuter_commitment_hash,
+    defender_commitment_hash )
 
 (** A dissection is 'poorly distributed' if its tick counts are not
 very evenly spread through the total tick-duration. Formally, the
@@ -638,6 +660,21 @@ let valid_initial_dissection ctxt ~start_hash =
       if i = 0 then (Some start_hash, tick_of_int_exn 0)
       else if i = size then (None, tick_of_int_exn 10000)
       else (Some (hash_int i), tick_of_int_exn (i * tick_per_state)))
+
+(* A valid dissection of an arbitrary section, in the shape
+   [Sc_rollup_dissection_chunk_repr.default_check] accepts: it starts at the
+   section's agreed chunk and ends at its stop tick with a different state. *)
+let valid_sub_dissection ~(start_chunk : D.t) ~(stop_chunk : D.t) ~size =
+  let t0 = Z.to_int (Sc_rollup_tick_repr.to_z start_chunk.D.tick) in
+  let t1 = Z.to_int (Sc_rollup_tick_repr.to_z stop_chunk.D.tick) in
+  let step = (t1 - t0) / size in
+  Stdlib.List.init (size + 1) (fun i ->
+      if i = 0 then start_chunk
+      else if i = size then
+        mk_dissection_chunk (Some (hash_string "endchunk"), tick_of_int_exn t1)
+      else
+        mk_dissection_chunk
+          (Some (hash_int (1000 + i)), tick_of_int_exn (t0 + (i * step))))
 
 (* A stub refutation [Move]: every operation built from it fails before the
    step is examined, so its contents do not matter. *)
@@ -1388,6 +1425,210 @@ let test_proof_is_checked_against_the_block_state () =
   in
   assert_not_in_block ~loc:__LOC__ ~scenario selection "proof"
 
+(* A game can be destroyed and reopened under the same key inside one block:
+   [Sc_rollup_timeout] removes it and a [Start] creates a new one. The
+   start-of-block context then describes a game that is gone, so a [Proof] is
+   checked against the wrong dissection entirely -- here against a narrowed one
+   that no longer holds the chosen tick, while the move lands on the fresh
+   dissection of the new game, whose section spans the commitment's whole 10000
+   ticks. No single-tick proof crosses that, so the new game is anchored on a
+   [Final_move] neither player can answer and the honest player is slashed by
+   the resulting [Draw].
+
+   The [Start] and the [Proof] are necessarily contents of one operation:
+   [start_game] puts its own sender on turn, so only that sender can play in the
+   game it has just opened, and [1M] gives a manager one operation per block.
+   Refusing a [Proof] that shares an operation with a [Start] on its game is
+   therefore enough, and needs to look no further than that operation. *)
+let test_proof_on_a_game_restarted_in_the_same_operation_is_refused () =
+  let open Lwt_result_wrap_syntax in
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash,
+         (refuter_commitment, _) ) =
+    two_stakers_in_conflict_with_commitments ()
+  in
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  let index = G.Index.make refuter defender in
+  let size =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+  (* Two dissection moves, so that the dissection no longer holds tick 0 and the
+     refuter is on turn again -- the state in which a timeout fires against it. *)
+  let*@ _, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:
+        (G.Dissection
+           (valid_initial_dissection ctxt ~start_hash:(hash_string "foo")))
+  in
+  let*@ _ctxt, game_opt = R.find_game ctxt rollup index in
+  let* start_chunk, stop_chunk =
+    match game_opt with
+    | Some {G.game_state = G.Dissecting {dissection = _ :: a :: b :: _; _}; _}
+      ->
+        return (a, b)
+    | _ -> Test.fail ~__LOC__ "restarted game: the game is not Dissecting"
+  in
+  let*@ _, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:defender
+      ~opponent:refuter
+      ~choice:start_chunk.D.tick
+      ~step:(G.Dissection (valid_sub_dissection ~start_chunk ~stop_chunk ~size))
+  in
+  (* Ground truth 1: the refuter is on turn, and tick 0 is no longer a chunk of
+     the dissection -- so the [Proof] checks have no section to look at. *)
+  let*@ _ctxt, game_opt = R.find_game ctxt rollup index in
+  let* () =
+    match game_opt with
+    | Some {G.game_state = G.Dissecting {dissection; _}; turn; _} ->
+        let* () =
+          Assert.equal_bool
+            ~loc:__LOC__
+            (Sc_rollup_repr.Staker.equal (G.Index.staker index turn) refuter)
+            true
+        in
+        Assert.equal_bool
+          ~loc:__LOC__
+          (List.exists
+             (fun (c : D.t) ->
+               Sc_rollup_tick_repr.equal c.D.tick Sc_rollup_tick_repr.initial)
+             dissection)
+          false
+    | _ -> Test.fail ~__LOC__ "restarted game: the game is not Dissecting"
+  in
+  let period = Constants_storage.sc_rollup_timeout_period_in_blocks ctxt in
+  let ctxt_before =
+    Raw_context.Internal_for_tests.add_level ctxt (period + 2)
+  in
+  let* proof = build_proof_step () in
+  let proof_move =
+    G.Move {choice = Sc_rollup_tick_repr.initial; step = G.Proof proof}
+  in
+  let start_move =
+    G.Start
+      {
+        player_commitment_hash = refuter_commitment_hash;
+        opponent_commitment_hash = defender_commitment_hash;
+      }
+  in
+  (* Ground truth 2: applied in order, the contents of such an operation move a
+     DIFFERENT game -- the timeout slashes only the refuter and removes the
+     game, the refuter re-publishes the same commitment and reopens it, and the
+     [Proof] anchors the fresh game on a section it cannot cross. *)
+  let*@ game_result, ctxt = R.timeout ctxt_before rollup index in
+  let* () =
+    match game_result with
+    | G.Loser {loser; _} when Sc_rollup_repr.Staker.equal loser refuter ->
+        return_unit
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "restarted game: the timeout did not slash the refuter alone, so the \
+           opponent can no longer be played against"
+  in
+  let*@ _status, ctxt, _ = R.apply_game_result ctxt rollup index game_result in
+  let*@ republished, _, ctxt, _ =
+    Sc_rollup_stake_storage.publish_commitment
+      ctxt
+      rollup
+      refuter
+      refuter_commitment
+  in
+  let* () =
+    Assert.equal_bool
+      ~loc:__LOC__
+      (Sc_rollup_commitment_repr.Hash.equal republished refuter_commitment_hash)
+      true
+  in
+  let*@ ctxt =
+    R.start_game
+      ctxt
+      rollup
+      ~player:(refuter, refuter_commitment_hash)
+      ~opponent:(defender, defender_commitment_hash)
+  in
+  let*@ _, ctxt =
+    R.game_move
+      ctxt
+      rollup
+      ~player:refuter
+      ~opponent:defender
+      ~choice:Sc_rollup_tick_repr.initial
+      ~step:(G.Proof proof)
+  in
+  let*@ _ctxt, game_opt = R.find_game ctxt rollup index in
+  let* () =
+    match game_opt with
+    | Some
+        {
+          G.game_state = G.Final_move {agreed_start_chunk; refuted_stop_chunk};
+          _;
+        } ->
+        Assert.equal_bool
+          ~loc:__LOC__
+          Z.(
+            gt
+              (Sc_rollup_tick_repr.distance
+                 agreed_start_chunk.D.tick
+                 refuted_stop_chunk.D.tick)
+              one)
+          true
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "restarted game: the Proof did not anchor an unanswerable \
+           Final_move, so this test no longer describes what it must prevent"
+  in
+  let scenario = "Proof on a game reopened by the same operation" in
+  (* Control: on its own the same [Proof] is accepted -- it is the move the game
+     expects, and the checks find no section to object to. *)
+  let* selection =
+    select_block_operations
+      ~ctxt_before
+      [
+        ( "lone proof",
+          mk_refute_op
+            ~source:refuter
+            ~opponent:defender
+            ~rollup
+            ~repr_refutation:proof_move );
+      ]
+  in
+  let* () = assert_in_block ~loc:__LOC__ ~scenario selection "lone proof" in
+  (* Batched behind the [Start] that reopens the game, it must be refused. *)
+  let* selection =
+    select_block_operations
+      ~ctxt_before
+      [
+        ( "batch",
+          mk_refute_batch_op
+            ~source:refuter
+            ~opponent:defender
+            ~rollup
+            ~first:start_move
+            ~second:proof_move );
+      ]
+  in
+  assert_not_in_block ~loc:__LOC__ ~scenario selection "batch"
+
 let tests =
   [
     Tztest.tztest
@@ -1454,6 +1695,10 @@ let tests =
       "A Proof is still checked against the start-of-block state."
       `Quick
       test_proof_is_checked_against_the_block_state;
+    Tztest.tztest
+      "A Proof on a game reopened by the same operation is refused."
+      `Quick
+      test_proof_on_a_game_restarted_in_the_same_operation_is_refused;
   ]
 
 let () =
