@@ -20,18 +20,15 @@ use tezos_data_encoding::{
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::{RuntimeError, ValueType},
+    host::RuntimeError,
     types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
-use tezos_smart_rollup_keyspace::{
-    Key, KeyError, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
-};
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::keyspace::KeySpaceExtBounded;
 use tezos_storage::{read_optional_nom_value, store_bin};
@@ -331,13 +328,14 @@ impl TezosOriginatedAccount {
     pub fn code(
         &self,
         host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Code, tezos_storage::error::Error> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
-        let code_path = code::code_path(self)?;
-        match host.store_read_all(&code_path) {
-            Ok(code) => Ok(Code::Code(code)),
+        let code_key = code::code_key(self)?;
+        match tez_accounts.get(&code_key) {
+            Some(code) => Ok(Code::Code(code)),
             // A KT1 with no `/data/code` is either a Tezos X alias — whose
             // script is the single shared implementation — or a genuinely
             // missing contract. Resolving on the code-miss keeps the common
@@ -345,7 +343,7 @@ impl TezosOriginatedAccount {
             // contracts; the gate on `is_alias` also means implicit `tz1`
             // accounts (which are never `TezosOriginatedAccount` values) are
             // untouched.
-            Err(RuntimeError::PathNotFound) => {
+            None => {
                 if self.is_alias(host)? {
                     // The slot is guaranteed seeded before any code-less alias
                     // can exist: `ensure_alias` seeds it before materializing
@@ -361,10 +359,14 @@ impl TezosOriginatedAccount {
                             )
                         })
                 } else {
-                    Err(RuntimeError::PathNotFound.into())
+                    Err(KeySpaceError::read(
+                        tez_accounts.name(),
+                        &code_key,
+                        ReadKind::Ext(StorageReadErrorKind::NotFound),
+                    )
+                    .into())
                 }
             }
-            Err(err) => Err(err.into()),
         }
     }
 
@@ -411,12 +413,12 @@ impl TezosOriginatedAccount {
     pub fn exists(
         &self,
         host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
-        let code_path = code::code_path(self)?;
-        if Some(ValueType::Value) == host.store_has(&code_path)? {
+        if tez_accounts.contains(&code::code_key(self)?) {
             return Ok(true);
         }
         // A code-less KT1 exists iff it is an alias.
@@ -484,15 +486,15 @@ impl TezosOriginatedAccount {
     #[cfg(test)]
     pub fn set_code(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, impl StorageV1 + KeySpaceLoader>,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        let path = code::code_path(self)?;
-        rk.host_mut().store_write_all(&path, data)?;
+        let path = code::code_key(self)?;
+        tez_accounts.set(&path, data)?;
         let code_size = data.len() as u64;
-        let mut info = self.read_info(rk.tez_accounts())?;
+        let mut info = self.read_info(tez_accounts)?;
         info.code_size = code_size.into();
-        self.write_info(rk.tez_accounts_mut(), &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok(code_size.into())
     }
 
@@ -588,7 +590,7 @@ impl TezosOriginatedAccount {
     /// definite code size of `0` — the shared code is not charged per alias.
     pub fn init(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, impl StorageV1 + KeySpaceLoader>,
+        tez_accounts: &mut impl KeySpace,
         code: Option<&[u8]>,
         storage: &[u8],
         lazy_storage_size_diff: Zarith,
@@ -610,21 +612,21 @@ impl TezosOriginatedAccount {
         // charged per alias.
         let code_size = match code {
             Some(code) => {
-                let code_path = code::code_path(self)?;
-                rk.host_mut().store_write_all(&code_path, code)?;
+                let code_key = code::code_key(self)?;
+                tez_accounts.set(&code_key, code)?;
                 code.len() as u64
             }
             None => 0,
         };
         let storage_key = code::storage_key(self)?;
-        rk.tez_accounts_mut().set(&storage_key, storage)?;
+        tez_accounts.set(&storage_key, storage)?;
         let storage_size = storage.len() as u64;
         let info = OriginatedContractInfo::for_new_contract(
             code_size,
             storage_size,
             lazy_storage_size_diff,
         );
-        self.write_info(rk.tez_accounts_mut(), &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok(StorageSpace {
             used_bytes: info.used_bytes.clone(),
             allocated_bytes: info.used_bytes,
@@ -1398,11 +1400,11 @@ mod test {
 
         // Set the code of the KT1
         account
-            .set_code(&mut rk, &code)
+            .set_code(rk.tez_accounts_mut(), &code)
             .expect("Setting code of the KT1 should succeed");
 
         let read_code = account
-            .code(&host)
+            .code(rk.host(), rk.tez_accounts())
             .expect("Read the code of the KT1 should succeed");
 
         assert_eq!(
@@ -1428,7 +1430,7 @@ mod test {
         let StorageSpace {
             allocated_bytes, ..
         } = account
-            .init(&mut rk, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
         assert_eq!(allocated_bytes, Zarith::from(initial_size));
@@ -1475,7 +1477,7 @@ mod test {
         let smaller_storage = vec![0x34_u8; 5];
 
         account
-            .init(&mut rk, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
 
@@ -1569,13 +1571,14 @@ mod test {
     /// and never written to durable storage.
     #[test]
     fn test_exists_returns_true_for_enshrined() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(account.exists(&host).unwrap());
+        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated KT1 with no code blob in storage must report
@@ -1583,12 +1586,13 @@ mod test {
     /// `ContractDoesNotExist`.
     #[test]
     fn test_exists_returns_false_when_never_originated() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(&host).unwrap());
+        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// After `set_code` writes a code blob at `/data/code`, `exists`
@@ -1602,9 +1606,11 @@ mod test {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(rk.host()).unwrap());
-        account.set_code(&mut rk, &[0xab_u8; 4]).unwrap();
-        assert!(account.exists(&host).unwrap());
+        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
+        account
+            .set_code(rk.tez_accounts_mut(), &[0xab_u8; 4])
+            .unwrap();
+        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// `used_bytes` and `paid_bytes` default to zero on a contract that
@@ -1632,14 +1638,16 @@ mod test {
     /// Helper: originate a contract with the given main-storage size,
     /// then return the live account.
     fn init_with_storage(
-        rk: &mut RuntimeKeyspaces<'_, impl StorageV1 + KeySpaceLoader>,
+        tez_accounts: &mut impl KeySpace,
         storage_len: usize,
     ) -> TezosOriginatedAccount {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; storage_len];
-        account.init(rk, Some(&code), &storage, 0.into()).unwrap();
+        account
+            .init(tez_accounts, Some(&code), &storage, 0.into())
+            .unwrap();
         account
     }
 
@@ -1649,7 +1657,7 @@ mod test {
     fn test_update_storage_space_grows_on_positive_lazy_delta() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
         let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace {
@@ -1670,7 +1678,7 @@ mod test {
     fn test_update_storage_space_shrinks_on_negative_lazy_delta() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
         let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
         let prev_paid = account.paid_bytes(rk.tez_accounts()).unwrap();
 
@@ -1702,7 +1710,7 @@ mod test {
     fn test_update_storage_space_unchanged_when_both_diffs_zero() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
         let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
         let prev_paid = account.paid_bytes(rk.tez_accounts()).unwrap();
 
@@ -1724,7 +1732,7 @@ mod test {
     fn test_update_storage_space_sums_storage_and_lazy_diffs() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
         let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace { used_bytes, .. } = account
@@ -1740,7 +1748,7 @@ mod test {
     fn test_update_storage_space_shrink_below_paid_bytes_no_diff() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
 
         // Push the watermark up by 500 first.
         account
@@ -1778,7 +1786,12 @@ mod test {
             used_bytes,
             allocated_bytes,
         } = account
-            .init(&mut rk, Some(&code), &storage, initial_lazy.into())
+            .init(
+                rk.tez_accounts_mut(),
+                Some(&code),
+                &storage,
+                initial_lazy.into(),
+            )
             .unwrap();
 
         let expected = (code.len() + storage.len()) as u64 + initial_lazy;
@@ -1860,15 +1873,19 @@ mod test {
     #[test]
     fn alias_code_resolves_to_shared_implementation() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(&mut host, &account);
+        classify_as_alias(rk.host_mut(), &account);
         let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
-        write_alias_implementation(&mut host, &implementation).unwrap();
+        write_alias_implementation(rk.host_mut(), &implementation).unwrap();
 
-        assert_eq!(account.code(&host).unwrap(), Code::Code(implementation));
-        assert!(account.exists(&host).unwrap());
+        assert_eq!(
+            account.code(rk.host(), rk.tez_accounts()).unwrap(),
+            Code::Code(implementation)
+        );
+        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// An alias whose shared implementation has not been seeded is an error, not
@@ -1876,18 +1893,19 @@ mod test {
     #[test]
     fn alias_without_seeded_implementation_errors() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(&mut host, &account);
+        classify_as_alias(rk.host_mut(), &account);
         // Pin the error type: an unseeded slot is an internal invariant breach,
         // not a generic/typecheck error (so it can't silently change meaning).
         assert!(matches!(
-            account.code(&host),
+            account.code(rk.host(), rk.tez_accounts()),
             Err(tezos_storage::error::Error::Internal(_))
         ));
         // Still classified, so it exists.
-        assert!(account.exists(&host).unwrap());
+        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 that is not an alias is a genuinely missing contract:
@@ -1895,20 +1913,25 @@ mod test {
     /// because `/data/code` is absent — a regular contract never pays for it.
     #[test]
     fn code_less_non_alias_is_missing() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         // Pin the variant: a code-less non-alias must surface as the plain
-        // missing-path error, not get routed through the alias branch (which
-        // would yield `Internal`).
-        assert!(matches!(
-            account.code(&host),
-            Err(tezos_storage::error::Error::Runtime(
-                RuntimeError::PathNotFound
-            ))
-        ));
-        assert!(!account.exists(&host).unwrap());
+        // missing-value error, and must not go through the alias branch (which
+        // yields `Internal`).
+        let code_key = code::code_key(&account).unwrap();
+        assert_eq!(
+            account.code(rk.host(), rk.tez_accounts()),
+            Err(KeySpaceError::read(
+                rk.tez_accounts().name(),
+                &code_key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into())
+        );
+        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 classified `Origin::Native` is not an alias either:
@@ -1918,18 +1941,23 @@ mod test {
     #[test]
     fn code_less_native_classified_is_missing() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        account.set_origin(&mut host, &Origin::Native).unwrap();
+        account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
 
-        assert!(matches!(
-            account.code(&host),
-            Err(tezos_storage::error::Error::Runtime(
-                RuntimeError::PathNotFound
-            ))
-        ));
-        assert!(!account.exists(&host).unwrap());
+        let code_key = code::code_key(&account).unwrap();
+        assert_eq!(
+            account.code(rk.host(), rk.tez_accounts()),
+            Err(KeySpaceError::read(
+                rk.tez_accounts().name(),
+                &code_key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into())
+        );
+        assert!(!account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated contract (with `/data/code`) is unaffected: its own
@@ -1942,10 +1970,13 @@ mod test {
         let account = originated(&contract);
 
         let own_code = vec![0x05u8, 0x01, 0x02, 0x03];
-        account.set_code(&mut rk, &own_code).unwrap();
+        account.set_code(rk.tez_accounts_mut(), &own_code).unwrap();
 
-        assert_eq!(account.code(&host).unwrap(), Code::Code(own_code));
-        assert!(account.exists(&host).unwrap());
+        assert_eq!(
+            account.code(rk.host(), rk.tez_accounts()).unwrap(),
+            Code::Code(own_code)
+        );
+        assert!(account.exists(rk.host(), rk.tez_accounts()).unwrap());
     }
 
     /// The `OriginatedContractInfo` binary layout is a fixed cross-language
@@ -1985,7 +2016,7 @@ mod test {
     fn test_bounded_record_read_roundtrips() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let account = init_with_storage(&mut rk, 20);
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
 
         let info = account.read_info(rk.tez_accounts()).unwrap();
         assert_eq!(info.code_size, Narith::from(30u64));
@@ -2006,7 +2037,7 @@ mod test {
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
         account
-            .init(&mut rk, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
 
         let info: OriginatedContractInfo = rk

@@ -184,25 +184,26 @@ mod tests {
         use mir::gas::Gas;
         use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_execution::account_storage::write_alias_implementation;
         use tezos_execution::context::originated_from_kt1;
         use tezos_execution::get_contract_entrypoint;
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
         let mut host = MockKernelHost::default();
-        // Aliases resolve under the production Michelson accounts path
-        // `/tez/tez_accounts`, so this pins the real composition rather than a
-        // mixed layout that never ships.
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        // `RuntimeKeyspaces::init` loads the accounts keyspace at
+        // `/tez/tez_accounts`, so aliases resolve under the real layout.
 
         // Seed the shared slot with the real forwarder code.
-        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+        write_alias_implementation(rk.host_mut(), &forwarder_code().unwrap()).unwrap();
 
         // A code-less KT1 classified as an alias (no /data/code written).
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"alias-entrypoint-test"));
         originated_from_kt1(&kt1)
             .unwrap()
             .set_origin(
-                &mut host,
+                rk.host_mut(),
                 &Origin::Alias(AliasInfo {
                     runtime: RuntimeId::Ethereum,
                     native_address: "0xabc".to_string(),
@@ -211,9 +212,13 @@ mod tests {
             .unwrap();
 
         // The entrypoints RPC resolves through code() to the shared forwarder.
-        let entrypoints =
-            get_contract_entrypoint(&host, &AddressHash::Kt1(kt1), &mut Gas::default())
-                .expect("alias entrypoints resolve to the shared forwarder");
+        let entrypoints = get_contract_entrypoint(
+            rk.host(),
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1),
+            &mut Gas::default(),
+        )
+        .expect("alias entrypoints resolve to the shared forwarder");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
     }
 

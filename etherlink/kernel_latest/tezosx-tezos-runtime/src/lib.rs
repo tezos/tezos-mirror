@@ -1496,7 +1496,7 @@ impl RuntimeInterface for TezosRuntime {
         // aliases code.
         budget.consume(ALIAS_LOOKUP_COST)?;
         let account = context::originated_from_kt1(&kt1)?;
-        if account.exists(host)? {
+        if account.exists(host, rk.tez_accounts())? {
             Ok(())
         } else {
             Err(CheckNativeAddressError::NotProvablyNative.into())
@@ -1983,9 +1983,9 @@ mod tests {
         // L2-1529: a materialized alias carries no per-contract script —
         // nothing is written at `/data/code`. Its code is the single shared
         // implementation.
-        let code_path = tezos_execution::context::code::code_path(&account).unwrap();
+        let code_key = tezos_execution::context::code::code_key(&account).unwrap();
         assert!(
-            rk.host().store_has(&code_path).unwrap().is_none(),
+            !rk.tez_accounts().contains(&code_key),
             "a materialized alias must not store its own /data/code"
         );
 
@@ -2014,7 +2014,7 @@ mod tests {
             Some(Origin::Alias(_))
         ));
         crate::alias_forwarder::init_alias_implementation(rk.host_mut()).unwrap();
-        match account.code(rk.host()).unwrap() {
+        match account.code(rk.host(), rk.tez_accounts()).unwrap() {
             tezos_execution::account_storage::Code::Code(bytes) => assert_eq!(
                 bytes,
                 alias_forwarder::forwarder_code()
@@ -2964,7 +2964,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut rk,
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3034,7 +3034,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut rk,
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3098,7 +3098,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut rk,
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3168,7 +3168,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            &mut rk,
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3386,7 +3386,7 @@ mod tests {
             .unwrap();
         receiver
             .init(
-                &mut rk,
+                rk.tez_accounts_mut(),
                 Some(
                     &receiver_script
                         .encode(&mut Gas::default())
@@ -3428,7 +3428,7 @@ mod tests {
             .unwrap();
         parent
             .init(
-                &mut rk,
+                rk.tez_accounts_mut(),
                 Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                 &Micheline::from(())
                     .encode(&mut Gas::default())
@@ -3536,7 +3536,7 @@ mod tests {
                 .unwrap();
             receiver
                 .init(
-                    &mut rk,
+                    rk.tez_accounts_mut(),
                     Some(
                         &receiver_script
                             .encode(&mut Gas::default())
@@ -3575,7 +3575,7 @@ mod tests {
                 .unwrap();
             parent
                 .init(
-                    &mut rk,
+                    rk.tez_accounts_mut(),
                     Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                     &Micheline::from(())
                         .encode(&mut Gas::default())
@@ -3897,7 +3897,12 @@ mod tests {
             let kt1 = kt1(b"unclassified_kt1_with_code");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(&mut rk, Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(
+                    rk.tez_accounts_mut(),
+                    Some(&[0x02, 0, 0, 0, 0]),
+                    &[],
+                    0.into(),
+                )
                 .unwrap();
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
@@ -3967,7 +3972,12 @@ mod tests {
             let kt1 = kt1(b"oog_code_lookup");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(&mut rk, Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(
+                    rk.tez_accounts_mut(),
+                    Some(&[0x02, 0, 0, 0, 0]),
+                    &[],
+                    0.into(),
+                )
                 .unwrap();
 
             let err = check(

@@ -275,7 +275,7 @@ pub mod address_registry {
 pub mod code {
     use super::*;
 
-    const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
+    const CODE: Key = Key::from_static(b"/data/code");
 
     const STORAGE: Key = Key::from_static(b"/data/storage");
 
@@ -316,8 +316,15 @@ pub mod code {
         segment_key(account, &INFO)
     }
 
-    pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        originated_path(account, &CODE_PATH)
+    /// Returns the key of the code of `account`, `/data/code` under the key of
+    /// `account`, relative to the accounts keyspace.
+    ///
+    /// Fails when the joined key exceeds the maximum key size or is not a valid
+    /// path.
+    pub fn code_key(
+        account: &TezosOriginatedAccount,
+    ) -> Result<Key, tezos_storage::error::Error> {
+        segment_key(account, &CODE)
     }
 
     /// Returns the key of the storage of `account`, `/data/storage` under the
@@ -464,6 +471,7 @@ mod tests {
         let (_, account, index) = sample_originated();
         for (key, segment) in [
             (code::info_key(&account).unwrap(), "/info"),
+            (code::code_key(&account).unwrap(), "/data/code"),
             (code::storage_key(&account).unwrap(), "/data/storage"),
         ] {
             assert_eq!(durable(&key), format!("{index}{segment}").into_bytes());

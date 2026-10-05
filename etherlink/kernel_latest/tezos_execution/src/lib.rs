@@ -1543,15 +1543,10 @@ where
         Contract::Originated(kt1) => {
             let dest_account = context::originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            // Reject transfers to a never-originated KT1 before any state
-            // write. Without this check, `transfer_tez` would create a
-            // balance entry under the bogus contract path and the failure
-            // would only surface at `code()` as RuntimeError::PathNotFound,
-            // wrapped as FailedToFetchContractCode → CracError::BlockAbort
-            // — a user-controllable block-abort handle. Mirrors Tezos's
-            // `Contract.Non_existing_contract`.
+            // Reject a transfer to a never-originated KT1 before any write, as
+            // Tezos does. Otherwise the NotFound error of `code()` aborts the block.
             if !dest_account
-                .exists(tc_ctx.rk.host())
+                .exists(tc_ctx.rk.host(), tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
             {
                 return Err(TransferError::ContractDoesNotExist(Contract::Originated(
@@ -1574,7 +1569,7 @@ where
                 )?
             };
             let code = dest_account
-                .code(tc_ctx.rk.host())
+                .code(tc_ctx.rk.host(), tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let (code_read_count, code_size) = match &code {
                 Code::Code(code_bytes) => (1, code_bytes.len() as u64),
@@ -1795,12 +1790,13 @@ fn get_originated_contract_entrypoint(
 
 pub fn get_contract_entrypoint(
     host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     address: &AddressHash,
     gas: &mut Gas,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+    let code = contract_account.code(host, tez_accounts).ok()?;
     match code {
         Code::Code(code) => get_originated_contract_entrypoint(code, gas),
         Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
@@ -1921,11 +1917,12 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
 /// truth.
 pub fn get_enshrined_contract_views(
     host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     address: &AddressHash,
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+    let code = contract_account.code(host, tez_accounts).ok()?;
     match code {
         Code::Code(_) => None,
         Code::Enshrined(contract) => {
@@ -2673,7 +2670,12 @@ where
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
-        .init(ctx.rk, script_code, &new_storage, lazy_storage_size_diff)
+        .init(
+            ctx.rk.tez_accounts_mut(),
+            script_code,
+            &new_storage,
+            lazy_storage_size_diff,
+        )
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -3866,6 +3868,7 @@ mod tests {
 
         let entrypoints = get_contract_entrypoint(
             rk.host(),
+            rk.tez_accounts(),
             &AddressHash::Kt1(kt1),
             &mut Gas::default(),
         )
@@ -4308,7 +4311,7 @@ mod tests {
 
         account
             .init(
-                rk,
+                rk.tez_accounts_mut(),
                 Some(
                     &script_micheline
                         .encode(&mut Gas::default())
@@ -6786,7 +6789,7 @@ mod tests {
 
         // Verify code and storage
         let smart_contract_code = smart_contract_account
-            .code(rk.host())
+            .code(rk.host(), rk.tez_accounts())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_code,
@@ -8593,7 +8596,9 @@ mod tests {
         let originated_account = context::originated_from_kt1(&expected_kt1)
             .expect("originated account handle");
         assert!(
-            !originated_account.exists(rk.host()).unwrap(),
+            !originated_account
+                .exists(rk.host(), rk.tez_accounts())
+                .unwrap(),
             "originated contract must be rolled back"
         );
 
@@ -9010,7 +9015,9 @@ mod tests {
         let originated_account = context::originated_from_kt1(&l1_canonical)
             .expect("originated account handle");
         assert!(
-            originated_account.exists(rk.host()).unwrap(),
+            originated_account
+                .exists(rk.host(), rk.tez_accounts())
+                .unwrap(),
             "Contract must be stored at the L1-canonical KT1"
         );
     }
@@ -9604,7 +9611,7 @@ mod tests {
             ))
             .unwrap();
             assert!(
-                account.code(rk.host()).is_err(),
+                account.code(rk.host(), rk.tez_accounts()).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
             );
         }
