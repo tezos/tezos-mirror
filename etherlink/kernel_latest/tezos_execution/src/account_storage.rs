@@ -25,13 +25,13 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
+use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
+use tezos_storage::keyspace::KeySpaceExtBounded;
 use tezos_storage::{
-    read_optional_nom_value, read_optional_nom_value_bounded,
-    read_optional_nom_value_bounded_with_len, read_optional_rlp, store_bin, store_rlp,
+    read_optional_nom_value, read_optional_nom_value_bounded_with_len, store_bin,
 };
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
@@ -46,8 +46,9 @@ const INFO_KEY: Key = Key::from_static(b"/info");
 /// the gas upper-bound convention (see `COUNTER_SIZE` in `lib.rs`).
 ///
 /// Used to read each field in a single `store_read` host call instead of
-/// the `store_value_size` + `store_read` pair that `store_read_all`
-/// performs. See [`read_optional_nom_value_bounded`].
+/// the `store_value_size` + `store_read` pair that
+/// [`KeySpaceExtBin::read_nom`] performs. See
+/// [`KeySpaceExtBounded::read_nom_bounded`].
 const NARITH_FIELD_MAX_BYTES: usize = 32;
 
 /// Upper bound, in bytes, on an encoded [`OriginatedContractInfo`]. The
@@ -58,7 +59,7 @@ const NARITH_FIELD_MAX_BYTES: usize = 32;
 /// roughly 42 bytes for the whole record. 64 leaves generous headroom and
 /// lets the record be read with a single bounded `store_read` host call
 /// instead of the `store_value_size` + `store_read` pair `store_read_all`
-/// performs. See [`read_optional_nom_value_bounded`].
+/// performs. See [`read_optional_nom_value_bounded_with_len`].
 const INFO_MAX_BYTES: usize = 64;
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -82,17 +83,17 @@ pub trait TezosAccount {
 
     /// Get the **balance** of an account in Mutez held by the account.
     /// Each account kind reads it from its own storage layout (RLP `/info`
-    /// for implicit accounts, the `/balance` path for originated ones), so
+    /// for implicit accounts, the `/balance` key for originated ones), so
     /// there is no shared default.
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error>;
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error>;
 
@@ -108,11 +109,11 @@ pub trait TezosAccount {
     /// read-modify-write on the RLP blob.
     fn add_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         amount: u64,
     ) -> Result<(), tezos_storage::error::Error> {
-        let current = self.balance(host)?;
-        self.set_balance(host, &Narith(current.0 + amount))
+        let current = self.balance(tez_accounts)?;
+        self.set_balance(tez_accounts, &Narith(current.0 + amount))
     }
 }
 
@@ -132,22 +133,23 @@ impl TezosAccount for TezosOriginatedAccount {
 
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = contracts::balance_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
+        let key = contracts::balance_key(self)?;
+        Ok(tez_accounts
+            .read_nom_bounded(&key, NARITH_FIELD_MAX_BYTES)?
+            .unwrap_or(0_u64.into()))
     }
 
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = contracts::balance_path(self)?;
-        store_bin(balance, host, &path)
+        let key = contracts::balance_key(self)?;
+        tez_accounts
+            .store_bin(&key, balance)
+            .map_err(tezos_storage::error::Error::from)
     }
 }
 #[derive(Debug, PartialEq)]
@@ -861,16 +863,6 @@ pub struct TezosImplicitAccount {
     pub(crate) key: Key,
 }
 
-/// Returns the durable path of the RLP info record of `account`.
-///
-/// Fails with a [`PathError`] when the path is invalid.
-fn info_record_path(account: &TezosImplicitAccount) -> Result<OwnedPath, PathError> {
-    concat(
-        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-        &account.key,
-    )
-}
-
 impl TezosAccount for TezosImplicitAccount {
     fn contract(&self) -> Contract {
         Contract::Implicit(self.pkh.clone())
@@ -878,9 +870,9 @@ impl TezosAccount for TezosImplicitAccount {
 
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        match read_optional_rlp::<TezosAccountInfo>(host, &info_record_path(self)?) {
+        match get_tezos_account_info_at(tez_accounts, &self.key) {
             Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
             Ok(None) => Ok(Narith::from(0u64)),
             Err(e) => Err(tezos_storage::error::Error::TcError(format!("{e}"))),
@@ -889,16 +881,15 @@ impl TezosAccount for TezosImplicitAccount {
 
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = info_record_path(self)?;
-        let mut info: TezosAccountInfo = read_optional_rlp(host, &path)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?
-            .unwrap_or_default();
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
         info.balance = narith_to_u256(balance)
             .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
-        store_rlp(&info, host, &path)
+        set_tezos_account_info_at(tez_accounts, &self.key, info)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
     }
 }
 
@@ -1164,7 +1155,7 @@ mod test {
         let account = implicit(&pkh);
 
         let read_balance = account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
@@ -1202,6 +1193,7 @@ mod test {
     #[test]
     fn test_set_and_read_balance() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let balance = 4579_u64.into();
 
@@ -1211,11 +1203,11 @@ mod test {
         let account = implicit_of(&contract);
 
         let () = account
-            .set_balance(&mut host, &balance)
+            .set_balance(rk.tez_accounts_mut(), &balance)
             .expect("set_balance should succeeded");
 
         let read_balance = account
-            .balance(&host)
+            .balance(rk.tez_accounts())
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
@@ -1364,7 +1356,7 @@ mod test {
         let test_balance = 1999_u64.into();
 
         account
-            .set_balance(rk.host_mut(), &test_balance)
+            .set_balance(rk.tez_accounts_mut(), &test_balance)
             .expect("Set balance should have succeeded");
 
         // Calling init on a contract already initialized will do nothing
@@ -1374,7 +1366,7 @@ mod test {
             .expect("Account initialization should have succeeded");
 
         let read_balance = account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Read balance should have succeeded");
 
         assert_eq!(test_balance, read_balance);

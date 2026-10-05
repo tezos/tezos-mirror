@@ -10,7 +10,7 @@ use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{ops::checked::CheckedSub, Zero};
 use tezos_data_encoding::types::Zarith;
 use tezos_protocol::contract::Contract;
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
     ApplyOperationError, Balance, BalanceUpdate, ContentResult, EventContent,
@@ -42,8 +42,8 @@ impl From<StorageFee> for BigUint {
 /// Burns the cost of `nb_consumed_bytes` bytes from the payer and
 /// returns the cost. Subtracts `consumed_bytes` from
 /// `storage_limit_remaining`, refusing to go negative.
-fn burn_storage_fee<Host: StorageV1>(
-    host: &mut Host,
+fn burn_storage_fee(
+    tez_accounts: &mut impl KeySpace,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     nb_consumed_bytes: &Zarith,
@@ -64,7 +64,7 @@ fn burn_storage_fee<Host: StorageV1>(
     if to_burn.is_zero() {
         return Ok(StorageFee::default());
     }
-    burn_tez(host, payer, &to_burn).map_err(|err| match err {
+    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -182,8 +182,8 @@ fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<BigUint, Transfer
 ///   `CannotPayStorageFee`.
 ///
 /// No-op on `mutez_cost == 0`.
-pub fn burn_storage_cost<Host: StorageV1>(
-    host: &mut Host,
+pub fn burn_storage_cost(
+    tez_accounts: &mut impl KeySpace,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     mutez_cost: u64,
@@ -199,7 +199,7 @@ pub fn burn_storage_cost<Host: StorageV1>(
         .ok_or(ApplyOperationError::OperationQuotaExceeded)?;
 
     let to_burn = BigUint::from(mutez_cost);
-    burn_tez(host, payer, &to_burn).map_err(|err| match err {
+    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -213,19 +213,18 @@ pub fn burn_storage_cost<Host: StorageV1>(
 /// `storage_limit_remaining` at each step), then render the
 /// resulting balance-update pairs on `success.balance_updates` in
 /// the per-kind display order.
-pub fn burn_storage_fees<Host, M, A>(
-    host: &mut Host,
+pub fn burn_storage_fees<M, A>(
+    tez_accounts: &mut impl KeySpace,
     payer: &A,
     storage_limit_remaining: &mut BigUint,
     success: &mut M::Success,
 ) -> Result<(), ApplyOperationError>
 where
-    Host: StorageV1,
     M: OperationStorageFees,
     A: TezosAccount,
 {
     let storage_fees = M::build_storage_fees(success, |bytes| {
-        burn_storage_fee(host, payer, storage_limit_remaining, bytes)
+        burn_storage_fee(tez_accounts, payer, storage_limit_remaining, bytes)
     })?;
     M::write_balance_updates(success, storage_fees, |fee| {
         compute_storage_balance_updates(payer.contract(), fee.into()).map_err(|e| {
@@ -241,47 +240,64 @@ where
 /// status is `Applied`. No-op on every other status: a non-Applied
 /// content result records work that did not allocate anything (Failed,
 /// Skipped) or that has been rolled back (BackTracked).
-pub fn burn_content_storage_fees<Host: StorageV1, M: OperationStorageFees>(
-    host: &mut Host,
+pub fn burn_content_storage_fees<KS: KeySpace, M: OperationStorageFees>(
+    tez_accounts: &mut KS,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     content: &mut ContentResult<M>,
 ) -> Result<(), ApplyOperationError> {
     match content {
-        ContentResult::Applied(success) => {
-            burn_storage_fees::<_, M, _>(host, payer, storage_limit_remaining, success)
-        }
+        ContentResult::Applied(success) => burn_storage_fees::<M, _>(
+            tez_accounts,
+            payer,
+            storage_limit_remaining,
+            success,
+        ),
         _ => Ok(()),
     }
 }
 
-fn burn_internal_meta_storage_fees<Host: StorageV1, M: OperationStorageFees>(
-    host: &mut Host,
+fn burn_internal_meta_storage_fees<KS: KeySpace, M: OperationStorageFees>(
+    tez_accounts: &mut KS,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     meta: &mut InternalContentWithMetadata<M>,
 ) -> Result<(), ApplyOperationError> {
-    burn_content_storage_fees(host, payer, storage_limit_remaining, &mut meta.result)
+    burn_content_storage_fees(
+        tez_accounts,
+        payer,
+        storage_limit_remaining,
+        &mut meta.result,
+    )
 }
 
 /// Charge the payer for the storage allocated by a single internal
 /// operation, dispatching on its [`InternalOperationSum`] variant.
-pub fn burn_internal_op_storage_fees<Host: StorageV1>(
-    host: &mut Host,
+pub fn burn_internal_op_storage_fees<KS: KeySpace>(
+    tez_accounts: &mut KS,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     op: &mut InternalOperationSum,
 ) -> Result<(), ApplyOperationError> {
     match op {
-        InternalOperationSum::Transfer(meta) => {
-            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
-        }
-        InternalOperationSum::Origination(meta) => {
-            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
-        }
-        InternalOperationSum::Event(meta) => {
-            burn_internal_meta_storage_fees(host, payer, storage_limit_remaining, meta)
-        }
+        InternalOperationSum::Transfer(meta) => burn_internal_meta_storage_fees(
+            tez_accounts,
+            payer,
+            storage_limit_remaining,
+            meta,
+        ),
+        InternalOperationSum::Origination(meta) => burn_internal_meta_storage_fees(
+            tez_accounts,
+            payer,
+            storage_limit_remaining,
+            meta,
+        ),
+        InternalOperationSum::Event(meta) => burn_internal_meta_storage_fees(
+            tez_accounts,
+            payer,
+            storage_limit_remaining,
+            meta,
+        ),
     }
 }
 
@@ -518,9 +534,8 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_KEYSPACE_NAME;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup::types::PublicKeyHash;
-    use tezos_smart_rollup_keyspace::KeySpaceLoader;
     use tezos_tezlink::operation::{
         OriginationContent, Parameters, Script, TransferContent,
     };
@@ -556,38 +571,45 @@ mod tests {
         ContentResult::Applied(success)
     }
 
-    fn init_payer(host: &mut MockKernelHost, balance: u64) -> TezosImplicitAccount {
+    fn init_payer(
+        tez_accounts: &mut impl KeySpace,
+        balance: u64,
+    ) -> TezosImplicitAccount {
         let pkh = PublicKeyHash::from_b58check(SOURCE_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&pkh).unwrap();
-        let mut tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME).unwrap();
-        account.allocate(&mut tez_accounts).unwrap();
-        account.set_balance(host, &balance.into()).unwrap();
+        account.allocate(tez_accounts).unwrap();
+        account.set_balance(tez_accounts, &balance.into()).unwrap();
         account
     }
 
     /// Test wrapper around [`burn_content_storage_fees`] that builds
     /// the `storage_limit_remaining` accumulator from a `u64`.
     fn burn_content<M: OperationStorageFees>(
-        host: &mut MockKernelHost,
+        tez_accounts: &mut impl KeySpace,
         payer: &impl TezosAccount,
         storage_limit: u64,
         content: &mut ContentResult<M>,
     ) -> Result<(), ApplyOperationError> {
         let mut storage_limit_remaining = BigUint::from(storage_limit);
-        burn_content_storage_fees(host, payer, &mut storage_limit_remaining, content)
+        burn_content_storage_fees(
+            tez_accounts,
+            payer,
+            &mut storage_limit_remaining,
+            content,
+        )
     }
 
     /// Test wrapper that exercises the byte-level primitive
     /// [`burn_bytes`] and converts the resulting [`StorageFee`] into
     /// the legacy `Vec<BalanceUpdate>` shape these tests assert on.
-    fn burn_storage_fee<Host: StorageV1>(
-        host: &mut Host,
+    fn burn_storage_fee<KS: KeySpace>(
+        tez_accounts: &mut KS,
         payer: &impl TezosAccount,
         storage_limit_remaining: &mut BigUint,
         nb_consumed_bytes: &Zarith,
     ) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
         let fee = super::burn_storage_fee(
-            host,
+            tez_accounts,
             payer,
             storage_limit_remaining,
             nb_consumed_bytes,
@@ -602,13 +624,18 @@ mod tests {
     /// Test wrapper around [`burn_internal_op_storage_fees`] that
     /// builds the `storage_limit_remaining` accumulator from a `u64`.
     fn burn_internal_op(
-        host: &mut MockKernelHost,
+        tez_accounts: &mut impl KeySpace,
         payer: &impl TezosAccount,
         storage_limit: u64,
         op: &mut InternalOperationSum,
     ) -> Result<(), ApplyOperationError> {
         let mut storage_limit_remaining = BigUint::from(storage_limit);
-        burn_internal_op_storage_fees(host, payer, &mut storage_limit_remaining, op)
+        burn_internal_op_storage_fees(
+            tez_accounts,
+            payer,
+            &mut storage_limit_remaining,
+            op,
+        )
     }
 
     /// On a zero-byte input, `burn_storage_fee` returns no balance
@@ -616,16 +643,21 @@ mod tests {
     #[test]
     fn burn_storage_fee_zero_bytes_is_noop() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let initial_balance = 50_u64;
-        let payer = init_payer(&mut host, initial_balance);
+        let payer = init_payer(rk.tez_accounts_mut(), initial_balance);
 
-        let updates =
-            burn_storage_fee(&mut host, &payer, &mut BigUint::from(u64::MAX), &0.into())
-                .expect("zero-byte burn cannot fail");
+        let updates = burn_storage_fee(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut BigUint::from(u64::MAX),
+            &0.into(),
+        )
+        .expect("zero-byte burn cannot fail");
 
         assert!(updates.is_empty(), "zero-byte burn must emit no updates");
         assert_eq!(
-            payer.balance(&host).expect("read balance"),
+            payer.balance(rk.tez_accounts()).expect("read balance"),
             initial_balance.into(),
             "payer balance must be unchanged",
         );
@@ -637,12 +669,13 @@ mod tests {
     #[test]
     fn burn_storage_fee_emits_balance_pair() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let initial_balance = 100_000_u64;
         let nb_consumed_bytes = 10_u64;
-        let payer = init_payer(&mut host, initial_balance);
+        let payer = init_payer(rk.tez_accounts_mut(), initial_balance);
 
         let updates = burn_storage_fee(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut BigUint::from(u64::MAX),
             &nb_consumed_bytes.into(),
@@ -656,7 +689,7 @@ mod tests {
         assert_eq!(updates[1].balance, Balance::StorageFees);
         assert_eq!(updates[1].changes, expected_to_burn as i64);
         assert_eq!(
-            payer.balance(&host).expect("read balance"),
+            payer.balance(rk.tez_accounts()).expect("read balance"),
             (initial_balance - expected_to_burn).into(),
             "payer balance must drop by the burn amount",
         );
@@ -669,13 +702,14 @@ mod tests {
     #[test]
     fn burn_storage_fee_insolvent_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Cost = 10 × COST_PER_BYTES; balance is 5, strictly below.
         let initial_balance = 5_u64;
         let nb_consumed_bytes = 10_u64;
-        let payer = init_payer(&mut host, initial_balance);
+        let payer = init_payer(rk.tez_accounts_mut(), initial_balance);
 
         let err = burn_storage_fee(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut BigUint::from(u64::MAX),
             &nb_consumed_bytes.into(),
@@ -701,13 +735,14 @@ mod tests {
     #[test]
     fn applied_reveal_is_a_noop() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000);
         let mut content: ContentResult<RevealContent> =
             ContentResult::Applied(RevealSuccess {
                 consumed_milligas: 0_u64.into(),
             });
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
+        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
     }
 
     /// A Transfer with `paid_storage_size_diff > 0` debits the payer
@@ -717,17 +752,18 @@ mod tests {
     #[test]
     fn transfer_with_storage_growth_fires_variable_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 100_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 100_000);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
 
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         let burn = 10 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (100_000 - burn).into(),
             "payer must drop by the burn amount"
         );
@@ -757,10 +793,11 @@ mod tests {
     #[test]
     fn transfer_with_no_storage_growth_is_a_noop() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000);
         let mut content = applied_transfer(TransferSuccess::default());
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
+        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
@@ -772,11 +809,12 @@ mod tests {
     #[test]
     fn failed_top_level_does_not_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000);
         let mut content: ContentResult<TransferContent> =
             ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(&host).unwrap(), 1_000_u64.into());
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
+        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
     }
 
     /// Insolvent payer for the top-level burn: returns a single
@@ -785,13 +823,14 @@ mod tests {
     #[test]
     fn insolvent_payer_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Burn cost = 10 × COST_PER_BYTES; balance is 5, strictly below.
-        let payer = init_payer(&mut host, 5);
+        let payer = init_payer(rk.tez_accounts_mut(), 5);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
-        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+        let err = burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content)
             .expect_err("burn must fail when payer is insolvent");
 
         assert_eq!(
@@ -810,7 +849,8 @@ mod tests {
     #[test]
     fn applied_internal_transfer_fires_its_own_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 100_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 100_000);
         let mut op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -825,10 +865,13 @@ mod tests {
             })),
         });
 
-        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
+        burn_internal_op(rk.tez_accounts_mut(), &payer, u64::MAX, &mut op).unwrap();
 
         let burn = 4 * COST_PER_BYTES;
-        assert_eq!(payer.balance(&host).unwrap(), (100_000 - burn).into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (100_000 - burn).into()
+        );
 
         let InternalOperationSum::Transfer(inner) = &op else {
             panic!("expected internal Transfer");
@@ -861,14 +904,18 @@ mod tests {
     #[test]
     fn origination_with_storage_growth_fires_double_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut content = applied_origination(origination_success(38));
 
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         let variable = 38 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
-        assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (1_000_000 - total).into()
+        );
         let ContentResult::Applied(success) = &content else {
             panic!("expected Applied origination");
         };
@@ -906,13 +953,14 @@ mod tests {
     #[test]
     fn origination_with_no_growth_only_fires_slot_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut content = applied_origination(origination_success(0));
 
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(success) = &content else {
@@ -945,12 +993,13 @@ mod tests {
     #[test]
     fn origination_insolvent_on_slot_burn_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Cover variable burn (38 × COST_PER_BYTES = 38) but not the
         // slot burn (SLOT_BURN = 257). 100 - 38 = 62 remaining < 257.
-        let payer = init_payer(&mut host, 100);
+        let payer = init_payer(rk.tez_accounts_mut(), 100);
         let mut content = applied_origination(origination_success(38));
 
-        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+        let err = burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content)
             .expect_err("slot burn must fail when payer is insolvent");
 
         assert_eq!(
@@ -980,7 +1029,8 @@ mod tests {
     #[test]
     fn applied_internal_origination_fires_double_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut op = InternalOperationSum::Origination(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -995,11 +1045,14 @@ mod tests {
             result: ContentResult::Applied(origination_success(10)),
         });
 
-        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
+        burn_internal_op(rk.tez_accounts_mut(), &payer, u64::MAX, &mut op).unwrap();
 
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
-        assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (1_000_000 - total).into()
+        );
 
         let InternalOperationSum::Origination(inner) = &op else {
             panic!("expected internal Origination");
@@ -1044,16 +1097,17 @@ mod tests {
     #[test]
     fn transfer_with_allocation_only_fires_slot_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut content = applied_transfer(TransferSuccess {
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
@@ -1083,18 +1137,22 @@ mod tests {
     #[test]
     fn transfer_with_growth_and_allocation_fires_both_burns() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        burn_content(&mut host, &payer, u64::MAX, &mut content).unwrap();
+        burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
-        assert_eq!(payer.balance(&host).unwrap(), (1_000_000 - total).into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (1_000_000 - total).into()
+        );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
@@ -1135,16 +1193,17 @@ mod tests {
     #[test]
     fn transfer_insolvent_on_slot_burn_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Cover variable burn (10 × COST_PER_BYTES = 10) but not the
         // slot burn (SLOT_BURN = 257). 100 - 10 = 90 remaining < 257.
-        let payer = init_payer(&mut host, 100);
+        let payer = init_payer(rk.tez_accounts_mut(), 100);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             allocated_destination_contract: true,
             ..Default::default()
         });
 
-        let err = burn_content(&mut host, &payer, u64::MAX, &mut content)
+        let err = burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content)
             .expect_err("slot burn must fail when payer is insolvent");
 
         assert_eq!(
@@ -1175,7 +1234,8 @@ mod tests {
     #[test]
     fn applied_internal_allocation_fires_slot_burn() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut op = InternalOperationSum::Transfer(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -1190,10 +1250,10 @@ mod tests {
             })),
         });
 
-        burn_internal_op(&mut host, &payer, u64::MAX, &mut op).unwrap();
+        burn_internal_op(rk.tez_accounts_mut(), &payer, u64::MAX, &mut op).unwrap();
 
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (1_000_000 - SLOT_BURN).into()
         );
         let InternalOperationSum::Transfer(inner) = &op else {
@@ -1228,18 +1288,19 @@ mod tests {
     #[test]
     fn transfer_overshoot_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut content = applied_transfer(TransferSuccess {
             paid_storage_size_diff: 10_u64.into(),
             ..Default::default()
         });
 
-        let trace = burn_content(&mut host, &payer, 9, &mut content)
+        let trace = burn_content(rk.tez_accounts_mut(), &payer, 9, &mut content)
             .expect_err("burn must fail when consumed exceeds storage_limit");
 
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             1_000_000_u64.into(),
             "payer balance must be untouched on quota failure",
         );
@@ -1253,11 +1314,12 @@ mod tests {
     #[test]
     fn origination_overshoot_on_slot_burn_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 10_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 10_000_000);
         let mut content = applied_origination(origination_success(38));
 
         let trace = burn_content(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             38_u64 + ORIGINATION_SIZE - 1,
             &mut content,
@@ -1274,11 +1336,12 @@ mod tests {
     #[test]
     fn burn_at_exact_storage_limit_succeeds() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut storage_limit_remaining = BigUint::from(10_u64);
 
         let updates = burn_storage_fee(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &10_u64.into(),
@@ -1288,7 +1351,7 @@ mod tests {
         assert!(storage_limit_remaining.is_zero());
 
         let zero_updates = burn_storage_fee(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &0_u64.into(),
@@ -1297,7 +1360,7 @@ mod tests {
         assert!(zero_updates.is_empty());
 
         let trace = burn_storage_fee(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &1_u64.into(),
@@ -1367,7 +1430,8 @@ mod tests {
     #[test]
     fn compute_internal_op_dispatches_per_kind() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 0);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 0);
         let op = InternalOperationSum::Origination(InternalContentWithMetadata {
             sender: payer.contract(),
             nonce: 0,
@@ -1388,25 +1452,41 @@ mod tests {
     #[test]
     fn burn_storage_cost_zero_is_noop() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         let mut storage_limit_remaining = BigUint::from(100u64);
-        burn_storage_cost(&mut host, &payer, &mut storage_limit_remaining, 0).unwrap();
+        burn_storage_cost(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            0,
+        )
+        .unwrap();
         assert_eq!(storage_limit_remaining, BigUint::from(100u64));
-        assert_eq!(payer.balance(&host).unwrap(), 1_000_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            1_000_000_u64.into()
+        );
     }
 
     #[test]
     fn burn_storage_cost_within_limit_debits_payer() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         // Pick V = 10 × COST_PER_BYTES to land exactly on 10 bytes.
         let mutez_cost: u64 = 10 * COST_PER_BYTES;
         let mut storage_limit_remaining = BigUint::from(100u64);
-        burn_storage_cost(&mut host, &payer, &mut storage_limit_remaining, mutez_cost)
-            .expect("absorption must succeed when limit and balance suffice");
+        burn_storage_cost(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            mutez_cost,
+        )
+        .expect("absorption must succeed when limit and balance suffice");
         assert_eq!(storage_limit_remaining, BigUint::from(90u64));
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (1_000_000_u64 - mutez_cost).into()
         );
     }
@@ -1414,12 +1494,13 @@ mod tests {
     #[test]
     fn burn_storage_cost_overshoot_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 1_000_000);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         // 10 bytes worth of cost, but the budget only allows 9.
         let mutez_cost: u64 = 10 * COST_PER_BYTES;
         let mut storage_limit_remaining = BigUint::from(9u64);
         let err = burn_storage_cost(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             mutez_cost,
@@ -1427,7 +1508,7 @@ mod tests {
         .expect_err("overshoot must surface OperationQuotaExceeded");
         assert!(matches!(err, ApplyOperationError::OperationQuotaExceeded));
         assert_eq!(
-            payer.balance(&host).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             1_000_000_u64.into(),
             "payer balance must be untouched when the limit check rejects the burn"
         );
@@ -1436,11 +1517,12 @@ mod tests {
     #[test]
     fn burn_storage_cost_insolvent_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
-        let payer = init_payer(&mut host, 5);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 5);
         let mutez_cost: u64 = 10 * COST_PER_BYTES;
         let mut storage_limit_remaining = BigUint::from(100u64);
         let err = burn_storage_cost(
-            &mut host,
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             mutez_cost,

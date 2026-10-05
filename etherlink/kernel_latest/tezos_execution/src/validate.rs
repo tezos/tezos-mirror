@@ -8,11 +8,9 @@ use tezos_crypto_rs::{PublicKeySignatureVerifier, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
@@ -256,8 +254,8 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host: StorageV1 + KeySpaceLoader>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+pub fn execute_validation(
+    tez_accounts: &mut impl KeySpace,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
     required_fees: Option<u64>,
@@ -271,7 +269,7 @@ pub fn execute_validation<Host: StorageV1 + KeySpaceLoader>(
         TezlinkOperationGas::start(operation.content[0].gas_limit()?)
             .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
 
-    let (pk, source_account) = validate_source(rk.tez_accounts(), &operation.content)?;
+    let (pk, source_account) = validate_source(tez_accounts, &operation.content)?;
 
     match verify_signature(
         &operation.content,
@@ -300,10 +298,10 @@ pub fn execute_validation<Host: StorageV1 + KeySpaceLoader>(
         .collect::<Result<_, _>>()?;
 
     let mut source_balance = source_account
-        .balance(rk.host())
+        .balance(tez_accounts)
         .map_err(|_| ValidityError::FailedToFetchBalance)?;
     let mut source_counter = source_account
-        .counter(rk.tez_accounts())
+        .counter(tez_accounts)
         .map_err(|_| ValidityError::FailedToFetchCounter)?;
 
     let mut validated_operations = Vec::new();
@@ -351,11 +349,11 @@ pub fn execute_validation<Host: StorageV1 + KeySpaceLoader>(
     }
 
     source_account
-        .set_balance(rk.host_mut(), &source_balance)
+        .set_balance(tez_accounts, &source_balance)
         .map_err(|_| ValidityError::FailedToUpdateBalance)?;
 
     source_account
-        .increment_counter(rk.tez_accounts_mut(), validated_operations.len())
+        .increment_counter(tez_accounts, validated_operations.len())
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
     let mut source_public_key = Vec::new();

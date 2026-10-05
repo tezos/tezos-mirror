@@ -1539,11 +1539,11 @@ impl TezosRuntime {
 
     // Used for debug while we don't have our own originated account implementation.
     pub fn get_originated_account_balance(
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
         let originated_account = context::originated_from_kt1(kt1)?;
-        let balance = originated_account.balance(host)?;
+        let balance = originated_account.balance(tez_accounts)?;
         narith_to_u256(&balance)
     }
 }
@@ -2079,8 +2079,9 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let balance = TezosRuntime::get_originated_account_balance(rk.host(), &kt1)
-            .expect("should read balance");
+        let balance =
+            TezosRuntime::get_originated_account_balance(rk.tez_accounts(), &kt1)
+                .expect("should read balance");
         assert_eq!(balance, U256::zero());
     }
 

@@ -1627,18 +1627,18 @@ where
     // when the balance is already zero — no state change will occur.
     let account = ctx.contract_account().clone();
     let current = {
-        let host = ctx.host();
+        let (rk, _, _) = ctx.cross_runtime_split();
         account
-            .balance(host)
+            .balance(rk.tez_accounts())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?
     };
     if !current.0.is_zero() {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
-        let host = ctx.host();
+        let (rk, _, _) = ctx.cross_runtime_split();
         account
-            .set_balance(host, &0u64.into())
+            .set_balance(rk.tez_accounts_mut(), &0u64.into())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     }
     Ok(response_body)

@@ -47,7 +47,7 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_storage::error::Error as StorageError;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
@@ -298,20 +298,19 @@ fn finalize_statuses<M: OperationKind>(
 /// balance_updates survive. Host-side debits applied by `burn_tez`
 /// are rolled back out-of-band by the caller's `SafeStorage`
 /// transaction.
-fn burn_pass<Host, M, A>(
-    host: &mut Host,
+fn burn_pass<M, A>(
+    tez_accounts: &mut impl KeySpace,
     payer: &A,
     storage_limit_remaining: &mut BigUint,
     content: &mut ContentResult<M>,
     internal_operation_results: Vec<TaggedInternalOp>,
 ) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
 where
-    Host: StorageV1,
     M: storage_fees::OperationStorageFees,
     A: TezosAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
-        host,
+        tez_accounts,
         payer,
         storage_limit_remaining,
         content,
@@ -330,7 +329,7 @@ where
                         delegated_storage_cost,
                     } => {
                         storage_fees::burn_internal_op_storage_fees(
-                            host,
+                            tez_accounts,
                             payer,
                             storage_limit_remaining,
                             &mut op,
@@ -361,8 +360,8 @@ where
 /// internal) to `BackTracked`, with the burn errors attached to
 /// the parent.
 #[allow(clippy::too_many_arguments)]
-fn finalize_and_burn<Host, M, A>(
-    host: &mut Host,
+fn finalize_and_burn<M, A>(
+    tez_accounts: &mut impl KeySpace,
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
@@ -373,7 +372,6 @@ fn finalize_and_burn<Host, M, A>(
     internals: SubtreeStatus,
 ) -> OperationResult<M>
 where
-    Host: StorageV1,
     M: storage_fees::OperationStorageFees,
     A: TezosAccount,
 {
@@ -381,7 +379,7 @@ where
         finalize_statuses::<M>(result, &mut internal_operation_results, internals);
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
     let (mut internals, burn_outcome) = burn_pass(
-        host,
+        tez_accounts,
         payer,
         &mut storage_limit_remaining,
         &mut content,
@@ -389,7 +387,7 @@ where
     );
     let burn_outcome = burn_outcome.and_then(|()| {
         storage_fees::burn_storage_cost(
-            host,
+            tez_accounts,
             payer,
             &mut storage_limit_remaining,
             delegated_storage_cost,
@@ -526,20 +524,17 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
     }
 }
 
-fn transfer_tez<Host>(
-    host: &mut Host,
+fn transfer_tez(
+    tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     amount: &Narith,
     receiver_account: &impl TezosAccount,
-) -> Result<TransferSuccess, TransferError>
-where
-    Host: StorageV1,
-{
+) -> Result<TransferSuccess, TransferError> {
     let balance_updates =
         compute_balance_updates(giver_account, receiver_account, amount)
             .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
 
-    apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
+    apply_balance_changes(tez_accounts, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -561,7 +556,7 @@ where
 /// Assumption: this path is enabled from a foreign calling runtime,
 /// and the sender was already debited in that runtime.
 fn credit_destination_without_debiting_sender(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     amount: &Narith,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
@@ -580,12 +575,12 @@ fn credit_destination_without_debiting_sender(
         });
     }
     let receiver_balance = receiver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
     let new_receiver_balance = (&receiver_balance + &amount.0).into();
     receiver_account
-        .set_balance(host, &new_receiver_balance)
+        .set_balance(tez_accounts, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
     let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
     Ok(TransferSuccess {
@@ -612,12 +607,12 @@ fn credit_destination_without_debiting_sender(
 }
 
 fn burn_tez(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
     let balance = account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_balance = match balance.0.checked_sub(amount) {
         None => {
@@ -630,7 +625,7 @@ fn burn_tez(
         Some(new_balance) => new_balance.into(),
     };
     account
-        .set_balance(host, &new_balance)
+        .set_balance(tez_accounts, &new_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     Ok(new_balance)
 }
@@ -1518,12 +1513,17 @@ where
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.rk.host_mut(),
+                    tc_ctx.rk.tez_accounts_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
+                transfer_tez(
+                    tc_ctx.rk.tez_accounts_mut(),
+                    sender_account,
+                    amount,
+                    &dest_account,
+                )?
             };
             Ok(TransferStep {
                 success: TransferSuccess {
@@ -1561,12 +1561,17 @@ where
             }
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.rk.host_mut(),
+                    tc_ctx.rk.tez_accounts_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
+                transfer_tez(
+                    tc_ctx.rk.tez_accounts_mut(),
+                    sender_account,
+                    amount,
+                    &dest_account,
+                )?
             };
             let code = dest_account
                 .code(tc_ctx.rk.host())
@@ -1587,7 +1592,7 @@ where
             consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
                 .map_err(TransferError::OutOfGas)?;
             let exec_ctx = ExecCtx::create(
-                tc_ctx.rk.host_mut(),
+                tc_ctx.rk.tez_accounts_mut(),
                 sender_account,
                 &dest_account,
                 amount,
@@ -2089,7 +2094,7 @@ where
     let balance = match params.balance {
         Some(balance) => balance,
         None => account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .map_err(host_err)?
             .0
             .try_into()
@@ -2700,7 +2705,7 @@ where
 
     // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
-        ctx.rk.host_mut(),
+        ctx.rk.tez_accounts_mut(),
         sender_account,
         &smart_contract,
         &initial_balance.0,
@@ -2757,17 +2762,14 @@ fn compute_balance_updates(
 }
 
 /// Applies balance changes by updating both source and destination accounts.
-fn apply_balance_changes<Host>(
-    host: &mut Host,
+fn apply_balance_changes(
+    tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     receiver_account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
-) -> Result<(), TransferError>
-where
-    Host: StorageV1,
-{
+) -> Result<(), TransferError> {
     let giver_balance = giver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
@@ -2780,15 +2782,15 @@ where
         Some(new_source_balance) => new_source_balance.into(),
     };
     giver_account
-        .set_balance(host, &new_giver_balance)
+        .set_balance(tez_accounts, &new_giver_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     let receiver_balance = receiver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
     let new_receiver_balance = (&receiver_balance + amount).into();
     receiver_account
-        .set_balance(host, &new_receiver_balance)
+        .set_balance(tez_accounts, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
 
     log!(Debug,
@@ -2963,7 +2965,7 @@ where
     let validation = {
         let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
         validate::execute_validation(
-            &mut rk,
+            rk.tez_accounts_mut(),
             operation,
             skip_signature_check,
             required_fees,
@@ -3053,12 +3055,11 @@ where
             .restore_origination_index(origination_index_before);
     }
 
-    // The refund is written once the operation's mirror is promoted or
-    // reverted, on the host under it: it survives a failed operation, and
-    // stays covered by whatever rollback that host is itself under.
+    // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
+    // keeps the refund. A rollback of the storage under `rk` drops the refund too.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
-        apply_fee_refund(&mut *safe_host.host, &mut processed_ops, fee_refund)
+        apply_fee_refund(rk.tez_accounts_mut(), &mut processed_ops, fee_refund)
             .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
 
@@ -3068,14 +3069,11 @@ where
 /// Credit the source with a fee refund and record balance updates in the receipt.
 ///
 /// Returns Ok(()) with no effect when `fee_refund == 0`.
-fn apply_fee_refund<Host>(
-    host: &mut Host,
+fn apply_fee_refund(
+    tez_accounts: &mut impl KeySpace,
     processed_operations: &mut [ProcessedOperation],
     fee_refund: u64,
-) -> Result<(), anyhow::Error>
-where
-    Host: StorageV1,
-{
+) -> Result<(), anyhow::Error> {
     if fee_refund == 0 {
         return Ok(());
     }
@@ -3093,7 +3091,7 @@ where
 
     // Credit source account with the refund.
     let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
-    source_account.add_balance(host, fee_refund)?;
+    source_account.add_balance(tez_accounts, fee_refund)?;
 
     log!(
         Debug,
@@ -3240,8 +3238,8 @@ where
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
-            OperationResultSum::Reveal(finalize_and_burn::<_, RevealContent, _>(
-                tc_ctx.rk.host_mut(),
+            OperationResultSum::Reveal(finalize_and_burn::<RevealContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -3302,8 +3300,8 @@ where
                     Err(e)
                 }
             };
-            OperationResultSum::Transfer(finalize_and_burn::<_, TransferContent, _>(
-                tc_ctx.rk.host_mut(),
+            OperationResultSum::Transfer(finalize_and_burn::<TransferContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -3341,20 +3339,18 @@ where
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
-            OperationResultSum::Origination(
-                finalize_and_burn::<_, OriginationContent, _>(
-                    tc_ctx.rk.host_mut(),
-                    source_account,
-                    storage_limit,
-                    balance_updates,
-                    0,
-                    0,
-                    origination_result.map_err(|e| e.into()),
-                    internal_operations_receipts,
-                    // An origination emits no internal operation.
-                    SubtreeStatus::AllApplied,
-                ),
-            )
+            OperationResultSum::Origination(finalize_and_burn::<OriginationContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
+                source_account,
+                storage_limit,
+                balance_updates,
+                0,
+                0,
+                origination_result.map_err(|e| e.into()),
+                internal_operations_receipts,
+                // An origination emits no internal operation.
+                SubtreeStatus::AllApplied,
+            ))
         }
     };
 
@@ -4279,10 +4275,8 @@ mod tests {
             .expect("Account allocation should have succeed");
 
         // Setting the balance to pass the validity check
-        let mut info = account_storage::get_tezos_account_info_or_init(tez_accounts, src)
-            .expect("Account info read should have succeed");
-        info.balance = amount.into();
-        account_storage::set_tezos_account_info(tez_accounts, src, info)
+        account
+            .set_balance(tez_accounts, &amount.into())
             .expect("Set balance should have succeed");
 
         account
@@ -4331,7 +4325,7 @@ mod tests {
             .expect("Account initialisation should have succeeded");
 
         account
-            .set_balance(rk.host_mut(), balance)
+            .set_balance(rk.tez_accounts_mut(), balance)
             .expect("Set balance should have succeeded");
 
         account
@@ -4738,7 +4732,7 @@ mod tests {
 
         // The victim's fee must not be charged and its counter must not move.
         assert_eq!(
-            account.balance(rk.host()).unwrap(),
+            account.balance(rk.tez_accounts()).unwrap(),
             50_u64.into(),
             "Victim balance must not be debited"
         );
@@ -4899,9 +4893,12 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source only paid the fees and the destination balance is unchanged
-        assert_eq!(source_account.balance(rk.host()).unwrap(), 35.into());
         assert_eq!(
-            destination_account.balance(rk.host()).unwrap(),
+            source_account.balance(rk.tez_accounts()).unwrap(),
+            35.into()
+        );
+        assert_eq!(
+            destination_account.balance(rk.tez_accounts()).unwrap(),
             50_u64.into()
         );
 
@@ -5001,8 +4998,11 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            80_u64.into()
+        );
 
         // Verify that the source's counter has been incremented
         assert_eq!(
@@ -5098,7 +5098,7 @@ mod tests {
         }];
 
         // Verify that balance was only debited for fees
-        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
 
@@ -5265,11 +5265,11 @@ mod tests {
             }
         );
         assert_eq!(
-            faucet.balance(rk.host()).unwrap(),
+            faucet.balance(rk.tez_accounts()).unwrap(),
             (faucet_balance - requested_amount).into()
         );
         assert_eq!(
-            requester.balance(rk.host()).unwrap(),
+            requester.balance(rk.tez_accounts()).unwrap(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
 
@@ -5353,16 +5353,18 @@ mod tests {
         // never-originated KT1 must remain absent from durable storage.
         let dest_account = context::originated_from_kt1(&desthash)
             .expect("originated_from_kt1 should have succeeded");
-        let balance_path = context::contracts::balance_path(&dest_account)
-            .expect("balance_path should have succeeded");
-        assert_eq!(
-            rk.host_mut().store_has(&balance_path).unwrap(),
-            None,
+        let balance_key = context::contracts::balance_key(&dest_account)
+            .expect("balance_key should have succeeded");
+        assert!(
+            !rk.tez_accounts().contains(&balance_key),
             "no balance entry should exist for a never-originated KT1"
         );
 
         // Source paid the manager fee but not the transfer amount.
-        assert_eq!(requester.balance(rk.host()).unwrap(), (50_u64 - 15).into());
+        assert_eq!(
+            requester.balance(rk.tez_accounts()).unwrap(),
+            (50_u64 - 15).into()
+        );
         assert_eq!(
             requester.counter(rk.tez_accounts()).unwrap(),
             1.into(),
@@ -5488,8 +5490,11 @@ mod tests {
 
         // Verify that source and destination balances changed:
         // 54 - 15 fee - 30 transfer - 4 burn (4 × COST_PER_BYTES) = 5.
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            80_u64.into()
+        );
 
         assert_eq!(receipt, expected_receipt);
 
@@ -5687,7 +5692,10 @@ mod tests {
 
         // SafeStorage rollback: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
-        assert_eq!(source.balance(rk.host()).unwrap(), (48_u64 - 15).into());
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap(),
+            (48_u64 - 15).into()
+        );
         assert_eq!(
             destination.storage(rk.host()).unwrap(),
             initial_storage
@@ -5802,9 +5810,12 @@ mod tests {
 
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
-        assert_eq!(dest_account.balance(rk.host()).unwrap(), 30_u64.into());
+        assert_eq!(
+            dest_account.balance(rk.tez_accounts()).unwrap(),
+            30_u64.into()
+        );
         // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
     }
 
     #[test]
@@ -5908,7 +5919,10 @@ mod tests {
 
         // SafeStorage rolled back the allocation: the destination
         // account is gone again, and the source paid only the fee.
-        assert_eq!(source.balance(rk.host()).unwrap(), (50_u64 - 15).into());
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap(),
+            (50_u64 - 15).into()
+        );
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert!(
@@ -5999,8 +6013,11 @@ mod tests {
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
-        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 50_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            50_u64.into()
+        );
 
         assert_eq!(receipt, expected_receipt);
 
@@ -6188,7 +6205,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
 
         // op‑2: transfer 10ꜩ to dest
         let transfer_content_1 = OperationContent::Transfer(TransferContent {
@@ -6351,12 +6368,12 @@ mod tests {
         // counter updated, balances moved
         // initial_balance: 50 tez, fee amount: (3*5)tez, transfer amount: (10 + 20)tez
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             5u64.into(),
             "Source account should have 5ꜩ left after fees and transfers."
         );
         assert_eq!(
-            dest_acc.balance(rk.host()).unwrap(),
+            dest_acc.balance(rk.tez_accounts()).unwrap(),
             80u64.into(),
             "Destination account should have 80ꜩ after transfers."
         );
@@ -6422,7 +6439,7 @@ mod tests {
         assert_eq!(
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .balance(rk.host())
+                .balance(rk.tez_accounts())
                 .unwrap(),
             50u64.into()
         );
@@ -6578,7 +6595,7 @@ mod tests {
         // Initial balance: 1050 tez, paid in fees: (3*10) tez,
         // transfer + storage burn reverted via SafeStorage.
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             1020.into(),
             "Fees should have been paid for failed operation"
         );
@@ -6598,7 +6615,7 @@ mod tests {
 
         // Retrieve initial balance for the end of the test
         let initial_balance = src_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance");
 
         let fee = 15u64;
@@ -6728,7 +6745,7 @@ mod tests {
 
         // Balance of the source
         let current_balance = src_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance for the source");
 
         let expected_balance = initial_balance
@@ -6753,7 +6770,7 @@ mod tests {
 
         // Balance of the smart contract
         let current_kt1_balance = smart_contract_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance for the smart contract");
 
         assert_eq!(
@@ -8562,7 +8579,7 @@ mod tests {
         let src_account =
             context::implicit_from_public_key_hash(&src.pkh).expect("source account");
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             (funded - fee).into()
         );
 
@@ -8577,7 +8594,7 @@ mod tests {
 
         // Initial-balance transfer rolled back too.
         assert_eq!(
-            originated_account.balance(rk.host()).unwrap(),
+            originated_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "originated contract balance must be 0 (initial transfer rolled back)"
         );
@@ -8765,17 +8782,17 @@ mod tests {
                  // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             expected_src_balance.into(),
             "Source balance should be correct"
         );
         assert_eq!(
-            init_contract_account.balance(rk.host()).unwrap(),
+            init_contract_account.balance(rk.tez_accounts()).unwrap(),
             expected_init_contract_balance.into(),
             "Init contract balance should be correct"
         );
         assert_eq!(
-            originated_account.balance(rk.host()).unwrap(),
+            originated_account.balance(rk.tez_accounts()).unwrap(),
             1000u64.into(),
             "Originated contract balance should be correct"
         );
@@ -9250,7 +9267,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
 
         // op‑2 orgination: create a contract with 15ꜩ balance successfully
         let origination_content_1 = OperationContent::Origination(OriginationContent {
@@ -9562,7 +9579,7 @@ mod tests {
         );
         // Check the balances
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
@@ -11278,7 +11295,7 @@ mod tests {
         // Verify that source balance decreased by fee (15) + transfer amount (50)
         // Initial: 100, Final: 100 - 15 - 50 = 35
         assert_eq!(
-            source_account.balance(rk.host()).unwrap(),
+            source_account.balance(rk.tez_accounts()).unwrap(),
             35_u64.into(),
             "Source balance should have decreased by fee + transfer amount"
         );
@@ -11291,7 +11308,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.host()).unwrap(),
+            gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after successful serve call"
         );
@@ -11391,12 +11408,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000 per op × 2 ops = 20_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             979_990_u64.into(),
             "Source balance should be 1_000_000 - 20_000 (fees) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.host()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -11448,12 +11465,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             989_990_u64.into(),
             "Source balance should be 1_000_000 - 10_000 (fee) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.host()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -12450,7 +12467,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.host()).unwrap(),
+            gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after forwarding"
         );
@@ -13355,12 +13372,12 @@ mod tests {
 
         // Verify final balances.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (initial_balance - fee + expected_refund - amount).into(),
             "Source balance should reflect fee, refund, and transfer"
         );
         assert_eq!(
-            ctx.destination.balance(ctx.rk.host()).unwrap(),
+            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
             (50 + amount).into(),
             "Destination balance should increase by transfer amount"
         );
@@ -13385,7 +13402,7 @@ mod tests {
 
         // Source balance = initial - fee - amount (no refund).
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (100 - fee - amount).into(),
         );
     }
@@ -13406,7 +13423,7 @@ mod tests {
 
         // Source balance = initial - fee - amount.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (2000 - fee - amount).into(),
         );
     }
@@ -13467,13 +13484,13 @@ mod tests {
 
         // Source paid fees but got refund; transfer was reverted so amount not deducted.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (initial_balance - fee + expected_refund).into(),
             "Source should pay fee minus refund, transfer amount reverted"
         );
         // Destination unchanged: transfer was reverted.
         assert_eq!(
-            ctx.destination.balance(ctx.rk.host()).unwrap(),
+            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
@@ -14411,8 +14428,8 @@ mod tests {
                 ..Default::default()
             }));
         let mut storage_limit_remaining = num_bigint::BigUint::from(8_u64);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14475,8 +14492,8 @@ mod tests {
         // and internal 1 needs 257.
         let mut storage_limit_remaining =
             num_bigint::BigUint::from(2 * ORIGINATION_SIZE - 1);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14557,8 +14574,8 @@ mod tests {
         // the Own internal alone. A buggy burn that also charged the
         // Crac internal (7 bytes) would overshoot and return an error.
         let mut storage_limit_remaining = num_bigint::BigUint::from(4_u64);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14570,7 +14587,7 @@ mod tests {
         // pair, charging 4 × COST_PER_BYTES against the payer's balance.
         let own_burn = 4 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.host()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (100_000 - own_burn).into()
         );
 

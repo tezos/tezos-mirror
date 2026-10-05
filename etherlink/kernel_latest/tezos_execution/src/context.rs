@@ -106,7 +106,7 @@ pub mod contracts {
 
     use super::*;
 
-    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
+    const BALANCE: Key = Key::from_static(b"/balance");
 
     /// The contract index, as a key of the accounts keyspace.
     const INDEX_KEY: Key = Key::from_static(b"/contracts/index");
@@ -139,13 +139,17 @@ pub mod contracts {
         Ok(INDEX_KEY.concat(account_path(contract)?.as_bytes())?)
     }
 
-    /// Path of an originated account's mutez balance. (Implicit accounts keep
-    /// their balance in the RLP `/info` record, so only originated accounts
-    /// use this path.)
-    pub fn balance_path(
+    /// Returns the key of `account`'s mutez balance in the accounts keyspace.
+    ///
+    /// Implicit accounts keep their balance in their RLP `/info` record
+    /// instead.
+    ///
+    /// Fails with [`Error::Key`](tezos_storage::error::Error::Key) when the
+    /// resulting key is invalid (for example, too long).
+    pub fn balance_key(
         account: &TezosOriginatedAccount,
-    ) -> Result<OwnedPath, PathError> {
-        originated_path(account, &BALANCE_PATH)
+    ) -> Result<Key, tezos_storage::error::Error> {
+        Ok(account.key.concat(&BALANCE)?)
     }
 }
 
@@ -459,6 +463,17 @@ mod tests {
         assert_eq!(
             durable(&crate::account_storage::key_to_tezos_account(&pkh).unwrap()),
             b"/tez/tez_accounts/tezosx/tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx/info"
+        );
+    }
+
+    /// The balance of an originated account resolves to `/balance` under the
+    /// durable path of the account.
+    #[test]
+    fn balance_key_keeps_its_durable_path() {
+        let (_, account, index) = sample_originated();
+        assert_eq!(
+            durable(&contracts::balance_key(&account).unwrap()),
+            format!("{index}/balance").into_bytes()
         );
     }
 
