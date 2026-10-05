@@ -21,10 +21,7 @@ use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
 use tezos_protocol::contract::Contract;
-use tezos_smart_rollup::{
-    host::RuntimeError,
-    types::{PublicKey, PublicKeyHash},
-};
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
 use tezos_storage::error::StorageReadErrorKind;
@@ -810,16 +807,13 @@ pub fn key_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<Key, KeyErro
 ///
 /// Returns `None` when the record is absent or when the host fails to read it.
 ///
-/// Fails with [`RuntimeError::DecodingError`] inside
-/// [`TezosXRuntimeError::Runtime`] when the stored bytes do not decode into a
+/// Fails with a [`KeySpaceError`] when the stored bytes do not decode into a
 /// [`TezosAccountInfo`].
 pub fn get_tezos_account_info_at(
     tez_accounts: &impl KeySpace,
     key: &Key,
-) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
-    Ok(tez_accounts
-        .read_rlp(key)
-        .map_err(|_| RuntimeError::DecodingError)?)
+) -> Result<Option<TezosAccountInfo>, KeySpaceError> {
+    tez_accounts.read_rlp(key)
 }
 
 /// Returns the info record at `key` as [`get_tezos_account_info_at`] does, or
@@ -828,7 +822,7 @@ pub fn get_tezos_account_info_at(
 pub fn get_tezos_account_info_or_init_at(
     tez_accounts: &impl KeySpace,
     key: &Key,
-) -> Result<TezosAccountInfo, TezosXRuntimeError> {
+) -> Result<TezosAccountInfo, KeySpaceError> {
     Ok(get_tezos_account_info_at(tez_accounts, key)?.unwrap_or_default())
 }
 
@@ -836,16 +830,13 @@ pub fn get_tezos_account_info_or_init_at(
 /// with the RLP encoding of `info`. `key` must come from
 /// [`key_to_tezos_account`].
 ///
-/// Fails with [`TezosXRuntimeError::Custom`] when the write fails.
+/// Fails with a [`KeySpaceError`] when the write fails.
 pub fn set_tezos_account_info_at(
     tez_accounts: &mut impl KeySpace,
     key: &Key,
     info: TezosAccountInfo,
-) -> Result<(), TezosXRuntimeError> {
-    tez_accounts
-        .store_rlp(key, &info)
-        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    tez_accounts.store_rlp(key, &info)
 }
 
 pub struct TezosImplicitAccount {
@@ -2064,10 +2055,10 @@ mod test {
         pub_key_hash: &PublicKeyHash,
         info: TezosAccountInfo,
     ) -> Result<(), TezosXRuntimeError> {
-        set_tezos_account_info_at(
+        Ok(set_tezos_account_info_at(
             tez_accounts,
             &key_to_tezos_account(pub_key_hash)?,
             info,
-        )
+        )?)
     }
 }

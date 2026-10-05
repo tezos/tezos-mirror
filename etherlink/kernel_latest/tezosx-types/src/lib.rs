@@ -149,6 +149,9 @@ pub enum TezosXRuntimeError {
     Path(#[from] tezos_smart_rollup_host::path::PathError),
     #[error(transparent)]
     Key(#[from] tezos_smart_rollup_keyspace::KeyError),
+    /// A read or a write of a key space failed.
+    #[error(transparent)]
+    KeySpace(#[from] tezos_smart_rollup_keyspace::KeySpaceError<StorageReadErrorKind>),
     #[error("Custom error: {0}")]
     Custom(String),
     /// The request is malformed (invalid URL, missing/invalid headers, bad
@@ -170,6 +173,12 @@ pub enum TezosXRuntimeError {
     OutOfGas,
     #[error("Native address verification error: {0}")]
     CheckNativeAddressError(CheckNativeAddressError),
+}
+
+impl From<tezos_smart_rollup_keyspace::KeySpaceError> for TezosXRuntimeError {
+    fn from(e: tezos_smart_rollup_keyspace::KeySpaceError) -> Self {
+        TezosXRuntimeError::KeySpace(tezos_smart_rollup_keyspace::KeySpaceError::widen(e))
+    }
 }
 
 impl From<KernelStorageError> for TezosXRuntimeError {

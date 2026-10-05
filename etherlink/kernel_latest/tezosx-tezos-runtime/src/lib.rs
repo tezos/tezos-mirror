@@ -1536,7 +1536,7 @@ impl TezosRuntime {
             .balance
             .checked_add(amount)
             .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        set_tezos_account_info_at(tez_accounts, &key, info)
+        Ok(set_tezos_account_info_at(tez_accounts, &key, info)?)
     }
 
     // Used for debug while we don't have our own originated account implementation.

@@ -3900,7 +3900,10 @@ mod tests {
         use tezos_execution::account_storage::{
             get_tezos_account_info_at, key_to_tezos_account,
         };
-        get_tezos_account_info_at(tez_accounts, &key_to_tezos_account(pub_key_hash)?)
+        Ok(get_tezos_account_info_at(
+            tez_accounts,
+            &key_to_tezos_account(pub_key_hash)?,
+        )?)
     }
 
     fn set_tezos_account_info(
@@ -3911,10 +3914,10 @@ mod tests {
         use tezos_execution::account_storage::{
             key_to_tezos_account, set_tezos_account_info_at,
         };
-        set_tezos_account_info_at(
+        Ok(set_tezos_account_info_at(
             tez_accounts,
             &key_to_tezos_account(pub_key_hash)?,
             info,
-        )
+        )?)
     }
 }
