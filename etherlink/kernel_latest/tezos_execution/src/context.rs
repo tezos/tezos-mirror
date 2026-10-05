@@ -139,64 +139,52 @@ pub mod big_maps {
         concat(&root()?, &OwnedPath::try_from(format!("/{id}"))?)
     }
 
-    /// Converts a [`KeyError`] into a [`PathError`]: a [`KeyError::PathError`]
-    /// passes through unchanged, and [`KeyError::KeyTooLarge`] becomes
-    /// [`PathError::PathTooLong`].
-    fn path_error(error: KeyError) -> PathError {
-        match error {
-            KeyError::PathError(error) => error,
-            KeyError::KeyTooLarge => PathError::PathTooLong,
-        }
-    }
-
     /// Returns the prefix of every key of big map `id`, relative to the
     /// accounts keyspace.
     ///
-    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// Fails with [`KeyError::KeyTooLarge`] when `id` has too many digits for
     /// a key.
-    fn big_map_key(id: &BigMapId) -> Result<Key, PathError> {
-        BIG_MAP_KEY.concat(format!("/{id}")).map_err(path_error)
+    fn big_map_key(id: &BigMapId) -> Result<Key, KeyError> {
+        BIG_MAP_KEY.concat(format!("/{id}"))
     }
 
     /// Returns the key of big map `id`'s key type, relative to the accounts
     /// keyspace.
     ///
-    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// Fails with [`KeyError::KeyTooLarge`] when `id` has too many digits for
     /// a key.
-    pub fn key_type_key(id: &BigMapId) -> Result<Key, PathError> {
-        big_map_key(id)?.concat(&KEY_TYPE).map_err(path_error)
+    pub fn key_type_key(id: &BigMapId) -> Result<Key, KeyError> {
+        big_map_key(id)?.concat(&KEY_TYPE)
     }
 
     /// Returns the key of big map `id`'s value type, relative to the accounts
     /// keyspace.
     ///
-    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// Fails with [`KeyError::KeyTooLarge`] when `id` has too many digits for
     /// a key.
-    pub fn value_type_key(id: &BigMapId) -> Result<Key, PathError> {
-        big_map_key(id)?.concat(&VALUE_TYPE).map_err(path_error)
+    pub fn value_type_key(id: &BigMapId) -> Result<Key, KeyError> {
+        big_map_key(id)?.concat(&VALUE_TYPE)
     }
 
     /// Returns the key of big map `id`'s `total_bytes` counter, relative to the
     /// accounts keyspace.
     ///
-    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// Fails with [`KeyError::KeyTooLarge`] when `id` has too many digits for
     /// a key.
-    pub fn total_bytes_key(id: &BigMapId) -> Result<Key, PathError> {
-        big_map_key(id)?.concat(&TOTAL_BYTES).map_err(path_error)
+    pub fn total_bytes_key(id: &BigMapId) -> Result<Key, KeyError> {
+        big_map_key(id)?.concat(&TOTAL_BYTES)
     }
 
     /// Returns the key of the entry of big map `id` whose packed Michelson key
     /// hashes to `key_hashed`, relative to the accounts keyspace.
     ///
-    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// Fails with [`KeyError::KeyTooLarge`] when `id` has too many digits for
     /// a key.
     pub fn value_key(
         id: &BigMapId,
         key_hashed: &ScriptExprHash,
-    ) -> Result<Key, PathError> {
-        big_map_key(id)?
-            .concat(format!("/{}", hex::encode(key_hashed)))
-            .map_err(path_error)
+    ) -> Result<Key, KeyError> {
+        big_map_key(id)?.concat(format!("/{}", hex::encode(key_hashed)))
     }
 }
 

@@ -1131,15 +1131,11 @@ impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
         if temporary {
             Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
-            let id: BigMapId = self
-                .rk
-                .tez_accounts()
-                .read_nom_or(&NEXT_ID_KEY, 0.into())
-                .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+            let id: BigMapId =
+                self.rk.tez_accounts().read_nom_or(&NEXT_ID_KEY, 0.into())?;
             self.rk
                 .tez_accounts_mut()
-                .store_bin(&NEXT_ID_KEY, &id.succ())
-                .map_err(storage_error_to_lazy)?;
+                .store_bin(&NEXT_ID_KEY, &id.succ())?;
             Ok(id)
         }
     }
@@ -1193,17 +1189,6 @@ fn hash_micheline_expr(
         .map_err(|_| LazyStorageError::OutOfGasError(OutOfGas))?;
     gas.consume(cost)?;
     Ok(digest_256(&bytes).into())
-}
-
-/// Converts a storage failure into a [`LazyStorageError::BinWriteError`]
-/// that holds its message.
-///
-/// [`LazyStorageError`] has no `From` impl for this conversion, because it
-/// belongs to `mir`, and `mir` does not depend on `tezos-storage-latest`.
-fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStorageError {
-    LazyStorageError::BinWriteError(tezos_data_encoding::enc::BinError::custom(
-        e.into().to_string(),
-    ))
 }
 
 /// Route a metered read's failure to the view-lookup error it means. Keeping
@@ -1317,11 +1302,9 @@ fn total_bytes(
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
     let key = total_bytes_key(id)?;
-    match tez_accounts.read_nom::<Zarith>(&key) {
-        Ok(Some(total)) => Ok(total),
-        Ok(None) => Err(LazyStorageError::MissingTotalBytes(id.clone())),
-        Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
-    }
+    tez_accounts
+        .read_nom::<Zarith>(&key)?
+        .ok_or_else(|| LazyStorageError::MissingTotalBytes(id.clone()))
 }
 
 /// Write the `total_bytes` counter persisted for a big-map.
@@ -1331,9 +1314,7 @@ fn set_total_bytes(
     value: &Zarith,
 ) -> Result<(), LazyStorageError> {
     let key = total_bytes_key(id)?;
-    tez_accounts
-        .store_bin(&key, value)
-        .map_err(storage_error_to_lazy)?;
+    tez_accounts.store_bin(&key, value)?;
     Ok(())
 }
 
@@ -1457,10 +1438,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     1,
                     encoded.len() as u64,
                 )?;
-                self.rk
-                    .tez_accounts_mut()
-                    .set(&value_key, &encoded)
-                    .map_err(storage_error_to_lazy)?;
+                self.rk.tez_accounts_mut().set(&value_key, &encoded)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -1511,12 +1489,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .encode(&mut self.operation_gas.remaining)??;
         self.rk
             .tez_accounts_mut()
-            .set(&value_type_key, &value_type_encoded)
-            .map_err(storage_error_to_lazy)?;
+            .set(&value_type_key, &value_type_encoded)?;
         self.rk
             .tez_accounts_mut()
-            .set(&key_type_key, &key_type_encoded)
-            .map_err(storage_error_to_lazy)?;
+            .set(&key_type_key, &key_type_encoded)?;
         set_total_bytes(self.rk.tez_accounts_mut(), &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -2508,7 +2484,7 @@ pub mod tests {
 
         assert!(matches!(
             ctx.big_map_new(&Type::Int, &Type::String, false),
-            Err(LazyStorageError::NomReadError(_))
+            Err(LazyStorageError::KeySpace(_))
         ));
         assert_eq!(ctx.rk.tez_accounts().get(&NEXT_ID_KEY), Some(vec![0xff]));
     }

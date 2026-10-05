@@ -16,6 +16,7 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use typed_arena::Arena;
 
 use super::{
@@ -268,6 +269,12 @@ impl<'a> BigMap<'a> {
 /// Errors that can happen when working with lazy storage.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum LazyStorageError {
+    /// A read or a write of the key space failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
+    /// The key of a lazy storage value is not a valid key.
+    #[error(transparent)]
+    Key(#[from] KeyError),
     /// Error when computing path in storage
     #[error("Error generating path: {0}")]
     PathError(#[from] PathError),
@@ -280,9 +287,6 @@ pub enum LazyStorageError {
     /// Typecheck error when returning value from storage
     #[error("Error typechecking stored value: {0}")]
     TcError(#[from] TcError),
-    /// Error when using nom_read to interact with the storage
-    #[error("Error nom_reading stored value: {0}")]
-    NomReadError(String),
     /// Error when using bin_write to interact with the storage
     #[error("Error bin_writing value to store: {0}")]
     BinWriteError(#[from] tezos_data_encoding::enc::BinError),
