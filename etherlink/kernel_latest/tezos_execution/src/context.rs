@@ -154,7 +154,7 @@ pub mod big_maps {
 
     const KEY_TYPE: Key = Key::from_static(b"/key_type");
 
-    const VALUE_TYPE_PATH: RefPath = RefPath::assert_from(b"/value_type");
+    const VALUE_TYPE: Key = Key::from_static(b"/value_type");
 
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
 
@@ -202,8 +202,13 @@ pub mod big_maps {
         big_map_key(id)?.concat(&KEY_TYPE).map_err(path_error)
     }
 
-    pub fn value_type_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
-        concat(&big_map_path(id)?, &VALUE_TYPE_PATH)
+    /// Returns the key of big map `id`'s value type, relative to the accounts
+    /// keyspace.
+    ///
+    /// Fails with [`PathError::PathTooLong`] when `id` has too many digits for
+    /// a key.
+    pub fn value_type_key(id: &BigMapId) -> Result<Key, PathError> {
+        big_map_key(id)?.concat(&VALUE_TYPE).map_err(path_error)
     }
 
     pub fn total_bytes_path(id: &BigMapId) -> Result<OwnedPath, PathError> {
@@ -345,6 +350,17 @@ mod tests {
         assert_eq!(
             durable(&big_maps::key_type_key(&BigMapId::from(7)).unwrap()),
             b"/tez/tez_accounts/big_map/7/key_type"
+        );
+    }
+
+    /// Makes sure that the key of a big map's value type resolves to its
+    /// durable path. The test writes the path in full, so it fails if the key
+    /// changes.
+    #[test]
+    fn big_map_value_type_key_keeps_its_durable_path() {
+        assert_eq!(
+            durable(&big_maps::value_type_key(&BigMapId::from(7)).unwrap()),
+            b"/tez/tez_accounts/big_map/7/value_type"
         );
     }
 

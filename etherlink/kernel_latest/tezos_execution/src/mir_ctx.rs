@@ -272,7 +272,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         let arena = Arena::new();
         let key_type_key = key_type_key(id)?;
-        let value_type_path = value_type_path(id)?;
+        let value_type_key = value_type_key(id)?;
 
         let Some(encoded_key_type) = self.rk.tez_accounts().get(&key_type_key) else {
             return Ok(None);
@@ -285,11 +285,9 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         )??
         .parse_ty(self.gas())?;
 
-        let encoded_value_type = match self.rk.host().store_read_all(&value_type_path) {
-            Ok(key_type) => Ok(key_type),
-            Err(RuntimeError::PathNotFound) => return Ok(None),
-            Err(err) => Err(err),
-        }?;
+        let Some(encoded_value_type) = self.rk.tez_accounts().get(&value_type_key) else {
+            return Ok(None);
+        };
         let value_type = Micheline::decode_raw(
             &arena,
             &encoded_value_type,
@@ -1501,7 +1499,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         let arena = Arena::new();
         let id = self.generate_id(temporary)?;
         let key_type_key = key_type_key(&id)?;
-        let value_type_path = value_type_path(&id)?;
+        let value_type_key = value_type_key(&id)?;
         let key_type_encoded = key_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
@@ -1509,8 +1507,9 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
         self.rk
-            .host_mut()
-            .store_write_all(&value_type_path, &value_type_encoded)?;
+            .tez_accounts_mut()
+            .set(&value_type_key, &value_type_encoded)
+            .map_err(storage_error_to_lazy)?;
         self.rk
             .tez_accounts_mut()
             .set(&key_type_key, &key_type_encoded)
@@ -1705,9 +1704,9 @@ pub mod tests {
             "Key type should have been removed",
         );
 
-        let value_type_path = value_type_path(id).unwrap();
+        let value_type_key = value_type_key(id).unwrap();
         assert!(
-            ctx.rk.host().store_has(&value_type_path).unwrap().is_none(),
+            !ctx.rk.tez_accounts().contains(&value_type_key),
             "Value type should have been removed",
         );
     }
