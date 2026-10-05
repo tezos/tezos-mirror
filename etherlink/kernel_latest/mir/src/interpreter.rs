@@ -112,8 +112,8 @@ pub enum InterpretError<'a> {
     InternalError(InterpretInvariant),
     /// Non-recoverable kernel storage failure from the address registry;
     /// aborts contract execution. Carries the abort-worthy variants
-    /// (`HostError`, `AlreadySeeded`) — the `From` impl below routes
-    /// `OutOfGas` to [`InterpretError::OutOfGas`].
+    /// (`KeySpace`, `Key`, `MissingCounter`, `AlreadySeeded`). The `From`
+    /// impl below routes `OutOfGas` to [`InterpretError::OutOfGas`].
     #[error("address registry error: {0}")]
     AddressRegistryError(crate::context::AddressRegistryError),
 }
@@ -123,7 +123,9 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
         use crate::context::AddressRegistryError;
         match e {
             AddressRegistryError::OutOfGas(_) => InterpretError::OutOfGas,
-            e @ (AddressRegistryError::HostError(_)
+            e @ (AddressRegistryError::KeySpace(_)
+            | AddressRegistryError::Key(_)
+            | AddressRegistryError::MissingCounter
             | AddressRegistryError::AlreadySeeded(_)) => {
                 InterpretError::AddressRegistryError(e)
             }
@@ -11563,7 +11565,7 @@ mod interpreter_tests {
                 InterpretError::OutOfGas
             ));
             assert!(matches!(
-                InterpretError::from(AddressRegistryError::HostError("io".into())),
+                InterpretError::from(AddressRegistryError::MissingCounter),
                 InterpretError::AddressRegistryError(_)
             ));
         }
