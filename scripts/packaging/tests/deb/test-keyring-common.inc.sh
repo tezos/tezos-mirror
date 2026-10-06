@@ -10,6 +10,7 @@ KEYRING="/usr/share/keyrings/octez-archive-keyring.gpg"
 
 # include apt-get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
+set_octez_repo_urls
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -29,10 +30,10 @@ setup_keyring_test() {
   sudo rm -f /etc/apt/keyrings/octez.gpg
   sudo rm -f /etc/apt/sources.list.d/octez.list
   sudo mkdir -p /etc/apt/keyrings
-  sudo curl -fsSL "$REPO/$DISTRO/octez.asc" |
+  sudo curl -fsSL "$REPO_FETCH_URL/octez.asc" |
     sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/octez.gpg
 
-  echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] $REPO/$DISTRO $RELEASE main" |
+  echo "deb [signed-by=/etc/apt/keyrings/octez.gpg] $REPO_URL $RELEASE main" |
     sudo tee /etc/apt/sources.list.d/octez.list
   apt_get update
 

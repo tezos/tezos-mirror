@@ -9,6 +9,7 @@ RELEASE=$2
 
 # include apt_get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
+set_octez_repo_urls
 
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
@@ -72,9 +73,9 @@ done < <(dpkg -l "${packages[@]}" | awk '$1 == "ii" { print $2, $3 }')
 # [add next repository]
 # Bootstrap with curl, install the keyring, and switch APT to managed keyring.
 sudo mkdir -p /etc/apt/keyrings
-sudo curl -fsSL "$REPO/$DISTRO/octez.asc" |
+sudo curl -fsSL "$REPO_FETCH_URL/octez.asc" |
   sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
-echo "deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEASE main" |
+echo "deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO_URL $RELEASE main" |
   sudo tee /etc/apt/sources.list.d/octez-next.list
 apt_get update
 apt_get install -y octez-archive-keyring

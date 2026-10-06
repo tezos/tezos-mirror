@@ -52,9 +52,9 @@ echo ""
 echo "=== Check 2: Verify dual-signed Release.gpg and InRelease ==="
 
 release_dir=$(mktemp -d)
-curl -fsSL "$REPO/$DISTRO/dists/$RELEASE/Release" -o "$release_dir/Release"
-curl -fsSL "$REPO/$DISTRO/dists/$RELEASE/Release.gpg" -o "$release_dir/Release.gpg"
-curl -fsSL "$REPO/$DISTRO/dists/$RELEASE/InRelease" -o "$release_dir/InRelease"
+curl -fsSL "$REPO_FETCH_URL/dists/$RELEASE/Release" -o "$release_dir/Release"
+curl -fsSL "$REPO_FETCH_URL/dists/$RELEASE/Release.gpg" -o "$release_dir/Release.gpg"
+curl -fsSL "$REPO_FETCH_URL/dists/$RELEASE/InRelease" -o "$release_dir/InRelease"
 
 # Extract key IDs from the installed keyring (avoids hardcoding test key IDs)
 keyring_key_ids=$(gpg --no-default-keyring \
@@ -231,8 +231,8 @@ GNUPGHOME="$combined_gnupghome" gpg --batch --no-default-keyring \
 
 # Download Release and Release.gpg for verification
 rotation_release_dir=$(mktemp -d)
-curl -fsSL "$REPO/$DISTRO/dists/$RELEASE/Release" -o "$rotation_release_dir/Release"
-curl -fsSL "$REPO/$DISTRO/dists/$RELEASE/Release.gpg" -o "$rotation_release_dir/Release.gpg"
+curl -fsSL "$REPO_FETCH_URL/dists/$RELEASE/Release" -o "$rotation_release_dir/Release"
+curl -fsSL "$REPO_FETCH_URL/dists/$RELEASE/Release.gpg" -o "$rotation_release_dir/Release.gpg"
 
 # Verify: the combined keyring should accept the signature from the valid key
 # even though the expired key is also present

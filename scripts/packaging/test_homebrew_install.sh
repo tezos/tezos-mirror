@@ -35,10 +35,21 @@ TestBranch | TestProtectedBranch)
   ;;
 esac
 
-echo "installing formula from https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb"
-
-# get around the fact that we cannot install a formula directly from https
-curl -q "https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb" -O
+# brew cannot install a formula directly from a URL, so fetch it first.
+case "$RELEASETYPE" in
+TestBranch)
+  # Formulae of unprotected refs live in a bucket that require GCP
+  # authentication.
+  echo "installing formula from gs://$BUCKET/$TARGETDIR/octez.rb"
+  . scripts/ci/gcp_auth.sh
+  gsutil -q cp "gs://$BUCKET/$TARGETDIR/octez.rb" .
+  ;;
+*)
+  # Protected refs publish to a bucket used over https.
+  echo "installing formula from https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb"
+  curl -q "https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb" -O
+  ;;
+esac
 # Create pre-compiled bottle from local octez formula
 # with verbose output and developer checks enabled
 export HOMEBREW_DEVELOPER=1
