@@ -2,7 +2,12 @@
 
 set -eu
 
-REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
+# PACKAGES_BUCKET is not derived here. This script runs inside the systemd
+# Docker container started by scripts/packaging/tests/systemd-docker-test.sh
+# (in the CI through scripts/ci/systemd-packages-test.sh): that harness
+# sources scripts/ci/packages_bucket.inc.sh on the host and passes
+# PACKAGES_BUCKET into the container with docker exec -e.
+REPO="https://storage.googleapis.com/${PACKAGES_BUCKET:?must be set, see scripts/ci/packages_bucket.inc.sh}/$CI_COMMIT_REF_NAME"
 REPOOLD="https://packages.nomadic-labs.com"
 DISTRO=$1
 RELEASE=$2
