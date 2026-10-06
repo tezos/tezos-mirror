@@ -3,7 +3,13 @@
 # Shared setup for keyring test scripts.
 # Source this file from test-keyring-user-journey.sh and test-keyring-ci-checks.sh.
 
-REPO="https://storage.googleapis.com/${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}/$CI_COMMIT_REF_NAME"
+# PACKAGES_BUCKET is not derived here. The scripts sourcing this file run
+# inside the systemd Docker container started by
+# scripts/packaging/tests/systemd-docker-test.sh (in the CI through
+# scripts/ci/systemd-packages-test.sh, with test-keyring.sh as the test
+# file): that harness sources scripts/ci/packages_bucket.inc.sh on the host
+# and passes PACKAGES_BUCKET into the container with docker exec -e.
+REPO="https://storage.googleapis.com/${PACKAGES_BUCKET:?must be set, see scripts/ci/packages_bucket.inc.sh}/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
 KEYRING="/usr/share/keyrings/octez-archive-keyring.gpg"

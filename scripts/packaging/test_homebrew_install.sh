@@ -8,9 +8,8 @@ set -ue
 # and creates a formula scripts/packaging/Formula/octez.rb
 # that is ready to be installed with brew.
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 . scripts/ci/octez-packages-version.sh
 case "$RELEASETYPE" in
