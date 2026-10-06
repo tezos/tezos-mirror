@@ -89,7 +89,7 @@ let job_build_homebrew_formula_macosx =
       ]
 
 let () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_build_homebrew_formula);
       (Auto, job_build_homebrew_formula_macosx);

@@ -376,7 +376,7 @@ let () =
   (* Register the Debian partial jobs directly into before_merging and
      merge_train pipelines with only_if_changed so they run automatically
      only when relevant files change. *)
-  Cacio.register_merge_request_jobs (jobs Partial) ;
+  Tezos_ci_pipelines.register_merge_request_jobs (jobs Partial) ;
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
   Cacio.register_jobs Tezos_ci_pipelines.debian_daily (jobs Full) ;

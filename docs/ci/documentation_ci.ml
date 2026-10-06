@@ -257,7 +257,7 @@ let job_publish =
       ]
 
 let register () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_trixie `current_branch);

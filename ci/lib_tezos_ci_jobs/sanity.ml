@@ -282,7 +282,7 @@ let job_cargo_audit =
       | `all -> ["./scripts/ci/cargo_audit.sh --all || exit $?"])
 
 let register () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);
@@ -295,8 +295,12 @@ let register () =
       (Immediate, job_npm_audit `mr);
       (Immediate, job_cargo_audit `mr);
     ] ;
-  Cacio.register_jobs Before_merging [(Immediate, job_commit_titles `lenient)] ;
-  Cacio.register_jobs Merge_train [(Immediate, job_commit_titles `strict)] ;
+  Cacio.register_jobs
+    Tezos_ci_pipelines.before_merging
+    [(Immediate, job_commit_titles `lenient)] ;
+  Cacio.register_jobs
+    Tezos_ci_pipelines.merge_train
+    [(Immediate, job_commit_titles `strict)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_extended_test
     [

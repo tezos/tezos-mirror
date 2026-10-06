@@ -237,7 +237,7 @@ let job_script_docker_verify_image =
 
 let register () =
   Cacio.register_jobs
-    Before_merging
+    Tezos_ci_pipelines.before_merging
     [
       (Auto, job_docker `experimental `test Amd64);
       (Auto, job_docker `experimental `test Arm64);
@@ -245,13 +245,13 @@ let register () =
       (Manual, job_script_docker_verify_image Arm64);
     ] ;
   Cacio.register_jobs
-    Merge_train
+    Tezos_ci_pipelines.merge_train
     [
       (Auto, job_docker `experimental `test Amd64);
       (Auto, job_docker `experimental `test Arm64);
     ] ;
   Cacio.register_jobs
-    Master
+    Tezos_ci_pipelines.master_branch
     [(Auto, job_docker_merge_manifests `experimental `real)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_docker_build_pipeline

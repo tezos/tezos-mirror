@@ -10,6 +10,24 @@
     Add jobs to those pipelines with [Cacio.register_jobs].
     They are registered with CIAO by [Cacio.close]. *)
 
+(** Lints code in merge requests, checks that it compiles and runs tests. *)
+val before_merging : Cacio.global_pipeline
+
+(** A merge-train-specific version of {!before_merging}.
+
+    Manual jobs are not allowed in this pipeline: it must finish ASAP so as to
+    not block other MRs, so it does not make sense to have to wait on a manual
+    action. *)
+val merge_train : Cacio.global_pipeline
+
+(** Add jobs to both the {!before_merging} and the {!merge_train} pipelines.
+
+    Manual jobs are only added to {!before_merging}. *)
+val register_merge_request_jobs : (Cacio.trigger * Cacio.job) list -> unit
+
+(** Publishes artifacts (docs, static binaries) from master on each merge. *)
+val master_branch : Cacio.global_pipeline
+
 (** Updates the 'latest' tag of the Octez Docker distribution on Docker Hub. *)
 val octez_latest_release : Cacio.global_pipeline
 

@@ -120,7 +120,7 @@ let job_build_kernels =
     ~script:["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_check_riscv_kernels);
       (Immediate, job_audit_riscv_deps);

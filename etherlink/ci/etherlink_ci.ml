@@ -581,7 +581,7 @@ let job_docker_promote_to_latest =
 
 let register () =
   let open Runner.Arch in
-  Cacio.register_merge_request_jobs
+  Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Immediate, job_check_changelog Tezosx);
       (Immediate, job_check_changelog Node);
@@ -589,7 +589,7 @@ let register () =
       (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
-         returns an equivalent job for [Before_merging] and [Merge_train]. *)
+         returns an equivalent job for [Tezos_ci_pipelines.before_merging] and [Tezos_ci_pipelines.merge_train]. *)
       (Auto, job_test_kernel);
       (Auto, job_test_evm_compatibility);
       (Auto, job_test_revm_compatibility);
