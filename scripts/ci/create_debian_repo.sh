@@ -10,7 +10,7 @@
 
 # expected env vars
 # - ARCHITECTURES
-# - GCP_LINUX_PACKAGES_BUCKET
+# - GCP_LINUX_PACKAGES_BUCKET_UNPROTECTED / _PROTECTED (see scripts/ci/packages_bucket.inc.sh)
 
 # Env vars set by scripts/ci/repository-keys.sh
 # - GPG_DUAL_SIGNING
@@ -21,6 +21,12 @@
 # - GPG_PUBLIC_KEY
 
 set -eu
+
+# BUCKET is derived from the ref below; refuse a value injected from the outside.
+if [ -n "${BUCKET+x}" ]; then
+  echo "error: BUCKET is already set; it is derived from the ref, do not set it" >&2
+  exit 1
+fi
 
 if [ $# -lt 2 ]; then
   cat << EOF
@@ -50,9 +56,8 @@ shift
 # E.g. '22_04 24_04', 'trixie'
 RELEASES=$*
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 oldPWD=$PWD
 

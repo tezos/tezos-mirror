@@ -8,9 +8,14 @@
 
 set -ue
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+# BUCKET is derived from the ref below; refuse a value injected from the outside.
+if [ -n "${BUCKET+x}" ]; then
+  echo "error: BUCKET is already set; it is derived from the ref, do not set it" >&2
+  exit 1
+fi
+
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 # fetch tags for releases
 git fetch -q --tags
