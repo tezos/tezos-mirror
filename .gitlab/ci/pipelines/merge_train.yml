@@ -2470,7 +2470,6 @@ oc.build-homebrew-formula:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
@@ -2507,7 +2506,6 @@ oc.build-homebrew-formula-macosx:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
@@ -3157,7 +3155,6 @@ oc.create-homebrew-formula:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*

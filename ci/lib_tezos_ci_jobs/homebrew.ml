@@ -13,7 +13,6 @@ let only_if_changed =
     "scripts/packaging/homebrew_install.sh";
     "scripts/packaging/octez/homebrew/Formula/*";
     "scripts/version.sh";
-    "manifest/**/*.ml*";
   ]
 
 open Tezos_ci
