@@ -46,9 +46,12 @@ let convert_error trace =
              [String (0, Format.asprintf "%a" Error_monad.pp_print_trace trace)],
              [] ))
 
-let convert_trace = function
-  | Environment.Ecoproto_error err :: _ as trace -> convert_error trace err
-  | _ -> assert false
+(* Error traces are non-empty lists. The primary error of the trace is
+   the last one. *)
+let convert_trace trace =
+  match List.last_opt trace with
+  | Some (Environment.Ecoproto_error err) -> convert_error trace err
+  | Some _ | None -> assert false
 
 let match_output ~got ~expected =
   let open Result_syntax in

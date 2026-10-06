@@ -163,8 +163,6 @@ The L1 version is more permissive than MIR for the Ed25519 scheme: the former ac
 
 The errors returned by MIR or the L1 interpreter are not always the same. This comes from the different capabilities of the source languages (Rust and OCaml), their implementation specificities and their handling of errors.
 
-This can be observed for instance on the TZT files `drop_deep_apply_00.tzt`, `drop_deep_comb_00.tzt` and `swap_drop_deep_apply_00.tzt` in `tzt_reference_test_suite`. These files return a static error when run with a L1 client, against a gas exhaustion in MIR.
-
 ##### TZT
 
 It happens that MIR and L1 don't provide the same results on TZT files. There can be two reasons why:
