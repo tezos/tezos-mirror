@@ -23,9 +23,9 @@
 #       scripts/packaging/tests/deb/test-keyring-user-journey.sh \
 #       images/packages/debian-systemd-tests.Dockerfile
 #
-#   systemd-docker-test.sh defaults CI_COMMIT_REF_NAME to the current branch
-#   and GCP_LINUX_PACKAGES_BUCKET to tezos-linux-repo; override either to point
-#   at a different published repository. Pass test-keyring.sh instead of this
+#   systemd-docker-test.sh defaults CI_COMMIT_REF_NAME to the current branch;
+#   GCP_LINUX_PACKAGES_BUCKET_UNPROTECTED must be set (no default, see
+#   scripts/ci/packages_bucket.inc.sh). Pass test-keyring.sh instead of this
 #   file to run the user journey and CI verification suites together.
 
 set -eu

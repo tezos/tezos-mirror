@@ -8,9 +8,8 @@
 
 set -ue
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 # fetch tags for releases
 git fetch -q --tags
