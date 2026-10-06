@@ -35,11 +35,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       dir
       Signer_services.sign
       (fun pkh (signature, req_version) data ->
-        let pkh =
-          match req_version with
-          | Some version -> Signer_messages.Pkh_with_version (pkh, version)
-          | None -> Signer_messages.Pkh pkh
-        in
+        let pkh = Signer_messages.request_pkh ?version:req_version pkh in
         Handler.sign
           ?signing_version
           ?magic_bytes

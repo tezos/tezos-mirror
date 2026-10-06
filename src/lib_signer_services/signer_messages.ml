@@ -59,9 +59,10 @@ let pkh_encoding =
          case
            (Tag 3)
            ~title:"Bls"
-           (conv
-              (fun (pkh, version) -> (pkh, version))
-              (fun (pkh, version) -> (pkh, version))
+           (with_decoding_guard
+              (function
+                | (Bls _ : Tezos_crypto.Signature.Public_key_hash.t), _ -> Ok ()
+                | _ -> Error "expected a BLS public key hash")
               (obj2
                  (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
                  (req "version" Tezos_crypto.Signature.version_encoding)))
@@ -71,7 +72,19 @@ let pkh_encoding =
              | Pkh_with_version ((Bls _ as x), version) -> Some (x, version)
              | _ -> None)
            (function x, version -> Pkh_with_version (x, version));
+         case
+           (Tag 4)
+           ~title:"Mldsa44"
+           Tezos_crypto.Signature.Mldsa44.Public_key_hash.encoding
+           (function Pkh (Mldsa44 x) -> Some x | _ -> None)
+           (function x -> Pkh (Mldsa44 x));
        ]
+
+let request_pkh ?version (pkh : Tezos_crypto.Signature.Public_key_hash.t) =
+  match (pkh, version) with
+  | _, None -> Pkh pkh
+  | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _ -> Pkh pkh
+  | Bls _, Some version -> Pkh_with_version (pkh, version)
 
 module type Authenticated_signing_request = sig
   type t = {

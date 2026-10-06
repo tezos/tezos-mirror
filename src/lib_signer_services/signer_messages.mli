@@ -28,6 +28,21 @@ type pkh =
       Tezos_crypto.Signature.Public_key_hash.t * Tezos_crypto.Signature.version
   | Pkh of Tezos_crypto.Signature.Public_key_hash.t
 
+(** [request_pkh ?version pkh] builds the [pkh] field of a signing request,
+    tagging it with [version] only when the signature version changes how
+    [pkh] signs.
+
+    BLS is the only scheme for which it does, and {!type-pkh} is encoded
+    accordingly: it has a versioned case for BLS only. The other schemes
+    either sign identically in every version, or exist in a single one
+    (Mldsa44 was introduced by version 3). A scheme whose signature starts to
+    depend on the version needs both a branch here and a versioned case in
+    the encoding. *)
+val request_pkh :
+  ?version:Tezos_crypto.Signature.version ->
+  Tezos_crypto.Signature.Public_key_hash.t ->
+  pkh
+
 module type Authenticated_signing_request = sig
   type t = {
     pkh : pkh;

@@ -33,7 +33,11 @@ type t
     This is useful for running one-shot signer CLI commands (e.g.
     [gen keys], [create bls proof]) without launching a listening daemon.
 
-    The signer is configured to use its private base directory. *)
+    The signer is configured to use its private base directory.
+
+    If [require_authentication] is [true] (default [false]), the signer
+    only accepts signing requests authenticated by one of its authorized
+    keys (see {!add_authorized_key}). *)
 val create :
   ?name:string ->
   ?color:Log.Color.t ->
@@ -46,6 +50,7 @@ val create :
   ?magic_byte:string ->
   ?allow_list_known_keys:bool ->
   ?allow_to_prove_possession:bool ->
+  ?require_authentication:bool ->
   ?keys:Account.key list ->
   unit ->
   t Lwt.t
@@ -73,7 +78,9 @@ val create :
     If [runner] is specified, the signer will be spawned on this
     runner using SSH.
 
-    The allowed magic byte value for the signer can be specified with [magic_byte]. *)
+    The allowed magic byte value for the signer can be specified with [magic_byte].
+
+    See {!create} for [require_authentication]. *)
 val init :
   ?name:string ->
   ?color:Log.Color.t ->
@@ -87,6 +94,7 @@ val init :
   ?magic_byte:string ->
   ?allow_list_known_keys:bool ->
   ?allow_to_prove_possession:bool ->
+  ?require_authentication:bool ->
   unit ->
   t Lwt.t
 
@@ -159,6 +167,11 @@ val spawn_command :
 
 (** Import a secret key into the signer's wallet. *)
 val import_secret_key : t -> Account.key -> unit Lwt.t
+
+(** Authorize [key] to authenticate signing requests, using its alias as
+    name. The signer reads its authorized keys on each request, so this can
+    be called while the signer is running. *)
+val add_authorized_key : t -> Account.key -> unit Lwt.t
 
 (** Spawn [octez-signer gen keys <alias> --sig <sig_alg>]. *)
 val spawn_gen_keys : ?alias:string -> ?sig_alg:string -> t -> Process.t
