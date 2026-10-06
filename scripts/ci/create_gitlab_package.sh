@@ -9,7 +9,7 @@
 
 # expected env vars
 # - architectures
-# - GCP_LINUX_PACKAGES_BUCKET
+# - GCP_LINUX_PACKAGES_BUCKET_UNPROTECTED / _PROTECTED (see scripts/ci/packages_bucket.inc.sh)
 
 # Env vars set by scripts/ci/repository-keys.sh
 # - GPG_DUAL_SIGNING
@@ -133,9 +133,8 @@ gpg_detach_sign_and_verify() {
 mkdir -p public
 echo "$GPG_PUBLIC_KEY" > "public/octez.asc"
 
-# If it's a protected branch the value of $BUCKET will
-# be set accordingly by the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 ./scripts/ci/gcp_auth.sh
 GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
