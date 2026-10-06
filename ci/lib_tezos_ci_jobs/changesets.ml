@@ -109,7 +109,6 @@ let changeset_homebrew =
         "scripts/packaging/homebrew_install.sh";
         "scripts/packaging/octez/homebrew/Formula/*";
         "scripts/version.sh";
-        "manifest/**/*.ml*";
       ])
 
 let changeset_test_sdk_bindings =

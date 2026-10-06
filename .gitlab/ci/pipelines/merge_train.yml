@@ -171,7 +171,6 @@ trigger:homebrew_auto:
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
