@@ -42,32 +42,6 @@ use tezosx_journal::TezosXJournal;
 
 use crate::{headers, url, ExecuteRequestOutcome, RequestFailure, NULL_PKH};
 
-/// Resource-exhaustion `TcError`s that must route to
-/// [`TezosXRuntimeError::OutOfGas`]: direct budget exhaustion, a
-/// cost-arithmetic overflow ("the cost is unrepresentably large",
-/// catchable like OOG), and the comparison-cost path.
-/// `CompareError::Incomparable` is a deterministic type failure and is
-/// deliberately excluded.
-///
-/// Single-sourced so [`classify_tc_error`] and the nested-`TcError` arm
-/// of [`classify_interpret_error`] cannot drift apart — the realistic
-/// failure mode, since the two used to duplicate this set by hand. The
-/// non-OOG side intentionally keeps a wildcard rather than enumerating
-/// `TcError`'s ~40 deterministic variants (which would duplicate the
-/// enum and add churn on every MIR change); a new *resource-exhaustion*
-/// variant is the only thing that needs adding here, and that is a
-/// reviewed, deliberate act.
-fn tc_error_is_oog(e: &TcError) -> bool {
-    use mir::gas::CompareError;
-    matches!(
-        e,
-        TcError::OutOfGas(_)
-            | TcError::CostOverflow(_)
-            | TcError::CompareError(CompareError::Cost(_))
-            | TcError::CompareError(CompareError::OutOfGas(_))
-    )
-}
-
 /// Classify a MIR typechecker error into the right HTTP-surface error.
 ///
 /// The invariant here is that **every** error must map to a catchable
@@ -78,13 +52,13 @@ fn tc_error_is_oog(e: &TcError) -> bool {
 /// `parse_ty`.
 ///
 /// `OutOfGas` (and the other resource-exhaustion shapes, see
-/// [`tc_error_is_oog`]) needs specific routing
+/// [`TcError::is_out_of_gas`]) needs specific routing
 /// (→ [`TezosXRuntimeError::OutOfGas`], catchable 429). Every other
 /// `TcError` is a deterministic, caller-visible failure (malformed
 /// input, type mismatch, unknown entrypoint, ...) and maps to
 /// [`TezosXRuntimeError::BadRequest`] (→ 400).
 fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
-    if tc_error_is_oog(&e) {
+    if e.is_out_of_gas() {
         TezosXRuntimeError::OutOfGas
     } else {
         // Bounded like `classify_interpret_error`: a `TcError` can embed a
@@ -109,11 +83,11 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 /// The `InvalidDestination` arm of `EnshrinedViewDispatch` is
 /// caller-controllable (Michelson `string` allows characters that
 /// `http::Uri` rejects), so it routes to `BadRequest` instead.
-/// `OutOfGas` (including the variant nested under `TcError`) routes to
-/// [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
+/// Resource exhaustion (see [`InterpretError::is_out_of_gas`], which also
+/// covers the exhaustions nested under `TcError` and `LazyStorageError`)
+/// routes to [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
-    use mir::gas::CompareError;
     // Match by reference: `InterpretError` implements `Drop` (a deep
     // `FailedWith` payload is flattened iteratively when the error is
     // finally dropped — see L2-1446 + !22025), so Rust forbids partial-move
@@ -122,21 +96,11 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
     // `Drop` runs then, after any `format!("{other:?}")` above has already
     // serialised the value into the response body.
     match &e {
-        // All flavours of resource exhaustion → OutOfGas: direct
-        // interpreter budget exhaustion, a cost helper overflowing, the
-        // comparison-cost path, and the nested-`TcError` forms (routed
-        // through the shared `tc_error_is_oog` so this cannot drift from
-        // `classify_tc_error`). `CompareError::Incomparable` (a
-        // deterministic type failure) falls through to BadRequest.
-        InterpretError::OutOfGas
-        | InterpretError::CostOverflow(_)
-        | InterpretError::CompareError(CompareError::Cost(_))
-        | InterpretError::CompareError(CompareError::OutOfGas(_)) => {
-            TezosXRuntimeError::OutOfGas
-        }
-        InterpretError::TcError(tc) if tc_error_is_oog(tc) => {
-            TezosXRuntimeError::OutOfGas
-        }
+        // All flavours of resource exhaustion → OutOfGas, single-sourced in
+        // MIR so that this cannot drift from `classify_tc_error`.
+        // `CompareError::Incomparable` (a deterministic type failure) falls
+        // through to BadRequest.
+        _ if e.is_out_of_gas() => TezosXRuntimeError::OutOfGas,
         InterpretError::EnshrinedViewDispatch(
             err @ EnshrinedViewDispatchError::InvalidDestination { .. },
         ) => TezosXRuntimeError::BadRequest(err.to_string()),
@@ -564,11 +528,18 @@ mod tests {
             )),
             TezosXRuntimeError::OutOfGas
         ));
-        // Nested TcError OOG goes through the shared `tc_error_is_oog`.
+        // Nested TcError OOG goes through `TcError::is_out_of_gas`.
         assert!(matches!(
             classify_interpret_error(InterpretError::TcError(TcError::CostOverflow(
                 CostOverflow
             ))),
+            TezosXRuntimeError::OutOfGas
+        ));
+        // So does gas exhaustion while manipulating lazy storage.
+        assert!(matches!(
+            classify_interpret_error(InterpretError::LazyStorageError(
+                mir::ast::big_map::LazyStorageError::OutOfGasError(mir::gas::OutOfGas)
+            )),
             TezosXRuntimeError::OutOfGas
         ));
     }

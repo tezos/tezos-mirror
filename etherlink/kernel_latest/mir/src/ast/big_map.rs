@@ -304,6 +304,18 @@ pub enum LazyStorageError {
     MissingTotalBytes(BigMapId),
 }
 
+impl LazyStorageError {
+    /// Whether this error is a resource exhaustion, see
+    /// [TcError::is_out_of_gas].
+    pub fn is_out_of_gas(&self) -> bool {
+        match self {
+            LazyStorageError::OutOfGasError(_) => true,
+            LazyStorageError::TcError(e) => e.is_out_of_gas(),
+            _ => false,
+        }
+    }
+}
+
 impl From<BorrowedUnparseError> for LazyStorageError {
     fn from(err: BorrowedUnparseError) -> Self {
         match err {

@@ -368,6 +368,26 @@ impl Drop for TypecheckDepthGuard {
     }
 }
 
+impl TcError {
+    /// Whether this error is a resource exhaustion rather than a type
+    /// failure: running out of gas, a cost too large to be represented, or
+    /// either of them while comparing values. A cost too large to be
+    /// represented counts as running out of gas because L1 computes gas costs
+    /// with saturating arithmetic: such a cost exceeds any gas limit. `CompareError::Incomparable` is a type failure.
+    ///
+    /// Only a new resource-exhaustion variant needs adding here; the other
+    /// variants are deterministic failures.
+    pub fn is_out_of_gas(&self) -> bool {
+        matches!(
+            self,
+            TcError::OutOfGas(_)
+                | TcError::CostOverflow(_)
+                | TcError::CompareError(CompareError::Cost(_))
+                | TcError::CompareError(CompareError::OutOfGas(_))
+        )
+    }
+}
+
 impl From<TryFromBigIntError<()>> for TcError {
     fn from(error: TryFromBigIntError<()>) -> Self {
         TcError::NumericConversion(error)
