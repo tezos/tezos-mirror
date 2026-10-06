@@ -7,6 +7,12 @@
 
 let tezlink_protocol = Protocol.U025
 
+(** [error_id id] is the id under which the Michelson runtime reports the
+    error of the L1 protocol registered as [id], e.g.
+    ["contract.balance_too_low"]. *)
+let error_id id =
+  Printf.sprintf "proto.%s.%s" (Protocol.encoding_prefix tezlink_protocol) id
+
 (* How to add a new contract to this list to serve as bootstrap contracts in
    Tezlink integration tests.
 

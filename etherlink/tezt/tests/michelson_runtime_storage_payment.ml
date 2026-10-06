@@ -238,10 +238,10 @@ module Tezos_JSON = struct
     result |-> "allocated_destination_contract" |> as_opt |> Option.map as_bool
     |> Option.value ~default:false
 
-  let error_messages_of_result result =
+  let error_ids_of_result result =
     result |-> "errors" |> as_opt |> Option.map as_list
     |> Option.value ~default:[]
-    |> List.map (fun err -> err |-> "error_message" |> as_string)
+    |> List.map (fun err -> err |-> "id" |> as_string)
 end
 
 (** [revm/src/precompiles/constants.rs:RUNTIME_GATEWAY_PRECOMPILE_ADDRESS] *)
@@ -781,18 +781,17 @@ let test_partial_internal_burn_failure_backtracks_all () =
       string
       ~error_msg:"Expected main op status %R, got %L") ;
 
-  let top_level_errors = Tezos_JSON.error_messages_of_result operation_result in
+  (* As on L1, the storage fee failure is reported with its cause. *)
+  let top_level_errors = Tezos_JSON.error_ids_of_result operation_result in
   Check.(
-    (List.length top_level_errors = 1)
-      int
-      ~error_msg:"Expected exactly one error on top-level, got %L") ;
-  let error_msg = List.hd top_level_errors in
-  Check.is_true
-    (String.starts_with ~prefix:"CannotPayStorageFee" error_msg)
-    ~error_msg:
-      (sf
-         "Expected top-level error to start with CannotPayStorageFee, got: %s"
-         error_msg) ;
+    (top_level_errors
+    = Michelson_contracts.
+        [
+          error_id "contract.cannot_pay_storage_fee";
+          error_id "contract.balance_too_low";
+        ])
+      (list string)
+      ~error_msg:"Expected top-level errors %R, got %L") ;
 
   let paid_storage_size_diff =
     Tezos_JSON.get_operation_content_paid_storage_size_diff content
@@ -935,19 +934,12 @@ let test_partial_internal_storage_limit_overshoot_backtracks_all () =
       string
       ~error_msg:"Expected main op status %R, got %L") ;
 
-  let top_level_errors = Tezos_JSON.error_messages_of_result operation_result in
+  let top_level_errors = Tezos_JSON.error_ids_of_result operation_result in
   Check.(
-    (List.length top_level_errors = 1)
-      int
-      ~error_msg:"Expected exactly one error on top-level, got %L") ;
-  let error_msg = List.hd top_level_errors in
-  Check.is_true
-    (String.starts_with ~prefix:"OperationQuotaExceeded" error_msg)
-    ~error_msg:
-      (sf
-         "Expected top-level error to start with OperationQuotaExceeded, got: \
-          %s"
-         error_msg) ;
+    (top_level_errors
+    = [Michelson_contracts.error_id "storage_exhausted.operation"])
+      (list string)
+      ~error_msg:"Expected top-level errors %R, got %L") ;
 
   let paid_storage_size_diff =
     Tezos_JSON.get_operation_content_paid_storage_size_diff content

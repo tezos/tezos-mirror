@@ -13062,9 +13062,9 @@ let test_crac_failwith_receipt_is_gas_bounded () =
     Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
   in
   (* Read the failed internal transfer to [target] from the most recent
-     Michelson block and return its error_message. Each CRAC produces its own
+     Michelson block and return its first error. Each CRAC produces its own
      (latest) block, so this reads the run that just executed. *)
-  let failed_error_message ~target () =
+  let failed_error ~target () =
     let* ops = fetch_recent_michelson_manager_ops sequencer in
     let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
     let internals =
@@ -13082,15 +13082,16 @@ let test_crac_failwith_receipt_is_gas_bounded () =
           && JSON.(iop |-> "result" |-> "status" |> as_string) = "failed")
         internals
     with
-    | Some iop ->
-        return
-          JSON.(
-            iop |-> "result" |-> "errors" |=> 0 |-> "error_message" |> as_string)
+    | Some iop -> return JSON.(iop |-> "result" |-> "errors" |=> 0)
     | None ->
         Test.fail
           "%s: no failed internal transaction to %s in the latest receipt"
           prefix
           target
+  in
+  let failed_error_message ~target () =
+    let* err = failed_error ~target () in
+    return JSON.(err |-> "error_message" |> as_string)
   in
   (* 1. Measure the gas a successful small-payload CRAC consumes. Its per-byte
      charge is negligible, so this budget reflects alias + dispatch +
@@ -13108,8 +13109,8 @@ let test_crac_failwith_receipt_is_gas_bounded () =
     (String.length small_msg)
     gas_used_small ;
   (* The small payload must be persisted in full (a ~128-byte interpret error,
-     vs. the ~27-byte "Transfer(OutOfGas(OutOfGas))"): this confirms the small
-     CRAC's charge succeeded, so gas_used_small is a complete measurement. *)
+     vs. a message-less gas exhaustion error): this confirms the small CRAC's
+     charge succeeded, so gas_used_small is a complete measurement. *)
   Check.(
     (String.length small_msg > 100)
       int
@@ -13144,19 +13145,18 @@ let test_crac_failwith_receipt_is_gas_bounded () =
       ~gas_limit:(Int64.to_int gas_used_small)
       large_caller
   in
-  let* tight_msg = failed_error_message ~target:large_kt1 () in
-  Log.info
-    "%s: tight-run error_message = %S (length %d)"
-    prefix
-    tight_msg
-    (String.length tight_msg) ;
+  let* tight_error = failed_error ~target:large_kt1 () in
+  Log.info "%s: tight-run error = %s" prefix (JSON.encode tight_error) ;
   Check.(
-    (String.length tight_msg < 100)
-      int
+    (JSON.(tight_error |-> "id" |> as_string)
+    = Michelson_contracts.error_id "gas_exhausted.operation")
+      string
       ~error_msg:
-        "tight-run error_message is %L bytes (≥ 100): the full FAILWITH \
-         payload leaked into the receipt; expected a gas-bounded OutOfGas \
-         message (< 100 bytes)") ;
+        "tight-run error is %L: expected the full FAILWITH payload to be \
+         replaced by %R") ;
+  Check.is_true
+    JSON.(tight_error |-> "error_message" |> is_null)
+    ~error_msg:"tight-run error leaks the FAILWITH payload" ;
   unit
 
 (** The error of a failed CRAC receipt is stored once — on the
@@ -15432,11 +15432,10 @@ let test_crac_collect_result_owner_recollect_after_native_reverts () =
      re-collect" ;
   let* statuses = TezRunner.get_collect_result_statuses () in
   let owner_mismatch_error =
-    "Transfer(GatewayError(\"collect_result: sender is not the dispatch slot \
-     owner\"))"
+    "Gateway problem: collect_result: sender is not the dispatch slot owner"
   in
   let already_set_error =
-    "Transfer(GatewayError(\"collect_result: dispatch result already set\"))"
+    "Gateway problem: collect_result: dispatch result already set"
   in
   let failed = List.filter (fun (status, _) -> status = "failed") statuses in
   Check.(
@@ -19221,9 +19220,9 @@ let test_crac_deep_failure_backtracks_alias_target () =
       int
       ~error_msg:
         "C1→C2 error_message must be non-empty (carries the FAILWITH payload)") ;
-  (* The receipt carries the faithful wrapped Michelson error
-     ([Transfer(MichelsonContractInterpretError("... String(\"xxx...\") ..."))]),
-     so the FAILWITH marker is embedded rather than the whole message. *)
+  (* The receipt carries the message of the Michelson error, which embeds
+     the FAILWITH value ([... failed with: String("xxx...") ...]), so the
+     marker is matched rather than the whole message. *)
   if not (c1_to_c2_error =~ rex payload_run) then
     Test.fail
       "%s: C1→C2 error_message must embed the FAILWITH marker (%s), got %s"
