@@ -3,10 +3,6 @@
 distribution=$1
 release=$2
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-bucket="$GCP_LINUX_PACKAGES_BUCKET"
-
 # This logic must be kept in sync with the script in
 # ./scripts/ci/create_debian_repo.sh
 
@@ -70,6 +66,9 @@ if [ "$RELEASETYPE" = "Master" ]; then
   sudo apt-get update
   # [end add repository]
 else
+  # The bucket depends on the ref: see scripts/ci/packages_bucket.inc.sh.
+  . scripts/ci/packages_bucket.inc.sh
+  bucket="$PACKAGES_BUCKET"
   apt_get update
   apt_get install -y sudo gpg curl
   case "$RELEASETYPE" in

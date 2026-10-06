@@ -2,7 +2,7 @@
 
 set -eu
 
-REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
+REPO="https://storage.googleapis.com/${PACKAGES_BUCKET:?must be set, see scripts/ci/packages_bucket.inc.sh}/$CI_COMMIT_REF_NAME"
 REPOOLD="https://packages.nomadic-labs.com"
 DISTRO=$1
 RELEASE=$2

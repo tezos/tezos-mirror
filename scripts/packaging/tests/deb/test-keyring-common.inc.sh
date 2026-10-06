@@ -3,7 +3,7 @@
 # Shared setup for keyring test scripts.
 # Source this file from test-keyring-user-journey.sh and test-keyring-ci-checks.sh.
 
-REPO="https://storage.googleapis.com/${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}/$CI_COMMIT_REF_NAME"
+REPO="https://storage.googleapis.com/${PACKAGES_BUCKET:?must be set, see scripts/ci/packages_bucket.inc.sh}/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
 KEYRING="/usr/share/keyrings/octez-archive-keyring.gpg"
