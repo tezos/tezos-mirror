@@ -360,7 +360,7 @@ pub(crate) const TEZOSX_GATEWAY_PER_WORD_MILLIGAS: Milligas = Milligas::new(
 );
 
 /// Per-byte gas charged on attacker-controlled bytes that are persisted
-/// verbatim into the failed CRAC receipt (BSON sink) — the Debug-rendered
+/// verbatim into the failed CRAC receipt (BSON sink) — the rendered
 /// `FAILWITH` payload, internal-op error bodies, and 4xx response bodies.
 ///
 /// This is a Tezos-specific **DoS bound**, deliberately *not* the EVM-parity
@@ -499,18 +499,12 @@ fn charge_persisted_bytes(
 /// so indexers see the attempted call.  The top-level operation result carries
 /// an empty error vector (`status: failed`, no payload).
 ///
-/// The BSON sink renders the persisted copy as
-/// `format!("{:?}", ApplyOperationError::Transfer(&error))` — i.e. the Debug
-/// form of the *wrapping* `ApplyOperationError::Transfer(...)` variant, not the
-/// bare `TransferError`.  The wrapped form is `"Transfer(" + bare_debug + ")"`,
-/// so its byte length equals the bare Debug length plus the 10-byte constant
-/// wrapper (`"Transfer("` = 9 bytes, `")"` = 1 byte).  This helper charges
+/// The persisted copy is the encoding of
+/// `ApplyOperationError::Transfer(error)`, whose size is
+/// [`TransferError::persisted_len`].  This helper charges
 /// [`PERSISTED_ERROR_PER_BYTE_MILLIGAS`] per persisted byte — the dedicated
 /// persisted-error DoS rate, *not* the EVM-parity gateway crossing rate — so
 /// the gas bound tracks the size actually persisted.
-///
-/// The wrapped length is derived from the bare Debug length without cloning
-/// the (potentially attacker-sized) error string.
 ///
 /// ## Security: this is the operative DoS bound on the persisted body
 ///
@@ -537,15 +531,8 @@ pub(crate) fn charge_persisted_error(
     error: TransferError,
 ) -> CracError {
     // The failed CRAC receipt persists this error once, on the synthetic
-    // alias(E_1)→target failed-transfer entry, rendered by the BSON sink as
-    //   format!("{:?}", ApplyOperationError::Transfer(&error))
-    //   = "Transfer(" + format!("{error:?}") + ")"
-    // Derive the wrapped length from the bare Debug length to avoid an
-    // O(N) clone of the (potentially attacker-sized) error string.
-    let bare_len = format!("{error:?}").len();
-    let wrapped_len = bare_len + "Transfer(".len() + ")".len();
-    let persisted_len = wrapped_len;
-    match charge_persisted_bytes(operation_gas, persisted_len) {
+    // alias(E_1)→target failed-transfer entry.
+    match charge_persisted_bytes(operation_gas, error.persisted_len()) {
         Ok(()) => CracError::Operation(error),
         Err(_oog) => CracError::Operation(TransferError::OutOfGas(mir::gas::OutOfGas)),
     }
@@ -553,13 +540,11 @@ pub(crate) fn charge_persisted_error(
 
 /// Meter the persisted error bodies in `internal_receipts` that will land in
 /// the failed CRAC receipt BSON sink, charging the persisted-error per-byte
-/// rate over the Debug-rendered `ApplyOperationError` body for each
-/// `ContentResult::Failed` entry.
+/// rate over the encoded `ApplyOperationError` bodies of each
+/// `ContentResult::Failed` entry ([`ApplyOperationError::persisted_len`]).
 ///
 /// This closes the bypass by which an attacker-controlled internal-op
-/// FAILWITH payload routes unmetered into the persisted receipt.  The BSON
-/// sink serialises every non-`PastError` `ApplyOperationError` as
-/// `format!("{error:?}")`, so that is the length we charge.
+/// FAILWITH payload routes unmetered into the persisted receipt.
 ///
 /// On gas exhaustion the oversized `Failed` body is replaced with
 /// `Failed(ApplyOperationError::OutOfGas(...).into())` so the internal-op
@@ -573,8 +558,7 @@ pub(crate) fn charge_internal_receipt_bodies(
     macro_rules! meter_failed {
         ($r:expr) => {
             if let ContentResult::Failed(ref errors) = $r.result {
-                let len: usize =
-                    errors.errors.iter().map(|e| format!("{e:?}").len()).sum();
+                let len: usize = errors.errors.iter().map(|e| e.persisted_len()).sum();
                 if charge_persisted_bytes(operation_gas, len).is_err() {
                     $r.result = ContentResult::Failed(
                         ApplyOperationError::OutOfGas(mir::gas::OutOfGas).into(),
@@ -6226,16 +6210,14 @@ pub(crate) mod tests {
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
     /// stores the error once (on the synthetic alias(E_1)→target
     /// failed-transfer internal op), so the charge equals
-    /// `PERSISTED_ERROR_PER_BYTE_MILLIGAS * len` where `len` is the
-    /// Debug-rendered length of `ApplyOperationError::Transfer(error)` (the
-    /// wrapping variant stored by the BSON sink), i.e. bare Debug length + 10.
+    /// `PERSISTED_ERROR_PER_BYTE_MILLIGAS * len` where `len` is the encoded
+    /// length of `ApplyOperationError::Transfer(error)`.
     #[test]
     fn charge_persisted_error_charges_per_byte() {
         let msg = "x".repeat(10);
         let err = TransferError::MichelsonContractInterpretError(msg.clone());
-        // The BSON sink stores the wrapped form: "Transfer(" + bare_debug + ")",
-        // persisted once in the receipt (alias→target internal op only).
-        let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
+        // Persisted once in the receipt (alias→target internal op only).
+        let wrapped_len = ApplyOperationError::Transfer(err.clone()).persisted_len();
         let expected_cost =
             u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);
 
@@ -6265,11 +6247,9 @@ pub(crate) mod tests {
         let short_err = TransferError::MichelsonContractInterpretError(short_msg.clone());
         let long_err = TransferError::MichelsonContractInterpretError(long_msg.clone());
 
-        // Wrapped lengths: "Transfer(" + bare_debug + ")" = bare + 10,
-        // persisted once in the receipt (alias→target internal op only).
-        let wrapper_overhead = "Transfer(".len() + ")".len();
-        let short_len = format!("{short_err:?}").len() + wrapper_overhead;
-        let long_len = format!("{long_err:?}").len() + wrapper_overhead;
+        // Persisted once in the receipt (alias→target internal op only).
+        let short_len = short_err.persisted_len();
+        let long_len = long_err.persisted_len();
 
         let budget = 10_000_000u64;
         let mut gas_short = make_operation_gas(budget);
@@ -6300,9 +6280,8 @@ pub(crate) mod tests {
     fn charge_persisted_error_oog_returns_out_of_gas() {
         let msg = "x".repeat(100);
         let err = TransferError::MichelsonContractInterpretError(msg);
-        // Wrapped length: "Transfer(" + bare_debug + ")" = bare + 10,
-        // persisted once in the receipt (alias→target internal op only).
-        let wrapped_len = format!("{err:?}").len() + "Transfer(".len() + ")".len();
+        // Persisted once in the receipt (alias→target internal op only).
+        let wrapped_len = err.persisted_len();
         let cost = u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);
 
         // Budget is strictly less than the required cost.

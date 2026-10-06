@@ -12552,20 +12552,18 @@ mod tests {
                 as u64
                 - mir::gas::interpret_cost::micheline_decoding_bytes(short_code.len())
                     .unwrap() as u64;
-        // charge_persisted_error gas (charged per byte of the Debug-rendered error).
+        // charge_persisted_error gas (charged per byte of the encoded error).
         let short_rendered = match &err_short.error {
-            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            CracError::Operation(te) => te.persisted_len() as u64,
             other => panic!("expected Operation error (short), got: {other:?}"),
         };
         let long_rendered = match &err_long.error {
-            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            CracError::Operation(te) => te.persisted_len() as u64,
             other => panic!("expected Operation error (long), got: {other:?}"),
         };
         // The error is persisted once (synthetic alias(E_1)→target
-        // failed-transfer entry only), charged per byte over the *wrapped*
-        // length ("Transfer(" + bare_debug + ")", i.e. bare + 10). The
-        // constant +10 wrapper cancels in the delta, so the per-byte charge
-        // applies to the rendered length delta.
+        // failed-transfer entry only), charged per byte over its encoded
+        // length.
         let metering_delta = u64::from(
             PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered),
         );
@@ -12818,7 +12816,7 @@ mod tests {
                 ContentResult::Failed(errors) => errors
                     .errors
                     .iter()
-                    .map(|e| format!("{e:?}").len())
+                    .map(|e| e.persisted_len())
                     .sum::<usize>(),
                 other => {
                     panic!("expected Failed internal receipt on OOG, got: {other:?}")
@@ -12827,13 +12825,10 @@ mod tests {
             other => panic!("expected Transfer internal receipt, got: {other:?}"),
         };
         // A bounded body must be much smaller than the N_LONG-byte payload.
-        let long_payload_debug_len = format!(
-            "{:?}",
-            ApplyOperationError::Transfer(
-                TransferError::MichelsonContractInterpretError("x".repeat(N_LONG))
-            )
+        let long_payload_debug_len = ApplyOperationError::Transfer(
+            TransferError::MichelsonContractInterpretError("x".repeat(N_LONG)),
         )
-        .len();
+        .persisted_len();
         assert!(
             oog_body_len < long_payload_debug_len,
             "OOG internal receipt body ({oog_body_len} bytes) must be smaller \
