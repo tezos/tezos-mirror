@@ -79,7 +79,6 @@ let changeset_debian_packages =
         "scripts/ci/create_debian_repo.sh";
         "docs/introduction/install-bin-deb.sh";
         "scripts/version.sh";
-        "manifest/**/*.ml*";
       ])
 
 let changeset_rpm_packages =
@@ -110,7 +109,6 @@ let changeset_homebrew =
         "scripts/packaging/homebrew_install.sh";
         "scripts/packaging/octez/homebrew/Formula/*";
         "scripts/version.sh";
-        "manifest/**/*.ml*";
       ])
 
 let changeset_test_sdk_bindings =
