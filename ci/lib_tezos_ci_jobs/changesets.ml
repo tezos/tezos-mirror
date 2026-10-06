@@ -79,7 +79,6 @@ let changeset_debian_packages =
         "scripts/ci/create_debian_repo.sh";
         "docs/introduction/install-bin-deb.sh";
         "scripts/version.sh";
-        "manifest/**/*.ml*";
       ])
 
 let changeset_rpm_packages =
