@@ -17,7 +17,6 @@ apt_repo_debian:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -2912,7 +2911,6 @@ oc.build-data_packages:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -2955,7 +2953,6 @@ oc.build-debian:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -3012,7 +3009,6 @@ oc.build-homebrew-formula:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
@@ -3050,7 +3046,6 @@ oc.build-homebrew-formula-macosx:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
@@ -3091,7 +3086,6 @@ oc.build-keyring_package:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -4090,7 +4084,6 @@ oc.create-homebrew-formula:
   rules:
   - changes:
     - images/scripts/install-gcloud.sh
-    - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*
@@ -4236,7 +4229,6 @@ oc.install_bin_debian:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -4280,7 +4272,6 @@ oc.install_bin_debian_systemd:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -4398,7 +4389,6 @@ oc.lintian_debian:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -4870,7 +4860,6 @@ oc.test_keyring_debian:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh
@@ -5368,7 +5357,6 @@ oc.upgrade_bin_debian_systemd:
   rules:
   - changes:
     - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
     - scripts/ci/build-keyring-deb.sh

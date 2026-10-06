@@ -25,7 +25,6 @@ let only_if_changed =
     "scripts/packaging/tests/deb/test-keyring*";
     "docs/introduction/install-bin-deb.sh";
     "scripts/version.sh";
-    "manifest/**/*.ml*";
   ]
 
 open Tezos_ci
