@@ -360,6 +360,25 @@ impl MichelsonJournal {
         std::mem::take(&mut self.pending_alias_origination_internals)
     }
 
+    /// Number of alias originations pending, to be passed to
+    /// [`Self::take_pending_alias_origination_internals_from`].
+    pub fn pending_alias_origination_count(&self) -> usize {
+        self.pending_alias_origination_internals.len()
+    }
+
+    /// Take the alias originations pushed since `watermark` (a
+    /// [`Self::pending_alias_origination_count`]), leaving the earlier ones
+    /// to whoever took that watermark first.
+    pub fn take_pending_alias_origination_internals_from(
+        &mut self,
+        watermark: usize,
+    ) -> Vec<InternalOperationSum> {
+        let start = watermark.min(self.pending_alias_origination_internals.len());
+        self.pending_alias_origination_internals
+            .drain(start..)
+            .collect()
+    }
+
     /// Operation hash of this synthetic Michelson manager operation.
     /// Set once at construction and stable for the journal's life.
     pub fn operation_hash(&self) -> &OperationHash {
@@ -704,6 +723,79 @@ impl MichelsonJournal {
         let start = (checkpoint_index + 1).min(self.snapshots.len());
         for snapshot in self.snapshots.drain(start..) {
             host.store_delete(&snapshot.snapshot_path)?;
+        }
+        Ok(())
+    }
+
+    /// Number of snapshots currently held, to be passed to
+    /// [`Self::release_snapshots_from`].
+    pub fn snapshot_count(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Whether the snapshot at `index` is the revert point of the open EVM
+    /// frame, which [`Self::revert_frame`] restores: it must outlive the work
+    /// that took it.
+    fn is_frame_revert_point(&self, index: usize) -> bool {
+        self.external_checkpoints
+            .last()
+            .is_some_and(|frame| frame.snapshot_watermark == index)
+    }
+
+    /// Release the snapshots taken since `watermark` (a [`Self::snapshot_count`])
+    /// by work that succeeded, e.g. an alias materialized from a Michelson
+    /// operation, whose snapshot no EVM frame would otherwise clean up.
+    ///
+    /// The revert point of an open EVM frame is kept. It is one of these
+    /// snapshots only if the work took the first snapshot of the frame: on the
+    /// paths that reach this, a cross-runtime transfer took one before, so all
+    /// of them are released.
+    pub fn release_snapshots_from<Host>(
+        &mut self,
+        host: &mut Host,
+        watermark: usize,
+    ) -> Result<(), RuntimeError>
+    where
+        Host: StorageV1,
+    {
+        let start = if self.is_frame_revert_point(watermark) {
+            watermark.saturating_add(1)
+        } else {
+            watermark
+        }
+        .min(self.snapshots.len());
+        for snapshot in self.snapshots.drain(start..) {
+            host.store_delete(&snapshot.snapshot_path)?;
+        }
+        Ok(())
+    }
+
+    /// Undo work that failed after taking snapshots since `watermark` (a
+    /// [`Self::snapshot_count`]): restore the world state from the first of
+    /// them, and release them. Nothing is restored if the work took none.
+    ///
+    /// As in [`Self::release_snapshots_from`], the revert point of an open EVM
+    /// frame is restored from but kept.
+    pub fn revert_snapshots_from<Host>(
+        &mut self,
+        host: &mut Host,
+        watermark: usize,
+    ) -> Result<(), RuntimeError>
+    where
+        Host: StorageV1,
+    {
+        if self.snapshots.len() <= watermark {
+            return Ok(());
+        }
+        for snapshot in self.snapshots.drain(watermark.saturating_add(1)..) {
+            host.store_delete(&snapshot.snapshot_path)?;
+        }
+        if self.is_frame_revert_point(watermark) {
+            if let Some(snapshot) = self.snapshots.last() {
+                host.store_copy(&snapshot.snapshot_path, &snapshot.from_path)?;
+            }
+        } else if let Some(snapshot) = self.snapshots.pop() {
+            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
         }
         Ok(())
     }
@@ -1958,6 +2050,153 @@ mod tests {
             },
             result: ContentResult::Skipped,
         })
+    }
+
+    // Outside an EVM frame, nothing else would delete the snapshots: they are
+    // all released, and the world state is left as written.
+    #[test]
+    fn release_snapshots_from_deletes_them_outside_an_evm_frame() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+
+        let watermark = journal.snapshot_count();
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+        journal
+            .release_snapshots_from(&mut host, watermark)
+            .unwrap();
+
+        assert_eq!(journal.snapshot_count(), 0);
+        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&host, &world), b"v1");
+    }
+
+    // Inside an EVM frame whose first snapshot the work took, that snapshot
+    // is kept so the frame can still revert through it, and later ones are
+    // released.
+    #[test]
+    fn release_snapshots_from_keeps_the_frame_revert_point() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+        journal.push_external_checkpoint();
+
+        let watermark = journal.snapshot_count();
+        journal.checkpoint(&mut host, &world).unwrap();
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+        journal
+            .release_snapshots_from(&mut host, watermark)
+            .unwrap();
+
+        assert_eq!(journal.snapshot_count(), 1);
+        assert!(has_snap(&host, 0, &world));
+        assert!(!has_snap(&host, 1, &world));
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(read_data(&host, &world), b"v0");
+    }
+
+    // The usual case inside an EVM frame: a cross-runtime transfer took the
+    // frame's revert point first, so all the work's snapshots are released.
+    #[test]
+    fn release_snapshots_from_releases_all_after_the_frame_revert_point() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut host, &world).unwrap();
+
+        let watermark = journal.snapshot_count();
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+        journal
+            .release_snapshots_from(&mut host, watermark)
+            .unwrap();
+
+        assert_eq!(journal.snapshot_count(), 1);
+        assert!(!has_snap(&host, 1, &world));
+        journal.revert_frame(&mut host).unwrap();
+        assert_eq!(read_data(&host, &world), b"v0");
+    }
+
+    // A failed work is undone without relying on an enclosing rollback.
+    #[test]
+    fn revert_snapshots_from_restores_the_state_before_the_work() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+
+        let watermark = journal.snapshot_count();
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+
+        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(journal.snapshot_count(), 0);
+        assert!(!has_snap(&host, 0, &world));
+    }
+
+    // A work that failed before taking any snapshot must not restore one taken
+    // by its caller.
+    #[test]
+    fn revert_snapshots_from_without_snapshot_leaves_the_caller_one() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+
+        let watermark = journal.snapshot_count();
+        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+
+        assert_eq!(read_data(&host, &world), b"v1");
+        assert_eq!(journal.snapshot_count(), 1);
+    }
+
+    // Undoing a work that took the frame's first snapshot restores from it
+    // but keeps it, so the frame can still revert through it.
+    #[test]
+    fn revert_snapshots_from_keeps_the_frame_revert_point() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        write_data(&mut host, &world, b"v0");
+        journal.push_external_checkpoint();
+
+        let watermark = journal.snapshot_count();
+        journal.checkpoint(&mut host, &world).unwrap();
+        write_data(&mut host, &world, b"v1");
+        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+
+        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(journal.snapshot_count(), 1);
+        assert!(has_snap(&host, 0, &world));
+    }
+
+    // Only the originations pushed since the watermark are taken: the earlier
+    // ones belong to whoever took that watermark first.
+    #[test]
+    fn take_pending_alias_origination_internals_from_leaves_earlier_ones() {
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+        let watermark = journal.pending_alias_origination_count();
+        journal.push_pending_alias_origination_internal(dummy_alias_internal());
+
+        assert_eq!(
+            journal.take_pending_alias_origination_internals_from(watermark),
+            vec![dummy_alias_internal()]
+        );
+        assert_eq!(journal.pending_alias_origination_count(), 1);
+        // A watermark past the end takes nothing.
+        assert!(journal
+            .take_pending_alias_origination_internals_from(5)
+            .is_empty());
     }
 
     #[test]

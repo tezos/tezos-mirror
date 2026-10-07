@@ -1615,11 +1615,12 @@ mod tests {
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
         );
         let (entries, views) = decode_result(&result).expect("gateway has entrypoints");
-        assert_eq!(entries.len(), 3);
+        assert_eq!(entries.len(), 4);
         assert!(!entries.contains_key("default"));
         assert!(entries.contains_key("call"));
         assert!(entries.contains_key("call_evm"));
         assert!(entries.contains_key("collect_result"));
+        assert!(entries.contains_key("materialize_alias"));
         assert_eq!(views.len(), 3);
 
         // Synthetic view `staticcall_evm`: (pair string bytes) -> bytes.

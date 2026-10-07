@@ -72,6 +72,25 @@
     },
     "collect_result": {
       "prim": "bytes"
+    },
+    "materialize_alias": {
+      "prim": "pair",
+      "args": [
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "option",
+          "args": [
+            {
+              "prim": "string"
+            }
+          ]
+        }
+      ]
     }
   }
 }

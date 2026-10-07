@@ -690,9 +690,10 @@ struct PendingParent {
     receipt_at: usize,
     /// Storage cost the transfer delegated, dropped if the subtree raises.
     delegated_storage_cost: u64,
-    /// `(pending, failed, backtracked)` CRAC list lengths captured before the
-    /// subtree ran; see [`splice_reentrant_crac_ops`].
-    crac_watermarks: (usize, usize, usize),
+    /// `(pending, failed, backtracked)` CRAC list lengths, and the number of
+    /// pending alias originations, captured before the subtree ran; see
+    /// [`splice_reentrant_crac_ops`].
+    crac_watermarks: (usize, usize, usize, usize),
 }
 
 /// Drain the re-entrant CRAC ops accumulated while the operation whose receipt
@@ -705,8 +706,14 @@ fn splice_reentrant_crac_ops(
     journal: &mut TezosXJournal,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     receipt_at: usize,
-    (pending, failed, backtracked): (usize, usize, usize),
+    (pending, failed, backtracked, alias_originations): (usize, usize, usize, usize),
 ) {
+    // Aliases the operation materialized itself, e.g. through the gateway's
+    // `%materialize_alias`, come first: they were materialized before
+    // anything the operation emitted ran.
+    let alias_originations = journal
+        .michelson
+        .take_pending_alias_origination_internals_from(alias_originations);
     let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
         journal,
         pending,
@@ -716,7 +723,10 @@ fn splice_reentrant_crac_ops(
     let frame_at = receipt_at + 1;
     all_internal_receipts.splice(
         frame_at..frame_at,
-        reentrant_ops.into_iter().map(TaggedInternalOp::from_crac),
+        alias_originations
+            .into_iter()
+            .chain(reentrant_ops)
+            .map(TaggedInternalOp::from_crac),
     );
 }
 
@@ -948,6 +958,7 @@ where
             journal.michelson.pending_crac_receipts.len(),
             journal.michelson.failed_crac_receipts.len(),
             journal.michelson.backtracked_crac_receipts.len(),
+            journal.michelson.pending_alias_origination_count(),
         );
         tc_ctx
             .operation_gas
@@ -1345,6 +1356,7 @@ where
     let failed_crac_receipts_before = journal.michelson.failed_crac_receipts.len();
     let backtracked_crac_receipts_before =
         journal.michelson.backtracked_crac_receipts.len();
+    let alias_originations_before = journal.michelson.pending_alias_origination_count();
 
     let step_result = transfer_step(
         tc_ctx,
@@ -1360,6 +1372,11 @@ where
         skip_sender_debit,
         allow_forged_lazy_storage_id,
     );
+    // Aliases the gateway materialized itself, through `%materialize_alias`,
+    // were materialized before anything it emitted ran: they come first.
+    let alias_originations = journal
+        .michelson
+        .take_pending_alias_origination_internals_from(alias_originations_before);
     // A direct gateway call may re-enter Michelson even without emitting a
     // callback. Nest its CRAC frames before callbacks, including on failure.
     let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
@@ -1368,8 +1385,12 @@ where
         failed_crac_receipts_before,
         backtracked_crac_receipts_before,
     );
-    all_internal_receipts
-        .extend(reentrant_ops.into_iter().map(TaggedInternalOp::from_crac));
+    all_internal_receipts.extend(
+        alias_originations
+            .into_iter()
+            .chain(reentrant_ops)
+            .map(TaggedInternalOp::from_crac),
+    );
     let TransferStep {
         success,
         delegated_storage_cost,
@@ -11674,6 +11695,261 @@ mod tests {
             "Expected Failed transfer when EVM reverts, got {:?}",
             receipts[0].receipt
         );
+    }
+
+    // --- %materialize_alias ---
+
+    /// A registry that materializes aliases like the Michelson runtime does,
+    /// as far as the caller can see: under a world-state snapshot, parking
+    /// the alias origination on the journal. Everything else is the mock's.
+    struct AliasMaterializingRegistry(crate::test_utils::MockRegistry);
+
+    /// The internal operation the registry above parks on the journal, an
+    /// applied one as an alias origination is.
+    fn parked_alias_origination() -> InternalOperationSum {
+        InternalOperationSum::Event(InternalContentWithMetadata {
+            sender: Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+                )
+                .unwrap(),
+            ),
+            nonce: 0,
+            content: tezos_tezlink::operation_result::EventContent {
+                ty: mir::serializer::MichelineExpr(vec![]),
+                tag: None,
+                payload: None,
+            },
+            result: ContentResult::Applied(
+                tezos_tezlink::operation_result::EventSuccess {
+                    consumed_milligas: 0u64.into(),
+                },
+            ),
+        })
+    }
+
+    impl tezosx_interfaces::Registry for AliasMaterializingRegistry {
+        type Journal = TezosXJournal;
+
+        #[allow(clippy::too_many_arguments)]
+        fn ensure_alias<Host>(
+            &self,
+            rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+            journal: &mut TezosXJournal,
+            alias_info: tezosx_interfaces::AliasInfo,
+            native_public_key: Option<&[u8]>,
+            target_runtime: RuntimeId,
+            context: tezosx_interfaces::CrossRuntimeContext,
+            gas_remaining: tezosx_interfaces::Gas,
+        ) -> Result<
+            (String, tezosx_interfaces::AliasResolution),
+            tezosx_interfaces::TezosXRuntimeError,
+        >
+        where
+            Host: StorageV1 + KeySpaceLoader,
+        {
+            journal
+                .michelson
+                .checkpoint(
+                    rk.host_mut(),
+                    &OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT),
+                )
+                .unwrap();
+            journal
+                .michelson
+                .push_pending_alias_origination_internal(parked_alias_origination());
+            self.0.ensure_alias(
+                rk,
+                journal,
+                alias_info,
+                native_public_key,
+                target_runtime,
+                context,
+                gas_remaining,
+            )
+        }
+
+        fn alias_exists<Host>(
+            &self,
+            rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+            journal: &mut TezosXJournal,
+            target_runtime: RuntimeId,
+            alias: &str,
+        ) -> Result<bool, tezosx_interfaces::TezosXRuntimeError>
+        where
+            Host: StorageV1 + KeySpaceLoader,
+        {
+            self.0.alias_exists(rk, journal, target_runtime, alias)
+        }
+
+        fn compute_alias(
+            &self,
+            alias_info: &tezosx_interfaces::AliasInfo,
+        ) -> Result<String, tezosx_interfaces::TezosXRuntimeError> {
+            self.0.compute_alias(alias_info)
+        }
+
+        fn address_from_string(
+            &self,
+            address_str: &str,
+            runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+            self.0.address_from_string(address_str, runtime_id)
+        }
+
+        fn public_key_from_string(
+            &self,
+            public_key: &str,
+            runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+            self.0.public_key_from_string(public_key, runtime_id)
+        }
+
+        fn read_origin<Host, KS>(
+            &self,
+            rk: &RuntimeKeyspaces<'_, Host, KS>,
+            addr_runtime: RuntimeId,
+            addr: &str,
+            budget: tezosx_interfaces::Gas,
+        ) -> Result<
+            (tezosx_interfaces::Classification, tezosx_interfaces::Gas),
+            tezosx_interfaces::TezosXRuntimeError,
+        >
+        where
+            Host: StorageV1,
+            KS: tezos_smart_rollup_keyspace::KeySpace,
+        {
+            self.0.read_origin(rk, addr_runtime, addr, budget)
+        }
+
+        fn check_is_native_address<Host, KS>(
+            &self,
+            rk: &RuntimeKeyspaces<'_, Host, KS>,
+            addr_runtime: RuntimeId,
+            address: &str,
+            public_key: Option<&str>,
+            budget: &mut tezosx_interfaces::Gas,
+        ) -> Result<(), tezosx_interfaces::TezosXRuntimeError>
+        where
+            Host: StorageV1,
+            KS: tezos_smart_rollup_keyspace::KeySpace,
+        {
+            self.0
+                .check_is_native_address(rk, addr_runtime, address, public_key, budget)
+        }
+
+        fn serve<Host, KS>(
+            &self,
+            rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+            journal: &mut TezosXJournal,
+            request: http::Request<Vec<u8>>,
+        ) -> http::Response<Vec<u8>>
+        where
+            Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+            KS: tezos_smart_rollup_keyspace::KeySpace,
+        {
+            self.0.serve(rk, journal, request)
+        }
+    }
+
+    /// An alias materialized by a Michelson operation lands in that
+    /// operation's receipt, right after the gateway call, ahead of the
+    /// `%alias_materialized` event, and leaves no snapshot behind.
+    #[test]
+    fn materialize_alias_from_an_operation_fills_its_receipt() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(rk.host_mut(), &src.pkh, 100);
+        reveal_account(rk.host_mut(), &src);
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap();
+        let arena = Arena::new();
+        let mut gas = Gas::default();
+        let params = Micheline::prim2(
+            &arena,
+            mir::lexer::Prim::Pair,
+            "ethereum".to_string().into(),
+            Micheline::prim2(
+                &arena,
+                mir::lexer::Prim::Pair,
+                "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"
+                    .to_string()
+                    .into(),
+                Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+                &mut gas,
+            )
+            .unwrap(),
+            &mut gas,
+        )
+        .unwrap();
+        let operation = make_transfer_operation(
+            15,
+            1,
+            100_000,
+            100,
+            src.clone(),
+            0_u64.into(),
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::try_from("materialize_alias").unwrap(),
+                value: params.encode(&mut Gas::default()).unwrap().unwrap(),
+            },
+        );
+        let registry = AliasMaterializingRegistry(crate::test_utils::MockRegistry::new(
+            "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+        ));
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                &registry,
+                &mut journal,
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .unwrap(),
+        );
+
+        let [receipt] = receipts.as_slice() else {
+            panic!("expected one receipt, got {receipts:?}");
+        };
+        let OperationResultSum::Transfer(OperationResult {
+            result: ContentResult::Applied(_),
+            internal_operation_results,
+            ..
+        }) = &receipt.receipt
+        else {
+            panic!("expected an applied transfer, got {:?}", receipt.receipt);
+        };
+        let [origination, InternalOperationSum::Event(event)] =
+            internal_operation_results.as_slice()
+        else {
+            panic!("expected the alias origination then the event, got {internal_operation_results:?}");
+        };
+        assert_eq!(*origination, parked_alias_origination());
+        assert_eq!(
+            event.content.tag.as_ref().map(|tag| tag.to_string()),
+            Some(crate::enshrined_contracts::ALIAS_MATERIALIZED_EVENT_TAG.to_string())
+        );
+        assert!(journal
+            .michelson
+            .take_pending_alias_origination_internals()
+            .is_empty());
+        assert_eq!(journal.michelson.snapshot_count(), 0);
+        // Where the journal keeps the first snapshot of the accounts.
+        let snapshot =
+            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
+        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
     }
 
     // --- Tezos alias forwarder tests ---
