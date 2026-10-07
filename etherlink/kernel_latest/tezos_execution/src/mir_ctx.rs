@@ -37,7 +37,9 @@ use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError, KeySpaceLoader, ReadKind};
+use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
@@ -235,10 +237,7 @@ impl ExecCtx {
                 TransferError::MirAmountToNarithError(err.to_string())
             },
         )?;
-        let contract_account = TezosOriginatedAccount {
-            path: dest_account.path().clone(),
-            kt1: dest_account.kt1().clone(),
-        };
+        let contract_account = dest_account.clone();
         Ok(Self {
             sender,
             amount,
@@ -337,29 +336,50 @@ fn registry_error(e: impl std::fmt::Display) -> AddressRegistryError {
 /// presence marks the registry as seeded, so a second call errors with
 /// [`AddressRegistryError::AlreadySeeded`] rather than overwriting it. Fresh
 /// networks seed at runtime activation; that is the only seeding point.
-pub fn init_address_registry<Host: StorageV1>(
-    host: &mut Host,
+///
+/// `tez_accounts` must be the keyspace rooted at `/tez/tez_accounts`: the
+/// registry keys are relative to it. Errors with
+/// [`AddressRegistryError::HostError`] if a keyspace write fails, or if a
+/// stored counter does not decode.
+pub fn init_address_registry(
+    tez_accounts: &mut impl KeySpace,
 ) -> Result<(), AddressRegistryError> {
-    let counter_path = address_registry::counter_path().map_err(registry_error)?;
-    if let Some(counter) =
-        read_optional_nom_value::<Narith>(host, &counter_path).map_err(registry_error)?
+    if let Some(counter) = tez_accounts
+        .read_nom::<Narith>(&address_registry::COUNTER_KEY)
+        .map_err(registry_error)?
     {
         return Err(AddressRegistryError::AlreadySeeded(counter.0));
     }
     let zero_entry =
-        address_registry::entry_path(&AddressHash::default()).map_err(registry_error)?;
-    store_bin(&Narith(BigUint::from(0u32)), host, &zero_entry).map_err(registry_error)?;
-    store_bin(&Narith(BigUint::from(1u32)), host, &counter_path)
+        address_registry::entry_key(&AddressHash::default()).map_err(registry_error)?;
+    tez_accounts
+        .store_bin(&zero_entry, &Narith(BigUint::from(0u32)))
+        .map_err(registry_error)?;
+    tez_accounts
+        .store_bin(&address_registry::COUNTER_KEY, &Narith(BigUint::from(1u32)))
         .map_err(registry_error)?;
     Ok(())
 }
 
-pub fn read_address_counter<Host: StorageV1>(
-    host: &mut Host,
+/// Returns the address registry counter, the next free index.
+///
+/// `tez_accounts` must be the `/tez/tez_accounts` keyspace. Errors with
+/// [`AddressRegistryError::HostError`] when the counter is absent or does
+/// not decode. The counter is absent in a registry that is not set up yet
+/// (see [`init_address_registry`]).
+pub fn read_address_counter(
+    tez_accounts: &impl KeySpace,
 ) -> Result<BigUint, AddressRegistryError> {
-    let counter_path = address_registry::counter_path().map_err(registry_error)?;
-    Ok(read_nom_value::<Narith>(host, &counter_path)
+    Ok(tez_accounts
+        .read_nom::<Narith>(&address_registry::COUNTER_KEY)
         .map_err(registry_error)?
+        .ok_or_else(|| {
+            registry_error(KeySpaceError::<StorageReadErrorKind>::read(
+                tez_accounts.name(),
+                &address_registry::COUNTER_KEY,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            ))
+        })?
         .0)
 }
 
@@ -448,10 +468,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         mir::context::LookupViewError,
     > {
         use mir::context::LookupViewError;
-        // `originated_from_kt1` only builds the contract's durable path
-        // from the index; it does not check existence. Failures here
-        // mean a path/index corruption (or some host-layer issue) and
-        // are surfaced as host errors.
+        // `originated_from_kt1` only builds the key of the contract. It does
+        // not make sure that the contract exists. A failure here means that
+        // `originated_from_kt1` cannot build the key. This function reports
+        // the failure as a host error.
         let account = crate::context::originated_from_kt1(contract)
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         // L1 VIEW semantics push `None` when the target KT1 does not
@@ -610,18 +630,20 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
             WASM_CHUNK_SIZE as u64,
         )?;
 
-        let entry = address_registry::entry_path(address).map_err(registry_error)?;
-        let counter = read_address_counter(self.tc_ctx.rk.host_mut())?;
+        let entry = address_registry::entry_key(address).map_err(registry_error)?;
+        let counter = read_address_counter(self.tc_ctx.rk.tez_accounts())?;
         let current = Narith(counter);
-        store_bin(&current, self.tc_ctx.rk.host_mut(), &entry).map_err(registry_error)?;
+        self.tc_ctx
+            .rk
+            .tez_accounts_mut()
+            .store_bin(&entry, &current)
+            .map_err(registry_error)?;
 
-        let counter_path = address_registry::counter_path().map_err(registry_error)?;
-        store_bin(
-            &Narith(&current.0 + 1u32),
-            self.tc_ctx.rk.host_mut(),
-            &counter_path,
-        )
-        .map_err(registry_error)?;
+        self.tc_ctx
+            .rk
+            .tez_accounts_mut()
+            .store_bin(&address_registry::COUNTER_KEY, &Narith(&current.0 + 1u32))
+            .map_err(registry_error)?;
         // Emit the (address, index) pair on the frame's receipt, like L1's
         // address_registry_diff.
         // Sr1 addresses consume an index but are skipped here: the receipt's
@@ -643,13 +665,15 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         &mut self,
         address: &AddressHash,
     ) -> Result<Option<BigUint>, AddressRegistryError> {
-        let entry = address_registry::entry_path(address).map_err(registry_error)?;
+        let entry = address_registry::entry_key(address).map_err(registry_error)?;
         consume_storage_read_milligas(self.tc_ctx.operation_gas, 1, COUNTER_SIZE)?;
-        Ok(
-            read_optional_nom_value::<Narith>(self.tc_ctx.rk.host(), &entry)
-                .map_err(registry_error)?
-                .map(|n| n.0),
-        )
+        Ok(self
+            .tc_ctx
+            .rk
+            .tez_accounts()
+            .read_nom::<Narith>(&entry)
+            .map_err(registry_error)?
+            .map(|n| n.0))
     }
 }
 
@@ -2372,10 +2396,9 @@ pub mod tests {
     /// missing-`code` durable read as a `LookupViewError::HostError`.
     #[test]
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
-        use crate::account_storage::TezosImplicitAccount;
-        use crate::account_storage::TezosOriginatedAccount;
+        use crate::context::implicit_from_public_key_hash;
+        use crate::context::originated_from_kt1;
         use mir::ast::michelson_address::AddressHash;
-        use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -2387,10 +2410,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezosImplicitAccount {
-            path: RefPath::assert_from(b"/mock_source").into(),
-            pkh: bootstrap_pkh.clone(),
-        };
+        let source = implicit_from_public_key_hash(&bootstrap_pkh).unwrap();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -2415,10 +2435,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezosOriginatedAccount {
-                path: RefPath::assert_from(b"/mock_self").into(),
-                kt1: placeholder_kt1,
-            },
+            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
         };
 
         // The test exercises `lookup_view_storage_balance` directly,
@@ -3037,12 +3054,11 @@ pub mod tests {
     /// into a hard test failure.
     #[test]
     fn enshrined_synthetic_views_dispatch_in_sync() {
-        use crate::account_storage::TezosImplicitAccount;
-        use crate::account_storage::TezosOriginatedAccount;
+        use crate::context::implicit_from_public_key_hash;
+        use crate::context::originated_from_kt1;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
         use tezos_crypto_rs::hash::HashTrait;
-        use tezos_smart_rollup_host::path::RefPath;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -3054,10 +3070,7 @@ pub mod tests {
         let bootstrap_pkh =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
         let placeholder_kt1 = ContractKt1Hash::from([0u8; 20]);
-        let source = TezosImplicitAccount {
-            path: RefPath::assert_from(b"/mock_source").into(),
-            pkh: bootstrap_pkh.clone(),
-        };
+        let source = implicit_from_public_key_hash(&bootstrap_pkh).unwrap();
         let mut counter = 0u128;
         let level = BlockNumber { block_number: 0 };
         let now = Timestamp::from(0);
@@ -3082,10 +3095,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: TezosOriginatedAccount {
-                path: RefPath::assert_from(b"/mock_self").into(),
-                kt1: placeholder_kt1,
-            },
+            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
         };
 
         let mut journal = tezosx_journal::TezosXJournal::new(
@@ -3378,23 +3388,23 @@ pub mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // An unseeded registry has no counter: the read errors rather than
         // seeding on demand.
-        assert!(super::read_address_counter(rk.host_mut()).is_err());
+        assert!(super::read_address_counter(rk.tez_accounts()).is_err());
 
         // Seeding installs null@0 and the next-free counter at 1.
-        super::init_address_registry(rk.host_mut()).unwrap();
+        super::init_address_registry(rk.tez_accounts_mut()).unwrap();
         assert_eq!(
             rk.host_mut().store_read_all(&NULL_ENTRY_PATH).unwrap(),
             [0x00]
         );
         assert_eq!(rk.host_mut().store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
         assert_eq!(
-            super::read_address_counter(rk.host_mut()).unwrap(),
+            super::read_address_counter(rk.tez_accounts()).unwrap(),
             BigUint::from(1u32)
         );
 
         // Seeding is one-shot: a second call errors instead of overwriting.
         assert_eq!(
-            super::init_address_registry(rk.host_mut()),
+            super::init_address_registry(rk.tez_accounts_mut()),
             Err(AddressRegistryError::AlreadySeeded(BigUint::from(1u32)))
         );
         assert_eq!(rk.host_mut().store_read_all(&COUNTER_PATH).unwrap(), [0x01]);
@@ -3432,11 +3442,11 @@ pub mod tests {
 #[cfg(test)]
 pub(crate) mod mock {
     use super::*;
+    use crate::context::originated_from_kt1;
     use mir::ast::{ByteReprTrait, Entrypoint};
     use num_bigint::BigInt;
     use std::collections::HashMap;
     use tezos_crypto_rs::hash::HashTrait;
-    use tezos_smart_rollup_host::path::RefPath;
 
     /// Mock execution context for testing enshrined contracts.
     /// Implements CtxTrait and HasHost with configurable values.
@@ -3485,10 +3495,8 @@ pub(crate) mod mock {
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 operation_gas: crate::gas::TezlinkOperationGas::default(),
                 operation_counter: 0,
-                contract_account: TezosOriginatedAccount {
-                    path: RefPath::assert_from(b"/mock").into(),
-                    kt1: ContractKt1Hash::from([0u8; 20]),
-                },
+                contract_account: originated_from_kt1(&ContractKt1Hash::from([0u8; 20]))
+                    .unwrap(),
                 crac_chain_depth: 0,
                 crac_origin: None,
                 delegated_storage_cost: 0,

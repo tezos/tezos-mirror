@@ -460,12 +460,18 @@ where
     }
 
     let tez_tez_accounts_subkeys = kernel_host
-        .store_count_subkeys(&chains::TEZOS_ACCOUNTS_ROOT)
+        .store_count_subkeys(
+            &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+        )
         .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
 
     if tez_tez_accounts_subkeys == 0 {
         kernel_host
-            .store_write(&chains::TEZOS_ACCOUNTS_ROOT, b"Un carnaval de foncteur", 0)
+            .store_write(
+                &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+                b"Un carnaval de foncteur",
+                0,
+            )
             .unwrap();
     }
 

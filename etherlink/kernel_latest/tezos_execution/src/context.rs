@@ -6,20 +6,16 @@
 
 //! Account addressing, construction, and origin classification helpers.
 
-use crate::account_storage::{
-    path_to_tezos_account, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
-};
+use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
 use mir::ast::{big_map::BigMapId, AddressHash};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeyError};
 use tezosx_interfaces::Origin;
-
-/// SafeStorage root for the Michelson account state. Re-exported as
-/// `chains::TEZOS_ACCOUNTS_ROOT`.
-pub const TEZOS_ACCOUNTS_ROOT: RefPath = RefPath::assert_from(b"/tez/tez_accounts");
 
 // Account resolution helpers.
 
@@ -27,12 +23,7 @@ pub const TEZOS_ACCOUNTS_ROOT: RefPath = RefPath::assert_from(b"/tez/tez_account
 pub fn implicit_from_public_key_hash(
     pkh: &PublicKeyHash,
 ) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
-    let path = path_to_tezos_account(pkh)
-        .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
-    Ok(TezosImplicitAccount {
-        path,
-        pkh: pkh.clone(),
-    })
+    Ok(TezosImplicitAccount { pkh: pkh.clone() })
 }
 
 /// Resolve the implicit account backing a [`Contract`]. Errors on an
@@ -50,12 +41,10 @@ pub fn implicit_from_contract(
 pub fn originated_from_kt1(
     kt1: &ContractKt1Hash,
 ) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
-    let index = contracts::index()?;
-    let contract = Contract::Originated(kt1.clone());
-    let path = concat(&index, &contracts::account_path(&contract)?)?;
+    let key = contracts::account_key(&Contract::Originated(kt1.clone()))?;
     Ok(TezosOriginatedAccount {
-        path,
         kt1: kt1.clone(),
+        key,
     })
 }
 
@@ -89,34 +78,42 @@ pub fn read_origin_for_address(
     }
 }
 
+/// Returns the durable path of `suffix` in the storage of `account`, under
+/// the accounts root.
+///
+/// Fails when the result is not a valid storage path, for example when it is
+/// too long.
+fn originated_path(
+    account: &TezosOriginatedAccount,
+    suffix: &RefPath,
+) -> Result<OwnedPath, PathError> {
+    OwnedPath::try_from(
+        [
+            TEZ_ACCOUNTS_ROOT_PATH.as_bytes(),
+            account.key.as_bytes(),
+            suffix.as_bytes(),
+        ]
+        .concat(),
+    )
+}
+
 pub mod contracts {
     use mir::ast::BinWriter;
 
     use super::*;
 
-    const ROOT: RefPath = RefPath::assert_from(b"/contracts");
-
-    const INDEX: RefPath = RefPath::assert_from(b"/index");
-
-    const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
-
     const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
-    pub fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
-    }
+    /// The contract index, as a key of the accounts keyspace.
+    const INDEX_KEY: Key = Key::from_static(b"/contracts/index");
 
-    pub fn index() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &INDEX)
-    }
-
-    pub fn global_counter() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &GLOBAL_COUNTER)
-    }
-
-    /// Path segment identifying a contract under [`index`], using the same
-    /// encoding as the octez node's context (see
+    /// Returns the path segment `/<hex>` that identifies `contract` under the
+    /// contract index. `<hex>` is the hex form of the binary encoding that the
+    /// context of the octez node uses (see
     /// `octez-codec describe alpha.contract binary schema`).
+    ///
+    /// Fails with a decoding error if `contract` cannot be binary-encoded, or
+    /// with a path error if the result is not a valid storage path.
     pub fn account_path(
         contract: &Contract,
     ) -> Result<OwnedPath, tezos_storage::error::Error> {
@@ -129,13 +126,22 @@ pub mod contracts {
         Ok(OwnedPath::try_from(path_string)?)
     }
 
+    /// Returns the key of `contract` under the contract index of the accounts
+    /// keyspace. Every key of an originated account starts with this key.
+    ///
+    /// Fails when `contract` cannot be binary-encoded, or when the resulting
+    /// path or key is invalid (for example, too long).
+    pub fn account_key(contract: &Contract) -> Result<Key, tezos_storage::error::Error> {
+        Ok(INDEX_KEY.concat(account_path(contract)?.as_bytes())?)
+    }
+
     /// Path of an originated account's mutez balance. (Implicit accounts keep
     /// their balance in the RLP `/info` record, so only originated accounts
     /// use this path.)
     pub fn balance_path(
         account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &BALANCE_PATH)
+        originated_path(account, &BALANCE_PATH)
     }
 }
 
@@ -155,7 +161,7 @@ pub mod big_maps {
     const TOTAL_BYTES_PATH: RefPath = RefPath::assert_from(b"/total_bytes");
 
     fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &BIG_MAP_PATH)
+        concat(&TEZ_ACCOUNTS_ROOT_PATH, &BIG_MAP_PATH)
     }
 
     pub fn next_id_path() -> Result<OwnedPath, PathError> {
@@ -195,22 +201,22 @@ pub mod address_registry {
 
     use super::*;
 
-    const ROOT: RefPath = RefPath::assert_from(b"/address_registry");
+    /// The registry, as a key of the accounts keyspace.
+    const ROOT: Key = Key::from_static(b"/address_registry");
 
-    const COUNTER: RefPath = RefPath::assert_from(b"/counter");
-
-    fn root() -> Result<OwnedPath, PathError> {
-        concat(&TEZOS_ACCOUNTS_ROOT, &ROOT)
-    }
-
-    pub fn entry_path(address: &AddressHash) -> Result<OwnedPath, PathError> {
+    /// Returns the key of the registry entry of `address`, relative to the
+    /// accounts keyspace.
+    ///
+    /// Returns a [`KeyError`] if the key breaks the size or path limits of
+    /// [`Key`]. The hex encoding of an address hash stays within them.
+    pub fn entry_key(address: &AddressHash) -> Result<Key, KeyError> {
         let addr_hex = hex::encode(address.to_bytes_vec());
-        concat(&root()?, &OwnedPath::try_from(format!("/{addr_hex}"))?)
+        ROOT.concat(format!("/{addr_hex}"))
     }
 
-    pub fn counter_path() -> Result<OwnedPath, PathError> {
-        concat(&root()?, &COUNTER)
-    }
+    /// Key of the registry counter (the next free index), relative to the
+    /// accounts keyspace.
+    pub const COUNTER_KEY: Key = Key::from_static(b"/address_registry/counter");
 }
 
 pub mod code {
@@ -234,29 +240,102 @@ pub mod code {
     const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
     pub fn info_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &INFO_PATH)
+        originated_path(account, &INFO_PATH)
     }
 
     pub fn code_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &CODE_PATH)
+        originated_path(account, &CODE_PATH)
     }
 
     pub fn storage_path(
         account: &TezosOriginatedAccount,
     ) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &STORAGE_PATH)
+        originated_path(account, &STORAGE_PATH)
     }
 
     pub fn origin_path(account: &TezosOriginatedAccount) -> Result<OwnedPath, PathError> {
-        concat(account.path(), &ORIGIN_PATH)
+        originated_path(account, &ORIGIN_PATH)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mir::ast::{BinWriter, ByteReprTrait};
     use tezos_crypto_rs::blake2b;
     use tezos_evm_runtime::runtime::MockKernelHost;
+
+    /// Returns the durable path that `key` resolves to in the accounts
+    /// keyspace, which prepends its name to every key. This function writes
+    /// the name in full, and it does not read the name from the keyspace.
+    fn durable(key: &Key) -> Vec<u8> {
+        [b"/tez/tez_accounts", key.as_bytes()].concat()
+    }
+
+    /// Makes sure that every key of the address registry resolves to its
+    /// durable path under `/tez/tez_accounts/address_registry`. The expected
+    /// paths are literals, not rebuilt from the key builders, so a builder
+    /// that moves a key fails the test.
+    #[test]
+    fn address_registry_keys_keep_their_durable_paths() {
+        assert_eq!(
+            durable(&address_registry::COUNTER_KEY),
+            b"/tez/tez_accounts/address_registry/counter"
+        );
+        let zero = AddressHash::default();
+        assert_eq!(
+            durable(&address_registry::entry_key(&zero).unwrap()),
+            format!(
+                "/tez/tez_accounts/address_registry/{}",
+                hex::encode(zero.to_bytes_vec())
+            )
+            .into_bytes()
+        );
+    }
+
+    /// Returns an originated contract, its account and the durable path of the
+    /// account.
+    fn sample_originated() -> (Contract, TezosOriginatedAccount, String) {
+        let contract =
+            Contract::from_b58check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT").unwrap();
+        let account = originated_from_kt1(match &contract {
+            Contract::Originated(kt1) => kt1,
+            _ => unreachable!("KT1 parses as originated"),
+        })
+        .unwrap();
+        let index = format!(
+            "/tez/tez_accounts/contracts/index/{}",
+            hex::encode({
+                let mut bytes = Vec::new();
+                contract.bin_write(&mut bytes).unwrap();
+                bytes
+            })
+        );
+        (contract, account, index)
+    }
+
+    /// Makes sure that the key of a contract resolves to
+    /// `/tez/tez_accounts/contracts/index/<hex>`, for an originated contract
+    /// and for an implicit one.
+    #[test]
+    fn account_key_keeps_its_durable_path() {
+        let (contract, account, index) = sample_originated();
+        assert_eq!(
+            durable(&contracts::account_key(&contract).unwrap()),
+            index.clone().into_bytes()
+        );
+        assert_eq!(durable(&account.key), index.into_bytes());
+
+        let implicit =
+            Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let mut bytes = Vec::new();
+        implicit.bin_write(&mut bytes).unwrap();
+        assert_eq!(
+            durable(&contracts::account_key(&implicit).unwrap()),
+            format!("/tez/tez_accounts/contracts/index/{}", hex::encode(bytes))
+                .into_bytes()
+        );
+    }
 
     #[test]
     fn read_origin_for_address_implicit_is_native_by_construction() {

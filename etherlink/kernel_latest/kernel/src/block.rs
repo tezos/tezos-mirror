@@ -632,6 +632,35 @@ where
             block,
         }) => {
             let timestamp = block.timestamp();
+            // `promote_block` commits these writes with the Tezos genesis block. The
+            // block hashed its state first, so the next Michelson state_root shows them.
+            if chain_config.is_tezos_runtime_enabled(processed_blueprint)
+                && crate::storage::read_michelson_runtime_sunrise_level(rk.host())
+                    .is_none()
+            {
+                crate::storage::store_michelson_runtime_sunrise_level(
+                    rk.host_mut(),
+                    processed_blueprint,
+                )?;
+                // L2-1526: seed the shared Michelson alias implementation
+                // when the runtime activates on a fresh network. Migrations
+                // only run on upgrades, so this is the genesis seeding point.
+                // The write is the same on every replica, and a second run
+                // changes nothing.
+                tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
+                    rk.host_mut(),
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!("seeding alias implementation failed: {e}")
+                })?;
+                // Seed the address registry (null address at index 0) when
+                // the runtime activates on a fresh network. Activation is the
+                // only seeding point.
+                tezos_execution::mir_ctx::init_address_registry(rk.tez_accounts_mut())
+                    .map_err(|e| {
+                        anyhow::anyhow!("seeding address registry failed: {e}")
+                    })?;
+            }
             promote_block(
                 rk.host_mut(),
                 &mut base,
@@ -641,40 +670,6 @@ where
                 config,
                 included_delayed_transactions,
             )?;
-            // Write sunrise_level only after the block has been committed, so
-            // it is atomic with the Tezos genesis block existing in storage.
-            if chain_config.is_tezos_runtime_enabled(processed_blueprint)
-                && crate::storage::read_michelson_runtime_sunrise_level(
-                    rk.host_mut().host,
-                )
-                .is_none()
-            {
-                crate::storage::store_michelson_runtime_sunrise_level(
-                    rk.host_mut().host,
-                    processed_blueprint,
-                )?;
-                // L2-1526: seed the shared Michelson alias implementation
-                // when the runtime activates on a fresh network. Migrations
-                // only run on upgrades, so this is the genesis seeding point.
-                // Like the sunrise_level write above, this runs after the
-                // block has been promoted, so the slot is first reflected in
-                // the *next* block's Michelson state_root (its content is
-                // rooted under /tez/tez_accounts). It is identical across all
-                // replicas and idempotent.
-                tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
-                    rk.host_mut().host,
-                )
-                .map_err(|e| {
-                    anyhow::anyhow!("seeding alias implementation failed: {e}")
-                })?;
-                // Seed the address registry (null address at index 0) when
-                // the runtime activates on a fresh network. Activation is the
-                // only seeding point.
-                tezos_execution::mir_ctx::init_address_registry(rk.host_mut().host)
-                    .map_err(|e| {
-                        anyhow::anyhow!("seeding address registry failed: {e}")
-                    })?;
-            }
             // The mirror is promoted, so its `/tmp` copy is gone: the
             // sequencer key change runs on the live host.
             upgrade::possible_sequencer_key_change(
@@ -730,8 +725,7 @@ mod tests {
     use crate::chains::{DebugFeatures, TezlinkContent};
     use crate::chains::{
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
-        TezosXChainConfig, TezosXTransaction, TEZOS_ACCOUNTS_ROOT,
-        TEZ_SAFE_STORAGE_ROOT_PATH,
+        TezosXChainConfig, TezosXTransaction, TEZ_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -762,6 +756,7 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -1099,7 +1094,7 @@ mod tests {
         .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&TEZOS_ACCOUNTS_ROOT, b"placeholder")
+        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
     }
 
@@ -1552,6 +1547,37 @@ mod tests {
         );
     }
 
+    /// Makes sure that a failure of `init_address_registry` at activation
+    /// fails the block before `promote_block`. The Tezos genesis block, the
+    /// sunrise level and the alias implementation do not reach the live
+    /// storage.
+    #[test]
+    fn failed_activation_write_commits_nothing() {
+        let mut host = MockKernelHost::default();
+        // A counter already in place makes `init_address_registry` fail.
+        let registry_counter =
+            RefPath::assert_from(b"/tez/tez_accounts/address_registry/counter");
+        host.store_write_all(&registry_counter, &[1]).unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut config = dummy_configuration();
+        store_blueprints(&mut base, vec![blueprint(vec![])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        let produced = produce(&mut host, base, &chain_config, &mut config, None, None);
+
+        assert!(produced.is_err());
+        assert!(crate::storage::read_michelson_runtime_sunrise_level(&host).is_none());
+        assert!(
+            block_storage::read_current_number(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+                .is_err()
+        );
+        let alias_implementation = RefPath::assert_from(
+            b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
+        );
+        assert!(host.store_has(&alias_implementation).unwrap().is_none());
+    }
+
     /// Build a blueprint carrying Tezos operations wrapped as
     /// [`TransactionContent::TezosDelayed`] with an explicit timestamp.
     /// Mirrors the production path taken by delayed Tezos operations on
@@ -1592,7 +1618,7 @@ mod tests {
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
+        // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
             .allocate(&mut host)
@@ -1682,7 +1708,7 @@ mod tests {
         let dst_pkh = bootstrap2.pkh.clone();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
+        // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
         // (bootstrap2's TezosX balance is established below.)
         context::implicit_from_public_key_hash(&dst_pkh)
             .expect("Account interface should be correct")
@@ -1904,7 +1930,7 @@ mod tests {
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-        // backup of TEZOS_ACCOUNTS_ROOT succeeds.
+        // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
             .allocate(&mut host)
@@ -2955,7 +2981,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Allocate bootstrap2 in Tezlink storage so the SafeStorage
-        // backup of TEZOS_ACCOUNTS_ROOT succeeds,
+        // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds,
         // mirroring `test_tezblock_stored_after_tezos_operation`.
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")

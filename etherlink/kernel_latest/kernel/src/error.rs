@@ -16,7 +16,7 @@ use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
-use tezos_storage::error::Error as GenStorageError;
+use tezos_storage::error::{Error as GenStorageError, StorageReadErrorKind};
 use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
 
@@ -59,9 +59,15 @@ pub enum StorageError {
     #[error("Storage error: storing the current block hash failed")]
     BlockHashStorageFailed,
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceError),
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
-    KeySpaceKey(#[from] KeyError),
+    Key(#[from] KeyError),
+}
+
+impl From<KeySpaceError> for StorageError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -180,13 +186,13 @@ impl From<RuntimeError> for Error {
 
 impl From<KeySpaceError> for Error {
     fn from(e: KeySpaceError) -> Self {
-        Self::Storage(StorageError::KeySpace(e))
+        Self::Storage(e.into())
     }
 }
 
 impl From<KeyError> for Error {
     fn from(e: KeyError) -> Self {
-        Self::Storage(StorageError::KeySpaceKey(e))
+        Self::Storage(StorageError::Key(e))
     }
 }
 
@@ -265,9 +271,7 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::KeySpace(e) => {
                 Error::Storage(StorageError::KeySpace(e))
             }
-            IndexableStorageError::KeySpaceKey(e) => {
-                Error::Storage(StorageError::KeySpaceKey(e))
-            }
+            IndexableStorageError::Key(e) => Error::Storage(StorageError::Key(e)),
         }
     }
 }
@@ -277,6 +281,7 @@ impl From<GenStorageError> for Error {
         match e {
             GenStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
             GenStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
+            GenStorageError::Key(e) => Error::Storage(StorageError::Key(e)),
             GenStorageError::KeySpace(e) => Error::Storage(StorageError::KeySpace(e)),
             GenStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             GenStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),

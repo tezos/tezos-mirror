@@ -2095,10 +2095,7 @@ where
             .clone()
             .map_or_else(|| self_address.clone(), AddressHash::Implicit)
     });
-    let contract_account = account_storage::TezosOriginatedAccount {
-        path: account.path().clone(),
-        kt1: account.kt1().clone(),
-    };
+    let contract_account = account.clone();
 
     let mut counter = 0u128;
 
@@ -2314,8 +2311,9 @@ where
         .map_err(|oog: OutOfGas| CracTransferError::from(TransferError::from(oog)))?
         .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
-    let world_state =
-        tezos_smart_rollup_host::path::OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
+    let world_state = tezos_smart_rollup_host::path::OwnedPath::from(
+        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+    );
     let checkpoint_index = journal
         .michelson
         .checkpoint(tc_ctx.rk.host_mut(), &world_state)
@@ -3348,7 +3346,8 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_journal::TezosXHashes;
 
-    use tezos_smart_rollup_keyspace::KeySpaceLoader;
+    use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
+    use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
@@ -3439,7 +3438,7 @@ mod tests {
     /// Test-only SafeStorage root matching the production Michelson accounts
     /// root, used to build the account/big-map paths in tests.
     fn test_root() -> OwnedPath {
-        OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT)
+        OwnedPath::from(&tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH)
     }
 
     /// Pins [`run_code`](crate::run_code)'s step-constant semantics where
@@ -3566,7 +3565,7 @@ mod tests {
                 let mut safe_host = SafeStorage {
                     host: rk.host_mut(),
                     world_states: vec![OwnedPath::from(
-                        crate::context::TEZOS_ACCOUNTS_ROOT,
+                        tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
                     )],
                 };
                 safe_host.start().expect("the snapshot is taken");
@@ -4256,8 +4255,8 @@ mod tests {
     }
 
     // This function sets up an account that will pass the validity checks
-    fn init_contract(
-        host: &mut impl StorageV1,
+    fn init_contract<Host: StorageV1, KS: KeySpace>(
+        rk: &mut RuntimeKeyspaces<Host, KS>,
         src: &ContractKt1Hash,
         script: &str,
         storage_micheline: &Micheline,
@@ -4274,7 +4273,7 @@ mod tests {
 
         account
             .init(
-                host,
+                rk.host_mut(),
                 Some(
                     &script_micheline
                         .encode(&mut Gas::default())
@@ -4290,7 +4289,7 @@ mod tests {
             .expect("Account initialisation should have succeeded");
 
         account
-            .set_balance(host, balance)
+            .set_balance(rk.host_mut(), balance)
             .expect("Set balance should have succeeded");
 
         account
@@ -5098,7 +5097,7 @@ mod tests {
             "#,
             &Micheline::from(()),
         );
-        let faucet = init_contract(rk.host_mut(), &desthash, code, storage, &1000.into());
+        let faucet = init_contract(&mut rk, &desthash, code, storage, &1000.into());
         let requested_amount = 100;
         let operation = make_transfer_operation(
             fees,
@@ -5341,13 +5340,8 @@ mod tests {
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
         let source = init_account(rk.host_mut(), &src.pkh, 54);
         reveal_account(rk.host_mut(), &src);
-        let destination = init_contract(
-            rk.host_mut(),
-            &dest,
-            SCRIPT,
-            &initial_storage,
-            &50_u64.into(),
-        );
+        let destination =
+            init_contract(&mut rk, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
         let storage_value = Micheline::from("Hello world")
             .encode(&mut Gas::default())
@@ -5484,13 +5478,8 @@ mod tests {
         // storage burn (4 × COST_PER_BYTES) + 5 remaining balance.
         init_account(rk.host_mut(), &src.pkh, 1050);
         reveal_account(rk.host_mut(), &src);
-        let destination = init_contract(
-            rk.host_mut(),
-            &dest,
-            SCRIPT,
-            &initial_storage,
-            &50_u64.into(),
-        );
+        let destination =
+            init_contract(&mut rk, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
         let storage_value = Micheline::from("Hello world")
             .encode(&mut Gas::default())
@@ -5552,7 +5541,7 @@ mod tests {
         let source = init_account(rk.host_mut(), &src.pkh, 48);
         reveal_account(rk.host_mut(), &src);
         let destination = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest,
             SCRIPT,
             &initial_storage.clone(),
@@ -5898,7 +5887,7 @@ mod tests {
         reveal_account(rk.host_mut(), &src);
 
         let destination = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest,
             FAILING_SCRIPT,
             &initial_storage,
@@ -6420,14 +6409,14 @@ mod tests {
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
 
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &fail_dest,
             FAILING_SCRIPT,
             &Micheline::from(()),
             &0_u64.into(),
         );
         let succ_account = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &succ_dest,
             SCRIPT,
             &Micheline::from("initial"),
@@ -6784,7 +6773,7 @@ mod tests {
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -6794,7 +6783,7 @@ mod tests {
             .expect("ContractKt1Hash b58 conversion should have succeed");
         let initial_storage = Micheline::Bytes(vec![]);
         let raising_account = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &raising_hash,
             EMIT_THEN_SET_DELEGATE_SCRIPT,
             &initial_storage,
@@ -6976,7 +6965,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_chapo_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -6987,7 +6976,7 @@ mod tests {
         let internal_fail_contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &internal_fail_contract_hash,
             FAILING_SCRIPT,
             &Micheline::from(()),
@@ -6999,7 +6988,7 @@ mod tests {
             ContractKt1Hash::from_base58_check(CONTRACT_3)
                 .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &internal_success_contract_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -7221,7 +7210,7 @@ mod tests {
                 let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
                     .expect("ContractKt1Hash b58 conversion should have succeed");
                 init_contract(
-                    rk.host_mut(),
+                    &mut rk,
                     &contract_hash,
                     SELF_RECURSIVE_TRANSFER_SCRIPT,
                     &Micheline::from(()),
@@ -7319,7 +7308,7 @@ mod tests {
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_hash,
             SELF_RECURSIVE_TRANSFER_SCRIPT,
             &Micheline::from(()),
@@ -7482,7 +7471,7 @@ mod tests {
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -7491,7 +7480,7 @@ mod tests {
         let set_delegate_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &set_delegate_hash,
             SET_DELEGATE_SCRIPT,
             &Micheline::from(()),
@@ -7500,7 +7489,7 @@ mod tests {
         let sibling_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &sibling_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -7640,7 +7629,7 @@ mod tests {
         let emitter_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &emitter_hash,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -7649,7 +7638,7 @@ mod tests {
         let recursive_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &recursive_hash,
             SELF_RECURSIVE_FAILING_SCRIPT,
             &Micheline::from(()),
@@ -7660,7 +7649,7 @@ mod tests {
         let starter_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &starter_hash,
             CHAIN_STARTER_SCRIPT,
             &Micheline::Bytes(
@@ -7818,7 +7807,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &parent_hash,
             DUP_TRANSFER_SCRIPT,
             &Micheline::from(()),
@@ -7828,7 +7817,7 @@ mod tests {
         let receiver_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &receiver_hash,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -7955,7 +7944,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &parent_hash,
             DUP_ORIGINATION_SCRIPT,
             &Micheline::prim0(mir::lexer::Prim::None, &mut Gas::default()).unwrap(),
@@ -8074,7 +8063,7 @@ mod tests {
         let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &parent_hash,
             DUP_EMIT_SCRIPT,
             &Micheline::from(()),
@@ -8188,7 +8177,7 @@ mod tests {
         let initial_amount = 0;
         let transfer_amount = 30;
         let src_contract = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_hash,
             SCRIPT,
             &Micheline::from(initial_amount),
@@ -8264,7 +8253,7 @@ mod tests {
         let transfer_amount = 30;
         let initial_balance = 200;
         let src_contract = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_hash,
             SCRIPT,
             &Micheline::from(0),
@@ -8340,7 +8329,7 @@ mod tests {
                 .unwrap(),
         );
         let src_contract = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_hash,
             SCRIPT_ADDR,
             &micheline_address,
@@ -8571,7 +8560,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8763,7 +8752,7 @@ mod tests {
                 make_script_emitting_internal_origination(&originated_script);
             let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
             init_contract(
-                rk.host_mut(),
+                &mut rk,
                 &contract_hash,
                 &init_script,
                 &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8851,7 +8840,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -8995,7 +8984,7 @@ mod tests {
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
@@ -9791,7 +9780,7 @@ mod tests {
             "#,
             &Micheline::from(()),
         );
-        init_contract(rk.host_mut(), &kt1_addr, code, storage, &0.into());
+        init_contract(&mut rk, &kt1_addr, code, storage, &0.into());
 
         // An empty external transfer to an implicit account fails.
         let operation = make_transfer_operation(
@@ -10019,13 +10008,7 @@ mod tests {
             "#,
             &Micheline::from(5),
         );
-        init_contract(
-            rk.host_mut(),
-            &view_addr,
-            code_view,
-            storage_view,
-            &0.into(),
-        );
+        init_contract(&mut rk, &view_addr, code_view, storage_view, &0.into());
 
         let mich_addr = TypedValue::Address(Address {
             hash: mir::ast::AddressHash::Kt1(view_addr),
@@ -10049,7 +10032,7 @@ mod tests {
         );
 
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &caller_addr,
             code_caller,
             storage_caller,
@@ -10118,7 +10101,7 @@ mod tests {
         // Contract with a view that returns its BALANCE
         let view_balance = 500;
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &view_addr,
             r#"
                 parameter unit ;
@@ -10139,7 +10122,7 @@ mod tests {
 
         // Caller invokes the view and asserts the result equals 500
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &caller_addr,
             r#"
                 parameter unit ;
@@ -10243,7 +10226,7 @@ mod tests {
         let parser = Parser::new();
 
         let sender_contract = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &sender_addr,
             script_sender,
             &parser
@@ -10253,7 +10236,7 @@ mod tests {
         );
 
         let receiver_contract = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &receiver_addr,
             script_receiver,
             &parser
@@ -10576,7 +10559,7 @@ mod tests {
         let parser = Parser::new();
 
         let originator_contract = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &originator_addr,
             &script_originator,
             &parser
@@ -10828,7 +10811,7 @@ mod tests {
         let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _victim = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &victim_addr,
             "parameter unit ; storage (big_map nat string) ; \
              code { CDR ; NIL operation ; PAIR }",
@@ -10842,7 +10825,7 @@ mod tests {
         let writer_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _writer = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &writer_addr,
             "parameter (big_map nat string) ; storage (big_map nat string) ; \
              code { CAR ; PUSH string \"Hacked-by-mi\" ; SOME ; PUSH nat 0 ; \
@@ -10937,7 +10920,7 @@ mod tests {
         let victim_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let _victim = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &victim_addr,
             "parameter unit ; storage (big_map nat string) ; \
              code { CDR ; NIL operation ; PAIR }",
@@ -11078,7 +11061,7 @@ mod tests {
             ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
 
         let _ = init_contract(
-            ctx.rk.host_mut(),
+            ctx.rk,
             &second_sender_contract,
             &script_sender,
             &parser
@@ -11752,7 +11735,9 @@ mod tests {
                 .michelson
                 .checkpoint(
                     rk.host_mut(),
-                    &OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT),
+                    &OwnedPath::from(
+                        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+                    ),
                 )
                 .unwrap();
             journal
@@ -12002,7 +11987,7 @@ mod tests {
 
         let storage_micheline = Micheline::String(evm_address.to_string());
         let _alias_account = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &alias_kt1,
             forwarder_script,
             &storage_micheline,
@@ -12117,7 +12102,7 @@ mod tests {
         // Chapo contract: emits internal transfers to each address in param
         let chapo = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &chapo,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -12127,7 +12112,7 @@ mod tests {
         // OK target: accepts unit, does nothing
         let ok_target = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &ok_target,
             UNIT_SCRIPT,
             &Micheline::from(()),
@@ -12137,7 +12122,7 @@ mod tests {
         // Fail target: always FAILWITHs
         let fail_target = ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &fail_target,
             FAILING_SCRIPT,
             &Micheline::from(()),
@@ -12402,7 +12387,7 @@ mod tests {
         // Destination: a KT1 contract with `PUSH string; FAILWITH`.
         let dest_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest_kt1,
             &push_failwith_script(n),
             &Micheline::from(()),
@@ -12626,7 +12611,7 @@ mod tests {
         // Balance 100 mutez so it can forward 10 mutez per internal op.
         let outer_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &outer_kt1,
             SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
@@ -12636,7 +12621,7 @@ mod tests {
         // Inner contract: FAILWITHs with `n` bytes.
         let inner_kt1 = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &inner_kt1,
             &push_failwith_script(n),
             &Micheline::from(()),
@@ -13123,7 +13108,6 @@ mod tests {
         use crate::context::address_registry;
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
-        use tezos_storage::read_optional_nom_value;
 
         const DEST: &str = CONTRACT_1;
         const A: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
@@ -13131,14 +13115,14 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         let account = init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -13146,9 +13130,8 @@ mod tests {
         );
 
         let a_hash = mir::ast::AddressHash::from_base58_check(A).unwrap();
-        let a_entry = address_registry::entry_path(&a_hash).unwrap();
-        let baseline_a: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let a_entry = address_registry::entry_key(&a_hash).unwrap();
+        let baseline_a: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         assert_eq!(baseline_a, None, "A must start unregistered");
 
         let encode_address = |address: &str| {
@@ -13188,8 +13171,7 @@ mod tests {
             .expect("first indexing operation should apply"),
         );
 
-        let first_index: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let first_index: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         let first_index = first_index.expect("first INDEX_ADDRESS must register A");
         let first_storage = Micheline::from(first_index.0.clone())
             .encode(&mut Gas::default())
@@ -13257,8 +13239,7 @@ mod tests {
             .expect("second idempotent indexing operation should apply"),
         );
 
-        let second_index: Option<Narith> =
-            read_optional_nom_value(rk.host(), &a_entry).unwrap();
+        let second_index: Option<Narith> = rk.tez_accounts().read_nom(&a_entry).unwrap();
         assert_eq!(
             second_index,
             Some(first_index),
@@ -13322,7 +13303,6 @@ mod tests {
     fn parent_and_child_index_address_diffs_land_on_their_own_receipts() {
         use crate::context::address_registry;
         use crate::contract_from_address;
-        use tezos_storage::read_optional_nom_value;
         use tezos_tezlink::operation_result::AddressRegistry;
 
         const PARENT: &str = CONTRACT_1;
@@ -13333,14 +13313,14 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &child,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -13348,7 +13328,7 @@ mod tests {
         );
         let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &parent,
             INDEX_THEN_CALL_CHILD_SCRIPT,
             &Micheline::from(999i128),
@@ -13392,8 +13372,10 @@ mod tests {
         let index_of = |address: &str| -> Zarith {
             use mir::ast::ByteReprTrait;
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
-            let index: Narith = read_optional_nom_value(rk.host(), &entry)
+            let entry = address_registry::entry_key(&hash).unwrap();
+            let index: Narith = rk
+                .tez_accounts()
+                .read_nom(&entry)
                 .unwrap()
                 .expect("address must be registered");
             Zarith(index.0.into())
@@ -13457,7 +13439,6 @@ mod tests {
         use crate::context::address_registry;
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
-        use tezos_storage::read_optional_nom_value;
 
         const PARENT: &str = CONTRACT_1;
         const CHILD: &str = CONTRACT_2;
@@ -13467,14 +13448,14 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
 
         let child = ContractKt1Hash::from_base58_check(CHILD).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &child,
             r#"
                 parameter address;
@@ -13491,7 +13472,7 @@ mod tests {
         );
         let parent = ContractKt1Hash::from_base58_check(PARENT).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &parent,
             INDEX_THEN_CALL_CHILD_SCRIPT,
             &Micheline::from(999i128),
@@ -13578,9 +13559,9 @@ mod tests {
         // The whole operation was reverted: neither address stays registered.
         for address in [P, C] {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
+            let entry = address_registry::entry_key(&hash).unwrap();
             assert_eq!(
-                read_optional_nom_value::<Narith>(rk.host(), &entry).unwrap(),
+                rk.tez_accounts().read_nom::<Narith>(&entry).unwrap(),
                 None,
                 "registry write for {address} must be rolled back"
             );
@@ -13597,7 +13578,6 @@ mod tests {
         use crate::contract_from_address;
         use mir::ast::ByteReprTrait;
         use num_bigint::BigUint;
-        use tezos_storage::read_optional_nom_value;
         use tezos_tezlink::operation_result::AddressRegistry;
 
         const DEST: &str = CONTRACT_1;
@@ -13609,7 +13589,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
@@ -13618,7 +13598,7 @@ mod tests {
         let parser = mir::parser::Parser::new();
         let empty_list = parser.parse("{}").unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest,
             r#"
                 parameter (list address);
@@ -13708,8 +13688,10 @@ mod tests {
         // The durable registry matches the reported indices.
         for (address, index) in [(X, 1u32), (A, 2), (B, 3), (C, 4)] {
             let hash = mir::ast::AddressHash::from_base58_check(address).unwrap();
-            let entry = address_registry::entry_path(&hash).unwrap();
-            let stored: Narith = read_optional_nom_value(rk.host(), &entry)
+            let entry = address_registry::entry_key(&hash).unwrap();
+            let stored: Narith = rk
+                .tez_accounts()
+                .read_nom(&entry)
                 .unwrap()
                 .expect("address must be registered");
             assert_eq!(stored.0, BigUint::from(index));
@@ -13724,7 +13706,6 @@ mod tests {
         use crate::context::address_registry;
         use mir::ast::ByteReprTrait;
         use num_bigint::BigUint;
-        use tezos_storage::read_optional_nom_value;
 
         const DEST: &str = CONTRACT_1;
         const SR1: &str = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
@@ -13732,14 +13713,14 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
-        crate::mir_ctx::init_address_registry(rk.host_mut()).unwrap();
+        crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
         let src = bootstrap1();
         init_account(rk.host_mut(), &src.pkh, 1_000_000);
         reveal_account(rk.host_mut(), &src);
 
         let dest = ContractKt1Hash::from_base58_check(DEST).unwrap();
         init_contract(
-            rk.host_mut(),
+            &mut rk,
             &dest,
             INDEX_ADDRESS_SCRIPT,
             &Micheline::from(999i128),
@@ -13783,13 +13764,16 @@ mod tests {
         // Index 0 is reserved for the pre-registered null address, so sr1 is
         // assigned index 1 and the counter advances to 2.
         let sr1_hash = mir::ast::Address::from_base58_check(SR1).unwrap().hash;
-        let entry = address_registry::entry_path(&sr1_hash).unwrap();
-        let stored: Narith = read_optional_nom_value(rk.host(), &entry)
+        let entry = address_registry::entry_key(&sr1_hash).unwrap();
+        let stored: Narith = rk
+            .tez_accounts()
+            .read_nom(&entry)
             .unwrap()
             .expect("sr1 address must be registered");
         assert_eq!(stored.0, BigUint::from(1u32));
-        let counter_path = address_registry::counter_path().unwrap();
-        let counter: Narith = read_optional_nom_value(rk.host(), &counter_path)
+        let counter: Narith = rk
+            .tez_accounts()
+            .read_nom(&address_registry::COUNTER_KEY)
             .unwrap()
             .expect("counter must be initialised");
         assert_eq!(counter.0, BigUint::from(2u32));

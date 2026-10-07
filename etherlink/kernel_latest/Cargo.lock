@@ -3502,6 +3502,7 @@ dependencies = [
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
+ "tezos_data_encoding",
  "thiserror 2.0.18",
 ]
 

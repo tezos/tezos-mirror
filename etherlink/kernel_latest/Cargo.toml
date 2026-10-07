@@ -122,6 +122,7 @@ tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
 tezos-smart-rollup-keyspace = { path = "../../src/kernel_sdk/keyspace", features = [
   "rlp",
+  "tezos-encoding",
 ] }
 tezos-smart-rollup-build-utils = { path = "../../src/kernel_sdk/build-utils" }
 tezos-protocol = { path = "../../sdk/rust/protocol" }

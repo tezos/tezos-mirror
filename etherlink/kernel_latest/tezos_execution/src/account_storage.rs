@@ -6,7 +6,7 @@
 
 //! Tezos account state and storage
 
-use crate::context::{self, code, contracts};
+use crate::context::{code, contracts};
 use crate::enshrined_contracts::{self, EnshrinedContracts};
 use num_bigint::BigInt;
 use primitive_types::U256;
@@ -27,6 +27,7 @@ use tezos_smart_rollup::{
 };
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::Key;
 use tezos_storage::{
     read_optional_nom_value, read_optional_nom_value_bounded,
     read_optional_nom_value_bounded_with_len, store_bin,
@@ -76,7 +77,6 @@ pub enum Manager {
 }
 
 pub trait TezosAccount {
-    fn path(&self) -> &OwnedPath;
     fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
@@ -117,15 +117,14 @@ pub trait TezosAccount {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TezosOriginatedAccount {
-    pub(crate) path: OwnedPath,
     pub(crate) kt1: ContractKt1Hash,
+    /// The key of the account in the accounts keyspace. Every key of the
+    /// account starts with it. It must equal [`contracts::account_key`] of
+    /// the originated contract `kt1`.
+    pub(crate) key: Key,
 }
 
 impl TezosAccount for TezosOriginatedAccount {
-    #[inline]
-    fn path(&self) -> &OwnedPath {
-        &self.path
-    }
     fn contract(&self) -> Contract {
         Contract::Originated(self.kt1.clone())
     }
@@ -769,7 +768,10 @@ pub fn path_to_implicit_account_prefix(
     let address_path: Vec<u8> = format!("/tezosx/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-    Ok(concat(&context::TEZOS_ACCOUNTS_ROOT, &address_path)?)
+    Ok(concat(
+        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+        &address_path,
+    )?)
 }
 
 pub fn path_to_tezos_account(
@@ -819,14 +821,9 @@ pub fn set_tezos_account_info(
 
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
-    pub(crate) path: OwnedPath,
 }
 
 impl TezosAccount for TezosImplicitAccount {
-    fn path(&self) -> &OwnedPath {
-        &self.path
-    }
-
     fn contract(&self) -> Contract {
         Contract::Implicit(self.pkh.clone())
     }
@@ -1019,7 +1016,7 @@ mod tests {
 
     #[test]
     fn set_manager_public_key_reveals_manager() {
-        use super::{Manager, TezosImplicitAccount};
+        use super::Manager;
         use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
         use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -1030,11 +1027,7 @@ mod tests {
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .unwrap();
-        let path = super::path_to_tezos_account(&pkh).unwrap();
-        let account = TezosImplicitAccount {
-            pkh: pkh.clone(),
-            path,
-        };
+        let account = crate::context::implicit_from_public_key_hash(&pkh).unwrap();
 
         // Reveal records the public key as the account's manager. It writes no
         // `/origin` record — an implicit account is Native by construction.

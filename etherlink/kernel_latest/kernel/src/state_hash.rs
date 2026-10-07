@@ -18,7 +18,7 @@
 //!  || timestamp_le_bytes
 //! )
 //! evm_state_hash          = keccak256(h_keyspace(/evm/eth_accounts) || blueprint_hash)
-//! tez_accounts_state_hash = keccak256(h(/tez/tez_accounts) || blueprint_hash)
+//! tez_accounts_state_hash = keccak256(h_keyspace(/tez/tez_accounts) || blueprint_hash)
 //! ```
 //!
 //! The `u32`-length prefixes on each tx list disambiguate the boundary
@@ -46,24 +46,9 @@
 
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_smart_rollup_core::STORE_HASH_SIZE;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::block::AppliedOperation;
-
-use crate::chains::TEZOS_ACCOUNTS_ROOT;
-
-/// Sentinel returned by `safe_store_get_hash` when the input path is absent.
-const EMPTY_STORE_HASH: [u8; STORE_HASH_SIZE] = [b'0'; STORE_HASH_SIZE];
-
-fn safe_store_get_hash(host: &mut impl StorageV1, path: &impl Path) -> Vec<u8> {
-    match host.store_get_hash(path) {
-        Ok(hash) => hash.into(),
-        Err(_) => EMPTY_STORE_HASH.to_vec(),
-    }
-}
 
 /// Keccak256 over Michelson op hashes in execution order.
 pub fn michelson_ops_commitment(ops: &[AppliedOperation]) -> [u8; 32] {
@@ -115,30 +100,38 @@ pub fn evm_state_hash(
     runtime_state_hash(&eth_accounts.hash(), blueprint_hash)
 }
 
-/// Compute `keccak256(h(/tez/tez_accounts) || blueprint_hash)` and return
-/// it as a byte vector suitable for the Michelson block `state_root`.
-pub fn tez_accounts_state_hash<Host: StorageV1>(
-    host: &mut Host,
+/// Computes the [`TezBlock::state_root`] of a block, always 32 bytes long.
+///
+/// The value is `keccak256(tez_accounts.hash() || blueprint_hash)`.
+/// `tez_accounts` is the keyspace rooted at `/tez/tez_accounts`, and
+/// `blueprint_hash` is the result of [`blueprint_hash()`] for the same block.
+///
+/// [`TezBlock::state_root`]: tezos_tezlink::block::TezBlock::state_root
+pub fn tez_accounts_state_hash(
+    tez_accounts: &impl KeySpace,
     blueprint_hash: &[u8; 32],
 ) -> Vec<u8> {
-    runtime_state_hash(
-        &safe_store_get_hash(host, &TEZOS_ACCOUNTS_ROOT),
-        blueprint_hash,
-    )
+    runtime_state_hash(&tez_accounts.hash(), blueprint_hash)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
-    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
+    use tezos_evm_runtime::safe_storage::SafeStorage;
+    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::Key;
 
-    /// Durable root of the EVM accounts, spelled out rather than derived from
-    /// the keyspace name: the tests below pin the keyspace hash to the host
-    /// hash of this exact prefix, and a shared builder would let the two sides
-    /// move together unnoticed.
+    /// Durable root of the EVM accounts keyspace, spelled out and not derived
+    /// from the keyspace name. The tests below compare the keyspace hash with
+    /// the host hash of this exact path. With one builder for both sides, a
+    /// change to the builder moves both sides, and no test fails.
     const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/eth_accounts");
+    /// Durable root of the Tez accounts keyspace, spelled out for the same
+    /// reason as [`EVM_ACCOUNTS_PATH`].
+    const TEZ_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/tez/tez_accounts");
 
     fn fixture_inputs() -> (
         [TransactionHash; 2],
@@ -201,26 +194,24 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
 
-        // Write something distinct under each accounts path so the
-        // subtree hashes differ. An empty subtree maps to the same
-        // sentinel for both and would trivially match.
+        // Two empty roots hash the same, so each root gets its own value.
         rk.host_mut()
             .store_write_all(&EVM_ACCOUNTS_PATH, b"evm")
             .unwrap();
         rk.host_mut()
-            .store_write_all(&TEZOS_ACCOUNTS_ROOT, b"tez")
+            .store_write_all(&TEZ_ACCOUNTS_PATH, b"tez")
             .unwrap();
 
         let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
         let evm = evm_state_hash(rk.eth_accounts(), &bh);
-        let tez = tez_accounts_state_hash(rk.host_mut(), &bh);
+        let tez = tez_accounts_state_hash(rk.tez_accounts(), &bh);
 
         assert_ne!(evm, tez);
     }
 
-    /// The keyspace hashes the same subtree the raw host does, so moving the
-    /// root out of the mirror leaves `state_root` byte-identical. A drift here
-    /// would change every block's `state_root` at the upgrade.
+    /// Makes sure that the EVM keyspace hash equals the raw host hash of
+    /// `/evm/eth_accounts`. A difference changes the `state_root` of every
+    /// block.
     #[test]
     fn evm_hash_matches_the_durable_subtree_hash() {
         let (valid, delayed, michelson, ts) = fixture_inputs();
@@ -232,11 +223,48 @@ mod tests {
 
         let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
         let through_keyspace = evm_state_hash(rk.eth_accounts(), &bh);
-        let through_host = runtime_state_hash(
-            &safe_store_get_hash(rk.host_mut(), &EVM_ACCOUNTS_PATH),
-            &bh,
-        );
+        let raw = rk.host_mut().store_get_hash(&EVM_ACCOUNTS_PATH).unwrap();
+        let through_host = runtime_state_hash(&raw, &bh);
 
         assert_eq!(through_keyspace, through_host);
+    }
+
+    /// Makes sure that the Tez keyspace hash equals the raw host hash in the
+    /// `/tmp` copy (the temporary copy that a `SafeStorage` writes to).
+    ///
+    /// Both sides hash the `/tmp` copy, with the big-map writes that go
+    /// through the raw host. After `promote`, the live root keeps that hash.
+    /// The block computes `state_root` before `promote`, so a difference on
+    /// either side changes the `state_root`.
+    #[test]
+    fn tez_hash_matches_the_durable_root_hash_in_the_tmp_copy() {
+        let (valid, delayed, michelson, ts) = fixture_inputs();
+        let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
+        let mut host = MockKernelHost::default();
+        // `start` copies the root, so it has to exist.
+        host.store_write_all(&TEZ_ACCOUNTS_PATH, b"tez").unwrap();
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(TEZ_ACCOUNTS_PATH)],
+        };
+        safe.start().unwrap();
+
+        let through_tmp_copy = {
+            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
+            rk.tez_accounts_mut()
+                .set(&Key::from_static(b"/contracts/index/kt1"), b"contract")
+                .unwrap();
+            let big_map = RefPath::assert_from(b"/tez/tez_accounts/big_map/0/key");
+            rk.host_mut().store_write_all(&big_map, b"value").unwrap();
+
+            let through_keyspace = tez_accounts_state_hash(rk.tez_accounts(), &bh);
+            let raw = rk.host_mut().store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
+            assert_eq!(through_keyspace, runtime_state_hash(&raw, &bh));
+            through_keyspace
+        };
+
+        safe.promote().unwrap();
+        let live = host.store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
+        assert_eq!(through_tmp_copy, runtime_state_hash(&live, &bh));
     }
 }

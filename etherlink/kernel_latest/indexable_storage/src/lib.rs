@@ -12,7 +12,10 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_smart_rollup_storage::StorageError;
-use tezos_storage::{error::Error as GenStorageError, read_u64_le, write_u64_le};
+use tezos_storage::{
+    error::{Error as GenStorageError, StorageReadErrorKind},
+    read_u64_le, write_u64_le,
+};
 use thiserror::Error;
 
 const LENGTH: RefPath = RefPath::assert_from(b"/length");
@@ -56,9 +59,15 @@ pub enum IndexableStorageError {
     #[error("Internal invariant violation: {0}")]
     Internal(String),
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceError),
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]
-    KeySpaceKey(#[from] KeyError),
+    Key(#[from] KeyError),
+}
+
+impl From<KeySpaceError> for IndexableStorageError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -67,6 +76,7 @@ impl From<GenStorageError> for IndexableStorageError {
             GenStorageError::Path(e) => IndexableStorageError::Path(e),
             GenStorageError::Runtime(e) => IndexableStorageError::Runtime(e),
             GenStorageError::Storage(e) => IndexableStorageError::Storage(e),
+            GenStorageError::Key(e) => IndexableStorageError::Key(e),
             GenStorageError::KeySpace(e) => IndexableStorageError::KeySpace(e),
             GenStorageError::RlpDecoderError(e) => {
                 IndexableStorageError::RlpDecoderError(e)

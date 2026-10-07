@@ -1155,7 +1155,9 @@ impl RuntimeInterface for TezosRuntime {
             ))
         })?;
 
-        let world_state = OwnedPath::from(&context::TEZOS_ACCOUNTS_ROOT);
+        let world_state = OwnedPath::from(
+            &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
+        );
         journal
             .michelson
             .checkpoint(rk.host_mut(), &world_state)

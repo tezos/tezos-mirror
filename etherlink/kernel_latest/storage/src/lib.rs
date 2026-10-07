@@ -7,6 +7,7 @@
 
 pub mod error;
 pub mod helpers;
+pub mod keyspace;
 
 use crate::error::Error;
 
