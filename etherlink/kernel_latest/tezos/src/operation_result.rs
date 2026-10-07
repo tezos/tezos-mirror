@@ -9,12 +9,14 @@ use crate::operation::{
     ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
     OperationContent, OriginationContent, RevealContent, TransferContent,
 };
+use crate::protocol::TARGET_TEZOS_PROTOCOL;
 use mir::ast::Entrypoint;
 use mir::gas;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
 use primitive_types::U256;
+use std::borrow::Cow;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
@@ -441,11 +443,41 @@ fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
     document
 }
 
+// In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
+// we cannot use the rust binary json crate to produce compatible bson data because
+// this crate uses Float pointer instructions (which is incompatible with the PVM).
+// To avoid reimplementing full bson support, we restrict the encoding of errors
+// to flat bson objects whose fields are all strings.
+//
+// An error that has an L1 counterpart taking only string fields is encoded as L1
+// encodes it: `{ "kind": <kind>, "id": "proto.<protocol>.<id>", <fields> }`,
+// with the fields in the order L1 registers them. The node decodes such errors as
+// the corresponding protocol errors, and wallets and indexers recognise them.
+//
+// An error without such a counterpart is encoded as
+// `{ "kind": <kind>, "id": "proto.<protocol>.tezosx_internal.<id>",
+//    "error_message": <message> }`, where the kind is temporary unless
+// retrying cannot help.
+//
+// TODO: https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
+// Encode the Michelson script failures (`michelson_v1.script_rejected`, ...)
+// as L1 does, which needs non-string bson fields.
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorKind {
     Temporary,
     Branch,
     Permanent,
+}
+
+impl ErrorKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            ErrorKind::Temporary => "temporary",
+            ErrorKind::Branch => "branch",
+            ErrorKind::Permanent => "permanent",
+        }
+    }
 }
 
 /// The id of an error, without the `proto.<protocol>.` prefix.
@@ -508,6 +540,23 @@ impl L1Error {
 
     fn gas_exhausted() -> Self {
         Self::new(ErrorKind::Temporary, "gas_exhausted.operation", vec![])
+    }
+
+    fn to_bson(&self) -> Vec<u8> {
+        let prefix = TARGET_TEZOS_PROTOCOL.error_prefix();
+        let id = match self.id {
+            ErrorId::L1(id) => format!("proto.{prefix}.{id}"),
+            ErrorId::TezosxInternal(id) => {
+                format!("proto.{prefix}.tezosx_internal.{id}")
+            }
+        };
+        let mut elements: Vec<(&[u8], &[u8])> = Vec::with_capacity(2 + self.fields.len());
+        elements.push((b"kind", self.kind.as_str().as_bytes()));
+        elements.push((b"id", id.as_bytes()));
+        for (key, value) in &self.fields {
+            elements.push((key.as_bytes(), value.as_bytes()));
+        }
+        elements_to_bson(&elements)
     }
 }
 
@@ -674,6 +723,12 @@ impl TransferError {
             }
         }
     }
+
+    /// Number of bytes this error takes in a receipt, once wrapped in an
+    /// [ApplyOperationError::Transfer].
+    pub fn persisted_len(&self) -> usize {
+        persisted_len(&[Cow::Owned(self.to_l1_error().to_bson())])
+    }
 }
 
 impl OriginationError {
@@ -722,43 +777,106 @@ impl OriginationError {
     }
 }
 
-// In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
-// we cannot use the rust binary json crate to produce compatible bson data because
-// this crate uses Float pointer instructions (which is incompatible with the PVM).
-// To avoid reimplementing full bson support, we restrict the encoding of errors
-// to a single bson structure. This gives us error which can be decoded using
-// Tezos data encoding but with less possibilities than what Tezos L1 produces.
-// For compatibility with the TzKT indexer, we need to produce a BSON object with
-// an "id" field (see https://github.com/baking-bad/tzkt/blob/master/Tzkt.Sync/Protocols/Helpers/OperationErrors.cs).
-// We use the following structure:
-// { "kind": "permanent", "id": "tezlink_error", "error_message": "<error>" }
-// This is a temporary solution while waiting for better error support.
-// TODO https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
-impl BinWriter for ApplyOperationError {
-    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        tezos_enc::dynamic(|error: &ApplyOperationError, out: &mut Vec<u8>| {
-            match *error {
-                ApplyOperationError::PastError(ref bytes) => {
-                    tezos_enc::bytes(bytes, out)?
-                }
-                _ => {
-                    let str_error = format!("{error:?}");
-                    let encoded_str_error = str_error.as_bytes();
-                    let bson = elements_to_bson(&[
-                        (b"kind", b"permanent"),
-                        (b"id", b"tezlink_error"),
-                        (b"error_message", encoded_str_error),
-                    ]);
-                    tezos_enc::bytes(bson, out)?;
-                }
+impl ApplyOperationError {
+    /// The bson objects this error is encoded as. Most errors are encoded as
+    /// one object, but, as on L1, failing to pay a storage fee is reported
+    /// with the cause.
+    fn bson_objects(&self) -> Vec<Cow<'_, [u8]>> {
+        let l1_errors = match self {
+            ApplyOperationError::PastError(bytes) => return vec![Cow::Borrowed(bytes)],
+            ApplyOperationError::Reveal(error) => vec![error.to_l1_error()],
+            ApplyOperationError::Transfer(error) => vec![error.to_l1_error()],
+            ApplyOperationError::Origination(error) => vec![error.to_l1_error()],
+            ApplyOperationError::CannotPayStorageFee(error) => vec![
+                L1Error::new(
+                    ErrorKind::Temporary,
+                    "contract.cannot_pay_storage_fee",
+                    vec![],
+                ),
+                L1Error::balance_too_low(error),
+            ],
+            ApplyOperationError::OperationQuotaExceeded => vec![L1Error::new(
+                ErrorKind::Temporary,
+                "storage_exhausted.operation",
+                vec![],
+            )],
+            ApplyOperationError::OutOfGas(_) => vec![L1Error::gas_exhausted()],
+            ApplyOperationError::UnSupportedEmit(_) => vec![L1Error::tezosx_internal(
+                ErrorKind::Permanent,
+                "unsupported_emit",
+                self,
+            )],
+            ApplyOperationError::EmitMichelineSerializationError(_) => {
+                vec![L1Error::tezosx_internal(
+                    ErrorKind::Permanent,
+                    "emit_micheline_serialization_error",
+                    self,
+                )]
             }
-            Ok(())
-        })(self, output)
+            ApplyOperationError::UnSupportedSetDelegate(_) => {
+                vec![L1Error::tezosx_internal(
+                    ErrorKind::Permanent,
+                    "unsupported_set_delegate",
+                    self,
+                )]
+            }
+            ApplyOperationError::InternalOperationNonceOverflow(_) => {
+                vec![L1Error::tezosx_internal(
+                    ErrorKind::Permanent,
+                    "internal_operation_nonce_overflow",
+                    self,
+                )]
+            }
+            ApplyOperationError::InternalOperationReplay => {
+                vec![L1Error::tezosx_internal(
+                    ErrorKind::Permanent,
+                    "internal_operation_replay",
+                    self,
+                )]
+            }
+            ApplyOperationError::BlockAbort(_) => vec![L1Error::tezosx_internal(
+                ErrorKind::Temporary,
+                "block_abort",
+                self,
+            )],
+        };
+        l1_errors
+            .iter()
+            .map(|error| Cow::Owned(error.to_bson()))
+            .collect()
+    }
+
+    /// Number of bytes this error takes in a receipt.
+    pub fn persisted_len(&self) -> usize {
+        persisted_len(&self.bson_objects())
     }
 }
 
-// As we're encoding the OperationError with a single String, the NomReader function is broken.
-// For now, we decode them as a PastError with the raw bytes.
+/// Size of the prefix giving the length of each bson object.
+const BSON_OBJECT_SIZE_PREFIX_LEN: usize = 4;
+
+fn persisted_len(objects: &[Cow<'_, [u8]>]) -> usize {
+    objects
+        .iter()
+        .map(|object| BSON_OBJECT_SIZE_PREFIX_LEN + object.len())
+        .sum()
+}
+
+// An [ApplyOperationError] is written as one or several elements of the list
+// of errors: each bson object is an element.
+impl BinWriter for ApplyOperationError {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        for object in self.bson_objects() {
+            tezos_enc::dynamic(|object: &[u8], out: &mut Vec<u8>| {
+                tezos_enc::bytes(object, out)
+            })(&object, output)?;
+        }
+        Ok(())
+    }
+}
+
+// Errors are not decoded: each bson object is kept as a PastError with its raw
+// bytes, which re-encodes it identically.
 impl NomReader<'_> for ApplyOperationError {
     fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
         tezos_nom::dynamic(|bytes| {
@@ -1951,6 +2069,250 @@ mod tests {
             "backtracked",
         );
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    fn tz1(b58: &str) -> Contract {
+        Contract::from_b58check(b58).unwrap()
+    }
+
+    fn encode_error(error: &ApplyOperationError) -> Vec<u8> {
+        let mut output = vec![];
+        error
+            .bin_write(&mut output)
+            .expect("Operation error should be encodable");
+        output
+    }
+
+    /// The bson object of `{kind, id, fields}`, prefixed by its size, as the
+    /// node expects one error of a list.
+    fn expected_object(kind: &str, id: &str, fields: &[(&str, &str)]) -> Vec<u8> {
+        let id = format!("proto.025-PsUshuai.{id}");
+        let mut elements: Vec<(&[u8], &[u8])> =
+            vec![(b"kind", kind.as_bytes()), (b"id", id.as_bytes())];
+        for (key, value) in fields {
+            elements.push((key.as_bytes(), value.as_bytes()));
+        }
+        let bson = elements_to_bson(&elements);
+        let mut out = (bson.len() as u32).to_be_bytes().to_vec();
+        out.extend_from_slice(&bson);
+        out
+    }
+
+    #[test]
+    fn balance_too_low_is_encoded_as_on_l1() {
+        let error =
+            ApplyOperationError::Transfer(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: tz1("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
+                balance: 10_u64.into(),
+                amount: 21_u64.into(),
+            }));
+        let encoded = encode_error(&error);
+        assert_eq!(
+            encoded,
+            expected_object(
+                "temporary",
+                "contract.balance_too_low",
+                &[
+                    ("contract", "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
+                    ("balance", "10"),
+                    ("amount", "21"),
+                ],
+            )
+        );
+        assert_eq!(error.persisted_len(), encoded.len());
+    }
+
+    #[test]
+    fn cannot_pay_storage_fee_is_encoded_with_its_cause() {
+        let error = ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
+            contract: tz1("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
+            balance: 10_u64.into(),
+            amount: 21_u64.into(),
+        });
+        let encoded = encode_error(&error);
+        let mut expected =
+            expected_object("temporary", "contract.cannot_pay_storage_fee", &[]);
+        expected.extend(expected_object(
+            "temporary",
+            "contract.balance_too_low",
+            &[
+                ("contract", "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"),
+                ("balance", "10"),
+                ("amount", "21"),
+            ],
+        ));
+        assert_eq!(encoded, expected);
+        assert_eq!(error.persisted_len(), encoded.len());
+
+        // Read back, each object is one error, re-encoded identically.
+        let errors = ApplyOperationErrors::from(error);
+        let mut bytes = vec![];
+        errors.bin_write(&mut bytes).unwrap();
+        let (remaining, decoded) = ApplyOperationErrors::nom_read(&bytes).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(decoded.errors.len(), 2);
+        assert!(decoded
+            .errors
+            .iter()
+            .all(|e| matches!(e, ApplyOperationError::PastError(_))));
+        let mut reencoded = vec![];
+        decoded.bin_write(&mut reencoded).unwrap();
+        assert_eq!(reencoded, bytes);
+    }
+
+    #[test]
+    fn out_of_gas_is_encoded_as_on_l1() {
+        let expected = expected_object("temporary", "gas_exhausted.operation", &[]);
+        for error in [
+            ApplyOperationError::OutOfGas(gas::OutOfGas),
+            ApplyOperationError::Transfer(TransferError::OutOfGas(gas::OutOfGas)),
+            ApplyOperationError::Origination(OriginationError::OutOfGas(gas::OutOfGas)),
+            ApplyOperationError::Reveal(RevealError::OutOfGas),
+        ] {
+            assert_eq!(encode_error(&error), expected, "{error:?}");
+        }
+        assert_eq!(
+            encode_error(&ApplyOperationError::OperationQuotaExceeded),
+            expected_object("temporary", "storage_exhausted.operation", &[])
+        );
+    }
+
+    #[test]
+    fn errors_with_l1_counterparts_carry_their_fields() {
+        let source = tz1("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx");
+        let public_key = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .unwrap();
+        let expected_hash =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let computed_hash =
+            PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap();
+        // (error, kind, id, fields)
+        type Case<'a> = (
+            ApplyOperationError,
+            &'a str,
+            &'a str,
+            Vec<(&'a str, String)>,
+        );
+        let cases: Vec<Case> = vec![
+            (
+                RevealError::PreviouslyRevealedKey(source.clone()).into(),
+                "branch",
+                "contract.previously_revealed_key",
+                vec![("contract", source.to_string())],
+            ),
+            (
+                RevealError::InconsistentPublicKey {
+                    public_key: public_key.clone(),
+                    expected_hash: expected_hash.clone(),
+                    computed_hash: computed_hash.clone(),
+                }
+                .into(),
+                "permanent",
+                "contract.manager.inconsistent_hash",
+                vec![
+                    ("public_key", public_key.to_b58check()),
+                    ("expected_hash", expected_hash.to_b58check()),
+                    ("provided_hash", computed_hash.to_b58check()),
+                ],
+            ),
+            (
+                RevealError::InconsistentHash {
+                    public_key: public_key.clone(),
+                    expected_hash: expected_hash.clone(),
+                    source_hash: computed_hash.clone(),
+                }
+                .into(),
+                "permanent",
+                "contract.manager.inconsistent_hash",
+                vec![
+                    ("public_key", public_key.to_b58check()),
+                    ("expected_hash", expected_hash.to_b58check()),
+                    ("provided_hash", computed_hash.to_b58check()),
+                ],
+            ),
+            (
+                TransferError::EmptyImplicitTransfer(source.clone()).into(),
+                "branch",
+                "contract.empty_transaction",
+                vec![("contract", source.to_string())],
+            ),
+            (
+                TransferError::ContractDoesNotExist(source.clone()).into(),
+                "temporary",
+                "contract.non_existing_contract",
+                vec![("contract", source.to_string())],
+            ),
+            (
+                TransferError::BadContractParameter(source.clone()).into(),
+                "permanent",
+                "michelson_v1.bad_contract_parameter",
+                vec![("contract", source.to_string())],
+            ),
+            (
+                TransferError::NoSuchEntrypoint(Entrypoint::try_from("foo").unwrap())
+                    .into(),
+                "permanent",
+                "michelson_v1.no_such_entrypoint",
+                vec![("entrypoint", "foo".to_string())],
+            ),
+            (
+                OriginationError::BalanceTooLow(BalanceTooLow {
+                    contract: source.clone(),
+                    balance: 1_u64.into(),
+                    amount: 2_u64.into(),
+                })
+                .into(),
+                "temporary",
+                "contract.balance_too_low",
+                vec![
+                    ("contract", source.to_string()),
+                    ("balance", "1".to_string()),
+                    ("amount", "2".to_string()),
+                ],
+            ),
+        ];
+        for (error, kind, id, fields) in cases {
+            let fields: Vec<(&str, &str)> =
+                fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            let encoded = encode_error(&error);
+            assert_eq!(encoded, expected_object(kind, id, &fields), "{error:?}");
+            assert_eq!(error.persisted_len(), encoded.len(), "{error:?}");
+        }
+    }
+
+    #[test]
+    fn errors_without_l1_counterpart_carry_their_message() {
+        let interpret_error = TransferError::MichelsonContractInterpretError(
+            "failed with: Nat(1)".to_string(),
+        );
+        let error = ApplyOperationError::Transfer(interpret_error.clone());
+        let encoded = encode_error(&error);
+        assert_eq!(
+            encoded,
+            expected_object(
+                "temporary",
+                "tezosx_internal.transfer.michelson_contract_interpret_error",
+                &[(
+                    "error_message",
+                    "Failed interpreting the Michelson contract with failed with: Nat(1)"
+                )],
+            )
+        );
+        assert_eq!(error.persisted_len(), encoded.len());
+        assert_eq!(interpret_error.persisted_len(), encoded.len());
+        // Pins the size, which the persisted-error gas is charged on.
+        assert_eq!(encoded.len(), 203);
+
+        assert_eq!(
+            encode_error(&ApplyOperationError::InternalOperationReplay),
+            expected_object(
+                "permanent",
+                "tezosx_internal.internal_operation_replay",
+                &[("error_message", "Internal operation replay attempt")],
+            )
+        );
     }
 
     #[test]
