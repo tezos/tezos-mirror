@@ -115,7 +115,7 @@ pub enum RevealError {
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, BinWriter, NomReader)]
-#[error("{contract:?} cannot spend {amount:?} as its balance is {balance:?}")]
+#[error("Balance of contract {contract} too low ({}) to spend {}", .balance.0, .amount.0)]
 pub struct BalanceTooLow {
     pub contract: Contract,
     pub balance: Narith,
@@ -126,7 +126,7 @@ pub struct BalanceTooLow {
 pub enum TransferError {
     #[error(transparent)]
     BalanceTooLow(BalanceTooLow),
-    #[error("{0:?} is unspendable")]
+    #[error("{0} is unspendable")]
     UnspendableContract(Contract),
     #[error("Called a non-smart contract with parameter")]
     NonSmartContractExecutionCall,
