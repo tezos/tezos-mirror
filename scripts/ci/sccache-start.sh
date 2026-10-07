@@ -18,6 +18,16 @@ if ! command -v sccache > /dev/null; then
   exit 1
 fi
 
+# Authenticate to GCS backend on protected branches
+if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
+  echo "### Authenticating to protected GCS bucket..."
+  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
+  gcloud auth activate-service-account --key-file=protected_sa.json
+  GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+  export GOOGLE_OAUTH_ACCESS_TOKEN
+  rm -f protected_sa.json
+fi
+
 max_attempts=${1:-4}
 attempts="$max_attempts"
 
@@ -33,16 +43,6 @@ done
 if [ "${attempts}" = 0 ]; then
   echo "Could not start sccache after ${max_attempts}, running without sccache."
   export RUSTC_WRAPPER=""
-fi
-
-# Authenticate to GCS backend on protected branches
-if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
-  echo "### Authenticating to protected GCS bucket..."
-  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
-  gcloud auth activate-service-account --key-file=protected_sa.json
-  GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
-  export GOOGLE_OAUTH_ACCESS_TOKEN
-  rm -f protected_sa.json
 fi
 
 echo "GCS sccache bucket: ${GCP_SCCACHE_BUCKET:-unset}"
