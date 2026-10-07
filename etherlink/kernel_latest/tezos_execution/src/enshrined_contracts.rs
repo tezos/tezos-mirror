@@ -5258,8 +5258,9 @@ pub(crate) mod tests {
                 .unwrap();
         let user_facing: Vec<TransferError> = vec![
             TransferError::OutOfGas(OutOfGas),
-            TransferError::EmptyImplicitTransfer,
-            TransferError::NonSmartContractExecutionCall,
+            TransferError::EmptyImplicitTransfer(Contract::Originated(kt1.clone())),
+            TransferError::NoSuchEntrypoint(mir::ast::Entrypoint::default()),
+            TransferError::BadContractParameter(Contract::Originated(kt1.clone())),
             TransferError::MirAddressUnsupportedError,
             TransferError::ContractDoesNotExist(Contract::Originated(kt1)),
         ];

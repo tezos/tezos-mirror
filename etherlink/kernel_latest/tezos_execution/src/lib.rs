@@ -467,19 +467,31 @@ where
         .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
-        Manager::Revealed(pk) => return Err(RevealError::PreviouslyRevealedKey(pk)),
+        Manager::Revealed(_) => {
+            return Err(RevealError::PreviouslyRevealedKey(Contract::Implicit(
+                source_account.pkh().clone(),
+            )))
+        }
         Manager::NotRevealed(pkh) => pkh,
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
     if &expected_hash != source_account.pkh() {
-        return Err(RevealError::InconsistentHash(expected_hash));
+        return Err(RevealError::InconsistentHash {
+            public_key: public_key.clone(),
+            expected_hash,
+            source_hash: source_account.pkh().clone(),
+        });
     }
 
     // Check the public key
     let pkh_from_pk = public_key.pk_hash();
     if expected_hash != pkh_from_pk {
-        return Err(RevealError::InconsistentPublicKey(expected_hash));
+        return Err(RevealError::InconsistentPublicKey {
+            public_key: public_key.clone(),
+            expected_hash,
+            computed_hash: pkh_from_pk,
+        });
     }
 
     // Set the public key as the manager
@@ -1474,12 +1486,20 @@ where
             // could execute code or touch another root (non-default entrypoint /
             // non-Unit parameter). Do not relax it without revisiting that
             // classifier.
-            if param != Micheline::from(()) || !entrypoint.is_default() {
-                return Err(TransferError::NonSmartContractExecutionCall.into());
+            if !entrypoint.is_default() {
+                return Err(TransferError::NoSuchEntrypoint(entrypoint.clone()).into());
+            }
+            if param != Micheline::from(()) {
+                return Err(TransferError::BadContractParameter(
+                    sender_account.contract(),
+                )
+                .into());
             }
             // Transfers of 0 tez to an implicit contract are rejected.
             if amount.eq(&0_u64.into()) {
-                return Err(TransferError::EmptyImplicitTransfer.into());
+                return Err(
+                    TransferError::EmptyImplicitTransfer(dest_contract.clone()).into()
+                );
             };
 
             let dest_account = context::implicit_from_public_key_hash(pkh)
@@ -2674,7 +2694,10 @@ where
         &smart_contract,
         &initial_balance.0,
     )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    .map_err(|err| match err {
+        TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
+        _ => OriginationError::FailedToApplyBalanceUpdate,
+    })?;
 
     // Record the classification of the new contract. Origination is the only
     // writer of the origin path for a freshly created KT1, so write it
@@ -4472,7 +4495,7 @@ mod tests {
             receipt: OperationResultSum::Reveal(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
                         changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -4483,7 +4506,11 @@ mod tests {
                     },
                 ],
                 result: ContentResult::Failed(
-                    vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
+                    vec![RevealError::PreviouslyRevealedKey(Contract::Implicit(
+                        source.pkh,
+                    ))
+                    .into()]
+                    .into(),
                 ),
                 internal_operation_results: vec![],
             }),
@@ -6022,7 +6049,7 @@ mod tests {
             receipt: OperationResultSum::Transfer(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
                         changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -6034,7 +6061,7 @@ mod tests {
                 ],
                 result: ContentResult::Failed(
                     vec![ApplyOperationError::Transfer(
-                        TransferError::NonSmartContractExecutionCall,
+                        TransferError::BadContractParameter(Contract::Implicit(src.pkh)),
                     )]
                     .into(),
                 ),
@@ -6108,7 +6135,10 @@ mod tests {
                 ],
                 result: ContentResult::Failed(
                     vec![ApplyOperationError::Transfer(
-                        TransferError::NonSmartContractExecutionCall,
+                        TransferError::NoSuchEntrypoint(
+                            mir::ast::Entrypoint::try_from("non_default")
+                                .expect("Entrypoint should be valid"),
+                        ),
                     )]
                     .into(),
                 ),
@@ -9475,7 +9505,11 @@ mod tests {
                     ],
                     result: ContentResult::Failed(
                         ApplyOperationError::Origination(
-                            OriginationError::FailedToApplyBalanceUpdate,
+                            OriginationError::BalanceTooLow(BalanceTooLow {
+                                contract: Contract::Implicit(src.pkh.clone()),
+                                balance: 399_366_u64.into(),
+                                amount: 999_999_u64.into(),
+                            }),
                         )
                         .into(),
                     ),
@@ -9788,7 +9822,7 @@ mod tests {
             5,
             src.clone(),
             0.into(),
-            Contract::Implicit(dst.pkh),
+            Contract::Implicit(dst.pkh.clone()),
             Parameters::default(),
         );
         let receipts1 = ProcessedOperation::into_receipts(
@@ -9817,8 +9851,8 @@ mod tests {
             }) if errors.len() == 1 && matches!(
                 &errors[0],
                 ApplyOperationError::Transfer(
-                    TransferError::EmptyImplicitTransfer
-                )
+                    TransferError::EmptyImplicitTransfer(contract)
+                ) if *contract == Contract::Implicit(dst.pkh.clone())
             )
         ), "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}", receipts1[0]);
 
@@ -9921,8 +9955,8 @@ mod tests {
                         if errors.len() == 1 && matches!(
                             &errors[0],
                             ApplyOperationError::Transfer(
-                                TransferError::EmptyImplicitTransfer
-                            )
+                                TransferError::EmptyImplicitTransfer(contract)
+                            ) if *contract == Contract::Implicit(src.pkh.clone())
                         )
                 )
             ),

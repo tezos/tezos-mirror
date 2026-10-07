@@ -1908,7 +1908,7 @@ pub(crate) mod tests {
             if let OperationResultSum::Transfer(ref mut result) = op.receipt {
                 result.result = ContentResult::Failed(ApplyOperationErrors::from(
                     ApplyOperationError::Transfer(
-                        TransferError::NonSmartContractExecutionCall,
+                        TransferError::MirAddressUnsupportedError,
                     ),
                 ));
             }
