@@ -32,8 +32,6 @@ if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
   umask 022
   export SCCACHE_GCS_KEY_PATH
   gcloud auth activate-service-account --key-file="$SCCACHE_GCS_KEY_PATH"
-  GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
-  export GOOGLE_OAUTH_ACCESS_TOKEN
 fi
 
 max_attempts=${1:-4}
