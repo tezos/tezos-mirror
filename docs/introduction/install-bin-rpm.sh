@@ -3,8 +3,6 @@
 distroname=$1
 release=$2
 
-bucket="$GCP_LINUX_PACKAGES_BUCKET"
-
 . scripts/ci/octez-packages-version.sh
 
 # include apt-get function with retry
@@ -53,6 +51,11 @@ if [ "$RELEASETYPE" = "Master" ]; then
   dnf_retry -y update
 
 else
+  # Test publications live in the bucket of the ref: see
+  # scripts/ci/packages_bucket.inc.sh.
+  . scripts/ci/packages_bucket.inc.sh
+  bucket="$PACKAGES_BUCKET"
+
   # Update and install the config-mananger plugin
   dnf_retry -y update
   dnf_retry -y install dnf-plugins-core

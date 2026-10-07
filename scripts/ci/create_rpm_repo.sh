@@ -6,7 +6,7 @@
 
 # expected env vars
 # - ARCHITECTURES
-# - GCP_LINUX_PACKAGES_BUCKET
+# - GCP_LINUX_PACKAGES_BUCKET_UNPROTECTED / _PROTECTED (see scripts/ci/packages_bucket.inc.sh)
 
 # Env vars set by scripts/ci/repository-keys.sh
 # - GPG_DUAL_SIGNING
@@ -47,9 +47,8 @@ shift
 # E.g. '39', '9'
 RELEASES=$*
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+. scripts/ci/packages_bucket.inc.sh
+BUCKET="$PACKAGES_BUCKET"
 
 oldPWD=$PWD
 
