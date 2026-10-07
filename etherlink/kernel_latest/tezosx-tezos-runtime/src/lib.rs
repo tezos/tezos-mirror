@@ -3002,6 +3002,72 @@ mod tests {
         );
     }
 
+    /// A call whose target runs out of gas in MIR is the caller's budget
+    /// problem: it surfaces as the catchable 429 with the `OOG` body, like
+    /// any other gas exhaustion, not as a 400 carrying the interpreter
+    /// message.
+    #[test]
+    fn serve_mir_out_of_gas_is_429() {
+        use crate::headers::{
+            X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+            X_TEZOS_TIMESTAMP,
+        };
+        use mir::ast::micheline::Micheline;
+        use tezos_crypto_rs::blake2b::digest_160;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+
+        const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
+        const GAS_LIMIT: u64 = 100_000_000;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = test_rk(&mut host);
+        let runtime = test_runtime();
+        let registry = NotWiredRegistry;
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let parser = mir::parser::Parser::new();
+        let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-2069-mir-out-of-gas"));
+        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        // Loops until the budget is exhausted.
+        let script = parser
+            .parse_top_level(
+                r#"parameter unit; storage unit;
+                   code { DROP; PUSH bool True; LOOP { PUSH bool True };
+                          UNIT; NIL operation; PAIR }"#,
+            )
+            .unwrap();
+        dest.init(
+            rk.host_mut(),
+            Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
+            &Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            0.into(),
+        )
+        .unwrap();
+
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("http://tezos/{}", dest_kt1.to_base58_check()))
+            .header(X_TEZOS_AMOUNT, "0")
+            .header(X_TEZOS_GAS_LIMIT, GAS_LIMIT.to_string())
+            .header(X_TEZOS_TIMESTAMP, "1000000")
+            .header(X_TEZOS_BLOCK_NUMBER, "1")
+            .header(X_TEZOS_SENDER, SENDER_KT1)
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut rk, &mut journal, request);
+
+        assert_eq!(
+            resp.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "body: {}",
+            String::from_utf8_lossy(resp.body())
+        );
+        assert_eq!(resp.body().as_slice(), b"OOG");
+    }
+
     // A view that fails after metering must report the gas it metered,
     // not zero.
     #[test]

@@ -305,6 +305,11 @@ impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
         {
             return Self::AddressRegistryAbort(inner.to_string());
         }
+        // Running out of gas is reported as such, like on L1, rather than
+        // folded into the interpretation-failure string.
+        if err.is_out_of_gas() {
+            return Self::OutOfGas(gas::OutOfGas);
+        }
         Self::MichelsonContractInterpretError(mir::bounded_fmt::display_bounded(
             &err,
             mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
@@ -321,6 +326,9 @@ impl From<mir::typechecker::TcError> for TransferError {
         // such a type is gas-bounded (the typechecker's `DUP` walks the
         // unfolded type), so the render is `O(gas)` rather than unbounded, but
         // that ceiling is still large enough to cap here.
+        if err.is_out_of_gas() {
+            return Self::OutOfGas(gas::OutOfGas);
+        }
         Self::MirTypecheckingError(mir::bounded_fmt::display_bounded(
             &err,
             mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
@@ -1643,6 +1651,79 @@ mod tests {
             "backtracked",
         );
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn mir_out_of_gas_is_reported_as_out_of_gas() {
+        use mir::ast::big_map::LazyStorageError;
+        use mir::interpreter::{ContractInterpretError, InterpretError};
+        use mir::typechecker::TcError;
+        assert_eq!(
+            TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::OutOfGas
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(ContractInterpretError::TcError(TcError::OutOfGas(
+                gas::OutOfGas
+            ))),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(TcError::OutOfGas(gas::OutOfGas)),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(ContractInterpretError::LazyStorageError(
+                LazyStorageError::OutOfGasError(gas::OutOfGas)
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::LazyStorageError(LazyStorageError::OutOfGasError(
+                    gas::OutOfGas
+                ))
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        // Running out of gas while comparing values, e.g. with COMPARE.
+        assert_eq!(
+            TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::CompareError(mir::gas::CompareError::OutOfGas(
+                    gas::OutOfGas
+                ))
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        // Running out of gas while typechecking during interpretation, e.g.
+        // with UNPACK or CONTRACT.
+        assert_eq!(
+            TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::TcError(TcError::OutOfGas(gas::OutOfGas))
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(TcError::CompareError(mir::gas::CompareError::OutOfGas(
+                gas::OutOfGas
+            ))),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        assert_eq!(
+            TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::CostOverflow(mir::gas::CostOverflow)
+            )),
+            TransferError::OutOfGas(gas::OutOfGas)
+        );
+        // Comparing incomparable values is a type failure.
+        assert!(matches!(
+            TransferError::from(TcError::CompareError(
+                mir::gas::CompareError::Incomparable
+            )),
+            TransferError::MirTypecheckingError(_)
+        ));
     }
 
     #[test]

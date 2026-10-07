@@ -2463,6 +2463,19 @@ fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
     )
 }
 
+/// Typechecking failure of an originated script, part `what` of it. Running
+/// out of gas is reported as such, like on L1.
+fn origination_tc_error(what: &str, e: &mir::typechecker::TcError) -> OriginationError {
+    if e.is_out_of_gas() {
+        OriginationError::OutOfGas(mir::gas::OutOfGas)
+    } else {
+        OriginationError::MirTypecheckingError(format!(
+            "{what} : {}",
+            bounded_tc_error(e)
+        ))
+    }
+}
+
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
 pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
@@ -2483,19 +2496,9 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
         .split_script()
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Splitting script : {}",
-                bounded_tc_error(&e)
-            ))
-        })?
+        .map_err(|e| origination_tc_error("Splitting script", &e))?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Script : {}",
-                bounded_tc_error(&e)
-            ))
-        })?;
+        .map_err(|e| origination_tc_error("Script", &e))?;
     let storage_micheline =
         Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
             .map_err(OriginationError::from)?
@@ -2515,12 +2518,7 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
             TypecheckViews::Enabled,
             AllowForgedLazyStorageId::No,
         )
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Storage : {}",
-                bounded_tc_error(&e)
-            ))
-        })
+        .map_err(|e| origination_tc_error("Storage", &e))
 }
 
 /// Dump the initial storage's big maps and serialize it.
