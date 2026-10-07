@@ -441,6 +441,287 @@ fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
     document
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorKind {
+    Temporary,
+    Branch,
+    Permanent,
+}
+
+/// The id of an error, without the `proto.<protocol>.` prefix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorId {
+    /// The id of an L1 error.
+    L1(&'static str),
+    /// The id of an error without L1 counterpart, under `tezosx_internal.`,
+    /// which is not a stable API.
+    TezosxInternal(&'static str),
+}
+
+/// An error in the shape L1 encodes it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct L1Error {
+    pub kind: ErrorKind,
+    pub id: ErrorId,
+    /// The fields, in the order L1 encodes them.
+    pub fields: Vec<(&'static str, String)>,
+}
+
+impl L1Error {
+    fn new(
+        kind: ErrorKind,
+        id: &'static str,
+        fields: Vec<(&'static str, String)>,
+    ) -> Self {
+        Self {
+            kind,
+            id: ErrorId::L1(id),
+            fields,
+        }
+    }
+
+    /// An error without L1 counterpart, of `kind`: temporary unless retrying
+    /// cannot help, as for its closest L1 counterparts.
+    fn tezosx_internal(
+        kind: ErrorKind,
+        id: &'static str,
+        error: &impl std::fmt::Display,
+    ) -> Self {
+        Self {
+            kind,
+            id: ErrorId::TezosxInternal(id),
+            fields: vec![("error_message", error.to_string())],
+        }
+    }
+
+    fn balance_too_low(error: &BalanceTooLow) -> Self {
+        Self::new(
+            ErrorKind::Temporary,
+            "contract.balance_too_low",
+            vec![
+                ("contract", error.contract.to_string()),
+                ("balance", error.balance.0.to_string()),
+                ("amount", error.amount.0.to_string()),
+            ],
+        )
+    }
+
+    fn gas_exhausted() -> Self {
+        Self::new(ErrorKind::Temporary, "gas_exhausted.operation", vec![])
+    }
+}
+
+impl RevealError {
+    pub fn to_l1_error(&self) -> L1Error {
+        use ErrorKind::*;
+        match self {
+            RevealError::PreviouslyRevealedKey(contract) => L1Error::new(
+                Branch,
+                "contract.previously_revealed_key",
+                vec![("contract", contract.to_string())],
+            ),
+            RevealError::InconsistentPublicKey {
+                public_key,
+                expected_hash,
+                computed_hash,
+            } => L1Error::new(
+                Permanent,
+                "contract.manager.inconsistent_hash",
+                vec![
+                    ("public_key", public_key.to_string()),
+                    ("expected_hash", expected_hash.to_string()),
+                    ("provided_hash", computed_hash.to_string()),
+                ],
+            ),
+            RevealError::OutOfGas => L1Error::gas_exhausted(),
+            RevealError::InconsistentHash {
+                public_key,
+                expected_hash,
+                source_hash,
+            } => L1Error::new(
+                Permanent,
+                "contract.manager.inconsistent_hash",
+                vec![
+                    ("public_key", public_key.to_string()),
+                    ("expected_hash", expected_hash.to_string()),
+                    ("provided_hash", source_hash.to_string()),
+                ],
+            ),
+            RevealError::UnretrievableManager => L1Error::tezosx_internal(
+                ErrorKind::Temporary,
+                "reveal.unretrievable_manager",
+                self,
+            ),
+            RevealError::FailedToWriteManager => L1Error::tezosx_internal(
+                ErrorKind::Temporary,
+                "reveal.failed_to_write_manager",
+                self,
+            ),
+        }
+    }
+}
+
+impl TransferError {
+    pub fn to_l1_error(&self) -> L1Error {
+        use ErrorKind::*;
+        let fallback = |kind, id| L1Error::tezosx_internal(kind, id, self);
+        match self {
+            TransferError::BalanceTooLow(error) => L1Error::balance_too_low(error),
+            TransferError::NoSuchEntrypoint(entrypoint) => L1Error::new(
+                Permanent,
+                "michelson_v1.no_such_entrypoint",
+                vec![("entrypoint", entrypoint.to_string())],
+            ),
+            TransferError::BadContractParameter(contract) => L1Error::new(
+                Permanent,
+                "michelson_v1.bad_contract_parameter",
+                vec![("contract", contract.to_string())],
+            ),
+            TransferError::EmptyImplicitTransfer(contract) => L1Error::new(
+                Branch,
+                "contract.empty_transaction",
+                vec![("contract", contract.to_string())],
+            ),
+            TransferError::ContractDoesNotExist(contract) => L1Error::new(
+                Temporary,
+                "contract.non_existing_contract",
+                vec![("contract", contract.to_string())],
+            ),
+            TransferError::OutOfGas(_) => L1Error::gas_exhausted(),
+            TransferError::UnspendableContract(_) => {
+                fallback(ErrorKind::Permanent, "transfer.unspendable_contract")
+            }
+            TransferError::MichelineSerializationError(_) => fallback(
+                ErrorKind::Permanent,
+                "transfer.micheline_serialization_error",
+            ),
+            TransferError::MichelsonContractInterpretError(_) => fallback(
+                ErrorKind::Temporary,
+                "transfer.michelson_contract_interpret_error",
+            ),
+            TransferError::MirTypecheckingError(_) => {
+                fallback(ErrorKind::Permanent, "transfer.mir_typechecking_error")
+            }
+            TransferError::FailedToAllocateDestination => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_allocate_destination",
+            ),
+            TransferError::FailedToComputeBalanceUpdate(_) => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_compute_balance_update",
+            ),
+            TransferError::FailedToApplyBalanceChanges => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_apply_balance_changes",
+            ),
+            TransferError::FailedToFetchDestinationAccount => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_fetch_destination_account",
+            ),
+            TransferError::FailedToFetchContractCode => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_fetch_contract_code",
+            ),
+            TransferError::FailedToFetchContractStorage => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_fetch_contract_storage",
+            ),
+            TransferError::FailedToFetchDestinationBalance => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_fetch_destination_balance",
+            ),
+            TransferError::FailedToFetchSenderBalance => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_fetch_sender_balance",
+            ),
+            TransferError::FailedToUpdateContractStorage => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_update_contract_storage",
+            ),
+            TransferError::FailedToUpdateDestinationBalance => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_update_destination_balance",
+            ),
+            TransferError::MirAddressUnsupportedError => fallback(
+                ErrorKind::Permanent,
+                "transfer.mir_address_unsupported_error",
+            ),
+            TransferError::FailedToExecuteInternalOperation(_) => fallback(
+                ErrorKind::Temporary,
+                "transfer.failed_to_execute_internal_operation",
+            ),
+            TransferError::MirAmountToNarithError(_) => {
+                fallback(ErrorKind::Temporary, "transfer.mir_amount_to_narith_error")
+            }
+            TransferError::MirNarithToAmountError(_) => {
+                fallback(ErrorKind::Temporary, "transfer.mir_narith_to_amount_error")
+            }
+            TransferError::StorageFeesConversion(_) => {
+                fallback(ErrorKind::Temporary, "transfer.storage_fees_conversion")
+            }
+            TransferError::DepositError(_) => {
+                fallback(ErrorKind::Temporary, "transfer.deposit_error")
+            }
+            TransferError::GatewayError(_) => {
+                fallback(ErrorKind::Temporary, "transfer.gateway_error")
+            }
+            TransferError::EnshrinedViewDispatchAbort(_) => fallback(
+                ErrorKind::Temporary,
+                "transfer.enshrined_view_dispatch_abort",
+            ),
+            TransferError::AddressRegistryAbort(_) => {
+                fallback(ErrorKind::Temporary, "transfer.address_registry_abort")
+            }
+        }
+    }
+}
+
+impl OriginationError {
+    pub fn to_l1_error(&self) -> L1Error {
+        let fallback = |kind, id| L1Error::tezosx_internal(kind, id, self);
+        match self {
+            OriginationError::BalanceTooLow(error) => L1Error::balance_too_low(error),
+            OriginationError::OutOfGas(_) => L1Error::gas_exhausted(),
+            OriginationError::FailedToFetchSourceAccount => fallback(
+                ErrorKind::Temporary,
+                "origination.failed_to_fetch_source_account",
+            ),
+            OriginationError::FailedToFetchOriginated => fallback(
+                ErrorKind::Temporary,
+                "origination.failed_to_fetch_originated",
+            ),
+            OriginationError::FailedToComputeBalanceUpdate(_) => fallback(
+                ErrorKind::Temporary,
+                "origination.failed_to_compute_balance_update",
+            ),
+            OriginationError::FailedToApplyBalanceUpdate => fallback(
+                ErrorKind::Temporary,
+                "origination.failed_to_apply_balance_update",
+            ),
+            OriginationError::CantInitContract => {
+                fallback(ErrorKind::Temporary, "origination.cant_init_contract")
+            }
+            OriginationError::CantOriginateEmptyContract => fallback(
+                ErrorKind::Permanent,
+                "origination.cant_originate_empty_contract",
+            ),
+            OriginationError::MirBigMapAllocation(_) => {
+                fallback(ErrorKind::Temporary, "origination.mir_big_map_allocation")
+            }
+            OriginationError::MirTypecheckingError(_) => {
+                fallback(ErrorKind::Permanent, "origination.mir_typechecking_error")
+            }
+            OriginationError::ScriptTooLarge(_) => {
+                fallback(ErrorKind::Permanent, "origination.script_too_large")
+            }
+            OriginationError::MichelineSerializationError(_) => fallback(
+                ErrorKind::Permanent,
+                "origination.micheline_serialization_error",
+            ),
+        }
+    }
+}
+
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
 // we cannot use the rust binary json crate to produce compatible bson data because
 // this crate uses Float pointer instructions (which is incompatible with the PVM).
