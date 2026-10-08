@@ -841,12 +841,10 @@ mod test {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
         use revm::primitives::{hardfork::SpecId, Address, U256};
+        use tezos_ethereum::keyspace::KeySpaceExtU256;
         use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-        use tezos_smart_rollup_host::{
-            path::{concat, OwnedPath, RefPath},
-            storage::StorageV1,
-        };
-        use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+        use tezos_smart_rollup_host::storage::StorageV1;
+        use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceLoader};
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
             AliasInfo, AliasResolution, CrossRuntimeContext, Registry as RegistryTrait,
@@ -907,12 +905,14 @@ mod test {
 
             pub(crate) fn get_balance(
                 &self,
-                host: &mut impl StorageV1,
+                tez_accounts: &impl KeySpace,
                 address: &[u8],
                 runtime_id: RuntimeId,
             ) -> Result<primitive_types::U256, TezosXRuntimeError> {
                 match runtime_id {
-                    RuntimeId::Tezos => self.mock_tezos.get_balance(host, address),
+                    RuntimeId::Tezos => {
+                        Ok(self.mock_tezos.get_balance(tez_accounts, address))
+                    }
                     RuntimeId::Ethereum => {
                         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
                     }
@@ -1111,31 +1111,72 @@ mod test {
 
         pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
 
-        // Path where mock Tezos balances are stored for testing
-        const MOCK_TEZOS_BALANCES_PATH: RefPath =
-            RefPath::assert_from(b"/mock_tezos/balances");
+        // Every mock Tezos balance is under this key of the accounts keyspace.
+        const MOCK_TEZOS_BALANCES_KEY: Key = Key::from_static(b"/mock_tezos/balances");
 
-        // Paths where the mock Tezos runtime records the last inbound
+        // Keys where the mock Tezos runtime records the last inbound
         // `X-Tezos-Source` / `X-Tezos-Sender` header values, so a test
         // can assert what an outgoing CRAC actually forwarded.
-        const MOCK_TEZOS_LAST_SOURCE_PATH: RefPath =
-            RefPath::assert_from(b"/mock_tezos/last_source");
-        const MOCK_TEZOS_LAST_SENDER_PATH: RefPath =
-            RefPath::assert_from(b"/mock_tezos/last_sender");
+        const MOCK_TEZOS_LAST_SOURCE_KEY: Key =
+            Key::from_static(b"/mock_tezos/last_source");
+        const MOCK_TEZOS_LAST_SENDER_KEY: Key =
+            Key::from_static(b"/mock_tezos/last_sender");
+
+        /// Returns the key that holds the mock Tezos balance of `address`.
+        ///
+        /// The mock stores the balance as 32 little-endian bytes. Returns a
+        /// [`KeyError`] when `address` is empty (a key cannot end with `/`) or
+        /// when its hex encoding makes the key too long.
+        fn mock_tezos_balance_key(address: &[u8]) -> Result<Key, KeyError> {
+            MOCK_TEZOS_BALANCES_KEY.concat(format!("/{}", hex::encode(address)))
+        }
+
+        /// The mock stores the balance of an address at
+        /// `/tez/tez_accounts/mock_tezos/balances/<hex>`, where `<hex>` is the
+        /// hex encoding of the address.
+        #[test]
+        fn mock_tezos_balance_key_keeps_its_durable_path() {
+            let key = mock_tezos_balance_key(b"tz1").unwrap();
+            assert_eq!(
+                [b"/tez/tez_accounts", key.as_bytes()].concat(),
+                b"/tez/tez_accounts/mock_tezos/balances/747a31"
+            );
+        }
+
+        /// The mock records the headers under `/tez/tez_accounts/mock_tezos`.
+        #[test]
+        fn mock_tezos_header_keys_keep_their_durable_paths() {
+            for (key, path) in [
+                (
+                    &MOCK_TEZOS_LAST_SOURCE_KEY,
+                    &b"/tez/tez_accounts/mock_tezos/last_source"[..],
+                ),
+                (
+                    &MOCK_TEZOS_LAST_SENDER_KEY,
+                    &b"/tez/tez_accounts/mock_tezos/last_sender"[..],
+                ),
+            ] {
+                assert_eq!([b"/tez/tez_accounts", key.as_bytes()].concat(), path);
+            }
+        }
 
         /// Read back the `X-Tezos-Source` header recorded by the last
         /// CRAC the mock Tezos runtime served.
-        pub(crate) fn last_recorded_source(host: &impl StorageV1) -> Option<String> {
-            host.store_read_all(&MOCK_TEZOS_LAST_SOURCE_PATH)
-                .ok()
+        pub(crate) fn last_recorded_source(
+            tez_accounts: &impl KeySpace,
+        ) -> Option<String> {
+            tez_accounts
+                .get(&MOCK_TEZOS_LAST_SOURCE_KEY)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
         }
 
         /// Read back the `X-Tezos-Sender` header recorded by the last
         /// CRAC the mock Tezos runtime served.
-        pub(crate) fn last_recorded_sender(host: &impl StorageV1) -> Option<String> {
-            host.store_read_all(&MOCK_TEZOS_LAST_SENDER_PATH)
-                .ok()
+        pub(crate) fn last_recorded_sender(
+            tez_accounts: &impl KeySpace,
+        ) -> Option<String> {
+            tez_accounts
+                .get(&MOCK_TEZOS_LAST_SENDER_KEY)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
         }
 
@@ -1198,7 +1239,8 @@ mod test {
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
             where
-                Host: StorageV1,
+                Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+                KS: KeySpace,
             {
                 // Read-only GET requests (Michelson view / EVM
                 // STATICCALL shape) echo their request body back as the
@@ -1225,44 +1267,35 @@ mod test {
                     .unwrap_or(0);
 
                 // Store the balance keyed by the address string from the URL
-                let address_hex = hex::encode(address_str.as_bytes());
-                let path = OwnedPath::try_from(format!("/{address_hex}")).unwrap();
-                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path).unwrap();
+                let key = mock_tezos_balance_key(address_str.as_bytes()).unwrap();
 
-                let current_balance = match rk.host().store_read_all(&full_path) {
-                    Ok(bytes) if bytes.len() == 32 => {
-                        primitive_types::U256::from_little_endian(&bytes)
-                    }
-                    _ => primitive_types::U256::zero(),
-                };
+                let current_balance = rk
+                    .tez_accounts()
+                    .get_u256_le_or(&key, primitive_types::U256::zero());
 
                 let new_balance = current_balance
                     .checked_add(primitive_types::U256::from(amount))
                     .expect("Balance overflow");
-                let mut balance_bytes = [0u8; 32];
-                new_balance.to_little_endian(&mut balance_bytes);
-                rk.host_mut()
-                    .store_write_all(&full_path, &balance_bytes)
+                rk.tez_accounts_mut()
+                    .store_u256_le(&key, new_balance)
                     .unwrap();
 
                 // Record the trusted identity headers so a test can
                 // assert what the outgoing CRAC actually forwarded.
-                for (header, path) in [
+                for (header, key) in [
                     (
                         tezosx_interfaces::X_TEZOS_SOURCE,
-                        &MOCK_TEZOS_LAST_SOURCE_PATH,
+                        &MOCK_TEZOS_LAST_SOURCE_KEY,
                     ),
                     (
                         tezosx_interfaces::X_TEZOS_SENDER,
-                        &MOCK_TEZOS_LAST_SENDER_PATH,
+                        &MOCK_TEZOS_LAST_SENDER_KEY,
                     ),
                 ] {
                     if let Some(value) =
                         request.headers().get(header).and_then(|v| v.to_str().ok())
                     {
-                        rk.host_mut()
-                            .store_write_all(path, value.as_bytes())
-                            .unwrap();
+                        rk.tez_accounts_mut().set(key, value.as_bytes()).unwrap();
                     }
                 }
 
@@ -1343,24 +1376,14 @@ mod test {
 
             fn get_balance(
                 &self,
-                host: &mut impl StorageV1,
+                tez_accounts: &impl KeySpace,
                 address: &[u8],
-            ) -> Result<primitive_types::U256, TezosXRuntimeError> {
-                let address_hex = hex::encode(address);
-                let path = OwnedPath::try_from(format!("/{address_hex}"))
-                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
+            ) -> primitive_types::U256 {
+                let key = mock_tezos_balance_key(address)
+                    .expect("the mock balance key is valid");
 
-                match host.store_read_all(&full_path) {
-                    Ok(bytes) if bytes.len() == 32 => {
-                        Ok(primitive_types::U256::from_little_endian(&bytes))
-                    }
-                    Ok(_) => Ok(primitive_types::U256::zero()),
-                    Err(tezos_smart_rollup_host::runtime::RuntimeError::PathNotFound) => {
-                        Ok(primitive_types::U256::zero())
-                    }
-                    Err(e) => Err(TezosXRuntimeError::Runtime(e)),
-                }
+                // An absent key is an account that the mock never credited.
+                tez_accounts.get_u256_le_or(&key, primitive_types::U256::zero())
             }
 
             fn check_is_native_address<Host, KS>(
@@ -1633,7 +1656,7 @@ mod test {
         );
         let balance = registry
             .get_balance(
-                rk.host_mut(),
+                rk.tez_accounts(),
                 implicit_address.as_bytes(),
                 tezosx_interfaces::RuntimeId::Tezos,
             )
@@ -4418,12 +4441,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(rk.host()).as_deref(),
+                last_recorded_source(rk.tez_accounts()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(rk.host()).as_deref(),
+                last_recorded_sender(rk.tez_accounts()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -4457,12 +4480,12 @@ mod test {
             assert_ne!(expected_source, expected_sender);
 
             assert_eq!(
-                last_recorded_source(rk.host()).as_deref(),
+                last_recorded_source(rk.tez_accounts()).as_deref(),
                 Some(expected_source.as_str()),
                 "X-Tezos-Source must be the alias of the transitive originator"
             );
             assert_eq!(
-                last_recorded_sender(rk.host()).as_deref(),
+                last_recorded_sender(rk.tez_accounts()).as_deref(),
                 Some(expected_sender.as_str()),
                 "X-Tezos-Sender must stay on the immediate sender alias"
             );
@@ -6323,13 +6346,13 @@ mod test {
 
     /// Read the mock Tezos balance recorded for `native_address`.
     fn tezos_balance(
-        host: &mut impl StorageV1,
+        tez_accounts: &impl KeySpace,
         registry: &Registry,
         native_address: &str,
     ) -> primitive_types::U256 {
         registry
             .get_balance(
-                host,
+                tez_accounts,
                 native_address.as_bytes(),
                 tezosx_interfaces::RuntimeId::Tezos,
             )
@@ -6425,13 +6448,13 @@ mod test {
         // Materialization must not have triggered a gateway subcall: the
         // mock Tezos runtime never recorded an incoming CRAC.
         assert!(
-            utilities::last_recorded_source(rk.host()).is_none(),
+            utilities::last_recorded_source(rk.tez_accounts()).is_none(),
             "materialization must not forward any balance to the gateway"
         );
 
         // The native Tezos side never received anything.
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::zero(),
             "materialization must not move value to the native address"
         );
@@ -6504,7 +6527,7 @@ mod test {
         // Materializing with a zero balance must not trigger a gateway
         // subcall either.
         assert!(
-            utilities::last_recorded_source(rk.host()).is_none(),
+            utilities::last_recorded_source(rk.tez_accounts()).is_none(),
             "materialization with zero balance must not forward anything"
         );
 
@@ -6552,7 +6575,7 @@ mod test {
                 let native_addr_str = native_address.to_string();
                 let tezos_balance = registry
                     .get_balance(
-                        rk.host_mut(),
+                        rk.tez_accounts(),
                         native_addr_str.as_bytes(),
                         tezosx_interfaces::RuntimeId::Tezos,
                     )
@@ -6635,7 +6658,7 @@ mod test {
         let expected_mutez =
             crate::helpers::legacy::alloy_to_u256(&(swept / U256::from(ONE_MUTEZ_WEI)));
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             expected_mutez,
             "the native side receives the swept amount floored to mutez"
         );
@@ -6699,7 +6722,7 @@ mod test {
             "the poke must sweep the full resident residue"
         );
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::from(3u64),
             "the residue lands on the native side, in mutez"
         );
@@ -6753,7 +6776,7 @@ mod test {
 
         assert_eq!(get_balance(rk.eth_accounts_mut(), alias), U256::ZERO);
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::zero()
         );
         assert!(
@@ -6813,7 +6836,7 @@ mod test {
             "sub-mutez dust must stay resident on the alias"
         );
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::zero()
         );
         assert!(
@@ -6874,7 +6897,7 @@ mod test {
             "a balance of exactly one mutez must be fully swept"
         );
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::from(1u64),
             "the swept mutez lands on the native side"
         );
@@ -6937,7 +6960,7 @@ mod test {
             "a balance one wei below one mutez must stay resident"
         );
         assert_eq!(
-            tezos_balance(rk.host_mut(), &registry, native_address),
+            tezos_balance(rk.tez_accounts(), &registry, native_address),
             primitive_types::U256::zero()
         );
         assert!(

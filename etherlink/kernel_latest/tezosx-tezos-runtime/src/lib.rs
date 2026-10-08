@@ -1511,12 +1511,11 @@ impl RuntimeInterface for TezosRuntime {
     }
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
+    /// # Panics
+    ///
+    /// Always panics: only the test mocks of this trait return a balance.
     #[cfg(feature = "testing")]
-    fn get_balance(
-        &self,
-        _host: &mut impl StorageV1,
-        _address: &[u8],
-    ) -> Result<U256, TezosXRuntimeError> {
+    fn get_balance(&self, _accounts: &impl KeySpace, _address: &[u8]) -> U256 {
         unimplemented!("Use mocks if you are in tests")
     }
 

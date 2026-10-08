@@ -307,12 +307,17 @@ pub trait RuntimeInterface {
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
+    /// Returns the balance of `address` read from `accounts`, the accounts
+    /// keyspace of this runtime.
+    ///
+    /// Returns zero for an account that holds nothing or whose balance the
+    /// keyspace fails to read.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `address` cannot form a key of `accounts`.
     #[cfg(feature = "testing")]
-    fn get_balance(
-        &self,
-        host: &mut impl StorageV1,
-        address: &[u8],
-    ) -> Result<U256, TezosXRuntimeError>;
+    fn get_balance(&self, accounts: &impl KeySpace, address: &[u8]) -> U256;
 }
 
 /// Translate the captured original source into its address in `target`.
