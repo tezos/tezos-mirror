@@ -20,6 +20,18 @@ class Octez < Formula
     depends_on dependency => :build
   end
 
+  # opam extracts .tbz source archives with bzip2. Homebrew does not put it on
+  # the sandbox PATH by itself: bzip2 is only a runtime dependency of unzip, a
+  # build dependency, and Homebrew prunes the transitive dependencies of build
+  # dependencies. It used to reach the PATH by accident, through
+  # hidapi -> systemd -> python@3.14, until systemd dropped that dependency
+  # (Homebrew/homebrew-core@2ecc31ed). On macOS the system bzip2 is used.
+  uses_from_macos "bzip2" => :build
+  # Same for .txz archives: xz is only on the Linux PATH today because
+  # systemd happens to depend on it at runtime, and macOS does not ship it
+  # at all, hence a plain depends_on. The xz formula also provides lzma.
+  depends_on "xz" => :build
+
   dependencies = %w[gmp hidapi libev libffi libpq]
   dependencies.each do |dependency|
     depends_on dependency
@@ -69,6 +81,11 @@ class Octez < Formula
       #!/bin/sh
 
       set +x
+      # Stop at the first failing step. Without this, a failure in
+      # [make build-deps] does not stop the script: it carries on to
+      # [make release], which dies with "dune: not found" -- burying the real
+      # error many lines earlier in the build log.
+      set -e
 
       . ./scripts/version.sh
       rustup install $recommended_rust_version

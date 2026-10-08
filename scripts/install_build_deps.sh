@@ -40,8 +40,14 @@ unset OPAMSWITCH
 
 echo "Use opam repository commit: $opam_repository_tag"
 opam_repository="https://github.com/ocaml/opam-repository.git#$opam_repository_tag"
-opam repository set-url tezos --dont-select "$opam_repository" ||
-  opam repository add tezos --dont-select "$opam_repository" > /dev/null 2>&1
+# [set-url] fails when the repository is not registered yet (a fresh opam root),
+# which is expected, so only its output is silenced. [add] is the fallback that
+# must work: let it report, and fail the script if it does not -- otherwise the
+# repository is missing and the build only fails much later, with an unrelated
+# message such as "dune: not found".
+if ! opam repository set-url tezos --dont-select "$opam_repository" > /dev/null 2>&1; then
+  opam repository add tezos --dont-select "$opam_repository"
+fi
 
 # Note: there should be no need to 'opam update' since 'opam repository add/set-url'
 # should have fetched already and the repository cannot change since it is

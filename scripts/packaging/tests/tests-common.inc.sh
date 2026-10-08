@@ -111,6 +111,40 @@ dnf_with_retries() {
 # Wrapper function for dnf with retry logic.
 dnf_retry() { dnf_with_retries "$@"; }
 
+# Mirror a package repository published for an unprotected ref from
+# the GCS bucket into a local directory, so that apt can install from
+# it with a [file:] source. The download is authenticated with the GCP
+# identity of the job, the same one the publishing jobs rely on (see
+# scripts/ci/gcp_auth.sh), through gsutil. The files are made
+# world-readable because apt fetches [file:] sources as the
+# unprivileged _apt user. Usage: gcs_mirror gs://bucket/prefix
+# destination-directory
+gcs_mirror() {
+  src="$1"
+  dst="$2"
+  mkdir -p "$dst"
+  gsutil -m -q rsync -r "$src" "$dst"
+  chmod -R a+rX "$dst"
+}
+
+# Select where a test script reads the ref's apt repository from, given REPO
+# (bucket URL of the ref) and DISTRO:
+#   REPO_URL        apt source URL ([file:/dir] or [https://...])
+#   REPO_FETCH_URL  base URL for curl ([file:///dir] or [https://...])
+# The local mirror handed over by systemd-docker-test.sh through OCTEZ_REPO_DIR
+# wins when set (typically for unprotected refs) otherwise the bucket over
+# https, which protected refs use.
+# shellcheck disable=SC2034 # both variables are consumed by the sourcing script
+set_octez_repo_urls() {
+  if [ -n "${OCTEZ_REPO_DIR:-}" ]; then
+    REPO_URL="file:$OCTEZ_REPO_DIR"
+    REPO_FETCH_URL="file://$OCTEZ_REPO_DIR"
+  else
+    REPO_URL="$REPO/$DISTRO"
+    REPO_FETCH_URL="$REPO_URL"
+  fi
+}
+
 get_node_version() {
   url="http://localhost:8732/version"
   max_attempts=100
