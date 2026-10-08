@@ -16,7 +16,8 @@ CI_COMMIT_REF_PROTECTED=${CI_COMMIT_REF_PROTECTED:-"false"}
 
 PREFIX=${PREFIX:-""}
 CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE:-tezos}
-GCP_LINUX_PACKAGES_BUCKET=${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}
+# Resolved here, on the host, and handed to the container as PACKAGES_BUCKET.
+. scripts/ci/packages_bucket.inc.sh
 
 #shellcheck disable=SC2236
 if [ ! -z ${DEP_IMAGE+x} ]; then
@@ -45,7 +46,7 @@ REPO_MOUNT=""
 OCTEZ_REPO_DIR=""
 if [ "$CI_COMMIT_REF_PROTECTED" != "true" ]; then
   . scripts/packaging/tests/tests-common.inc.sh
-  gcs_mirror "gs://$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME/$DISTRIBUTION" "$PWD/octez-repo"
+  gcs_mirror "gs://$PACKAGES_BUCKET/$CI_COMMIT_REF_NAME/$DISTRIBUTION" "$PWD/octez-repo"
   OCTEZ_REPO_DIR=/octez-repo
   REPO_MOUNT="-v $PWD/octez-repo:$OCTEZ_REPO_DIR"
 fi
@@ -81,7 +82,7 @@ docker exec \
   -e "CI_COMMIT_REF_PROTECTED=$CI_COMMIT_REF_PROTECTED" \
   -e "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE" \
   -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA" \
-  -e "GCP_LINUX_PACKAGES_BUCKET=$GCP_LINUX_PACKAGES_BUCKET" \
+  -e "PACKAGES_BUCKET=$PACKAGES_BUCKET" \
   -e "OCTEZ_REPO_DIR=$OCTEZ_REPO_DIR" \
   -i systemd \
   /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE $ARGS"

@@ -3,10 +3,6 @@
 distribution=$1
 release=$2
 
-# If it's a protected branch the value of $bucket will
-# be set accordingly but the CI.
-bucket="$GCP_LINUX_PACKAGES_BUCKET"
-
 # This logic must be kept in sync with the script in
 # ./scripts/ci/create_debian_repo.sh
 
@@ -53,7 +49,10 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 set -x
 
-if [ "$RELEASETYPE" = "Master" ]; then
+case "$RELEASETYPE" in
+Master | Release | ReleaseCandidate)
+  # Production publications, served as packages.nomadic-labs.com and installed
+  # exactly as howtoget.rst documents.
   apt_get update
   apt_get install -y sudo
 
@@ -65,7 +64,12 @@ if [ "$RELEASETYPE" = "Master" ]; then
     sudo tee /etc/apt/sources.list.d/octez.list
   sudo apt-get update
   # [end add repository]
-else
+  ;;
+*)
+  # Test publications live in the bucket of the ref: see
+  # scripts/ci/packages_bucket.inc.sh.
+  . scripts/ci/packages_bucket.inc.sh
+  bucket="$PACKAGES_BUCKET"
   apt_get update
   apt_get install -y sudo gpg curl
   case "$RELEASETYPE" in
@@ -86,4 +90,5 @@ else
   esac
   echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez.list
   apt_get update
-fi
+  ;;
+esac

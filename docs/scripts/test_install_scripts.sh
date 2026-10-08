@@ -69,13 +69,13 @@ for test_case in "$@"; do
     docker run --rm -i -e RELEASETYPE=Master -v "$DOCS_DIR/..":/Tezos "$UBUNTU_22_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 22.04"
     ;;
   "install-bin-rc-26.04")
-    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$UBUNTU_26_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 26.04 rc"
+    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -v "$DOCS_DIR/..":/Tezos "$UBUNTU_26_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 26.04"
     ;;
   "install-bin-rc-24.04")
-    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$UBUNTU_24_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 24.04 rc"
+    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -v "$DOCS_DIR/..":/Tezos "$UBUNTU_24_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 24.04"
     ;;
   "install-bin-rc-22.04")
-    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$UBUNTU_22_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 22.04 rc"
+    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -v "$DOCS_DIR/..":/Tezos "$UBUNTU_22_04" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh ubuntu 22.04"
     ;;
   "install-bin-bookworm")
     docker run --rm -i -e RELEASETYPE=Master -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm"
@@ -84,7 +84,7 @@ for test_case in "$@"; do
     docker run --rm -i -e RELEASETYPE=Master -v "$DOCS_DIR/..":/Tezos "$DEBIAN_TRIXIE" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian trixie"
     ;;
   "install-bin-rc-bookworm")
-    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm rc"
+    docker run --rm -i -e RELEASETYPE=ReleaseCandidate -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm"
     ;;
   "compile-release-sources-bookworm")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-12 /Scripts/compile-sources.sh tezos/tezos latest-release
