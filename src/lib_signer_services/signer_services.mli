@@ -86,11 +86,17 @@ val known_keys :
     Tezos_crypto.Signature.Public_key_hash.t list )
   Tezos_rpc.Service.t
 
+(** The query carries the public key to override, when any, and the
+    authentication signature required by a signer started with
+    [--require-authentication]. See
+    {!Signer_messages.Bls_prove_possession.Request.to_sign} for the payload
+    that signature covers. *)
 val bls_prove_possession :
   ( [`GET],
     unit,
     unit * Tezos_crypto.Signature.Public_key_hash.t,
-    Tezos_crypto.Signature.Bls.Public_key.t option,
+    Tezos_crypto.Signature.Bls.Public_key.t option
+    * Tezos_crypto.Signature.t option,
     unit,
     Tezos_crypto.Signature.Bls.t )
   Tezos_rpc.Service.t

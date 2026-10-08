@@ -80,6 +80,14 @@ Signer
   socket signers: the client failed to encode the request with
   ``Data_encoding.Write_error(No case matched)``. (MR :gl:`!22917`)
 
+- Fixed a signer started with ``--require-authentication`` answering
+  ``bls_prove_possession`` requests to anyone able to reach it:
+  authorization was checked on signing requests only, so an
+  unauthenticated caller could obtain a proof of possession over a
+  public key of its choosing (via ``--override-public-key``). These
+  requests now carry an authentication signature, bound to the request
+  kind and the overridden public key. (MR :gl:`!22920`)
+
 Baker
 -----
 

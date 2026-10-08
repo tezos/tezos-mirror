@@ -147,9 +147,21 @@ end
 
 module Bls_prove_possession : sig
   module Request : sig
-    type t =
-      Tezos_crypto.Signature.Public_key_hash.t
-      * Tezos_crypto.Signature.Bls.Public_key.t option
+    type t = {
+      pkh : Tezos_crypto.Signature.Public_key_hash.t;
+      override_pk : Tezos_crypto.Signature.Bls.Public_key.t option;
+      signature : Tezos_crypto.Signature.t option;
+    }
+
+    (** [to_sign ~pkh ~override_pk] is the payload that an authorized key must
+        sign to authenticate a proof-of-possession request for [pkh] over
+        [override_pk]. It binds both, and uses a request tag of its own, so
+        that an authentication signature is not replayable on another request
+        kind nor on another overridden public key. *)
+    val to_sign :
+      pkh:Tezos_crypto.Signature.Public_key_hash.t ->
+      override_pk:Tezos_crypto.Signature.Bls.Public_key.t option ->
+      Bytes.t
 
     val encoding : t Data_encoding.t
   end

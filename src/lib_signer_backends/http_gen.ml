@@ -137,7 +137,9 @@ struct
 
     let import_secret_key ~io:_ = public_key_hash
 
-    let get_signature base pkh msg =
+    (* [authenticate base to_sign] returns the authentication signature over
+       [to_sign], or [None] when the signer does not require authentication. *)
+    let authenticate base to_sign =
       let open Lwt_result_syntax in
       let* o =
         RPC_client.call_service
@@ -152,13 +154,12 @@ struct
       in
       match o with
       | Some authorized_keys ->
-          let* signature =
-            P.authenticate
-              authorized_keys
-              (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg)
-          in
+          let* signature = P.authenticate authorized_keys to_sign in
           return_some signature
       | None -> return_none
+
+    let get_signature base pkh msg =
+      authenticate base (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg)
 
     let list_known_keys base =
       RPC_client.call_service
@@ -241,6 +242,13 @@ struct
     let bls_prove_possession ?override_pk uri =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
+      let* signature =
+        authenticate
+          base
+          (Signer_messages.Bls_prove_possession.Request.to_sign
+             ~pkh
+             ~override_pk)
+      in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -248,7 +256,7 @@ struct
         ~base
         Signer_services.bls_prove_possession
         ((), pkh)
-        override_pk
+        (override_pk, signature)
         ()
   end
 

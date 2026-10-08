@@ -56,12 +56,21 @@ let sign_query =
 
 let bls_pk_query =
   let open Tezos_rpc.Query in
-  query (fun pk -> pk)
+  query (fun pk signature -> (pk, signature))
   |+ opt_field
        ~descr:"Override the public key to sign when making a BLS proof"
        "bls_pk"
        Tezos_crypto.Signature.Bls.Public_key.rpc_arg
-       (fun pk -> pk)
+       fst
+  |+ opt_field
+       ~descr:
+         "Must be provided if the signer requires authentication. In this \
+          case, it must be the signature of the request kind, the public key \
+          hash and the bls_pk parameter concatenated, by one of the keys \
+          authorized by the signer."
+       "authentication"
+       Tezos_crypto.Signature.rpc_arg
+       snd
   |> seal
 
 let sign =
