@@ -2698,7 +2698,7 @@ test_sdk_rust:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu

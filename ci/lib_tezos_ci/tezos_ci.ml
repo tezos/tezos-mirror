@@ -1621,9 +1621,13 @@ module Images = struct
 
     let debian_trixie = make_img "debian:trixie"
 
+    let debian_build_trixie = make_img "debian-build:trixie"
+
     let ubuntu_22_04 = make_img "ubuntu:22.04"
 
     let ubuntu_24_04 = make_img "ubuntu:24.04"
+
+    let ubuntu_build_24_04 = make_img "ubuntu-build:24.04"
 
     let ubuntu_26_04 = make_img "ubuntu:26.04"
 

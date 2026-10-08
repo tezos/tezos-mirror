@@ -1501,7 +1501,7 @@ oc.compile_sources_doc_deps_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1531,7 +1531,7 @@ oc.compile_sources_doc_debian:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.compile_sources_doc_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-e92d4ade
   stage: test
   tags:
   - gcp_very_high_cpu
