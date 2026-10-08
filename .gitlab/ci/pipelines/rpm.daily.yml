@@ -12,7 +12,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -62,14 +62,14 @@ oc.docker-build-rockylinux-dependencies:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-build-merge-manifest.rockylinux:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-build-rockylinux-dependencies
   dependencies: []
@@ -99,7 +99,7 @@ oc.docker-build-merge-manifest.rockylinux:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_dev
 
 oc.build-rockylinux:
   image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -143,8 +143,8 @@ oc.build-rockylinux:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-rockylinux-data:
   image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -187,14 +187,14 @@ oc.build-rockylinux-data:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 rpm_repo_rockylinux:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
@@ -255,14 +255,14 @@ oc.docker-build-fedora-dependencies:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-build-merge-manifest.fedora:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-build-fedora-dependencies
   dependencies: []
@@ -292,7 +292,7 @@ oc.docker-build-merge-manifest.fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_dev
 
 oc.build-fedora:
   image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -336,8 +336,8 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-fedora-data:
   image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -380,14 +380,14 @@ oc.build-fedora-data:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 rpm_repo_fedora:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-fedora
   - oc.build-fedora-data
@@ -448,14 +448,14 @@ oc.docker-systemd-tests-rpm-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-systemd-merge-manifest.fedora:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-systemd-tests-rpm-fedora
   dependencies: []
@@ -485,13 +485,13 @@ oc.docker-systemd-merge-manifest.fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_dev
 
 oc.install_bin_fedora_39.doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - rpm_repo_fedora
   dependencies: []
@@ -512,7 +512,7 @@ oc.install_bin_fedora_39_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-systemd-tests-rpm-fedora
   - rpm_repo_fedora
@@ -572,14 +572,14 @@ oc.docker-systemd-tests-rpm-rockylinux:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-systemd-merge-manifest.rockylinux:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-systemd-tests-rpm-rockylinux
   dependencies: []
@@ -609,13 +609,13 @@ oc.docker-systemd-merge-manifest.rockylinux:
       - "9"
       - "10"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_dev
 
 oc.install_bin_rockylinux_9.doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - rpm_repo_rockylinux
   dependencies: []
@@ -636,7 +636,7 @@ oc.install_bin_rockylinux_9_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker-systemd-tests-rpm-rockylinux
   - rpm_repo_rockylinux

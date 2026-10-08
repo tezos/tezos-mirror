@@ -12,7 +12,7 @@ oc.docker:ci:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -39,7 +39,7 @@ oc.docker:rust-sdk-bindings:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -65,7 +65,7 @@ oc.docker:ci:arm64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -96,7 +96,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -118,7 +118,7 @@ sdk_bindings.test:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:rust-sdk-bindings:amd64
   dependencies:
@@ -159,7 +159,7 @@ build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -208,7 +208,7 @@ build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -270,7 +270,7 @@ check_riscv_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -311,7 +311,7 @@ audit_riscv_deps:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -351,7 +351,7 @@ test_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -391,7 +391,7 @@ oc.build_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -444,7 +444,7 @@ oc.build_x86_64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -509,7 +509,7 @@ oc.build_x86_64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -575,7 +575,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -636,7 +636,7 @@ sanity_ci:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -658,7 +658,7 @@ docker:hadolint:
   image: hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -678,7 +678,7 @@ oc.ocaml_fmt:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-e92d4ade
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -712,7 +712,7 @@ oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -733,7 +733,7 @@ check_jsonnet:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-e92d4ade
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -756,7 +756,7 @@ check_rust_fmt:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -775,7 +775,7 @@ nix:
   image: nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -805,7 +805,7 @@ oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -848,7 +848,7 @@ oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -872,7 +872,7 @@ oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -912,7 +912,7 @@ oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -943,7 +943,7 @@ oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -985,7 +985,7 @@ oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1010,7 +1010,7 @@ oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -1039,7 +1039,7 @@ oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1063,7 +1063,7 @@ oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1084,7 +1084,7 @@ oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1124,7 +1124,7 @@ oc.unit:webassembly-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1156,7 +1156,7 @@ oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -1217,7 +1217,7 @@ oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   - oc.build_kernels
@@ -1271,7 +1271,7 @@ oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1330,7 +1330,7 @@ oc.unit:other-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_high_cpu
+  - gcp_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1389,7 +1389,7 @@ ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1425,7 +1425,7 @@ test_sdk_rust:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1462,7 +1462,7 @@ oc.compile_sources_doc_deps_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1483,7 +1483,7 @@ oc.compile_sources_doc_deps_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1504,7 +1504,7 @@ oc.compile_sources_doc_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-e92d4ade
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1534,7 +1534,7 @@ oc.compile_sources_doc_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-build:24.04-master-e92d4ade
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1564,7 +1564,7 @@ release_page.build:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1593,7 +1593,7 @@ release_page.build_tezt:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1630,7 +1630,7 @@ release_page.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - release_page.build
@@ -1690,7 +1690,7 @@ oc.misc_checks:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-e92d4ade
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -1717,7 +1717,7 @@ oc.build:static-arm64-linux-experimental-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1764,7 +1764,7 @@ oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1810,7 +1810,7 @@ oc.build_arm64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1866,7 +1866,7 @@ oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1922,7 +1922,7 @@ oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1983,7 +1983,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -2030,7 +2030,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -2076,7 +2076,7 @@ de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -2098,7 +2098,7 @@ de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -2120,7 +2120,7 @@ resto.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -2142,7 +2142,7 @@ resto.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -2164,7 +2164,7 @@ tezt-static-binaries:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-released-binaries
@@ -2228,7 +2228,7 @@ tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -2293,7 +2293,7 @@ tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -2356,7 +2356,7 @@ tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -2420,7 +2420,7 @@ tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -2483,7 +2483,7 @@ tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels
@@ -2547,7 +2547,7 @@ tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_kernels

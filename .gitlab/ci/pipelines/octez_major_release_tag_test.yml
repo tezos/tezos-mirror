@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:ci:arm64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -69,7 +69,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -90,7 +90,7 @@ oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-e92d4ade
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -140,7 +140,7 @@ oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -188,7 +188,7 @@ oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -272,14 +272,14 @@ oc.build-ubuntu:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 apt_repo_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-data_packages
   - oc.build-ubuntu
@@ -347,14 +347,14 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-data_packages
   - oc.build-debian
@@ -387,7 +387,7 @@ oc.docker:arm64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -423,7 +423,7 @@ oc.docker:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -459,7 +459,7 @@ docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -487,7 +487,7 @@ docker:container_scanning:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - docker:merge_manifests
   dependencies: []
@@ -518,7 +518,7 @@ docker:promote_to_latest:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - docker:merge_manifests
   - docker:container_scanning
@@ -548,7 +548,7 @@ publish:release-page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -591,7 +591,7 @@ gitlab:release:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.create-homebrew-formula
   - oc.build:static-x86_64-linux-released-binaries
@@ -622,7 +622,7 @@ grafazos.build:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-e92d4ade
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: manual
     allow_failure: true
@@ -652,7 +652,7 @@ teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - when: manual
     allow_failure: true
@@ -705,7 +705,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: manual
     allow_failure: true
@@ -758,7 +758,7 @@ octez-smart-rollup-node.build:static-arm64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -805,7 +805,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -852,7 +852,7 @@ grafazos.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -891,7 +891,7 @@ teztale.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -932,7 +932,7 @@ octez-smart-rollup-node.release-page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -973,7 +973,7 @@ octez-smart-rollup-node.docker:arm64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1003,7 +1003,7 @@ octez-smart-rollup-node.docker:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1033,7 +1033,7 @@ octez-smart-rollup-node.docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - octez-smart-rollup-node.docker:amd64
   - octez-smart-rollup-node.docker:arm64

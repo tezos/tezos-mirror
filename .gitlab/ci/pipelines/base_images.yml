@@ -25,7 +25,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -46,7 +46,7 @@ images.debian:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   dependencies: []
@@ -78,7 +78,7 @@ images.ubuntu:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   dependencies: []
@@ -140,14 +140,14 @@ images.debian-rust:
     - RELEASE:
       - trixie
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 images.debian-rust.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: on_success
   needs:
@@ -175,7 +175,7 @@ images.debian-homebrew:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   needs:
@@ -208,7 +208,7 @@ images.alpine-docker-ci:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   needs: []
@@ -273,14 +273,14 @@ images.debian-build:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 images.debian-build.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: on_success
   needs:
@@ -343,14 +343,14 @@ images.ubuntu-build:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 images.ubuntu-build.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: on_success
   needs:
@@ -383,7 +383,7 @@ images.debian-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   needs:
@@ -417,7 +417,7 @@ images.ubuntu-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   needs:
@@ -452,7 +452,7 @@ images.debian-jsonnet:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   needs:
@@ -485,7 +485,7 @@ images.ci-release:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: on_success
   dependencies: []

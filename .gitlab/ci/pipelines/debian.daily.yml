@@ -11,7 +11,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -94,14 +94,14 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-data_packages
   - oc.build-debian
@@ -134,7 +134,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_debian
   dependencies: []
@@ -164,7 +164,7 @@ oc.install_bin_debian_bookworm_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_debian
   dependencies: []
@@ -194,7 +194,7 @@ oc.install_bin_debian_bookworm:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_debian
   dependencies: []
@@ -252,14 +252,14 @@ oc.build-ubuntu:
       - "24.04"
       - "26.04"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 apt_repo_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-data_packages
   - oc.build-ubuntu
@@ -292,7 +292,7 @@ oc.upgrade_bin_ubuntu_24_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -322,7 +322,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -352,7 +352,7 @@ oc.install_bin_ubuntu_26_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -382,7 +382,7 @@ oc.install_bin_ubuntu_24_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -412,7 +412,7 @@ oc.install_bin_ubuntu_26_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:26.04-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -434,7 +434,7 @@ oc.install_bin_ubuntu_24_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -456,7 +456,7 @@ oc.install_bin_ubuntu_22_04:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - apt_repo_ubuntu
   dependencies: []
@@ -478,7 +478,7 @@ oc.lintian_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.build-debian
   dependencies:
@@ -503,7 +503,7 @@ oc.lintian_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-e92d4ade
   stage: publishing_tests
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.build-ubuntu
   dependencies:

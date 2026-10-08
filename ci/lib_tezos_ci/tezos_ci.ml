@@ -828,8 +828,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
     ?interruptible_runner ?git_strategy ?retry ?parallel ?environment
-    ?description ?(dev_infra = false) ~__POS__ ?image ?template
-    ?(datadog = true) ~stage ~name script : tezos_job =
+    ?description ?(dev_infra = true) ~__POS__ ?image ?template ?(datadog = true)
+    ~stage ~name script : tezos_job =
   declared_jobs := String_map.add name __POS__ !declared_jobs ;
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =

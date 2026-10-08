@@ -14,9 +14,9 @@
 open Tezos_ci
 module CI = Cacio.Shared
 
-let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu
+let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu_dev
 
-let tag_arm64 = Runner.Tag.show Gcp_arm64
+let tag_arm64 = Runner.Tag.show Gcp_dev_arm64
 
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job [oc.build-debian].

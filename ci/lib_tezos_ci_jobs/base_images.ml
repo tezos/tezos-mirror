@@ -240,14 +240,16 @@ let jobs ?start_job ?(changeset = false) () =
     let platform, tags =
       match compilation with
       | Amd64_only -> ("linux/amd64", [])
-      | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
+      | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_dev_arm64])])
       | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
       | Native ->
           ( "",
             [
               ( "TAGS",
-                [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64]
-              );
+                [
+                  Runner.Tag.show Gcp_very_high_cpu_dev;
+                  Runner.Tag.show Gcp_dev_arm64;
+                ] );
             ] )
     in
     let emulated = tags = [] in
@@ -279,7 +281,7 @@ let jobs ?start_job ?(changeset = false) () =
             Cacio. *)
            else [job_rule ~when_:On_success ()])
       ~parallel:(Matrix [matrix @ tags])
-      ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
+      ~tag:(if emulated then Gcp_very_high_cpu_dev else Dynamic)
       ?dependencies
       [script]
   in
@@ -444,7 +446,7 @@ let jobs ?start_job ?(changeset = false) () =
                ();
            ]
          else [job_rule ~when_:On_success ()])
-      ~tag:Gcp_very_high_cpu
+      ~tag:Gcp_very_high_cpu_dev
       ~__POS__
       ~image:Images_external.docker
       ~variables

@@ -664,8 +664,8 @@ let convert_graph ?(interruptible_pipeline = true)
               in
               let dev_infra =
                 match provider with
-                | None | Some GCP | Some AWS -> false
-                | Some GCP_dev -> true
+                | Some GCP | Some AWS -> false
+                | None | Some GCP_dev -> true
               in
               let maybe_enable_cargo_cache job =
                 if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job

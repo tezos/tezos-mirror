@@ -122,9 +122,9 @@ let make_job_merge_systemd_test_dependencies ~distribution ~dependencies ~matrix
     ~parallel:(Matrix matrix)
     ["scripts/ci/docker-merge-base-images.sh"]
 
-let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu
+let tag_amd64 = Runner.Tag.show Gcp_very_high_cpu_dev
 
-let tag_arm64 = Runner.Tag.show Gcp_arm64
+let tag_arm64 = Runner.Tag.show Gcp_dev_arm64
 
 (** These are the set of Rocky Linux release-architecture combinations for
     which we build rpm packages in the job
@@ -337,7 +337,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ["./scripts/ci/prepare-rpm-repo.sh"])
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ["./scripts/ci/create_rpm_repo.sh rockylinux 9 10"]
-      ~tag:Gcp_not_interruptible
+      ~tag:Gcp_not_interruptible_dev
   in
   let job_rpm_repo_fedora =
     make_job_repo
@@ -359,7 +359,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ["./scripts/ci/prepare-rpm-repo.sh"])
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ["./scripts/ci/create_rpm_repo.sh fedora 39 42"]
-      ~tag:Gcp_not_interruptible
+      ~tag:Gcp_not_interruptible_dev
   in
   (* These test the installability *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])

@@ -432,7 +432,7 @@ let job_create_gitlab_package =
     ~allow_failure:No
     ~script:["./scripts/ci/create_gitlab_package.sh"]
     ~retry:no_retry
-    ~tag:Gcp_not_interruptible
+    ~tag:Gcp_not_interruptible_dev
 
 let job_update_gitlab_release =
   CI.job
@@ -447,7 +447,7 @@ let job_update_gitlab_release =
     ~id_tokens:Tezos_ci.id_tokens
     ~script:["./scripts/releases/update_gitlab_release.sh"]
     ~retry:no_retry
-    ~tag:Gcp_not_interruptible
+    ~tag:Gcp_not_interruptible_dev
 
 let job_release_page_packaging_revision =
   Cacio.parameterize @@ fun mode ->
