@@ -36,6 +36,12 @@ class Octez < Formula
   dependencies.each do |dependency|
     depends_on dependency
   end
+  # The opam package ssl (ocaml-ssl 0.7.0) sets SSLv3 as the minimum protocol
+  # version of its default context, which OpenSSL 4 rejects since it removed
+  # SSLv3: every binary using conduit then aborts at startup with "Failed to
+  # set protocol to SSLv3". Build against openssl@3, which is keg-only since
+  # Homebrew made openssl@4 its default OpenSSL (homebrew-core, 2026-09-27).
+  depends_on "openssl@3"
 
   def make_deps
     ENV.deparallelize
@@ -43,7 +49,12 @@ class Octez < Formula
     ENV["OPAMROOT"]="./.opam"
     ENV["OPAMYES"]="true"
     ENV["BLST_PORTABLE"]="yes"
-    ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
+    # OCaml's configure bakes LDFLAGS into the link command of every
+    # executable, ahead of the flags the libraries pass. On macOS, cc-override
+    # below bypasses Homebrew's compiler shim, which would otherwise put the
+    # keg-only openssl@3 first, so -lssl would resolve to the openssl@4 linked
+    # in #{HOMEBREW_PREFIX}/lib. Put openssl@3 first explicitly.
+    ENV["LDFLAGS"] = "-L#{Formula["openssl@3"].opt_lib} -L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
     # opam tarballs embed uid/gid from their build machines; when tar runs as
     # root it tries to chown extracted files to those non-existent ids and
