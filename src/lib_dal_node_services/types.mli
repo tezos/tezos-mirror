@@ -319,6 +319,8 @@ val trap_encoding : trap Data_encoding.t
 
 val pp_header_status : Format.formatter -> header_status -> unit
 
+val pp_profile : Format.formatter -> profile -> unit
+
 module Store : sig
   (** [stored_data] is the kind of data being encoded/decoded. This
     datatype is used to get better events UX. *)

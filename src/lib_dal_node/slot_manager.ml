@@ -626,7 +626,7 @@ let get_commitment_from_slot_id ctxt slot_id =
             Event.emit_failed_to_retrieve_commitment_of_slot_id
               ~published_level:slot_id.slot_level
               ~slot_index:slot_id.slot_index
-              ~error:[error]
+              ~error
           in
           Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 

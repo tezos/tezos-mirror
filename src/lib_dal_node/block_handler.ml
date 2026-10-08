@@ -227,6 +227,11 @@ let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
                  the slot for operator slot indices, so the operator can
                  still inspect it; unattested slots at other slot indices
                  are dropped with their shards. *)
+              let*! () =
+                Event.emit_published_slot_not_attested
+                  ~published_level
+                  ~slot_index
+              in
               let* () = remove_shards store slot_id in
               if Profile_manager.is_operator_slot profile_ctxt ~slot_index then
                 return_unit

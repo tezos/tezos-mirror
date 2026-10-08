@@ -488,6 +488,10 @@ let slot_header_encoding =
           (req "commitment" Cryptobox.Commitment.encoding)
           (req "status" header_status_encoding)))
 
+let pp_profile fmt = function
+  | Bootstrap -> Format.fprintf fmt "Bootstrap"
+  | Controller profile -> Controller_profiles.pp fmt profile
+
 let profile_encoding =
   let open Data_encoding in
   union

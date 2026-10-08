@@ -89,6 +89,24 @@ let merge ?(on_new_attester = fun _ -> ()) t1 t2 =
     observers = t1.observers @ t2.observers;
   }
 
+let pp fmt {operators; observers; attesters} =
+  let pp_elements pp_elt fmt = function
+    | [] -> Format.pp_print_string fmt "none"
+    | l ->
+        Format.(
+          pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ ") pp_elt fmt l)
+  in
+  Format.fprintf
+    fmt
+    "@[<hov 2>operators: @[<hov>%a@];@ observers: @[<hov>%a@];@ attesters: \
+     @[<hov>%a@]@]"
+    (pp_elements Format.pp_print_int)
+    (Slot_set.elements operators)
+    (pp_elements Format.pp_print_int)
+    (Slot_set.elements observers)
+    (pp_elements Signature.Public_key_hash.pp)
+    (Pkh_set.elements attesters)
+
 let encoding =
   let open Data_encoding in
   conv
