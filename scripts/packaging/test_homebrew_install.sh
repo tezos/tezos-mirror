@@ -57,6 +57,20 @@ export HOMEBREW_NO_ENV_FILTERING=1
 # do not upgrade homebrew automatically
 export HOMEBREW_NO_AUTO_UPDATE=1
 
+# The GitLab macOS images ship Homebrew with an old, linked openssl@3 keg.
+# Since openssl@4 became Homebrew's default OpenSSL (homebrew-core,
+# 2026-09-27), it is no longer keg-only and overwrites the links of
+# openssl@3, while openssl@3 is keg-only and only needed by some of our
+# dependencies (libpq, krb5). Installing the formula thus upgrades openssl@3
+# and installs openssl@4 in the same transaction: brew locks both up front,
+# then deadlocks on its own openssl@3 lock when linking openssl@4 has to
+# unlink the old openssl@3 keg. Unlinking it beforehand leaves nothing to
+# overwrite; the keg and /opt/homebrew/opt/openssl@3 stay, so the
+# preinstalled tools keep working. See https://gitlab.com/tezos/tezos/-/issues/8410.
+if brew list --formula openssl@3 > /dev/null 2>&1; then
+  brew unlink openssl@3
+fi
+
 brew install -v --formula --build-bottle ./octez.rb
 
 octez-node --version
