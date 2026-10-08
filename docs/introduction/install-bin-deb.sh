@@ -38,7 +38,7 @@ Master)
 SoftRelease)
   distribution="${PREFIX}${CI_COMMIT_TAG}/${distribution}"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   distribution="${PREFIX}${CI_COMMIT_REF_NAME}/${distribution}"
   ;;
 *)
