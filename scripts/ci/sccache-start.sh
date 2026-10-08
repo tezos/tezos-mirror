@@ -18,6 +18,22 @@ if ! command -v sccache > /dev/null; then
   exit 1
 fi
 
+# On protected refs GCP_SCCACHE_BUCKET is the protected bucket, which only
+# protected-registry@ may read and write. The sccache server reads its GCS
+# credentials once, when it starts, so the key must be in place BEFORE the
+# start loop below. Without it the server runs as the GKE node service
+# account, which has no access to that bucket.
+# The key file is removed by sccache-stop.sh, after the server is stopped.
+if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
+  echo "### Authenticating to protected GCS bucket..."
+  SCCACHE_GCS_KEY_PATH="${TMPDIR:-/tmp}/sccache_protected_sa.json"
+  umask 077
+  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > "$SCCACHE_GCS_KEY_PATH"
+  umask 022
+  export SCCACHE_GCS_KEY_PATH
+  gcloud auth activate-service-account --key-file="$SCCACHE_GCS_KEY_PATH"
+fi
+
 max_attempts=${1:-4}
 attempts="$max_attempts"
 
@@ -33,16 +49,6 @@ done
 if [ "${attempts}" = 0 ]; then
   echo "Could not start sccache after ${max_attempts}, running without sccache."
   export RUSTC_WRAPPER=""
-fi
-
-# Authenticate to GCS backend on protected branches
-if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
-  echo "### Authenticating to protected GCS bucket..."
-  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
-  gcloud auth activate-service-account --key-file=protected_sa.json
-  GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
-  export GOOGLE_OAUTH_ACCESS_TOKEN
-  rm -f protected_sa.json
 fi
 
 echo "GCS sccache bucket: ${GCP_SCCACHE_BUCKET:-unset}"
