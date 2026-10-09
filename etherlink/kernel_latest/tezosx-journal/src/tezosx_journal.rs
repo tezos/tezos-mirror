@@ -319,6 +319,13 @@ impl TezosXJournal {
         }
     }
 
+    pub fn discard_fake_top_level_call(&mut self) {
+        if let Some(mut tracer) = self.evm.take_tracer() {
+            tracer.discard_fake_top_level_call();
+            self.evm.restore_tracer(Some(tracer));
+        }
+    }
+
     pub fn enable_debug_precompiles(&mut self) {
         self.evm.enable_debug_precompiles()
     }

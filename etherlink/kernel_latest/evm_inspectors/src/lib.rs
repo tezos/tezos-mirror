@@ -133,6 +133,17 @@ impl Tracer {
             }
         }
     }
+
+    /// See [`CallTracer::discard_fake_top_level_call`]; no-op on the
+    /// struct logger.
+    pub fn discard_fake_top_level_call(&mut self) {
+        match self {
+            Tracer::CallTracer(call_tracer) => call_tracer.discard_fake_top_level_call(),
+            Tracer::StructLogger(struct_logger) => {
+                struct_logger.discard_fake_top_level_call()
+            }
+        }
+    }
 }
 
 /// Access to the [`Tracer`] owned by a journal, for [`TracerInspector`].
