@@ -467,19 +467,31 @@ where
         .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
-        Manager::Revealed(pk) => return Err(RevealError::PreviouslyRevealedKey(pk)),
+        Manager::Revealed(_) => {
+            return Err(RevealError::PreviouslyRevealedKey(Contract::Implicit(
+                source_account.pkh().clone(),
+            )))
+        }
         Manager::NotRevealed(pkh) => pkh,
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
     if &expected_hash != source_account.pkh() {
-        return Err(RevealError::InconsistentHash(expected_hash));
+        return Err(RevealError::InconsistentHash {
+            public_key: public_key.clone(),
+            expected_hash,
+            source_hash: source_account.pkh().clone(),
+        });
     }
 
     // Check the public key
     let pkh_from_pk = public_key.pk_hash();
     if expected_hash != pkh_from_pk {
-        return Err(RevealError::InconsistentPublicKey(expected_hash));
+        return Err(RevealError::InconsistentPublicKey {
+            public_key: public_key.clone(),
+            expected_hash,
+            computed_hash: pkh_from_pk,
+        });
     }
 
     // Set the public key as the manager
@@ -1474,12 +1486,20 @@ where
             // could execute code or touch another root (non-default entrypoint /
             // non-Unit parameter). Do not relax it without revisiting that
             // classifier.
-            if param != Micheline::from(()) || !entrypoint.is_default() {
-                return Err(TransferError::NonSmartContractExecutionCall.into());
+            if !entrypoint.is_default() {
+                return Err(TransferError::NoSuchEntrypoint(entrypoint.clone()).into());
+            }
+            if param != Micheline::from(()) {
+                return Err(TransferError::BadContractParameter(
+                    sender_account.contract(),
+                )
+                .into());
             }
             // Transfers of 0 tez to an implicit contract are rejected.
             if amount.eq(&0_u64.into()) {
-                return Err(TransferError::EmptyImplicitTransfer.into());
+                return Err(
+                    TransferError::EmptyImplicitTransfer(dest_contract.clone()).into()
+                );
             };
 
             let dest_account = context::implicit_from_public_key_hash(pkh)
@@ -2463,6 +2483,19 @@ fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
     )
 }
 
+/// Typechecking failure of an originated script, part `what` of it. Running
+/// out of gas is reported as such, like on L1.
+fn origination_tc_error(what: &str, e: &mir::typechecker::TcError) -> OriginationError {
+    if e.is_out_of_gas() {
+        OriginationError::OutOfGas(mir::gas::OutOfGas)
+    } else {
+        OriginationError::MirTypecheckingError(format!(
+            "{what} : {}",
+            bounded_tc_error(e)
+        ))
+    }
+}
+
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
 pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
@@ -2483,19 +2516,9 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
         .split_script()
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Splitting script : {}",
-                bounded_tc_error(&e)
-            ))
-        })?
+        .map_err(|e| origination_tc_error("Splitting script", &e))?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Script : {}",
-                bounded_tc_error(&e)
-            ))
-        })?;
+        .map_err(|e| origination_tc_error("Script", &e))?;
     let storage_micheline =
         Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
             .map_err(OriginationError::from)?
@@ -2515,12 +2538,7 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
             TypecheckViews::Enabled,
             AllowForgedLazyStorageId::No,
         )
-        .map_err(|e| {
-            OriginationError::MirTypecheckingError(format!(
-                "Storage : {}",
-                bounded_tc_error(&e)
-            ))
-        })
+        .map_err(|e| origination_tc_error("Storage", &e))
 }
 
 /// Dump the initial storage's big maps and serialize it.
@@ -2676,7 +2694,10 @@ where
         &smart_contract,
         &initial_balance.0,
     )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    .map_err(|err| match err {
+        TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
+        _ => OriginationError::FailedToApplyBalanceUpdate,
+    })?;
 
     // Record the classification of the new contract. Origination is the only
     // writer of the origin path for a freshly created KT1, so write it
@@ -4474,7 +4495,7 @@ mod tests {
             receipt: OperationResultSum::Reveal(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
                         changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -4485,7 +4506,11 @@ mod tests {
                     },
                 ],
                 result: ContentResult::Failed(
-                    vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
+                    vec![RevealError::PreviouslyRevealedKey(Contract::Implicit(
+                        source.pkh,
+                    ))
+                    .into()]
+                    .into(),
                 ),
                 internal_operation_results: vec![],
             }),
@@ -6024,7 +6049,7 @@ mod tests {
             receipt: OperationResultSum::Transfer(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
                         changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -6036,7 +6061,7 @@ mod tests {
                 ],
                 result: ContentResult::Failed(
                     vec![ApplyOperationError::Transfer(
-                        TransferError::NonSmartContractExecutionCall,
+                        TransferError::BadContractParameter(Contract::Implicit(src.pkh)),
                     )]
                     .into(),
                 ),
@@ -6110,7 +6135,10 @@ mod tests {
                 ],
                 result: ContentResult::Failed(
                     vec![ApplyOperationError::Transfer(
-                        TransferError::NonSmartContractExecutionCall,
+                        TransferError::NoSuchEntrypoint(
+                            mir::ast::Entrypoint::try_from("non_default")
+                                .expect("Entrypoint should be valid"),
+                        ),
                     )]
                     .into(),
                 ),
@@ -9477,7 +9505,11 @@ mod tests {
                     ],
                     result: ContentResult::Failed(
                         ApplyOperationError::Origination(
-                            OriginationError::FailedToApplyBalanceUpdate,
+                            OriginationError::BalanceTooLow(BalanceTooLow {
+                                contract: Contract::Implicit(src.pkh.clone()),
+                                balance: 399_366_u64.into(),
+                                amount: 999_999_u64.into(),
+                            }),
                         )
                         .into(),
                     ),
@@ -9790,7 +9822,7 @@ mod tests {
             5,
             src.clone(),
             0.into(),
-            Contract::Implicit(dst.pkh),
+            Contract::Implicit(dst.pkh.clone()),
             Parameters::default(),
         );
         let receipts1 = ProcessedOperation::into_receipts(
@@ -9819,8 +9851,8 @@ mod tests {
             }) if errors.len() == 1 && matches!(
                 &errors[0],
                 ApplyOperationError::Transfer(
-                    TransferError::EmptyImplicitTransfer
-                )
+                    TransferError::EmptyImplicitTransfer(contract)
+                ) if *contract == Contract::Implicit(dst.pkh.clone())
             )
         ), "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}", receipts1[0]);
 
@@ -9923,8 +9955,8 @@ mod tests {
                         if errors.len() == 1 && matches!(
                             &errors[0],
                             ApplyOperationError::Transfer(
-                                TransferError::EmptyImplicitTransfer
-                            )
+                                TransferError::EmptyImplicitTransfer(contract)
+                            ) if *contract == Contract::Implicit(src.pkh.clone())
                         )
                 )
             ),
@@ -12520,20 +12552,18 @@ mod tests {
                 as u64
                 - mir::gas::interpret_cost::micheline_decoding_bytes(short_code.len())
                     .unwrap() as u64;
-        // charge_persisted_error gas (charged per byte of the Debug-rendered error).
+        // charge_persisted_error gas (charged per byte of the encoded error).
         let short_rendered = match &err_short.error {
-            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            CracError::Operation(te) => te.persisted_len() as u64,
             other => panic!("expected Operation error (short), got: {other:?}"),
         };
         let long_rendered = match &err_long.error {
-            CracError::Operation(te) => format!("{te:?}").len() as u64,
+            CracError::Operation(te) => te.persisted_len() as u64,
             other => panic!("expected Operation error (long), got: {other:?}"),
         };
         // The error is persisted once (synthetic alias(E_1)→target
-        // failed-transfer entry only), charged per byte over the *wrapped*
-        // length ("Transfer(" + bare_debug + ")", i.e. bare + 10). The
-        // constant +10 wrapper cancels in the delta, so the per-byte charge
-        // applies to the rendered length delta.
+        // failed-transfer entry only), charged per byte over its encoded
+        // length.
         let metering_delta = u64::from(
             PERSISTED_ERROR_PER_BYTE_MILLIGAS * (long_rendered - short_rendered),
         );
@@ -12786,7 +12816,7 @@ mod tests {
                 ContentResult::Failed(errors) => errors
                     .errors
                     .iter()
-                    .map(|e| format!("{e:?}").len())
+                    .map(|e| e.persisted_len())
                     .sum::<usize>(),
                 other => {
                     panic!("expected Failed internal receipt on OOG, got: {other:?}")
@@ -12795,13 +12825,10 @@ mod tests {
             other => panic!("expected Transfer internal receipt, got: {other:?}"),
         };
         // A bounded body must be much smaller than the N_LONG-byte payload.
-        let long_payload_debug_len = format!(
-            "{:?}",
-            ApplyOperationError::Transfer(
-                TransferError::MichelsonContractInterpretError("x".repeat(N_LONG))
-            )
+        let long_payload_debug_len = ApplyOperationError::Transfer(
+            TransferError::MichelsonContractInterpretError("x".repeat(N_LONG)),
         )
-        .len();
+        .persisted_len();
         assert!(
             oog_body_len < long_payload_debug_len,
             "OOG internal receipt body ({oog_body_len} bytes) must be smaller \

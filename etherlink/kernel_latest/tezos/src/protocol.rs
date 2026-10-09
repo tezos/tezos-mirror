@@ -11,6 +11,19 @@ pub enum Protocol {
 
 pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::U025;
 
+impl Protocol {
+    /// The prefix of the ids of the errors of this protocol on L1: an error
+    /// `<id>` of this protocol is identified as `proto.<prefix>.<id>`. It is
+    /// made of the version number and the short hash of the protocol (see
+    /// `src/proto_*/lib_protocol/dune`).
+    pub const fn error_prefix(self) -> &'static str {
+        match self {
+            Protocol::T024 => "024-PtTALLiN",
+            Protocol::U025 => "025-PsUshuai",
+        }
+    }
+}
+
 /// The oldest protocol the Michelson runtime still supports. Used as the
 /// default `next_protocol` when decoding headers from kernels that predate
 /// this field.
@@ -90,6 +103,12 @@ mod tests {
         let rlp = rlp::Rlp::new(&encoded);
         let decoded: Protocol = rlp.as_val().unwrap();
         assert_eq!(decoded, protocol);
+    }
+
+    #[test]
+    pub fn error_prefixes_match_l1_error_ids() {
+        assert_eq!(Protocol::T024.error_prefix(), "024-PtTALLiN");
+        assert_eq!(Protocol::U025.error_prefix(), "025-PsUshuai");
     }
 
     #[test]

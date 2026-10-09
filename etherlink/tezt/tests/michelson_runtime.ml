@@ -29,6 +29,11 @@ let check_kernel_version ~evm_node ~equal expected =
       ~error_msg:"Expected kernelVersion to be different than %R" ;
   return kernel_version
 
+(* How the client reports an operation that ran out of gas, or whose cost
+   could not be represented, which the Michelson runtime reports as
+   [gas_exhausted.operation], as L1 does. *)
+let client_out_of_gas = "Gas limit exceeded during typechecking or execution"
+
 let register_tezosx_test ~title ~tags ?(kernels = [Kernel.Latest])
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
@@ -629,6 +634,100 @@ let test_submitted_counter =
       int
       ~__LOC__
       ~error_msg:"The expected counter should be %R, got %L") ;
+  unit
+
+(* A transfer of the whole balance of its source, which cannot be paid once
+   the fee is debited, is how a wallet probes the maximal amount it can send
+   (here to itself, so that no storage is needed).
+   Its failure is reported with the id and fields of L1. *)
+let test_balance_too_low_error =
+  register_tezosx_test
+    ~title:"Michelson runtime reports balance_too_low as L1 does"
+    ~tags:["rpc"; "simulate"; "error"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
+  let source = Constant.bootstrap1 in
+  let fee = 1000 in
+  let* balance =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:source.public_key_hash
+         ()
+  in
+  let balance = Tez.to_mutez balance in
+  let* counter =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let simulate amount =
+    let* branch =
+      RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash ()
+    in
+    let* op =
+      Operation.Manager.(
+        operation
+          ~branch
+          ~signer:source
+          [
+            make
+              ~source
+              ~counter
+              ~fee
+              ~gas_limit:3000
+              ~storage_limit:0
+              (transfer ~dest:source ~amount ());
+          ]
+          client)
+    in
+    let* data = Operation.make_run_operation_input op client in
+    let* response =
+      RPC_core.call tezlink_endpoint
+      @@ RPC.post_chain_block_helpers_scripts_simulate_operation
+           ~data:(RPC_core.Data data)
+           ()
+    in
+    return
+      JSON.(response |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
+  in
+  (* Once the fee is paid, the whole balance cannot be sent. *)
+  let* op_result = simulate balance in
+  Check.(
+    (JSON.(op_result |-> "status" |> as_string) = "failed")
+      string
+      ~error_msg:"Expected the transfer of the whole balance to be %R, got %L") ;
+  let errors = JSON.(op_result |-> "errors" |> as_list) in
+  Check.((List.length errors = 1) int ~error_msg:"Expected %R error, got %L") ;
+  let err = List.hd errors in
+  let field name = JSON.(err |-> name |> as_string) in
+  Check.(
+    (field "kind" = "temporary") string ~error_msg:"Expected kind %R, got %L") ;
+  Check.(
+    (field "id" = Michelson_contracts.error_id "contract.balance_too_low")
+      string
+      ~error_msg:"Expected id %R, got %L") ;
+  Check.(
+    (field "contract" = source.public_key_hash)
+      string
+      ~error_msg:"Expected contract %R, got %L") ;
+  Check.(
+    (field "balance" = string_of_int (balance - fee))
+      string
+      ~error_msg:"Expected balance %R, got %L") ;
+  Check.(
+    (field "amount" = string_of_int balance)
+      string
+      ~error_msg:"Expected amount %R, got %L") ;
+  (* What is left once the fee is paid can be sent. *)
+  let* op_result = simulate (balance - fee) in
+  Check.(
+    (JSON.(op_result |-> "status" |> as_string) = "applied")
+      string
+      ~error_msg:
+        "Expected the transfer of the balance minus the fee to be %R, got %L") ;
   unit
 
 let test_version =
@@ -4112,12 +4211,11 @@ let test_michelson_gas_exhaustion =
       string
       ~error_msg:"Expected operation to fail (gas exhaustion), got status %L") ;
   (* Verify the error is specifically gas exhaustion. *)
-  let error_message =
-    JSON.(op_result |-> "errors" |=> 0 |-> "error_message" |> as_string)
-  in
+  let error_id = JSON.(op_result |-> "errors" |=> 0 |-> "id" |> as_string) in
   Check.(
-    (error_message =~ rex "Gas_exhaustion")
-      ~error_msg:"Expected Gas_exhaustion error, got %L") ;
+    (error_id = Michelson_contracts.error_id "gas_exhausted.operation")
+      string
+      ~error_msg:"Expected error %R, got %L") ;
   let* balance_after =
     Client.get_balance_for
       ~endpoint
@@ -4245,7 +4343,7 @@ code {
       client
   in
   let* err = Process.check_and_read_stderr ~expect_failure:true process in
-  Check.(err =~ rex "Gas_exhaustion")
+  Check.(err =~ rex client_out_of_gas)
     ~error_msg:"Expected a clean out-of-gas failure, got %L" ;
   unit
 
@@ -4365,10 +4463,9 @@ code {
       client
   in
   let* err = Process.check_and_read_stderr ~expect_failure:true process in
-  (* The Michelson runtime surfaces this as [Transfer(OutOfGas(OutOfGas))]
-     rather than the protocol's [Gas_exhaustion]; what matters is that it is a
-     bounded error at all, where before the fix the kernel trapped. *)
-  Check.(err =~ rex "OutOfGas")
+  (* What matters is that it is a bounded error at all, where before the fix
+     the kernel trapped. *)
+  Check.(err =~ rex client_out_of_gas)
     ~error_msg:"Expected a clean out-of-gas failure, got %L" ;
   unit
 
@@ -6714,7 +6811,7 @@ code {
         ~sequencer
         ~client
         ~alias:"blake2b"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ hash_contract ~op:"BLAKE2B"
     in
     let* () =
@@ -6722,7 +6819,7 @@ code {
         ~sequencer
         ~client
         ~alias:"keccak"
-        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ hash_contract ~op:"KECCAK"
     in
     let* () =
@@ -6730,7 +6827,7 @@ code {
         ~sequencer
         ~client
         ~alias:"sha256"
-        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ hash_contract ~op:"SHA256"
     in
     let* () =
@@ -6738,7 +6835,7 @@ code {
         ~sequencer
         ~client
         ~alias:"sha3"
-        ~outcome:(Fails_with "arithmetic overflow in cost computation")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ hash_contract ~op:"SHA3"
     in
     let* () =
@@ -6746,7 +6843,7 @@ code {
         ~sequencer
         ~client
         ~alias:"sha512"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ hash_contract ~op:"SHA512"
     in
     unit
@@ -6762,7 +6859,7 @@ code {
       ~sequencer
       ~client
       ~alias:"checksignature"
-      ~outcome:(Fails_with "Gas_exhaustion")
+      ~outcome:(Fails_with client_out_of_gas)
       {|
 parameter unit ;
 storage unit ;
@@ -6819,7 +6916,7 @@ code {
         ~sequencer
         ~client
         ~alias:"lsl"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
         {|
 parameter unit ;
 storage unit ;
@@ -6842,7 +6939,7 @@ code {
         ~sequencer
         ~client
         ~alias:"lsr"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
         {|
 parameter unit ;
 storage unit ;
@@ -6876,7 +6973,7 @@ code {
         ~sequencer
         ~client
         ~alias:"concatstring"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
         {|
 parameter unit ;
 storage unit ;
@@ -6899,7 +6996,7 @@ code {
         ~sequencer
         ~client
         ~alias:"concatbytes"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
         {|
 parameter unit ;
 storage unit ;
@@ -6929,7 +7026,7 @@ code {
       ~sequencer
       ~client
       ~alias:"not"
-      ~outcome:(Fails_with "Gas_exhaustion")
+      ~outcome:(Fails_with client_out_of_gas)
       {|
 parameter unit ;
 storage unit ;
@@ -6973,7 +7070,7 @@ code {
         ~sequencer
         ~client
         ~alias:"and"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ bitwise_contract ~op:"AND"
     in
     let* () =
@@ -6981,7 +7078,7 @@ code {
         ~sequencer
         ~client
         ~alias:"or"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ bitwise_contract ~op:"OR"
     in
     let* () =
@@ -6989,7 +7086,7 @@ code {
         ~sequencer
         ~client
         ~alias:"xor"
-        ~outcome:(Fails_with "Gas_exhaustion")
+        ~outcome:(Fails_with client_out_of_gas)
       @@ bitwise_contract ~op:"XOR"
     in
     unit
@@ -7004,7 +7101,7 @@ code {
       ~sequencer
       ~client
       ~alias:"slice"
-      ~outcome:(Fails_with "Gas_exhaustion")
+      ~outcome:(Fails_with client_out_of_gas)
       {|
 parameter unit ;
 storage unit ;
@@ -7036,7 +7133,7 @@ code {
       ~alias:"finalizestorage"
       ~init:"0x"
       ~arg:"Pair 0x 0x"
-      ~outcome:(Fails_with "OutOfGas")
+      ~outcome:(Fails_with client_out_of_gas)
       {|
 parameter (pair bytes bytes) ;
 storage bytes ;
@@ -7073,7 +7170,7 @@ code {
       ~alias:"bigmapdump"
       ~init:"Pair {} 0x"
       ~arg:"Unit"
-      ~outcome:(Fails_with "Gas_exhaustion")
+      ~outcome:(Fails_with client_out_of_gas)
       {|
 parameter unit ;
 storage (pair (big_map bytes bytes) bytes) ;
@@ -7156,6 +7253,7 @@ let () =
   test_manager_key [Alpha] ;
   test_counter [Alpha] ;
   test_submitted_counter [Alpha] ;
+  test_balance_too_low_error [Alpha] ;
   test_protocols [Alpha] ;
   test_genesis_block_arg [Alpha] ;
   test_expected_issuance [Alpha] ;

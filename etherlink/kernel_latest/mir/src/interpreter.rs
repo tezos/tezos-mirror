@@ -208,6 +208,35 @@ pub enum EnshrinedViewDispatchError {
     UnclassifiableResponse { status: u16 },
 }
 
+impl InterpretError<'_> {
+    /// Whether this error is a resource exhaustion, see
+    /// [TcError::is_out_of_gas], including the exhaustions nested in a
+    /// typechecking or lazy storage error.
+    pub fn is_out_of_gas(&self) -> bool {
+        match self {
+            InterpretError::OutOfGas
+            | InterpretError::CostOverflow(_)
+            | InterpretError::CompareError(CompareError::Cost(_))
+            | InterpretError::CompareError(CompareError::OutOfGas(_)) => true,
+            InterpretError::TcError(e) => e.is_out_of_gas(),
+            InterpretError::LazyStorageError(e) => e.is_out_of_gas(),
+            _ => false,
+        }
+    }
+}
+
+impl ContractInterpretError<'_> {
+    /// Whether this error is a resource exhaustion, see
+    /// [TcError::is_out_of_gas].
+    pub fn is_out_of_gas(&self) -> bool {
+        match self {
+            ContractInterpretError::TcError(e) => e.is_out_of_gas(),
+            ContractInterpretError::InterpretError(e) => e.is_out_of_gas(),
+            ContractInterpretError::LazyStorageError(e) => e.is_out_of_gas(),
+        }
+    }
+}
+
 impl<'a> From<OutOfGas> for InterpretError<'a> {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas

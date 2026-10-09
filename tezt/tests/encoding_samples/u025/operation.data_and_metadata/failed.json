@@ -14,14 +14,18 @@
           "status": "failed",
           "errors": [
             {
-              "kind": "permanent",
-              "id": "tezlink_error",
-              "error_message": "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) }))"
+              "kind": "temporary",
+              "id": "proto.025-PsUshuai.contract.balance_too_low",
+              "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+              "balance": "10",
+              "amount": "21"
             },
             {
-              "kind": "permanent",
-              "id": "tezlink_error",
-              "error_message": "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\"))), balance: Narith(55), amount: Narith(1111) }))"
+              "kind": "temporary",
+              "id": "proto.025-PsUshuai.contract.balance_too_low",
+              "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+              "balance": "55",
+              "amount": "1111"
             }
           ]
         }
