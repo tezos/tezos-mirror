@@ -229,6 +229,9 @@ impl Registry for NotWiredRegistry {
     }
 }
 
+/// What [`MockRegistry::with_serve_journal_hook`] runs on the journal.
+pub type ServeJournalHook = Box<dyn Fn(&mut TezosXJournal)>;
+
 /// Configurable success mock with call tracking.
 ///
 /// - `ensure_alias` / `compute_alias` return `generated_alias` (unless
@@ -258,6 +261,10 @@ pub struct MockRegistry {
     pub alias_creation_out_of_gas: bool,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
+    /// When `Some`, `serve` runs it on the journal before answering, so
+    /// tests can leave what the target runtime would have recorded there
+    /// (e.g. the CRAC receipt of a nested call). Default `None`.
+    pub serve_journal_hook: Option<ServeJournalHook>,
 }
 
 impl MockRegistry {
@@ -271,6 +278,7 @@ impl MockRegistry {
             alias_creation_out_of_gas: false,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
+            serve_journal_hook: None,
         }
     }
 
@@ -292,6 +300,15 @@ impl MockRegistry {
     /// override path.
     pub fn with_serve_response(mut self, status: u16, body: Vec<u8>) -> Self {
         self.serve_override = Some((status, body));
+        self
+    }
+
+    /// Have `serve()` run `hook` on the journal before answering.
+    pub fn with_serve_journal_hook(
+        mut self,
+        hook: impl Fn(&mut TezosXJournal) + 'static,
+    ) -> Self {
+        self.serve_journal_hook = Some(Box::new(hook));
         self
     }
 
@@ -431,7 +448,7 @@ impl Registry for MockRegistry {
     fn serve<Host, KS>(
         &self,
         _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
-        _journal: &mut TezosXJournal,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
@@ -439,6 +456,9 @@ impl Registry for MockRegistry {
         KS: KeySpace,
     {
         self.serve_calls.borrow_mut().push(request);
+        if let Some(hook) = &self.serve_journal_hook {
+            hook(journal);
+        }
         match &self.serve_override {
             None => http::Response::builder()
                 .status(200)
