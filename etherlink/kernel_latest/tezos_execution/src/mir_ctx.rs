@@ -38,9 +38,10 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError, KeySpaceLoader, ReadKind};
+use tezos_smart_rollup_keyspace::{
+    Key, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
+};
 use tezos_storage::error::StorageReadErrorKind;
-use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
@@ -271,14 +272,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         id: &BigMapId,
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         let arena = Arena::new();
-        let key_type_path = key_type_path(id)?;
-        let value_type_path = value_type_path(id)?;
+        let key_type_key = key_type_key(id)?;
+        let value_type_key = value_type_key(id)?;
 
-        let encoded_key_type = match self.rk.host().store_read_all(&key_type_path) {
-            Ok(key_type) => Ok(key_type),
-            Err(RuntimeError::PathNotFound) => return Ok(None),
-            Err(err) => Err(err),
-        }?;
+        let Some(encoded_key_type) = self.rk.tez_accounts().get(&key_type_key) else {
+            return Ok(None);
+        };
 
         let key_type = Micheline::decode_raw(
             &arena,
@@ -287,11 +286,9 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         )??
         .parse_ty(self.gas())?;
 
-        let encoded_value_type = match self.rk.host().store_read_all(&value_type_path) {
-            Ok(key_type) => Ok(key_type),
-            Err(RuntimeError::PathNotFound) => return Ok(None),
-            Err(err) => Err(err),
-        }?;
+        let Some(encoded_value_type) = self.rk.tez_accounts().get(&value_type_key) else {
+            return Ok(None);
+        };
         let value_type = Micheline::decode_raw(
             &arena,
             &encoded_value_type,
@@ -1150,10 +1147,14 @@ impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
         if temporary {
             Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
-            let next_id_path = next_id_path()?;
-            let id: BigMapId =
-                read_nom_value(self.rk.host(), &next_id_path).unwrap_or(0.into());
-            store_bin(&id.succ(), self.rk.host_mut(), &next_id_path)
+            let id: BigMapId = self
+                .rk
+                .tez_accounts()
+                .read_nom_or(&NEXT_ID_KEY, 0.into())
+                .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+            self.rk
+                .tez_accounts_mut()
+                .store_bin(&NEXT_ID_KEY, &id.succ())
                 .map_err(storage_error_to_lazy)?;
             Ok(id)
         }
@@ -1164,6 +1165,7 @@ fn remove_big_map<Host: StorageV1>(
     host: &mut Host,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
+    // The keyspace cannot delete every key under a path, so this uses the raw host.
     host.store_delete(&big_map_path(id)?)?;
 
     Ok(())
@@ -1209,33 +1211,29 @@ fn hash_micheline_expr(
     Ok(digest_256(&bytes).into())
 }
 
-/// Adapter for the legacy `tezos_storage::Error → LazyStorageError`
-/// stringification path. `tezos_storage::Error` is not a `BinError`, so
-/// the new `From<BinError>` impl on `LazyStorageError` does not apply
-/// here; keep the explicit conversion isolated in one helper instead of
-/// inlining `.map_err(|e| LazyStorageError::BinWriteError(...))` at
-/// each call site.
-fn storage_error_to_lazy(e: tezos_storage::error::Error) -> LazyStorageError {
+/// Converts a storage failure into a [`LazyStorageError::BinWriteError`]
+/// that holds its message.
+///
+/// [`LazyStorageError`] has no `From` impl for this conversion, because it
+/// belongs to `mir`, and `mir` does not depend on `tezos-storage-latest`.
+fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStorageError {
     LazyStorageError::BinWriteError(std::rc::Rc::new(
-        tezos_data_encoding::enc::BinError::custom(e.to_string()),
+        tezos_data_encoding::enc::BinError::custom(e.into().to_string()),
     ))
 }
 
 /// Charge for and read a big_map entry value, returning `None` when absent.
 fn read_big_map_value_metered(
     operation_gas: &mut crate::gas::TezlinkOperationGas,
-    host: &impl StorageV1,
-    path: &impl tezos_smart_rollup_host::path::Path,
+    tez_accounts: &impl KeySpace,
+    key: &Key,
 ) -> Result<Option<Vec<u8>>, LazyStorageError> {
     consume_storage_read_milligas(operation_gas, 1, 0)?; // mem
-    match host.store_value_size(path) {
-        Ok(size) => {
-            consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
-            Ok(Some(host.store_read_all(path)?))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(e) => Err(e.into()),
-    }
+    let Some(size) = tez_accounts.value_length(key) else {
+        return Ok(None);
+    };
+    consume_storage_read_milligas(operation_gas, 1, size as u64)?; // get
+    Ok(tez_accounts.get(key))
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
@@ -1320,11 +1318,11 @@ const BYTES_SIZE_FOR_EMPTY: u64 = 33;
 
 /// Read the `total_bytes` counter persisted for a big-map.
 fn total_bytes(
-    host: &mut impl StorageV1,
+    tez_accounts: &impl KeySpace,
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
-    let path = total_bytes_path(id)?;
-    match read_optional_nom_value::<Zarith>(host, &path) {
+    let key = total_bytes_key(id)?;
+    match tez_accounts.read_nom::<Zarith>(&key) {
         Ok(Some(total)) => Ok(total),
         Ok(None) => Err(LazyStorageError::MissingTotalBytes(id.clone())),
         Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
@@ -1333,12 +1331,14 @@ fn total_bytes(
 
 /// Write the `total_bytes` counter persisted for a big-map.
 fn set_total_bytes(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     id: &BigMapId,
     value: &Zarith,
 ) -> Result<(), LazyStorageError> {
-    let path = total_bytes_path(id)?;
-    store_bin(value, host, &path).map_err(storage_error_to_lazy)?;
+    let key = total_bytes_key(id)?;
+    tez_accounts
+        .store_bin(&key, value)
+        .map_err(storage_error_to_lazy)?;
     Ok(())
 }
 
@@ -1359,9 +1359,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         key: &TypedValue,
         value_type: &Type,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(id, &hash_key(key.clone(), self.gas())?)?;
-        let Some(encoded_value) =
-            read_big_map_value_metered(self.operation_gas, self.rk.host(), &value_path)?
+        let value_key = value_key(id, &hash_key(key.clone(), self.gas())?)?;
+        let Some(encoded_value) = read_big_map_value_metered(
+            self.operation_gas,
+            self.rk.tez_accounts(),
+            &value_key,
+        )?
         else {
             return Ok(None);
         };
@@ -1387,10 +1390,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
         let key_hashed = hash_key(key.clone(), self.gas())?;
-        let path = value_path(id, &key_hashed)?;
+        let key = value_key(id, &key_hashed)?;
         // Mirrors L1's carbonated `Big_map.Contents.mem`.
         consume_storage_read_milligas(self.operation_gas, 1, 0)?;
-        Ok(self.rk.host().store_has(&path)?.is_some())
+        Ok(self.rk.tez_accounts().contains(&key))
     }
 
     fn big_map_update_ref(
@@ -1410,15 +1413,16 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         // key_hashed: hash of packed encoding (with 0x05 prefix), used for storage path
         // See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L5563
         let key_hashed = hash_micheline_expr(&micheline_expr, self.gas())?;
-        let value_path = value_path(id, &key_hashed)?;
+        let value_key = value_key(id, &key_hashed)?;
         match value {
             None => {
                 consume_storage_write_milligas(self.operation_gas, 1, 0)?;
                 let mut lazy_storage_size_diff = Zarith(BigInt::from(0));
-                if self.rk.host().store_has(&value_path)?.is_some() {
-                    let previous_value_size: BigInt =
-                        self.rk.host().store_value_size(&value_path)?.into();
-                    self.rk.host_mut().store_delete(&value_path)?;
+                if let Some(previous_value_size) =
+                    self.rk.tez_accounts().value_length(&value_key)
+                {
+                    let previous_value_size: BigInt = previous_value_size.into();
+                    self.rk.tez_accounts_mut().delete(&value_key);
 
                     lazy_storage_size_diff = Zarith(
                         -(BigInt::from(BYTES_SIZE_FOR_BIG_MAP_KEY) + previous_value_size),
@@ -1442,15 +1446,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     .encode(&mut self.operation_gas.remaining)??;
                 let new_value_size: BigInt = encoded.len().into();
                 let lazy_storage_size_diff =
-                    match self.rk.host().store_value_size(&value_path) {
-                        Err(RuntimeError::PathNotFound) => {
-                            Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size)
-                        }
-                        Ok(previous_value_size) => {
+                    match self.rk.tez_accounts().value_length(&value_key) {
+                        None => Zarith(BYTES_SIZE_FOR_BIG_MAP_KEY + new_value_size),
+                        Some(previous_value_size) => {
                             let previous_value_size: BigInt = previous_value_size.into();
                             Zarith(new_value_size - previous_value_size)
                         }
-                        Err(err) => return Err(err.into()),
                     };
                 self.interpret_context
                     .record_lazy_storage_size_diff(id, &lazy_storage_size_diff);
@@ -1461,7 +1462,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     1,
                     encoded.len() as u64,
                 )?;
-                self.rk.host_mut().store_write_all(&value_path, &encoded)?;
+                self.rk
+                    .tez_accounts_mut()
+                    .set(&value_key, &encoded)
+                    .map_err(storage_error_to_lazy)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -1486,8 +1490,12 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
         if delta.0.is_zero() {
             return Ok(());
         }
-        let current = total_bytes(self.rk.host_mut(), id)?;
-        set_total_bytes(self.rk.host_mut(), id, &Zarith(current.0 + &delta.0))
+        let current = total_bytes(self.rk.tez_accounts(), id)?;
+        set_total_bytes(
+            self.rk.tez_accounts_mut(),
+            id,
+            &Zarith(current.0 + &delta.0),
+        )
     }
 
     fn big_map_new(
@@ -1498,8 +1506,8 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
         let id = self.generate_id(temporary)?;
-        let key_type_path = key_type_path(&id)?;
-        let value_type_path = value_type_path(&id)?;
+        let key_type_key = key_type_key(&id)?;
+        let value_type_key = value_type_key(&id)?;
         let key_type_encoded = key_type
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
@@ -1507,12 +1515,14 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .into_micheline_optimized_legacy(&arena, self.gas())?
             .encode(&mut self.operation_gas.remaining)??;
         self.rk
-            .host_mut()
-            .store_write_all(&value_type_path, &value_type_encoded)?;
+            .tez_accounts_mut()
+            .set(&value_type_key, &value_type_encoded)
+            .map_err(storage_error_to_lazy)?;
         self.rk
-            .host_mut()
-            .store_write_all(&key_type_path, &key_type_encoded)?;
-        set_total_bytes(self.rk.host_mut(), &id, &Zarith(BigInt::from(0)))?;
+            .tez_accounts_mut()
+            .set(&key_type_key, &key_type_encoded)
+            .map_err(storage_error_to_lazy)?;
+        set_total_bytes(self.rk.tez_accounts_mut(), &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
             &id,
@@ -1536,8 +1546,9 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
 
         // The copy is paid for in *storage burn*, via the `total_bytes(src) + bytes_size_for_empty`
         // returned by `apply_init`
-        let source_total_bytes = total_bytes(self.rk.host_mut(), id)?;
+        let source_total_bytes = total_bytes(self.rk.tez_accounts(), id)?;
 
+        // The keyspace cannot copy every key under a path, so this uses the raw host.
         self.rk.host_mut().store_copy(&src_path, &dest_path)?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -1559,7 +1570,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let total = total_bytes(self.rk.host_mut(), id)?;
+        let total = total_bytes(self.rk.tez_accounts(), id)?;
         self.interpret_context.record_lazy_storage_size_diff(
             id,
             &Zarith(-(BigInt::from(BYTES_SIZE_FOR_EMPTY) + total.0)),
@@ -1695,15 +1706,15 @@ pub mod tests {
         ctx: &TcCtx<'a, '_, Host>,
         id: &BigMapId,
     ) {
-        let key_type_path = key_type_path(id).unwrap();
+        let key_type_key = key_type_key(id).unwrap();
         assert!(
-            ctx.rk.host().store_has(&key_type_path).unwrap().is_none(),
+            !ctx.rk.tez_accounts().contains(&key_type_key),
             "Key type should have been removed",
         );
 
-        let value_type_path = value_type_path(id).unwrap();
+        let value_type_key = value_type_key(id).unwrap();
         assert!(
-            ctx.rk.host().store_has(&value_type_path).unwrap().is_none(),
+            !ctx.rk.tez_accounts().contains(&value_type_key),
             "Value type should have been removed",
         );
     }
@@ -2489,7 +2500,23 @@ pub mod tests {
 
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0.into());
+        assert_eq!(total_bytes(ctx.rk.tez_accounts(), &id).unwrap(), 0.into());
+    }
+
+    /// Makes sure that `big_map_new` fails on a next-ID counter that does not
+    /// decode, and leaves the counter unchanged.
+    #[test]
+    fn big_map_new_rejects_an_undecodable_next_id() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        make_default_ctx!(ctx, rk);
+        ctx.rk.tez_accounts_mut().set(&NEXT_ID_KEY, [0xff]).unwrap();
+
+        assert!(matches!(
+            ctx.big_map_new(&Type::Int, &Type::String, false),
+            Err(LazyStorageError::NomReadError(_))
+        ));
+        assert_eq!(ctx.rk.tez_accounts().get(&NEXT_ID_KEY), Some(vec![0xff]));
     }
 
     #[test]
@@ -2500,13 +2527,13 @@ pub mod tests {
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
         let value = TypedValue::String("hello".into());
         let value_size = encoded_size(&value);
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2523,7 +2550,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(small))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         let big = TypedValue::String("hello, world".into());
         let big_size = encoded_size(&big);
@@ -2532,7 +2559,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + big_size - small_size).into()
         );
     }
@@ -2549,7 +2576,7 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(big))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         let small = TypedValue::String("hi".into());
         let small_size = encoded_size(&small);
@@ -2558,7 +2585,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 + small_size - big_size).into()
         );
     }
@@ -2575,12 +2602,12 @@ pub mod tests {
         ctx.big_map_update(&id, TypedValue::int(1), Some(value))
             .unwrap();
 
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             (old_total_bytes.0 - (BYTES_SIZE_FOR_BIG_MAP_KEY + value_size)).into()
         );
     }
@@ -2591,12 +2618,12 @@ pub mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
         let id = ctx.big_map_new(&Type::Int, &Type::String, false).unwrap();
-        let old_total_bytes = total_bytes(ctx.rk.host_mut(), &id).unwrap();
+        let old_total_bytes = total_bytes(ctx.rk.tez_accounts(), &id).unwrap();
 
         ctx.big_map_update(&id, TypedValue::int(42), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             old_total_bytes
         );
     }
@@ -2619,11 +2646,14 @@ pub mod tests {
             Some(TypedValue::String("bb".into())),
         )
         .unwrap();
-        let src_total = total_bytes(ctx.rk.host_mut(), &src).unwrap();
+        let src_total = total_bytes(ctx.rk.tez_accounts(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &dest).unwrap(), src_total);
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
+            src_total
+        );
     }
 
     /// `big_map_copy` duplicates the whole subtree with one `store_copy`
@@ -2694,7 +2724,10 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
+            0u64.into()
+        );
     }
 
     #[test]
@@ -2719,7 +2752,7 @@ pub mod tests {
         }
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &id).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
             Zarith(expected)
         );
     }
@@ -2737,7 +2770,7 @@ pub mod tests {
         )
         .unwrap();
         let dest = ctx.big_map_copy(&src, false).unwrap();
-        let dest_total_after_copy = total_bytes(ctx.rk.host_mut(), &dest).unwrap();
+        let dest_total_after_copy = total_bytes(ctx.rk.tez_accounts(), &dest).unwrap();
 
         ctx.big_map_update(
             &src,
@@ -2748,7 +2781,7 @@ pub mod tests {
         ctx.big_map_update(&src, TypedValue::int(1), None).unwrap();
 
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
             dest_total_after_copy
         );
     }
@@ -2769,7 +2802,7 @@ pub mod tests {
             ctx.big_map_update(&src, TypedValue::int(*k), Some(v.clone()))
                 .unwrap();
         }
-        let src_total_after_inserts = total_bytes(ctx.rk.host_mut(), &src).unwrap();
+        let src_total_after_inserts = total_bytes(ctx.rk.tez_accounts(), &src).unwrap();
 
         let dest = ctx.big_map_copy(&src, false).unwrap();
 
@@ -2782,7 +2815,7 @@ pub mod tests {
         let extra = encoded_size(&TypedValue::String("xx".into()))
             - encoded_size(&TypedValue::String("x".into()));
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &src).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &src).unwrap(),
             Zarith(src_total_after_inserts.0.clone() + extra)
         );
 
@@ -2795,15 +2828,15 @@ pub mod tests {
         let added =
             BYTES_SIZE_FOR_BIG_MAP_KEY + encoded_size(&TypedValue::String("wwww".into()));
         assert_eq!(
-            total_bytes(ctx.rk.host_mut(), &dest).unwrap(),
+            total_bytes(ctx.rk.tez_accounts(), &dest).unwrap(),
             Zarith(src_total_after_inserts.0 + added)
         );
 
         ctx.big_map_remove(&src).unwrap();
-        let src_path = total_bytes_path(&src).unwrap();
-        assert!(ctx.rk.host().store_has(&src_path).unwrap().is_none());
+        let src_total_bytes_key = total_bytes_key(&src).unwrap();
+        assert!(!ctx.rk.tez_accounts().contains(&src_total_bytes_key));
 
-        assert!(total_bytes(ctx.rk.host_mut(), &dest).unwrap().0 > 0u64.into());
+        assert!(total_bytes(ctx.rk.tez_accounts(), &dest).unwrap().0 > 0u64.into());
     }
 
     #[test]
@@ -2827,11 +2860,14 @@ pub mod tests {
         .unwrap();
         ctx.big_map_update(&id, TypedValue::int(1), None).unwrap();
 
-        assert_eq!(total_bytes(ctx.rk.host_mut(), &id).unwrap(), 0u64.into());
+        assert_eq!(
+            total_bytes(ctx.rk.tez_accounts(), &id).unwrap(),
+            0u64.into()
+        );
     }
 
     #[test]
-    fn big_map_remove_clears_total_bytes_path() {
+    fn big_map_remove_clears_total_bytes_key() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
@@ -2842,12 +2878,12 @@ pub mod tests {
             Some(TypedValue::String("hello".into())),
         )
         .unwrap();
-        let path = total_bytes_path(&id).unwrap();
-        assert!(ctx.rk.host().store_has(&path).unwrap().is_some());
+        let total_bytes_key = total_bytes_key(&id).unwrap();
+        assert!(ctx.rk.tez_accounts().contains(&total_bytes_key));
 
         ctx.big_map_remove(&id).unwrap();
 
-        assert!(ctx.rk.host().store_has(&path).unwrap().is_none());
+        assert!(!ctx.rk.tez_accounts().contains(&total_bytes_key));
     }
 
     #[test]
@@ -2863,12 +2899,12 @@ pub mod tests {
         )
         .unwrap();
 
-        let path = total_bytes_path(&id).unwrap();
-        ctx.rk.host_mut().store_delete(&path).unwrap();
+        let total_bytes_key = total_bytes_key(&id).unwrap();
+        ctx.rk.tez_accounts_mut().delete(&total_bytes_key);
 
         assert!(
             matches!(
-                total_bytes(ctx.rk.host_mut(), &id),
+                total_bytes(ctx.rk.tez_accounts(), &id),
                 Err(LazyStorageError::MissingTotalBytes(_))
             ),
             "an absent counter must surface as MissingTotalBytes"
@@ -2894,16 +2930,16 @@ pub mod tests {
             Some(TypedValue::String("world".into())),
         )
         .unwrap();
-        let path1 = total_bytes_path(&temp1).unwrap();
-        let path2 = total_bytes_path(&temp2).unwrap();
-        assert!(ctx.rk.host().store_has(&path1).unwrap().is_some());
-        assert!(ctx.rk.host().store_has(&path2).unwrap().is_some());
+        let key1 = total_bytes_key(&temp1).unwrap();
+        let key2 = total_bytes_key(&temp2).unwrap();
+        assert!(ctx.rk.tez_accounts().contains(&key1));
+        assert!(ctx.rk.tez_accounts().contains(&key2));
 
         clear_temporary_big_maps(ctx.rk.host_mut(), &ctx.temporary_big_map_id_allocator)
             .unwrap();
 
-        assert!(ctx.rk.host().store_has(&path1).unwrap().is_none());
-        assert!(ctx.rk.host().store_has(&path2).unwrap().is_none());
+        assert!(!ctx.rk.tez_accounts().contains(&key1));
+        assert!(!ctx.rk.tez_accounts().contains(&key2));
     }
 
     /// The frames of one operation share its allocator, so a second frame must

@@ -1033,10 +1033,11 @@ mod tests {
         use tezos_evm_runtime::safe_storage::{
             ETHERLINK_SAFE_STORAGE_ROOT_PATH, TMP_PATH,
         };
-        use tezos_execution::context::big_maps::{big_map_path, next_id_path};
+        use tezos_execution::context::big_maps::big_map_path;
         use tezos_execution::TezlinkOperationGas;
         use tezos_protocol::contract::Contract;
         use tezos_smart_rollup::types::Timestamp;
+        use tezos_smart_rollup_host::path::RefPath;
         use tezos_smart_rollup_host::storage::StorageV1;
 
         const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
@@ -1163,7 +1164,8 @@ mod tests {
                 result.unwrap().storage,
                 micheline_bytes(parser.parse("0").unwrap())
             );
-            assert!(host.store_has(&next_id_path().unwrap()).unwrap().is_none());
+            let next_id = RefPath::assert_from(b"/tez/tez_accounts/big_map/next_id");
+            assert!(host.store_has(&next_id).unwrap().is_none());
             assert!(host
                 .store_has(&big_map_path(&BigMapId::from(0)).unwrap())
                 .unwrap()
