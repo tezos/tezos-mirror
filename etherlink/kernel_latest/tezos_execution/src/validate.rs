@@ -12,7 +12,7 @@ use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
@@ -256,8 +256,8 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host: StorageV1, KS: KeySpace>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn execute_validation<Host: StorageV1 + KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
     required_fees: Option<u64>,

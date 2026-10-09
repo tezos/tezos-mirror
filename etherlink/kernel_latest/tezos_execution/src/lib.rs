@@ -2065,7 +2065,7 @@ impl From<ScriptError<'_>> for RunCodeError {
 /// `interpret` *delete* that big map. Nothing in this crate enforces
 /// this; `tezosx_run_code_fn` does, with a reverted `SafeStorage`.
 pub fn run_code<Host, R>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &R,
     journal: &mut TezosXJournal,
     params: &RunCodeParams,
@@ -2919,7 +2919,7 @@ pub fn get_required_da_fees(
 }
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     operation: Operation,
@@ -3121,7 +3121,7 @@ where
 }
 
 fn apply_batch<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     validation_info: validate::ValidatedBatch,
@@ -3204,7 +3204,7 @@ fn log_on_operation_failure<T, E: std::fmt::Debug>(
 
 #[allow(clippy::too_many_arguments)]
 fn apply_operation<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     source_account: &TezosImplicitAccount,
@@ -4297,8 +4297,8 @@ mod tests {
     }
 
     // This function sets up an account that will pass the validity checks
-    fn init_contract<Host: StorageV1, KS: KeySpace>(
-        rk: &mut RuntimeKeyspaces<Host, KS>,
+    fn init_contract<Host: StorageV1 + KeySpaceLoader>(
+        rk: &mut RuntimeKeyspaces<Host>,
         src: &ContractKt1Hash,
         script: &str,
         storage_micheline: &Micheline,
@@ -12101,7 +12101,7 @@ mod tests {
         #[allow(clippy::too_many_arguments)]
         fn ensure_alias<Host>(
             &self,
-            rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+            rk: &mut RuntimeKeyspaces<'_, Host>,
             journal: &mut TezosXJournal,
             alias_info: tezosx_interfaces::AliasInfo,
             native_public_key: Option<&[u8]>,
@@ -12140,7 +12140,7 @@ mod tests {
 
         fn alias_exists<Host>(
             &self,
-            rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+            rk: &mut RuntimeKeyspaces<'_, Host>,
             journal: &mut TezosXJournal,
             target_runtime: RuntimeId,
             alias: &str,
@@ -12174,9 +12174,9 @@ mod tests {
             self.0.public_key_from_string(public_key, runtime_id)
         }
 
-        fn read_origin<Host, KS>(
+        fn read_origin<Host>(
             &self,
-            rk: &RuntimeKeyspaces<'_, Host, KS>,
+            rk: &RuntimeKeyspaces<'_, Host>,
             addr_runtime: RuntimeId,
             addr: &str,
             budget: tezosx_interfaces::Gas,
@@ -12185,37 +12185,34 @@ mod tests {
             tezosx_interfaces::TezosXRuntimeError,
         >
         where
-            Host: StorageV1,
-            KS: tezos_smart_rollup_keyspace::KeySpace,
+            Host: StorageV1 + KeySpaceLoader,
         {
             self.0.read_origin(rk, addr_runtime, addr, budget)
         }
 
-        fn check_is_native_address<Host, KS>(
+        fn check_is_native_address<Host>(
             &self,
-            rk: &RuntimeKeyspaces<'_, Host, KS>,
+            rk: &RuntimeKeyspaces<'_, Host>,
             addr_runtime: RuntimeId,
             address: &str,
             public_key: Option<&str>,
             budget: &mut tezosx_interfaces::Gas,
         ) -> Result<(), tezosx_interfaces::TezosXRuntimeError>
         where
-            Host: StorageV1,
-            KS: tezos_smart_rollup_keyspace::KeySpace,
+            Host: StorageV1 + KeySpaceLoader,
         {
             self.0
                 .check_is_native_address(rk, addr_runtime, address, public_key, budget)
         }
 
-        fn serve<Host, KS>(
+        fn serve<Host>(
             &self,
-            rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+            rk: &mut RuntimeKeyspaces<'_, Host>,
             journal: &mut TezosXJournal,
             request: http::Request<Vec<u8>>,
         ) -> http::Response<Vec<u8>>
         where
-            Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-            KS: tezos_smart_rollup_keyspace::KeySpace,
+            Host: StorageV1 + KeySpaceLoader,
         {
             self.0.serve(rk, journal, request)
         }

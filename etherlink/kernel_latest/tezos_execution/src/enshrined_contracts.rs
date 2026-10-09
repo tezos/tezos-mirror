@@ -22,7 +22,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
@@ -201,7 +201,7 @@ fn typecheck_entrypoint_value<'a>(
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
-pub(crate) fn execute_enshrined_contract<'a, 'host, Host, KS>(
+pub(crate) fn execute_enshrined_contract<'a, 'host, Host>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
@@ -211,13 +211,12 @@ pub(crate) fn execute_enshrined_contract<'a, 'host, Host, KS>(
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<'host, Host, KS>
+              + HasCrossRuntime<'host, Host>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader + 'host,
 {
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
@@ -775,17 +774,16 @@ pub const ALIAS_MATERIALIZED_EVENT_TAG: &str = "alias_materialized";
 /// Idempotent: an existing alias is left untouched. A new one is announced by
 /// an `%alias_materialized` event holding
 /// `(native_runtime, (native_address, alias))`.
-fn materialize_alias<'a, 'host, Host, KS>(
+fn materialize_alias<'a, 'host, Host>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasOperationGas
-              + HasCrossRuntime<'host, Host, KS>
+              + HasCrossRuntime<'host, Host>
               + HasDelegatedStorageCost),
     typed: TypedValue<'a>,
 ) -> Result<Vec<OperationInfo<'a>>, TransferError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader + 'host,
 {
     let to_transfer_error = |e: TezosXRuntimeError| match e {
         TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(OutOfGas),
@@ -1247,20 +1245,19 @@ fn inject_context_headers_raw(
 /// The target runtime is derived from the request URI host (e.g. `"ethereum"`,
 /// `"tezos"`). Gas is converted from Tezos milligas to the target runtime's
 /// units before being written to `X-Tezos-Gas-Limit`.
-fn inject_context_headers<'a, 'host, Host, KS>(
+fn inject_context_headers<'a, 'host, Host>(
     mut request: http::Request<Vec<u8>>,
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<'host, Host, KS>
+              + HasCrossRuntime<'host, Host>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
 ) -> Result<http::Request<Vec<u8>>, TransferError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader + 'host,
 {
     let target_host = request.uri().host().map(str::to_string);
     let target_runtime = target_host
@@ -1577,21 +1574,20 @@ fn build_ethereum_request(
 /// call (EVM `CALL`) or a DFS-expanded `TRANSFER_TOKENS` (Michelson since
 /// Florence). The target is always the *other* runtime: a NAC back into
 /// the caller's own runtime is refused (see `ERR_SAME_RUNTIME_NAC`).
-fn dispatch_crac_call<'a, 'host, Host, KS>(
+fn dispatch_crac_call<'a, 'host, Host>(
     ctx: &mut (impl CtxTrait<'a>
               + HasHost<Host>
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
-              + HasCrossRuntime<'host, Host, KS>
+              + HasCrossRuntime<'host, Host>
               + HasCracChainDepth
               + HasDelegatedStorageCost),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader + 'host,
 {
     if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()).into());
@@ -1681,16 +1677,15 @@ const RESOLUTION_DERIVED_NAT: u64 = 1;
 /// covers the primary alias lookup and, for EVM sources, the code-presence
 /// back-stop when it fires — is converted back to milligas and charged
 /// to `operation_gas`. Callers do not pre-charge anything.
-fn classify_origin_for_view<'a, Host, KS, R>(
-    rk: &RuntimeKeyspaces<'_, Host, KS>,
+fn classify_origin_for_view<'a, Host, R>(
+    rk: &RuntimeKeyspaces<'_, Host>,
     registry: &R,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     source_runtime: RuntimeId,
     addr_str: &str,
 ) -> Result<Classification, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // The remaining milligas is the budget; `Gas` carries the unit across
@@ -1741,8 +1736,8 @@ where
 /// destination side. The `Recorded` upgrade fires when the destination
 /// already has an Alias record pointing back to `source_runtime` with
 /// the same `basis`; otherwise the result is `Derived`.
-fn derive_alias_for_view<'a, Host, KS, R>(
-    rk: &RuntimeKeyspaces<'_, Host, KS>,
+fn derive_alias_for_view<'a, Host, R>(
+    rk: &RuntimeKeyspaces<'_, Host>,
     registry: &R,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     source_runtime: RuntimeId,
@@ -1750,8 +1745,7 @@ fn derive_alias_for_view<'a, Host, KS, R>(
     basis: String,
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     operation_gas
@@ -1797,16 +1791,15 @@ where
 /// On an invalid runtime ID (`source_runtime` does not map to a known
 /// [`RuntimeId`]), returns `Err(InterpretError::FailedWith(...))` with
 /// the Michelson payload `(Pair "INVALID_RUNTIME_ID" received_nat)`.
-pub fn dispatch_origin_of_get<'a, Host, KS, R>(
-    rk: &RuntimeKeyspaces<'_, Host, KS>,
+pub fn dispatch_origin_of_get<'a, Host, R>(
+    rk: &RuntimeKeyspaces<'_, Host>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     addr_str: &str,
     source_runtime_nat: &num_bigint::BigUint,
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // ── Runtime ID validation ────────────────────────────────────────────
@@ -1828,8 +1821,8 @@ where
 /// - Unknown source  → `None`
 /// - Resolved target → `Some (Pair <resolution_nat> <translated_addr>)`
 ///   where `resolution_nat` is 0 (Recorded) or 1 (Derived).
-pub fn dispatch_resolve_address_get<'a, Host, KS, R>(
-    rk: &RuntimeKeyspaces<'_, Host, KS>,
+pub fn dispatch_resolve_address_get<'a, Host, R>(
+    rk: &RuntimeKeyspaces<'_, Host>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     addr_str: &str,
@@ -1837,8 +1830,7 @@ pub fn dispatch_resolve_address_get<'a, Host, KS, R>(
     target_runtime_nat: &num_bigint::BigUint,
 ) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Reusing `EnshrinedViewDispatchError::AliasResolution` for all three
@@ -2057,8 +2049,8 @@ fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
 /// at call time, so it scales with the outer view's remaining
 /// budget rather than a hardcoded magic.
 #[allow(clippy::too_many_arguments)]
-pub fn dispatch_staticcall_evm_get<'a, Host, KS, R>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn dispatch_staticcall_evm_get<'a, Host, R>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     journal: &mut TezosXJournal,
@@ -2072,8 +2064,7 @@ pub fn dispatch_staticcall_evm_get<'a, Host, KS, R>(
     calldata: &[u8],
 ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias
@@ -2395,7 +2386,7 @@ pub(crate) mod tests {
     use num_bigint::BigInt;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::{MockKeySpace, MockRuntimeKeyspaces};
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::{Origin, RuntimeId};
     use tezosx_journal::{DispatchSlotError, OriginalSource, TezosXJournal};
@@ -5988,7 +5979,7 @@ pub(crate) mod tests {
         rk: &'rk mut MockRuntimeKeyspaces<'host>,
         journal: &'j mut TezosXJournal,
         registry: &'r MockRegistry,
-    ) -> MockCtx<'rk, 'j, 'r, 'host, MockKernelHost, MockKeySpace, MockRegistry> {
+    ) -> MockCtx<'rk, 'j, 'r, 'host, MockKernelHost, MockRegistry> {
         let mut ctx = MockCtx::new(
             rk,
             journal,

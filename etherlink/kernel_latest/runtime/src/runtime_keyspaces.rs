@@ -104,9 +104,6 @@ struct Keyspaces<KS> {
     tez_accounts: KS,
 }
 
-/// A keyspace a [`MockKernelHost`] mints, for the tests.
-pub type MockKeySpace = <MockKernelHost as KeySpaceLoader>::KeySpace;
-
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
 pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 
