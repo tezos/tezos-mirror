@@ -606,7 +606,7 @@ impl TezosXChainConfig {
     pub fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &TezosXBlockConstants,
@@ -696,7 +696,7 @@ impl TezosXChainConfig {
 
     pub fn finalize_and_store<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         block_in_progress: BlockInProgress,
         block_constants: &TezosXBlockConstants,
         _chain_header: EVMBlockHeader,
@@ -714,7 +714,7 @@ impl TezosXChainConfig {
 
     pub fn start_simulation_mode<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         base: &mut impl KeySpace,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     ) -> anyhow::Result<()>
@@ -752,7 +752,7 @@ impl TezosXChainConfig {
     fn apply_tezos_operation<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         operation: TezlinkOperation,
@@ -1109,7 +1109,7 @@ fn get_fees_data(
 pub fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &TezlinkBlockConstants,
     operation: TezlinkOperation,

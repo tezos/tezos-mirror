@@ -385,7 +385,7 @@ impl Evaluation {
     /// traces captured during cross-runtime execution.
     pub fn run<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         base: &mut impl KeySpace,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
         tracer_input: Option<TracerInput>,
@@ -720,7 +720,7 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 }
 
 pub fn start_simulation_mode<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     base: &mut impl KeySpace,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     spec_id: &SpecId,
@@ -752,7 +752,7 @@ mod tests {
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_keyspace::KeySpace;
+
     use tezosx_journal::TezosXJournal;
 
     use crate::registry_impl::RegistryImpl;
@@ -829,13 +829,12 @@ mod tests {
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
     #[cfg(test)]
-    fn create_contract<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
-        base: &mut KS,
+    fn create_contract<Host>(
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+        base: &mut Host::KeySpace,
     ) -> H160
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
