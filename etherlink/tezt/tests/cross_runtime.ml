@@ -6193,6 +6193,87 @@ let test_crac_call_tracer_static_crossing ~backtracked () =
         traces)
     [false; true]
 
+(** L2-2195 — a Michelson operation whose crossing fails before it is
+    recorded registers no synthetic EVM transaction, so it must leave no
+    trace either. The gateway materializes the sender's EVM alias (an EVM
+    frame) before the EVM runtime rejects the invalid destination with a
+    4xx, before recording the crossing. A normal EVM transfer in the same
+    block makes [debug_traceBlockByNumber] replay the block. The failed
+    operation reverts the materialization, so the next block exercises the
+    same path again. *)
+let test_crac_call_tracer_crossing_rejected_before_recorded () =
+  register_crac_runner_test
+    ~title:"CRAC callTracer: crossing rejected before being recorded"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "block"; "regression"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "L2-2195" in
+  let* arg =
+    Client.convert_data_to_json
+      ~data:{|Pair "zzzz" (Pair "f()" (Pair 0x None))|}
+      client
+  in
+  let rejected_crossing_in_block () =
+    let* branch = tez_branch client_tezlink in
+    let* operation =
+      Operation.Manager.(
+        operation
+          ~branch
+          [
+            make
+              ~source
+              ~counter:(tez_counter ())
+              ~fee:100_000
+              ~gas_limit:200_000
+              ~storage_limit:1000
+              (call
+                 ~dest:gateway_address
+                 ~arg
+                 ~entrypoint:"call_evm"
+                 ~amount:0
+                 ());
+          ])
+        client
+    in
+    let* normal_hash =
+      send_evm_transfer_no_block ~address:sender.Eth_account.address ()
+    in
+    let* receipt =
+      TezContract.inject_op_and_produce_block
+        ~client_tezlink
+        ~sequencer
+        operation
+    in
+    Check.(
+      (JSON.(
+         receipt |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+         |-> "status" |> as_string)
+      = "failed")
+        string
+        ~error_msg:(prefix ^ ": expected the crossing status %R, got %L")) ;
+    let*@ block = latest_block ~sequencer in
+    let hashes =
+      match block.transactions with
+      | Block.Hash hashes -> hashes
+      | _ -> Test.fail "%s: expected transaction hashes" prefix
+    in
+    Check.(
+      (hashes = [normal_hash])
+        (list string)
+        ~error_msg:(prefix ^ ": expected only the normal transfer %R, got %L")) ;
+    let*@ traces =
+      Rpc.trace_block ~block:(Number (Int32.to_int block.number)) sequencer
+    in
+    Check.(
+      (List.map (fun t -> JSON.(t |-> "txHash" |> as_string)) traces
+      = [normal_hash])
+        (list string)
+        ~error_msg:(prefix ^ ": expected one trace for %R, got %L")) ;
+    unit
+  in
+  let* () = rejected_crossing_in_block () in
+  rejected_crossing_in_block ()
+
 (** Example E (block trace) of the cross-runtime tracing RFC
     (https://linear.app/tezos/document/rfc-debug-tracetransaction-and-debug-traceblockbynumber-with-17e28d426ee1)
     as a block ⇄ transaction CONSISTENCY proof for
@@ -19637,6 +19718,7 @@ let () =
   test_crac_l2_1212_multi_michelson_block () ;
   test_crac_call_tracer_static_crossing ~backtracked:false () ;
   test_crac_call_tracer_static_crossing ~backtracked:true () ;
+  test_crac_call_tracer_crossing_rejected_before_recorded () ;
   test_crac_debug_trace_block_consistency_mixed () ;
   test_crac_debug_trace_call_with_nac () ;
   test_http_trace_nested_crac () ;
