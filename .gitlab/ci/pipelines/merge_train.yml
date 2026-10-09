@@ -924,6 +924,7 @@ etherlink.mir_no_tickets:
   - gcp
   rules:
   - changes:
+    - etherlink/kernel_latest/clippy.toml
     - etherlink/kernel_latest/mir/**/*.lalrpop
     - etherlink/kernel_latest/mir/**/*.rs
     - etherlink/kernel_latest/mir/**/*.toml
@@ -971,6 +972,7 @@ etherlink.mir_tzt:
   - gcp
   rules:
   - changes:
+    - etherlink/kernel_latest/clippy.toml
     - etherlink/kernel_latest/mir/**/*.lalrpop
     - etherlink/kernel_latest/mir/**/*.rs
     - etherlink/kernel_latest/mir/**/*.toml
@@ -1059,7 +1061,10 @@ etherlink.test_kernel:
   - changes:
     - etherlink.mk
     - etherlink/**/*.rs
+    - etherlink/kernel_latest/**/Cargo.toml
+    - etherlink/kernel_latest/Cargo.lock
     - etherlink/kernel_latest/Makefile
+    - etherlink/kernel_latest/clippy.toml
     - etherlink/kernel_latest/mir/**/*.lalrpop
     - etherlink/kernel_latest/mir/**/*.rs
     - etherlink/kernel_latest/mir/**/*.toml

@@ -2832,6 +2832,8 @@ pub(crate) mod tests {
                 .unwrap()
             })
             .collect();
+        // Finished `Vec`; see Note: alloc_extend.
+        #[allow(clippy::disallowed_methods)]
         let headers_seq = Micheline::Seq(arena.alloc_extend(header_pairs));
         let method_callback = Micheline::prim2(
             arena,

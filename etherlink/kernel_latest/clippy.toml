@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+# Applies to every crate of the workspace. Clippy reads the nearest
+# clippy.toml up from the crate it is linting and stops there, so a
+# crate-level file shadows this one rather than adding to it: a rule
+# every crate must obey belongs here and nowhere else.
+disallowed-methods = [
+    # there's a pothole in alloc_extend causing panics, be careful when using it
+    { path = "typed_arena::Arena::alloc_extend", reason = "alloc_extend can panic, see Note: alloc_extend" },
+]

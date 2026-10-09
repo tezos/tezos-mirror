@@ -17,7 +17,16 @@ module Files = struct
   let node = ["etherlink/**/*"]
 
   let kernel =
-    ["etherlink.mk"; "etherlink/**/*.rs"; "etherlink/kernel_latest/Makefile"]
+    [
+      "etherlink.mk";
+      "etherlink/**/*.rs";
+      "etherlink/kernel_latest/Makefile";
+      (* The workspace lint configuration every crate is checked
+         against, and the manifests the workspace is built from. *)
+      "etherlink/kernel_latest/clippy.toml";
+      "etherlink/kernel_latest/**/Cargo.toml";
+      "etherlink/kernel_latest/Cargo.lock";
+    ]
 
   let kernel_test_data =
     [
@@ -43,9 +52,12 @@ module Files = struct
     [
       "etherlink/kernel_latest/mir/**/*.rs";
       "etherlink/kernel_latest/mir/**/*.lalrpop";
-      (* Cargo.toml, clippy.toml *)
+      (* Cargo.toml *)
       "etherlink/kernel_latest/mir/**/*.toml";
       "etherlink/kernel_latest/mir/**/Cargo.lock";
+      (* The lint configuration mir is checked against lives at the
+         workspace root. *)
+      "etherlink/kernel_latest/clippy.toml";
     ]
 
   let tzt = ["tzt_reference_test_suite/**/*"]
