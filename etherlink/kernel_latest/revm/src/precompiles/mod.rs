@@ -8,17 +8,16 @@ use tezosx_interfaces::Registry;
 
 use crate::{database::EtherlinkVMDB, journal::Journal};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
-pub fn log<'j, 'host, Host, KS, R, CTX>(context: &mut CTX, log: Log)
+pub fn log<'j, 'host, Host, R, CTX>(context: &mut CTX, log: Log)
 where
     'host: 'j,
-    Host: StorageV1 + 'host,
-    KS: KeySpace + 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
-        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-        Journal = Journal<'j, 'host, Host, KS, R>,
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
     >,
 {
     if let Some(mut tracer) = context.journal_mut().take_tracer() {

@@ -43,7 +43,7 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{
     canonicalize_native_address, resolve_routing, AliasInfo, AliasResolution,
     CrossRuntimeContext, Gas as TezosXGas, Registry, RoutingDecision, RuntimeId,
@@ -58,12 +58,11 @@ use tezosx_interfaces::{
 pub struct Journal<
     'a,
     'host,
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 > {
     /// Database
-    pub database: EtherlinkVMDB<'a, 'host, Host, KS, R>,
+    pub database: EtherlinkVMDB<'a, 'host, Host, R>,
 
     /// TezosX journal combining EVM and Michelson journal state.
     pub journal: &'a mut TezosXJournal,
@@ -77,13 +76,12 @@ pub struct Journal<
 impl<
         'a,
         'host,
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
-    > Journal<'a, 'host, Host, KS, R>
+    > Journal<'a, 'host, Host, R>
 {
     pub fn new_with_inner(
-        database: EtherlinkVMDB<'a, 'host, Host, KS, R>,
+        database: EtherlinkVMDB<'a, 'host, Host, R>,
         journal: &'a mut TezosXJournal,
     ) -> Self {
         Self {
@@ -104,10 +102,9 @@ impl<
 impl<
         'a,
         'host,
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
-    > TracerContainer for Journal<'a, 'host, Host, KS, R>
+    > TracerContainer for Journal<'a, 'host, Host, R>
 {
     fn take_tracer(&mut self) -> Option<Box<Tracer>> {
         self.journal.evm.take_tracer()
@@ -123,22 +120,19 @@ impl<
 impl<
         'a,
         'host,
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
-    > JournalTr for Journal<'a, 'host, Host, KS, R>
+    > JournalTr for Journal<'a, 'host, Host, R>
 {
-    type Database = EtherlinkVMDB<'a, 'host, Host, KS, R>;
+    type Database = EtherlinkVMDB<'a, 'host, Host, R>;
     type State = EvmState;
     type JournaledAccount<'b>
-        = JournaledAccount<'b, EtherlinkVMDB<'a, 'host, Host, KS, R>>
+        = JournaledAccount<'b, EtherlinkVMDB<'a, 'host, Host, R>>
     where
-        EtherlinkVMDB<'a, 'host, Host, KS, R>: 'b,
+        EtherlinkVMDB<'a, 'host, Host, R>: 'b,
         'a: 'b;
 
-    fn new(
-        _database: EtherlinkVMDB<'a, 'host, Host, KS, R>,
-    ) -> Journal<'a, 'host, Host, KS, R> {
+    fn new(_database: EtherlinkVMDB<'a, 'host, Host, R>) -> Journal<'a, 'host, Host, R> {
         unimplemented!("Use Journal::new_with_inner instead")
     }
 
@@ -546,10 +540,9 @@ impl<
 }
 
 impl<
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
-    > JournalExt for Journal<'_, '_, Host, KS, R>
+    > JournalExt for Journal<'_, '_, Host, R>
 {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
@@ -568,10 +561,9 @@ impl<
 }
 
 impl<
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = tezosx_journal::TezosXJournal>,
-    > Journal<'_, '_, Host, KS, R>
+    > Journal<'_, '_, Host, R>
 {
     pub fn get_and_increment_global_counter(
         &mut self,
@@ -819,10 +811,9 @@ pub trait CrossRuntimeCall {
 impl<
         'a,
         'host,
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
         R: Registry<Journal = TezosXJournal>,
-    > CrossRuntimeCall for Journal<'a, 'host, Host, KS, R>
+    > CrossRuntimeCall for Journal<'a, 'host, Host, R>
 {
     fn tezosx_resolve_source_alias(
         &mut self,
@@ -1083,16 +1074,15 @@ impl<
     }
 }
 
-pub fn commit_evm_journal_from_external<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn commit_evm_journal_from_external<Host>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     journal: &mut TezosXJournal,
     sequencer_credit: Option<(Address, U256)>,
 ) -> Result<Vec<Withdrawal>, EvmRunError>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Cross-runtime callers are classified through their staged alias,
     // never as Native: no caller to classify here.

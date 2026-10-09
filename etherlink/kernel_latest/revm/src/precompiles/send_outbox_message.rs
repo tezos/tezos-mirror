@@ -47,7 +47,7 @@ use evm_types::{
     PrecompileStateError,
 };
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 sol! {
     contract SendOutboxMessage {
@@ -275,18 +275,17 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<'j, 'host, CTX, Host, KS, R>(
+fn send_outbox_methods<'j, 'host, CTX, Host, R>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
     'host: 'j,
-    Host: StorageV1 + 'host,
-    KS: KeySpace + 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
-        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-        Journal = Journal<'j, 'host, Host, KS, R>,
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
     >,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
@@ -467,19 +466,18 @@ where
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<'j, 'host, CTX, Host, KS, R>(
+pub(crate) fn send_outbox_message_precompile<'j, 'host, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     'host: 'j,
-    Host: StorageV1 + 'host,
-    KS: KeySpace + 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
-        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-        Journal = Journal<'j, 'host, Host, KS, R>,
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
     >,
 {
     let mut gas = Gas::new(inputs.gas_limit);
