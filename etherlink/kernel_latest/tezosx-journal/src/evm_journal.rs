@@ -222,12 +222,8 @@ impl EvmJournal {
     /// Record one incoming CRAC crossing.
     ///
     /// The first crossing fixes the originator (`source`), which is
-    /// invariant across all crossings in a foreign-runtime op. Each
-    /// crossing contributes to `has_mutating`: a single mutating
-    /// (`%call_evm`) crossing is enough to require a fake tx, while a
-    /// leading read-only `staticcall_evm` can no longer latch the slot
-    /// and suppress a later value-bearing crossing (the L2-1408
-    /// poisoning bug).
+    /// invariant across all crossings in a foreign-runtime op. Any
+    /// crossing, mutating or read-only, requires a fake tx.
     pub fn record_crac_crossing(&mut self, source: Address) {
         match &mut self.crac_tx_info {
             Some(_) => (),
@@ -237,9 +233,7 @@ impl EvmJournal {
 
     /// Take the aggregate CRAC identity, if a fake tx should be built.
     ///
-    /// Returns `None` when no CRAC was serviced, or when every crossing
-    /// was a read-only `staticcall_evm` (`!has_mutating`): such an op
-    /// left no EVM-observable effect, so no fake tx is emitted for it.
+    /// Returns `None` iff no crossing was recorded.
     pub fn take_crac_data(&mut self) -> Option<CracTransactionInfo> {
         self.crac_tx_info.take()
     }
