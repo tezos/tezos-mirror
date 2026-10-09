@@ -226,6 +226,19 @@ impl TaggedInternalOp {
     }
 }
 
+/// Whether the last [`InternalOpOrigin::Own`] receipt of `receipts` is
+/// applied (vacuously true when there is none). Paired with the frame's
+/// [`SubtreeStatus`] by every parent verdict. CRAC receipts are ignored: EVM
+/// can catch their failures and let the parent succeed, and an uncaught one
+/// already fails the gateway transfer that made the call.
+fn last_own_receipt_applied(receipts: &[TaggedInternalOp]) -> bool {
+    receipts
+        .iter()
+        .rev()
+        .find(|t| t.is_own())
+        .is_none_or(|t| t.op.is_applied())
+}
+
 /// Drop the origin tags and return the underlying internal operations
 /// in their original order.
 fn untag_internals(tagged: Vec<TaggedInternalOp>) -> Vec<InternalOperationSum> {
@@ -252,11 +265,7 @@ fn finalize_statuses<M: OperationKind>(
             // Also check the last Own receipt. Ignore CRAC receipts here:
             // EVM can catch their failures and let the parent succeed.
             let all_internal_succeeded = internals.all_applied()
-                && internal_operation_results
-                    .iter()
-                    .rev()
-                    .find(|t| t.is_own())
-                    .is_none_or(|t| t.op.is_applied());
+                && last_own_receipt_applied(internal_operation_results);
             if all_internal_succeeded {
                 ContentResult::Applied(success)
             } else {
@@ -801,16 +810,15 @@ fn settle_parent_transfer(
     let (applied, delegated_storage_cost) = match end {
         SubtreeEnd::Drained(status) => {
             // Both signals are needed. The subtree's own verdict covers what no
-            // receipt records (see [`SubtreeStatus`]); the tail of its receipts
-            // covers what no frame records — a re-entrant CRAC receipt, spliced
-            // in without ever passing through an [`InternalOpFrame`]. Read
-            // before the CRAC splice below, exactly where and when the
-            // recursive version read it.
+            // receipt records (see [`SubtreeStatus`]); its last own receipt
+            // covers the rest. A re-entrant CRAC receipt spliced at the tail
+            // does not count, as in [`finalize_statuses`]. Read before the
+            // CRAC splice below, exactly where and when the recursive version
+            // read it.
             let applied = status.all_applied()
                 && all_internal_receipts
                     .get(receipt_at..)
-                    .and_then(|sub_ops| sub_ops.last())
-                    .is_none_or(|t| t.op.is_applied());
+                    .is_none_or(last_own_receipt_applied);
             if !applied {
                 receipt.result.backtrack_if_applied();
             }
@@ -2362,12 +2370,14 @@ where
         }) => {
             // transfer() returns Ok even when internal operations failed: the
             // failure is contained and only reported. `subtree` carries the
-            // verdict of the ops it drove, and the receipt tail catches a
+            // verdict of the ops it drove, and the last own receipt catches a
             // failure no frame saw — the same pair [`finalize_statuses`] uses
-            // in the normal Tezos operation path. Deciding on the tail alone
-            // would commit the snapshot of a failed sub-execution (L2-1863).
-            let all_internal_succeeded = subtree.all_applied()
-                && internal_receipts.last().is_none_or(|t| t.op.is_applied());
+            // in the normal Tezos operation path. Deciding on the receipts
+            // alone would commit the snapshot of a failed sub-execution
+            // (L2-1863). The CRAC frames drained by `transfer` are ignored: a
+            // failure the EVM side caught must not revert this crossing.
+            let all_internal_succeeded =
+                subtree.all_applied() && last_own_receipt_applied(&internal_receipts);
             if all_internal_succeeded {
                 // promote: discard the snapshot, keep changes
                 journal
@@ -11709,6 +11719,337 @@ mod tests {
             ),
             "Expected Failed transfer when EVM reverts, got {:?}",
             receipts[0].receipt
+        );
+    }
+
+    // --- Caught CRAC failures ---
+
+    /// Calls `run()` on an EVM contract through the gateway's `%call_evm`,
+    /// without a callback: that call is its only, hence its last, internal
+    /// operation.
+    const GATEWAY_FORWARDER_SCRIPT: &str = r#"
+        parameter unit;
+        storage unit;
+        code {
+            DROP;
+            PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+            CONTRACT %call_evm (pair string (pair string (pair bytes (option (contract bytes)))));
+            IF_NONE { PUSH string "No gateway"; FAILWITH } {};
+            PUSH mutez 1;
+            NONE (contract bytes);
+            PUSH bytes 0x;
+            PAIR;
+            PUSH string "run()";
+            PAIR;
+            PUSH string "0x3333333333333333333333333333333333333333";
+            PAIR;
+            TRANSFER_TOKENS;
+            NIL operation;
+            SWAP;
+            CONS;
+            UNIT;
+            SWAP;
+            PAIR
+        }"#;
+
+    /// The receipt of a nested crossing whose Michelson target failed, as
+    /// the target runtime records it: a single failed transfer.
+    fn failed_crac_receipt() -> tezos_tezlink::block::AppliedOperation {
+        use tezos_crypto_rs::hash::{BlockHash, OperationHash, UnknownSignature};
+        use tezos_tezlink::operation_result::{
+            OperationBatchWithMetadata, OperationDataAndMetadata,
+        };
+        let failed = || {
+            ContentResult::Failed(
+                ApplyOperationError::from(
+                    TransferError::FailedToExecuteInternalOperation(
+                        "nested crossing failed".into(),
+                    ),
+                )
+                .into(),
+            )
+        };
+        let target =
+            Contract::Originated(ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap());
+        let failed_transfer =
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                sender: Contract::Implicit(bootstrap1().pkh),
+                nonce: 0,
+                content: TransferContent {
+                    amount: 0_u64.into(),
+                    destination: target.clone(),
+                    parameters: Parameters::default(),
+                },
+                result: failed(),
+            });
+        tezos_tezlink::block::AppliedOperation {
+            hash: OperationHash::default(),
+            branch: BlockHash::default(),
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transaction(ManagerOperation {
+                            source: bootstrap1().pkh,
+                            fee: 0_u64.into(),
+                            counter: 0_u64.into(),
+                            gas_limit: 0_u64.into(),
+                            storage_limit: 0_u64.into(),
+                            operation: TransferContent {
+                                amount: 0_u64.into(),
+                                destination: target,
+                                parameters: Parameters::default(),
+                            },
+                        }),
+                        receipt: OperationResultSum::Transfer(OperationResult {
+                            balance_updates: vec![],
+                            result: failed(),
+                            internal_operation_results: vec![failed_transfer],
+                        }),
+                    }],
+                    signature: UnknownSignature::try_from([0u8; 64].as_slice()).unwrap(),
+                },
+            ),
+        }
+    }
+
+    /// A registry whose EVM leg returns successfully after catching the
+    /// failure of a nested crossing, whose failed receipt it leaves on the
+    /// journal.
+    fn registry_catching_a_nested_failure() -> crate::test_utils::MockRegistry {
+        crate::test_utils::MockRegistry::new("KT1_mock_alias").with_serve_journal_hook(
+            |journal| {
+                journal
+                    .michelson
+                    .push_failed_crac_receipt(failed_crac_receipt())
+            },
+        )
+    }
+
+    fn is_failed_transfer(op: &InternalOperationSum) -> bool {
+        matches!(
+            op,
+            InternalOperationSum::Transfer(InternalContentWithMetadata {
+                result: ContentResult::Failed(_),
+                ..
+            })
+        )
+    }
+
+    /// Apply `src → emitter → forwarder → gateway`, with the forwarder
+    /// running [`GATEWAY_FORWARDER_SCRIPT`].
+    fn apply_through_gateway_forwarder(
+        registry: &crate::test_utils::MockRegistry,
+    ) -> Vec<OperationWithMetadata> {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(rk.host_mut(), &src.pkh, 1_000_000);
+        reveal_account(rk.host_mut(), &src);
+        let emitter = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &emitter,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let forwarder = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
+        init_contract(
+            &mut rk,
+            &forwarder,
+            GATEWAY_FORWARDER_SCRIPT,
+            &Micheline::from(()),
+            &1_000_u64.into(),
+        );
+        let callees: Vec<Micheline> = vec![Micheline::Bytes(
+            Contract::Originated(forwarder).to_bytes().unwrap(),
+        )];
+        let operation = make_transfer_operation(
+            10,
+            1,
+            100_000,
+            1_000,
+            src,
+            0_u64.into(),
+            Contract::Originated(emitter),
+            Parameters {
+                entrypoint: Entrypoint::default(),
+                value: Micheline::Seq(&callees)
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                registry,
+                &mut journal,
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect("validate_and_apply_operation should not fail"),
+        )
+    }
+
+    /// In `src → emitter → forwarder → gateway`, the EVM leg catches
+    /// the failure of a nested crossing. Its failed receipt is spliced right
+    /// after `forwarder → gateway`, at the tail of `emitter → forwarder`'s
+    /// subtree. That tail used to be read as the subtree failing, which
+    /// backtracked the whole operation; it now stays applied.
+    #[test]
+    fn caught_crac_failure_at_the_tail_of_a_subtree_keeps_the_operation_applied() {
+        let receipts =
+            apply_through_gateway_forwarder(&registry_catching_a_nested_failure());
+
+        assert_eq!(receipts.len(), 1);
+        let internals = match &receipts[0].receipt {
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::Applied(_),
+                internal_operation_results,
+                ..
+            }) => internal_operation_results,
+            other => panic!("The operation must stay applied, got {other:?}"),
+        };
+        assert_eq!(
+            internals.len(),
+            3,
+            "Expected emitter → forwarder, forwarder → gateway and the caught \
+             failure, got {internals:?}"
+        );
+        assert!(
+            internals[..2].iter().all(InternalOperationSum::is_applied),
+            "The own internal operations must stay applied, got {internals:?}"
+        );
+        assert!(
+            is_failed_transfer(&internals[2]),
+            "The caught failure must keep its failed receipt, got {:?}",
+            internals[2]
+        );
+    }
+
+    /// Run `cross_runtime_transfer` from an implicit account to `dest`.
+    fn run_cross_runtime_transfer(
+        registry: &crate::test_utils::MockRegistry,
+        dest: &Contract,
+        parameters: &Parameters,
+    ) -> Result<crate::CrossRuntimeTransferResult, CracTransferError> {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        let sender_account = init_account(rk.host_mut(), &src.pkh, 100_000);
+
+        let parser = Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(10_000_000)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            rk: &mut rk,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            temporary_big_map_id_allocator:
+                tezosx_journal::TemporaryBigMapIdAllocator::new(),
+        };
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: 0,
+            applied_counters: std::collections::BTreeSet::new(),
+        };
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        let mut nonce_counter: u16 = 0;
+        cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            registry,
+            &mut journal,
+            &sender_account,
+            &Narith::from(1u64),
+            dest,
+            parameters,
+            &parser,
+            &mut nonce_counter,
+        )
+    }
+
+    /// A crossing that targets the gateway itself, whose EVM leg catches the
+    /// failure of a nested crossing. `transfer` drains the
+    /// failed receipt into the crossing's receipts, where it is the only one,
+    /// and used to make `cross_runtime_transfer` revert the crossing.
+    #[test]
+    fn caught_crac_failure_through_the_gateway_keeps_the_crossing() {
+        let gateway = Contract::Originated(
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap(),
+        );
+        let arena = Arena::new();
+        let mut gas = Gas::default();
+        let call_evm = Micheline::prim2(
+            &arena,
+            mir::lexer::Prim::Pair,
+            Micheline::String("0x3333333333333333333333333333333333333333".to_string()),
+            Micheline::prim2(
+                &arena,
+                mir::lexer::Prim::Pair,
+                Micheline::String("run()".to_string()),
+                Micheline::prim2(
+                    &arena,
+                    mir::lexer::Prim::Pair,
+                    Micheline::Bytes(vec![]),
+                    Micheline::prim0(mir::lexer::Prim::None, &mut gas).unwrap(),
+                    &mut gas,
+                )
+                .unwrap(),
+                &mut gas,
+            )
+            .unwrap(),
+            &mut gas,
+        )
+        .unwrap();
+        let parameters = Parameters {
+            entrypoint: Entrypoint::try_from("call_evm").unwrap(),
+            value: call_evm.encode(&mut Gas::default()).unwrap().unwrap(),
+        };
+        let result = run_cross_runtime_transfer(
+            &registry_catching_a_nested_failure(),
+            &gateway,
+            &parameters,
+        )
+        .unwrap_or_else(|e| panic!("The crossing must succeed, got {:?}", e.error));
+
+        let receipts = &result.internal_receipts;
+        assert_eq!(
+            receipts.len(),
+            1,
+            "Expected the caught failure only, got {receipts:?}"
+        );
+        assert!(
+            is_failed_transfer(&receipts[0]),
+            "The caught failure must keep its failed receipt, got {:?}",
+            receipts[0]
         );
     }
 
