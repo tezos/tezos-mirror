@@ -22,7 +22,9 @@ pub use tezosx_types::{
 use primitive_types::U256;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+#[cfg(feature = "testing")]
+use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 /// Result of an alias-resolution call.
 ///
@@ -85,7 +87,7 @@ pub trait Registry {
     #[allow(clippy::too_many_arguments)]
     fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -98,7 +100,7 @@ pub trait Registry {
 
     fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
@@ -141,16 +143,15 @@ pub trait Registry {
     /// primary `/origin` lookup, plus the EVM code-presence back-stop when
     /// it fires. `consumed ≤ budget` on the `Ok` path; insufficient budget
     /// returns `Err(OutOfGas)`.
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: RuntimeId,
         addr: &str,
         budget: Gas,
     ) -> Result<(Classification, Gas /* consumed */), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     /// Check that `address` is provably native to `addr_runtime`, i.e. that
     /// it is not an alias, by dispatching to that runtime's
@@ -163,28 +164,26 @@ pub trait Registry {
     /// `address` is not provably native or `public_key` is rejected, and with
     /// [`TezosXRuntimeError::OutOfGas`] when `budget` runs out. The cost of
     /// the check is consumed from `budget`, even when it fails.
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: RuntimeId,
         address: &str,
         public_key: Option<&str>,
         budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 }
 
 pub trait RuntimeInterface {
@@ -193,10 +192,10 @@ pub trait RuntimeInterface {
     /// Materialize `alias` — already derived by the registry and named
     /// in this runtime — for the account `alias_info` describes.
     #[allow(clippy::too_many_arguments)]
-    fn create_alias<Host, KS>(
+    fn create_alias<Host>(
         &self,
         registry: &impl Registry<Journal = Self::Journal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         alias: &str,
         alias_info: AliasInfo,
@@ -205,18 +204,16 @@ pub trait RuntimeInterface {
         gas_remaining: Gas,
     ) -> Result<AliasResolution, TezosXRuntimeError>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
@@ -230,16 +227,15 @@ pub trait RuntimeInterface {
     ///
     /// Returns an HTTP response with a status code indicating success (200) or
     /// failure (4xx/5xx), along with runtime-specific response headers and body.
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
         registry: &impl Registry<Journal = Self::Journal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     /// The URL host that identifies this runtime in HTTP requests routed
     /// by the registry (e.g. `"tezos"`, `"ethereum"`).
@@ -272,15 +268,14 @@ pub trait RuntimeInterface {
     ///
     /// For the Tezos runtime, no back-stop is applied — a storage miss
     /// returns `Unknown` after charging `ALIAS_LOOKUP_COST`.
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr: &str,
         budget: Gas,
     ) -> Result<(Classification, Gas /* consumed */), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     /// Check that `address` is provably native to this runtime, i.e. that it
     /// is not an alias, consuming the cost of the check from `budget`, even
@@ -293,16 +288,15 @@ pub trait RuntimeInterface {
     /// - EVM runtime: precompiles are rejected. An address is native if it is
     ///   classified so, has a positive nonce or code other than an alias's;
     ///   otherwise `public_key` must be given and hash to it.
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         address: &str,
         public_key: Option<&str>,
         budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace;
+        Host: StorageV1 + KeySpaceLoader;
 
     #[cfg(feature = "testing")]
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;

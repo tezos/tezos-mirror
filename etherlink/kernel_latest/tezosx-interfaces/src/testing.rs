@@ -12,7 +12,7 @@
 use std::cell::{Cell, RefCell};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_journal::TezosXJournal;
 
 use crate::{
@@ -29,7 +29,7 @@ impl Registry for UnimplementedRegistry {
     type Journal = TezosXJournal;
     fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -45,7 +45,7 @@ impl Registry for UnimplementedRegistry {
 
     fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut Self::Journal,
         _target_runtime: RuntimeId,
         _alias: &str,
@@ -79,44 +79,41 @@ impl Registry for UnimplementedRegistry {
         unimplemented!("UnimplementedRegistry::public_key_from_string")
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _gas: Gas,
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         unimplemented!("UnimplementedRegistry::read_origin")
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _address: &str,
         _public_key: Option<&str>,
         _budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         unimplemented!("UnimplementedRegistry::check_is_native_address")
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut TezosXJournal,
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         unimplemented!("UnimplementedRegistry::serve")
     }
@@ -133,7 +130,7 @@ impl Registry for NotWiredRegistry {
     type Journal = TezosXJournal;
     fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut TezosXJournal,
         _alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -149,7 +146,7 @@ impl Registry for NotWiredRegistry {
 
     fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         _alias: &str,
@@ -183,44 +180,41 @@ impl Registry for NotWiredRegistry {
         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: RuntimeId,
         _addr: &str,
         _gas: Gas,
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: RuntimeId,
         _address: &str,
         _public_key: Option<&str>,
         _budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Err(TezosXRuntimeError::RuntimeNotFound(addr_runtime))
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut TezosXJournal,
         _request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         http::Response::builder()
             .status(http::StatusCode::INTERNAL_SERVER_ERROR)
@@ -338,7 +332,7 @@ impl Registry for MockRegistry {
     type Journal = TezosXJournal;
     fn ensure_alias<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         _native_public_key: Option<&[u8]>,
@@ -367,7 +361,7 @@ impl Registry for MockRegistry {
 
     fn alias_exists<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
@@ -408,31 +402,29 @@ impl Registry for MockRegistry {
         Ok(public_key.as_bytes().to_vec())
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: Gas,
     ) -> Result<(crate::Classification, Gas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Ok((crate::Classification::Unknown, Gas::ZERO))
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _address: &str,
         _public_key: Option<&str>,
         budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         match self.native_address_rejection_cost {
             Some(cost) => {
@@ -445,15 +437,14 @@ impl Registry for MockRegistry {
         }
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         self.serve_calls.borrow_mut().push(request);
         if let Some(hook) = &self.serve_journal_hook {
@@ -538,7 +529,7 @@ impl Registry for StubRegistry {
     type Journal = TezosXJournal;
     fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias_info: AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -562,7 +553,7 @@ impl Registry for StubRegistry {
 
     fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         target_runtime: RuntimeId,
         alias: &str,
@@ -618,16 +609,15 @@ impl Registry for StubRegistry {
         Ok(public_key.as_bytes().to_vec())
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _addr: &str,
         _budget: Gas,
     ) -> Result<(Classification, Gas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let count = self.read_count.get();
         self.read_count.set(count + 1);
@@ -641,30 +631,28 @@ impl Registry for StubRegistry {
         Ok((classification, Gas::ZERO))
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        _rk: &RuntimeKeyspaces<'_, Host, KS>,
+        _rk: &RuntimeKeyspaces<'_, Host>,
         _addr_runtime: RuntimeId,
         _address: &str,
         _public_key: Option<&str>,
         _budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         Ok(())
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         self.inner.serve(rk, journal, request)
     }
