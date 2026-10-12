@@ -83,6 +83,10 @@ TestBranch | TestProtectedBranch)
 esac
 
 # Retrieve and import GPG keys (keyring is ready after this)
+# The APT repository keeps the Linux packages key set; naming it explicitly
+# keeps the two signing paths visibly distinct. See repository-keys.sh.
+GPG_KEY_SET=LINUX_PACKAGES
+export GPG_KEY_SET
 . ./scripts/ci/repository-keys.sh
 
 # Preset a key's passphrase into gpg-agent so that batch signing with
