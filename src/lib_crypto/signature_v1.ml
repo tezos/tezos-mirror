@@ -74,7 +74,7 @@ module Public_key_hash = struct
       ~prefix:"\255\255"
       ~length:2
       ~to_raw:(fun _ -> assert false)
-      ~of_raw:(fun _ -> assert false)
+      ~of_raw:(fun _ -> None)
       ~wrap:(fun x -> Data x)
 
   let raw_encoding =
@@ -316,7 +316,7 @@ module Public_key = struct
       ~prefix:"\255\255"
       ~length:2
       ~to_raw:(fun _ -> assert false)
-      ~of_raw:(fun _ -> assert false)
+      ~of_raw:(fun _ -> None)
       ~wrap:(fun x -> Data x)
 
   let of_b58check_opt s =
@@ -462,7 +462,7 @@ module Secret_key = struct
       ~prefix:"\255\255"
       ~length:2
       ~to_raw:(fun _ -> assert false)
-      ~of_raw:(fun _ -> assert false)
+      ~of_raw:(fun _ -> None)
       ~wrap:(fun x -> Data x)
 
   let of_b58check_opt b =
@@ -604,7 +604,7 @@ let b58check_encoding =
     ~prefix:"\255\255"
     ~length:2
     ~to_raw:(fun _ -> assert false)
-    ~of_raw:(fun _ -> assert false)
+    ~of_raw:(fun _ -> None)
     ~wrap:(fun x -> Data x)
 
 include Compare.Make (struct
