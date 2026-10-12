@@ -138,8 +138,7 @@ the build cache.
 To build the Octez Docker distribution locally, use the script
 `./scripts/create_docker_image.sh`. Called without parameters, this
 script will build the Octez Docker Distribution with the *released*
-set of executables (see `scripts-inputs/released-executables`) and
-without EVM artifacts.
+set of executables (see `script-inputs/released-executables`).
 
 Building the Octez Docker distribution requires two of the CI images
 as input: `alpine-runtime` (the base of the distribution variants) and
