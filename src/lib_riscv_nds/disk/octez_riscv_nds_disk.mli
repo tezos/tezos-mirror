@@ -64,14 +64,6 @@ module Normal : sig
         every other registry recovered from the same snapshot
         (copy-on-write, as {!to_imm}). *)
     val from_imm : imm -> t
-
-    (** [duplicate registry] is [from_imm (to_imm registry)]: an
-        independent registry holding the same contents, backed by the
-        same repository.  Mutations to either handle are invisible to
-        the other.  Copies the in-memory state up to twice for unshared
-        state (once in {!to_imm}, once on the duplicate's first
-        mutation); acceptable here as this is not a hot path. *)
-    val duplicate : t -> t
   end
 
   include NORMAL with module Registry := Registry

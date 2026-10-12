@@ -431,6 +431,133 @@ module Tick_model : sig
   val nds_hash : tick
 end
 
+(** The [Nds_not_enabled] error code ([-16]) every [nds_*] host function
+    answers when NDS is not activated on chain. *)
+val nds_disabled_code : int32
+
+(** Tick cost of each NDS host function, a function of its inputs alone.
+    The interpreter charges it before it runs the body, also when NDS is
+    not activated on chain. The fast execution engine computes the same
+    cost before its own body. A negative key length raises
+    [Invalid_argument] in this computation. The interpreter commits
+    [Stuck]. The fast engine raises, and with [--slow-vm-fallback] the
+    interpreter replays the [kernel_run]. *)
+module Nds_ticks : sig
+  val registry_resize : unit -> Z.t
+
+  val registry_copy : unit -> Z.t
+
+  val registry_move : unit -> Z.t
+
+  val registry_clear : unit -> Z.t
+
+  val store_exists : key_len:int32 -> Z.t
+
+  val store_read : key_len:int32 -> Z.t
+
+  val store_write : key_len:int32 -> Z.t
+
+  val store_set : key_len:int32 -> Z.t
+
+  val store_delete : key_len:int32 -> Z.t
+
+  val store_value_size : key_len:int32 -> Z.t
+
+  val database_get_hash : unit -> Z.t
+end
+
+(** Bodies of the NDS host functions, parameterised by the memory access
+    layer like {!Aux} so the interpreter and the fast execution engine
+    share one implementation.  Each function returns the [i32] the kernel
+    receives: the operation's result, or a negative {!Error} code. *)
+module Nds_aux : sig
+  (** Size in bytes of an NDS hash (Blake3-256), the full-length output of
+      [database_get_hash]. *)
+  val nds_hash_size : int32
+
+  module type S = sig
+    type memory
+
+    val registry_resize : nds:Nds.t -> diff:int64 -> int32 Lwt.t
+
+    val registry_copy : nds:Nds.t -> src:int64 -> dst:int64 -> int32 Lwt.t
+
+    val registry_move : nds:Nds.t -> src:int64 -> dst:int64 -> int32 Lwt.t
+
+    val registry_clear : nds:Nds.t -> db_index:int64 -> int32 Lwt.t
+
+    val store_exists :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      int32 Lwt.t
+
+    val store_read :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      offset:int64 ->
+      dst:int32 ->
+      max_bytes:int32 ->
+      int32 Lwt.t
+
+    val store_write :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      offset:int64 ->
+      src:int32 ->
+      num_bytes:int32 ->
+      int32 Lwt.t
+
+    val store_set :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      src:int32 ->
+      num_bytes:int32 ->
+      int32 Lwt.t
+
+    val store_delete :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      int32 Lwt.t
+
+    val store_value_size :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      key_offset:int32 ->
+      key_len:int32 ->
+      int32 Lwt.t
+
+    val database_get_hash :
+      nds:Nds.t ->
+      memory:memory ->
+      db_index:int64 ->
+      dst:int32 ->
+      max_bytes:int32 ->
+      int32 Lwt.t
+  end
+
+  module Make (Memory_access : Memory_access) :
+    S with type memory = Memory_access.t
+
+  include
+    S with type memory = Tezos_webassembly_interpreter.Instance.memory_inst
+end
+
 module Internal_for_tests : sig
   (** The number of bytes used to store the metadata of a rollup in memory *)
   val metadata_size : int

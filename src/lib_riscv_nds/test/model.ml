@@ -179,6 +179,9 @@ module Registry = struct
     let open Result_syntax in
     let+ () = check_db_in_bounds r db in
     r.dbs.(Int64.to_int db) <- Bytes_map.empty
+
+  (* The databases are persistent maps, so copying the array suffices. *)
+  let duplicate r = {dbs = Array.copy r.dbs}
 end
 
 module Database = struct

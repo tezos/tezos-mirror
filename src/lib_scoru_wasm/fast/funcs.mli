@@ -27,19 +27,30 @@ open Tezos_webassembly_interpreter
 open Tezos_wasmer
 open Tezos_scoru_wasm
 
-(** Host state environment for Fast Execution *)
+(** Host state environment for Fast Execution.
+
+    [durable] is persistent, so mutating host functions write the new
+    value back into the field.  [nds] is the NDS handle of a [Dual]
+    storage, mutated in place by the [nds_*] host functions; it is
+    [None] on [Durable_only] storage. *)
 type host_state = {
   retrieve_mem : unit -> Memory.t;
   buffers : Eval.buffers;
   mutable durable : Durable.t;
+  nds : Octez_riscv_nds_common.Nds.t option;
 }
 
-(** [make ~debug builtins host_state] generates a list of host functions that
-    can be imported by WebAssembly modules. If [debug] is true, an
-    implementation for [write_debug] will be picked that prints to the standard
-    output. *)
+(** [make ~version ~nds_host_functions_enabled ~reveal_builtins
+    ~write_debug host_state] generates the list of host functions a
+    WebAssembly module may import, for the PVM [version].
+    [nds_host_functions_enabled] is [true] when NDS is activated on
+    chain. When NDS is not activated on chain, every [nds_*] function
+    answers [Host_funcs.nds_disabled_code] and touches neither the memory
+    nor the NDS, as on the interpreter. A negative key length raises
+    [Invalid_argument] instead. *)
 val make :
   version:Wasm_pvm_state.version ->
+  nds_host_functions_enabled:bool ->
   reveal_builtins:Builtins.reveals ->
   write_debug:Builtins.write_debug ->
   host_state ->

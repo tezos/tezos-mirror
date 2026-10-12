@@ -164,6 +164,12 @@ Smart Rollup node
   making such a call computed a different state under the fast engine than
   under the interpreter. (MR :gl:`!22837`)
 
+- The WASM PVM fast execution engine (Wasmer) now implements the new durable
+  storage (NDS) host functions of PVM version V6 and above, with the same
+  results as the interpreter. A kernel importing them no longer panics the
+  fast engine, so it runs at full speed without ``--slow-vm-fallback``.
+  (MR :gl:`!22822`)
+
 - Fixed the public ``secure`` RPC ACL, which did not deny the mutating
   ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
   ``POST /local/dal/slot/indices`` and ``POST /local/dal/injection/<id>/forget``).

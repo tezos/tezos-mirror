@@ -200,25 +200,23 @@ struct
             in
             {irmin = irmin_state; nds = Active nds}
 
-      (* Derive the output [nds_state] from the encoded [storage]: a
-         coherent pair passes through unchanged; the activation tick
-         ([Dual] storage with an [Inactive] tag) flips to [Active] so the
-         next decode reattaches the handle; [Durable_only] storage with
-         an [Active] tag is a producer error — deactivation is not part
-         of the kernel contract. *)
+      (* The storage's handle is authoritative: usually the one [decode]
+         attached, but an evaluation may replace it — the activation tick
+         installs a fresh one, the fast engine's interpreter fallback
+         replays from a snapshot.  [Durable_only] storage under an
+         [Active] tag is a producer error: deactivation is not part of
+         the kernel contract. *)
       let nds_state_of_storage storage nds_state =
         match (storage, nds_state) with
         | ( Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.Durable_only _,
-            Inactive )
-        | Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.Dual _, Active _
-        (* storage and nds_state are coherent. *) ->
+            Inactive ) ->
             nds_state
         | ( Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.Durable_only _,
             Active _ ) ->
             invalid_arg
               "Dual_state.encode: pvm storage is Durable_only but nds_state is \
                Active — deactivation is not part of the kernel contract"
-        | Dual {nds; _}, Inactive -> Active nds
+        | Dual {nds; _}, (Inactive | Active _) -> Active nds
 
       let encode pvm_state {irmin = irmin_state; nds = nds_state} =
         let open Lwt.Syntax in
@@ -524,7 +522,9 @@ struct
        with {!Backend.copy} — otherwise a "snapshot" would keep
        mutating under later evaluation of the source (or vice versa).
        The eval loop itself goes through {!read} / {!write}, which
-       alias, so per-step evaluation never pays a copy. *)
+       alias, so per-step evaluation pays no copy here.  With
+       [--slow-vm-fallback], the fast engine copies the handle once per
+       [kernel_run] to replay from ([Tezos_scoru_wasm_fast.Vm]). *)
     let to_imm (m : mut_state) : state = {irmin = m.irmin; nds = copy_nds m.nds}
 
     let from_imm (s : state) : mut_state =

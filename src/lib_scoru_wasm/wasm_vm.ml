@@ -35,6 +35,8 @@ module type S = sig
 
   val patch_flags_on_eval_trapped : Durable.t -> Durable.t Lwt.t
 
+  val current_level_of : pvm_state -> int32
+
   val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
 
   val has_reboot_flag : Durable.t -> bool Lwt.t

@@ -46,17 +46,30 @@ module Make_vm (P : Wasm_vm.Params) = struct
         | _ -> Wasm_vm.should_compute pvm_state)
       pvm_state
 
-  let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug
-      pvm_state =
+  let compute_fast ~wasm_entrypoint ~(hooks : Hooks.t) ~reveal_builtins
+      ~write_debug pvm_state =
     let open Lwt.Syntax in
     let* version = Wasm_vm.get_wasm_version pvm_state in
+    (* Whether NDS is activated on chain at this level, as the interpreter
+       evaluates it at every step. *)
+    let nds_host_functions_enabled =
+      Wasm_pvm_config.nds_host_functions_enabled
+        P.config
+        ~current_level:(Wasm_vm.current_level_of pvm_state)
+    in
+    let durable, nds =
+      match pvm_state.storage with
+      | Durable_only {durable} -> (durable, None)
+      | Dual {durable; nds} -> (durable, Some nds)
+    in
     (* Execute! *)
-    let durable = Wasm_pvm_state.Internal_state.durable_of pvm_state.storage in
     let* durable =
       Exec.compute
         ~hooks
         ~wasm_entrypoint
         ~version
+        ~nds
+        ~nds_host_functions_enabled
         ~reveal_builtins
         ~write_debug
         durable
@@ -69,14 +82,13 @@ module Make_vm (P : Wasm_vm.Params) = struct
        tick. *)
     let ticks = pvm_state.max_nb_ticks in
     let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
+    let storage =
+      match nds with
+      | None -> Durable_only {durable}
+      | Some nds -> Dual {durable; nds}
+    in
     let pvm_state =
-      {
-        pvm_state with
-        storage =
-          Wasm_pvm_state.Internal_state.update_durable pvm_state.storage durable;
-        current_tick;
-        tick_state = Padding;
-      }
+      {pvm_state with storage; current_tick; tick_state = Padding}
     in
     (* Here, we don't reuse the [write_debug] argument, because we are
        in the [Padding] stage of the WASM PVM execution, so there is no
@@ -113,7 +125,7 @@ module Make_vm (P : Wasm_vm.Params) = struct
       Tezos_webassembly_interpreter.Output_buffer.snapshot
         pvm_state.buffers.output
     in
-    let backup pvm_state =
+    let backup ?(storage = pvm_state.storage) pvm_state =
       let+ pvm_state, ticks =
         Wasm_vm.compute_step_many
           ~wasm_entrypoint
@@ -124,6 +136,7 @@ module Make_vm (P : Wasm_vm.Params) = struct
           ~max_steps
           {
             pvm_state with
+            storage;
             buffers = {input = inbox_snapshot; output = outbox_snapshot};
           }
       in
@@ -199,8 +212,34 @@ module Make_vm (P : Wasm_vm.Params) = struct
               Lwt.reraise exn)
         in
         match pvm_state.tick_state with
-        | Snapshot when hooks.fast_exec.fallback ->
-            Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
+        | Snapshot when hooks.fast_exec.fallback -> (
+            (* Unlike [Durable.t], an NDS handle mutates in place, so a
+               [kernel_run] the fast engine abandons halfway leaves its
+               trace in the handle.  Replay from a snapshot of it, as from
+               the input and output buffer snapshots.  The snapshot copies
+               the registry at once, at every [kernel_run]
+               ({!Octez_riscv_nds_common.Nds.copy}). *)
+            (* TODO: https://linear.app/tezos/issue/L2-2190
+               Make this snapshot cheap.
+            *)
+            let snapshot =
+              match pvm_state.storage with
+              | Durable_only _ as storage -> Some storage
+              | Dual {durable; nds} -> (
+                  match Octez_riscv_nds_common.Nds.copy nds with
+                  | nds -> Some (Dual {durable; nds})
+                  | exception ((Stack_overflow | Out_of_memory) as exn) ->
+                      raise exn
+                  | exception _ -> None)
+            in
+            match snapshot with
+            | Some storage ->
+                Lwt.catch go_like_the_wind (fun _ -> backup ~storage pvm_state)
+            | None ->
+                (* The copy failed before the fast engine ran, so the
+                   handle in [pvm_state] is intact. The interpreter
+                   evaluates the [kernel_run] from it. *)
+                backup pvm_state)
         | Snapshot -> go_like_the_wind ()
         | _ -> goto_snapshot_and_retry ())
     | _ ->

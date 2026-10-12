@@ -87,8 +87,8 @@ let preload_kernel ~hooks durable =
   let* _ = load_kernel ~hooks durable in
   return_unit
 
-let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version
-    ~reveal_builtins ~write_debug durable buffers =
+let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version ~nds
+    ~nds_host_functions_enabled ~reveal_builtins ~write_debug durable buffers =
   let open Lwt.Syntax in
   let* module_ = load_kernel ~hooks durable in
 
@@ -97,9 +97,14 @@ let compute ?(wasm_entrypoint = Constants.wasm_entrypoint) ~hooks ~version
     match !main_mem with Some x -> x () | None -> assert false
   in
 
-  let host_state = Funcs.{retrieve_mem; buffers; durable} in
+  let host_state = Funcs.{retrieve_mem; buffers; durable; nds} in
   let host_funcs =
-    Funcs.make ~version ~reveal_builtins ~write_debug host_state
+    Funcs.make
+      ~version
+      ~nds_host_functions_enabled
+      ~reveal_builtins
+      ~write_debug
+      host_state
   in
 
   let with_durable f =

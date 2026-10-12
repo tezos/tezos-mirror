@@ -44,6 +44,12 @@ module type S = sig
       run. *)
   val patch_flags_on_eval_trapped : Durable.t -> Durable.t Lwt.t
 
+  (** [current_level_of pvm_state] is the inbox level of the most recent
+      input, or [0l] before the first input. {!Wasm_pvm_config} compares
+      this level with the level at which a feature is activated on
+      chain. *)
+  val current_level_of : pvm_state -> int32
+
   (** [should_compute pvm_state] probes whether it is possible to continue
       with more computational steps. *)
   val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool

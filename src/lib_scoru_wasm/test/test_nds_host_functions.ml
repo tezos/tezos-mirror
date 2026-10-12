@@ -1109,6 +1109,132 @@ let test_nds_functions_return_disabled_when_feature_flag_off () =
   assert (result_off = Values.[Num (I32 expected)]) ;
   Lwt.return_ok ()
 
+(** V6 runs on a released protocol. When NDS is not activated on chain,
+    each [nds_*] call answers [Nds_not_enabled] and charges the tick cost
+    of its inputs. A negative key length raises [Invalid_argument] in that
+    tick computation. *)
+let test_nds_ticks_when_not_activated_on_chain () =
+  let open Lwt.Syntax in
+  let registry =
+    Host_funcs.registry
+      ~version:Wasm_pvm_state.V6
+      ~nds_host_functions_enabled:false
+      ~write_debug:Noop
+  in
+  let* durable = make_durable [] in
+  let call func_inst inputs =
+    let global_name =
+      match func_inst with
+      | Tezos_webassembly_interpreter.Func.HostFunc (_, name) -> name
+      | _ -> Stdlib.failwith "not a host function"
+    in
+    match
+      Tezos_webassembly_interpreter.Host_funcs.lookup ~global_name registry
+    with
+    | Tezos_webassembly_interpreter.Host_funcs.Host_func f ->
+        let input = Input_buffer.alloc () in
+        let output =
+          Output_buffer.alloc
+            ~validity_period:0l
+            ~message_limit:Z.zero
+            ~last_level:None
+        in
+        let+ _durable, result, ticks =
+          f
+            input
+            output
+            durable
+            Tezos_webassembly_interpreter.Host_funcs.No_memories_during_init
+            inputs
+        in
+        (result, ticks)
+    | _ -> Stdlib.failwith "expected a plain host function"
+  in
+  let check ~__LOC__ func_inst inputs ~expected_ticks =
+    let+ result, ticks = call func_inst inputs in
+    if result <> Values.[Num (I32 Host_funcs.nds_disabled_code)] then
+      Stdlib.failwith (__LOC__ ^ ": expected the Nds_not_enabled code") ;
+    if not (Z.equal ticks (Z.of_int expected_ticks)) then
+      Stdlib.failwith
+        (Printf.sprintf
+           "%s: expected %d ticks, got %s"
+           __LOC__
+           expected_ticks
+           (Z.to_string ticks))
+  in
+  let open Host_funcs.Internal_for_tests in
+  (* A 5-byte key costs 42 ticks per byte plus one backend tick. *)
+  let* () =
+    check
+      ~__LOC__
+      nds_store_exists
+      Values.[Num (I64 0L); Num (I32 100l); Num (I32 5l)]
+      ~expected_ticks:211
+  in
+  let* () =
+    check
+      ~__LOC__
+      nds_store_read
+      Values.
+        [
+          Num (I64 0L);
+          Num (I32 100l);
+          Num (I32 5l);
+          Num (I64 0L);
+          Num (I32 200l);
+          Num (I32 10l);
+        ]
+      ~expected_ticks:211
+  in
+  let* () =
+    check
+      ~__LOC__
+      nds_store_write
+      Values.
+        [
+          Num (I64 0L);
+          Num (I32 100l);
+          Num (I32 5l);
+          Num (I64 0L);
+          Num (I32 200l);
+          Num (I32 10l);
+        ]
+      ~expected_ticks:211
+  in
+  (* One backend tick plus 42 ticks per byte of the 32-byte hash. *)
+  let* () =
+    check
+      ~__LOC__
+      nds_database_get_hash
+      Values.[Num (I64 0L); Num (I32 200l); Num (I32 32l)]
+      ~expected_ticks:1345
+  in
+  let* () =
+    check ~__LOC__ nds_registry_resize Values.[Num (I64 1L)] ~expected_ticks:2
+  in
+  let* () =
+    check
+      ~__LOC__
+      nds_registry_copy
+      Values.[Num (I64 0L); Num (I64 1L)]
+      ~expected_ticks:1
+  in
+  let* raised =
+    Lwt.catch
+      (fun () ->
+        let+ _ =
+          call
+            nds_store_exists
+            Values.[Num (I64 0L); Num (I32 100l); Num (I32 (-1l))]
+        in
+        false)
+      (function
+        | Invalid_argument _ -> Lwt.return true | exn -> Lwt.reraise exn)
+  in
+  if not raised then
+    Stdlib.failwith "a negative key length did not raise Invalid_argument" ;
+  Lwt.return_ok ()
+
 let test_nds_dispatch_without_dual_storage_crashes () =
   let open Lwt.Syntax in
   let module_reg, module_key, host_funcs_registry, _nds =
@@ -1376,6 +1502,10 @@ let tests =
       "NDS functions return Nds_not_enabled when feature flag is off"
       `Quick
       test_nds_functions_return_disabled_when_feature_flag_off;
+    tztest
+      "NDS not activated on chain: calls charge the tick cost of their inputs"
+      `Quick
+      test_nds_ticks_when_not_activated_on_chain;
     tztest
       "NDS dispatch without Dual storage crashes"
       `Quick

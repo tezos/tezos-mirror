@@ -1453,6 +1453,79 @@ struct
         "Encoding_runner.encode accepted Durable_only + Active — deactivation \
          contract not enforced"
 
+  (** The encoder takes the NDS handle of the storage.  The state is
+      tagged [Active a] and the [Dual] storage holds a different handle
+      [b], with different contents.  Both [Encoding_runner.encode] and
+      [Encoding_runner.encode_storage] answer [Active b], and stamp the
+      registry hash of [b] in the marker.  The interpreter fallback of the
+      fast engine leaves a replayed copy in the storage, so the encoder
+      must take that copy. *)
+  let test_encode_takes_the_storage_handle () =
+    let open Lwt_result_syntax in
+    let open Tezos_scoru_wasm.Wasm_pvm_state.Internal_state in
+    let a = make_empty_nds () in
+    let b = make_empty_nds () in
+    (match Octez_riscv_nds_common.Nds.resize b 1L with
+    | Ok () -> ()
+    | Error _ -> Test.fail ~__LOC__ "failed to resize") ;
+    let b_hash = Octez_riscv_nds_common.Nds.registry_hash b in
+    Check.(
+      (Octez_riscv_nds_common.Nds.registry_hash a <> b_hash)
+        bytes_typ
+        ~__LOC__
+        ~error_msg:"sanity: the two handles have the same registry hash (%L)") ;
+    let*! irmin = stamp_nds_marker (Irmin.empty_state ()) a in
+    let*! durable = Irmin.Encoding_runner.decode_durable_storage irmin in
+    let storage = Dual {durable; nds = b} in
+    let pvm_state =
+      {
+        last_input_info = None;
+        current_tick = Z.zero;
+        reboot_counter = Z.zero;
+        storage;
+        buffers = default_buffers 0l Z.zero ();
+        tick_state = Collect;
+        last_top_level_call = Z.zero;
+        max_nb_ticks = Z.zero;
+        maximum_reboots_per_input = Z.zero;
+        output_buffer_parameters =
+          {validity_period = 0l; message_limit = Z.zero};
+      }
+    in
+    let check_takes_b encoder (state : Dual.state) =
+      (match state.nds with
+      | Dual.Active nds when nds == b -> ()
+      | Dual.Active _ ->
+          Test.fail
+            ~__LOC__
+            "%s answered an Active handle that is not the handle of the storage"
+            encoder
+      | Dual.Inactive -> Test.fail ~__LOC__ "%s answered Inactive" encoder) ;
+      let*! () = check_nds_hash_marker state.irmin b in
+      (* The marker matches the handle, so the decoder accepts the state. *)
+      let*! decoded = Dual.Encoding_runner.decode_storage state in
+      match decoded with
+      | Dual {nds; _} ->
+          Check.(
+            (Octez_riscv_nds_common.Nds.registry_hash nds = b_hash)
+              bytes_typ
+              ~__LOC__
+              ~error_msg:
+                "the decoded handle has the registry hash %L, expected the \
+                 hash of the storage handle %R") ;
+          return_unit
+      | Durable_only _ ->
+          Test.fail ~__LOC__ "%s: expected Dual storage after decode" encoder
+    in
+    let*! encoded =
+      Dual.Encoding_runner.encode pvm_state (dual irmin (Dual.Active a))
+    in
+    let* () = check_takes_b "encode" encoded in
+    let*! encoded =
+      Dual.Encoding_runner.encode_storage storage (dual irmin (Dual.Active a))
+    in
+    check_takes_b "encode_storage" encoded
+
   (* -------------------------------------------------------------------- *)
   (* Mutable-state conversions: snapshot independence                      *)
   (* -------------------------------------------------------------------- *)
@@ -1826,6 +1899,11 @@ struct
          Durable_only + Active (deactivation)"
         `Quick
         test_encode_raises_on_deactivation;
+      tztest
+        "encoder: Encoding_runner.encode takes the handle of the Dual storage, \
+         not the handle of the Active tag"
+        `Quick
+        test_encode_takes_the_storage_handle;
       tztest
         "plumbing: Dual proof with swapped NDS half rejected by verify_proof"
         `Quick
