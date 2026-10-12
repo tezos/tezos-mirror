@@ -518,7 +518,9 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_KEYSPACE_NAME;
     use tezos_smart_rollup::types::PublicKeyHash;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
     use tezos_tezlink::operation::{
         OriginationContent, Parameters, Script, TransferContent,
     };
@@ -557,7 +559,8 @@ mod tests {
     fn init_payer(host: &mut MockKernelHost, balance: u64) -> TezosImplicitAccount {
         let pkh = PublicKeyHash::from_b58check(SOURCE_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&pkh).unwrap();
-        account.allocate(host).unwrap();
+        let mut tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME).unwrap();
+        account.allocate(&mut tez_accounts).unwrap();
         account.set_balance(host, &balance.into()).unwrap();
         account
     }

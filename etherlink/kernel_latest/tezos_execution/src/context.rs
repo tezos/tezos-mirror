@@ -23,7 +23,11 @@ use tezosx_interfaces::Origin;
 pub fn implicit_from_public_key_hash(
     pkh: &PublicKeyHash,
 ) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
-    Ok(TezosImplicitAccount { pkh: pkh.clone() })
+    let key = crate::account_storage::key_to_tezos_account(pkh)?;
+    Ok(TezosImplicitAccount {
+        pkh: pkh.clone(),
+        key,
+    })
 }
 
 /// Resolve the implicit account backing a [`Contract`]. Errors on an
@@ -443,6 +447,18 @@ mod tests {
             durable(&contracts::account_key(&implicit).unwrap()),
             format!("/tez/tez_accounts/contracts/index/{}", hex::encode(bytes))
                 .into_bytes()
+        );
+    }
+
+    /// The RLP info record of an implicit account resolves to
+    /// `/tez/tez_accounts/tezosx/<pkh>/info`.
+    #[test]
+    fn implicit_account_key_keeps_its_durable_path() {
+        let pkh =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        assert_eq!(
+            durable(&crate::account_storage::key_to_tezos_account(&pkh).unwrap()),
+            b"/tez/tez_accounts/tezosx/tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx/info"
         );
     }
 

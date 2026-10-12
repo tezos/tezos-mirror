@@ -461,7 +461,7 @@ mod tests {
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
         context::implicit_from_public_key_hash(&null_pkh)
             .unwrap()
-            .allocate(rk.host_mut())
+            .allocate(rk.tez_accounts_mut())
             .unwrap();
 
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);

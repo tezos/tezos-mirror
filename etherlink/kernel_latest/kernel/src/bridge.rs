@@ -30,7 +30,7 @@ use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
@@ -546,7 +546,7 @@ where
             let depositor = Contract::Implicit(source.clone());
 
             let (result, internal_operation_results) = match TezosRuntime::add_balance(
-                rk.host_mut(),
+                rk.tez_accounts_mut(),
                 pkh,
                 U256::from(amount.as_u64()),
             ) {
@@ -621,22 +621,19 @@ where
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host>(
-    host: &mut Host,
+fn tezlink_deposit<Host: StorageV1, KS: KeySpace>(
+    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     amount: u64,
     receiver: Contract,
-) -> Result<TransferSuccess, TransferError>
-where
-    Host: StorageV1,
-{
+) -> Result<TransferSuccess, TransferError> {
     let to_account = tezos_execution::context::implicit_from_contract(&receiver)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
 
     let _was_allocated = to_account
-        .allocate(host)
+        .allocate(rk.tez_accounts_mut())
         .map_err(|_| TransferError::FailedToAllocateDestination)?;
 
-    match to_account.add_balance(host, amount) {
+    match to_account.add_balance(rk.host_mut(), amount) {
         Ok(()) => {
             let mut success = TransferSuccess::default();
             let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR).unwrap();
@@ -653,15 +650,10 @@ where
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host>(
-    host: &mut Host,
+pub fn execute_tezlink_deposit<Host: StorageV1, KS: KeySpace>(
+    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
     deposit: &Deposit,
-) -> Result<DepositResult<TezlinkOutcome>, BridgeError>
-where
-    Host: StorageV1,
-{
-    // Deposits only resolve implicit accounts (whose path is derived from the
-    // pkh), so the Tezos accounts root is not consulted here.
+) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;
@@ -676,7 +668,7 @@ where
         parameters: Parameters::default(),
     };
 
-    let result = match tezlink_deposit(host, amount.as_u64(), receiver) {
+    let result = match tezlink_deposit(rk, amount.as_u64(), receiver) {
         Ok(success) => ContentResult::Applied(TransferTarget::ToContract(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],
