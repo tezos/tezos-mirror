@@ -281,6 +281,99 @@ let test_simple_decode_undersized () =
     Base58.Prefix.ed25519_public_key
     (* Ed25519 public keys are 32 bytes. *) 32
 
+(* Checksum-valid strings carrying the raw prefix ["\255\255"] of the
+   placeholder encodings registered by the [Signature] and
+   [Aggregate_signature] modules, with a payload of the registered length
+   (2 bytes). *)
+let placeholder_inputs =
+  List.map
+    (fun payload -> Base58.safe_encode ("\255\255" ^ payload))
+    ["\000\000"; "\001\002"; "\255\255"]
+
+(** The placeholder encodings are never meant to decode anything: a
+    checksum-valid string with their prefix and length must be rejected
+    ([None]) by {!Base58.decode} and by the [of_b58check_opt] functions built
+    on it, not crash with [Assert_failure]. *)
+let test_placeholder_prefix () =
+  List.iter
+    (fun s ->
+      let check name f =
+        Alcotest.(check bool) (name ^ " " ^ s) true (f s = None)
+      in
+      check "Base58.decode" (fun s -> Option.map ignore (Base58.decode s)) ;
+      let check_sig name (of_pkh, of_pk, of_sk, of_sig) =
+        check (name ^ ".Public_key_hash") (fun s ->
+            Option.map ignore (of_pkh s)) ;
+        check (name ^ ".Public_key") (fun s -> Option.map ignore (of_pk s)) ;
+        check (name ^ ".Secret_key") (fun s -> Option.map ignore (of_sk s)) ;
+        check name (fun s -> Option.map ignore (of_sig s))
+      in
+      check_sig
+        "Signature.V0"
+        Signature.V0.
+          ( Public_key_hash.of_b58check_opt,
+            Public_key.of_b58check_opt,
+            Secret_key.of_b58check_opt,
+            of_b58check_opt ) ;
+      check_sig
+        "Signature.V1"
+        Signature.V1.
+          ( Public_key_hash.of_b58check_opt,
+            Public_key.of_b58check_opt,
+            Secret_key.of_b58check_opt,
+            of_b58check_opt ) ;
+      check_sig
+        "Signature.V2"
+        Signature.V2.
+          ( Public_key_hash.of_b58check_opt,
+            Public_key.of_b58check_opt,
+            Secret_key.of_b58check_opt,
+            of_b58check_opt ) ;
+      check_sig
+        "Signature.V3"
+        Signature.V3.
+          ( Public_key_hash.of_b58check_opt,
+            Public_key.of_b58check_opt,
+            Secret_key.of_b58check_opt,
+            of_b58check_opt ) ;
+      check_sig
+        "Aggregate_signature"
+        Aggregate_signature.
+          ( Public_key_hash.of_b58check_opt,
+            Public_key.of_b58check_opt,
+            Secret_key.of_b58check_opt,
+            of_b58check_opt ))
+    ("jpV15smzBkM" :: placeholder_inputs)
+
+(** For every encoding in the global registry of this test binary,
+    {!Base58.decode} never raises on a checksum-valid string carrying its
+    prefix, whatever the payload length, including the registered one.
+    This only covers the encodings registered by the modules linked into
+    this binary, not all of lib_crypto's. It covers none of the protocols'
+    encodings either: each protocol environment registers them in its own
+    registry, not in the global one.
+    Unlike {!test_registered_encodings_wrong_length}, the decoded value is
+    not checked: a payload of the right length may legitimately decode. *)
+let test_registered_encodings_never_raise () =
+  Base58.Internal_for_tests.iter_encodings
+    (fun ~prefix ~length ~encoded_length:_ ->
+      List.iter
+        (fun k ->
+          List.iter
+            (fun b ->
+              let forged = Base58.safe_encode (prefix ^ String.make k b) in
+              match Base58.decode forged with
+              | _ -> ()
+              | exception exn ->
+                  Alcotest.failf
+                    "prefix %S, payload of %d x %C: raised %s"
+                    prefix
+                    k
+                    b
+                    (Printexc.to_string exn))
+            ['\000'; '\x2a'; '\xff'])
+        [0; length - 1; length; length + 1])
+
 let tests : unit Alcotest.test list =
   [
     ( "base58",
@@ -300,5 +393,9 @@ let tests : unit Alcotest.test list =
         ( "simple_decode rejects undersized payload",
           `Quick,
           test_simple_decode_undersized );
+        ("placeholder prefix", `Quick, test_placeholder_prefix);
+        ( "registered encodings never raise",
+          `Quick,
+          test_registered_encodings_never_raise );
       ] );
   ]
