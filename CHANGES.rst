@@ -71,6 +71,12 @@ Node
   protocol, each with the level of the block that recorded it.
   (MR :gl:`!22838`)
 
+- Fixed handling of the source optional argument of the ``POST
+  chains/<chain>/blocks/<block>/helpers/scripts/run_script_view`` RPC
+  for Ushuaia and Alpha protocols. The argument had no effect until
+  now, it now controls the value returned by the ``SENDER``
+  instruction in the called view. (MR :gl:`!22791`)
+
 Client
 ------
 

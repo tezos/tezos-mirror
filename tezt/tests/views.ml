@@ -224,6 +224,10 @@ let test_create_contract =
     ~error_msg:"expected storage %R, got %L" ;
   unit
 
+(* Cancel the indentation from the multi-line Michelson output of the client. *)
+let compact_whitespace s =
+  String.trim @@ replace_string ~all:true (rex "\\s+") ~by:" " s
+
 let test_view_step_constant =
   Protocol.register_test
     ~__FILE__
@@ -247,12 +251,34 @@ let test_view_step_constant =
       ["opcodes"; "view_op_test_step_contants"]
       protocol
   in
+  let source = Constant.bootstrap1.public_key_hash in
+  let* actual =
+    Client.run_view
+      ~source:contract
+      ~payer:source
+      ~view:"step_constants"
+      ~contract:lib_contract
+      client
+  in
+  let expected =
+    sf
+      {|(Pair (Pair 0 %d) (Pair "%s" "%s") "%s")|}
+      amount
+      lib_contract
+      contract
+      Constant.bootstrap1.public_key_hash
+  in
+  Check.(
+    (compact_whitespace actual = expected)
+      string
+      ~__LOC__
+      ~error_msg:"expected view result %R, got %L") ;
   let* () =
     Client.transfer
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.alias
+      ~giver:source
       ~receiver:contract
       ~arg:(sf "\"%s\"" lib_contract)
       client
@@ -260,18 +286,7 @@ let test_view_step_constant =
   let* actual =
     Client.contract_storage ~unparsing_mode:Readable contract client
   in
-  let expected =
-    sf
-      {|Some (Pair (Pair 0 %d)
-           (Pair "%s" "%s")
-           "%s")
-|}
-      amount
-      lib_contract
-      contract
-      Constant.bootstrap1.public_key_hash
-  in
-  Check.((actual = expected) string ~__LOC__)
+  Check.((compact_whitespace actual = "Some " ^ expected) string ~__LOC__)
     ~error_msg:"expected storage %R, got %L" ;
   unit
 
