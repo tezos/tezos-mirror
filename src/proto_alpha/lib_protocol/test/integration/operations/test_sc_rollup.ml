@@ -3784,9 +3784,7 @@ let test_duplicate_signal_preserves_activation_level () =
   in
   (* Record the signals after the first execution. *)
   let* incr = Incremental.begin_construction block in
-  let*@ signals_after_first =
-    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
-  in
+  let*@ signals_after_first = Sc_rollup.signals (Incremental.alpha_ctxt incr) in
   (* Send the same signal a second time, in a new block. *)
   let output =
     make_canonical_rollup_signal_output
@@ -3804,10 +3802,56 @@ let test_duplicate_signal_preserves_activation_level () =
   (* Verify the signals are unchanged. *)
   let* incr = Incremental.begin_construction block in
   let*@ signals_after_second =
-    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+    Sc_rollup.signals (Incremental.alpha_ctxt incr)
   in
   assert (signals_after_first = signals_after_second) ;
   return_unit
+
+(** Test that the [smart_rollups/all/signals] RPC reports each recorded
+    signal with the level of the block that recorded it, and agrees with the
+    storage accessor. *)
+let test_signals_rpc () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Set this rollup as the canonical rollup. *)
+  let* block = set_canonical_rollup_address block rollup in
+  (* No signal has been recorded yet. *)
+  let* signals = Context.Sc_rollup.signals (B block) in
+  let* () = Assert.is_true ~loc:__LOC__ (List.is_empty signals) in
+  (* Send the signal from the canonical rollup. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* The signal is reported with the level of the block that recorded it. *)
+  let*? expected_level = Context.get_level (B block) in
+  let* signals = Context.Sc_rollup.signals (B block) in
+  let* () =
+    match signals with
+    | [(name, level)] ->
+        let* () = Assert.equal_string ~loc:__LOC__ signal name in
+        Assert.equal_int32
+          ~loc:__LOC__
+          (Raw_level.to_int32 level)
+          (Raw_level.to_int32 expected_level)
+    | _ -> failwith "Expected exactly one recorded signal"
+  in
+  (* The RPC and the storage accessor agree. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ storage_signals = Sc_rollup.signals (Incremental.alpha_ctxt incr) in
+  Assert.is_true ~loc:__LOC__ (signals = storage_signals)
 
 let tests =
   [
@@ -3999,6 +4043,10 @@ let tests =
       "Duplicate signal preserves activation level"
       `Quick
       test_duplicate_signal_preserves_activation_level;
+    Tztest.tztest
+      "smart_rollups/all/signals reports recorded signals"
+      `Quick
+      test_signals_rpc;
   ]
 
 let () =
