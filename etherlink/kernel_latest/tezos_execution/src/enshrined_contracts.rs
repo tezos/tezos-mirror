@@ -85,10 +85,9 @@ impl From<TransferError> for CracError {
             //
             // KeySpace carries the failed account read or write. Context
             // carries an invalid key, or a deposit receiver of the wrong
-            // kind, which no CRAC transfer produces. The other variants of
-            // this arm come from a tezos_storage::error::Error or from a
-            // failed balance update conversion. None of these causes is
-            // recoverable user input.
+            // kind, which no CRAC transfer produces.
+            // FailedToComputeBalanceUpdate comes from a failed balance update
+            // conversion. None of these causes is recoverable user input.
             // A non-existent originated destination is caught upstream by the
             // `dest_account.exists(tez_accounts)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist
@@ -96,7 +95,6 @@ impl From<TransferError> for CracError {
             // kernel-internal cause.
             TransferError::KeySpace(_)
             | TransferError::Context(_)
-            | TransferError::FailedToUpdateContractStorage
             | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
             }
@@ -5230,7 +5228,6 @@ pub(crate) mod tests {
             )),
             TransferError::Context(KeyError::KeyTooLarge.into()),
             TransferError::Context(OriginatedToImplicit(kt1).into()),
-            TransferError::FailedToUpdateContractStorage,
             TransferError::FailedToComputeBalanceUpdate(String::new()),
         ];
         for variant in infra {

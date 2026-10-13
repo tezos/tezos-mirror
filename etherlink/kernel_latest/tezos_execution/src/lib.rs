@@ -1641,9 +1641,8 @@ where
                         new_storage.len() as u64,
                         lazy_storage_size_diff,
                     );
-                    let info_bytes_written = new_info
-                        .encoded_len()
-                        .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+                    let info_bytes_written =
+                        dest_account.info_len(tc_ctx.rk.tez_accounts(), &new_info)?;
 
                     consume_storage_write_milligas(
                         tc_ctx.operation_gas,
