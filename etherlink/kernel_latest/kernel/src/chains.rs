@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    apply::{extract_cross_runtime_effects, RuntimeExecutionInfo, TezosExecutionInfo},
+    apply::{
+        extract_cross_runtime_effects, CrossRuntimeEffect, RuntimeExecutionInfo,
+        TezosExecutionInfo,
+    },
     block_in_progress::BlockInProgress,
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
@@ -851,15 +854,26 @@ impl TezosXChainConfig {
                 let result = res.to_execution_result(
                     self.michelson_to_evm_gas_multiplier(block_constants),
                 );
-                journal.fake_top_level_call_end(
-                    michelson_milligas_to_evm_gas(
-                        res.consumed_milligas,
-                        block_constants
-                            .michelson_runtime_block_constants
-                            .michelson_to_evm_gas_multiplier,
-                    ),
-                    matches!(result, ExecutionResult::Success { .. }),
-                );
+                // Keep the fake top-level frame iff the operation registered
+                // a fake transaction, so the block holds exactly one
+                // top-level trace per transaction.
+                if res
+                    .cross_runtime_effects
+                    .iter()
+                    .any(|effect| matches!(effect, CrossRuntimeEffect::Evm(_)))
+                {
+                    journal.fake_top_level_call_end(
+                        michelson_milligas_to_evm_gas(
+                            res.consumed_milligas,
+                            block_constants
+                                .michelson_runtime_block_constants
+                                .michelson_to_evm_gas_multiplier,
+                        ),
+                        matches!(result, ExecutionResult::Success { .. }),
+                    );
+                } else {
+                    journal.discard_fake_top_level_call();
+                }
                 close_tezosx_journal(rk.host_mut(), journal, Some(&result))?;
                 Ok(crate::apply::ExecutionResult::Valid(
                     RuntimeExecutionInfo::Tezos(res),

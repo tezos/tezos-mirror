@@ -215,8 +215,10 @@ pub struct CallTracer {
     /// [`CallTracer::finalize`].  RLP encoding is deferred to flush time
     /// so the buffer remains readable.
     pending_traces: Vec<CallTrace>,
-    /// Whether a smart contract was called during the transaction lifespan
-    saw_call: bool,
+    /// Length of `pending_traces` when [`CallTracer::fake_top_level_call`]
+    /// opened its frame, so [`CallTracer::fake_top_level_call_end`] can
+    /// drop the frames recorded below it.
+    fake_top_level_start: usize,
     pub(crate) transaction_hash: Option<B256>,
     spec_id: SpecId,
 }
@@ -231,7 +233,7 @@ impl CallTracer {
             config,
             call_trace: Vec::with_capacity(1),
             pending_traces: Vec::new(),
-            saw_call: false,
+            fake_top_level_start: 0,
             transaction_hash,
             spec_id,
         }
@@ -328,19 +330,14 @@ impl CallTracer {
         call_trace.add_to(Some(caller));
         call_trace.add_gas(Some(gas_limit));
 
-        self.saw_call = false;
+        self.fake_top_level_start = self.pending_traces.len();
         self.call_trace.push(call_trace);
     }
 
-    /// Close the frame opened by [`CallTracer::fake_top_level_call`]. When
-    /// nothing nested below it, the mirrored operation dispatched no EVM
-    /// call: the frame is dropped without recording anything.
+    /// Close the frame opened by [`CallTracer::fake_top_level_call`] and
+    /// record it as a top-level trace that used `gas_spent` gas and
+    /// succeeded iff `status`.
     pub fn fake_top_level_call_end(&mut self, gas_spent: u64, status: bool) {
-        if !self.saw_call {
-            self.call_trace.pop();
-            return;
-        }
-
         self.end_transaction_layer(
             gas_spent,
             &Bytes::new(),
@@ -350,6 +347,13 @@ impl CallTracer {
                 InstructionResult::Revert
             },
         );
+    }
+
+    /// Discard the frame opened by [`CallTracer::fake_top_level_call`] and
+    /// every trace recorded since.
+    pub fn discard_fake_top_level_call(&mut self) {
+        self.pending_traces.truncate(self.fake_top_level_start);
+        self.call_trace.pop();
     }
 }
 
@@ -366,7 +370,6 @@ where
         // Entering a frame: its depth is the current stack height, before it
         // is pushed.
         let depth = self.call_trace.len() as u16;
-        self.saw_call = true;
 
         // Only the top-level frame accounts the transaction's intrinsic gas.
         let initial_gas = if depth == 0 {
@@ -418,7 +421,6 @@ where
         // Entering a frame: its depth is the current stack height, before it
         // is pushed.
         let depth = self.call_trace.len() as u16;
-        self.saw_call = true;
 
         // Only the top-level frame accounts the transaction's intrinsic gas.
         let initial_gas = if depth == 0 {
@@ -529,6 +531,47 @@ mod tests {
             .flatten()
             .map(|log| log.position)
             .collect()
+    }
+
+    /// One Michelson operation: the fake top-level frame, `nested` EVM
+    /// frames below it, closed with `fake_tx_registered`.
+    fn fake_operation(tracer: &mut CallTracer, nested: usize, fake_tx_registered: bool) {
+        tracer.fake_top_level_call(Address::ZERO, 0);
+        for _ in 0..nested {
+            enter(tracer);
+            leave(tracer);
+        }
+        if fake_tx_registered {
+            tracer.fake_top_level_call_end(0, false);
+        } else {
+            tracer.discard_fake_top_level_call();
+        }
+    }
+
+    fn top_level_traces(tracer: &CallTracer) -> usize {
+        tracer
+            .pending_traces
+            .iter()
+            .filter(|trace| trace.depth == 0)
+            .count()
+    }
+
+    #[test]
+    fn fake_top_level_call_kept_iff_fake_tx_registered() {
+        let mut tracer = tracer(false);
+        // A crossing whose frames all ran after it was recorded.
+        fake_operation(&mut tracer, 1, true);
+        // L2-2195: an EVM frame (the alias materialization) ran, then the
+        // gateway failed before recording the crossing.
+        fake_operation(&mut tracer, 1, false);
+        // A crossing recorded before any EVM frame ran.
+        fake_operation(&mut tracer, 0, true);
+        // No crossing at all.
+        fake_operation(&mut tracer, 0, false);
+
+        assert!(tracer.call_trace.is_empty());
+        assert_eq!(top_level_traces(&tracer), 2);
+        assert_eq!(tracer.pending_traces.len(), 3);
     }
 
     #[test]

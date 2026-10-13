@@ -254,10 +254,9 @@ pub enum RuntimeTransactionResult {
 /// Extract cross-runtime side effects accumulated in the journal
 /// during a Michelson transaction that may have CRACed into EVM.
 ///
-/// Returns no EVM effect when every crossing was a read-only
-/// `staticcall_evm` (`take_crac_data` suppresses the static-only case):
-/// such an op left no EVM-observable state change, so no fake tx mirrors
-/// it (L2-1408).
+/// Returns an EVM effect iff at least one crossing was recorded,
+/// read-only `staticcall_evm` crossings included, so every op that
+/// crossed into the EVM runtime is mirrored by a fake tx.
 pub fn extract_cross_runtime_effects(
     journal: &mut TezosXJournal,
     consumed_milligas: u64,
