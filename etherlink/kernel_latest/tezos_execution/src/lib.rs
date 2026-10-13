@@ -565,14 +565,9 @@ fn credit_destination_without_debiting_sender(
             address_registry_diff: vec![],
         });
     }
-    let receiver_balance = receiver_account
-        .balance(tez_accounts)
-        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
-        .0;
+    let receiver_balance = receiver_account.balance(tez_accounts)?.0;
     let new_receiver_balance = (&receiver_balance + &amount.0).into();
-    receiver_account
-        .set_balance(tez_accounts, &new_receiver_balance)
-        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
     let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
     Ok(TransferSuccess {
         storage: None,
@@ -602,9 +597,7 @@ fn burn_tez(
     account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
-    let balance = account
-        .balance(tez_accounts)
-        .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+    let balance = account.balance(tez_accounts)?;
     let new_balance = match balance.0.checked_sub(amount) {
         None => {
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
@@ -615,9 +608,7 @@ fn burn_tez(
         }
         Some(new_balance) => new_balance.into(),
     };
-    account
-        .set_balance(tez_accounts, &new_balance)
-        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    account.set_balance(tez_accounts, &new_balance)?;
     Ok(new_balance)
 }
 
@@ -1496,12 +1487,9 @@ where
                 );
             };
 
-            let dest_account = context::implicit_from_public_key_hash(pkh)
-                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let dest_account = context::implicit_from_public_key_hash(pkh)?;
             let already_allocated =
-                dest_account
-                    .allocate(tc_ctx.rk.tez_accounts_mut())
-                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
+                dest_account.allocate(tc_ctx.rk.tez_accounts_mut())?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.rk.tez_accounts_mut(),
@@ -1532,14 +1520,10 @@ where
             })
         }
         Contract::Originated(kt1) => {
-            let dest_account = account_storage::TezosOriginatedAccount::from_kt1(kt1)
-                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let dest_account = account_storage::TezosOriginatedAccount::from_kt1(kt1)?;
             // Reject a transfer to a never-originated KT1 before any write, as
             // Tezos does. Otherwise the NotFound error of `code()` aborts the block.
-            if !dest_account
-                .exists(tc_ctx.rk.tez_accounts())
-                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
-            {
+            if !dest_account.exists(tc_ctx.rk.tez_accounts())? {
                 return Err(TransferError::ContractDoesNotExist(Contract::Originated(
                     kt1.clone(),
                 ))
@@ -1572,9 +1556,7 @@ where
                 code_size,
             )
             .map_err(TransferError::OutOfGas)?;
-            let storage = dest_account
-                .storage(tc_ctx.rk.tez_accounts())
-                .map_err(|_| TransferError::FailedToFetchContractStorage)?;
+            let storage = dest_account.storage(tc_ctx.rk.tez_accounts())?;
             consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
                 .map_err(TransferError::OutOfGas)?;
             let exec_ctx = ExecCtx::create(
@@ -1655,9 +1637,8 @@ where
                         None,
                     )
                 } else {
-                    let (prev_info, info_bytes_read) = dest_account
-                        .read_info_with_len(tc_ctx.rk.tez_accounts())
-                        .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+                    let (prev_info, info_bytes_read) =
+                        dest_account.read_info_with_len(tc_ctx.rk.tez_accounts())?;
                     let (new_info, space) = prev_info.with_storage_size(
                         new_storage.len() as u64,
                         lazy_storage_size_diff,
@@ -1704,13 +1685,11 @@ where
             // Persist the storage blob and the accounting record now that
             // their gas has been charged (no-op for enshrined contracts).
             if let Some(info) = &info_to_write {
-                dest_account
-                    .write_storage_and_info(
-                        tc_ctx.rk.tez_accounts_mut(),
-                        &new_storage,
-                        info,
-                    )
-                    .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+                dest_account.write_storage_and_info(
+                    tc_ctx.rk.tez_accounts_mut(),
+                    &new_storage,
+                    info,
+                )?;
             }
             let StorageSpace {
                 used_bytes,
@@ -2766,9 +2745,7 @@ fn apply_balance_changes(
     receiver_account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError> {
-    let giver_balance = giver_account
-        .balance(tez_accounts)
-        .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+    let giver_balance = giver_account.balance(tez_accounts)?;
     let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
@@ -2779,17 +2756,10 @@ fn apply_balance_changes(
         }
         Some(new_source_balance) => new_source_balance.into(),
     };
-    giver_account
-        .set_balance(tez_accounts, &new_giver_balance)
-        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    let receiver_balance = receiver_account
-        .balance(tez_accounts)
-        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
-        .0;
+    giver_account.set_balance(tez_accounts, &new_giver_balance)?;
+    let receiver_balance = receiver_account.balance(tez_accounts)?.0;
     let new_receiver_balance = (&receiver_balance + amount).into();
-    receiver_account
-        .set_balance(tez_accounts, &new_receiver_balance)
-        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
 
     log!(Debug,
         "Transfer: OK - the new balance of the giver is {new_giver_balance:?} and the new balance of the receiver is {new_receiver_balance:?}"

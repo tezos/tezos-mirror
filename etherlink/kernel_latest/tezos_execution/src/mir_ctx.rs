@@ -230,9 +230,7 @@ impl ExecCtx {
             },
         )?;
         let self_address = address_from_contract(dest_account.contract());
-        let balance = dest_account
-            .balance(tez_accounts)
-            .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+        let balance = dest_account.balance(tez_accounts)?;
         let balance = balance.0.try_into().map_err(
             |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                 TransferError::MirAmountToNarithError(err.to_string())

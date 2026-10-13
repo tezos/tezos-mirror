@@ -626,12 +626,9 @@ fn tezlink_deposit(
     amount: u64,
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError> {
-    let to_account = tezos_execution::context::implicit_from_contract(&receiver)
-        .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+    let to_account = tezos_execution::context::implicit_from_contract(&receiver)?;
 
-    let _was_allocated = to_account
-        .allocate(tez_accounts)
-        .map_err(|_| TransferError::FailedToAllocateDestination)?;
+    let _was_allocated = to_account.allocate(tez_accounts)?;
 
     match to_account.add_balance(tez_accounts, amount) {
         Ok(()) => {
