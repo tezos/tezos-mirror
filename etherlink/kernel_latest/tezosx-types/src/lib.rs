@@ -115,6 +115,24 @@ pub struct CrossRuntimeContext {
 #[error("{0}")]
 pub struct KernelStorageError(pub String);
 
+/// What a kernel read from a key space can fail on, on top of the read failures
+/// of the SDK.
+#[derive(Error, Debug, Eq, PartialEq)]
+pub enum StorageReadErrorKind {
+    /// A bounded read found a value longer than its bound.
+    #[error("value of {length} bytes exceeds the bound of {max_bytes} bytes")]
+    ValueExceedsBound {
+        /// Length of the stored value, in bytes.
+        length: usize,
+        /// Bound of the read, in bytes.
+        max_bytes: usize,
+    },
+
+    /// The key holds no value, and the caller requires one.
+    #[error("no value at the key")]
+    NotFound,
+}
+
 // TODO: L2-971
 // cleanup this, and remove use of Custom for more specific errors
 #[derive(Eq, PartialEq, Debug, Error)]
