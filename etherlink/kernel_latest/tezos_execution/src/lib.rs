@@ -464,9 +464,7 @@ where
     Host: KeySpaceLoader + StorageV1,
 {
     log!(Debug, "Applying a reveal operation");
-    let manager = source_account
-        .manager(tc_ctx.rk.tez_accounts())
-        .map_err(|_| RevealError::UnretrievableManager)?;
+    let manager = source_account.manager(tc_ctx.rk.tez_accounts())?;
 
     let expected_hash = match manager {
         Manager::Revealed(_) => {
@@ -497,9 +495,7 @@ where
     }
 
     // Set the public key as the manager
-    source_account
-        .set_manager_public_key(tc_ctx.rk.tez_accounts_mut(), public_key)
-        .map_err(|_| RevealError::FailedToWriteManager)?;
+    source_account.set_manager_public_key(tc_ctx.rk.tez_accounts_mut(), public_key)?;
 
     log!(Debug, "Reveal operation succeed");
 

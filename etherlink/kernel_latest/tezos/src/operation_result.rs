@@ -31,7 +31,10 @@ use tezos_nom::NomReader;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_keyspace::{KeyError, KeySpaceLoaderError};
+use tezos_smart_rollup_keyspace::{
+    ErrorKind as KeySpaceErrorKind, KeyError, KeySpaceError, KeySpaceLoaderError,
+};
+use tezosx_types::StorageReadErrorKind;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -124,7 +127,7 @@ impl From<CryptoError> for ValidityError {
     }
 }
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum RevealError {
     #[error("Revelation failed because the manager key of {0} was already revealed.")]
     PreviouslyRevealedKey(Contract),
@@ -143,12 +146,17 @@ pub enum RevealError {
         expected_hash: PublicKeyHash,
         computed_hash: PublicKeyHash,
     },
-    #[error("Could not retrieve manager.")]
-    UnretrievableManager,
-    #[error("Failed to write manager.")]
-    FailedToWriteManager,
+    /// A read or a write of the account record failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error("Gas exhaustion")]
     OutOfGas,
+}
+
+impl From<KeySpaceError> for RevealError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq)]
@@ -505,13 +513,13 @@ impl ErrorKind {
 }
 
 /// The id of an error, without the `proto.<protocol>.` prefix.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ErrorId {
     /// The id of an L1 error.
     L1(&'static str),
     /// The id of an error without L1 counterpart, under `tezosx_internal.`,
     /// which is not a stable API.
-    TezosxInternal(&'static str),
+    TezosxInternal(Cow<'static, str>),
 }
 
 /// An error in the shape L1 encodes it.
@@ -540,14 +548,28 @@ impl L1Error {
     /// cannot help, as for its closest L1 counterparts.
     fn tezosx_internal(
         kind: ErrorKind,
-        id: &'static str,
+        id: impl Into<Cow<'static, str>>,
         error: &impl std::fmt::Display,
     ) -> Self {
         Self {
             kind,
-            id: ErrorId::TezosxInternal(id),
+            id: ErrorId::TezosxInternal(id.into()),
             fields: vec![("error_message", error.to_string())],
         }
+    }
+
+    /// Builds the temporary error of a key space failure without L1
+    /// counterpart, under `<operation>.read` for a failed read and
+    /// `<operation>.write` for a failed write.
+    fn key_space(
+        operation: &'static str,
+        error: &KeySpaceError<StorageReadErrorKind>,
+    ) -> Self {
+        let side = match error.kind() {
+            KeySpaceErrorKind::Read(_) => "read",
+            KeySpaceErrorKind::Write(_) => "write",
+        };
+        Self::tezosx_internal(ErrorKind::Temporary, format!("{operation}.{side}"), error)
     }
 
     fn balance_too_low(error: &BalanceTooLow) -> Self {
@@ -568,7 +590,7 @@ impl L1Error {
 
     fn to_bson(&self) -> Vec<u8> {
         let prefix = TARGET_TEZOS_PROTOCOL.error_prefix();
-        let id = match self.id {
+        let id = match &self.id {
             ErrorId::L1(id) => format!("proto.{prefix}.{id}"),
             ErrorId::TezosxInternal(id) => {
                 format!("proto.{prefix}.tezosx_internal.{id}")
@@ -620,16 +642,7 @@ impl RevealError {
                     ("provided_hash", source_hash.to_string()),
                 ],
             ),
-            RevealError::UnretrievableManager => L1Error::tezosx_internal(
-                ErrorKind::Temporary,
-                "reveal.unretrievable_manager",
-                self,
-            ),
-            RevealError::FailedToWriteManager => L1Error::tezosx_internal(
-                ErrorKind::Temporary,
-                "reveal.failed_to_write_manager",
-                self,
-            ),
+            RevealError::KeySpace(error) => L1Error::key_space("reveal", error),
         }
     }
 }
@@ -1639,6 +1652,7 @@ mod tests {
     use mir::lexer::Prim;
     use pretty_assertions::assert_eq;
     use std::borrow::Cow;
+    use tezos_smart_rollup_keyspace::{Key, Name, ReadKind, WriteKind};
     use typed_arena::Arena;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
@@ -2371,6 +2385,52 @@ mod tests {
                 "permanent",
                 "tezosx_internal.internal_operation_replay",
                 &[("error_message", "Internal operation replay attempt")],
+            )
+        );
+    }
+
+    fn key_space_read_error() -> KeySpaceError<StorageReadErrorKind> {
+        KeySpaceError::read(
+            &Name::from_static("/tez/tez_accounts"),
+            &Key::from_static(b"/info"),
+            ReadKind::Ext(StorageReadErrorKind::NotFound),
+        )
+    }
+
+    fn key_space_write_error() -> KeySpaceError<StorageReadErrorKind> {
+        KeySpaceError::write(
+            &Name::from_static("/tez/tez_accounts"),
+            &Key::from_static(b"/info"),
+            WriteKind::ValueSizeExceeded,
+        )
+    }
+
+    #[test]
+    fn reveal_key_space_errors_carry_the_key_space_and_the_key() {
+        assert_eq!(
+            encode_error(&ApplyOperationError::Reveal(RevealError::KeySpace(
+                key_space_read_error()
+            ))),
+            expected_object(
+                "temporary",
+                "tezosx_internal.reveal.read",
+                &[(
+                    "error_message",
+                    "at key /info of key space /tez/tez_accounts: no value at the key"
+                )],
+            )
+        );
+        assert_eq!(
+            encode_error(&ApplyOperationError::Reveal(RevealError::KeySpace(
+                key_space_write_error()
+            ))),
+            expected_object(
+                "temporary",
+                "tezosx_internal.reveal.write",
+                &[(
+                    "error_message",
+                    "at key /info of key space /tez/tez_accounts: value size exceeded the maximum allowed"
+                )],
             )
         );
     }
