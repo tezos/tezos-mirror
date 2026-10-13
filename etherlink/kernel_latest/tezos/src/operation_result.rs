@@ -207,8 +207,6 @@ pub enum TransferError {
     Context(#[from] ContextError),
     #[error("Failed to compute balance update: {0}")]
     FailedToComputeBalanceUpdate(String),
-    #[error("Failed to fetch contract code")]
-    FailedToFetchContractCode,
     #[error("Failed to update contract storage")]
     FailedToUpdateContractStorage,
     #[error("Apply operation failed because of an unsupported address error")]
@@ -719,10 +717,6 @@ impl TransferError {
             TransferError::FailedToComputeBalanceUpdate(_) => fallback(
                 ErrorKind::Temporary,
                 "transfer.failed_to_compute_balance_update",
-            ),
-            TransferError::FailedToFetchContractCode => fallback(
-                ErrorKind::Temporary,
-                "transfer.failed_to_fetch_contract_code",
             ),
             TransferError::FailedToUpdateContractStorage => fallback(
                 ErrorKind::Temporary,

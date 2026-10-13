@@ -92,11 +92,10 @@ impl From<TransferError> for CracError {
             // A non-existent originated destination is caught upstream by the
             // `dest_account.exists(tez_accounts)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist
-            // instead, so FailedToFetchContractCode here can only fire
-            // from genuine kernel-internal causes.
+            // instead, so a missing code here can only come from a
+            // kernel-internal cause.
             TransferError::KeySpace(_)
             | TransferError::Context(_)
-            | TransferError::FailedToFetchContractCode
             | TransferError::FailedToUpdateContractStorage
             | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
@@ -5231,7 +5230,6 @@ pub(crate) mod tests {
             )),
             TransferError::Context(KeyError::KeyTooLarge.into()),
             TransferError::Context(OriginatedToImplicit(kt1).into()),
-            TransferError::FailedToFetchContractCode,
             TransferError::FailedToUpdateContractStorage,
             TransferError::FailedToComputeBalanceUpdate(String::new()),
         ];

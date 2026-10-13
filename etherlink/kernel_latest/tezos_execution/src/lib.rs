@@ -1543,9 +1543,7 @@ where
                     &dest_account,
                 )?
             };
-            let code = dest_account
-                .code(tc_ctx.rk.tez_accounts())
-                .map_err(|_| TransferError::FailedToFetchContractCode)?;
+            let code = dest_account.code(tc_ctx.rk.tez_accounts())?;
             let (code_read_count, code_size) = match &code {
                 Code::Code(code_bytes) => (1, code_bytes.len() as u64),
                 Code::Enshrined(_) => (0, 0),
@@ -5258,9 +5256,9 @@ mod tests {
     /// Pin the existence-check guard introduced before `transfer_tez` in
     /// the `Contract::Originated` branch of `transfer`. A Transaction to a
     /// never-originated KT1 must produce a typed user-level
-    /// `ContractDoesNotExist` failure, not surface as
-    /// `FailedToFetchContractCode` (which is now routed to BlockAbort and
-    /// would discard the whole block).
+    /// `ContractDoesNotExist` failure, not surface as the key space error of
+    /// a missing code (which is routed to BlockAbort and would discard the
+    /// whole block).
     ///
     /// Regression for L2-1290: without this guard, a single transfer to
     /// any unknown KT1 would be a user-controllable block-abort handle.
