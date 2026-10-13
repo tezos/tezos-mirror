@@ -518,6 +518,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use std::str::FromStr;
     use tezos_evm_runtime::runtime::MockKernelHost;
 

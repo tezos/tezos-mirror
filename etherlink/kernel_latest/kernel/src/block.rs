@@ -709,6 +709,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use super::*;
     use crate::apply::TezosExecutionInfo;
     use crate::block_in_progress::BlockInProgress;

@@ -919,6 +919,7 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(all(test, feature = "testing"))]
 mod tests {
+    #![allow(clippy::disallowed_methods)]
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;

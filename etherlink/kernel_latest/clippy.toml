@@ -9,4 +9,9 @@
 disallowed-methods = [
     # there's a pothole in alloc_extend causing panics, be careful when using it
     { path = "typed_arena::Arena::alloc_extend", reason = "alloc_extend can panic, see Note: alloc_extend" },
+
+    # Native-token mutators: writers that can set a balance. Only
+    # sanctioned sites, each saying why, may call them.
+    { path = "revm_etherlink::storage::world_state_handler::StorageAccount::set_info", reason = "balance-carrying info write — use the balance-preserving writer" },
+    { path = "revm_etherlink::storage::world_state_handler::StorageAccount::set_info_without_code", reason = "balance-carrying info write — use the balance-preserving writer" },
 ]

@@ -217,10 +217,15 @@ where
                         Some(original_info) if *original_info == info
                     );
                     if !unchanged {
+                        // The commit funnel: revm owns the balances it
+                        // computed, this writes them out. Every
+                        // EVM-internal move lands here and nowhere else.
+                        #[allow(clippy::disallowed_methods)]
+                        let written = storage_account
+                            .set_info_without_code(self.rk.eth_accounts_mut(), info);
                         abort_on_error!(
                             self,
-                            storage_account
-                                .set_info_without_code(self.rk.eth_accounts_mut(), info),
+                            written,
                             "DatabaseCommit `set_info_without_code`"
                         );
                     }
@@ -248,16 +253,20 @@ where
                     }
                 }
                 AccountState::SelfDestructed => {
-                    // The classification survives a selfdestruct.
+                    // The classification survives a selfdestruct. The
+                    // balance is the one revm computed, emptied by the
+                    // selfdestruct.
+                    #[allow(clippy::disallowed_methods)]
+                    let written = storage_account.set_info_without_code(
+                        self.rk.eth_accounts_mut(),
+                        AccountInfo {
+                            origin: existing_origin,
+                            ..AccountInfo::default()
+                        },
+                    );
                     abort_on_error!(
                         self,
-                        storage_account.set_info_without_code(
-                            self.rk.eth_accounts_mut(),
-                            AccountInfo {
-                                origin: existing_origin,
-                                ..AccountInfo::default()
-                            },
-                        ),
+                        written,
                         "DatabaseCommit `set_info_without_code`"
                     );
                 }
@@ -538,9 +547,8 @@ fn write_alias_origin(
     alias_info: AliasInfo,
 ) -> Result<(), EvmDbError> {
     let mut storage_account = StorageAccount::from_address(address)?;
-    let mut info = storage_account
-        .info_without_migration(eth_accounts)?
-        .unwrap_or_default();
-    info.origin = AccountOrigin::Alias(alias_info);
-    storage_account.set_info_without_code(eth_accounts, info)
+    storage_account
+        .info_update(eth_accounts)?
+        .with_origin(AccountOrigin::Alias(alias_info))
+        .apply()
 }

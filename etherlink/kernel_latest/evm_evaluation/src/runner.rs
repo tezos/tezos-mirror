@@ -118,6 +118,7 @@ fn prepare_filler_source(
     }
 }
 
+// Test harness: writes the balances an Ethereum-spec fixture declares.
 fn initialize_accounts(eth_accounts: &mut impl KeySpace, unit: &TestUnit) {
     write_host!("\n[START] Accounts initialisation");
 
@@ -134,6 +135,7 @@ fn initialize_accounts(eth_accounts: &mut impl KeySpace, unit: &TestUnit) {
         if !info.code.is_empty() {
             CodeStorage::add(eth_accounts, &info.code, Some(code_hash)).unwrap();
         }
+        #[allow(clippy::disallowed_methods)]
         account
             .set_info(
                 eth_accounts,
