@@ -124,10 +124,6 @@ pub enum Error {
     Reboot,
     #[error(transparent)]
     Encoding(EncodingError),
-    #[error("Tried casting an Implicit account into an Originated account")]
-    ImplicitToOriginated,
-    #[error("Tried casting an Originated account into an Implicit account")]
-    OriginatedToImplicit,
     #[error("Error while initializing REVM precompile bytecodes")]
     RevmPrecompileInitError,
     #[error("Overflow occurred during an arithmetic operation")]
@@ -261,8 +257,6 @@ impl From<IndexableStorageError> for Error {
                 Error::Encoding(EncodingError::BinWriterError(msg))
             }
             IndexableStorageError::NomReadError(msg) => Error::NomReadError(msg),
-            IndexableStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
-            IndexableStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
             IndexableStorageError::TcError(msg) => Error::TcError(msg),
             IndexableStorageError::TryFromBigIntError(msg) => {
                 Error::TryFromBigIntError(msg)
@@ -292,8 +286,6 @@ impl From<GenStorageError> for Error {
                 Error::Encoding(EncodingError::BinWriterError(msg))
             }
             GenStorageError::NomReadError(msg) => Error::NomReadError(msg),
-            GenStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
-            GenStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
             GenStorageError::TcError(msg) => Error::TcError(msg),
             GenStorageError::TryFromBigIntError(msg) => Error::TryFromBigIntError(msg),
             GenStorageError::Internal(msg) => Error::Internal(msg),

@@ -31,13 +31,37 @@ use tezos_nom::NomReader;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_keyspace::KeySpaceLoaderError;
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceLoaderError};
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct CounterError {
     pub expected: Narith,
     pub found: Narith,
+}
+
+/// The contract is originated, and an implicit account was requested.
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("expected an implicit contract, got the originated contract {0}")]
+pub struct OriginatedToImplicit(pub ContractKt1Hash);
+
+/// The contract is implicit, and an originated account was requested.
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("expected an originated contract, got the implicit contract {0}")]
+pub struct ImplicitToOriginated(pub PublicKeyHash);
+
+/// Why a [`Contract`] does not resolve to the requested kind of account.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum ContextError {
+    /// A key of the account is not a valid key.
+    #[error(transparent)]
+    Key(#[from] KeyError),
+    /// An implicit account was requested from an originated contract.
+    #[error(transparent)]
+    OriginatedToImplicit(#[from] OriginatedToImplicit),
+    /// An originated account was requested from an implicit contract.
+    #[error(transparent)]
+    ImplicitToOriginated(#[from] ImplicitToOriginated),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]

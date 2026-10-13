@@ -13,6 +13,9 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
+use tezos_tezlink::operation_result::{
+    ContextError, ImplicitToOriginated, OriginatedToImplicit,
+};
 use tezosx_interfaces::Origin;
 
 // Account resolution helpers.
@@ -30,25 +33,32 @@ pub fn implicit_from_public_key_hash(
     })
 }
 
-/// Resolve the implicit account backing a [`Contract`]. Errors on an
-/// originated (`KT1`) contract.
+/// Resolve the implicit account backing a [`Contract`].
+///
+/// Fails with [`ContextError::OriginatedToImplicit`] on an originated (`KT1`)
+/// contract, and with [`ContextError::Key`] when a key of the account is not
+/// a valid key.
 pub fn implicit_from_contract(
     contract: &Contract,
-) -> Result<TezosImplicitAccount, tezos_storage::error::Error> {
+) -> Result<TezosImplicitAccount, ContextError> {
     match contract {
         Contract::Implicit(pkh) => Ok(implicit_from_public_key_hash(pkh)?),
-        _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
+        Contract::Originated(kt1) => Err(OriginatedToImplicit(kt1.clone()).into()),
     }
 }
 
 /// Resolve the originated account backing a [`Contract`] under the Tezos
-/// accounts root. Errors on an implicit contract.
+/// accounts root.
+///
+/// Fails with [`ContextError::ImplicitToOriginated`] on an implicit contract,
+/// and with [`ContextError::Key`] when a key of the account is not a valid
+/// key.
 pub fn originated_from_contract(
     contract: &Contract,
-) -> Result<TezosOriginatedAccount, tezos_storage::error::Error> {
+) -> Result<TezosOriginatedAccount, ContextError> {
     match contract {
         Contract::Originated(kt1) => Ok(TezosOriginatedAccount::from_kt1(kt1)?),
-        _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
+        Contract::Implicit(pkh) => Err(ImplicitToOriginated(pkh.clone()).into()),
     }
 }
 
