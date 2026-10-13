@@ -36,7 +36,13 @@ for arg in "$@"; do
   esac
 done
 
-# Retrieve and import GPG keys (keyring is ready after this)
+# Retrieve and import GPG keys (keyring is ready after this).
+# The GitLab release assets are signed under their own key set, so they can
+# later be moved onto a key with its own rotation schedule without touching
+# the APT repository. Until GITLAB_RELEASE-scoped CI/CD variables exist this
+# resolves to the Linux packages keys, i.e. no change of behaviour.
+GPG_KEY_SET=GITLAB_RELEASE
+export GPG_KEY_SET
 . ./scripts/ci/repository-keys.sh
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file

@@ -16,6 +16,41 @@
 # On non-protected branches:
 #   Embedded test keys from ./scripts/packaging/ are used.
 #
+# Key set selection:
+#
+#   Callers set GPG_KEY_SET before sourcing this file to name the set of
+#   CI/CD variables their key material comes from (default: LINUX_PACKAGES).
+#   It must be one of the sets mapped in the case statement below --
+#   LINUX_PACKAGES or GITLAB_RELEASE -- and an unknown value is an error.
+#   For a set named <SET>, the key material comes from two independent groups
+#   of <SET>-scoped variables:
+#
+#     GCP_SECRET_PATH_GPG_<SET>_PRIVATE_KEY
+#     GCP_SECRET_PATH_GPG_<SET>_PASSPHRASE
+#     GCP_BUCKET_GPG_<SET>_PUBLIC_KEY_URL
+#
+#     GPG_<SET>_FALLBACK_PRIVATE_KEY
+#     GPG_<SET>_FALLBACK_PASSPHRASE
+#     GPG_<SET>_FALLBACK_PUBLIC_KEY
+#
+#   A group is taken from the <SET>-scoped variables when its private key is
+#   defined, and from the LINUX_PACKAGES ones otherwise; the other two
+#   variables of that group are then required.
+#
+#   One exception to the pattern: the LINUX_PACKAGES public key URL is the
+#   unscoped GCP_BUCKET_GPG_PUBLIC_KEY_URL, not
+#   GCP_BUCKET_GPG_LINUX_PACKAGES_PUBLIC_KEY_URL, which does not exist. That
+#   variable predates key sets and never carried a set segment. Naming it
+#   symmetrically would mean introducing a new variable and keeping the
+#   unscoped one as a deprecated fallback: worth doing when a set is actually
+#   given its own key, not before.
+#
+#   This decouples the signing jobs at the configuration layer only: until a
+#   set is given its own secrets it signs with exactly the same keys as before.
+#   It exists so the APT repository and the GitLab release assets can later be
+#   moved onto separate keys -- with separate rotation schedules -- without
+#   touching this script again.
+#
 # Expected GitLab CI/CD variables:
 #
 # - These variables must be protected, but can be unmasked:
@@ -424,6 +459,52 @@ fetch_gcp_secrets() {
 ##############################################
 # Main                                       #
 ##############################################
+
+GPG_KEY_SET="${GPG_KEY_SET:-LINUX_PACKAGES}"
+echo "GPG key set: ${GPG_KEY_SET}" >&2
+
+# Map the key set onto the canonical variables the rest of this script reads.
+#
+# Spelled out per set rather than composed from ${GPG_KEY_SET}. An unknown
+# value is an error rather than a silent no-op.
+#
+# A set takes effect only once it has its own secrets, so adding one changes
+# nothing until the CI/CD variables are created. The switch is all or nothing:
+# a half-configured set -- new private key, old passphrase -- would fail at
+# signing time with an error pointing nowhere near the cause.
+case "${GPG_KEY_SET}" in
+LINUX_PACKAGES)
+  # The canonical variables already name this set: nothing to remap.
+  ;;
+GITLAB_RELEASE)
+  if [ -n "${GCP_SECRET_PATH_GPG_GITLAB_RELEASE_PRIVATE_KEY:-}" ]; then
+    echo "  using the GITLAB_RELEASE GCP secrets" >&2
+    GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PRIVATE_KEY="${GCP_SECRET_PATH_GPG_GITLAB_RELEASE_PRIVATE_KEY}"
+    GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PASSPHRASE="${GCP_SECRET_PATH_GPG_GITLAB_RELEASE_PASSPHRASE:?GITLAB_RELEASE private key is set but GCP_SECRET_PATH_GPG_GITLAB_RELEASE_PASSPHRASE is not}"
+    GCP_BUCKET_GPG_PUBLIC_KEY_URL="${GCP_BUCKET_GPG_GITLAB_RELEASE_PUBLIC_KEY_URL:?GITLAB_RELEASE private key is set but GCP_BUCKET_GPG_GITLAB_RELEASE_PUBLIC_KEY_URL is not}"
+  else
+    echo "  GITLAB_RELEASE has no GCP secrets: using the LINUX_PACKAGES ones" >&2
+  fi
+
+  # The emergency keys -- used only when GCP is unavailable -- are chosen
+  # independently of the GCP secrets above, so a set can bring its own secrets
+  # without having to bring its own fallback, and vice versa. Each of the two
+  # messages therefore states which group it is about.
+  if [ -n "${GPG_GITLAB_RELEASE_FALLBACK_PRIVATE_KEY:-}" ]; then
+    echo "  using the GITLAB_RELEASE fallback keys" >&2
+    GPG_LINUX_PACKAGES_FALLBACK_PRIVATE_KEY="${GPG_GITLAB_RELEASE_FALLBACK_PRIVATE_KEY}"
+    GPG_LINUX_PACKAGES_FALLBACK_PASSPHRASE="${GPG_GITLAB_RELEASE_FALLBACK_PASSPHRASE:?GITLAB_RELEASE fallback key is set but GPG_GITLAB_RELEASE_FALLBACK_PASSPHRASE is not}"
+    GPG_LINUX_PACKAGES_FALLBACK_PUBLIC_KEY="${GPG_GITLAB_RELEASE_FALLBACK_PUBLIC_KEY:?GITLAB_RELEASE fallback key is set but GPG_GITLAB_RELEASE_FALLBACK_PUBLIC_KEY is not}"
+  else
+    echo "  GITLAB_RELEASE has no fallback keys: using the LINUX_PACKAGES ones" >&2
+  fi
+  ;;
+*)
+  echo "ERROR: unknown GPG_KEY_SET '${GPG_KEY_SET}'." >&2
+  echo "       Known sets: LINUX_PACKAGES, GITLAB_RELEASE." >&2
+  exit 1
+  ;;
+esac
 
 # Flush the output variables to avoid any injection during the process
 export GPG_KEY_ID=""
