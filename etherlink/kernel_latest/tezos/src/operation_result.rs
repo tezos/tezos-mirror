@@ -276,10 +276,12 @@ impl From<KeyError> for TransferError {
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum OriginationError {
-    #[error("Failed to fetch source account")]
-    FailedToFetchSourceAccount,
-    #[error("Failed to fetch originated smart contract")]
-    FailedToFetchOriginated,
+    /// A read or a write during the origination failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
+    /// An account involved in the origination could not be resolved.
+    #[error(transparent)]
+    Context(#[from] ContextError),
     #[error("Failed to applied balance update")]
     FailedToApplyBalanceUpdate,
     #[error(transparent)]
@@ -300,6 +302,18 @@ pub enum OriginationError {
     MichelineSerializationError(String),
     #[error("Gas exhaustion")]
     OutOfGas(#[from] gas::OutOfGas),
+}
+
+impl From<KeySpaceError> for OriginationError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
+}
+
+impl From<KeyError> for OriginationError {
+    fn from(e: KeyError) -> Self {
+        Self::Context(e.into())
+    }
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
@@ -775,14 +789,8 @@ impl OriginationError {
         match self {
             OriginationError::BalanceTooLow(error) => L1Error::balance_too_low(error),
             OriginationError::OutOfGas(_) => L1Error::gas_exhausted(),
-            OriginationError::FailedToFetchSourceAccount => fallback(
-                ErrorKind::Temporary,
-                "origination.failed_to_fetch_source_account",
-            ),
-            OriginationError::FailedToFetchOriginated => fallback(
-                ErrorKind::Temporary,
-                "origination.failed_to_fetch_originated",
-            ),
+            OriginationError::KeySpace(error) => L1Error::key_space("origination", error),
+            OriginationError::Context(error) => L1Error::context("origination", error),
             OriginationError::FailedToApplyBalanceUpdate => fallback(
                 ErrorKind::Temporary,
                 "origination.failed_to_apply_balance_update",
@@ -2483,6 +2491,33 @@ mod tests {
                     "error_message",
                     "expected an implicit contract, got the originated contract KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
                 )],
+            )
+        );
+    }
+
+    #[test]
+    fn origination_key_space_and_context_errors_carry_their_cause() {
+        assert_eq!(
+            encode_error(&ApplyOperationError::Origination(
+                OriginationError::KeySpace(key_space_read_error())
+            )),
+            expected_object(
+                "temporary",
+                "tezosx_internal.origination.read",
+                &[(
+                    "error_message",
+                    "at key /info of key space /tez/tez_accounts: no value at the key"
+                )],
+            )
+        );
+        assert_eq!(
+            encode_error(&ApplyOperationError::Origination(
+                OriginationError::Context(KeyError::KeyTooLarge.into())
+            )),
+            expected_object(
+                "permanent",
+                "tezosx_internal.origination.key",
+                &[("error_message", "key exceeds the maximum allowed size")],
             )
         );
     }
