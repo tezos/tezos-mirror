@@ -20,7 +20,7 @@ use crate::{
     chains::{self, TezosXChainConfig},
     configuration::{fetch_common_config, fetch_tezosx_configuration},
     delayed_inbox::DelayedInbox,
-    journal::{prepare_tezosx_journal, TezosXHashes},
+    journal::{with_tezosx_journal, TezosXHashes},
     load_base_or_log, sub_block,
     transaction::Transaction,
 };
@@ -390,7 +390,7 @@ where
                     OperationHash::from(operation.tx_hash)
                 }
             };
-            // Built through `prepare_tezosx_journal` like every applied
+            // Built through `with_tezosx_journal` like every applied
             // journal, so this path cannot drift from block production on the
             // setup it shares. The live simulation block goes in, not
             // `BlockConstants::dummy()`, so a CRAC dispatched here observes
@@ -400,7 +400,8 @@ where
             // carries no prior operation, hence an internal-operation base of
             // 0, and no tracer: this entrypoint reports HTTP traces, not EVM
             // call traces.
-            let mut trace_journal = prepare_tezosx_journal(
+            match with_tezosx_journal(
+                &mut rk,
                 tezosx_journal::CracId::new(0, 0),
                 &TezosXHashes::from_michelson_operation(michelson),
                 &block_constants.evm_runtime_block_constants,
@@ -408,42 +409,51 @@ where
                 &chain_config.debug_features,
                 0,
                 None,
-            );
-            let enable_gas_refund = chain_config
-                .experimental_features
-                .is_michelson_gas_refund_enabled();
-            let execution_result = chains::apply_tezos_operation(
-                chain_config.michelson_chain_id(),
-                &block_in_progress,
-                &mut rk,
-                &registry,
-                &block_constants.michelson_runtime_block_constants,
-                operation,
-                None,
-                skip_signature_check,
-                skip_fees_check,
-                // Simulation / pre-application: do not enforce branch liveness
-                // (lenient, like skip_signature_check; matches L1 run_operation).
-                true,
-                Some(&outbox_queue),
-                Some(&block_constants.evm_runtime_block_constants),
-                &mut trace_journal,
-                enable_gas_refund,
-                // Off the block-production hot path (simulation / pre-application):
-                // conservatively preserve the prior always-promote behavior. The
-                // per-op store_has probe this patch removes is only taken on the
-                // block-production path.
-                true,
-                true,
-                false, // da fees are disabled in simulation
-            )
-            .map(|x| match x {
-                ExecutionResult::Valid(res) => {
-                    ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(res))
-                }
-                ExecutionResult::Invalid => ExecutionResult::Invalid,
-            });
-            (execution_result, trace_journal.into_http_traces())
+                |rk, trace_journal| -> anyhow::Result<_> {
+                    let enable_gas_refund = chain_config
+                        .experimental_features
+                        .is_michelson_gas_refund_enabled();
+                    let execution_result = chains::apply_tezos_operation(
+                        chain_config.michelson_chain_id(),
+                        &block_in_progress,
+                        rk,
+                        &registry,
+                        &block_constants.michelson_runtime_block_constants,
+                        operation,
+                        None,
+                        skip_signature_check,
+                        skip_fees_check,
+                        // Simulation / pre-application: do not enforce branch liveness
+                        // (lenient, like skip_signature_check; matches L1 run_operation).
+                        true,
+                        Some(&outbox_queue),
+                        Some(&block_constants.evm_runtime_block_constants),
+                        trace_journal,
+                        enable_gas_refund,
+                        // Off the block-production hot path (simulation / pre-application):
+                        // conservatively preserve the prior always-promote behavior. The
+                        // per-op store_has probe this patch removes is only taken on the
+                        // block-production path.
+                        true,
+                        true,
+                        false, // da fees are disabled in simulation
+                    )
+                    .map(|x| match x {
+                        ExecutionResult::Valid(res) => {
+                            ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(res))
+                        }
+                        ExecutionResult::Invalid => ExecutionResult::Invalid,
+                    });
+                    let traces = trace_journal.take_http_traces();
+                    Ok((
+                        None::<revm::context::result::ExecutionResult>,
+                        (execution_result, traces),
+                    ))
+                },
+            ) {
+                Ok((_, outcome)) => outcome,
+                Err(err) => (Err(err), vec![]),
+            }
         }
         _ => (
             chain_config.apply_transaction(
@@ -830,12 +840,6 @@ where
     let crac_id = tezosx_journal::CracId::new(0, 0);
     // There is no operation to seed the identities from, and the run is
     // always reverted: no origination address it derives outlives the call.
-    let mut journal = tezosx_journal::TezosXJournal::new(
-        crac_id,
-        TezosXHashes::zero(),
-        block_constants.evm_runtime_block_constants.clone(),
-    );
-
     // The roots an applied Michelson operation mirrors, unnarrowed: nothing
     // here proves the run touches accounts only.
     let mut safe_host = SafeStorage {
@@ -850,7 +854,26 @@ where
             RunCodeError::Host(format!("cannot load the runtime keyspaces: {err:?}"))
         })
         .and_then(|mut rk| {
-            tezos_execution::run_code(&mut rk, &registry, &mut journal, &params)
+            with_tezosx_journal(
+                &mut rk,
+                crac_id,
+                &TezosXHashes::zero(),
+                &block_constants.evm_runtime_block_constants,
+                false,
+                &chains::DebugFeatures::default(),
+                0,
+                None,
+                |rk, journal| {
+                    Ok::<_, anyhow::Error>((
+                        None::<revm::context::result::ExecutionResult>,
+                        tezos_execution::run_code(rk, &registry, journal, &params),
+                    ))
+                },
+            )
+            .map(|(_, outcome)| outcome)
+            .map_err(|err| {
+                RunCodeError::Host(format!("cannot close the journal: {err:?}"))
+            })?
         });
     match (result, safe_host.revert()) {
         (result, Ok(())) => result,

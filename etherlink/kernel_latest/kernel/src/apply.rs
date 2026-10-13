@@ -51,7 +51,7 @@ use crate::chains::{
 };
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
-use crate::journal::{self, close_tezosx_journal};
+use crate::journal;
 use crate::transaction::{Transaction, TransactionContent};
 
 pub struct TransactionReceiptInfo {
@@ -692,7 +692,8 @@ where
     let operation_hashes =
         journal::TezosXHashes::from_evm_transaction(B256::from(transaction_hash));
 
-    let mut journal = journal::prepare_tezosx_journal(
+    let (execution_outcome, crac_receipts) = journal::with_tezosx_journal(
+        rk,
         crac_id,
         &operation_hashes,
         block_constants,
@@ -700,54 +701,49 @@ where
         debug_features,
         internal_operations_base,
         tracer_input,
-    );
+        |rk, journal| -> anyhow::Result<_> {
+            let run_result = revm_run_transaction(
+                rk,
+                registry,
+                journal,
+                block_constants,
+                Some(transaction_hash),
+                caller,
+                to,
+                value,
+                call_data,
+                gas_limit,
+                effective_gas_price,
+                limits.maximum_gas_limit,
+                transaction.authorization_list.clone(),
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
+                        transaction.access_list.clone(),
+                    ),
+                },
+            );
 
-    let run_result = revm_run_transaction(
-        rk,
-        registry,
-        &mut journal,
-        block_constants,
-        Some(transaction_hash),
-        caller,
-        to,
-        value,
-        call_data,
-        gas_limit,
-        effective_gas_price,
-        limits.maximum_gas_limit,
-        transaction.authorization_list.clone(),
-        false,
-        TransactionOrigin::UserInput {
-            access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
-                transaction.access_list.clone(),
-            ),
+            // Capture HTTP traces before branching on the execution outcome so that
+            // partial traces from a transaction that failed mid-execution remain
+            // observable through the [http_trace*] RPCs. Matches the behavior of the
+            // other two journal sites (Tezos / TezosDelayed).
+            crate::storage::maybe_store_http_traces_for_tx(
+                rk.host_mut(),
+                http_trace_enabled,
+                &transaction_hash,
+                journal,
+            );
+
+            let execution_outcome = run_result?;
+
+            // Drain any CRAC receipts produced by EVM→Michelson calls during
+            // this transaction so they can be included in the Michelson runtime block.
+            let crac_receipts = drain_pending_crac_receipts(journal);
+
+            Ok((execution_outcome, crac_receipts))
         },
-    );
-
-    // Capture HTTP traces before branching on the execution outcome so that
-    // partial traces from a transaction that failed mid-execution remain
-    // observable through the [http_trace*] RPCs. Matches the behavior of the
-    // other two journal sites (Tezos / TezosDelayed).
-    crate::storage::maybe_store_http_traces_for_tx(
-        rk.host_mut(),
-        http_trace_enabled,
-        &transaction_hash,
-        &journal,
-    );
-
-    let execution_outcome = match run_result {
-        Ok(outcome) => outcome,
-        Err(err) => {
-            close_tezosx_journal(rk.host_mut(), journal, None)?;
-            return Err(err.into());
-        }
-    };
-
-    // Drain any CRAC receipts produced by EVM→Michelson calls during
-    // this transaction so they can be included in the Michelson runtime block.
-    let crac_receipts = drain_pending_crac_receipts(&mut journal);
-
-    close_tezosx_journal(rk.host_mut(), journal, Some(&execution_outcome.result))?;
+    )?;
 
     let transaction_result =
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -820,7 +816,8 @@ where
     // it — same rule as any other EVM-entered operation, even though the
     // kernel-managed XTZ bridge does not NAC into Michelson today.
     let operation_hashes = journal::TezosXHashes::from_deposit(transaction_hash);
-    let mut journal = journal::prepare_tezosx_journal(
+    let outcome = journal::with_tezosx_journal(
+        rk,
         CracId::mock(RuntimeId::Ethereum),
         &operation_hashes,
         &block_constants,
@@ -828,47 +825,41 @@ where
         &DebugFeatures::default(),
         0,
         tracer_input,
-    );
-
-    match revm_run_transaction(
-        rk,
-        registry,
-        &mut journal,
-        &block_constants,
-        Some(transaction_hash),
-        caller,
-        to,
-        value,
-        call_data,
-        gas_limit,
-        effective_gas_price,
-        maximum_gas_limit,
-        None,
-        false,
-        TransactionOrigin::UserInput {
-            access_list: revm::context::transaction::AccessList::default(),
-        },
-    ) {
-        Ok(execution_outcome) => {
-            // An EVM-internal revert returns `Ok` with a non-success result,
-            // so we must also refund the prefund here, otherwise the deposit
-            // value is stranded on FEED_DEPOSIT_ADDR while the receiver is
-            // uncredited.
-            if !execution_outcome.result.is_success() {
-                caller_account
-                    .sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
-            }
-            close_tezosx_journal(
-                rk.host_mut(),
+        |rk, journal| -> Result<_, Error> {
+            let outcome = revm_run_transaction(
+                rk,
+                registry,
                 journal,
-                Some(&execution_outcome.result),
-            )?;
-
-            Ok(execution_outcome)
-        }
+                &block_constants,
+                Some(transaction_hash),
+                caller,
+                to,
+                value,
+                call_data,
+                gas_limit,
+                effective_gas_price,
+                maximum_gas_limit,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: revm::context::transaction::AccessList::default(),
+                },
+            );
+            if let Ok(execution_outcome) = &outcome {
+                // Refund an EVM revert before closing, as on the previous success path.
+                if !execution_outcome.result.is_success() {
+                    caller_account
+                        .sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+                }
+            }
+            // Keep a runtime error as the value so its prefund refund runs after closing.
+            Ok(outcome)
+        },
+    )?;
+    match outcome {
+        Ok(outcome) => Ok(outcome),
         Err(err) => {
-            close_tezosx_journal(rk.host_mut(), journal, None)?;
-            // Something went wrong, we remove the added balance for the xtz deposit.
+            // Something went wrong, remove the XTZ deposit's prefund.
             caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
             Err(err)
         }
@@ -967,7 +958,8 @@ where
     let effective_gas_price = block_constants.base_fee_per_gas();
     // As in `pure_xtz_deposit`.
     let operation_hashes = journal::TezosXHashes::from_deposit(transaction_hash);
-    let mut journal = journal::prepare_tezosx_journal(
+    journal::with_tezosx_journal(
+        rk,
         CracId::mock(RuntimeId::Ethereum),
         &operation_hashes,
         &block_constants,
@@ -975,38 +967,30 @@ where
         &DebugFeatures::default(),
         0,
         tracer_input,
-    );
+        |rk, journal| {
+            let outcome = revm_run_transaction(
+                rk,
+                registry,
+                journal,
+                &block_constants,
+                Some(transaction_hash),
+                caller,
+                to,
+                value,
+                call_data,
+                gas_limit,
+                effective_gas_price,
+                maximum_gas_limit,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: revm::context::transaction::AccessList::default(),
+                },
+            )?;
 
-    let outcome = revm_run_transaction(
-        rk,
-        registry,
-        &mut journal,
-        &block_constants,
-        Some(transaction_hash),
-        caller,
-        to,
-        value,
-        call_data,
-        gas_limit,
-        effective_gas_price,
-        maximum_gas_limit,
-        None,
-        false,
-        TransactionOrigin::UserInput {
-            access_list: revm::context::transaction::AccessList::default(),
-        },
-    );
-
-    match outcome {
-        Ok(outcome) => {
-            close_tezosx_journal(rk.host_mut(), journal, Some(&outcome.result))?;
             Ok(outcome)
-        }
-        Err(err) => {
-            close_tezosx_journal(rk.host_mut(), journal, None)?;
-            Err(err)
-        }
-    }
+        },
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1101,7 +1085,7 @@ impl TezosExecutionInfo {
         batch.operations.iter().all(|op| op.receipt.is_applied())
     }
     /// Build the EVM [`revm::context::result::ExecutionResult`] describing this applied Tezos
-    /// operation, to feed the journal-owned tracer in [`crate::journal::close_tezosx_journal`].
+    /// operation, to feed the journal-owned tracer in [`crate::journal::with_tezosx_journal`].
     pub fn to_execution_result(
         &self,
         michelson_to_evm_gas_multiplier: u64,

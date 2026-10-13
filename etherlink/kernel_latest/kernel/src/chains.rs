@@ -15,8 +15,7 @@ use crate::{
     error,
     fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
     journal::{
-        close_tezosx_journal, fake_top_level_call_from_tezos_operation,
-        prepare_tezosx_journal, TezosXHashes,
+        fake_top_level_call_from_tezos_operation, with_tezosx_journal, TezosXHashes,
     },
     l2block::L2Block,
     registry_impl::RegistryImpl,
@@ -793,7 +792,8 @@ impl TezosXChainConfig {
         // inbound CRAC the Michelson operation dispatches to the EVM
         // runtime exposes the live block observables (BASEFEE,
         // GASLIMIT, ...) rather than zero.
-        let mut journal = prepare_tezosx_journal(
+        with_tezosx_journal(
+            rk,
             crac_id,
             &operation_hashes,
             &block_constants.evm_runtime_block_constants,
@@ -801,93 +801,94 @@ impl TezosXChainConfig {
             &DebugFeatures::default(),
             0,
             tracer_input,
-        );
-        fake_top_level_call_from_tezos_operation(
-            &mut journal,
-            registry,
-            &operation,
-            block_constants
-                .michelson_runtime_block_constants
-                .michelson_to_evm_gas_multiplier,
-        );
-        let result = apply_tezos_operation(
-            &self.michelson_chain_id,
-            block_in_progress,
-            rk,
-            registry,
-            &block_constants.michelson_runtime_block_constants,
-            operation,
-            sequencer_pool_address,
-            skip_signature_check,
-            skip_fees_check,
-            skip_branch_check,
-            Some(outbox_queue),
-            Some(&block_constants.evm_runtime_block_constants),
-            &mut journal,
-            self.experimental_features.is_michelson_gas_refund_enabled(),
-            tracer_input.is_some(),
-            http_trace_enabled,
-            da_fees_enabled,
-        );
-        // Persist HTTP traces regardless of [result] so that partial
-        // traces from an operation that failed mid-execution remain
-        // observable through the [http_trace*] RPCs. Matches the
-        // Ethereum / TezosDelayed apply sites in apply.rs.
-        //
-        // TODO: https://linear.app/tezos/issue/L2-1243
-        // The Tezlink-submitted path stores traces under the Tezos
-        // operation hash only, so [http_traceTransaction] queries
-        // that pass the fake Ethereum hash of a Tezos→EVM CRAC
-        // (the hash users see in [eth_getBlockByNumber]) return
-        // the empty list. Extend this site to dual-index the
-        // traces under each generated Ethereum fake hash once the
-        // mapping is available here.
-        crate::storage::maybe_store_http_traces_for_tx(
-            rk.host_mut(),
-            http_trace_enabled,
-            &tx_hash,
-            &journal,
-        );
-
-        match result {
-            Ok(crate::apply::ExecutionResult::Valid(res)) => {
-                let result = res.to_execution_result(
-                    self.michelson_to_evm_gas_multiplier(block_constants),
+            |rk, journal| {
+                fake_top_level_call_from_tezos_operation(
+                    journal,
+                    registry,
+                    &operation,
+                    block_constants
+                        .michelson_runtime_block_constants
+                        .michelson_to_evm_gas_multiplier,
                 );
-                // Keep the fake top-level frame iff the operation registered
-                // a fake transaction, so the block holds exactly one
-                // top-level trace per transaction.
-                if res
-                    .cross_runtime_effects
-                    .iter()
-                    .any(|effect| matches!(effect, CrossRuntimeEffect::Evm(_)))
-                {
-                    journal.fake_top_level_call_end(
-                        michelson_milligas_to_evm_gas(
-                            res.consumed_milligas,
-                            block_constants
-                                .michelson_runtime_block_constants
-                                .michelson_to_evm_gas_multiplier,
-                        ),
-                        matches!(result, ExecutionResult::Success { .. }),
-                    );
-                } else {
-                    journal.discard_fake_top_level_call();
+                let result = apply_tezos_operation(
+                    &self.michelson_chain_id,
+                    block_in_progress,
+                    rk,
+                    registry,
+                    &block_constants.michelson_runtime_block_constants,
+                    operation,
+                    sequencer_pool_address,
+                    skip_signature_check,
+                    skip_fees_check,
+                    skip_branch_check,
+                    Some(outbox_queue),
+                    Some(&block_constants.evm_runtime_block_constants),
+                    journal,
+                    self.experimental_features.is_michelson_gas_refund_enabled(),
+                    tracer_input.is_some(),
+                    http_trace_enabled,
+                    da_fees_enabled,
+                );
+                // Persist HTTP traces regardless of [result] so that partial
+                // traces from an operation that failed mid-execution remain
+                // observable through the [http_trace*] RPCs. Matches the
+                // Ethereum / TezosDelayed apply sites in apply.rs.
+                //
+                // TODO: https://linear.app/tezos/issue/L2-1243
+                // The Tezlink-submitted path stores traces under the Tezos
+                // operation hash only, so [http_traceTransaction] queries
+                // that pass the fake Ethereum hash of a Tezos→EVM CRAC
+                // (the hash users see in [eth_getBlockByNumber]) return
+                // the empty list. Extend this site to dual-index the
+                // traces under each generated Ethereum fake hash once the
+                // mapping is available here.
+                crate::storage::maybe_store_http_traces_for_tx(
+                    rk.host_mut(),
+                    http_trace_enabled,
+                    &tx_hash,
+                    journal,
+                );
+
+                match result {
+                    Ok(crate::apply::ExecutionResult::Valid(res)) => {
+                        let result = res.to_execution_result(
+                            self.michelson_to_evm_gas_multiplier(block_constants),
+                        );
+                        // Keep the fake top-level frame iff the operation registered
+                        // a fake transaction, so the block holds exactly one
+                        // top-level trace per transaction.
+                        if res
+                            .cross_runtime_effects
+                            .iter()
+                            .any(|effect| matches!(effect, CrossRuntimeEffect::Evm(_)))
+                        {
+                            journal.fake_top_level_call_end(
+                                michelson_milligas_to_evm_gas(
+                                    res.consumed_milligas,
+                                    block_constants
+                                        .michelson_runtime_block_constants
+                                        .michelson_to_evm_gas_multiplier,
+                                ),
+                                matches!(result, ExecutionResult::Success { .. }),
+                            );
+                        } else {
+                            journal.discard_fake_top_level_call();
+                        }
+                        Ok((
+                            Some(result),
+                            crate::apply::ExecutionResult::Valid(
+                                RuntimeExecutionInfo::Tezos(res),
+                            ),
+                        ))
+                    }
+                    Ok(crate::apply::ExecutionResult::Invalid) => {
+                        Ok((None, crate::apply::ExecutionResult::Invalid))
+                    }
+                    Err(err) => Err(err),
                 }
-                close_tezosx_journal(rk.host_mut(), journal, Some(&result))?;
-                Ok(crate::apply::ExecutionResult::Valid(
-                    RuntimeExecutionInfo::Tezos(res),
-                ))
-            }
-            Ok(crate::apply::ExecutionResult::Invalid) => {
-                close_tezosx_journal(rk.host_mut(), journal, None)?;
-                Ok(crate::apply::ExecutionResult::Invalid)
-            }
-            Err(err) => {
-                close_tezosx_journal(rk.host_mut(), journal, None)?;
-                Err(err)
-            }
-        }
+            },
+        )
+        .map(|(_, outcome)| outcome)
     }
 }
 
