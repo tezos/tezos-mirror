@@ -43,10 +43,10 @@ use tezos_tezlink::{
     },
     operation_result::{
         ApplyOperationError, ApplyOperationErrors, BacktrackedResult, ContentResult,
-        EventContent, EventSuccess, InternalContentWithMetadata, InternalOperationSum,
-        OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, OriginationError, OriginationSuccess,
-        TransferError, TransferSuccess, TransferTarget,
+        ContextError, EventContent, EventSuccess, InternalContentWithMetadata,
+        InternalOperationSum, OperationBatchWithMetadata, OperationDataAndMetadata,
+        OperationResult, OperationResultSum, OperationWithMetadata, OriginationError,
+        OriginationSuccess, TransferError, TransferSuccess, TransferTarget,
     },
 };
 use tezosx_interfaces::{
@@ -1126,7 +1126,8 @@ impl RuntimeInterface for TezosRuntime {
         }
         // Running out of gas means the whole budget was used: reported as
         // such, so the caller charges it rather than dropping it. The
-        // typechecker reports it as text, hence the look at the counter.
+        // typechecker reports it as text, hence the look at the counter. A
+        // key space or key failure keeps its value, with the key it failed on.
         fn origination_error(
             gas: &TezlinkOperationGas,
             context: &str,
@@ -1135,9 +1136,14 @@ impl RuntimeInterface for TezosRuntime {
             if gas.remaining.milligas().is_none()
                 || matches!(e, OriginationError::OutOfGas(_))
             {
-                TezosXRuntimeError::OutOfGas
-            } else {
-                TezosXRuntimeError::Custom(format!("{context}: {e:?}"))
+                return TezosXRuntimeError::OutOfGas;
+            }
+            match e {
+                OriginationError::KeySpace(e) => TezosXRuntimeError::KeySpace(e),
+                OriginationError::Context(ContextError::Key(e)) => {
+                    TezosXRuntimeError::Key(e)
+                }
+                e => TezosXRuntimeError::Custom(format!("{context}: {e:?}")),
             }
         }
 
