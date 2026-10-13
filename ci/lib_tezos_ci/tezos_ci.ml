@@ -1647,6 +1647,11 @@ module Images = struct
 
     let debian_rust_trixie = make_img "debian-rust:trixie"
 
+    (* Docker CLI image with regctl, gcloud and the usual CI tooling, built by
+       the [images.alpine-docker-ci] job in [base_images.ml]. The [28.5.1] part
+       of the tag is the [docker_version] that job builds it from. *)
+    let alpine_docker_ci = make_img "alpine-docker-ci:28.5.1"
+
     let ci_release =
       Image.mk_external
         ~image_path:
