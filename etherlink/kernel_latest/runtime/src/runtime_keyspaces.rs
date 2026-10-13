@@ -45,29 +45,29 @@ pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
 ///
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back
 /// once the handle is gone.
-pub struct RuntimeKeyspaces<'host, Host, KeySpace> {
+pub struct RuntimeKeyspaces<'host, Host: KeySpaceLoader> {
     host: &'host mut Host,
-    keyspaces: Keyspaces<KeySpace>,
+    keyspaces: Keyspaces<Host::KeySpace>,
 }
 
-impl<'host, Host, KeySpace> RuntimeKeyspaces<'host, Host, KeySpace> {
+impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     /// The `/evm/eth_accounts` keyspace.
-    pub fn eth_accounts(&self) -> &KeySpace {
+    pub fn eth_accounts(&self) -> &Host::KeySpace {
         &self.keyspaces.eth_accounts
     }
 
     /// The `/evm/eth_accounts` keyspace, for the writers.
-    pub fn eth_accounts_mut(&mut self) -> &mut KeySpace {
+    pub fn eth_accounts_mut(&mut self) -> &mut Host::KeySpace {
         &mut self.keyspaces.eth_accounts
     }
 
     /// Returns the `/tez/tez_accounts` keyspace.
-    pub fn tez_accounts(&self) -> &KeySpace {
+    pub fn tez_accounts(&self) -> &Host::KeySpace {
         &self.keyspaces.tez_accounts
     }
 
     /// Returns the `/tez/tez_accounts` keyspace for writing.
-    pub fn tez_accounts_mut(&mut self) -> &mut KeySpace {
+    pub fn tez_accounts_mut(&mut self) -> &mut Host::KeySpace {
         &mut self.keyspaces.tez_accounts
     }
 
@@ -80,9 +80,7 @@ impl<'host, Host, KeySpace> RuntimeKeyspaces<'host, Host, KeySpace> {
     pub fn host_mut(&mut self) -> &mut Host {
         &mut *self.host
     }
-}
 
-impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host, Host::KeySpace> {
     /// Loads the keyspaces from `host`.
     ///
     /// Errors with the loader's error: a keyspace already held elsewhere, or
@@ -106,12 +104,8 @@ struct Keyspaces<KS> {
     tez_accounts: KS,
 }
 
-/// A keyspace a [`MockKernelHost`] mints, for the tests.
-pub type MockKeySpace = <MockKernelHost as KeySpaceLoader>::KeySpace;
-
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
-pub type MockRuntimeKeyspaces<'host> =
-    RuntimeKeyspaces<'host, MockKernelHost, MockKeySpace>;
+pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 
 #[cfg(test)]
 mod tests {

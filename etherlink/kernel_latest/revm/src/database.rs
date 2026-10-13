@@ -38,14 +38,14 @@ use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{AliasInfo, Origin, Registry};
 
-pub struct EtherlinkVMDB<'a, 'host, Host, KS, R> {
+pub struct EtherlinkVMDB<'a, 'host, Host: KeySpaceLoader, R> {
     pub registry: &'a R,
     /// Runtime keyspaces handle. Durable access goes through
     /// `self.rk.host()` / `self.rk.host_mut()` (the wrapped storage).
-    pub rk: &'a mut RuntimeKeyspaces<'host, Host, KS>,
+    pub rk: &'a mut RuntimeKeyspaces<'host, Host>,
     /// Constants for the current block
     pub(crate) block: &'a BlockConstants,
     /// Commit guard, the `DatabaseCommit` trait and in particular
@@ -76,7 +76,7 @@ pub struct EtherlinkVMDB<'a, 'host, Host, KS, R> {
     staged_alias_origins: HashMap<Address, AliasInfo>,
 }
 
-impl<'a, 'host, Host, KS, R> HasHost for EtherlinkVMDB<'a, 'host, Host, KS, R> {
+impl<'a, 'host, Host: KeySpaceLoader, R> HasHost for EtherlinkVMDB<'a, 'host, Host, R> {
     type H = Host;
 
     fn as_host_mut(&mut self) -> &mut Self::H {
@@ -89,14 +89,13 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, 'host, Host, KS, R> EtherlinkVMDB<'a, 'host, Host, KS, R>
+impl<'a, 'host, Host, R> EtherlinkVMDB<'a, 'host, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     #[instrument(skip_all)]
     pub fn new(
-        rk: &'a mut RuntimeKeyspaces<'host, Host, KS>,
+        rk: &'a mut RuntimeKeyspaces<'host, Host>,
         registry: &'a R,
         block: &'a BlockConstants,
         classify_native: Option<Address>,
@@ -126,11 +125,10 @@ macro_rules! abort_on_error {
     };
 }
 
-impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    EtherlinkVMDB<'_, '_, Host, KS, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    EtherlinkVMDB<'_, '_, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
@@ -273,11 +271,10 @@ where
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    DatabasePrecompileStateChanges for EtherlinkVMDB<'_, '_, Host, KS, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabasePrecompileStateChanges for EtherlinkVMDB<'_, '_, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     fn log_node_message(&mut self, level: Level, message: &str) {
         log!(level, "{message:?}");
@@ -340,10 +337,9 @@ where
     }
 }
 
-impl<Host, KS, R> RevmDatabase for EtherlinkVMDB<'_, '_, Host, KS, R>
+impl<Host, R> RevmDatabase for EtherlinkVMDB<'_, '_, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     type Error = EvmDbError;
 
@@ -389,11 +385,10 @@ where
         }
     }
 }
-impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>>
-    DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, '_, Host, KS, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>>
+    DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, '_, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals;
@@ -494,11 +489,10 @@ where
     }
 }
 
-impl<Host, KS, R: Registry<Journal = tezosx_journal::TezosXJournal>> DatabaseCommit
-    for EtherlinkVMDB<'_, '_, Host, KS, R>
+impl<Host, R: Registry<Journal = tezosx_journal::TezosXJournal>> DatabaseCommit
+    for EtherlinkVMDB<'_, '_, Host, R>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     fn commit(&mut self, changes: AddressMap<Account>) {
         for (address, account) in changes {

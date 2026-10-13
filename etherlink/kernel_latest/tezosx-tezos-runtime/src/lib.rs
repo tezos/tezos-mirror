@@ -637,16 +637,15 @@ where
 /// The consumed milligas rides in the return type, in
 /// [`ExecuteRequestOutcome`] on success or [`RequestFailure`] on error;
 /// a failure before metering carries no value and reports as unset.
-fn execute_request<Host, KS>(
+fn execute_request<Host>(
     chain_id: &ChainId,
     registry: &impl Registry<Journal = TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match *request.method() {
         http::Method::POST => {
@@ -675,16 +674,15 @@ where
 /// total mutez storage cost this frame delegates upward — the sum
 /// of the values received from inner outgoing CRACs and the
 /// standalone cost of this frame's own internal operations.
-fn execute_entrypoint_call<Host, KS>(
+fn execute_entrypoint_call<Host>(
     chain_id: &ChainId,
     registry: &impl Registry<Journal = TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Drain on entry, NOT on exit: pending alias-origination
     // internal ops in the journal at this point can only belong
@@ -1105,10 +1103,10 @@ fn assert_receipt_markers_balanced(receipt: &tezos_tezlink::block::AppliedOperat
 impl RuntimeInterface for TezosRuntime {
     type Journal = TezosXJournal;
 
-    fn create_alias<Host, KS>(
+    fn create_alias<Host>(
         &self,
         _registry: &impl Registry<Journal = TezosXJournal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias: &str,
         alias_info: AliasInfo,
@@ -1117,8 +1115,7 @@ impl RuntimeInterface for TezosRuntime {
         gas_remaining: TezosXGas,
     ) -> Result<AliasResolution, TezosXRuntimeError>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         // Gas costs in milligas, charged incrementally so we fail early.
         // The closure pattern would persist a borrow on `remaining`; a
@@ -1309,15 +1306,14 @@ impl RuntimeInterface for TezosRuntime {
         ))
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         _journal: &mut Self::Journal,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let kt1 = ContractKt1Hash::from_base58_check(alias).map_err(|err| {
             TezosXRuntimeError::ConversionError(format!(
@@ -1344,16 +1340,15 @@ impl RuntimeInterface for TezosRuntime {
     /// debited by the calling runtime (e.g. EVM gateway). This handles both
     /// implicit and originated destinations, including Michelson code execution
     /// and internal operations.
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         // Open a dispatch slot for this CRAC entry so that any inner
         // %collect_result deposits land here. The slot is owned by
@@ -1407,15 +1402,14 @@ impl RuntimeInterface for TezosRuntime {
         Ok(bytes)
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr: &str,
         budget: TezosXGas,
     ) -> Result<(Classification, TezosXGas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let host = rk.host();
         // Malformed → Unknown, no charge.
@@ -1436,16 +1430,15 @@ impl RuntimeInterface for TezosRuntime {
         Ok((Classification::from(origin), consumed))
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         address: &str,
         public_key: Option<&str>,
         budget: &mut TezosXGas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let host = rk.host();
         let contract = Contract::from_b58check(address)
@@ -3744,8 +3737,8 @@ mod tests {
             ContractKt1Hash::from(tezos_crypto_rs::blake2b::digest_160(seed))
         }
 
-        fn check<KS: KeySpace>(
-            rk: &RuntimeKeyspaces<'_, MockKernelHost, KS>,
+        fn check(
+            rk: &RuntimeKeyspaces<'_, MockKernelHost>,
             address: &str,
             public_key: Option<&str>,
             budget: TezosXGas,

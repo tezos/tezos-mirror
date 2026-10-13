@@ -545,7 +545,7 @@ fn log_transaction_type(to: Option<H160>, data: &[u8]) {
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn revm_run_transaction<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     block_constants: &BlockConstants,
@@ -610,7 +610,7 @@ where
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 fn apply_ethereum_transaction_common<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
@@ -782,7 +782,7 @@ impl From<&Deposit> for SolXTZDeposit {
 
 #[allow(clippy::too_many_arguments)]
 pub fn pure_xtz_deposit<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
@@ -931,7 +931,7 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
 pub fn pure_fa_deposit<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
@@ -1012,7 +1012,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn apply_fa_deposit<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
@@ -1177,8 +1177,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn handle_transaction_result<Host, KS>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn handle_transaction_result<Host>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,
@@ -1188,8 +1188,7 @@ pub fn handle_transaction_result<Host, KS>(
     sequencer_pool_address: Option<H160>,
 ) -> Result<RuntimeExecutionInfo, anyhow::Error>
 where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match transaction_result {
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -1270,7 +1269,7 @@ where
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn apply_transaction<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,

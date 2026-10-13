@@ -29,7 +29,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::wei::{ceil_div, gas_from_wei};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 use std::mem::size_of;
 
@@ -178,15 +178,14 @@ impl FeeUpdates {
         outcome.gas_used = self.overall_gas_used.as_u64();
     }
 
-    pub fn apply<Host, KS>(
+    pub fn apply<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         caller: H160,
         sequencer_pool_address: Option<H160>,
     ) -> Result<(), anyhow::Error>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         tezos_evm_logging::log!(
             tezos_evm_logging::Level::Debug,
@@ -338,6 +337,7 @@ mod tests {
     use revm_etherlink::ExecutionOutcome;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_smart_rollup_keyspace::KeySpace;
 
     use proptest::prelude::*;
 

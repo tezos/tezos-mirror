@@ -36,7 +36,7 @@ use tezos_execution::TezlinkOperationGas;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{Milligas, TezosXRuntimeError};
 use tezosx_journal::TezosXJournal;
 
@@ -140,16 +140,15 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
 /// The returned [`ExecuteRequestOutcome`] carries the gas consumed during
 /// typechecking and interpretation, and [`RequestFailure`] does the same
 /// on failure, so the caller can report it to the gateway.
-pub(crate) fn execute_view_call<Host, KS>(
+pub(crate) fn execute_view_call<Host>(
     chain_id: &tezos_crypto_rs::hash::ChainId,
     registry: &impl tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecuteRequestOutcome, RequestFailure>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let parsed = url::parse_tezos_view_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;

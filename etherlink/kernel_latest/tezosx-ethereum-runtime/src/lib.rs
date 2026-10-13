@@ -31,7 +31,9 @@ use revm_etherlink::{
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+#[cfg(feature = "testing")]
+use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{
     AliasInfo, AliasResolution, Classification, CrossRuntimeContext, Gas, Origin,
     Registry, RuntimeId, RuntimeInterface, TezosXRuntimeError, ALIAS_LOOKUP_COST,
@@ -85,10 +87,10 @@ impl EthereumRuntime {
     /// run init to set forwarder storage and forward any prior balance.
     /// The delegation and classification are staged by the caller.
     #[allow(clippy::too_many_arguments)]
-    fn materialize_alias<Host, KS>(
+    fn materialize_alias<Host>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias: Address,
         native_address: &str,
@@ -97,8 +99,7 @@ impl EthereumRuntime {
         gas_remaining: u64,
     ) -> Result<u64, TezosXRuntimeError>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         // Ensure the AliasForwarder precompile code is available
         // (it should be initialized at kernel startup, but verify it exists)
@@ -318,16 +319,15 @@ sol! {
 /// - else  → catchable `405`.
 ///
 /// `serve` then only handles the result-to-HTTP-status mapping.
-fn execute_request<Host, KS>(
+fn execute_request<Host>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     match *request.method() {
         http::Method::POST => execute_call(runtime, registry, rk, journal, request),
@@ -390,16 +390,15 @@ fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
 /// sender, and runs the EVM transaction with state changes preserved
 /// (the journal is not committed here — the outer block builder handles
 /// that for the whole CRAC).
-fn execute_call<Host, KS>(
+fn execute_call<Host>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -568,16 +567,15 @@ fn public_key_matches(
 ///   so the top-level frame has `is_static = true` and any state
 ///   mutation halts with `StateChangeDuringStaticCall` (surfaced as
 ///   `400`).
-fn execute_static_call<Host, KS>(
+fn execute_static_call<Host>(
     runtime: &EthereumRuntime,
     registry: &impl Registry<Journal = TezosXJournal>,
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -662,10 +660,10 @@ where
 impl RuntimeInterface for EthereumRuntime {
     type Journal = TezosXJournal;
 
-    fn create_alias<Host, KS>(
+    fn create_alias<Host>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias: &str,
         alias_info: AliasInfo,
@@ -674,8 +672,7 @@ impl RuntimeInterface for EthereumRuntime {
         gas_remaining: Gas,
     ) -> Result<AliasResolution, TezosXRuntimeError>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let alias = Address::from_hex(alias).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Invalid alias address string: {e}"))
@@ -707,15 +704,14 @@ impl RuntimeInterface for EthereumRuntime {
         )))
     }
 
-    fn alias_exists<Host, KS>(
+    fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias: &str,
     ) -> Result<bool, TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let alias = Address::from_hex(alias).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Invalid alias address string: {e}"))
@@ -750,16 +746,15 @@ impl RuntimeInterface for EthereumRuntime {
         Ok(alias.to_string())
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
         registry: &impl Registry<Journal = TezosXJournal>,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         build_response(execute_request(self, registry, rk, journal, request))
     }
@@ -786,15 +781,14 @@ impl RuntimeInterface for EthereumRuntime {
             .map_err(|_| CheckNativeAddressError::MalformedPublicKey.into())
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr: &str,
         budget: Gas,
     ) -> Result<(Classification, Gas), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         // Malformed → Unknown, no charge.
         let address = match Address::from_hex(addr) {
@@ -842,16 +836,15 @@ impl RuntimeInterface for EthereumRuntime {
         Ok((cls, consumed))
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         address: &str,
         public_key: Option<&str>,
         budget: &mut Gas,
     ) -> Result<(), TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         let addr = Address::from_hex(address)
             .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
@@ -2911,17 +2904,14 @@ mod tests {
             ALIAS_LOOKUP_COST.as_runtime(RuntimeId::Ethereum)
         }
 
-        fn set_info<KS: KeySpace>(
-            rk: &mut RuntimeKeyspaces<'_, MockKernelHost, KS>,
-            info: AccountInfo,
-        ) {
+        fn set_info(rk: &mut RuntimeKeyspaces<'_, MockKernelHost>, info: AccountInfo) {
             let addr = Address::from_hex(ADDRESS).unwrap();
             let mut account = StorageAccount::from_address(&addr).unwrap();
             account.set_info(rk.eth_accounts_mut(), info).unwrap();
         }
 
-        fn check<KS: KeySpace>(
-            rk: &RuntimeKeyspaces<'_, MockKernelHost, KS>,
+        fn check(
+            rk: &RuntimeKeyspaces<'_, MockKernelHost>,
             address: &str,
             public_key: Option<&str>,
             budget: Gas,

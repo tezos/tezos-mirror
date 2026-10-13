@@ -26,7 +26,7 @@ use crate::{
 };
 use evm_types::{CustomPrecompileError, FaDepositWithProxy, IntoWithRemainder};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 sol! {
     contract Table {
@@ -62,19 +62,18 @@ sol! {
     }
 }
 
-pub(crate) fn table_precompile<'j, 'host, CTX, Host, KS, R>(
+pub(crate) fn table_precompile<'j, 'host, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     'host: 'j,
-    Host: StorageV1 + 'host,
-    KS: KeySpace + 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
-        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-        Journal = Journal<'j, 'host, Host, KS, R>,
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
     >,
 {
     let mut gas = Gas::new(inputs.gas_limit);

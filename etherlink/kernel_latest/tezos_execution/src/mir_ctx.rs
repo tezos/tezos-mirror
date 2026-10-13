@@ -110,7 +110,7 @@ impl Default for InterpretContext {
 }
 
 pub struct TcCtx<'operation, 'host, Host: KeySpaceLoader + StorageV1> {
-    pub rk: &'operation mut RuntimeKeyspaces<'host, Host, Host::KeySpace>,
+    pub rk: &'operation mut RuntimeKeyspaces<'host, Host>,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub interpret_context: InterpretContext,
@@ -875,7 +875,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R>
         // Distinct-field split borrows on `self`: `tc_ctx.rk`,
         // `tc_ctx.operation_gas`, `journal`, `registry`. The dispatcher
         // consumes them for the call only.
-        let rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace> = &mut *self.tc_ctx.rk;
+        let rk: &mut RuntimeKeyspaces<'_, Host> = &mut *self.tc_ctx.rk;
         let operation_gas: &mut crate::gas::TezlinkOperationGas =
             self.tc_ctx.operation_gas;
         let crac_chain_depth = self.operation_ctx.crac_chain_depth;
@@ -972,11 +972,13 @@ pub trait HasRegistry {
 /// `&mut self` exclusively and conflict. Implementers construct the
 /// tuple via direct field access so the borrow checker accepts the
 /// distinct-field split.
-pub trait HasCrossRuntime<'host, Host: StorageV1, KS>: HasJournal + HasRegistry {
+pub trait HasCrossRuntime<'host, Host: StorageV1 + KeySpaceLoader>:
+    HasJournal + HasRegistry
+{
     fn cross_runtime_split(
         &mut self,
     ) -> (
-        &mut RuntimeKeyspaces<'host, Host, KS>,
+        &mut RuntimeKeyspaces<'host, Host>,
         &mut tezosx_journal::TezosXJournal,
         &<Self as HasRegistry>::R,
     );
@@ -1027,12 +1029,12 @@ impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasRe
 }
 
 impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
-    HasCrossRuntime<'host, Host, Host::KeySpace> for Ctx<'a, 'operation, 'host, Host, R>
+    HasCrossRuntime<'host, Host> for Ctx<'a, 'operation, 'host, Host, R>
 {
     fn cross_runtime_split(
         &mut self,
     ) -> (
-        &mut RuntimeKeyspaces<'host, Host, Host::KeySpace>,
+        &mut RuntimeKeyspaces<'host, Host>,
         &mut tezosx_journal::TezosXJournal,
         &R,
     ) {
@@ -3491,8 +3493,8 @@ pub(crate) mod mock {
     /// independently) so tests can construct `MockCtx` from a long-lived
     /// host and shorter-lived journal/registry locals without forcing the
     /// borrow checker to unify them under a single `'a`.
-    pub struct MockCtx<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> {
-        pub rk: &'rk mut RuntimeKeyspaces<'host, Host, KS>,
+    pub struct MockCtx<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> {
+        pub rk: &'rk mut RuntimeKeyspaces<'host, Host>,
         pub journal: &'j mut tezosx_journal::TezosXJournal,
         pub registry: &'r R,
         pub sender: AddressHash,
@@ -3510,11 +3512,11 @@ pub(crate) mod mock {
         pub address_registry: HashMap<AddressHash, BigUint>,
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry>
-        MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         pub fn new(
-            rk: &'rk mut RuntimeKeyspaces<'host, Host, KS>,
+            rk: &'rk mut RuntimeKeyspaces<'host, Host>,
             journal: &'j mut tezosx_journal::TezosXJournal,
             registry: &'r R,
             sender: AddressHash,
@@ -3545,8 +3547,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasCracChainDepth
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasCracChainDepth for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn crac_chain_depth(&self) -> u32 {
             self.crac_chain_depth
@@ -3557,8 +3559,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasDelegatedStorageCost
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasDelegatedStorageCost for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn delegated_storage_cost(&self) -> u64 {
             self.delegated_storage_cost
@@ -3569,16 +3571,16 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasJournal
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> HasJournal
+        for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn journal(&mut self) -> &mut tezosx_journal::TezosXJournal {
             self.journal
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasRegistry
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> HasRegistry
+        for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         type R = R;
         fn registry(&self) -> &Self::R {
@@ -3586,13 +3588,13 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry>
-        HasCrossRuntime<'host, Host, KS> for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasCrossRuntime<'host, Host> for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn cross_runtime_split(
             &mut self,
         ) -> (
-            &mut RuntimeKeyspaces<'host, Host, KS>,
+            &mut RuntimeKeyspaces<'host, Host>,
             &mut tezosx_journal::TezosXJournal,
             &R,
         ) {
@@ -3600,8 +3602,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasOriginLookup
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasOriginLookup for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn read_origin_for_address(
             &self,
@@ -3612,40 +3614,40 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasHost<Host>
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> HasHost<Host>
+        for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn host(&mut self) -> &mut Host {
             self.rk.host_mut()
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasContractAccount
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasContractAccount for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn contract_account(&self) -> &TezosOriginatedAccount {
             &self.contract_account
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasOperationGas
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasOperationGas for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
             &mut self.operation_gas
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> HasSourcePublicKey
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        HasSourcePublicKey for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn source_public_key(&self) -> &[u8] {
             &[]
         }
     }
 
-    impl<'a, 'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> TypecheckingCtx<'a>
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'a, 'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        TypecheckingCtx<'a> for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn gas(&mut self) -> &mut mir::gas::Gas {
             &mut self.operation_gas.remaining
@@ -3666,8 +3668,8 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, 'rk, 'j, 'r, 'host, Host: StorageV1, KS, R: Registry> CtxTrait<'a>
-        for MockCtx<'rk, 'j, 'r, 'host, Host, KS, R>
+    impl<'a, 'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry>
+        CtxTrait<'a> for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
         fn sender(&self) -> AddressHash {
             self.sender.clone()

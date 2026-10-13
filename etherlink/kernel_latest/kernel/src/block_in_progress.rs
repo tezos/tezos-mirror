@@ -397,14 +397,14 @@ impl BlockInProgress {
     }
 
     #[instrument(skip_all)]
-    pub fn register_valid_transaction<Host, KS>(
+    pub fn register_valid_transaction<Host>(
         &mut self,
         execution_info: RuntimeExecutionInfo,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         michelson_to_evm_gas_multiplier: u64,
     ) -> Result<(), anyhow::Error>
     where
-        Host: WithGas + StorageV1,
+        Host: WithGas + StorageV1 + KeySpaceLoader,
     {
         match execution_info {
             RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
@@ -503,7 +503,7 @@ impl BlockInProgress {
     #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn finalize_and_store<Host>(
         self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error>

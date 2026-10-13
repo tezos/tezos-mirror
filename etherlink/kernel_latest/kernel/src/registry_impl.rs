@@ -22,7 +22,7 @@ use primitive_types::U256;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{AliasResolution, Registry, RuntimeInterface};
 use tezosx_journal::TezosXJournal;
@@ -33,7 +33,7 @@ impl Registry for RegistryImpl {
 
     fn ensure_alias<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         alias_info: tezosx_interfaces::AliasInfo,
         native_public_key: Option<&[u8]>,
@@ -86,7 +86,7 @@ impl Registry for RegistryImpl {
 
     fn alias_exists<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut Self::Journal,
         target_runtime: tezosx_interfaces::RuntimeId,
         alias: &str,
@@ -148,9 +148,9 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn read_origin<Host, KS>(
+    fn read_origin<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: tezosx_interfaces::RuntimeId,
         addr: &str,
         budget: tezosx_interfaces::Gas,
@@ -159,8 +159,7 @@ impl Registry for RegistryImpl {
         tezosx_interfaces::TezosXRuntimeError,
     >
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => {
@@ -172,17 +171,16 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn check_is_native_address<Host, KS>(
+    fn check_is_native_address<Host>(
         &self,
-        rk: &RuntimeKeyspaces<'_, Host, KS>,
+        rk: &RuntimeKeyspaces<'_, Host>,
         addr_runtime: tezosx_interfaces::RuntimeId,
         address: &str,
         public_key: Option<&str>,
         budget: &mut tezosx_interfaces::Gas,
     ) -> Result<(), tezosx_interfaces::TezosXRuntimeError>
     where
-        Host: StorageV1,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         match addr_runtime {
             tezosx_interfaces::RuntimeId::Tezos => self
@@ -194,15 +192,14 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn serve<Host, KS>(
+    fn serve<Host>(
         &self,
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> http::Response<Vec<u8>>
     where
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-        KS: KeySpace,
+        Host: StorageV1 + KeySpaceLoader,
     {
         journal.record_request(&request);
         let response = match request.uri().host() {

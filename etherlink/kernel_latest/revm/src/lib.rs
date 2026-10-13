@@ -46,26 +46,26 @@ pub mod journal;
 pub mod precompiles;
 pub mod storage;
 
-type EVMInnerContext<'a, 'host, Host, KS, R> = Context<
+type EVMInnerContext<'a, 'host, Host, R> = Context<
     &'a BlockEnv,
     &'a TxEnv,
     CfgEnv,
-    EtherlinkVMDB<'a, 'host, Host, KS, R>,
-    Journal<'a, 'host, Host, KS, R>,
+    EtherlinkVMDB<'a, 'host, Host, R>,
+    Journal<'a, 'host, Host, R>,
 >;
 
-type EvmContext<'a, 'host, Host, KS, R> = Evm<
-    EVMInnerContext<'a, 'host, Host, KS, R>,
+type EvmContext<'a, 'host, Host, R> = Evm<
+    EVMInnerContext<'a, 'host, Host, R>,
     (),
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, 'host, Host, KS, R>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, 'host, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
 
-pub type EvmInspection<'a, 'host, Host, KS, INSP, R> = Evm<
-    EVMInnerContext<'a, 'host, Host, KS, R>,
+pub type EvmInspection<'a, 'host, Host, INSP, R> = Evm<
+    EVMInnerContext<'a, 'host, Host, R>,
     INSP,
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, 'host, Host, KS, R>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, 'host, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
@@ -243,15 +243,14 @@ const ORIGIN_STATIC_GAS: u64 = 2;
 /// alias, exactly as they did before L2-1363). See L2-1441 for the
 /// design rationale that replaces the earlier `TxEnv.caller`-overload
 /// approach.
-fn etherlink_origin<'a, 'host, Host, KS, R>(
+fn etherlink_origin<'a, 'host, Host, R>(
     context: revm::interpreter::InstructionContext<
         '_,
-        EVMInnerContext<'a, 'host, Host, KS, R>,
+        EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
 ) where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use crate::journal::CrossRuntimeCall;
@@ -272,17 +271,16 @@ fn etherlink_origin<'a, 'host, Host, KS, R>(
 /// [`EvmInspection`] as the type alias for the etherlink-shaped `Evm`;
 /// the non-inspector [`EvmContext`] is just `EvmInspection` with
 /// `INSP = ()`, so the same function covers both call sites.
-fn install_etherlink_origin<'a, 'host, Host, KS, R, INSP>(
-    evm: &mut EvmInspection<'a, 'host, Host, KS, INSP, R>,
+fn install_etherlink_origin<'a, 'host, Host, R, INSP>(
+    evm: &mut EvmInspection<'a, 'host, Host, INSP, R>,
 ) where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
         ORIGIN_OPCODE,
         revm::interpreter::Instruction::new(
-            etherlink_origin::<Host, KS, R>,
+            etherlink_origin::<Host, R>,
             ORIGIN_STATIC_GAS,
         ),
     );
@@ -309,15 +307,14 @@ const GASPRICE_STATIC_GAS: u64 = 2;
 /// `TxEnv.gas_price` stays `0`, so the caller debit and basefee burn
 /// (role: accounting) are untouched. Mirrors the `ORIGIN` override,
 /// which likewise reports a value distinct from what the `TxEnv` drives.
-fn etherlink_gasprice<'a, 'host, Host, KS, R>(
+fn etherlink_gasprice<'a, 'host, Host, R>(
     context: revm::interpreter::InstructionContext<
         '_,
-        EVMInnerContext<'a, 'host, Host, KS, R>,
+        EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
 ) where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use revm::interpreter::Host as InterpHost;
@@ -331,17 +328,16 @@ fn etherlink_gasprice<'a, 'host, Host, KS, R>(
 /// the context builders only for cross-runtime origins, so a native EVM
 /// transaction keeps the stock handler (reading the real
 /// `TxEnv.gas_price`) and is left completely untouched.
-fn install_etherlink_gasprice<'a, 'host, Host, KS, R, INSP>(
-    evm: &mut EvmInspection<'a, 'host, Host, KS, INSP, R>,
+fn install_etherlink_gasprice<'a, 'host, Host, R, INSP>(
+    evm: &mut EvmInspection<'a, 'host, Host, INSP, R>,
 ) where
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     evm.instruction.insert_instruction(
         GASPRICE_OPCODE,
         revm::interpreter::Instruction::new(
-            etherlink_gasprice::<Host, KS, R>,
+            etherlink_gasprice::<Host, R>,
             GASPRICE_STATIC_GAS,
         ),
     );
@@ -349,8 +345,8 @@ fn install_etherlink_gasprice<'a, 'host, Host, KS, R, INSP>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn build_evm_inspector_context<'a, 'host, Host, KS, R>(
-    db: EtherlinkVMDB<'a, 'host, Host, KS, R>,
+fn build_evm_inspector_context<'a, 'host, Host, R>(
+    db: EtherlinkVMDB<'a, 'host, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -361,10 +357,9 @@ fn build_evm_inspector_context<'a, 'host, Host, KS, R>(
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmInspection<'a, 'host, Host, KS, TracerInspector, R>, EvmRunError>
+) -> Result<EvmInspection<'a, 'host, Host, TracerInspector, R>, EvmRunError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     let mut cfg = CfgEnv::new()
@@ -415,10 +410,9 @@ fn build_evm_context<
     'a,
     'host,
     Host,
-    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    db: EtherlinkVMDB<'a, 'host, Host, KS, R>,
+    db: EtherlinkVMDB<'a, 'host, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -429,9 +423,9 @@ fn build_evm_context<
     is_simulation: bool,
     is_cross_runtime: bool,
     alias_delegation: Option<Address>,
-) -> Result<EvmContext<'a, 'host, Host, KS, R>, EvmRunError>
+) -> Result<EvmContext<'a, 'host, Host, R>, EvmRunError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -477,17 +471,16 @@ fn execute_transaction<
     'a,
     'host,
     Host,
-    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    evm_context: &mut EvmContext<'a, 'host, Host, KS, R>,
+    evm_context: &mut EvmContext<'a, 'host, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     is_static_top_frame: bool,
     call_depth: usize,
 ) -> Result<ExecutionResult, EVMError<EvmDbError>>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    Host: StorageV1 + KeySpaceLoader,
 {
     let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> = match transaction_hash {
         Some(hash) if cfg!(feature = "tracing") => {
@@ -522,11 +515,10 @@ where
 /// alias-init sub-call resolves it. The write commits with the
 /// transaction and reverts with the frame.
 fn install_alias_delegation<
-    Host: StorageV1,
-    KS: KeySpace,
+    Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    journaled_state: &mut Journal<'_, '_, Host, KS, R>,
+    journaled_state: &mut Journal<'_, '_, Host, R>,
     alias: Option<Address>,
 ) -> Result<(), EvmRunError> {
     if let Some(alias) = alias {
@@ -548,10 +540,9 @@ pub fn run_transaction<
     'a,
     'host,
     Host,
-    KS: KeySpace,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 >(
-    rk: &'a mut RuntimeKeyspaces<'host, Host, KS>,
+    rk: &'a mut RuntimeKeyspaces<'host, Host>,
     registry: &'a R,
     journal: &'a mut TezosXJournal,
     block_constants: &'a BlockConstants,
@@ -566,7 +557,7 @@ pub fn run_transaction<
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EvmRunError>
 where
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // Consume the pending alias delegation before any fallible step
     // so an early return cannot leave it dangling for the next
@@ -925,7 +916,7 @@ mod test {
 
             fn ensure_alias<Host>(
                 &self,
-                rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+                rk: &mut RuntimeKeyspaces<'_, Host>,
                 journal: &mut TezosXJournal,
                 alias_info: AliasInfo,
                 native_public_key: Option<&[u8]>,
@@ -983,7 +974,7 @@ mod test {
 
             fn alias_exists<Host>(
                 &self,
-                rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+                rk: &mut RuntimeKeyspaces<'_, Host>,
                 journal: &mut Self::Journal,
                 target_runtime: RuntimeId,
                 alias: &str,
@@ -1039,9 +1030,9 @@ mod test {
                 }
             }
 
-            fn read_origin<Host, KS>(
+            fn read_origin<Host>(
                 &self,
-                rk: &RuntimeKeyspaces<'_, Host, KS>,
+                rk: &RuntimeKeyspaces<'_, Host>,
                 addr_runtime: RuntimeId,
                 addr: &str,
                 budget: tezosx_interfaces::Gas,
@@ -1050,8 +1041,7 @@ mod test {
                 TezosXRuntimeError,
             >
             where
-                Host: StorageV1,
-                KS: KeySpace,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 match addr_runtime {
                     RuntimeId::Tezos => self.mock_tezos.read_origin(rk, addr, budget),
@@ -1059,17 +1049,16 @@ mod test {
                 }
             }
 
-            fn check_is_native_address<Host, KS>(
+            fn check_is_native_address<Host>(
                 &self,
-                rk: &RuntimeKeyspaces<'_, Host, KS>,
+                rk: &RuntimeKeyspaces<'_, Host>,
                 addr_runtime: RuntimeId,
                 address: &str,
                 public_key: Option<&str>,
                 budget: &mut tezosx_interfaces::Gas,
             ) -> Result<(), TezosXRuntimeError>
             where
-                Host: StorageV1,
-                KS: KeySpace,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 match addr_runtime {
                     RuntimeId::Tezos => self
@@ -1081,15 +1070,14 @@ mod test {
                 }
             }
 
-            fn serve<Host, KS>(
+            fn serve<Host>(
                 &self,
-                rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+                rk: &mut RuntimeKeyspaces<'_, Host>,
                 journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
             where
-                Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-                KS: KeySpace,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 match request.uri().host() {
                     Some("tezos") | Some("stub") => {
@@ -1192,10 +1180,10 @@ mod test {
         impl RuntimeInterface for MockTezosRuntime {
             type Journal = TezosXJournal;
 
-            fn create_alias<Host, KS>(
+            fn create_alias<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
-                _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+                _rk: &mut RuntimeKeyspaces<'_, Host>,
                 _journal: &mut TezosXJournal,
                 _alias: &str,
                 _alias_info: AliasInfo,
@@ -1204,19 +1192,19 @@ mod test {
                 gas_remaining: tezosx_interfaces::Gas,
             ) -> Result<tezosx_interfaces::AliasResolution, TezosXRuntimeError>
             where
-                Host: StorageV1,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 Ok(tezosx_interfaces::AliasResolution::build(gas_remaining))
             }
 
-            fn alias_exists<Host, KS>(
+            fn alias_exists<Host>(
                 &self,
-                _rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+                _rk: &mut RuntimeKeyspaces<'_, Host>,
                 _journal: &mut TezosXJournal,
                 _alias: &str,
             ) -> Result<bool, TezosXRuntimeError>
             where
-                Host: StorageV1,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 Ok(false)
             }
@@ -1231,16 +1219,15 @@ mod test {
                 Ok(kt1.to_base58_check())
             }
 
-            fn serve<Host, KS>(
+            fn serve<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
-                rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+                rk: &mut RuntimeKeyspaces<'_, Host>,
                 _journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
             ) -> http::Response<Vec<u8>>
             where
-                Host: StorageV1 + KeySpaceLoader<KeySpace = KS>,
-                KS: KeySpace,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 // Read-only GET requests (Michelson view / EVM
                 // STATICCALL shape) echo their request body back as the
@@ -1346,9 +1333,9 @@ mod test {
                     .map_err(|e| TezosXRuntimeError::ConversionError(format!("{e}")))
             }
 
-            fn read_origin<Host, KS>(
+            fn read_origin<Host>(
                 &self,
-                _rk: &RuntimeKeyspaces<'_, Host, KS>,
+                _rk: &RuntimeKeyspaces<'_, Host>,
                 _addr: &str,
                 _budget: tezosx_interfaces::Gas,
             ) -> Result<
@@ -1356,7 +1343,7 @@ mod test {
                 TezosXRuntimeError,
             >
             where
-                Host: StorageV1,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 // Mock: always return Unknown with no consumption.
                 Ok((
@@ -1386,15 +1373,15 @@ mod test {
                 tez_accounts.get_u256_le_or(&key, primitive_types::U256::zero())
             }
 
-            fn check_is_native_address<Host, KS>(
+            fn check_is_native_address<Host>(
                 &self,
-                _rk: &RuntimeKeyspaces<'_, Host, KS>,
+                _rk: &RuntimeKeyspaces<'_, Host>,
                 address: &str,
                 _public_key: Option<&str>,
                 _budget: &mut tezosx_types::Gas,
             ) -> Result<(), tezosx_types::TezosXRuntimeError>
             where
-                Host: StorageV1,
+                Host: StorageV1 + KeySpaceLoader,
             {
                 // Every address but `MOCK_NOT_NATIVE` is native, for free.
                 if address == MOCK_NOT_NATIVE {

@@ -36,7 +36,7 @@ use crate::{
 
 use super::constants::DEBUGS;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
@@ -82,19 +82,18 @@ impl EtherlinkPrecompiles {
             || (self.enable_debug_precompiles && DEBUGS.contains(address))
     }
 
-    fn run_custom_precompile<'j, 'host, CTX, Host, KS, R>(
+    fn run_custom_precompile<'j, 'host, CTX, Host, R>(
         &mut self,
         context: &mut CTX,
         inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, CustomPrecompileAbort>
     where
         'host: 'j,
-        Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-        KS: KeySpace + 'j,
+        Host: StorageV1 + KeySpaceLoader + 'host,
         R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
         CTX: ContextTr<
-            Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-            Journal = Journal<'j, 'host, Host, KS, R>,
+            Db = EtherlinkVMDB<'j, 'host, Host, R>,
+            Journal = Journal<'j, 'host, Host, R>,
         >,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
@@ -159,15 +158,14 @@ impl EtherlinkPrecompiles {
     }
 }
 
-impl<'j, 'host, CTX, Host, KS, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
+impl<'j, 'host, CTX, Host, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
     'host: 'j,
-    Host: StorageV1 + KeySpaceLoader<KeySpace = KS> + 'host,
-    KS: KeySpace + 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
     R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
     CTX: ContextTr<
-        Db = EtherlinkVMDB<'j, 'host, Host, KS, R>,
-        Journal = Journal<'j, 'host, Host, KS, R>,
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
     >,
 {
     type Output = InterpreterResult;

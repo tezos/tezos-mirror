@@ -30,7 +30,7 @@ use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
@@ -489,7 +489,7 @@ fn build_deposit_event(
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
 pub fn apply_tezosx_xtz_deposit<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     deposit: &Deposit,
     block_constants: &BlockConstants,
@@ -621,8 +621,8 @@ where
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host: StorageV1, KS: KeySpace>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+fn tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     amount: u64,
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError> {
@@ -650,8 +650,8 @@ fn tezlink_deposit<Host: StorageV1, KS: KeySpace>(
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host: StorageV1, KS: KeySpace>(
-    rk: &mut RuntimeKeyspaces<'_, Host, KS>,
+pub fn execute_tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     deposit: &Deposit,
 ) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address

@@ -108,7 +108,7 @@ pub fn can_fit_in_reboot(
 
 #[allow(clippy::too_many_arguments)]
 pub fn compute<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -299,7 +299,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 pub fn compute_bip<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host, Host::KeySpace>,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -2873,13 +2873,12 @@ mod tests {
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
-    fn first_block<Host, KS>(
-        rk: &mut RuntimeKeyspaces<'_, Host, KS>,
-        base: &KS,
+    fn first_block<Host>(
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+        base: &Host::KeySpace,
     ) -> TezosXBlockConstants
     where
         Host: StorageV1 + KeySpaceLoader,
-        KS: KeySpace,
     {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
