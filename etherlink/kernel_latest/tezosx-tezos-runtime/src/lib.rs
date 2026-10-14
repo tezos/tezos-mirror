@@ -1174,7 +1174,7 @@ impl RuntimeInterface for TezosRuntime {
         // resolution fail). Idempotent — a no-op once the slot exists (seeded
         // at runtime activation / migration). This makes "seed precedes alias"
         // hold by construction, on every network.
-        crate::alias_forwarder::init_alias_implementation(rk.host_mut())?;
+        crate::alias_forwarder::init_alias_implementation(rk.tez_accounts_mut())?;
 
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
@@ -1322,7 +1322,7 @@ impl RuntimeInterface for TezosRuntime {
         })?;
         let account = context::originated_from_kt1(&kt1)?;
 
-        match account.origin(rk.host())? {
+        match account.origin(rk.tez_accounts())? {
             Some(Origin::Alias(_)) => Ok(true),
             Some(Origin::Native) => Err(TezosXRuntimeError::Custom(format!(
                 "alias_exists: account {alias} is recorded as Native"
@@ -1411,7 +1411,6 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let host = rk.host();
         // Malformed → Unknown, no charge.
         let contract = match Contract::from_b58check(addr) {
             Ok(c) => c,
@@ -1426,7 +1425,7 @@ impl RuntimeInterface for TezosRuntime {
             Contract::Implicit(pkh) => AddressHash::Implicit(pkh),
             Contract::Originated(kt1) => AddressHash::Kt1(kt1),
         };
-        let origin = context::read_origin_for_address(host, &address_hash)?;
+        let origin = context::read_origin_for_address(rk.tez_accounts(), &address_hash)?;
         Ok((Classification::from(origin), consumed))
     }
 
@@ -1440,7 +1439,6 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let host = rk.host();
         let contract = Contract::from_b58check(address)
             .map_err(|_| CheckNativeAddressError::MalformedAddress)?;
         let kt1 = match contract {
@@ -1478,8 +1476,10 @@ impl RuntimeInterface for TezosRuntime {
         }
         budget.consume(ALIAS_LOOKUP_COST)?;
         // if it's already classified as origin
-        let origin =
-            context::read_origin_for_address(host, &AddressHash::Kt1(kt1.clone()))?;
+        let origin = context::read_origin_for_address(
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1.clone()),
+        )?;
         match origin {
             Some(Origin::Native) => return Ok(()),
             Some(Origin::Alias(_)) => {
@@ -1496,7 +1496,7 @@ impl RuntimeInterface for TezosRuntime {
         // aliases code.
         budget.consume(ALIAS_LOOKUP_COST)?;
         let account = context::originated_from_kt1(&kt1)?;
-        if account.exists(host)? {
+        if account.exists(rk.tez_accounts())? {
             Ok(())
         } else {
             Err(CheckNativeAddressError::NotProvablyNative.into())
@@ -1539,11 +1539,11 @@ impl TezosRuntime {
 
     // Used for debug while we don't have our own originated account implementation.
     pub fn get_originated_account_balance(
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
         let originated_account = context::originated_from_kt1(kt1)?;
-        let balance = originated_account.balance(host)?;
+        let balance = originated_account.balance(tez_accounts)?;
         narith_to_u256(&balance)
     }
 }
@@ -1983,9 +1983,9 @@ mod tests {
         // L2-1529: a materialized alias carries no per-contract script —
         // nothing is written at `/data/code`. Its code is the single shared
         // implementation.
-        let code_path = tezos_execution::context::code::code_path(&account).unwrap();
+        let code_key = tezos_execution::context::code::code_key(&account).unwrap();
         assert!(
-            rk.host().store_has(&code_path).unwrap().is_none(),
+            !rk.tez_accounts().contains(&code_key),
             "a materialized alias must not store its own /data/code"
         );
 
@@ -1993,25 +1993,28 @@ mod tests {
         // code is not charged per alias), and used/paid bytes account for the
         // per-alias storage only. This also pins the receipt's
         // `paid_storage_size_diff`, which derives from these watermarks.
-        let storage_len = account.storage(rk.host()).unwrap().len() as u64;
-        assert_eq!(account.code_size(rk.host()).unwrap(), Zarith::from(0u64));
+        let storage_len = account.storage(rk.tez_accounts()).unwrap().len() as u64;
         assert_eq!(
-            account.used_bytes(rk.host()).unwrap(),
+            account.code_size(rk.tez_accounts()).unwrap(),
+            Zarith::from(0u64)
+        );
+        assert_eq!(
+            account.used_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(storage_len)
         );
         assert_eq!(
-            account.paid_bytes(rk.host()).unwrap(),
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(storage_len)
         );
 
         // It is classified as an alias, so once the shared slot is seeded its
         // code resolves to the forwarder.
         assert!(matches!(
-            account.origin(rk.host()).unwrap(),
+            account.origin(rk.tez_accounts()).unwrap(),
             Some(Origin::Alias(_))
         ));
-        crate::alias_forwarder::init_alias_implementation(rk.host_mut()).unwrap();
-        match account.code(rk.host()).unwrap() {
+        crate::alias_forwarder::init_alias_implementation(rk.tez_accounts_mut()).unwrap();
+        match account.code(rk.tez_accounts()).unwrap() {
             tezos_execution::account_storage::Code::Code(bytes) => assert_eq!(
                 bytes,
                 alias_forwarder::forwarder_code()
@@ -2048,7 +2051,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        let storage = account.storage(rk.host()).unwrap();
+        let storage = account.storage(rk.tez_accounts()).unwrap();
         let expected =
             alias_forwarder::forwarder_storage(evm_address, &mut Gas::default())
                 .unwrap()
@@ -2079,8 +2082,9 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let balance = TezosRuntime::get_originated_account_balance(rk.host(), &kt1)
-            .expect("should read balance");
+        let balance =
+            TezosRuntime::get_originated_account_balance(rk.tez_accounts(), &kt1)
+                .expect("should read balance");
         assert_eq!(balance, U256::zero());
     }
 
@@ -2122,7 +2126,9 @@ mod tests {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let account = context::originated_from_kt1(&kt1).unwrap();
 
-        account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
 
         // `alias_exists` takes the alias in its own runtime's canonical
         // form (base58 KT1). Passing the EVM address would fail the
@@ -2960,7 +2966,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3030,7 +3036,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3094,7 +3100,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3164,7 +3170,7 @@ mod tests {
             )
             .unwrap();
         dest.init(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             Some(&script.encode(&mut Gas::default()).unwrap().unwrap()),
             &Micheline::from(())
                 .encode(&mut Gas::default())
@@ -3382,7 +3388,7 @@ mod tests {
             .unwrap();
         receiver
             .init(
-                rk.host_mut(),
+                rk.tez_accounts_mut(),
                 Some(
                     &receiver_script
                         .encode(&mut Gas::default())
@@ -3424,7 +3430,7 @@ mod tests {
             .unwrap();
         parent
             .init(
-                rk.host_mut(),
+                rk.tez_accounts_mut(),
                 Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                 &Micheline::from(())
                     .encode(&mut Gas::default())
@@ -3532,7 +3538,7 @@ mod tests {
                 .unwrap();
             receiver
                 .init(
-                    rk.host_mut(),
+                    rk.tez_accounts_mut(),
                     Some(
                         &receiver_script
                             .encode(&mut Gas::default())
@@ -3571,7 +3577,7 @@ mod tests {
                 .unwrap();
             parent
                 .init(
-                    rk.host_mut(),
+                    rk.tez_accounts_mut(),
                     Some(&parent_script.encode(&mut Gas::default()).unwrap().unwrap()),
                     &Micheline::from(())
                         .encode(&mut Gas::default())
@@ -3689,7 +3695,9 @@ mod tests {
             ));
             let kt1_b58 = kt1.to_base58_check();
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let budget = TezosXGas::new(1_000_000, RuntimeId::Tezos);
             let (class, consumed) = runtime.read_origin(&rk, &kt1_b58, budget).unwrap();
@@ -3849,7 +3857,9 @@ mod tests {
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1");
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
             assert_eq!(remaining, milligas(BUDGET_MILLIGAS - lookup_cost()));
@@ -3861,7 +3871,9 @@ mod tests {
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1_with_key");
             let account = context::originated_from_kt1(&kt1).unwrap();
-            account.set_origin(rk.host_mut(), &Origin::Native).unwrap();
+            account
+                .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+                .unwrap();
 
             let err = check(&rk, &kt1.to_base58_check(), Some(PUBLIC_KEY), budget())
                 .unwrap_err();
@@ -3878,7 +3890,7 @@ mod tests {
                 runtime: RuntimeId::Ethereum,
                 native_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string(),
             });
-            account.set_origin(rk.host_mut(), &origin).unwrap();
+            account.set_origin(rk.tez_accounts_mut(), &origin).unwrap();
 
             let err = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap_err();
             assert_eq!(err, CheckNativeAddressError::NotProvablyNative.into());
@@ -3893,7 +3905,12 @@ mod tests {
             let kt1 = kt1(b"unclassified_kt1_with_code");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(
+                    rk.tez_accounts_mut(),
+                    Some(&[0x02, 0, 0, 0, 0]),
+                    &[],
+                    0.into(),
+                )
                 .unwrap();
 
             let remaining = check(&rk, &kt1.to_base58_check(), None, budget()).unwrap();
@@ -3963,7 +3980,12 @@ mod tests {
             let kt1 = kt1(b"oog_code_lookup");
             let account = context::originated_from_kt1(&kt1).unwrap();
             account
-                .init(rk.host_mut(), Some(&[0x02, 0, 0, 0, 0]), &[], 0.into())
+                .init(
+                    rk.tez_accounts_mut(),
+                    Some(&[0x02, 0, 0, 0, 0]),
+                    &[],
+                    0.into(),
+                )
                 .unwrap();
 
             let err = check(

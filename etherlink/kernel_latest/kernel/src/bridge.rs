@@ -30,7 +30,7 @@ use tezos_execution::account_storage::TezosAccount;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
@@ -621,8 +621,8 @@ where
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+fn tezlink_deposit(
+    tez_accounts: &mut impl KeySpace,
     amount: u64,
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError> {
@@ -630,10 +630,10 @@ fn tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
 
     let _was_allocated = to_account
-        .allocate(rk.tez_accounts_mut())
+        .allocate(tez_accounts)
         .map_err(|_| TransferError::FailedToAllocateDestination)?;
 
-    match to_account.add_balance(rk.host_mut(), amount) {
+    match to_account.add_balance(tez_accounts, amount) {
         Ok(()) => {
             let mut success = TransferSuccess::default();
             let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR).unwrap();
@@ -650,8 +650,8 @@ fn tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+pub fn execute_tezlink_deposit(
+    tez_accounts: &mut impl KeySpace,
     deposit: &Deposit,
 ) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address
@@ -668,7 +668,7 @@ pub fn execute_tezlink_deposit<Host: StorageV1 + KeySpaceLoader>(
         parameters: Parameters::default(),
     };
 
-    let result = match tezlink_deposit(rk, amount.as_u64(), receiver) {
+    let result = match tezlink_deposit(tez_accounts, amount.as_u64(), receiver) {
         Ok(success) => ContentResult::Applied(TransferTarget::ToContract(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],

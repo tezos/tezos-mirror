@@ -22,7 +22,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
@@ -86,7 +86,7 @@ impl From<TransferError> for CracError {
             // at each construction site is a tezos_storage::error::Error,
             // none of whose variants is recoverable user input. A non-existent
             // originated destination is caught upstream by the
-            // `dest_account.exists(host)` guard in `transfer` and
+            // `dest_account.exists(tez_accounts)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist
             // instead, so FailedToFetchContractCode here can only fire
             // from genuine kernel-internal causes.
@@ -1627,18 +1627,18 @@ where
     // when the balance is already zero — no state change will occur.
     let account = ctx.contract_account().clone();
     let current = {
-        let host = ctx.host();
+        let (rk, _, _) = ctx.cross_runtime_split();
         account
-            .balance(host)
+            .balance(rk.tez_accounts())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?
     };
     if !current.0.is_zero() {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
-        let host = ctx.host();
+        let (rk, _, _) = ctx.cross_runtime_split();
         account
-            .set_balance(host, &0u64.into())
+            .set_balance(rk.tez_accounts_mut(), &0u64.into())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     }
     Ok(response_body)
@@ -2068,19 +2068,19 @@ where
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // Minimal `HasOriginLookup` adapter for the read-only alias
-    // resolution path: needs only an immutable host, no operation gas / no
-    // source public key. Defined locally so the helper has no extra
+    // resolution path. It needs only the accounts keyspace, with no operation
+    // gas and no source public key. It is local, so the helper has no extra
     // preconditions on its callers.
-    struct ViewOriginLookup<'a, H> {
-        host: &'a H,
+    struct ViewOriginLookup<'a, KS> {
+        tez_accounts: &'a KS,
     }
-    impl<H: StorageV1> HasOriginLookup for ViewOriginLookup<'_, H> {
+    impl<KS: KeySpace> HasOriginLookup for ViewOriginLookup<'_, KS> {
         fn read_origin_for_address(
             &self,
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            crate::context::read_origin_for_address(self.host, address)
+            crate::context::read_origin_for_address(self.tez_accounts, address)
         }
     }
 
@@ -2096,7 +2096,9 @@ where
     // reads (`ALIAS_LOOKUP_COST`); the read-only path skips only the
     // alias *generation* (write) cost. The target is always Ethereum here,
     // so the read always happens (no Tezos short-circuit to skip).
-    let lookup = ViewOriginLookup { host: rk.host() };
+    let lookup = ViewOriginLookup {
+        tez_accounts: rk.tez_accounts(),
+    };
     operation_gas
         .cast_and_consume_milligas(ALIAS_LOOKUP_COST)
         .map_err(|_| mir::interpreter::InterpretError::OutOfGas)?;

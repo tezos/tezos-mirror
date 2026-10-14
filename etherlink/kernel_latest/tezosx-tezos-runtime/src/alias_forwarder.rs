@@ -43,7 +43,7 @@
 
 use mir::ast::micheline::Micheline;
 use mir::gas::{Gas, OutOfGas};
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 use tezosx_interfaces::TezosXRuntimeError;
 
 /// Micheline-encoded forwarding contract code.
@@ -82,29 +82,28 @@ pub fn forwarder_storage(
     Micheline::from(native_evm_address).encode(gas)
 }
 
-/// Seed the shared alias implementation slot with the canonical forwarder code
-/// if the slot is empty, leaving an already-populated slot untouched.
+/// Writes the forwarder code as the shared alias implementation when the
+/// implementation is absent, and leaves a present implementation untouched.
 ///
-/// Idempotent, so it is safe to call from both seeding points: the Michelson
-/// runtime activation (fresh networks) and the storage migration
-/// (already-deployed networks). The slot itself lives in `tezos_execution`
-/// ([`tezos_execution::account_storage::read_alias_implementation`]); this
-/// wrapper supplies the Michelson-runtime-specific forwarder code, which is why
-/// it lives next to it here rather than in the generic execution layer.
+/// A second call changes nothing. An implementation that the host cannot
+/// read counts as absent, and this function writes over it.
+///
+/// Fails with [`TezosXRuntimeError::Custom`] when the forwarder code does not
+/// decode, and with the error of the keyspace write when that write fails.
 pub fn init_alias_implementation(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
 ) -> Result<(), TezosXRuntimeError> {
     use tezos_execution::account_storage::{
         read_alias_implementation, write_alias_implementation,
     };
-    let seeded = read_alias_implementation(host)?;
-    if seeded.is_none() {
+    let current = read_alias_implementation(tez_accounts);
+    if current.is_none() {
         let code = forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "decoding forwarder code from hex failed: {e}"
             ))
         })?;
-        write_alias_implementation(host, &code)?;
+        write_alias_implementation(tez_accounts, &code)?;
     }
     Ok(())
 }
@@ -142,34 +141,38 @@ mod tests {
     #[test]
     fn alias_implementation_seed_and_roundtrip() {
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_execution::account_storage::{
             read_alias_implementation, write_alias_implementation,
         };
 
         let mut host = MockKernelHost::default();
-
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Absent before seeding.
-        assert!(read_alias_implementation(&host).unwrap().is_none());
+        assert!(read_alias_implementation(rk.tez_accounts()).is_none());
 
         // Seeding installs the canonical forwarder code.
-        init_alias_implementation(&mut host).unwrap();
+        init_alias_implementation(rk.tez_accounts_mut()).unwrap();
         let forwarder = forwarder_code().unwrap();
         assert_eq!(
-            read_alias_implementation(&host).unwrap(),
+            read_alias_implementation(rk.tez_accounts()),
             Some(forwarder.clone())
         );
 
         // Seeding again is a no-op: an already-populated slot is untouched.
-        write_alias_implementation(&mut host, b"already here").unwrap();
-        init_alias_implementation(&mut host).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), b"already here").unwrap();
+        init_alias_implementation(rk.tez_accounts_mut()).unwrap();
         assert_eq!(
-            read_alias_implementation(&host).unwrap(),
+            read_alias_implementation(rk.tez_accounts()),
             Some(b"already here".to_vec())
         );
 
         // An explicit write overwrites: the O(1) upgrade primitive.
-        write_alias_implementation(&mut host, &forwarder).unwrap();
-        assert_eq!(read_alias_implementation(&host).unwrap(), Some(forwarder));
+        write_alias_implementation(rk.tez_accounts_mut(), &forwarder).unwrap();
+        assert_eq!(
+            read_alias_implementation(rk.tez_accounts()),
+            Some(forwarder)
+        );
     }
 
     /// End-to-end check that the entrypoints RPC (`get_contract_entrypoint`),
@@ -184,25 +187,27 @@ mod tests {
         use mir::gas::Gas;
         use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_execution::account_storage::write_alias_implementation;
         use tezos_execution::context::originated_from_kt1;
         use tezos_execution::get_contract_entrypoint;
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
         let mut host = MockKernelHost::default();
-        // Aliases resolve under the production Michelson accounts path
-        // `/tez/tez_accounts`, so this pins the real composition rather than a
-        // mixed layout that never ships.
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        // `RuntimeKeyspaces::init` loads the accounts keyspace at
+        // `/tez/tez_accounts`, so aliases resolve under the real layout.
 
         // Seed the shared slot with the real forwarder code.
-        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &forwarder_code().unwrap())
+            .unwrap();
 
         // A code-less KT1 classified as an alias (no /data/code written).
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(b"alias-entrypoint-test"));
         originated_from_kt1(&kt1)
             .unwrap()
             .set_origin(
-                &mut host,
+                rk.tez_accounts_mut(),
                 &Origin::Alias(AliasInfo {
                     runtime: RuntimeId::Ethereum,
                     native_address: "0xabc".to_string(),
@@ -211,9 +216,12 @@ mod tests {
             .unwrap();
 
         // The entrypoints RPC resolves through code() to the shared forwarder.
-        let entrypoints =
-            get_contract_entrypoint(&host, &AddressHash::Kt1(kt1), &mut Gas::default())
-                .expect("alias entrypoints resolve to the shared forwarder");
+        let entrypoints = get_contract_entrypoint(
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1),
+            &mut Gas::default(),
+        )
+        .expect("alias entrypoints resolve to the shared forwarder");
         assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
     }
 
@@ -226,13 +234,16 @@ mod tests {
     fn upgrade_real_forwarder_to_superset_is_accepted() {
         use mir::gas::Gas;
         use tezos_evm_runtime::runtime::MockKernelHost;
+        use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
         use tezos_execution::account_storage::{
             read_alias_implementation, write_alias_implementation,
         };
         use tezos_execution::upgrade_alias_implementation;
 
         let mut host = MockKernelHost::default();
-        write_alias_implementation(&mut host, &forwarder_code().unwrap()).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &forwarder_code().unwrap())
+            .unwrap();
 
         // Keep `default : unit` (annotated `%default`) and `storage string`,
         // add a `foo` entrypoint.
@@ -246,8 +257,12 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        upgrade_alias_implementation(&mut host, &superset, &mut Gas::default())
-            .expect("a superset of the real forwarder must be accepted");
-        assert_eq!(read_alias_implementation(&host).unwrap(), Some(superset));
+        upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &superset,
+            &mut Gas::default(),
+        )
+        .expect("a superset of the real forwarder must be accepted");
+        assert_eq!(read_alias_implementation(rk.tez_accounts()), Some(superset));
     }
 }

@@ -47,7 +47,7 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_storage::error::Error as StorageError;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
@@ -298,20 +298,19 @@ fn finalize_statuses<M: OperationKind>(
 /// balance_updates survive. Host-side debits applied by `burn_tez`
 /// are rolled back out-of-band by the caller's `SafeStorage`
 /// transaction.
-fn burn_pass<Host, M, A>(
-    host: &mut Host,
+fn burn_pass<M, A>(
+    tez_accounts: &mut impl KeySpace,
     payer: &A,
     storage_limit_remaining: &mut BigUint,
     content: &mut ContentResult<M>,
     internal_operation_results: Vec<TaggedInternalOp>,
 ) -> (Vec<InternalOperationSum>, Result<(), ApplyOperationError>)
 where
-    Host: StorageV1,
     M: storage_fees::OperationStorageFees,
     A: TezosAccount,
 {
     let parent_outcome = storage_fees::burn_content_storage_fees::<_, M>(
-        host,
+        tez_accounts,
         payer,
         storage_limit_remaining,
         content,
@@ -330,7 +329,7 @@ where
                         delegated_storage_cost,
                     } => {
                         storage_fees::burn_internal_op_storage_fees(
-                            host,
+                            tez_accounts,
                             payer,
                             storage_limit_remaining,
                             &mut op,
@@ -361,8 +360,8 @@ where
 /// internal) to `BackTracked`, with the burn errors attached to
 /// the parent.
 #[allow(clippy::too_many_arguments)]
-fn finalize_and_burn<Host, M, A>(
-    host: &mut Host,
+fn finalize_and_burn<M, A>(
+    tez_accounts: &mut impl KeySpace,
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
@@ -373,7 +372,6 @@ fn finalize_and_burn<Host, M, A>(
     internals: SubtreeStatus,
 ) -> OperationResult<M>
 where
-    Host: StorageV1,
     M: storage_fees::OperationStorageFees,
     A: TezosAccount,
 {
@@ -381,7 +379,7 @@ where
         finalize_statuses::<M>(result, &mut internal_operation_results, internals);
     let mut storage_limit_remaining: BigUint = storage_limit.0.clone();
     let (mut internals, burn_outcome) = burn_pass(
-        host,
+        tez_accounts,
         payer,
         &mut storage_limit_remaining,
         &mut content,
@@ -389,7 +387,7 @@ where
     );
     let burn_outcome = burn_outcome.and_then(|()| {
         storage_fees::burn_storage_cost(
-            host,
+            tez_accounts,
             payer,
             &mut storage_limit_remaining,
             delegated_storage_cost,
@@ -526,20 +524,17 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
     }
 }
 
-fn transfer_tez<Host>(
-    host: &mut Host,
+fn transfer_tez(
+    tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     amount: &Narith,
     receiver_account: &impl TezosAccount,
-) -> Result<TransferSuccess, TransferError>
-where
-    Host: StorageV1,
-{
+) -> Result<TransferSuccess, TransferError> {
     let balance_updates =
         compute_balance_updates(giver_account, receiver_account, amount)
             .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
 
-    apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
+    apply_balance_changes(tez_accounts, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -561,7 +556,7 @@ where
 /// Assumption: this path is enabled from a foreign calling runtime,
 /// and the sender was already debited in that runtime.
 fn credit_destination_without_debiting_sender(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     amount: &Narith,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
@@ -580,12 +575,12 @@ fn credit_destination_without_debiting_sender(
         });
     }
     let receiver_balance = receiver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
     let new_receiver_balance = (&receiver_balance + &amount.0).into();
     receiver_account
-        .set_balance(host, &new_receiver_balance)
+        .set_balance(tez_accounts, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
     let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
     Ok(TransferSuccess {
@@ -612,12 +607,12 @@ fn credit_destination_without_debiting_sender(
 }
 
 fn burn_tez(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
     let balance = account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_balance = match balance.0.checked_sub(amount) {
         None => {
@@ -630,7 +625,7 @@ fn burn_tez(
         Some(new_balance) => new_balance.into(),
     };
     account
-        .set_balance(host, &new_balance)
+        .set_balance(tez_accounts, &new_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     Ok(new_balance)
 }
@@ -1518,12 +1513,17 @@ where
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.rk.host_mut(),
+                    tc_ctx.rk.tez_accounts_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
+                transfer_tez(
+                    tc_ctx.rk.tez_accounts_mut(),
+                    sender_account,
+                    amount,
+                    &dest_account,
+                )?
             };
             Ok(TransferStep {
                 success: TransferSuccess {
@@ -1543,15 +1543,10 @@ where
         Contract::Originated(kt1) => {
             let dest_account = context::originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            // Reject transfers to a never-originated KT1 before any state
-            // write. Without this check, `transfer_tez` would create a
-            // balance entry under the bogus contract path and the failure
-            // would only surface at `code()` as RuntimeError::PathNotFound,
-            // wrapped as FailedToFetchContractCode → CracError::BlockAbort
-            // — a user-controllable block-abort handle. Mirrors Tezos's
-            // `Contract.Non_existing_contract`.
+            // Reject a transfer to a never-originated KT1 before any write, as
+            // Tezos does. Otherwise the NotFound error of `code()` aborts the block.
             if !dest_account
-                .exists(tc_ctx.rk.host())
+                .exists(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
             {
                 return Err(TransferError::ContractDoesNotExist(Contract::Originated(
@@ -1561,15 +1556,20 @@ where
             }
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
-                    tc_ctx.rk.host_mut(),
+                    tc_ctx.rk.tez_accounts_mut(),
                     amount,
                     &dest_account,
                 )?
             } else {
-                transfer_tez(tc_ctx.rk.host_mut(), sender_account, amount, &dest_account)?
+                transfer_tez(
+                    tc_ctx.rk.tez_accounts_mut(),
+                    sender_account,
+                    amount,
+                    &dest_account,
+                )?
             };
             let code = dest_account
-                .code(tc_ctx.rk.host())
+                .code(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let (code_read_count, code_size) = match &code {
                 Code::Code(code_bytes) => (1, code_bytes.len() as u64),
@@ -1582,12 +1582,12 @@ where
             )
             .map_err(TransferError::OutOfGas)?;
             let storage = dest_account
-                .storage(tc_ctx.rk.host())
+                .storage(tc_ctx.rk.tez_accounts())
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
                 .map_err(TransferError::OutOfGas)?;
             let exec_ctx = ExecCtx::create(
-                tc_ctx.rk.host_mut(),
+                tc_ctx.rk.tez_accounts_mut(),
                 sender_account,
                 &dest_account,
                 amount,
@@ -1665,7 +1665,7 @@ where
                     )
                 } else {
                     let (prev_info, info_bytes_read) = dest_account
-                        .read_info_with_len(tc_ctx.rk.host())
+                        .read_info_with_len(tc_ctx.rk.tez_accounts())
                         .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
                     let (new_info, space) = prev_info.with_storage_size(
                         new_storage.len() as u64,
@@ -1714,7 +1714,11 @@ where
             // their gas has been charged (no-op for enshrined contracts).
             if let Some(info) = &info_to_write {
                 dest_account
-                    .write_storage_and_info(tc_ctx.rk.host_mut(), &new_storage, info)
+                    .write_storage_and_info(
+                        tc_ctx.rk.tez_accounts_mut(),
+                        &new_storage,
+                        info,
+                    )
                     .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             }
             let StorageSpace {
@@ -1785,13 +1789,13 @@ fn get_originated_contract_entrypoint(
 }
 
 pub fn get_contract_entrypoint(
-    host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     address: &AddressHash,
     gas: &mut Gas,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+    let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(code) => get_originated_contract_entrypoint(code, gas),
         Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
@@ -1827,13 +1831,13 @@ impl From<StorageError> for AliasUpgradeError {
 }
 
 /// Atomically upgrade the single shared Michelson alias implementation (see
-/// [`account_storage::ALIAS_IMPLEMENTATION_PATH`]). A single durable-storage
+/// [`account_storage::write_alias_implementation`]). A single durable-storage
 /// write here changes the behaviour of **every** existing and future alias at
 /// once — O(1) in the number of aliases.
 ///
 /// `new_code` must be a typeable Michelson script. To protect downstream
-/// callers, the upgrade enforces two invariants against the currently-installed
-/// implementation:
+/// callers, the upgrade enforces two invariants against the current
+/// implementation, when the host holds one that it can read:
 ///
 /// - **Entrypoint monotonicity:** every entrypoint exposed today must still be
 ///   present, with the same type, in `new_code` (new entrypoints may be added).
@@ -1841,6 +1845,9 @@ impl From<StorageError> for AliasUpgradeError {
 /// - **Storage-type invariance:** the storage type must not change. Each alias
 ///   keeps its own `/data/storage` typed against the shared code, so a
 ///   storage-type change would brick every alias at its next execution.
+///
+/// An absent or unreadable implementation leaves nothing to compare, so the
+/// upgrade writes `new_code` without these two checks.
 ///
 /// Note on widening the parameter while keeping the implicit `default`
 /// entrypoint: in Michelson the `default` entrypoint's type is the *whole* root
@@ -1856,8 +1863,8 @@ impl From<StorageError> for AliasUpgradeError {
 // governance decision reaches the kernel is out of scope for L2-1528. When a
 // metered caller is wired, revisit gas accounting and distinguishing
 // out-of-gas from a genuinely invalid script.
-pub fn upgrade_alias_implementation<Host: StorageV1>(
-    host: &mut Host,
+pub fn upgrade_alias_implementation(
+    tez_accounts: &mut impl KeySpace,
     new_code: &[u8],
     gas: &mut Gas,
 ) -> Result<(), AliasUpgradeError> {
@@ -1866,8 +1873,9 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
         .ok_or(AliasUpgradeError::InvalidScript)?;
 
     // Check invariants against the currently-installed implementation. An
-    // absent slot (not seeded yet) means there is nothing to preserve.
-    if let Some(current_code) = account_storage::read_alias_implementation(host)? {
+    // absent implementation (not set up yet, or unreadable) means there is
+    // nothing to preserve.
+    if let Some(current_code) = account_storage::read_alias_implementation(tez_accounts) {
         // The current implementation is already installed and trusted; typecheck
         // it with a fresh budget (it is small and known-good) so `new_code`'s
         // gas consumption cannot starve this check and misreport it as corrupt.
@@ -1897,7 +1905,7 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
     }
 
     // One write upgrades every alias.
-    account_storage::write_alias_implementation(host, new_code)?;
+    account_storage::write_alias_implementation(tez_accounts, new_code)?;
     Ok(())
 }
 
@@ -1911,12 +1919,12 @@ pub fn upgrade_alias_implementation<Host: StorageV1>(
 /// [`crate::mir_ctx::enshrined_synthetic_views`] for the source of
 /// truth.
 pub fn get_enshrined_contract_views(
-    host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     address: &AddressHash,
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+    let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(_) => None,
         Code::Enshrined(contract) => {
@@ -2089,7 +2097,7 @@ where
     let balance = match params.balance {
         Some(balance) => balance,
         None => account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .map_err(host_err)?
             .0
             .try_into()
@@ -2665,7 +2673,7 @@ where
         allocated_bytes: paid_storage_size_diff,
     } = smart_contract
         .init(
-            ctx.rk.host_mut(),
+            ctx.rk.tez_accounts_mut(),
             script_code,
             &new_storage,
             lazy_storage_size_diff,
@@ -2700,7 +2708,7 @@ where
 
     // Apply the initial-balance transfer (sender → smart_contract).
     apply_balance_changes(
-        ctx.rk.host_mut(),
+        ctx.rk.tez_accounts_mut(),
         sender_account,
         &smart_contract,
         &initial_balance.0,
@@ -2714,7 +2722,7 @@ where
     // writer of the origin path for a freshly created KT1, so write it
     // unconditionally.
     smart_contract
-        .set_origin(ctx.rk.host_mut(), origin)
+        .set_origin(ctx.rk.tez_accounts_mut(), origin)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     let origination_success = OriginationSuccess {
@@ -2757,17 +2765,14 @@ fn compute_balance_updates(
 }
 
 /// Applies balance changes by updating both source and destination accounts.
-fn apply_balance_changes<Host>(
-    host: &mut Host,
+fn apply_balance_changes(
+    tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     receiver_account: &impl TezosAccount,
     amount: &num_bigint::BigUint,
-) -> Result<(), TransferError>
-where
-    Host: StorageV1,
-{
+) -> Result<(), TransferError> {
     let giver_balance = giver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
@@ -2780,15 +2785,15 @@ where
         Some(new_source_balance) => new_source_balance.into(),
     };
     giver_account
-        .set_balance(host, &new_giver_balance)
+        .set_balance(tez_accounts, &new_giver_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     let receiver_balance = receiver_account
-        .balance(host)
+        .balance(tez_accounts)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
     let new_receiver_balance = (&receiver_balance + amount).into();
     receiver_account
-        .set_balance(host, &new_receiver_balance)
+        .set_balance(tez_accounts, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
 
     log!(Debug,
@@ -2963,7 +2968,7 @@ where
     let validation = {
         let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
         validate::execute_validation(
-            &mut rk,
+            rk.tez_accounts_mut(),
             operation,
             skip_signature_check,
             required_fees,
@@ -3053,12 +3058,11 @@ where
             .restore_origination_index(origination_index_before);
     }
 
-    // The refund is written once the operation's mirror is promoted or
-    // reverted, on the host under it: it survives a failed operation, and
-    // stays covered by whatever rollback that host is itself under.
+    // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
+    // keeps the refund. A rollback of the storage under `rk` drops the refund too.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
-        apply_fee_refund(&mut *safe_host.host, &mut processed_ops, fee_refund)
+        apply_fee_refund(rk.tez_accounts_mut(), &mut processed_ops, fee_refund)
             .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
 
@@ -3068,14 +3072,11 @@ where
 /// Credit the source with a fee refund and record balance updates in the receipt.
 ///
 /// Returns Ok(()) with no effect when `fee_refund == 0`.
-fn apply_fee_refund<Host>(
-    host: &mut Host,
+fn apply_fee_refund(
+    tez_accounts: &mut impl KeySpace,
     processed_operations: &mut [ProcessedOperation],
     fee_refund: u64,
-) -> Result<(), anyhow::Error>
-where
-    Host: StorageV1,
-{
+) -> Result<(), anyhow::Error> {
     if fee_refund == 0 {
         return Ok(());
     }
@@ -3093,7 +3094,7 @@ where
 
     // Credit source account with the refund.
     let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
-    source_account.add_balance(host, fee_refund)?;
+    source_account.add_balance(tez_accounts, fee_refund)?;
 
     log!(
         Debug,
@@ -3240,8 +3241,8 @@ where
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             log_on_operation_failure("Reveal", &reveal_result);
-            OperationResultSum::Reveal(finalize_and_burn::<_, RevealContent, _>(
-                tc_ctx.rk.host_mut(),
+            OperationResultSum::Reveal(finalize_and_burn::<RevealContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -3302,8 +3303,8 @@ where
                     Err(e)
                 }
             };
-            OperationResultSum::Transfer(finalize_and_burn::<_, TransferContent, _>(
-                tc_ctx.rk.host_mut(),
+            OperationResultSum::Transfer(finalize_and_burn::<TransferContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
                 source_account,
                 storage_limit,
                 balance_updates,
@@ -3341,20 +3342,18 @@ where
                 Err(err) => Err(err),
             };
             log_on_operation_failure("Origination", &origination_result);
-            OperationResultSum::Origination(
-                finalize_and_burn::<_, OriginationContent, _>(
-                    tc_ctx.rk.host_mut(),
-                    source_account,
-                    storage_limit,
-                    balance_updates,
-                    0,
-                    0,
-                    origination_result.map_err(|e| e.into()),
-                    internal_operations_receipts,
-                    // An origination emits no internal operation.
-                    SubtreeStatus::AllApplied,
-                ),
-            )
+            OperationResultSum::Origination(finalize_and_burn::<OriginationContent, _>(
+                tc_ctx.rk.tez_accounts_mut(),
+                source_account,
+                storage_limit,
+                balance_updates,
+                0,
+                0,
+                origination_result.map_err(|e| e.into()),
+                internal_operations_receipts,
+                // An origination emits no internal operation.
+                SubtreeStatus::AllApplied,
+            ))
         }
     };
 
@@ -3838,7 +3837,7 @@ mod tests {
     #[test]
     fn alias_entrypoints_resolve_via_shared_implementation() {
         use crate::account_storage::write_alias_implementation;
-        use crate::context::code::origin_path;
+        use crate::context::code::origin_key;
         use crate::get_contract_entrypoint;
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
@@ -3854,7 +3853,7 @@ mod tests {
             .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
-        write_alias_implementation(rk.host_mut(), &code).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &code).unwrap();
 
         // A code-less KT1 classified as an alias.
         let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
@@ -3865,12 +3864,12 @@ mod tests {
         });
         let mut buf = vec![];
         origin.bin_write(&mut buf).unwrap();
-        rk.host_mut()
-            .store_write_all(&origin_path(&account).unwrap(), &buf)
+        rk.tez_accounts_mut()
+            .set(&origin_key(&account).unwrap(), &buf)
             .unwrap();
 
         let entrypoints = get_contract_entrypoint(
-            rk.host(),
+            rk.tez_accounts(),
             &AddressHash::Kt1(kt1),
             &mut Gas::default(),
         )
@@ -3903,16 +3902,20 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let superset = encode_script(UPGRADE_SUPERSET_SCRIPT);
-        upgrade_alias_implementation(rk.host_mut(), &superset, &mut Gas::default())
-            .expect("adding an entrypoint while keeping `default` must be accepted");
+        upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &superset,
+            &mut Gas::default(),
+        )
+        .expect("adding an entrypoint while keeping `default` must be accepted");
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(superset)
         );
     }
@@ -3923,20 +3926,23 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Start from the superset (default + foo)...
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
 
         // ...then try to drop `foo` by going back to the bare default script.
         let dropped = encode_script(UPGRADE_BASE_SCRIPT);
-        let err =
-            upgrade_alias_implementation(rk.host_mut(), &dropped, &mut Gas::default())
-                .expect_err("dropping an exposed entrypoint must be rejected");
+        let err = upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &dropped,
+            &mut Gas::default(),
+        )
+        .expect_err("dropping an exposed entrypoint must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointRemoved(_)));
         // The slot is left untouched.
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(encode_script(UPGRADE_SUPERSET_SCRIPT))
         );
     }
@@ -3946,7 +3952,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -3955,9 +3961,12 @@ mod tests {
         let retyped = encode_script(
             "parameter string; storage unit; code { CDR; NIL operation; PAIR }",
         );
-        let err =
-            upgrade_alias_implementation(rk.host_mut(), &retyped, &mut Gas::default())
-                .expect_err("changing an entrypoint's type must be rejected");
+        let err = upgrade_alias_implementation(
+            rk.tez_accounts_mut(),
+            &retyped,
+            &mut Gas::default(),
+        )
+        .expect_err("changing an entrypoint's type must be rejected");
         assert!(matches!(err, AliasUpgradeError::EntrypointTypeChanged(_)));
     }
 
@@ -3967,7 +3976,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Base storage is `string` (like the forwarder).
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_SUPERSET_SCRIPT),
         )
         .unwrap();
@@ -3979,7 +3988,7 @@ mod tests {
              NIL operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &retyped_storage,
             &mut Gas::default(),
         )
@@ -3997,7 +4006,7 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
@@ -4007,7 +4016,7 @@ mod tests {
              operation; PAIR }",
         );
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &widened_no_default,
             &mut Gas::default(),
         )
@@ -4020,13 +4029,13 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
         )
         .unwrap();
 
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             b"not a michelson script",
             &mut Gas::default(),
         )
@@ -4034,7 +4043,7 @@ mod tests {
         assert!(matches!(err, AliasUpgradeError::InvalidScript));
         // The core safety property: the slot is left untouched on rejection.
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(encode_script(UPGRADE_BASE_SCRIPT))
         );
     }
@@ -4044,10 +4053,11 @@ mod tests {
         // A non-typeable slot means the current implementation is corrupt.
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        account_storage::write_alias_implementation(rk.host_mut(), b"garbage").unwrap();
+        account_storage::write_alias_implementation(rk.tez_accounts_mut(), b"garbage")
+            .unwrap();
 
         let err = upgrade_alias_implementation(
-            rk.host_mut(),
+            rk.tez_accounts_mut(),
             &encode_script(UPGRADE_BASE_SCRIPT),
             &mut Gas::default(),
         )
@@ -4064,10 +4074,10 @@ mod tests {
         let mut host = test_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let code = encode_script(UPGRADE_BASE_SCRIPT);
-        upgrade_alias_implementation(rk.host_mut(), &code, &mut Gas::default())
+        upgrade_alias_implementation(rk.tez_accounts_mut(), &code, &mut Gas::default())
             .expect("seeding an empty slot has no monotonicity constraint");
         assert_eq!(
-            account_storage::read_alias_implementation(rk.host()).unwrap(),
+            account_storage::read_alias_implementation(rk.tez_accounts()),
             Some(code)
         );
     }
@@ -4279,10 +4289,8 @@ mod tests {
             .expect("Account allocation should have succeed");
 
         // Setting the balance to pass the validity check
-        let mut info = account_storage::get_tezos_account_info_or_init(tez_accounts, src)
-            .expect("Account info read should have succeed");
-        info.balance = amount.into();
-        account_storage::set_tezos_account_info(tez_accounts, src, info)
+        account
+            .set_balance(tez_accounts, &amount.into())
             .expect("Set balance should have succeed");
 
         account
@@ -4315,7 +4323,7 @@ mod tests {
 
         account
             .init(
-                rk.host_mut(),
+                rk.tez_accounts_mut(),
                 Some(
                     &script_micheline
                         .encode(&mut Gas::default())
@@ -4331,7 +4339,7 @@ mod tests {
             .expect("Account initialisation should have succeeded");
 
         account
-            .set_balance(rk.host_mut(), balance)
+            .set_balance(rk.tez_accounts_mut(), balance)
             .expect("Set balance should have succeeded");
 
         account
@@ -4738,7 +4746,7 @@ mod tests {
 
         // The victim's fee must not be charged and its counter must not move.
         assert_eq!(
-            account.balance(rk.host()).unwrap(),
+            account.balance(rk.tez_accounts()).unwrap(),
             50_u64.into(),
             "Victim balance must not be debited"
         );
@@ -4899,9 +4907,12 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source only paid the fees and the destination balance is unchanged
-        assert_eq!(source_account.balance(rk.host()).unwrap(), 35.into());
         assert_eq!(
-            destination_account.balance(rk.host()).unwrap(),
+            source_account.balance(rk.tez_accounts()).unwrap(),
+            35.into()
+        );
+        assert_eq!(
+            destination_account.balance(rk.tez_accounts()).unwrap(),
             50_u64.into()
         );
 
@@ -5001,8 +5012,11 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            80_u64.into()
+        );
 
         // Verify that the source's counter has been incremented
         assert_eq!(
@@ -5098,7 +5112,7 @@ mod tests {
         }];
 
         // Verify that balance was only debited for fees
-        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
 
@@ -5265,11 +5279,11 @@ mod tests {
             }
         );
         assert_eq!(
-            faucet.balance(rk.host()).unwrap(),
+            faucet.balance(rk.tez_accounts()).unwrap(),
             (faucet_balance - requested_amount).into()
         );
         assert_eq!(
-            requester.balance(rk.host()).unwrap(),
+            requester.balance(rk.tez_accounts()).unwrap(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
 
@@ -5353,16 +5367,18 @@ mod tests {
         // never-originated KT1 must remain absent from durable storage.
         let dest_account = context::originated_from_kt1(&desthash)
             .expect("originated_from_kt1 should have succeeded");
-        let balance_path = context::contracts::balance_path(&dest_account)
-            .expect("balance_path should have succeeded");
-        assert_eq!(
-            rk.host_mut().store_has(&balance_path).unwrap(),
-            None,
+        let balance_key = context::contracts::balance_key(&dest_account)
+            .expect("balance_key should have succeeded");
+        assert!(
+            !rk.tez_accounts().contains(&balance_key),
             "no balance entry should exist for a never-originated KT1"
         );
 
         // Source paid the manager fee but not the transfer amount.
-        assert_eq!(requester.balance(rk.host()).unwrap(), (50_u64 - 15).into());
+        assert_eq!(
+            requester.balance(rk.tez_accounts()).unwrap(),
+            (50_u64 - 15).into()
+        );
         assert_eq!(
             requester.counter(rk.tez_accounts()).unwrap(),
             1.into(),
@@ -5488,8 +5504,11 @@ mod tests {
 
         // Verify that source and destination balances changed:
         // 54 - 15 fee - 30 transfer - 4 burn (4 × COST_PER_BYTES) = 5.
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 80_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            80_u64.into()
+        );
 
         assert_eq!(receipt, expected_receipt);
 
@@ -5500,7 +5519,7 @@ mod tests {
         );
 
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            destination.storage(rk.tez_accounts()).unwrap(),
             storage_value,
             "Storage has not been updated"
         )
@@ -5565,11 +5584,17 @@ mod tests {
         // is `code_size + |encoded("Hello world")|`. Read `code_size`
         // from durable storage — the invariant under test is exactly
         // `used == code_size + storage_size`.
-        let code_size = destination.code_size(rk.host()).unwrap();
+        let code_size = destination.code_size(rk.tez_accounts()).unwrap();
         let expected_used = Zarith(code_size.0 + new_storage_size);
 
-        assert_eq!(destination.used_bytes(rk.host()).unwrap(), expected_used);
-        assert_eq!(destination.paid_bytes(rk.host()).unwrap(), expected_used);
+        assert_eq!(
+            destination.used_bytes(rk.tez_accounts()).unwrap(),
+            expected_used
+        );
+        assert_eq!(
+            destination.paid_bytes(rk.tez_accounts()).unwrap(),
+            expected_used
+        );
     }
 
     #[test]
@@ -5687,9 +5712,12 @@ mod tests {
 
         // SafeStorage rollback: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
-        assert_eq!(source.balance(rk.host()).unwrap(), (48_u64 - 15).into());
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap(),
+            (48_u64 - 15).into()
+        );
+        assert_eq!(
+            destination.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -5802,9 +5830,12 @@ mod tests {
 
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
-        assert_eq!(dest_account.balance(rk.host()).unwrap(), 30_u64.into());
+        assert_eq!(
+            dest_account.balance(rk.tez_accounts()).unwrap(),
+            30_u64.into()
+        );
         // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
-        assert_eq!(source.balance(rk.host()).unwrap(), 5_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
     }
 
     #[test]
@@ -5908,7 +5939,10 @@ mod tests {
 
         // SafeStorage rolled back the allocation: the destination
         // account is gone again, and the source paid only the fee.
-        assert_eq!(source.balance(rk.host()).unwrap(), (50_u64 - 15).into());
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap(),
+            (50_u64 - 15).into()
+        );
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert!(
@@ -5999,8 +6033,11 @@ mod tests {
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
-        assert_eq!(source.balance(rk.host()).unwrap(), 35_u64.into());
-        assert_eq!(destination.balance(rk.host()).unwrap(), 50_u64.into());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap(),
+            50_u64.into()
+        );
 
         assert_eq!(receipt, expected_receipt);
 
@@ -6011,7 +6048,7 @@ mod tests {
         );
 
         assert_eq!(
-            destination.storage(rk.host()).unwrap(),
+            destination.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -6188,7 +6225,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
 
         // op‑2: transfer 10ꜩ to dest
         let transfer_content_1 = OperationContent::Transfer(TransferContent {
@@ -6351,12 +6388,12 @@ mod tests {
         // counter updated, balances moved
         // initial_balance: 50 tez, fee amount: (3*5)tez, transfer amount: (10 + 20)tez
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             5u64.into(),
             "Source account should have 5ꜩ left after fees and transfers."
         );
         assert_eq!(
-            dest_acc.balance(rk.host()).unwrap(),
+            dest_acc.balance(rk.tez_accounts()).unwrap(),
             80u64.into(),
             "Destination account should have 80ꜩ after transfers."
         );
@@ -6422,7 +6459,7 @@ mod tests {
         assert_eq!(
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
-                .balance(rk.host())
+                .balance(rk.tez_accounts())
                 .unwrap(),
             50u64.into()
         );
@@ -6562,7 +6599,7 @@ mod tests {
 
         // Storage must have reverted
         assert!(
-            succ_account.storage(rk.host()).unwrap()
+            succ_account.storage(rk.tez_accounts()).unwrap()
                 == Micheline::from("initial")
                     .encode(&mut Gas::default())
                     .unwrap()
@@ -6578,7 +6615,7 @@ mod tests {
         // Initial balance: 1050 tez, paid in fees: (3*10) tez,
         // transfer + storage burn reverted via SafeStorage.
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             1020.into(),
             "Fees should have been paid for failed operation"
         );
@@ -6598,7 +6635,7 @@ mod tests {
 
         // Retrieve initial balance for the end of the test
         let initial_balance = src_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance");
 
         let fee = 15u64;
@@ -6728,7 +6765,7 @@ mod tests {
 
         // Balance of the source
         let current_balance = src_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance for the source");
 
         let expected_balance = initial_balance
@@ -6753,7 +6790,7 @@ mod tests {
 
         // Balance of the smart contract
         let current_kt1_balance = smart_contract_account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Should have found a balance for the smart contract");
 
         assert_eq!(
@@ -6764,7 +6801,7 @@ mod tests {
 
         // Verify code and storage
         let smart_contract_code = smart_contract_account
-            .code(rk.host())
+            .code(rk.tez_accounts())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_code,
@@ -6772,7 +6809,7 @@ mod tests {
             "Current code for smart contract is not the same as the one originated"
         );
         let smart_contract_storage = smart_contract_account
-            .storage(rk.host())
+            .storage(rk.tez_accounts())
             .expect("Should have found a code for the KT1");
         assert_eq!(
             smart_contract_storage, storage,
@@ -6923,7 +6960,7 @@ mod tests {
         // The state effect the `Applied` status used to commit: the callee's
         // storage write is rolled back with the rest of the operation.
         assert_eq!(
-            raising_account.storage(rk.host()).unwrap(),
+            raising_account.storage(rk.tez_accounts()).unwrap(),
             initial_storage
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8266,7 +8303,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             Micheline::from(i128::from(transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8341,7 +8378,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             Micheline::from(i128::from(initial_balance + transfer_amount))
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8418,7 +8455,7 @@ mod tests {
         );
 
         assert_eq!(
-            src_contract.storage(rk.host()).unwrap(),
+            src_contract.storage(rk.tez_accounts()).unwrap(),
             micheline_address
                 .encode(&mut Gas::default())
                 .unwrap()
@@ -8562,7 +8599,7 @@ mod tests {
         let src_account =
             context::implicit_from_public_key_hash(&src.pkh).expect("source account");
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             (funded - fee).into()
         );
 
@@ -8571,13 +8608,13 @@ mod tests {
         let originated_account = context::originated_from_kt1(&expected_kt1)
             .expect("originated account handle");
         assert!(
-            !originated_account.exists(rk.host()).unwrap(),
+            !originated_account.exists(rk.tez_accounts()).unwrap(),
             "originated contract must be rolled back"
         );
 
         // Initial-balance transfer rolled back too.
         assert_eq!(
-            originated_account.balance(rk.host()).unwrap(),
+            originated_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "originated contract balance must be 0 (initial transfer rolled back)"
         );
@@ -8765,17 +8802,17 @@ mod tests {
                  // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             expected_src_balance.into(),
             "Source balance should be correct"
         );
         assert_eq!(
-            init_contract_account.balance(rk.host()).unwrap(),
+            init_contract_account.balance(rk.tez_accounts()).unwrap(),
             expected_init_contract_balance.into(),
             "Init contract balance should be correct"
         );
         assert_eq!(
-            originated_account.balance(rk.host()).unwrap(),
+            originated_account.balance(rk.tez_accounts()).unwrap(),
             1000u64.into(),
             "Originated contract balance should be correct"
         );
@@ -8988,7 +9025,7 @@ mod tests {
         let originated_account = context::originated_from_kt1(&l1_canonical)
             .expect("originated account handle");
         assert!(
-            originated_account.exists(rk.host()).unwrap(),
+            originated_account.exists(rk.tez_accounts()).unwrap(),
             "Contract must be stored at the L1-canonical KT1"
         );
     }
@@ -9250,7 +9287,7 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.host()).unwrap());
+        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
 
         // op‑2 orgination: create a contract with 15ꜩ balance successfully
         let origination_content_1 = OperationContent::Origination(OriginationContent {
@@ -9562,7 +9599,7 @@ mod tests {
         );
         // Check the balances
         assert_eq!(
-            src_acc.balance(rk.host()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap(),
             399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
@@ -9582,7 +9619,7 @@ mod tests {
             ))
             .unwrap();
             assert!(
-                account.code(rk.host()).is_err(),
+                account.code(rk.tez_accounts()).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
             );
         }
@@ -10378,7 +10415,7 @@ mod tests {
         let receiver_contract = result.receiver;
 
         if let Some(expected_sender_big_map) = expected_sender_big_map {
-            let storage = sender_contract.storage(ctx.rk.host()).unwrap();
+            let storage = sender_contract.storage(ctx.rk.tez_accounts()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -10404,7 +10441,7 @@ mod tests {
         }
 
         if let Some(expected_receiver_big_map) = expected_receiver_big_map {
-            let storage = receiver_contract.storage(ctx.rk.host()).unwrap();
+            let storage = receiver_contract.storage(ctx.rk.tez_accounts()).unwrap();
             let mich_storage =
                 Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
                     .unwrap()
@@ -10698,7 +10735,7 @@ mod tests {
             .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for originator");
         let mich_storage_originator = Micheline::decode_raw(
             &parser.arena,
@@ -10732,7 +10769,7 @@ mod tests {
         println!("Originator OK");
 
         let storage_0 = created_acount_0
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #0");
         let mich_storage_0 =
             Micheline::decode_raw(&parser.arena, &storage_0, &mut Gas::default())
@@ -10763,7 +10800,7 @@ mod tests {
         println!("Created_0 OK");
 
         let storage_1 = created_acount_1
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #1");
         let mich_storage_1 =
             Micheline::decode_raw(&parser.arena, &storage_1, &mut Gas::default())
@@ -10794,7 +10831,7 @@ mod tests {
         println!("Created_1 OK");
 
         let storage_2 = created_acount_2
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Failed to fetch storage for created account #2");
         let mich_storage_2 =
             Micheline::decode_raw(&parser.arena, &storage_2, &mut Gas::default())
@@ -11094,7 +11131,7 @@ mod tests {
 
         // Checks that the storage of the receiver is true
         let storage = receiver
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -11165,7 +11202,7 @@ mod tests {
 
         // Checks that the storage of the receiver contract is 'False'
         let storage = receiver
-            .storage(ctx.rk.host())
+            .storage(ctx.rk.tez_accounts())
             .expect("Get storage should succeed");
         let storage = Micheline::decode_raw(&parser.arena, &storage, &mut Gas::default())
             .unwrap()
@@ -11278,7 +11315,7 @@ mod tests {
         // Verify that source balance decreased by fee (15) + transfer amount (50)
         // Initial: 100, Final: 100 - 15 - 50 = 35
         assert_eq!(
-            source_account.balance(rk.host()).unwrap(),
+            source_account.balance(rk.tez_accounts()).unwrap(),
             35_u64.into(),
             "Source balance should have decreased by fee + transfer amount"
         );
@@ -11291,7 +11328,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.host()).unwrap(),
+            gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after successful serve call"
         );
@@ -11391,12 +11428,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000 per op × 2 ops = 20_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             979_990_u64.into(),
             "Source balance should be 1_000_000 - 20_000 (fees) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.host()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -11448,12 +11485,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.host()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap(),
             989_990_u64.into(),
             "Source balance should be 1_000_000 - 10_000 (fee) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.host()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -12450,7 +12487,7 @@ mod tests {
         let gateway_account = context::originated_from_kt1(&gateway_kt1)
             .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.host()).unwrap(),
+            gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after forwarding"
         );
@@ -13355,12 +13392,12 @@ mod tests {
 
         // Verify final balances.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (initial_balance - fee + expected_refund - amount).into(),
             "Source balance should reflect fee, refund, and transfer"
         );
         assert_eq!(
-            ctx.destination.balance(ctx.rk.host()).unwrap(),
+            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
             (50 + amount).into(),
             "Destination balance should increase by transfer amount"
         );
@@ -13385,7 +13422,7 @@ mod tests {
 
         // Source balance = initial - fee - amount (no refund).
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (100 - fee - amount).into(),
         );
     }
@@ -13406,7 +13443,7 @@ mod tests {
 
         // Source balance = initial - fee - amount.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (2000 - fee - amount).into(),
         );
     }
@@ -13467,13 +13504,13 @@ mod tests {
 
         // Source paid fees but got refund; transfer was reverted so amount not deducted.
         assert_eq!(
-            ctx.source.balance(ctx.rk.host()).unwrap(),
+            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (initial_balance - fee + expected_refund).into(),
             "Source should pay fee minus refund, transfer amount reverted"
         );
         // Destination unchanged: transfer was reverted.
         assert_eq!(
-            ctx.destination.balance(ctx.rk.host()).unwrap(),
+            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
@@ -13554,7 +13591,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            account.storage(rk.host()).unwrap(),
+            account.storage(rk.tez_accounts()).unwrap(),
             first_storage,
             "contract storage must record the registered address index"
         );
@@ -14411,8 +14448,8 @@ mod tests {
                 ..Default::default()
             }));
         let mut storage_limit_remaining = num_bigint::BigUint::from(8_u64);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14475,8 +14512,8 @@ mod tests {
         // and internal 1 needs 257.
         let mut storage_limit_remaining =
             num_bigint::BigUint::from(2 * ORIGINATION_SIZE - 1);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14557,8 +14594,8 @@ mod tests {
         // the Own internal alone. A buggy burn that also charged the
         // Crac internal (7 bytes) would overshoot and return an error.
         let mut storage_limit_remaining = num_bigint::BigUint::from(4_u64);
-        let (internals, outcome) = burn_pass::<_, TransferContent, _>(
-            rk.host_mut(),
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
             &mut content,
@@ -14570,7 +14607,7 @@ mod tests {
         // pair, charging 4 × COST_PER_BYTES against the payer's balance.
         let own_burn = 4 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.host()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap(),
             (100_000 - own_burn).into()
         );
 

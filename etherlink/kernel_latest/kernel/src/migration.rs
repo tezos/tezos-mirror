@@ -479,7 +479,7 @@ where
             // The path and code are frozen here as literals rather than read
             // from the live constants: a migration can run long after it was
             // written, so it must keep writing these exact bytes even if the
-            // live `ALIAS_IMPLEMENTATION_PATH` / `forwarder_code()` change later
+            // live `ALIAS_IMPLEMENTATION_KEY` / `forwarder_code()` change later
             // (migration discipline).
             const ALIAS_IMPLEMENTATION_PATH: RefPath = RefPath::assert_from(
                 b"/tez/tez_accounts/tezosx/__system__/alias_implementation",

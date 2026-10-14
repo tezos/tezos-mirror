@@ -218,7 +218,7 @@ pub fn address_from_contract(contract: Contract) -> AddressHash {
 
 impl ExecCtx {
     pub fn create(
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         sender_account: &impl TezosAccount,
         dest_account: &TezosOriginatedAccount,
         amount: &Narith,
@@ -231,7 +231,7 @@ impl ExecCtx {
         )?;
         let self_address = address_from_contract(dest_account.contract());
         let balance = dest_account
-            .balance(host)
+            .balance(tez_accounts)
             .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
         let balance = balance.0.try_into().map_err(
             |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
@@ -261,7 +261,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         get_contract_entrypoint(
-            self.rk.host(),
+            self.rk.tez_accounts(),
             address,
             &mut self.operation_gas.remaining,
         )
@@ -474,14 +474,14 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // L1 VIEW semantics push `None` when the target KT1 does not
         // exist at all (cf. `script_interpreter.ml::iview`). Probe
         // existence explicitly here — if we skipped this and went
-        // straight to `account.code(host)`, a never-originated KT1
+        // straight to `account.code(tez_accounts)`, a never-originated KT1
         // would error out on the missing `code` path and we would
         // propagate that as a hard `HostError`, breaking parity with
         // L1 for any contract doing
         //   `VIEW addr "name"; IF_NONE { ... }`
         // against a possibly-missing KT1.
         if !account
-            .exists(self.tc_ctx.rk.host())
+            .exists(self.tc_ctx.rk.tez_accounts())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?
         {
             return Ok(None);
@@ -491,7 +491,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // I/O on a known contract and must surface as an error rather
         // than impersonate "view not found".
         let serialized_script = account
-            .code(self.tc_ctx.rk.host())
+            .code(self.tc_ctx.rk.tez_accounts())
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         match serialized_script {
             Code::Code(serialized_script) => {
@@ -515,10 +515,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     code: view.code.clone(),
                 };
                 let storage = account
-                    .storage(self.tc_ctx.rk.host())
+                    .storage(self.tc_ctx.rk.tez_accounts())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
                 let balance = account
-                    .balance(self.tc_ctx.rk.host())
+                    .balance(self.tc_ctx.rk.tez_accounts())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
                 let balance: i64 = balance
                     .0
@@ -1007,7 +1007,7 @@ impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasOr
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(self.tc_ctx.rk.host(), address)
+        crate::context::read_origin_for_address(self.tc_ctx.rk.tez_accounts(), address)
     }
 }
 
@@ -1049,7 +1049,7 @@ impl<'operation, 'host, Host: KeySpaceLoader + StorageV1> HasOriginLookup
         &self,
         address: &AddressHash,
     ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error> {
-        crate::context::read_origin_for_address(self.rk.host(), address)
+        crate::context::read_origin_for_address(self.rk.tez_accounts(), address)
     }
 }
 
@@ -3610,7 +3610,7 @@ pub(crate) mod mock {
             address: &AddressHash,
         ) -> Result<Option<tezosx_interfaces::Origin>, tezos_storage::error::Error>
         {
-            crate::context::read_origin_for_address(self.rk.host(), address)
+            crate::context::read_origin_for_address(self.rk.tez_accounts(), address)
         }
     }
 

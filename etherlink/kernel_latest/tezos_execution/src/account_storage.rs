@@ -22,17 +22,13 @@ use tezos_ethereum::rlp_helpers::{
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::{RuntimeError, ValueType},
+    host::RuntimeError,
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
-use tezos_storage::{
-    read_optional_nom_value, read_optional_nom_value_bounded,
-    read_optional_nom_value_bounded_with_len, read_optional_rlp, store_bin, store_rlp,
-};
+use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtRlp};
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError, ReadKind};
+use tezos_storage::error::StorageReadErrorKind;
+use tezos_storage::keyspace::KeySpaceExtBounded;
 use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
 // Key of the RLP info record, under `key_to_implicit_account_prefix`. The
@@ -46,8 +42,9 @@ const INFO_KEY: Key = Key::from_static(b"/info");
 /// the gas upper-bound convention (see `COUNTER_SIZE` in `lib.rs`).
 ///
 /// Used to read each field in a single `store_read` host call instead of
-/// the `store_value_size` + `store_read` pair that `store_read_all`
-/// performs. See [`read_optional_nom_value_bounded`].
+/// the `store_value_size` + `store_read` pair that
+/// [`KeySpaceExtBin::read_nom`] performs. See
+/// [`KeySpaceExtBounded::read_nom_bounded`].
 const NARITH_FIELD_MAX_BYTES: usize = 32;
 
 /// Upper bound, in bytes, on an encoded [`OriginatedContractInfo`]. The
@@ -55,10 +52,11 @@ const NARITH_FIELD_MAX_BYTES: usize = 32;
 /// `Narith` and `used_bytes`/`paid_bytes` as `Zarith`. Each field holds a
 /// byte count that fits in a `u64` in practice — bounded by the contract
 /// size and storage limits — so each encodes to at most ~10/11 bytes,
-/// roughly 42 bytes for the whole record. 64 leaves generous headroom and
-/// lets the record be read with a single bounded `store_read` host call
-/// instead of the `store_value_size` + `store_read` pair `store_read_all`
-/// performs. See [`read_optional_nom_value_bounded`].
+/// roughly 42 bytes for the whole record. 64 leaves generous headroom. One
+/// bounded `store_read` host call then reads the whole record, in place of
+/// the `store_value_size` + `store_read` pair that
+/// [`KeySpaceExtBin::read_nom`] performs. See
+/// [`KeySpaceExtBounded::read_nom_bounded_with_len`].
 const INFO_MAX_BYTES: usize = 64;
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -82,17 +80,17 @@ pub trait TezosAccount {
 
     /// Get the **balance** of an account in Mutez held by the account.
     /// Each account kind reads it from its own storage layout (RLP `/info`
-    /// for implicit accounts, the `/balance` path for originated ones), so
+    /// for implicit accounts, the `/balance` key for originated ones), so
     /// there is no shared default.
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error>;
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error>;
 
@@ -108,11 +106,11 @@ pub trait TezosAccount {
     /// read-modify-write on the RLP blob.
     fn add_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         amount: u64,
     ) -> Result<(), tezos_storage::error::Error> {
-        let current = self.balance(host)?;
-        self.set_balance(host, &Narith(current.0 + amount))
+        let current = self.balance(tez_accounts)?;
+        self.set_balance(tez_accounts, &Narith(current.0 + amount))
     }
 }
 
@@ -132,22 +130,23 @@ impl TezosAccount for TezosOriginatedAccount {
 
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = contracts::balance_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded(host, &path, NARITH_FIELD_MAX_BYTES)?
-                .unwrap_or(0_u64.into()),
-        )
+        let key = contracts::balance_key(self)?;
+        Ok(tez_accounts
+            .read_nom_bounded(&key, NARITH_FIELD_MAX_BYTES)?
+            .unwrap_or(0_u64.into()))
     }
 
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = contracts::balance_path(self)?;
-        store_bin(balance, host, &path)
+        let key = contracts::balance_key(self)?;
+        tez_accounts
+            .store_bin(&key, balance)
+            .map_err(tezos_storage::error::Error::from)
     }
 }
 #[derive(Debug, PartialEq)]
@@ -156,40 +155,34 @@ pub enum Code {
     Enshrined(EnshrinedContracts),
 }
 
-/// Durable-storage path of the single shared Michelson implementation that
-/// backs every Tezos X alias. An alias `KT1` carries no script of its own;
-/// when its `/data/code` is absent and it is classified [`Origin::Alias`], its
-/// code resolves to the bytes stored here (see [`TezosOriginatedAccount::code`]).
+/// Key, in the `/tez/tez_accounts` keyspace, of the single shared Michelson
+/// implementation that backs every Tezos X alias. An alias `KT1` carries no
+/// script of its own. When its `/data/code` is absent and its classification
+/// is [`Origin::Alias`], its code resolves to the bytes stored here (see
+/// [`TezosOriginatedAccount::code`]).
 ///
-/// The slot lives in a `__system__` subtree of the `tezosx/` account namespace
-/// (`__system__` is not a valid base58 account address, so it cannot collide
-/// with a per-account directory) and, being rooted under `/tez/tez_accounts`,
-/// is covered by the Michelson state-hash commitment `h(/tez/tez_accounts)`:
-/// replicas that disagree on the implementation diverge on the Michelson block
-/// `state_root`.
-pub(crate) const ALIAS_IMPLEMENTATION_PATH: RefPath =
-    RefPath::assert_from(b"/tez/tez_accounts/tezosx/__system__/alias_implementation");
+/// The key is under `__system__` in the `tezosx/` account namespace. No
+/// account key can collide with it, because `__system__` is not a valid
+/// base58 account address. The key is in the accounts keyspace, so the
+/// Michelson state hash covers it. Replicas with different implementations
+/// get different Michelson block `state_root` values.
+pub(crate) const ALIAS_IMPLEMENTATION_KEY: Key =
+    Key::from_static(b"/tezosx/__system__/alias_implementation");
 
-/// Read the shared alias implementation. Returns `None` when the slot has not
-/// been seeded yet.
-pub fn read_alias_implementation(
-    host: &impl StorageV1,
-) -> Result<Option<Vec<u8>>, tezos_storage::error::Error> {
-    match host.store_read_all(&ALIAS_IMPLEMENTATION_PATH) {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
-    }
+/// Returns the shared alias implementation, or `None` when it is absent or
+/// when the host fails to read it.
+pub fn read_alias_implementation(tez_accounts: &impl KeySpace) -> Option<Vec<u8>> {
+    tez_accounts.get(&ALIAS_IMPLEMENTATION_KEY)
 }
 
 /// Overwrite the shared alias implementation with `code`. A single write here
 /// changes the behaviour of every existing and future alias at once — the O(1)
 /// upgrade primitive.
 pub fn write_alias_implementation(
-    host: &mut impl StorageV1,
+    tez_accounts: &mut impl KeySpace,
     code: &[u8],
 ) -> Result<(), tezos_storage::error::Error> {
-    host.store_write_all(&ALIAS_IMPLEMENTATION_PATH, code)?;
+    tez_accounts.set(&ALIAS_IMPLEMENTATION_KEY, code)?;
     Ok(())
 }
 
@@ -215,7 +208,7 @@ impl From<BigInt> for StorageDelta {
 }
 
 /// Aggregated storage-accounting record for an originated contract,
-/// persisted at [code::info_path]. It bundles the four small
+/// persisted at [`code::info_key`]. It bundles the four small
 /// counters (`code_size`, `storage_size`, `used_bytes`, `paid_bytes`) into
 /// a single value, so the whole accounting state is read and written with a
 /// single host call. The code and storage *blobs* (`/data/code`,
@@ -325,14 +318,14 @@ impl TezosOriginatedAccount {
 
     pub fn code(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Code, tezos_storage::error::Error> {
         if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
             return Ok(Code::Enshrined(c));
         }
-        let code_path = code::code_path(self)?;
-        match host.store_read_all(&code_path) {
-            Ok(code) => Ok(Code::Code(code)),
+        let code_key = code::code_key(self)?;
+        match tez_accounts.get(&code_key) {
+            Some(code) => Ok(Code::Code(code)),
             // A KT1 with no `/data/code` is either a Tezos X alias — whose
             // script is the single shared implementation — or a genuinely
             // missing contract. Resolving on the code-miss keeps the common
@@ -340,15 +333,15 @@ impl TezosOriginatedAccount {
             // contracts; the gate on `is_alias` also means implicit `tz1`
             // accounts (which are never `TezosOriginatedAccount` values) are
             // untouched.
-            Err(RuntimeError::PathNotFound) => {
-                if self.is_alias(host)? {
+            None => {
+                if self.is_alias(tez_accounts)? {
                     // The slot is guaranteed seeded before any code-less alias
                     // can exist: `ensure_alias` seeds it before materializing
                     // an alias (L2-1529), and migration / runtime activation
                     // seed it on existing networks. So an unseeded slot here is
                     // a should-never-happen invariant violation, surfaced as an
                     // internal error rather than silently substituting code.
-                    read_alias_implementation(host)?
+                    read_alias_implementation(tez_accounts)
                         .map(Code::Code)
                         .ok_or_else(|| {
                             tezos_storage::error::Error::Internal(
@@ -356,41 +349,49 @@ impl TezosOriginatedAccount {
                             )
                         })
                 } else {
-                    Err(RuntimeError::PathNotFound.into())
+                    Err(KeySpaceError::read(
+                        tez_accounts.name(),
+                        &code_key,
+                        ReadKind::Ext(StorageReadErrorKind::NotFound),
+                    )
+                    .into())
                 }
             }
-            Err(err) => Err(err.into()),
         }
     }
 
-    /// Read the classification record (`Origin`) at the account's `/origin`
-    /// path. `None` when the account carries no classification.
-    /// `read_optional_nom_value` maps a missing path to `None` and rejects
-    /// incomplete / trailing bytes.
+    /// Reads the classification record ([`Origin`]) at the account's `/origin`
+    /// key. Returns `None` when the account carries no classification, or when
+    /// the host fails to read it. Fails when the bytes are not exactly one
+    /// [`Origin`] encoding.
     pub fn origin(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Option<Origin>, tezos_storage::error::Error> {
-        read_optional_nom_value(host, &code::origin_path(self)?)
+        tez_accounts
+            .read_nom(&code::origin_key(self)?)
+            .map_err(tezos_storage::error::Error::from)
     }
 
     /// Write the classification record (`Origin`) at the account's `/origin`
-    /// path.
+    /// key.
     pub fn set_origin(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         origin: &Origin,
     ) -> Result<(), tezos_storage::error::Error> {
-        store_bin(origin, host, &code::origin_path(self)?)
+        tez_accounts
+            .store_bin(&code::origin_key(self)?, origin)
+            .map_err(tezos_storage::error::Error::from)
     }
 
     /// Whether this originated account is a Tezos X alias (classified
     /// [`Origin::Alias`]), whose script resolves to the shared implementation.
     pub fn is_alias(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
-        Ok(matches!(self.origin(host)?, Some(Origin::Alias(_))))
+        Ok(matches!(self.origin(tez_accounts)?, Some(Origin::Alias(_))))
     }
 
     /// Whether the originated contract exists in durable storage. A regular
@@ -405,29 +406,30 @@ impl TezosOriginatedAccount {
     /// `code()` failure.
     pub fn exists(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<bool, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(true);
         }
-        let code_path = code::code_path(self)?;
-        if Some(ValueType::Value) == host.store_has(&code_path)? {
+        if tez_accounts.contains(&code::code_key(self)?) {
             return Ok(true);
         }
         // A code-less KT1 exists iff it is an alias.
-        self.is_alias(host)
+        self.is_alias(tez_accounts)
     }
 
-    /// Read the aggregated [OriginatedContractInfo] for this contract. The
-    /// single `/info` record is read with one bounded `store_read` (see
-    /// [INFO_MAX_BYTES]); a contract with no record yet (never originated)
-    /// reads as an all-zero record. The individual getters use it so they
-    /// keep their `&self, &host` signature and can run on read-only hosts.
+    /// Reads the aggregated [`OriginatedContractInfo`] for this contract.
+    ///
+    /// It reads the single `/info` record with one bounded read of
+    /// `tez_accounts` (see [`INFO_MAX_BYTES`]). A contract with no record, or
+    /// whose record the host fails to read, reads as an all-zero record. Fails
+    /// if the bytes that it reads do not decode. When the record is longer
+    /// than [`INFO_MAX_BYTES`], the error says so.
     pub fn read_info(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<OriginatedContractInfo, tezos_storage::error::Error> {
-        Ok(self.read_info_with_len(host)?.0)
+        Ok(self.read_info_with_len(tez_accounts)?.0)
     }
 
     /// Like [Self::read_info], but also returns the number of bytes read
@@ -437,36 +439,37 @@ impl TezosOriginatedAccount {
     /// of length `0`.
     pub fn read_info_with_len(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<(OriginatedContractInfo, u64), tezos_storage::error::Error> {
-        let info_path = code::info_path(self)?;
-        Ok(
-            read_optional_nom_value_bounded_with_len(host, &info_path, INFO_MAX_BYTES)?
-                .map_or_else(
-                    || {
-                        (
-                            OriginatedContractInfo {
-                                code_size: 0u64.into(),
-                                storage_size: 0u64.into(),
-                                used_bytes: Zarith::from(0u64),
-                                paid_bytes: Zarith::from(0u64),
-                            },
-                            0,
-                        )
-                    },
-                    |(info, len)| (info, len as u64),
-                ),
-        )
+        let info_key = code::info_key(self)?;
+        Ok(tez_accounts
+            .read_nom_bounded_with_len(&info_key, INFO_MAX_BYTES)?
+            .map_or_else(
+                || {
+                    (
+                        OriginatedContractInfo {
+                            code_size: 0u64.into(),
+                            storage_size: 0u64.into(),
+                            used_bytes: Zarith::from(0u64),
+                            paid_bytes: Zarith::from(0u64),
+                        },
+                        0,
+                    )
+                },
+                |(info, len)| (info, len as u64),
+            ))
     }
 
     /// Persist the aggregated record in a single host write.
     pub fn write_info(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         info: &OriginatedContractInfo,
     ) -> Result<(), tezos_storage::error::Error> {
-        let info_path = code::info_path(self)?;
-        store_bin(info, host, &info_path)
+        let info_key = code::info_key(self)?;
+        tez_accounts
+            .store_bin(&info_key, info)
+            .map_err(tezos_storage::error::Error::from)
     }
 
     /// Only the test suite writes the code blob in isolation: `init`
@@ -476,60 +479,66 @@ impl TezosOriginatedAccount {
     #[cfg(test)]
     pub fn set_code(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        let path = code::code_path(self)?;
-        host.store_write_all(&path, data)?;
+        let path = code::code_key(self)?;
+        tez_accounts.set(&path, data)?;
         let code_size = data.len() as u64;
-        let mut info = self.read_info(host)?;
+        let mut info = self.read_info(tez_accounts)?;
         info.code_size = code_size.into();
-        self.write_info(host, &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok(code_size.into())
     }
 
     pub fn storage(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(vec![]);
         }
-        let storage_path = code::storage_path(self)?;
-        let storage = host.store_read_all(&storage_path)?;
-        Ok(storage)
+        let key = code::storage_key(self)?;
+        tez_accounts.get(&key).ok_or_else(|| {
+            KeySpaceError::read(
+                tez_accounts.name(),
+                &key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into()
+        })
     }
 
     pub fn code_size(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        Ok(self.read_info(host)?.code_size.into())
+        Ok(self.read_info(tez_accounts)?.code_size.into())
     }
 
     pub fn storage_size(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        Ok(self.read_info(host)?.storage_size)
+        Ok(self.read_info(tez_accounts)?.storage_size)
     }
 
     /// Returns the contract's `used_bytes` watermark, or `0` if nothing
     /// has been written yet.
     pub fn used_bytes(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        Ok(self.read_info(host)?.used_bytes)
+        Ok(self.read_info(tez_accounts)?.used_bytes)
     }
 
     /// Returns the contract's `paid_bytes` watermark, or `0` if nothing
     /// has been written yet.
     pub fn paid_bytes(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Zarith, tezos_storage::error::Error> {
-        Ok(self.read_info(host)?.paid_bytes)
+        Ok(self.read_info(tez_accounts)?.paid_bytes)
     }
 
     /// Persists `data` as the contract's main storage and refreshes the
@@ -548,19 +557,19 @@ impl TezosOriginatedAccount {
     #[cfg(test)]
     pub fn set_storage(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
     ) -> Result<StorageDelta, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(0.into());
         }
-        let path = code::storage_path(self)?;
-        host.store_write_all(&path, data)?;
-        let mut info = self.read_info(host)?;
+        let path = code::storage_key(self)?;
+        tez_accounts.set(&path, data)?;
+        let mut info = self.read_info(tez_accounts)?;
         let new_storage_size = data.len() as u64;
         let prev_storage_size = Zarith::from(info.storage_size.clone()).0;
         info.storage_size = new_storage_size.into();
-        self.write_info(host, &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok((BigInt::from(new_storage_size) - prev_storage_size).into())
     }
 
@@ -574,7 +583,7 @@ impl TezosOriginatedAccount {
     /// definite code size of `0` — the shared code is not charged per alias.
     pub fn init(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         code: Option<&[u8]>,
         storage: &[u8],
         lazy_storage_size_diff: Zarith,
@@ -596,21 +605,21 @@ impl TezosOriginatedAccount {
         // charged per alias.
         let code_size = match code {
             Some(code) => {
-                let code_path = code::code_path(self)?;
-                host.store_write_all(&code_path, code)?;
+                let code_key = code::code_key(self)?;
+                tez_accounts.set(&code_key, code)?;
                 code.len() as u64
             }
             None => 0,
         };
-        let storage_path = code::storage_path(self)?;
-        host.store_write_all(&storage_path, storage)?;
+        let storage_key = code::storage_key(self)?;
+        tez_accounts.set(&storage_key, storage)?;
         let storage_size = storage.len() as u64;
         let info = OriginatedContractInfo::for_new_contract(
             code_size,
             storage_size,
             lazy_storage_size_diff,
         );
-        self.write_info(host, &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok(StorageSpace {
             used_bytes: info.used_bytes.clone(),
             allocated_bytes: info.used_bytes,
@@ -633,7 +642,7 @@ impl TezosOriginatedAccount {
     #[cfg(test)]
     pub fn update_storage_space(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         storage_size_diff: StorageDelta,
         lazy_storage_size_diff: Zarith,
     ) -> Result<StorageSpace, tezos_storage::error::Error> {
@@ -643,7 +652,7 @@ impl TezosOriginatedAccount {
                 allocated_bytes: 0.into(),
             });
         }
-        let mut info = self.read_info(host)?;
+        let mut info = self.read_info(tez_accounts)?;
         let used_bytes = Zarith(
             info.used_bytes.0.clone() + storage_size_diff.0 .0 + lazy_storage_size_diff.0,
         );
@@ -656,7 +665,7 @@ impl TezosOriginatedAccount {
             Zarith::from(0u64)
         };
         info.used_bytes = used_bytes.clone();
-        self.write_info(host, &info)?;
+        self.write_info(tez_accounts, &info)?;
         Ok(StorageSpace {
             used_bytes,
             allocated_bytes,
@@ -673,16 +682,16 @@ impl TezosOriginatedAccount {
     /// happen only once their cost is secured.
     pub fn write_storage_and_info(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         data: &[u8],
         info: &OriginatedContractInfo,
     ) -> Result<(), tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(());
         }
-        let path = code::storage_path(self)?;
-        host.store_write_all(&path, data)?;
-        self.write_info(host, info)
+        let path = code::storage_key(self)?;
+        tez_accounts.set(&path, data)?;
+        self.write_info(tez_accounts, info)
     }
 }
 
@@ -861,16 +870,6 @@ pub struct TezosImplicitAccount {
     pub(crate) key: Key,
 }
 
-/// Returns the durable path of the RLP info record of `account`.
-///
-/// Fails with a [`PathError`] when the path is invalid.
-fn info_record_path(account: &TezosImplicitAccount) -> Result<OwnedPath, PathError> {
-    concat(
-        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-        &account.key,
-    )
-}
-
 impl TezosAccount for TezosImplicitAccount {
     fn contract(&self) -> Contract {
         Contract::Implicit(self.pkh.clone())
@@ -878,9 +877,9 @@ impl TezosAccount for TezosImplicitAccount {
 
     fn balance(
         &self,
-        host: &impl StorageV1,
+        tez_accounts: &impl KeySpace,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        match read_optional_rlp::<TezosAccountInfo>(host, &info_record_path(self)?) {
+        match get_tezos_account_info_at(tez_accounts, &self.key) {
             Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
             Ok(None) => Ok(Narith::from(0u64)),
             Err(e) => Err(tezos_storage::error::Error::TcError(format!("{e}"))),
@@ -889,16 +888,15 @@ impl TezosAccount for TezosImplicitAccount {
 
     fn set_balance(
         &self,
-        host: &mut impl StorageV1,
+        tez_accounts: &mut impl KeySpace,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = info_record_path(self)?;
-        let mut info: TezosAccountInfo = read_optional_rlp(host, &path)
-            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?
-            .unwrap_or_default();
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
         info.balance = narith_to_u256(balance)
             .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))?;
-        store_rlp(&info, host, &path)
+        set_tezos_account_info_at(tez_accounts, &self.key, info)
+            .map_err(|e| tezos_storage::error::Error::TcError(format!("{e}")))
     }
 }
 
@@ -1164,7 +1162,7 @@ mod test {
         let account = implicit(&pkh);
 
         let read_balance = account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
@@ -1202,6 +1200,7 @@ mod test {
     #[test]
     fn test_set_and_read_balance() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let balance = 4579_u64.into();
 
@@ -1211,11 +1210,11 @@ mod test {
         let account = implicit_of(&contract);
 
         let () = account
-            .set_balance(&mut host, &balance)
+            .set_balance(rk.tez_accounts_mut(), &balance)
             .expect("set_balance should succeeded");
 
         let read_balance = account
-            .balance(&host)
+            .balance(rk.tez_accounts())
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
@@ -1364,7 +1363,7 @@ mod test {
         let test_balance = 1999_u64.into();
 
         account
-            .set_balance(rk.host_mut(), &test_balance)
+            .set_balance(rk.tez_accounts_mut(), &test_balance)
             .expect("Set balance should have succeeded");
 
         // Calling init on a contract already initialized will do nothing
@@ -1374,7 +1373,7 @@ mod test {
             .expect("Account initialization should have succeeded");
 
         let read_balance = account
-            .balance(rk.host())
+            .balance(rk.tez_accounts())
             .expect("Read balance should have succeeded");
 
         assert_eq!(test_balance, read_balance);
@@ -1383,6 +1382,7 @@ mod test {
     #[test]
     fn test_set_read_large_code() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Create an originated account for KT1
         let contract = Contract::from_b58check(KT1).unwrap();
@@ -1392,11 +1392,11 @@ mod test {
 
         // Set the code of the KT1
         account
-            .set_code(&mut host, &code)
+            .set_code(rk.tez_accounts_mut(), &code)
             .expect("Setting code of the KT1 should succeed");
 
         let read_code = account
-            .code(&host)
+            .code(rk.tez_accounts())
             .expect("Read the code of the KT1 should succeed");
 
         assert_eq!(
@@ -1411,6 +1411,7 @@ mod test {
     #[test]
     fn test_update_storage_space_after_grow() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
@@ -1421,33 +1422,35 @@ mod test {
         let StorageSpace {
             allocated_bytes, ..
         } = account
-            .init(&mut host, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
         assert_eq!(allocated_bytes, Zarith::from(initial_size));
         assert_eq!(
-            account.used_bytes(&host).unwrap(),
+            account.used_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(initial_size)
         );
         assert_eq!(
-            account.paid_bytes(&host).unwrap(),
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(initial_size)
         );
 
-        let diff = account.set_storage(&mut host, &larger_storage).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &larger_storage)
+            .unwrap();
         let StorageSpace {
             allocated_bytes, ..
         } = account
-            .update_storage_space(&mut host, diff, 0.into())
+            .update_storage_space(rk.tez_accounts_mut(), diff, 0.into())
             .unwrap();
         let larger_size = (code.len() + larger_storage.len()) as u64;
         assert_eq!(allocated_bytes, Zarith::from(larger_size - initial_size));
         assert_eq!(
-            account.used_bytes(&host).unwrap(),
+            account.used_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(larger_size)
         );
         assert_eq!(
-            account.paid_bytes(&host).unwrap(),
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(larger_size)
         );
     }
@@ -1457,6 +1460,7 @@ mod test {
     #[test]
     fn test_update_storage_space_after_shrink() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
@@ -1465,23 +1469,25 @@ mod test {
         let smaller_storage = vec![0x34_u8; 5];
 
         account
-            .init(&mut host, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
         let initial_size = (code.len() + storage.len()) as u64;
 
-        let diff = account.set_storage(&mut host, &smaller_storage).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &smaller_storage)
+            .unwrap();
         let StorageSpace {
             allocated_bytes, ..
         } = account
-            .update_storage_space(&mut host, diff, 0.into())
+            .update_storage_space(rk.tez_accounts_mut(), diff, 0.into())
             .unwrap();
         assert_eq!(allocated_bytes, Zarith::from(0u64));
         assert_eq!(
-            account.used_bytes(&host).unwrap(),
+            account.used_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from((code.len() + smaller_storage.len()) as u64),
         );
         assert_eq!(
-            account.paid_bytes(&host).unwrap(),
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
             Zarith::from(initial_size)
         );
     }
@@ -1490,19 +1496,28 @@ mod test {
     #[test]
     fn test_set_storage_returns_signed_diff() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        let first = account.set_storage(&mut host, &[0u8; 30]).unwrap();
+        let first = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 30])
+            .unwrap();
         assert_eq!(first, 30.into(), "first write reports new_len");
 
-        let grow = account.set_storage(&mut host, &[0u8; 50]).unwrap();
+        let grow = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 50])
+            .unwrap();
         assert_eq!(grow, 20.into(), "grow reports new_len - prev_len");
 
-        let shrink = account.set_storage(&mut host, &[0u8; 5]).unwrap();
+        let shrink = account
+            .set_storage(rk.tez_accounts_mut(), &[0u8; 5])
+            .unwrap();
         assert_eq!(shrink, (-45).into(), "shrink reports the negative delta");
 
-        let same = account.set_storage(&mut host, &[1u8; 5]).unwrap();
+        let same = account
+            .set_storage(rk.tez_accounts_mut(), &[1u8; 5])
+            .unwrap();
         assert_eq!(same, 0.into(), "same-size overwrite reports zero delta");
     }
 
@@ -1511,6 +1526,7 @@ mod test {
     #[test]
     fn test_set_storage_returns_zero_for_enshrined() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Gateway is an enshrined contract; set_storage early-returns on it
         // without touching durable storage.
@@ -1518,7 +1534,9 @@ mod test {
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
 
-        let diff = account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
+        let diff = account
+            .set_storage(rk.tez_accounts_mut(), &[0xef_u8; 15])
+            .unwrap();
         assert_eq!(
             diff,
             0.into(),
@@ -1528,15 +1546,15 @@ mod test {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, diff, 0.into())
+            .update_storage_space(rk.tez_accounts_mut(), diff, 0.into())
             .unwrap();
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
 
-        let storage_path = code::storage_path(&account).unwrap();
-        let info_path = code::info_path(&account).unwrap();
-        assert_eq!(host.store_has(&storage_path).unwrap(), None);
-        assert_eq!(host.store_has(&info_path).unwrap(), None);
+        let storage_key = code::storage_key(&account).unwrap();
+        let info_key = code::info_key(&account).unwrap();
+        assert!(!rk.tez_accounts().contains(&storage_key));
+        assert!(!rk.tez_accounts().contains(&info_key));
     }
 
     /// `exists` is the guard the transfer pipeline uses to reject calls
@@ -1545,13 +1563,14 @@ mod test {
     /// and never written to durable storage.
     #[test]
     fn test_exists_returns_true_for_enshrined() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(account.exists(&host).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated KT1 with no code blob in storage must report
@@ -1559,12 +1578,13 @@ mod test {
     /// `ContractDoesNotExist`.
     #[test]
     fn test_exists_returns_false_when_never_originated() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(&host).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// After `set_code` writes a code blob at `/data/code`, `exists`
@@ -1573,13 +1593,16 @@ mod test {
     #[test]
     fn test_exists_returns_true_after_set_code() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert!(!account.exists(&host).unwrap());
-        account.set_code(&mut host, &[0xab_u8; 4]).unwrap();
-        assert!(account.exists(&host).unwrap());
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
+        account
+            .set_code(rk.tez_accounts_mut(), &[0xab_u8; 4])
+            .unwrap();
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// `used_bytes` and `paid_bytes` default to zero on a contract that
@@ -1589,25 +1612,34 @@ mod test {
     /// yet been bumped by the storage-payment pass.
     #[test]
     fn test_getters_default_to_zero_on_absent_path() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        assert_eq!(account.used_bytes(&host).unwrap(), Zarith::from(0u64));
-        assert_eq!(account.paid_bytes(&host).unwrap(), Zarith::from(0u64));
+        assert_eq!(
+            account.used_bytes(rk.tez_accounts()).unwrap(),
+            Zarith::from(0u64)
+        );
+        assert_eq!(
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
+            Zarith::from(0u64)
+        );
     }
 
     /// Helper: originate a contract with the given main-storage size,
     /// then return the live account.
     fn init_with_storage(
-        host: &mut MockKernelHost,
+        tez_accounts: &mut impl KeySpace,
         storage_len: usize,
     ) -> TezosOriginatedAccount {
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; storage_len];
-        account.init(host, Some(&code), &storage, 0.into()).unwrap();
+        account
+            .init(tez_accounts, Some(&code), &storage, 0.into())
+            .unwrap();
         account
     }
 
@@ -1616,19 +1648,20 @@ mod test {
     #[test]
     fn test_update_storage_space_grows_on_positive_lazy_delta() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
-        let prev_used = account.used_bytes(&host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
+        let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, 0.into(), (65 + 7).into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), (65 + 7).into())
             .unwrap();
 
         assert_eq!(used_bytes, Zarith(prev_used.0.clone() + (65 + 7)));
         assert_eq!(allocated_bytes, Zarith::from((65 + 7) as u64));
-        assert_eq!(account.paid_bytes(&host).unwrap(), used_bytes);
+        assert_eq!(account.paid_bytes(rk.tez_accounts()).unwrap(), used_bytes);
     }
 
     /// A negative `lazy_storage_size_diff` lowers `used_bytes` and
@@ -1636,26 +1669,30 @@ mod test {
     #[test]
     fn test_update_storage_space_shrinks_on_negative_lazy_delta() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
-        let prev_used = account.used_bytes(&host).unwrap();
-        let prev_paid = account.paid_bytes(&host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
+        let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
+        let prev_paid = account.paid_bytes(rk.tez_accounts()).unwrap();
 
         // First grow above the watermark so we have headroom to shrink.
         account
-            .update_storage_space(&mut host, 0.into(), 200.into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), 200.into())
             .unwrap();
-        let prev_paid_after_grow = account.paid_bytes(&host).unwrap();
+        let prev_paid_after_grow = account.paid_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, 0.into(), (-100).into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), (-100).into())
             .unwrap();
 
         assert_eq!(used_bytes, Zarith(prev_used.0 + 100));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
-        assert_eq!(account.paid_bytes(&host).unwrap(), prev_paid_after_grow);
+        assert_eq!(
+            account.paid_bytes(rk.tez_accounts()).unwrap(),
+            prev_paid_after_grow
+        );
         assert!(prev_paid_after_grow.0 > prev_paid.0);
     }
 
@@ -1664,20 +1701,21 @@ mod test {
     #[test]
     fn test_update_storage_space_unchanged_when_both_diffs_zero() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
-        let prev_used = account.used_bytes(&host).unwrap();
-        let prev_paid = account.paid_bytes(&host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
+        let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
+        let prev_paid = account.paid_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, 0.into(), 0.into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), 0.into())
             .unwrap();
 
         assert_eq!(used_bytes, prev_used);
         assert_eq!(allocated_bytes, Zarith::from(0u64));
-        assert_eq!(account.paid_bytes(&host).unwrap(), prev_paid);
+        assert_eq!(account.paid_bytes(rk.tez_accounts()).unwrap(), prev_paid);
     }
 
     /// `used_bytes` is the sum of both deltas added to the previous
@@ -1685,11 +1723,12 @@ mod test {
     #[test]
     fn test_update_storage_space_sums_storage_and_lazy_diffs() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
-        let prev_used = account.used_bytes(&host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
+        let prev_used = account.used_bytes(rk.tez_accounts()).unwrap();
 
         let StorageSpace { used_bytes, .. } = account
-            .update_storage_space(&mut host, 11.into(), 22.into())
+            .update_storage_space(rk.tez_accounts_mut(), 11.into(), 22.into())
             .unwrap();
 
         assert_eq!(used_bytes, Zarith(prev_used.0 + 33));
@@ -1700,25 +1739,26 @@ mod test {
     #[test]
     fn test_update_storage_space_shrink_below_paid_bytes_no_diff() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
 
         // Push the watermark up by 500 first.
         account
-            .update_storage_space(&mut host, 0.into(), 500.into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), 500.into())
             .unwrap();
-        let paid_high = account.paid_bytes(&host).unwrap();
+        let paid_high = account.paid_bytes(rk.tez_accounts()).unwrap();
 
         // Now drop used_bytes by 400 (still below the watermark).
         let StorageSpace {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, 0.into(), (-400).into())
+            .update_storage_space(rk.tez_accounts_mut(), 0.into(), (-400).into())
             .unwrap();
 
         assert!(used_bytes.0 < paid_high.0);
         assert_eq!(allocated_bytes, Zarith::from(0u64));
-        assert_eq!(account.paid_bytes(&host).unwrap(), paid_high);
+        assert_eq!(account.paid_bytes(rk.tez_accounts()).unwrap(), paid_high);
     }
 
     /// A non-zero `lazy_storage_size_diff` at origination contributes
@@ -1726,6 +1766,7 @@ mod test {
     #[test]
     fn test_init_with_initial_lazy_storage() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
@@ -1737,13 +1778,18 @@ mod test {
             used_bytes,
             allocated_bytes,
         } = account
-            .init(&mut host, Some(&code), &storage, initial_lazy.into())
+            .init(
+                rk.tez_accounts_mut(),
+                Some(&code),
+                &storage,
+                initial_lazy.into(),
+            )
             .unwrap();
 
         let expected = (code.len() + storage.len()) as u64 + initial_lazy;
         assert_eq!(used_bytes, Zarith::from(expected));
         assert_eq!(allocated_bytes, Zarith::from(expected));
-        assert_eq!(account.paid_bytes(&host).unwrap(), used_bytes);
+        assert_eq!(account.paid_bytes(rk.tez_accounts()).unwrap(), used_bytes);
     }
 
     /// Enshrined contracts short-circuit `update_storage_space` and
@@ -1751,6 +1797,7 @@ mod test {
     #[test]
     fn test_update_storage_space_enshrined_ignores_diffs() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
         let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
         let account = originated(&contract);
@@ -1759,31 +1806,34 @@ mod test {
             used_bytes,
             allocated_bytes,
         } = account
-            .update_storage_space(&mut host, 999_999.into(), 999_999.into())
+            .update_storage_space(rk.tez_accounts_mut(), 999_999.into(), 999_999.into())
             .unwrap();
 
         assert_eq!(used_bytes, Zarith::from(0u64));
         assert_eq!(allocated_bytes, Zarith::from(0u64));
     }
 
-    /// The shared alias-implementation slot must stay under `/tez/tez_accounts`
-    /// so it remains covered by the `h(/tez/tez_accounts)` state-hash
-    /// commitment. Nothing enforces this at compile time, so guard it here.
+    /// The alias implementation key resolves to
+    /// `/tez/tez_accounts/tezosx/__system__/alias_implementation`, under the
+    /// root that the Michelson state hash commits to.
     #[test]
-    fn alias_implementation_path_is_under_the_accounts_root() {
-        use tezos_smart_rollup_host::path::Path;
-        assert!(ALIAS_IMPLEMENTATION_PATH
-            .as_bytes()
-            .starts_with(b"/tez/tez_accounts"));
+    fn alias_implementation_key_keeps_its_durable_path() {
+        assert_eq!(
+            [b"/tez/tez_accounts", ALIAS_IMPLEMENTATION_KEY.as_bytes()].concat(),
+            b"/tez/tez_accounts/tezosx/__system__/alias_implementation"
+        );
     }
 
-    fn classify_as_alias(host: &mut impl StorageV1, account: &TezosOriginatedAccount) {
+    fn classify_as_alias(
+        tez_accounts: &mut impl KeySpace,
+        account: &TezosOriginatedAccount,
+    ) {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,
             native_address: "0xabc".to_string(),
         });
-        account.set_origin(host, &origin).unwrap();
+        account.set_origin(tez_accounts, &origin).unwrap();
     }
 
     /// The `Origin` classification round-trips through `set_origin` / `origin`:
@@ -1794,23 +1844,29 @@ mod test {
         use tezosx_interfaces::{AliasInfo, RuntimeId};
 
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         // An account with no `/origin` record carries no classification.
-        assert!(account.origin(&host).unwrap().is_none());
+        assert!(account.origin(rk.tez_accounts()).unwrap().is_none());
 
         // The native variant round-trips.
-        account.set_origin(&mut host, &Origin::Native).unwrap();
-        assert_eq!(account.origin(&host).unwrap(), Some(Origin::Native));
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
+        assert_eq!(
+            account.origin(rk.tez_accounts()).unwrap(),
+            Some(Origin::Native)
+        );
 
         // The alias variant round-trips.
         let alias = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Tezos,
             native_address: "tz1...".to_string(),
         });
-        account.set_origin(&mut host, &alias).unwrap();
-        assert_eq!(account.origin(&host).unwrap(), Some(alias));
+        account.set_origin(rk.tez_accounts_mut(), &alias).unwrap();
+        assert_eq!(account.origin(rk.tez_accounts()).unwrap(), Some(alias));
     }
 
     /// A KT1 classified `Origin::Alias` and carrying no `/data/code` resolves to
@@ -1818,15 +1874,19 @@ mod test {
     #[test]
     fn alias_code_resolves_to_shared_implementation() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(&mut host, &account);
+        classify_as_alias(rk.tez_accounts_mut(), &account);
         let implementation = vec![0x02u8, 0x00, 0x00, 0x00, 0x00];
-        write_alias_implementation(&mut host, &implementation).unwrap();
+        write_alias_implementation(rk.tez_accounts_mut(), &implementation).unwrap();
 
-        assert_eq!(account.code(&host).unwrap(), Code::Code(implementation));
-        assert!(account.exists(&host).unwrap());
+        assert_eq!(
+            account.code(rk.tez_accounts()).unwrap(),
+            Code::Code(implementation)
+        );
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// An alias whose shared implementation has not been seeded is an error, not
@@ -1834,18 +1894,19 @@ mod test {
     #[test]
     fn alias_without_seeded_implementation_errors() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        classify_as_alias(&mut host, &account);
+        classify_as_alias(rk.tez_accounts_mut(), &account);
         // Pin the error type: an unseeded slot is an internal invariant breach,
         // not a generic/typecheck error (so it can't silently change meaning).
         assert!(matches!(
-            account.code(&host),
+            account.code(rk.tez_accounts()),
             Err(tezos_storage::error::Error::Internal(_))
         ));
         // Still classified, so it exists.
-        assert!(account.exists(&host).unwrap());
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 that is not an alias is a genuinely missing contract:
@@ -1853,20 +1914,25 @@ mod test {
     /// because `/data/code` is absent — a regular contract never pays for it.
     #[test]
     fn code_less_non_alias_is_missing() {
-        let host = MockKernelHost::default();
+        let mut host = MockKernelHost::default();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         // Pin the variant: a code-less non-alias must surface as the plain
-        // missing-path error, not get routed through the alias branch (which
-        // would yield `Internal`).
-        assert!(matches!(
-            account.code(&host),
-            Err(tezos_storage::error::Error::Runtime(
-                RuntimeError::PathNotFound
-            ))
-        ));
-        assert!(!account.exists(&host).unwrap());
+        // missing-value error, and must not go through the alias branch (which
+        // yields `Internal`).
+        let code_key = code::code_key(&account).unwrap();
+        assert_eq!(
+            account.code(rk.tez_accounts()),
+            Err(KeySpaceError::read(
+                rk.tez_accounts().name(),
+                &code_key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into())
+        );
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A code-less KT1 classified `Origin::Native` is not an alias either:
@@ -1876,18 +1942,25 @@ mod test {
     #[test]
     fn code_less_native_classified_is_missing() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
-        account.set_origin(&mut host, &Origin::Native).unwrap();
+        account
+            .set_origin(rk.tez_accounts_mut(), &Origin::Native)
+            .unwrap();
 
-        assert!(matches!(
-            account.code(&host),
-            Err(tezos_storage::error::Error::Runtime(
-                RuntimeError::PathNotFound
-            ))
-        ));
-        assert!(!account.exists(&host).unwrap());
+        let code_key = code::code_key(&account).unwrap();
+        assert_eq!(
+            account.code(rk.tez_accounts()),
+            Err(KeySpaceError::read(
+                rk.tez_accounts().name(),
+                &code_key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into())
+        );
+        assert!(!account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// A regular originated contract (with `/data/code`) is unaffected: its own
@@ -1895,14 +1968,18 @@ mod test {
     #[test]
     fn regular_contract_returns_own_code() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         let own_code = vec![0x05u8, 0x01, 0x02, 0x03];
-        account.set_code(&mut host, &own_code).unwrap();
+        account.set_code(rk.tez_accounts_mut(), &own_code).unwrap();
 
-        assert_eq!(account.code(&host).unwrap(), Code::Code(own_code));
-        assert!(account.exists(&host).unwrap());
+        assert_eq!(
+            account.code(rk.tez_accounts()).unwrap(),
+            Code::Code(own_code)
+        );
+        assert!(account.exists(rk.tez_accounts()).unwrap());
     }
 
     /// The `OriginatedContractInfo` binary layout is a fixed cross-language
@@ -1941,9 +2018,10 @@ mod test {
     #[test]
     fn test_bounded_record_read_roundtrips() {
         let mut host = MockKernelHost::default();
-        let account = init_with_storage(&mut host, 20);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let account = init_with_storage(rk.tez_accounts_mut(), 20);
 
-        let info = account.read_info(&host).unwrap();
+        let info = account.read_info(rk.tez_accounts()).unwrap();
         assert_eq!(info.code_size, Narith::from(30u64));
         assert_eq!(info.storage_size, Narith::from(20u64));
         assert_eq!(info.used_bytes, Zarith::from(50u64));
@@ -1955,19 +2033,21 @@ mod test {
     #[test]
     fn test_init_writes_aggregated_record() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let contract = Contract::from_b58check(KT1).unwrap();
         let account = originated(&contract);
 
         let code = vec![0xab_u8; 30];
         let storage = vec![0xcd_u8; 20];
         account
-            .init(&mut host, Some(&code), &storage, 0.into())
+            .init(rk.tez_accounts_mut(), Some(&code), &storage, 0.into())
             .unwrap();
 
-        let info: OriginatedContractInfo =
-            read_optional_nom_value(&host, &code::info_path(&account).unwrap())
-                .unwrap()
-                .expect("the aggregated record must be present after init");
+        let info: OriginatedContractInfo = rk
+            .tez_accounts()
+            .read_nom(&code::info_key(&account).unwrap())
+            .unwrap()
+            .expect("the aggregated record must be present after init");
         assert_eq!(info.code_size, Narith::from(30u64));
         assert_eq!(info.storage_size, Narith::from(20u64));
         assert_eq!(info.used_bytes, Zarith::from(50u64));

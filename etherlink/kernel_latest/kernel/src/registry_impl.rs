@@ -489,7 +489,7 @@ mod tests {
         let kt1 = ContractKt1Hash::from_base58_check(&first.0).unwrap();
         let account = context::originated_from_kt1(&kt1).unwrap();
         assert_eq!(
-            account.origin(rk.host()).unwrap(),
+            account.origin(rk.tez_accounts()).unwrap(),
             Some(Origin::Alias(alias_info.clone()))
         );
 
@@ -579,8 +579,10 @@ mod tests {
         let registry = RegistryImpl::default();
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(rk.host_mut())
-            .unwrap();
+        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
+            rk.tez_accounts_mut(),
+        )
+        .unwrap();
         // An EVM account provably native: it has sent a transaction.
         let native = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
         StorageAccount::from_address(&Address::from_hex(native).unwrap())
@@ -629,7 +631,7 @@ mod tests {
         assert_eq!(
             context::originated_from_kt1(&kt1)
                 .unwrap()
-                .origin(rk.host())
+                .origin(rk.tez_accounts())
                 .unwrap(),
             Some(Origin::Alias(AliasInfo {
                 runtime: RuntimeId::Ethereum,

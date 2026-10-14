@@ -648,7 +648,7 @@ where
                 // The write is the same on every replica, and a second run
                 // changes nothing.
                 tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
-                    rk.host_mut(),
+                    rk.tez_accounts_mut(),
                 )
                 .map_err(|e| {
                     anyhow::anyhow!("seeding alias implementation failed: {e}")
@@ -2065,7 +2065,7 @@ mod tests {
 
         let stored = context::originated_from_contract(&generated_contract)
             .expect("originated account interface should be correct")
-            .storage(&host)
+            .storage(&tez_accounts)
             .expect("contract storage should be readable");
 
         assert_eq!(
@@ -2260,7 +2260,7 @@ mod tests {
         assert_eq!(
             context::originated_from_kt1(&kt1)
                 .unwrap()
-                .origin(rk.host())
+                .origin(rk.tez_accounts())
                 .unwrap(),
             Some(Origin::Alias(AliasInfo {
                 runtime: RuntimeId::Ethereum,

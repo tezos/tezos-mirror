@@ -44,7 +44,9 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{
+    RuntimeKeyspaces, TEZ_ACCOUNTS_KEYSPACE_NAME,
+};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -546,7 +548,13 @@ where
     let Some(mut base) = load_base_or_log(&mut kernel_host) else {
         return;
     };
-    tezosx_michelson_entrypoints_fn(&kernel_host, &mut base);
+    let Ok(tez_accounts) = kernel_host
+        .load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)
+        .inspect_err(|err| log!(Error, "Cannot load the accounts keyspace: {err:?}"))
+    else {
+        return;
+    };
+    tezosx_michelson_entrypoints_fn(&tez_accounts, &mut base);
 }
 
 /// Answers a contract entrypoints query from the node.
@@ -554,10 +562,15 @@ where
 /// The node leaves the contract address, a 22-byte binary `AddressHash`, at
 /// `/base/tezosx_entrypoints/input` and calls this entrypoint, which puts the
 /// encoded entrypoints and enshrined views at
-/// `/base/tezosx_entrypoints/result`. A missing or undecodable address is
-/// logged and leaves the result key untouched.
+/// `/base/tezosx_entrypoints/result`. This function reads the contract from
+/// `tez_accounts`, which must be the `/tez/tez_accounts` keyspace
+/// ([`TEZ_ACCOUNTS_KEYSPACE_NAME`]). If the address is absent or does
+/// not decode, the function logs an error and leaves the result key untouched.
 #[allow(dead_code)]
-pub fn tezosx_michelson_entrypoints_fn(host: &impl StorageV1, base: &mut impl KeySpace) {
+pub fn tezosx_michelson_entrypoints_fn(
+    tez_accounts: &impl KeySpace,
+    base: &mut impl KeySpace,
+) {
     let input = match base.get(&TEZOSX_ENTRYPOINTS_INPUT_KEY) {
         Some(bytes) => bytes,
         None => {
@@ -565,7 +578,12 @@ pub fn tezosx_michelson_entrypoints_fn(host: &impl StorageV1, base: &mut impl Ke
             return;
         }
     };
-    handle_query_entrypoints_to(host, base, &input, &TEZOSX_ENTRYPOINTS_RESULT_KEY);
+    handle_query_entrypoints_to(
+        tez_accounts,
+        base,
+        &input,
+        &TEZOSX_ENTRYPOINTS_RESULT_KEY,
+    );
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -860,7 +878,7 @@ where
 ///
 /// Input: binary-encoded contract AddressHash (22 bytes).
 fn handle_query_entrypoints_to(
-    host: &impl StorageV1,
+    tez_accounts: &impl KeySpace,
     base: &mut impl KeySpace,
     payload: &[u8],
     result_key: &Key,
@@ -883,10 +901,13 @@ fn handle_query_entrypoints_to(
     // on the conversion coefficient and is currently larger, so default
     // would reject RPC calls that would succeed in an operation. Use
     // Gas::unmetered() instead.
-    let entrypoints =
-        tezos_execution::get_contract_entrypoint(host, &address, &mut Gas::unmetered());
-    let views =
-        tezos_execution::get_enshrined_contract_views(host, &address).unwrap_or_default();
+    let entrypoints = tezos_execution::get_contract_entrypoint(
+        tez_accounts,
+        &address,
+        &mut Gas::unmetered(),
+    );
+    let views = tezos_execution::get_enshrined_contract_views(tez_accounts, &address)
+        .unwrap_or_default();
     let result = match encode_entrypoints_result(entrypoints, views) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -1003,6 +1024,7 @@ mod tests {
     use mir::ast::{Entrypoint, Micheline, Type};
     use mir::gas::Gas;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     /// The pinned vectors freeze the wire format shared with the node's
     /// `Run_code` module (`tezos_backend.ml`), which pins the same ones
@@ -1607,7 +1629,8 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         base.set(&TEZOSX_ENTRYPOINTS_INPUT_KEY, addr_hash)
             .expect("write input");
-        tezosx_michelson_entrypoints_fn(&host, &mut base);
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        tezosx_michelson_entrypoints_fn(rk.tez_accounts(), &mut base);
         base.get(&TEZOSX_ENTRYPOINTS_RESULT_KEY)
             .expect("entrypoints result should have been written")
     }
