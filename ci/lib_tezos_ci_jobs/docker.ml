@@ -166,6 +166,37 @@ let job_docker_merge_manifests =
       ]
     mode
 
+let job_docker_mirror_to_gitlab_registry =
+  Cacio.parameterize @@ fun contents ->
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "docker:mirror_to_gitlab_registry"
+    ~__POS__
+    ~description:
+      "Copy the published multi-architecture Docker tags into this \
+       repository's GitLab container registry. Manual: the distribution is \
+       published to Docker Hub or to the GCP registry, and this mirrors it on \
+       demand."
+    ~stage:Publish
+    ~retry:Tezos_ci.no_retry
+    ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
+    ~needs:[(Job, job_docker_merge_manifests contents mode)]
+      (* No dind service, and no docker_initialize.sh: the job copies registry
+         to registry with regctl, which talks to the registry API directly and
+         never needs a Docker daemon. docker_image_names.sh is pure shell. *)
+    ~variables:
+      [("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false")]
+    ?environment:
+      (match mode with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
+    ~script:
+      [
+        "./scripts/ci/docker_image_names.sh";
+        "./scripts/ci/docker_mirror_to_gitlab_registry.sh";
+      ]
+
 let job_docker_promote_weekly =
   CI.job
     "docker:promote_weekly"
