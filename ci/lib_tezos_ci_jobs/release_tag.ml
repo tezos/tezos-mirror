@@ -147,7 +147,6 @@ let job_gitlab_release =
           Build.job_build_static_linux_released_binaries Arm64 `release );
         (Job, job_docker_merge_manifests mode);
       ]
-    ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ~id_tokens:Tezos_ci.id_tokens
     ~script:
       [
@@ -170,7 +169,6 @@ let job_gitlab_publish =
         ( Artifacts,
           Build.job_build_static_linux_released_binaries Arm64 `release );
       ]
-    ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ?variables:
       (match mode with
       | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]

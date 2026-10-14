@@ -528,11 +528,9 @@ gitlab:publish:
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.create-homebrew-formula
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   dependencies:
-  - oc.create-homebrew-formula
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
