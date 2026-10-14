@@ -167,11 +167,9 @@ gitlab:publish:
   needs:
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
-  - oc.create-homebrew-formula
   dependencies:
   - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-arm64-linux-released-binaries
-  - oc.create-homebrew-formula
   timeout: 60 minutes
   interruptible: false
   before_script:
