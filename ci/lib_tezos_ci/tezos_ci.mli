@@ -648,6 +648,11 @@ module Images : sig
 
     val debian_rust_trixie : Image.t
 
+    (** Base image providing Docker-in-Docker for CI jobs that need
+        to build or push Docker images. Based on Alpine Linux,
+        includes the Docker daemon, gcloud, hadolint and regctl. *)
+    val alpine_docker_ci : Image.t
+
     val ci_release : Image.t
   end
 end

@@ -21,5 +21,13 @@ val job_docker_merge_manifests :
   [`real | `test] ->
   Cacio.job
 
+(** Job [docker:mirror_to_gitlab_registry]: copies the tags published by
+    [docker:merge_manifests] into the project's GitLab container registry.
+    Should be set to [Manual], and must run after that job. *)
+val job_docker_mirror_to_gitlab_registry :
+  [`released | `experimental | `experimental_with_evm] ->
+  [`real | `test] ->
+  Cacio.job
+
 (** Register Docker build and related jobs. *)
 val register : unit -> unit

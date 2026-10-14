@@ -28,6 +28,9 @@ let job_docker = Docker.job_docker `released
 
 let job_docker_merge_manifests = Docker.job_docker_merge_manifests `released
 
+let job_docker_mirror_to_gitlab_registry =
+  Docker.job_docker_mirror_to_gitlab_registry `released
+
 let vuln_predicate = "vuln-predicate.json"
 
 let scanning_report = "gl-container-scanning-report.json"
@@ -265,6 +268,7 @@ let () =
     Major_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
+      (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
@@ -275,6 +279,7 @@ let () =
     Major_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
@@ -287,6 +292,7 @@ let () =
     Minor_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
+      (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
@@ -297,6 +303,7 @@ let () =
     Minor_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
@@ -309,6 +316,7 @@ let () =
     Beta_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
+      (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
@@ -319,6 +327,7 @@ let () =
     Beta_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
@@ -330,6 +339,7 @@ let () =
     Non_release_tag
     [
       (Auto, job_docker_merge_manifests `real);
+      (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -338,6 +348,7 @@ let () =
     Non_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Debian_repository.job_apt_repo_debian Release);
@@ -348,6 +359,7 @@ let () =
     Scheduled_test_release
     [
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `scheduled_test);
       (Auto, Debian_repository.job_apt_repo_debian Release);
@@ -488,6 +500,7 @@ let () =
       (Manual, job_docker `real Amd64);
       (Manual, job_docker `real Arm64);
       (Auto, job_docker_merge_manifests `real);
+      (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Manual, job_docker_promote_to_version `real);
       (Manual, job_release_page_packaging_revision `real);
       (Manual, Debian_repository.job_build_data_packages);
@@ -504,6 +517,7 @@ let () =
       (Manual, job_docker `test Amd64);
       (Manual, job_docker `test Arm64);
       (Auto, job_docker_merge_manifests `test);
+      (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Manual, job_docker_promote_to_version `test);
       (Manual, job_release_page_packaging_revision `test);
       (Manual, Debian_repository.job_build_data_packages);
