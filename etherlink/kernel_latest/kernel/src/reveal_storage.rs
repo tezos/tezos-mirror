@@ -107,8 +107,10 @@ pub fn reveal_storage(
 
     log!(Info, "Done revealing");
 
-    let chain_config = fetch_tezosx_configuration(host, bk);
+    match fetch_tezosx_configuration(host, bk) {
+        Ok(chain_config) => log!(Info, "Chain Configuration {chain_config:?}"),
+        Err(err) => log!(Error, "Failed to read the chain configuration: {err:?}"),
+    }
     let configuration = fetch_configuration(host, bk.base());
-    log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }

@@ -225,7 +225,7 @@ where
     Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let Some(bk) = load_keyspaces_or_log(&mut kernel_host) else {
+    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
     let input = match bk.base().get(&TEZOSX_SIMULATION_INPUT_KEY) {
@@ -278,7 +278,13 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = fetch_tezosx_configuration(&mut kernel_host, &bk);
+    let chain_config = match fetch_tezosx_configuration(&mut kernel_host, &mut bk) {
+        Ok(chain_config) => chain_config,
+        Err(err) => {
+            log!(Error, "Failed to read the chain configuration: {:?}", err);
+            return;
+        }
+    };
     let mut base = bk.into_base();
     let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
         Ok(rk) => rk,
@@ -696,7 +702,7 @@ where
         // to fail on an absent result key. `Host`, not `Execution`: the
         // caller's script is not what is wrong.
         None => RunCodeResult::HostError("run_code input not found".to_string()),
-        Some(payload) => run_code_from_input(&mut kernel_host, &bk, &payload).into(),
+        Some(payload) => run_code_from_input(&mut kernel_host, &mut bk, &payload).into(),
     };
     let mut bytes = Vec::new();
     if let Err(err) = result.bin_write(&mut bytes) {
@@ -787,7 +793,7 @@ fn run_code_params(
 /// the script.
 fn run_code_from_input<Host>(
     host: &mut Host,
-    bk: &BlueprintKeyspaces<impl KeySpace>,
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     payload: &[u8],
 ) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
 where
@@ -798,7 +804,9 @@ where
     let input = RunCodeInput::nom_read_exact(payload)
         .map_err(|e| RunCodeError::Execution(format!("cannot decode the input: {e}")))?;
 
-    let chain_config = fetch_tezosx_configuration(host, bk);
+    let chain_config = fetch_tezosx_configuration(host, bk).map_err(|err| {
+        RunCodeError::Host(format!("cannot read the chain configuration: {err}"))
+    })?;
 
     // Reading the block header is durable-storage work: a failure here is
     // infrastructure, not the caller's script being wrong.
@@ -1203,7 +1211,7 @@ mod tests {
                 ..full_input()
             });
 
-            let result = run_code_from_input(&mut host, &bk, &payload);
+            let result = run_code_from_input(&mut host, &mut bk, &payload);
 
             // The returned storage names the big map the run allocated.
             assert_eq!(

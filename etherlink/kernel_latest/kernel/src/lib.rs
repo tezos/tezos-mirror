@@ -344,7 +344,7 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_tezosx_configuration(host, &bk);
+    let chain_configuration = fetch_tezosx_configuration(host, &mut bk)?;
     let mut configuration = fetch_configuration(host, bk.base());
     let sequencer_pool_address = read_sequencer_pool_address(host);
 

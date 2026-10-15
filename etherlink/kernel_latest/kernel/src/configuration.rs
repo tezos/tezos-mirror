@@ -29,7 +29,7 @@ use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError};
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
@@ -247,38 +247,28 @@ fn derive_michelson_chain_id(evm_chain_id: U256) -> ChainId {
 }
 
 fn fetch_michelson_runtime_chain_id(
-    host: &mut impl StorageV1,
+    tez_world_state: &mut impl KeySpace,
     evm_chain_id: U256,
-) -> ChainId {
-    let chain_id_res = read_michelson_runtime_chain_id(host);
-    if let Err(err) = &chain_id_res {
-        log!(
-            Info,
-            "Failed to read the Michelson runtime chain id ({err:?}), deriving it from the EVM chain id."
-        );
-    }
-    match chain_id_res {
-        Ok(Some(michelson_chain_id)) => michelson_chain_id,
-        Ok(None) | Err(_) => {
-            // Chain id not in storage yet (or unreadable): derive from the EVM
-            // chain id and persist.
+) -> Result<ChainId, KeySpaceError> {
+    match read_michelson_runtime_chain_id(tez_world_state)? {
+        Some(michelson_chain_id) => Ok(michelson_chain_id),
+        None => {
             let michelson_chain_id = derive_michelson_chain_id(evm_chain_id);
-            if let Err(err) = store_michelson_runtime_chain_id(host, &michelson_chain_id)
-            {
-                log!(
-                    Error,
-                    "Failed to persist the Michelson runtime chain id: {err:?}"
-                );
-            }
-            michelson_chain_id
+            store_michelson_runtime_chain_id(tez_world_state, &michelson_chain_id)?;
+            Ok(michelson_chain_id)
         }
     }
 }
 
+/// Reads the chain configuration of the TezosX kernel.
+///
+/// The Michelson chain id is read from the `/tez/world_state` keyspace of
+/// `bk`. When it is absent, the id is derived from the EVM chain id and
+/// written there. Errors when that read or write fails.
 pub fn fetch_tezosx_configuration(
     host: &mut impl StorageV1,
-    bk: &BlueprintKeyspaces<impl KeySpace>,
-) -> TezosXChainConfig {
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
+) -> Result<TezosXChainConfig, KeySpaceError> {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
@@ -287,15 +277,16 @@ pub fn fetch_tezosx_configuration(
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());
     let debug_features = DebugFeatures::read_from_storage(bk.base());
-    let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
-    TezosXChainConfig::create_config(
+    let michelson_chain_id =
+        fetch_michelson_runtime_chain_id(bk.tez_world_state_mut(), evm_chain_id)?;
+    Ok(TezosXChainConfig::create_config(
         evm_chain_id,
         limits,
         spec_id,
         experimental_features,
         debug_features,
         michelson_chain_id,
-    )
+    ))
 }
 
 pub fn fetch_common_config(host: &impl StorageV1, base: &impl KeySpace) -> CommonConfig {

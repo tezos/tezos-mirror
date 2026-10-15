@@ -191,7 +191,7 @@ where
 #[trace_kernel]
 pub fn handle_run_transaction<Host>(
     host: &mut Host,
-    bk: BlueprintKeyspaces<impl KeySpace>,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
@@ -218,7 +218,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &bk);
+    let config = fetch_tezosx_configuration(host, &mut bk)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
@@ -336,7 +336,7 @@ fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
 #[trace_kernel]
 pub fn assemble_block<Host>(
     host: &mut Host,
-    bk: BlueprintKeyspaces<impl KeySpace>,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
@@ -356,7 +356,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &bk);
+    let config = fetch_tezosx_configuration(host, &mut bk)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
