@@ -490,6 +490,10 @@ etherlink-outbox-monitor:
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'
 
+# The 'docker-image*' targets below build the Octez Docker distribution FROM
+# the alpine CI images, and default to the ones a local bake produces. Build
+# those first (see images/README.md):
+#   docker buildx bake -f images/ci/ci-images.hcl --load runtime build
 .PHONY: docker-image-build
 docker-image-build:
 	# Setting '--variants ""' creates only the build image.
