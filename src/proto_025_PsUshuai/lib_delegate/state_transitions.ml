@@ -262,6 +262,10 @@ let has_already_been_handled state new_proposal =
   Block_hash.(current_proposal.block.hash = new_proposal.block.hash)
   && state.level_state.is_latest_proposal_applied
 
+let must_apply_before_voting state proposal =
+  Round.(
+    proposal.block.round >= state.global_state.config.force_apply_from_round)
+
 let mark_awaiting_pqc state =
   let new_round_state =
     {state.round_state with awaiting_unlocking_pqc = true}
@@ -269,7 +273,11 @@ let mark_awaiting_pqc state =
   let new_state = {state with round_state = new_round_state} in
   new_state
 
-let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
+(* [~force_process] is set by the callers that have just installed
+   [new_proposal] as the latest proposal. Without it, an applied proposal
+   would then be taken for an already handled one and never voted on. *)
+let rec process_proposal ~is_proposal_applied ~force_process state
+    (new_proposal : proposal) =
   let open Lwt_syntax in
   (* We need to avoid to send votes if we are in phases where consensus
      votes are already being forged. This is needed to avoid switching
@@ -292,7 +300,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
   let new_proposal_level = new_proposal.block.shell.level in
   let current_proposal = state.level_state.latest_proposal in
   if
-    is_proposal_applied
+    is_proposal_applied && (not force_process)
     && Block_hash.(current_proposal.block.hash = new_proposal.block.hash)
   then
     let new_level_state =
@@ -452,8 +460,9 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
       in
       (* recursive call with the up-to-date state to handle the new
          level proposals *)
-      (handle_proposal
+      (process_proposal
          ~is_proposal_applied
+         ~force_process:true
          {state with level_state; round_state}
          new_proposal [@profiler.record_s {verbosity = Debug} "handle proposal"])
     in
@@ -477,7 +486,12 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
       {
         Baking_actions.new_round_proposal = new_proposal;
         handle_proposal =
-          (fun state -> handle_proposal ~is_proposal_applied state new_proposal);
+          (fun state ->
+            process_proposal
+              ~is_proposal_applied
+              ~force_process:true
+              state
+              new_proposal);
       }
     in
     let* new_state = update_proposal ~is_proposal_applied state new_proposal in
@@ -515,6 +529,9 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
            shouldn't happen but do nothing anyway. *)
         let* () = Events.(emit branch_proposal_has_same_prequorum ()) in
         do_nothing state
+
+let handle_proposal ~is_proposal_applied state proposal =
+  process_proposal ~is_proposal_applied ~force_process:false state proposal
 
 (* Create a fresh block proposal containing the current operations of the
    mempool in [state] and the additional [attestations] for [delegate] at round
@@ -1042,8 +1059,8 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
           | Some attestation_qc -> attestation_qc
         in
         let elected_block = Some {proposal = latest_proposal; attestation_qc} in
-        let new_level_state = {state.level_state with elected_block} in
-        {state with level_state = new_level_state}
+        let new_level_state = {new_state.level_state with elected_block} in
+        {new_state with level_state = new_level_state}
     | Some _ ->
         (* We already have an elected block at this level. We do not need to update
            it. The earlier, the better. *)
@@ -1252,11 +1269,20 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
               proposal.block.shell.level,
               proposal.block.round ))
       in
-      (handle_proposal
-         ~is_proposal_applied:false
-         state
-         proposal
-       [@profiler.record_s {verbosity = Info} "handle new valid proposal"])
+      if must_apply_before_voting state proposal then
+        (* A validation-only proposal may still fail during application. Do
+           not vote until the node emits the corresponding
+           [New_head_proposal], which certifies successful application. *)
+        do_nothing
+          state
+        [@profiler.record_s
+          {verbosity = Info} "wait for proposal application before voting"]
+      else
+        handle_proposal
+          ~is_proposal_applied:false
+          state
+          proposal
+        [@profiler.record_s {verbosity = Info} "handle new valid proposal"]
   | _, New_forge_event (forge_event : forge_event) ->
       let* () = Events.(emit new_forge_event forge_event) in
       (handle_forge_event
@@ -1274,7 +1300,12 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
               proposal.block.shell.level,
               proposal.block.round ))
       in
-      if has_already_been_handled state proposal then
+      if must_apply_before_voting state proposal then
+        do_nothing
+          state
+        [@profiler.record_s
+          {verbosity = Info} "wait for proposal application before voting"]
+      else if has_already_been_handled state proposal then
         let* () = Events.(emit valid_proposal_received_after_application ()) in
         (do_nothing state [@profiler.record_s {verbosity = Info} "do nothing"])
       else
