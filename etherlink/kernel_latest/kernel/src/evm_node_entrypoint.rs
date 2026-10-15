@@ -1063,7 +1063,6 @@ mod tests {
             store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
             EVMBlockHeader,
         };
-        use crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH;
         use crate::load_base;
         use mir::ast::big_map::BigMapId;
         use mir::ast::Micheline;
@@ -1075,6 +1074,7 @@ mod tests {
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH;
         use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
+        use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
         use tezos_evm_runtime::safe_storage::{
             ETHERLINK_SAFE_STORAGE_ROOT_PATH, TMP_PATH,
         };
@@ -1163,7 +1163,7 @@ mod tests {
                 .unwrap();
             for root in [
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                TEZ_SAFE_STORAGE_ROOT_PATH,
+                TEZ_WORLD_STATE_ROOT_PATH,
                 TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
             ] {

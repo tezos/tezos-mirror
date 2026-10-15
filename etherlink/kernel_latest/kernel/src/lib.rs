@@ -446,13 +446,15 @@ where
     }
 
     let tez_world_state_subkeys = kernel_host
-        .store_count_subkeys(&chains::TEZ_SAFE_STORAGE_ROOT_PATH)
+        .store_count_subkeys(
+            &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
+        )
         .expect("The kernel failed to read the number of /tez/world_state subkeys");
 
     if tez_world_state_subkeys == 0 {
         kernel_host
             .store_write(
-                &chains::TEZ_SAFE_STORAGE_ROOT_PATH,
+                &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
                 b"Une sarabande de monades",
                 0,
             )

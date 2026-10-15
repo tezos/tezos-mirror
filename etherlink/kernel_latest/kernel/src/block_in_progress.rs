@@ -15,7 +15,6 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{
     TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-    TEZ_SAFE_STORAGE_ROOT_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -39,7 +38,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -577,7 +576,7 @@ impl BlockInProgress {
             // Maintain the live_blocks set for the Michelson runtime (branch validation).
             block_storage::store_current(
                 rk.host_mut(),
-                &TEZ_SAFE_STORAGE_ROOT_PATH,
+                &TEZ_WORLD_STATE_ROOT_PATH,
                 &tez_block,
                 true, // maintain_live_blocks
             )

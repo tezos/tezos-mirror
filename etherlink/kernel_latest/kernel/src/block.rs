@@ -278,7 +278,7 @@ where
             }
             let tezos_parent_hash = block_storage::read_current_hash(
                 host,
-                &crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH,
+                &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
             )
             .unwrap_or_else(|_| {
                 H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
@@ -726,7 +726,7 @@ mod tests {
     use crate::chains::{DebugFeatures, TezlinkContent};
     use crate::chains::{
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
-        TezosXChainConfig, TezosXTransaction, TEZ_SAFE_STORAGE_ROOT_PATH,
+        TezosXChainConfig, TezosXTransaction,
     };
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -758,7 +758,7 @@ mod tests {
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::{
-        TEZ_ACCOUNTS_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH,
+        TEZ_ACCOUNTS_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
     use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
     use tezos_execution::context;
@@ -1095,7 +1095,7 @@ mod tests {
             b"placeholder",
         )
         .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+        host.store_write_all(&TEZ_WORLD_STATE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
@@ -1419,13 +1419,13 @@ mod tests {
 
         // Verify that a TezBlock was stored (under /tez/world_state)
         let tez_block_number =
-            block_storage::read_current_number(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .expect("TezBlock number should be readable");
         // Block number is 0 for the first block (same as EVM block numbering)
         assert_eq!(U256::from(0), tez_block_number);
 
         let tez_block_hash =
-            block_storage::read_current_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .expect("TezBlock hash should be readable");
         // The hash should not be zero (it's computed from the block content)
         assert_ne!(H256::zero(), tez_block_hash);
@@ -1484,7 +1484,7 @@ mod tests {
 
         // Record block 0 hash
         let block_0_hash =
-            block_storage::read_current_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .expect("TezBlock 0 hash should be readable");
         assert_ne!(H256::zero(), block_0_hash);
 
@@ -1526,13 +1526,13 @@ mod tests {
 
         // Block 1 hash should be different from block 0
         let block_1_hash =
-            block_storage::read_current_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .expect("TezBlock 1 hash should be readable");
         assert_ne!(block_0_hash, block_1_hash);
 
         // Read block 1 from storage and check its previous_hash equals block 0's hash
         let block_path = concat(
-            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &TEZ_WORLD_STATE_ROOT_PATH,
             &RefPath::assert_from(b"/blocks/current/block"),
         )
         .expect("Block path should be valid");
@@ -1574,7 +1574,7 @@ mod tests {
         assert!(produced.is_err());
         assert!(crate::storage::read_michelson_runtime_sunrise_level(&host).is_none());
         assert!(
-            block_storage::read_current_number(&host, &TEZ_SAFE_STORAGE_ROOT_PATH)
+            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .is_err()
         );
         let alias_implementation = RefPath::assert_from(

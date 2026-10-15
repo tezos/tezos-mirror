@@ -41,6 +41,12 @@ pub const TEZ_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(TEZ_ACCOUNTS_ROOT
 pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
     RefPath::assert_from(TEZ_ACCOUNTS_ROOT.as_bytes());
 
+const TEZ_WORLD_STATE_ROOT: &str = "/tez/world_state";
+
+/// The durable path of the `/tez/world_state` root.
+pub const TEZ_WORLD_STATE_ROOT_PATH: RefPath =
+    RefPath::assert_from(TEZ_WORLD_STATE_ROOT.as_bytes());
+
 /// Storage handle threaded through kernel execution.
 ///
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back

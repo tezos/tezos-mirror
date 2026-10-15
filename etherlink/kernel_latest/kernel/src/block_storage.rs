@@ -237,8 +237,8 @@ pub fn read_current_hash(
 
 #[cfg(test)]
 pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
-    use crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH;
-    let block_path = path::current_block(&TEZ_SAFE_STORAGE_ROOT_PATH)?;
+    use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
+    let block_path = path::current_block(&TEZ_WORLD_STATE_ROOT_PATH)?;
     let bytes = host.store_read_all(&block_path)?;
     Ok(bytes)
 }
@@ -305,9 +305,9 @@ pub mod internal_for_tests {
 #[cfg(test)]
 mod live_blocks_tests {
     use super::*;
-    use crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH;
     use crate::l2block::L2Block;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
     use tezos_smart_rollup::types::Timestamp;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::protocol::{INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
@@ -335,7 +335,7 @@ mod live_blocks_tests {
         let hash = block.hash();
         store_current(
             host,
-            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &TEZ_WORLD_STATE_ROOT_PATH,
             &block,
             maintain_live_blocks,
         )
@@ -349,12 +349,12 @@ mod live_blocks_tests {
         let h0 = store_tez_block(&mut host, 0, true);
         let h1 = store_tez_block(&mut host, 1, true);
 
-        assert!(is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &h0).unwrap());
-        assert!(is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &h1).unwrap());
+        assert!(is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &h0).unwrap());
+        assert!(is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &h1).unwrap());
         // A branch that is not a recent block of this instance (the replay case) is not a member.
         assert!(!is_recent_block_hash(
             &host,
-            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &TEZ_WORLD_STATE_ROOT_PATH,
             &H256::from([0xABu8; 32])
         )
         .unwrap());
@@ -371,16 +371,15 @@ mod live_blocks_tests {
 
         // Block 0 fell out of the window and is no longer a valid branch.
         assert!(
-            !is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hashes[0])
-                .unwrap()
+            !is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hashes[0]).unwrap()
         );
         // The oldest still-in-window block and the latest one remain members.
         assert!(
-            is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hashes[1]).unwrap()
+            is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hashes[1]).unwrap()
         );
         assert!(is_recent_block_hash(
             &host,
-            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &TEZ_WORLD_STATE_ROOT_PATH,
             &hashes[BLOCKS_STORED as usize]
         )
         .unwrap());
@@ -391,8 +390,6 @@ mod live_blocks_tests {
         // The EVM path (maintain_live_blocks = false) must not populate live_blocks.
         let mut host = MockKernelHost::default();
         let hash = store_tez_block(&mut host, 0, false);
-        assert!(
-            !is_recent_block_hash(&host, &TEZ_SAFE_STORAGE_ROOT_PATH, &hash).unwrap()
-        );
+        assert!(!is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hash).unwrap());
     }
 }

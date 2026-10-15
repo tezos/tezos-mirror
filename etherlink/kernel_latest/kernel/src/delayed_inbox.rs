@@ -429,14 +429,16 @@ mod tests {
     use super::DelayedTransaction;
     use super::Hash;
     use crate::block_storage;
-    use crate::chains::{make_test_operation, TEZ_SAFE_STORAGE_ROOT_PATH};
+    use crate::chains::make_test_operation;
     use crate::configuration::CommonConfig;
     use crate::load_base;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use primitive_types::{H160, H256, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH,
+    };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
     use crate::transaction::TransactionContent::{
@@ -535,7 +537,7 @@ mod tests {
         // Register the branch as live so the entry check accepts the operation.
         block_storage::internal_for_tests::register_live_block(
             rk.host_mut(),
-            &TEZ_SAFE_STORAGE_ROOT_PATH,
+            &TEZ_WORLD_STATE_ROOT_PATH,
             &H256(*op.branch),
         )
         .expect("register live block");
