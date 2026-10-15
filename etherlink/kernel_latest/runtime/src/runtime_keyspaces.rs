@@ -11,7 +11,8 @@
 //! covers the keyspaces.
 //!
 //! The keyspaces are `/evm/eth_accounts` and `/tez/tez_accounts`, the account
-//! state of the two runtimes.
+//! state of the two runtimes, and `/tez/world_state`, the chain-level state of
+//! the Michelson runtime.
 
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
@@ -41,7 +42,12 @@ pub const TEZ_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(TEZ_ACCOUNTS_ROOT
 pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
     RefPath::assert_from(TEZ_ACCOUNTS_ROOT.as_bytes());
 
+/// Durable root of the `/tez/world_state` keyspace.
 const TEZ_WORLD_STATE_ROOT: &str = "/tez/world_state";
+
+/// Name of the `/tez/world_state` keyspace, which holds the chain-level state
+/// of the Michelson runtime.
+pub const TEZ_WORLD_STATE_KEYSPACE_NAME: Name = Name::from_static(TEZ_WORLD_STATE_ROOT);
 
 /// The durable path of the `/tez/world_state` root.
 pub const TEZ_WORLD_STATE_ROOT_PATH: RefPath =
@@ -77,6 +83,16 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
         &mut self.keyspaces.tez_accounts
     }
 
+    /// Returns the `/tez/world_state` keyspace.
+    pub fn tez_world_state(&self) -> &Host::KeySpace {
+        &self.keyspaces.tez_world_state
+    }
+
+    /// Returns the `/tez/world_state` keyspace for writing.
+    pub fn tez_world_state_mut(&mut self) -> &mut Host::KeySpace {
+        &mut self.keyspaces.tez_world_state
+    }
+
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host(&self) -> &Host {
         &*self.host
@@ -94,11 +110,13 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     pub fn init(host: &'host mut Host) -> Result<Self, KeySpaceLoaderError> {
         let eth_accounts = host.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME)?;
         let tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)?;
+        let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
         Ok(Self {
             host,
             keyspaces: Keyspaces {
                 eth_accounts,
                 tez_accounts,
+                tez_world_state,
             },
         })
     }
@@ -108,6 +126,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
 struct Keyspaces<KS> {
     eth_accounts: KS,
     tez_accounts: KS,
+    tez_world_state: KS,
 }
 
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
@@ -124,19 +143,20 @@ mod tests {
     const PROBE: Key = Key::from_static(b"/probe");
 
     #[test]
-    fn init_loads_the_accounts_keyspaces_in_the_tmp_copy() {
+    fn init_loads_the_keyspaces_in_the_tmp_copy() {
         let mut host = MockKernelHost::default();
+        let roots = [
+            ETH_ACCOUNTS_ROOT_PATH,
+            TEZ_ACCOUNTS_ROOT_PATH,
+            TEZ_WORLD_STATE_ROOT_PATH,
+        ];
         // `start` copies the roots, so they have to exist.
-        host.store_write_all(&ETH_ACCOUNTS_ROOT_PATH, b"root")
-            .unwrap();
-        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"root")
-            .unwrap();
+        for root in &roots {
+            host.store_write_all(root, b"root").unwrap();
+        }
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![
-                OwnedPath::from(ETH_ACCOUNTS_ROOT_PATH),
-                OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH),
-            ],
+            world_states: roots.map(OwnedPath::from).to_vec(),
         };
         safe.start().unwrap();
 
@@ -150,21 +170,30 @@ mod tests {
                 rk.tez_accounts().name().to_string(),
                 "/tmp/tez/tez_accounts"
             );
+            assert_eq!(
+                rk.tez_world_state().name().to_string(),
+                "/tmp/tez/world_state"
+            );
+            rk.eth_accounts_mut().set(&PROBE, b"inside").unwrap();
             rk.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
+            rk.tez_world_state_mut().set(&PROBE, b"inside").unwrap();
         }
-        let probe_path = OwnedPath::try_from(
-            [TEZ_ACCOUNTS_ROOT_PATH.as_bytes(), PROBE.as_bytes()].concat(),
-        )
-        .unwrap();
-        assert!(safe.host.store_has(&probe_path).unwrap().is_none());
-        assert_eq!(
-            safe.host
-                .store_read_all(&safe_path(&probe_path).unwrap())
-                .unwrap(),
-            b"inside"
-        );
+        let probe_paths = roots.map(|root| {
+            OwnedPath::try_from([root.as_bytes(), PROBE.as_bytes()].concat()).unwrap()
+        });
+        for probe_path in &probe_paths {
+            assert!(safe.host.store_has(probe_path).unwrap().is_none());
+            assert_eq!(
+                safe.host
+                    .store_read_all(&safe_path(probe_path).unwrap())
+                    .unwrap(),
+                b"inside"
+            );
+        }
 
         safe.promote().unwrap();
-        assert_eq!(safe.host.store_read_all(&probe_path).unwrap(), b"inside");
+        for probe_path in &probe_paths {
+            assert_eq!(safe.host.store_read_all(probe_path).unwrap(), b"inside");
+        }
     }
 }
