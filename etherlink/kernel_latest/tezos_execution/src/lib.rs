@@ -1541,7 +1541,7 @@ where
             })
         }
         Contract::Originated(kt1) => {
-            let dest_account = context::originated_from_kt1(kt1)
+            let dest_account = account_storage::TezosOriginatedAccount::from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Reject a transfer to a never-originated KT1 before any write, as
             // Tezos does. Otherwise the NotFound error of `code()` aborts the block.
@@ -2087,9 +2087,12 @@ where
     let parser = Parser::new();
     let arena = &parser.arena;
 
-    let host_err = |e: tezos_storage::error::Error| RunCodeError::Host(e.to_string());
+    fn host_err(e: impl std::fmt::Display) -> RunCodeError {
+        RunCodeError::Host(e.to_string())
+    }
 
-    let account = context::originated_from_kt1(&params.self_address).map_err(host_err)?;
+    let account = account_storage::TezosOriginatedAccount::from_kt1(&params.self_address)
+        .map_err(host_err)?;
 
     let mut operation_gas = TezlinkOperationGas::start_milligas(params.milligas)
         .map_err(|e| RunCodeError::Execution(e.to_string()))?;
@@ -2636,7 +2639,7 @@ where
     let lazy_storage_size_diff = ctx.interpret_context.take_lazy_storage_size_diff();
 
     // Set the storage of the contract
-    let smart_contract = context::originated_from_kt1(&contract)
+    let smart_contract = account_storage::TezosOriginatedAccount::from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     // Charge gas for the durable writes `smart_contract.init` performs: the
@@ -3837,7 +3840,6 @@ mod tests {
     #[test]
     fn alias_entrypoints_resolve_via_shared_implementation() {
         use crate::account_storage::write_alias_implementation;
-        use crate::context::code::origin_key;
         use crate::get_contract_entrypoint;
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
@@ -3857,16 +3859,12 @@ mod tests {
 
         // A code-less KT1 classified as an alias.
         let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
-        let account = context::originated_from_kt1(&kt1).unwrap();
+        let account = account_storage::TezosOriginatedAccount::from_kt1(&kt1).unwrap();
         let origin = Origin::Alias(AliasInfo {
             runtime: RuntimeId::Ethereum,
             native_address: "0xabc".to_string(),
         });
-        let mut buf = vec![];
-        origin.bin_write(&mut buf).unwrap();
-        rk.tez_accounts_mut()
-            .set(&origin_key(&account).unwrap(), &buf)
-            .unwrap();
+        account.set_origin(rk.tez_accounts_mut(), &origin).unwrap();
 
         let entrypoints = get_contract_entrypoint(
             rk.tez_accounts(),
@@ -5365,12 +5363,13 @@ mod tests {
         // No balance entry should have been written under the bogus
         // contract path. The guard runs before `transfer_tez`, so the
         // never-originated KT1 must remain absent from durable storage.
-        let dest_account = context::originated_from_kt1(&desthash)
-            .expect("originated_from_kt1 should have succeeded");
-        let balance_key = context::contracts::balance_key(&dest_account)
-            .expect("balance_key should have succeeded");
         assert!(
-            !rk.tez_accounts().contains(&balance_key),
+            !rk.tez_accounts().contains(
+                &context::contracts::account_key(&Contract::Originated(desthash.clone()))
+                    .unwrap()
+                    .concat(&context::contracts::BALANCE)
+                    .unwrap()
+            ),
             "no balance entry should exist for a never-originated KT1"
         );
 
@@ -8605,8 +8604,9 @@ mod tests {
 
         // SafeStorage rolled back the origination: the smart contract is
         // nowhere to be found in durable storage.
-        let originated_account = context::originated_from_kt1(&expected_kt1)
-            .expect("originated account handle");
+        let originated_account =
+            account_storage::TezosOriginatedAccount::from_kt1(&expected_kt1)
+                .expect("originated account handle");
         assert!(
             !originated_account.exists(rk.tez_accounts()).unwrap(),
             "originated contract must be rolled back"
@@ -9022,8 +9022,9 @@ mod tests {
         );
 
         // The contract is actually stored at the L1-canonical KT1.
-        let originated_account = context::originated_from_kt1(&l1_canonical)
-            .expect("originated account handle");
+        let originated_account =
+            account_storage::TezosOriginatedAccount::from_kt1(&l1_canonical)
+                .expect("originated account handle");
         assert!(
             originated_account.exists(rk.tez_accounts()).unwrap(),
             "Contract must be stored at the L1-canonical KT1"
@@ -10719,20 +10720,23 @@ mod tests {
         let Originated {
             contract: created_addr_0,
         } = &contracts[0];
-        let created_acount_0 = context::originated_from_kt1(created_addr_0)
-            .expect("Failed to retrieve generated account");
+        let created_acount_0 =
+            account_storage::TezosOriginatedAccount::from_kt1(created_addr_0)
+                .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_1,
         } = &contracts[1];
-        let created_acount_1 = context::originated_from_kt1(created_addr_1)
-            .expect("Failed to retrieve generated account");
+        let created_acount_1 =
+            account_storage::TezosOriginatedAccount::from_kt1(created_addr_1)
+                .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_2,
         } = &contracts[2];
-        let created_acount_2 = context::originated_from_kt1(created_addr_2)
-            .expect("Failed to retrieve generated account");
+        let created_acount_2 =
+            account_storage::TezosOriginatedAccount::from_kt1(created_addr_2)
+                .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
             .storage(ctx.rk.tez_accounts())
@@ -11325,8 +11329,9 @@ mod tests {
         assert_eq!(serve_calls.len(), 1, "Serve should have been called once");
 
         // Verify that the gateway balance is 0 (funds were forwarded, not locked)
-        let gateway_account = context::originated_from_kt1(&gateway_kt1)
-            .expect("Gateway account should exist");
+        let gateway_account =
+            account_storage::TezosOriginatedAccount::from_kt1(&gateway_kt1)
+                .expect("Gateway account should exist");
         assert_eq!(
             gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),
@@ -12484,8 +12489,9 @@ mod tests {
         let gateway_kt1 =
             ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap();
-        let gateway_account = context::originated_from_kt1(&gateway_kt1)
-            .expect("Gateway account should exist");
+        let gateway_account =
+            account_storage::TezosOriginatedAccount::from_kt1(&gateway_kt1)
+                .expect("Gateway account should exist");
         assert_eq!(
             gateway_account.balance(rk.tez_accounts()).unwrap(),
             0_u64.into(),

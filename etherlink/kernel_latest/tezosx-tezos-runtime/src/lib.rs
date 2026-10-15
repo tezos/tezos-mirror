@@ -65,6 +65,7 @@ pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
     get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info,
+    TezosOriginatedAccount,
 };
 
 pub struct TezosRuntime(pub ChainId);
@@ -860,7 +861,7 @@ where
     // `tezos_execution::transfer` for the destination.
     let transfer_result = match &hdrs.sender {
         Contract::Originated(kt1) => {
-            let sender_account = context::originated_from_kt1(kt1).map_err(|e| {
+            let sender_account = TezosOriginatedAccount::from_kt1(kt1).map_err(|e| {
                 TezosXRuntimeError::Custom(format!(
                     "Failed to fetch sender account: {e:?}"
                 ))
@@ -1320,7 +1321,7 @@ impl RuntimeInterface for TezosRuntime {
                 "Failed to parse alias from string: {err}"
             ))
         })?;
-        let account = context::originated_from_kt1(&kt1)?;
+        let account = TezosOriginatedAccount::from_kt1(&kt1)?;
 
         match account.origin(rk.tez_accounts())? {
             Some(Origin::Alias(_)) => Ok(true),
@@ -1495,7 +1496,7 @@ impl RuntimeInterface for TezosRuntime {
         // bring no new cases, and would not be future proof when upgrading
         // aliases code.
         budget.consume(ALIAS_LOOKUP_COST)?;
-        let account = context::originated_from_kt1(&kt1)?;
+        let account = TezosOriginatedAccount::from_kt1(&kt1)?;
         if account.exists(rk.tez_accounts())? {
             Ok(())
         } else {
@@ -1542,7 +1543,7 @@ impl TezosRuntime {
         tez_accounts: &impl KeySpace,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
-        let originated_account = context::originated_from_kt1(kt1)?;
+        let originated_account = TezosOriginatedAccount::from_kt1(kt1)?;
         let balance = originated_account.balance(tez_accounts)?;
         narith_to_u256(&balance)
     }
@@ -1978,12 +1979,17 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let account = context::originated_from_kt1(&kt1).unwrap();
+        let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
 
         // L2-1529: a materialized alias carries no per-contract script —
         // nothing is written at `/data/code`. Its code is the single shared
         // implementation.
-        let code_key = tezos_execution::context::code::code_key(&account).unwrap();
+        let code_key = tezos_execution::context::contracts::account_key(
+            &Contract::Originated(kt1.clone()),
+        )
+        .unwrap()
+        .concat(b"/data/code")
+        .unwrap();
         assert!(
             !rk.tez_accounts().contains(&code_key),
             "a materialized alias must not store its own /data/code"
@@ -2049,7 +2055,7 @@ mod tests {
             .expect("ensure_alias should succeed");
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let account = context::originated_from_kt1(&kt1).unwrap();
+        let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
 
         let storage = account.storage(rk.tez_accounts()).unwrap();
         let expected =
@@ -2124,7 +2130,7 @@ mod tests {
         let runtime = test_runtime();
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
-        let account = context::originated_from_kt1(&kt1).unwrap();
+        let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
 
         account
             .set_origin(rk.tez_accounts_mut(), &Origin::Native)
@@ -2958,7 +2964,7 @@ mod tests {
 
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-failwith"));
-        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        let dest = TezosOriginatedAccount::from_kt1(&dest_kt1).unwrap();
         let script = parser
             .parse_top_level(
                 r#"parameter unit; storage unit;
@@ -3026,7 +3032,7 @@ mod tests {
 
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-2069-mir-out-of-gas"));
-        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        let dest = TezosOriginatedAccount::from_kt1(&dest_kt1).unwrap();
         // Loops until the budget is exhausted.
         let script = parser
             .parse_top_level(
@@ -3091,7 +3097,7 @@ mod tests {
 
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"l2-1439-view-failwith"));
-        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        let dest = TezosOriginatedAccount::from_kt1(&dest_kt1).unwrap();
         let script = parser
             .parse_top_level(
                 r#"parameter unit; storage unit;
@@ -3161,7 +3167,7 @@ mod tests {
 
         let parser = mir::parser::Parser::new();
         let dest_kt1 = ContractKt1Hash::from(digest_160(b"view-lookup-out-of-gas"));
-        let dest = context::originated_from_kt1(&dest_kt1).unwrap();
+        let dest = TezosOriginatedAccount::from_kt1(&dest_kt1).unwrap();
         let script = parser
             .parse_top_level(
                 r#"parameter unit; storage unit;
@@ -3380,7 +3386,7 @@ mod tests {
         // Receiver: accepts unit, emits nothing — so it contributes no
         // further counter increments.
         let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-receiver"));
-        let receiver = context::originated_from_kt1(&receiver_kt1).unwrap();
+        let receiver = TezosOriginatedAccount::from_kt1(&receiver_kt1).unwrap();
         let receiver_script = parser
             .parse_top_level(
                 "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
@@ -3407,7 +3413,7 @@ mod tests {
         // address passed as parameter — a single `operation_counter()`
         // increment.
         let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1676-parent"));
-        let parent = context::originated_from_kt1(&parent_kt1).unwrap();
+        let parent = TezosOriginatedAccount::from_kt1(&parent_kt1).unwrap();
         let parent_script = parser
             .parse_top_level(
                 r#"
@@ -3530,7 +3536,7 @@ mod tests {
             let parser = mir::parser::Parser::new();
 
             let receiver_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-receiver"));
-            let receiver = context::originated_from_kt1(&receiver_kt1).unwrap();
+            let receiver = TezosOriginatedAccount::from_kt1(&receiver_kt1).unwrap();
             let receiver_script = parser
                 .parse_top_level(
                     "parameter unit; storage unit; code { CDR; NIL operation; PAIR }",
@@ -3554,7 +3560,7 @@ mod tests {
                 .unwrap();
 
             let parent_kt1 = ContractKt1Hash::from(digest_160(b"l2-1727-parent"));
-            let parent = context::originated_from_kt1(&parent_kt1).unwrap();
+            let parent = TezosOriginatedAccount::from_kt1(&parent_kt1).unwrap();
             let parent_script = parser
                 .parse_top_level(
                     r#"
@@ -3694,7 +3700,7 @@ mod tests {
                 b"test_kt1_seed",
             ));
             let kt1_b58 = kt1.to_base58_check();
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             account
                 .set_origin(rk.tez_accounts_mut(), &Origin::Native)
                 .unwrap();
@@ -3856,7 +3862,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1");
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             account
                 .set_origin(rk.tez_accounts_mut(), &Origin::Native)
                 .unwrap();
@@ -3870,7 +3876,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"native_kt1_with_key");
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             account
                 .set_origin(rk.tez_accounts_mut(), &Origin::Native)
                 .unwrap();
@@ -3885,7 +3891,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"alias_kt1");
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             let origin = Origin::Alias(AliasInfo {
                 runtime: RuntimeId::Ethereum,
                 native_address: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string(),
@@ -3903,7 +3909,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"unclassified_kt1_with_code");
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             account
                 .init(
                     rk.tez_accounts_mut(),
@@ -3978,7 +3984,7 @@ mod tests {
             let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             let kt1 = kt1(b"oog_code_lookup");
-            let account = context::originated_from_kt1(&kt1).unwrap();
+            let account = TezosOriginatedAccount::from_kt1(&kt1).unwrap();
             account
                 .init(
                     rk.tez_accounts_mut(),

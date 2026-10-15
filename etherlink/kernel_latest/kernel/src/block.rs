@@ -2258,7 +2258,7 @@ mod tests {
 
         // The alias is classified as the alias of the EVM account.
         assert_eq!(
-            context::originated_from_kt1(&kt1)
+            tezos_execution::account_storage::TezosOriginatedAccount::from_kt1(&kt1)
                 .unwrap()
                 .origin(rk.tez_accounts())
                 .unwrap(),

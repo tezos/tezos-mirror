@@ -465,11 +465,11 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         mir::context::LookupViewError,
     > {
         use mir::context::LookupViewError;
-        // `originated_from_kt1` only builds the key of the contract. It does
-        // not make sure that the contract exists. A failure here means that
-        // `originated_from_kt1` cannot build the key. This function reports
+        // `TezosOriginatedAccount::from_kt1` only builds the keys of the
+        // contract. It does not make sure that the contract exists. A failure
+        // here means that it cannot build a key. This function reports
         // the failure as a host error.
-        let account = crate::context::originated_from_kt1(contract)
+        let account = crate::account_storage::TezosOriginatedAccount::from_kt1(contract)
             .map_err(|e| LookupViewError::HostError(e.to_string()))?;
         // L1 VIEW semantics push `None` when the target KT1 does not
         // exist at all (cf. `script_interpreter.ml::iview`). Probe
@@ -2410,7 +2410,6 @@ pub mod tests {
     #[test]
     fn lookup_view_storage_balance_returns_none_for_unoriginated_kt1() {
         use crate::context::implicit_from_public_key_hash;
-        use crate::context::originated_from_kt1;
         use mir::ast::michelson_address::AddressHash;
 
         let mut host = MockKernelHost::default();
@@ -2448,7 +2447,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
+            contract_account: TezosOriginatedAccount::from_kt1(&placeholder_kt1).unwrap(),
         };
 
         // The test exercises `lookup_view_storage_balance` directly,
@@ -3093,7 +3092,6 @@ pub mod tests {
     #[test]
     fn enshrined_synthetic_views_dispatch_in_sync() {
         use crate::context::implicit_from_public_key_hash;
-        use crate::context::originated_from_kt1;
         use crate::enshrined_contracts::EnshrinedContracts;
         use mir::ast::michelson_address::AddressHash;
         use tezos_crypto_rs::hash::HashTrait;
@@ -3133,7 +3131,7 @@ pub mod tests {
             amount: 0,
             self_address: AddressHash::Kt1(placeholder_kt1.clone()),
             balance: 0,
-            contract_account: originated_from_kt1(&placeholder_kt1).unwrap(),
+            contract_account: TezosOriginatedAccount::from_kt1(&placeholder_kt1).unwrap(),
         };
 
         let mut journal = tezosx_journal::TezosXJournal::new(
@@ -3480,7 +3478,6 @@ pub mod tests {
 #[cfg(test)]
 pub(crate) mod mock {
     use super::*;
-    use crate::context::originated_from_kt1;
     use mir::ast::{ByteReprTrait, Entrypoint};
     use num_bigint::BigInt;
     use std::collections::HashMap;
@@ -3533,8 +3530,10 @@ pub(crate) mod mock {
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 operation_gas: crate::gas::TezlinkOperationGas::default(),
                 operation_counter: 0,
-                contract_account: originated_from_kt1(&ContractKt1Hash::from([0u8; 20]))
-                    .unwrap(),
+                contract_account: TezosOriginatedAccount::from_kt1(
+                    &ContractKt1Hash::from([0u8; 20]),
+                )
+                .unwrap(),
                 crac_chain_depth: 0,
                 crac_origin: None,
                 delegated_storage_cost: 0,
