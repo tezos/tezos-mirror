@@ -177,9 +177,7 @@ where
     // balance. `lookup_view_storage_balance` below re-reads balance
     // internally; the extra storage read is the price of keeping this
     // ctx initialized in one shot rather than patching a placeholder.
-    let balance_narith = dest_account.balance(rk.tez_accounts()).map_err(|e| {
-        TezosXRuntimeError::Custom(format!("failed to read destination balance: {e:?}"))
-    })?;
+    let balance_narith = dest_account.balance(rk.tez_accounts())?;
     let balance: i64 = balance_narith.0.try_into().map_err(|_| {
         TezosXRuntimeError::BadRequest("destination balance overflows i64".into())
     })?;
