@@ -580,8 +580,8 @@ clean-kernels:
 
 .PHONY: wasm_runtime_gen_files
 wasm_runtime_gen_files::
-	@echo 'Building etherlink/lib_wasm_runtime'
-	@cd etherlink/lib_wasm_runtime; cargo build
+	@echo 'Generating etherlink/lib_wasm_runtime OCaml API'
+	@cd etherlink/lib_wasm_runtime; cargo check
 
 octez-evm-node: wasm_runtime_gen_files
 

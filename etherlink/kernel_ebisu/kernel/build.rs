@@ -5,7 +5,7 @@
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/*");
+    println!("cargo:rerun-if-changed=src");
     let git_hash = match (
         option_env!("CI_COMMIT_SHA"),
         Command::new("git").args(["rev-parse", "HEAD"]).output(),
