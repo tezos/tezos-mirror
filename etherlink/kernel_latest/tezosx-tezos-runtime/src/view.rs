@@ -185,10 +185,7 @@ where
     let source_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
         TezosXRuntimeError::ConversionError(format!("failed to parse null address: {e}"))
     })?;
-    let source_account =
-        context::implicit_from_public_key_hash(&source_pkh).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("failed to fetch source account: {e:?}"))
-        })?;
+    let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
 
     // Any error here comes from an invalid `X-Tezos-Gas-Limit` header
     // (value above `MAX_LIMIT` or not a valid u32), i.e. a caller
