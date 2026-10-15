@@ -543,9 +543,11 @@ impl BlockInProgress {
         );
 
         if enable_tezos_runtime {
-            let protocol = match read_current_tez_block_header(rk.host()) {
-                Ok(previous_header) => previous_header.next_protocol,
-                Err(_) => TARGET_TEZOS_PROTOCOL,
+            let protocol = match read_current_tez_block_header(rk.tez_world_state())
+                .context("Failed to read the current TezBlockHeader")?
+            {
+                Some(previous_header) => previous_header.next_protocol,
+                None => TARGET_TEZOS_PROTOCOL,
             };
             let mut tezos_ops = self.cumulative_tezos_operation_receipts.list;
             crate::apply::renumber_nonces(&mut tezos_ops).map_err(|e| {
@@ -581,7 +583,7 @@ impl BlockInProgress {
                 true, // maintain_live_blocks
             )
             .context("Failed to store the Tezos block")?;
-            store_current_tez_block_header(rk.host_mut(), &new_header)
+            store_current_tez_block_header(rk.tez_world_state_mut(), &new_header)
                 .context("Failed to store the current TezBlockHeader")?;
         }
 

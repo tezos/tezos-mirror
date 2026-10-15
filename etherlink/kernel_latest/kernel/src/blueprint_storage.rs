@@ -30,12 +30,9 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
-use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtNum, KeySpaceExtRlp};
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
-use tezos_storage::{read_rlp, store_rlp};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
@@ -51,8 +48,9 @@ const BLUEPRINT_CURRENT_GENERATION_KEY: Key = Key::from_static(b"/blueprints/gen
 // this relative key.
 const EVM_CURRENT_BLOCK_HEADER_KEY: Key = Key::from_static(b"/current_block_header");
 
-const TEZ_CURRENT_BLOCK_HEADER: RefPath =
-    RefPath::assert_from(b"/tez/world_state/current_chain_header");
+// The current Tezos block header is read and written through the
+// `/tez/world_state` keyspace at this relative key.
+const TEZ_CURRENT_BLOCK_HEADER_KEY: Key = Key::from_static(b"/current_chain_header");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
@@ -479,21 +477,17 @@ pub fn read_current_blueprint_header(
     Ok(block_header.blueprint_header)
 }
 
-pub fn store_current_tez_block_header<Host>(
-    host: &mut Host,
+pub fn store_current_tez_block_header(
+    tez_world_state: &mut impl KeySpace,
     header: &TezBlockHeader,
-) -> Result<(), Error>
-where
-    Host: StorageV1,
-{
-    store_rlp(header, host, &TEZ_CURRENT_BLOCK_HEADER).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    tez_world_state.store_rlp(&TEZ_CURRENT_BLOCK_HEADER_KEY, header)
 }
 
-pub fn read_current_tez_block_header<Host>(host: &Host) -> Result<TezBlockHeader, Error>
-where
-    Host: StorageV1,
-{
-    Ok(read_rlp(host, &TEZ_CURRENT_BLOCK_HEADER)?)
+pub fn read_current_tez_block_header(
+    tez_world_state: &impl KeySpace,
+) -> Result<Option<TezBlockHeader>, KeySpaceError> {
+    tez_world_state.read_rlp(&TEZ_CURRENT_BLOCK_HEADER_KEY)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -947,12 +941,16 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
+    use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
     // Absolute forms of the keys above, asserting the relative keys resolve to
     // the historical durable paths.
     const EVM_CURRENT_BLOCK_HEADER: RefPath =
         RefPath::assert_from(b"/base/current_block_header");
+    const TEZ_CURRENT_BLOCK_HEADER: RefPath =
+        RefPath::assert_from(b"/tez/world_state/current_chain_header");
     const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
 
     fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
@@ -1174,6 +1172,30 @@ mod tests {
         let read = read_current_block_header::<EVMBlockHeader>(&base).unwrap();
         assert_eq!(read.blueprint_header.number, 7.into());
         assert_eq!(read.blueprint_header.timestamp, Timestamp::from(10));
+    }
+
+    /// The current Tezos block header resolves to
+    /// `/tez/world_state/current_chain_header`.
+    #[test]
+    fn tez_current_block_header_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let header = TezBlockHeader {
+            hash: H256::from([42u8; 32]),
+            next_protocol: TARGET_TEZOS_PROTOCOL,
+        };
+
+        store_current_tez_block_header(rk.tez_world_state_mut(), &header).unwrap();
+
+        assert_eq!(
+            rk.host().store_read_all(&TEZ_CURRENT_BLOCK_HEADER).unwrap(),
+            header.rlp_bytes().to_vec()
+        );
+        let read = read_current_tez_block_header(rk.tez_world_state())
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.hash, header.hash);
+        assert_eq!(read.next_protocol, header.next_protocol);
     }
 
     // The sequencer-blueprint writer and its readers now go through the `/base`

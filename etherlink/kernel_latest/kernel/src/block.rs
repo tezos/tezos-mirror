@@ -3791,7 +3791,7 @@ mod tests {
             hash: H256(*TezBlock::genesis_block_hash()),
             next_protocol: previous_protocol,
         };
-        store_current_tez_block_header(rk.host_mut(), &header).unwrap();
+        store_current_tez_block_header(rk.tez_world_state_mut(), &header).unwrap();
 
         // First block: protocol = previous (from stored header),
         // next_protocol = current (TARGET_TEZOS_PROTOCOL)

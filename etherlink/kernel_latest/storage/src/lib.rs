@@ -15,7 +15,7 @@ use helpers::is_incomplete;
 use nom::error::ParseError;
 use nom::Finish;
 use primitive_types::{H256, U256};
-use rlp::{Decodable, Encodable};
+use rlp::Decodable;
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
@@ -165,17 +165,6 @@ pub fn write_u64_le(
     value: u64,
 ) -> Result<(), Error> {
     host.store_write(path, value.to_le_bytes().as_slice(), 0)
-        .map_err(Error::from)
-}
-
-/// Store `src` (which must be encodable) as rlp bytes into storage
-/// at the given `path`.
-pub fn store_rlp<T: Encodable>(
-    src: &T,
-    host: &mut impl StorageV1,
-    path: &impl Path,
-) -> Result<(), Error> {
-    host.store_write_all(path, &src.rlp_bytes())
         .map_err(Error::from)
 }
 
