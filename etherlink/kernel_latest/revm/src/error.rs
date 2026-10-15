@@ -20,7 +20,7 @@ use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use tezosx_interfaces::{KernelStorageError, TezosXRuntimeError};
-use tezosx_types::Wei;
+use tezosx_types::{GasConversionError, Wei};
 use thiserror::Error;
 
 /// Failures from the EVM database when reading or writing storage
@@ -83,8 +83,8 @@ pub enum EvmKernelError {
     KeySpace(#[from] KeySpaceError),
     #[error("Base fee per gas does not fit in u64")]
     BaseFeePerGasOverflow,
-    #[error("Gas for fees does not fit in u64")]
-    GasForFeesOverflow,
+    #[error("Cannot bill the fees in gas: {0}")]
+    GasForFees(#[from] GasConversionError),
     #[error("Insufficient gas to cover the non-execution fees (gas_limit={gas_limit}, gas_for_fees={gas_for_fees})")]
     GasToFeesUnderflow { gas_limit: u64, gas_for_fees: u64 },
     #[error("FA ticket creator encoding failed")]

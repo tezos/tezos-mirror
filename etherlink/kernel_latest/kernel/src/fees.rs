@@ -170,7 +170,7 @@ impl FeeUpdates {
 
         let gas_used = U256::from(u64::from(
             wei_to_evm_gas(initial_total_fees, gas_price)
-                .ok_or(EvmKernelError::GasForFeesOverflow)?,
+                .map_err(EvmKernelError::from)?,
         ));
 
         // A gas times a base fee cannot saturate: both fit in a u64.
@@ -325,7 +325,7 @@ pub(crate) fn gas_for_fees(
 
     wei_to_evm_gas(fees, gas_price)
         .map(u64::from)
-        .ok_or(EvmKernelError::GasForFeesOverflow)
+        .map_err(EvmKernelError::from)
 }
 
 // Size of a single EIP-7702 authorization entry:

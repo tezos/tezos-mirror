@@ -7,8 +7,20 @@
 //! `ethereum::wei`.
 
 use primitive_types::U256;
+use thiserror::Error;
 
 use crate::{EvmGas, Mutez, Wei, WeiToMutezError};
+
+/// Failure to convert a cost to EVM gas.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum GasConversionError {
+    /// The base fee is zero.
+    #[error("the base fee per gas is zero")]
+    ZeroBaseFee,
+    /// The gas amount does not fit in a `u64`.
+    #[error("the gas amount does not fit in u64")]
+    GasOverflow,
+}
 
 /// Convert Michelson gas to mutez using the current base fee.
 ///
@@ -48,15 +60,18 @@ fn ceil_div(a: U256, b: U256) -> U256 {
 ///
 /// Units: `cost` (wei) / `base_fee_per_gas` (wei/evm_gas) = evm_gas.
 ///
-/// Returns `None` when `base_fee_per_gas` is zero or the gas amount
-/// overflows `u64`.
-pub fn wei_to_evm_gas(cost: Wei, base_fee_per_gas: U256) -> Option<EvmGas> {
+/// Fails when `base_fee_per_gas` is zero or the gas amount overflows
+/// `u64`.
+pub fn wei_to_evm_gas(
+    cost: Wei,
+    base_fee_per_gas: U256,
+) -> Result<EvmGas, GasConversionError> {
     if base_fee_per_gas.is_zero() {
-        return None;
+        return Err(GasConversionError::ZeroBaseFee);
     }
     u64::try_from(ceil_div(cost.as_u256(), base_fee_per_gas))
-        .ok()
         .map(EvmGas::new)
+        .map_err(|_| GasConversionError::GasOverflow)
 }
 
 /// Convert a mutez cost to EVM gas at the given base fee, with ceiling
@@ -65,9 +80,12 @@ pub fn wei_to_evm_gas(cost: Wei, base_fee_per_gas: U256) -> Option<EvmGas> {
 /// Units: `cost` (mutez) * 10^12 (wei/mutez) / `base_fee_per_gas`
 /// (wei/evm_gas) = evm_gas, with ceiling division.
 ///
-/// Returns `None` when `base_fee_per_gas` is zero or the gas amount
-/// overflows `u64`.
-pub fn mutez_to_evm_gas(cost: Mutez, base_fee_per_gas: U256) -> Option<EvmGas> {
+/// Fails when `base_fee_per_gas` is zero or the gas amount overflows
+/// `u64`.
+pub fn mutez_to_evm_gas(
+    cost: Mutez,
+    base_fee_per_gas: U256,
+) -> Result<EvmGas, GasConversionError> {
     wei_to_evm_gas(cost.to_wei(), base_fee_per_gas)
 }
 
@@ -120,17 +138,14 @@ mod tests {
         let cost = Mutez::try_from(1u64).unwrap();
         assert_eq!(
             mutez_to_evm_gas(cost, U256::exp10(9)),
-            Some(EvmGas::new(1000))
+            Ok(EvmGas::new(1000))
         );
     }
 
     #[test]
     fn mutez_to_evm_gas_exact_division() {
         let cost = Mutez::try_from(1u64).unwrap();
-        assert_eq!(
-            mutez_to_evm_gas(cost, U256::exp10(12)),
-            Some(EvmGas::new(1))
-        );
+        assert_eq!(mutez_to_evm_gas(cost, U256::exp10(12)), Ok(EvmGas::new(1)));
     }
 
     #[test]
@@ -138,7 +153,7 @@ mod tests {
         let cost = Mutez::try_from(3u64).unwrap();
         assert_eq!(
             mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(2u64)),
-            Some(EvmGas::new(2))
+            Ok(EvmGas::new(2))
         );
     }
 
@@ -147,7 +162,7 @@ mod tests {
         let cost = Mutez::try_from(1u64).unwrap();
         assert_eq!(
             mutez_to_evm_gas(cost, U256::exp10(12) * U256::from(3u64)),
-            Some(EvmGas::new(1))
+            Ok(EvmGas::new(1))
         );
     }
 
@@ -155,20 +170,26 @@ mod tests {
     fn mutez_to_evm_gas_zero_mutez_is_zero() {
         assert_eq!(
             mutez_to_evm_gas(Mutez::ZERO, U256::one()),
-            Some(EvmGas::new(0))
+            Ok(EvmGas::new(0))
         );
     }
 
     #[test]
-    fn mutez_to_evm_gas_zero_base_fee_is_none() {
+    fn mutez_to_evm_gas_zero_base_fee_errs() {
         let cost = Mutez::try_from(1u64).unwrap();
-        assert_eq!(mutez_to_evm_gas(cost, U256::zero()), None);
+        assert_eq!(
+            mutez_to_evm_gas(cost, U256::zero()),
+            Err(GasConversionError::ZeroBaseFee)
+        );
     }
 
     #[test]
-    fn mutez_to_evm_gas_overflow_is_none() {
+    fn mutez_to_evm_gas_overflow_errs() {
         // Mutez::MAX wei / 1 overflows u64.
-        assert_eq!(mutez_to_evm_gas(Mutez::MAX, U256::one()), None);
+        assert_eq!(
+            mutez_to_evm_gas(Mutez::MAX, U256::one()),
+            Err(GasConversionError::GasOverflow)
+        );
     }
 
     #[test]
@@ -178,27 +199,30 @@ mod tests {
                 Wei::from_u256(U256::exp10(12) * U256::from(3u64)),
                 U256::exp10(12) * U256::from(2u64)
             ),
-            Some(EvmGas::new(2))
+            Ok(EvmGas::new(2))
         );
         assert_eq!(
             wei_to_evm_gas(
                 Wei::from_u256(U256::exp10(12) * U256::from(2u64)),
                 U256::exp10(12)
             ),
-            Some(EvmGas::new(2))
+            Ok(EvmGas::new(2))
         );
     }
 
     #[test]
-    fn wei_to_evm_gas_overflow_is_none() {
-        assert_eq!(wei_to_evm_gas(Wei::from_u256(U256::MAX), U256::one()), None);
+    fn wei_to_evm_gas_overflow_errs() {
+        assert_eq!(
+            wei_to_evm_gas(Wei::from_u256(U256::MAX), U256::one()),
+            Err(GasConversionError::GasOverflow)
+        );
     }
 
     #[test]
-    fn wei_to_evm_gas_zero_base_fee_is_none() {
+    fn wei_to_evm_gas_zero_base_fee_errs() {
         assert_eq!(
             wei_to_evm_gas(Wei::from_u256(U256::exp10(12)), U256::zero()),
-            None
+            Err(GasConversionError::ZeroBaseFee)
         );
     }
 }

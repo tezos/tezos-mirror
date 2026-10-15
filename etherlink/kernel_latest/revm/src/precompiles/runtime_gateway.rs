@@ -370,7 +370,7 @@ fn charge_delegated_storage_cost(
         ));
     }
     let g2 = mutez_to_evm_gas(v, PU256::from(base_fee_per_gas))
-        .ok_or(CustomPrecompileError::OutOfGas)?;
+        .map_err(|_| CustomPrecompileError::OutOfGas)?;
     charge(gas, g2)
 }
 
