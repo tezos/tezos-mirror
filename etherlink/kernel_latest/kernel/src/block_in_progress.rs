@@ -777,6 +777,7 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_tezlink::block::OperationsWithReceipts;
+    use tezosx_types::Wei;
 
     fn new_sig_unsafe(v: u64, r: H256, s: H256) -> TxSignature {
         TxSignature::new(U256::from(v), r, s).unwrap()
@@ -813,7 +814,7 @@ mod tests {
 
     fn dummy_tx_deposit(i: u8) -> TezosXTransaction {
         let deposit = Deposit {
-            amount: i.into(),
+            amount: Wei::from_u256(i.into()),
             receiver: crate::bridge::DepositReceiver::Ethereum(H160([i; 20])),
             inbox_level: 1,
             inbox_msg_id: 0,

@@ -869,7 +869,7 @@ where
     let mut caller_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR)?;
     let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
     let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
-    let value = Wei::from_u256(deposit.amount);
+    let value = deposit.amount;
     // Prefund the feeder address, refunded on every !is_success() exit
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit

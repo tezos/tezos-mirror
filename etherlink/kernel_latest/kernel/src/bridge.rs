@@ -13,7 +13,7 @@ use primitive_types::{H160, H256, U256};
 use revm::primitives::{Address, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, h160_to_alloy, u256_to_alloy};
 use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
-use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::{BlockHash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
@@ -265,10 +265,10 @@ impl DepositInfo {
     }
 }
 /// Native token deposit
-#[derive(Debug, PartialEq, Clone, RlpEncodable)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Deposit {
-    /// Deposit amount in wei
-    pub amount: U256,
+    /// Deposit amount
+    pub amount: Wei,
     /// Deposit receiver on L2
     pub receiver: DepositReceiver,
     /// Inbox level containing the original deposit message
@@ -299,7 +299,7 @@ impl Deposit {
             .ok()
             .and_then(|raw| Mutez::try_from(raw).ok())
             .ok_or(BridgeError::InvalidAmount(amount_u256))?;
-        let amount: U256 = amount_mutez.to_wei().as_u256();
+        let amount = amount_mutez.to_wei();
 
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
@@ -325,7 +325,7 @@ impl Deposit {
     pub fn event_log(&self) -> Result<Log, BridgeError> {
         let event_data = SolBridgeDepositEvent {
             receiver: h160_to_alloy(&self.receiver.to_h160()?),
-            amount: u256_to_alloy(&self.amount),
+            amount: u256_to_alloy(&self.amount.as_u256()),
             inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
             inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
         };
@@ -357,6 +357,16 @@ impl Deposit {
     }
 }
 
+impl Encodable for Deposit {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(4);
+        s.append(&self.amount.as_u256());
+        s.append(&self.receiver);
+        s.append(&self.inbox_level);
+        s.append(&self.inbox_msg_id);
+    }
+}
+
 impl Decodable for Deposit {
     /// Decode deposit from RLP bytes in a retro-compatible manner.
     /// If it is a legacy deposit it will have zero inbox level and message ID.
@@ -371,7 +381,7 @@ impl Decodable for Deposit {
         match decoder.item_count()? {
             2 => {
                 let mut it = decoder.iter();
-                let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
+                let amount = Wei::from_u256(decode_field(&next(&mut it)?, "amount")?);
                 let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
                 Ok(Self {
                     amount,
@@ -382,7 +392,7 @@ impl Decodable for Deposit {
             }
             4 => {
                 let mut it = decoder.iter();
-                let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
+                let amount = Wei::from_u256(decode_field(&next(&mut it)?, "amount")?);
                 let receiver_decoder = next(&mut it)?;
                 let receiver: DepositReceiver =
                     decode_field(&receiver_decoder, "receiver")?;
@@ -524,7 +534,8 @@ where
             Ok(ExecutionResult::Valid(transaction_result))
         }
         DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
-            let amount = Wei::from_u256(deposit.amount)
+            let amount = deposit
+                .amount
                 .to_mutez_exact()
                 .map_err(|_| crate::Error::InvalidConversion)?;
 
@@ -652,9 +663,10 @@ pub fn execute_tezlink_deposit(
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;
 
-    let amount = Wei::from_u256(deposit.amount)
+    let amount = deposit
+        .amount
         .to_mutez_exact()
-        .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
+        .map_err(|_| BridgeError::InvalidAmount(deposit.amount.as_u256()))?;
 
     let content = TransferContent {
         amount: amount.to_narith(),
@@ -711,7 +723,7 @@ mod tests {
     use super::{
         apply_tezosx_xtz_deposit, execute_tezlink_deposit, BridgeError, ContentResult,
         Deposit, Mutez, OperationDataAndMetadata, OperationResult, OperationResultSum,
-        TezosRuntime, TransferError,
+        TezosRuntime, TransferError, Wei,
     };
     use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
@@ -732,7 +744,7 @@ mod tests {
 
     fn dummy_deposit() -> Deposit {
         Deposit {
-            amount: U256::from(1u64),
+            amount: Wei::from_u256(U256::from(1u64)),
             receiver: DepositReceiver::Ethereum(H160::from([2u8; 20])),
             inbox_level: 3,
             inbox_msg_id: 4,
@@ -803,7 +815,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: Mutez::try_from(2u64).unwrap().to_wei().as_u256(),
+                amount: Mutez::try_from(2u64).unwrap().to_wei(),
                 receiver: DepositReceiver::Ethereum(H160([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -826,7 +838,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: Mutez::try_from(2u64).unwrap().to_wei().as_u256(),
+                amount: Mutez::try_from(2u64).unwrap().to_wei(),
                 receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -976,7 +988,7 @@ mod tests {
         assert_eq!(
             res,
             Deposit {
-                amount: U256::one(),
+                amount: Wei::from_u256(U256::one()),
                 receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -1047,7 +1059,7 @@ mod tests {
         init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
 
         let mut deposit = dummy_deposit();
-        deposit.amount = U256::MAX;
+        deposit.amount = Wei::from_u256(U256::MAX);
 
         let limits = EvmLimits::default();
         let execution_result = apply_tezosx_xtz_deposit(
@@ -1149,7 +1161,7 @@ mod tests {
 
         let pkh = full_tezos_receiver(rk.tez_accounts_mut());
         let deposit = Deposit {
-            amount: U256::from(ONE_MUTEZ_WEI),
+            amount: Wei::from_u256(U256::from(ONE_MUTEZ_WEI)),
             receiver: DepositReceiver::Tezos(Contract::Implicit(pkh.clone())),
             ..dummy_deposit()
         };
@@ -1199,7 +1211,7 @@ mod tests {
 
         let pkh = full_tezos_receiver(rk.tez_accounts_mut());
         let deposit = Deposit {
-            amount: U256::from(ONE_MUTEZ_WEI),
+            amount: Wei::from_u256(U256::from(ONE_MUTEZ_WEI)),
             receiver: DepositReceiver::Tezos(Contract::Implicit(pkh.clone())),
             ..dummy_deposit()
         };
