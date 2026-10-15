@@ -12,6 +12,13 @@ fn generate_ocaml_sigs() {
 }
 
 pub fn main() {
+    // The generated OCaml signature files live in this package, so without an
+    // explicit list cargo fingerprints the whole package by mtime and this
+    // script invalidates itself on every build.
+    println!("cargo:rerun-if-changed=src");
+    // `INSIDE_DUNE` decides whether the signatures are generated.
+    println!("cargo:rerun-if-env-changed=INSIDE_DUNE");
+
     if env::var("INSIDE_DUNE").is_err() {
         // Generate the Ocaml signatures only when building outside the Dune rule.
         generate_ocaml_sigs();
