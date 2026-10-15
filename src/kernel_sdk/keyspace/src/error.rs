@@ -22,8 +22,12 @@ use core::convert::Infallible;
 /// can report its own failures in this error. It sets `R` to its read
 /// failures, `W` to its write failures, or both, and builds them with
 /// [`ReadKind::Ext`] or [`WriteKind::Ext`]. [`KeySpaceError::widen`] carries
-/// the failures of the SDK into that error. A crate error that holds the
-/// extended error in one variant implements `From<KeySpaceError>` with
+/// the failures of the SDK into that error. When the extension marks its
+/// failure type with [`ExtensionError`], `?` does the same conversion in a
+/// function that returns the extended error.
+///
+/// `?` does not chain two conversions. A crate error that holds the extended
+/// error in one variant implements `From<KeySpaceError>` with
 /// [`KeySpaceError::widen`], so that `?` takes both kinds of failure:
 ///
 /// ```ignore
@@ -89,6 +93,26 @@ impl KeySpaceError {
             key: self.key,
             kind,
         }
+    }
+}
+
+/// Marks a type of failures that an extension reports in [`ReadKind::Ext`] or
+/// [`WriteKind::Ext`].
+///
+/// When `R` implements this trait, or when `R` is [`Infallible`] and `W`
+/// implements it, `?` converts a [`KeySpaceError`] into a
+/// `KeySpaceError<R, W>`, as [`KeySpaceError::widen`] does.
+pub trait ExtensionError {}
+
+impl<R: ExtensionError, W> From<KeySpaceError> for KeySpaceError<R, W> {
+    fn from(e: KeySpaceError) -> Self {
+        e.widen()
+    }
+}
+
+impl<W: ExtensionError> From<KeySpaceError> for KeySpaceError<Infallible, W> {
+    fn from(e: KeySpaceError) -> Self {
+        e.widen()
     }
 }
 

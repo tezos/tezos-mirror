@@ -647,6 +647,51 @@ mod tests {
     }
 
     #[test]
+    fn question_mark_carries_an_sdk_failure_into_an_extended_error() {
+        #[derive(Debug, PartialEq, Eq, thiserror::Error)]
+        #[error("extension failure")]
+        struct ExtFailure;
+        impl crate::ExtensionError for ExtFailure {}
+
+        fn read_ext(
+            ks: &mut StorageV1KeySpaceCompat<MockHost>,
+            k: &Key,
+        ) -> Result<(), KeySpaceError<ExtFailure>> {
+            ks.write(k, 4, b"x")?;
+            Ok(())
+        }
+
+        fn write_ext(
+            ks: &mut StorageV1KeySpaceCompat<MockHost>,
+            k: &Key,
+        ) -> Result<(), KeySpaceError<core::convert::Infallible, ExtFailure>> {
+            ks.write(k, 4, b"x")?;
+            Ok(())
+        }
+
+        let mut ks = make_ks(MockHost::default(), "/errors");
+        let k = key(b"/short");
+        ks.set(&k, b"abc").unwrap();
+
+        assert_eq!(
+            read_ext(&mut ks, &k),
+            Err(KeySpaceError::write(
+                ks.name(),
+                &k,
+                WriteKind::InvalidOffset
+            ))
+        );
+        assert_eq!(
+            write_ext(&mut ks, &k),
+            Err(KeySpaceError::write(
+                ks.name(),
+                &k,
+                WriteKind::InvalidOffset
+            ))
+        );
+    }
+
+    #[test]
     fn get_prefix_exact_returns_first_n_bytes_when_value_has_at_least_n() {
         let mut ks = make_ks(MockHost::default(), "/test");
         ks.set(&key(b"/exact"), b"hello").unwrap();

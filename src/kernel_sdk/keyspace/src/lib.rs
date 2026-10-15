@@ -26,7 +26,9 @@ pub mod wasm_nds;
 #[cfg(feature = "irmin-compat")]
 pub use irmin_path_validator::{MAX_KEYSPACE_NAME_SIZE, MAX_KEY_SIZE};
 
-pub use error::{ErrorKind, KeySpaceError, KeySpaceLoaderError, ReadKind, WriteKind};
+pub use error::{
+    ErrorKind, ExtensionError, KeySpaceError, KeySpaceLoaderError, ReadKind, WriteKind,
+};
 
 /// Key creation error
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
