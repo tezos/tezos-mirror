@@ -31,7 +31,7 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::{
     get_b58_kt1, read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le,
     store_bin, store_read_slice, write_u256_le, write_u64_le,
@@ -151,9 +151,10 @@ const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL_KEY: Key =
     Key::from_static(b"/michelson_runtime_target_sunrise_level");
 
 // EVM block number where the Michelson runtime first started producing
-// Tezos blocks. Written once by the kernel at the sunrise block.
-const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
-    RefPath::assert_from(b"/tez/world_state/michelson_runtime/sunrise_level");
+// Tezos blocks, inside the `/tez/world_state` keyspace. Written once by the
+// kernel at the sunrise block.
+const MICHELSON_RUNTIME_SUNRISE_LEVEL_KEY: Key =
+    Key::from_static(b"/michelson_runtime/sunrise_level");
 
 // Key to the Michelson gas-refund feature flag, inside the `/base` keyspace.
 // Written by the installer/node; the reader goes through the `/base` keyspace.
@@ -940,14 +941,16 @@ pub fn read_michelson_runtime_target_sunrise_level(base: &impl KeySpace) -> Opti
 }
 
 pub fn store_michelson_runtime_sunrise_level(
-    host: &mut impl StorageV1,
+    tez_world_state: &mut impl KeySpace,
     level: U256,
-) -> Result<(), Error> {
-    write_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL, level).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    tez_world_state.store_u256_le(&MICHELSON_RUNTIME_SUNRISE_LEVEL_KEY, level)
 }
 
-pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
-    read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
+pub fn read_michelson_runtime_sunrise_level(
+    tez_world_state: &impl KeySpace,
+) -> Option<U256> {
+    tez_world_state.get_u256_le(&MICHELSON_RUNTIME_SUNRISE_LEVEL_KEY)
 }
 
 pub fn enable_debug_precompiles(base: &impl KeySpace) -> bool {
@@ -1729,5 +1732,32 @@ mod tests {
         assert_eq!(decoded[1].response_status, 204);
         assert_eq!(decoded[1].request_body, b"payload".to_vec());
         assert_eq!(decoded[1].response_body, b"r2".to_vec());
+    }
+
+    /// The sunrise level of the Michelson runtime resolves to
+    /// `/tez/world_state/michelson_runtime/sunrise_level`.
+    #[test]
+    fn michelson_runtime_sunrise_level_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let level = primitive_types::U256::from(11);
+
+        super::store_michelson_runtime_sunrise_level(rk.tez_world_state_mut(), level)
+            .unwrap();
+
+        let mut bytes = [0u8; 32];
+        level.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/tez/world_state/michelson_runtime/sunrise_level"
+                ))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(
+            super::read_michelson_runtime_sunrise_level(rk.tez_world_state()),
+            Some(level)
+        );
     }
 }

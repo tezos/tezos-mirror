@@ -638,11 +638,13 @@ where
             // `promote_block` commits these writes with the Tezos genesis block. The
             // block hashed its state first, so the next Michelson state_root shows them.
             if chain_config.is_tezos_runtime_enabled(processed_blueprint)
-                && crate::storage::read_michelson_runtime_sunrise_level(rk.host())
-                    .is_none()
+                && crate::storage::read_michelson_runtime_sunrise_level(
+                    rk.tez_world_state(),
+                )
+                .is_none()
             {
                 crate::storage::store_michelson_runtime_sunrise_level(
-                    rk.host_mut(),
+                    rk.tez_world_state_mut(),
                     processed_blueprint,
                 )?;
                 // L2-1526: seed the shared Michelson alias implementation
@@ -1574,7 +1576,13 @@ mod tests {
         let produced = produce(&mut host, bk, &chain_config, &mut config, None, None);
 
         assert!(produced.is_err());
-        assert!(crate::storage::read_michelson_runtime_sunrise_level(&host).is_none());
+        {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            assert!(crate::storage::read_michelson_runtime_sunrise_level(
+                rk.tez_world_state()
+            )
+            .is_none());
+        }
         assert!(
             block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
                 .is_err()
