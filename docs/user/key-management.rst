@@ -38,7 +38,7 @@ These solutions are detailed in the rest of this page.
 Ledger support
 --------------
 
-It is possible and advised to use a hardware wallet to securely store and manage your
+It is possible and advised to use a wallet based on a hardware security module (HSM) to securely store and manage your
 keys. The Octez client supports Ledger Nano devices provided that they have
 two Tezos apps installed, `Tezos Wallet app <https://github.com/trilitech/ledger-app-tezos-wallet>`_ and `Tezos Baking app <https://github.com/trilitech/ledger-app-tezos-baking>`_ which are provided by `Trilitech Ltd <https://www.trili.tech/>`_. They can be installed from the Ledger Live store.
 
@@ -452,7 +452,7 @@ Security Model
 
 Using a consensus key improves operational security compared to baking directly with the manager key:
 
-- **Manager key stays offline**: The manager key can be kept in cold storage (hardware wallet, air-gapped machine). Only the consensus key needs to be accessible to the baker or signer.
+- **Manager key stays offline**: The manager key can be kept in cold storage (wallet based on a hardware security module, a.k.a HSM, air-gapped machine). Only the consensus key needs to be accessible to the baker or signer.
 - **Key rotation without redelegation**: If the consensus key is compromised, you can rotate it using the offline manager key. Delegators are unaffected.
 - **Faster incident response**: You can detect compromise and rotate the consensus key while the manager key remains safe.
 
