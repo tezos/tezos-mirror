@@ -373,10 +373,10 @@ let jobs pipeline_type =
         [Distro.Debian; Ubuntu]
 
 let () =
-  (* Register the Debian partial jobs directly into before_merging and
-     merge_train pipelines with only_if_changed so they run automatically
-     only when relevant files change. *)
-  Tezos_ci_pipelines.register_merge_request_jobs (jobs Partial) ;
+  (* No merge-request registration: the packages are deprecated and will not
+     ship in v26, so paying for them on every merge request and on the merge
+     train buys little. debian.daily, below, is what catches packaging
+     breakage while v25-release is maintained. See #8406. *)
   (* In merge pipelines we tests only Debian.
      Ubuntu packages are built and tested in the scheduled pipelines. *)
   Cacio.register_jobs Tezos_ci_pipelines.debian_daily (jobs Full) ;
