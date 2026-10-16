@@ -238,6 +238,17 @@ You may also activate Bash autocompletion by executing::
   Note that if your shell is ``zsh``, you may need extra configuration to customize shell
   completion (refer to the ``zsh`` documentation).
 
+Incremental Rust builds
+^^^^^^^^^^^^^^^^^^^^^^^
+
+You can enable incremental Rust compilation for development builds with::
+
+  OCTEZ_RUST_INCREMENTAL=1 make
+
+This speeds up rebuilds after Rust code changes, at the cost of extra disk space
+for cached compilation results. Run ``dune clean`` to reclaim that space;
+the next build will rebuild everything.
+
 .. _update_from_sources:
 
 Update

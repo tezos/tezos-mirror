@@ -28,4 +28,8 @@
   (no-infer
    (run
     ./build.sh
-    %{workspace_root}/../.cargo-target/%{context_name}/rust-deps))))
+    %{workspace_root}/../.cargo-target/%{context_name}/rust-deps
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

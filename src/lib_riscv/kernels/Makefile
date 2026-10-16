@@ -12,8 +12,11 @@ all: check build
 
 build: ${KERNELS}
 
+# Shared with the other Dune-managed Rust components.
+CARGO_BUILD_SCRIPT ?= ../../../scripts/cargo-build.sh
+
 cargo-build:
-	@cargo build --release
+	@sh "$(CARGO_BUILD_SCRIPT)" "$(DUNE_PROFILE)" "$(OCTEZ_RUST_INCREMENTAL)" --release
 
 riscv-echo: cargo-build
 	@cp "$(BUILD_DIR)/$@" "$@"

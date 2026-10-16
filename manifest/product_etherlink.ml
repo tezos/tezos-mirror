@@ -89,10 +89,7 @@ let lib_etherlink_wasm_runtime =
                ];
                [
                  S "action";
-                 [
-                   S "no-infer";
-                   [S "run"; S "./build.sh"; cargo_target_dir "evm-runtime"];
-                 ];
+                 [S "no-infer"; cargo_build ~root:"../.." "evm-runtime"];
                ];
              ];
            ])

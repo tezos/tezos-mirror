@@ -112,6 +112,17 @@ module Dune = struct
   let cargo_target_dir component =
     S ("%{workspace_root}/../.cargo-target/%{context_name}/" ^ component)
 
+  let cargo_build ~root component =
+    [
+      S "run";
+      S "./build.sh";
+      cargo_target_dir component;
+      S "sh";
+      S ("%{dep:" ^ root ^ "/scripts/cargo-build.sh}");
+      S "%{profile}";
+      S "%{env:OCTEZ_RUST_INCREMENTAL=0}";
+    ]
+
   type language = C
 
   type foreign_stubs = {

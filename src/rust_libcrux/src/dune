@@ -22,4 +22,10 @@
   (source_tree ../.cargo))
  (action
   (no-infer
-   (run ./build.sh %{workspace_root}/../.cargo-target/%{context_name}/libcrux))))
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/libcrux
+    sh
+    %{dep:../../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

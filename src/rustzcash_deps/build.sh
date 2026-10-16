@@ -13,12 +13,15 @@ OUT_DIR=$(dirname "$0")
 # Dune passes a persistent cache outside its context directory.
 CARGO_TARGET_DIR="${1:?Dune must supply the Cargo cache directory}"
 
+# The remaining arguments are the shared Cargo build command supplied by Dune.
+shift
+
 # Make sure the subsequent processes have access to these.
 export OCTEZ_RUST_DEPS_NO_WASMER_HEADERS=1
 export CARGO_TARGET_DIR
 
 # Build the Rust project.
-cargo build --release --locked --target-dir="$CARGO_TARGET_DIR"
+"$@" --release --locked --target-dir="$CARGO_TARGET_DIR"
 
 # Copy the built artifacts to the output directory.
 cp -f "$CARGO_TARGET_DIR/release/librustzcash.a" "$OUT_DIR/liboctez_rustzcash_deps.a"

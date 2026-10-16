@@ -12,6 +12,9 @@ OUT_DIR=$(dirname "$0")
 # Dune passes a persistent cache outside its context directory.
 CARGO_TARGET_DIR="${1:?Dune must supply the Cargo cache directory}"
 
+# The remaining arguments are the shared Cargo build command supplied by Dune.
+shift
+
 export OCTEZ_RUST_DEPS_NO_WASMER_HEADERS=1
 export CARGO_TARGET_DIR
 
@@ -27,7 +30,7 @@ cargo_status=$(mktemp)
 # code is recorded. /bin/sh has no pipefail, hence the status file.
 set +e
 {
-  cargo build --release --locked --target-dir="$CARGO_TARGET_DIR" 2>&1
+  "$@" --release --locked --target-dir="$CARGO_TARGET_DIR" 2>&1
   echo "$?" > "$cargo_status"
 } | tee "$build_log"
 set -e

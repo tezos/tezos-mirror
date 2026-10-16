@@ -40,4 +40,8 @@
   (no-infer
    (run
     ./build.sh
-    %{workspace_root}/../.cargo-target/%{context_name}/evm-runtime))))
+    %{workspace_root}/../.cargo-target/%{context_name}/evm-runtime
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

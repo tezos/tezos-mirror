@@ -29,4 +29,8 @@
   (no-infer
    (run
     ./build.sh
-    %{workspace_root}/../.cargo-target/%{context_name}/rollup-node))))
+    %{workspace_root}/../.cargo-target/%{context_name}/rollup-node
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

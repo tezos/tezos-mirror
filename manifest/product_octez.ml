@@ -520,10 +520,7 @@ let lib_rustzcash =
                ];
                [
                  S "action";
-                 [
-                   S "no-infer";
-                   [S "run"; S "./build.sh"; cargo_target_dir "rustzcash"];
-                 ];
+                 [S "no-infer"; cargo_build ~root:"../.." "rustzcash"];
                ];
              ];
            ])
@@ -561,11 +558,7 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S "../../sdk/rust"];
               ];
               [
-                S "action";
-                [
-                  S "no-infer";
-                  [S "run"; S "./build.sh"; cargo_target_dir "rust-deps"];
-                ];
+                S "action"; [S "no-infer"; cargo_build ~root:"../.." "rust-deps"];
               ];
             ];
           ]
@@ -875,13 +868,7 @@ let octez_libcrux_ml_dsa =
               [S "file"; S "../../../rust-toolchain"];
               [S "source_tree"; S "../.cargo"];
             ];
-            [
-              S "action";
-              [
-                S "no-infer";
-                [S "run"; S "./build.sh"; cargo_target_dir "libcrux"];
-              ];
-            ];
+            [S "action"; [S "no-infer"; cargo_build ~root:"../../.." "libcrux"]];
           ];
         ]
 
@@ -3945,10 +3932,7 @@ let lib_rollup_node_rust_deps =
                ];
                [
                  S "action";
-                 [
-                   S "no-infer";
-                   [S "run"; S "./build.sh"; cargo_target_dir "rollup-node"];
-                 ];
+                 [S "no-infer"; cargo_build ~root:"../.." "rollup-node"];
                ];
              ];
            ])
@@ -4051,7 +4035,14 @@ let octez_riscv_kernels =
                 S "setenv";
                 S "CARGO_TARGET_DIR";
                 cargo_target_dir "riscv-kernels";
-                [S "run"; S "make"; S "build"];
+                [
+                  S "run";
+                  S "make";
+                  S "build";
+                  S "CARGO_BUILD_SCRIPT=%{dep:../../../scripts/cargo-build.sh}";
+                  S "DUNE_PROFILE=%{profile}";
+                  S "OCTEZ_RUST_INCREMENTAL=%{env:OCTEZ_RUST_INCREMENTAL=0}";
+                ];
               ];
             ];
           ];

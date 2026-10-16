@@ -93,6 +93,11 @@ module Dune : sig
       Rules using it must declare [(sandbox none)]. Removed by [dune clean]. *)
   val cargo_target_dir : string -> s_expr
 
+  (** Run a component's [build.sh] with its persistent cache and the shared
+      Cargo build command. [root] is the relative path to the repository root.
+      The command tracks the Dune profile and the incremental compilation opt-in. *)
+  val cargo_build : root:string -> string -> s_expr
+
   (** Convert a list of [s_expr] to an [s_expr].
 
       [of_list [a; b; c]] is [(a b c)].

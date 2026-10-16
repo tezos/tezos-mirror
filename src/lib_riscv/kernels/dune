@@ -22,6 +22,11 @@
   (setenv
    CARGO_TARGET_DIR
    %{workspace_root}/../.cargo-target/%{context_name}/riscv-kernels
-   (run make build))))
+   (run
+    make
+    build
+    CARGO_BUILD_SCRIPT=%{dep:../../../scripts/cargo-build.sh}
+    DUNE_PROFILE=%{profile}
+    OCTEZ_RUST_INCREMENTAL=%{env:OCTEZ_RUST_INCREMENTAL=0}))))
 
 (alias (name default) (deps riscv-echo riscv-echo.checksum))
