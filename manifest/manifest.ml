@@ -3774,32 +3774,52 @@ let generate_workspace env dune =
   Format.fprintf fmt "@." ;
   pp_do_not_edit ~comment_start:";" fmt ()
 
-let find_opam_and_dune_files =
-  let root = "." in
+let find_source_files ~keep =
   let rec loop acc dir =
-    let dir_contents = Sys.readdir (root // dir) in
+    let dir_contents = Sys.readdir ("." // dir) in
     let add_item acc filename =
       let full_filename = dir // filename in
       if
-        filename = "dune"
-        || Filename.extension filename = ".opam"
-        || filename = "dune-project"
-        || filename = "dune-workspace"
-      then String_set.add (canonicalize_path full_filename) acc
-      else if filename.[0] = '.' || filename.[0] = '_' then acc
-      else if
-        try Sys.is_directory (root // dir // filename)
-        with Sys_error _ -> false
-      then loop acc full_filename
-      else acc
+        filename.[0] = '.'
+        || filename.[0] = '_'
+        || filename = "target" || filename = "node_modules"
+      then acc
+      else
+        match (Unix.lstat full_filename).st_kind with
+        | Unix.S_DIR -> loop acc full_filename
+        | Unix.S_REG when keep filename -> String_set.add full_filename acc
+        | _ -> acc
     in
     Array.fold_left add_item acc dir_contents
   in
-  loop String_set.empty
+  loop String_set.empty ""
+
+let generate_cargo_exclusions () =
+  let files = find_source_files ~keep:(String.equal "Cargo.toml") in
+  write "script-inputs/cargo-dirs.sexp" @@ fun fmt ->
+  pp_do_not_edit ~comment_start:";" fmt () ;
+  String_set.iter
+    (fun cargo_manifest ->
+      let path = Filename.dirname cargo_manifest in
+      let dirs =
+        Dune.[S "dirs"; S ":standard"; S ".cargo"; S "\\"; S "target"]
+      in
+      let stanza =
+        if path = "." then dirs else Dune.[S "subdir"; S path; dirs]
+      in
+      Format.fprintf fmt "@.%a@." Dune.pp [stanza])
+    files
+
+let find_opam_and_dune_files () =
+  find_source_files ~keep:(fun filename ->
+      filename = "dune"
+      || Filename.extension filename = ".opam"
+      || filename = "dune-project"
+      || filename = "dune-workspace")
 
 let check_for_non_generated_files ~remove_extra_files
     ?(exclude = fun _ -> false) () =
-  let all_files = find_opam_and_dune_files "" in
+  let all_files = find_opam_and_dune_files () in
 
   let all_non_excluded_files =
     String_set.filter (fun x -> not (exclude x)) all_files

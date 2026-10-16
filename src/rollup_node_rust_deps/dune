@@ -8,8 +8,6 @@
  (foreign_archives octez_rollup_node_rust_deps)
  (c_library_flags ((:include %{workspace_root}/c++-stdlib-link-flags.sexp))))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_rollup_node_rust_deps.a dlloctez_rollup_node_rust_deps.so)
  (deps

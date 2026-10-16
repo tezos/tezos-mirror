@@ -7,8 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (modules))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets riscv-echo riscv-echo.checksum)
  (mode (fallback))

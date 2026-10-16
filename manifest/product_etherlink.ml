@@ -52,15 +52,6 @@ let lib_etherlink_wasm_runtime =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               (* We need this stanza to ensure .cargo can be used as a
-                  dependency via source_tree. *)
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";

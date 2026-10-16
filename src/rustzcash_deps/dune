@@ -7,8 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (foreign_archives octez_rustzcash_deps))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_rustzcash_deps.a dlloctez_rustzcash_deps.so)
  (deps

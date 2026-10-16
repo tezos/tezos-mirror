@@ -500,15 +500,6 @@ let lib_rustzcash =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               (* We need this stanza to ensure .cargo can be used as a
-                  dependency via source_tree. *)
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";
@@ -542,15 +533,6 @@ let octez_rust_deps, lib_wasmer_riscv =
       ~dune:
         Dune.
           [
-            [
-              S "dirs";
-              S ":standard";
-              (* We need this stanza to ensure .cargo can be used as a
-                 dependency via source_tree. *)
-              S ".cargo";
-              (* Do not track Cargo output directory. *)
-              [S "not"; S "target"];
-            ];
             [
               S "rule";
               [S "targets"; S "liboctez_rust_deps.a"; S "dlloctez_rust_deps.so"];
@@ -3938,13 +3920,6 @@ let lib_rollup_node_rust_deps =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";
@@ -4047,7 +4022,6 @@ let octez_riscv_kernels =
     ~dune:
       Dune.
         [
-          [S "dirs"; S ":standard"; S ".cargo"; [S "not"; S "target"]];
           [
             S "rule";
             S "targets" :: targets;

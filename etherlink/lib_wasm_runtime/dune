@@ -7,8 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (foreign_archives octez_evm_node_rust_deps))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_evm_node_rust_deps.a dlloctez_evm_node_rust_deps.so)
  (deps

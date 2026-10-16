@@ -1369,6 +1369,12 @@ val postcheck : ?exclude:(string -> bool) -> unit -> unit
  *)
 val generate_workspace : Env.t -> Dune.s_expr -> unit
 
+(** Generate [script-inputs/cargo-dirs.sexp], excluding Cargo [target] directories
+    for every discovered [Cargo.toml]. Discovery skips hidden directories,
+    directories beginning with [_], [target], [node_modules], and symlinks.
+    The output is sorted. Discovery uses the filesystem, not the Git index. *)
+val generate_cargo_exclusions : unit -> unit
+
 (** [write filename f] writes a file relatively to the root directory of the repository.
 
     The callback [f] is reponsible for feeding the content of the file by using the formmater. *)

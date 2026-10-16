@@ -14,6 +14,13 @@ and `.opam` files. If you are removing targets, you need to remove the
 corresponding `dune` and `.opam` files manually. Then, commit both
 your modifications to the manifest and to the `dune` and `.opam` files.
 
+The manifest also generates `script-inputs/cargo-dirs.sexp`, included by the
+root `dune` file. It discovers `Cargo.toml` files and excludes each project's
+`target/` directory from Dune, while retaining `.cargo` configuration. Run
+`make -C manifest` when adding or removing Cargo projects. Discovery skips
+hidden directories, directories starting with `_`, `target/`, `node_modules/`,
+and symlinks; it does not rely on the Git index.
+
 ## Alternative build system
 
 The manifest comes with a `dune` configuration that mainly serves for
