@@ -508,6 +508,7 @@ let lib_rustzcash =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -517,7 +518,13 @@ let lib_rustzcash =
                  [S "source_tree"; S "include"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [
+                   S "no-infer";
+                   [S "run"; S "./build.sh"; cargo_target_dir "rustzcash"];
+                 ];
+               ];
              ];
            ])
 
@@ -538,6 +545,7 @@ let octez_rust_deps, lib_wasmer_riscv =
               [S "targets"; S "liboctez_rust_deps.a"; S "dlloctez_rust_deps.so"];
               [
                 S "deps";
+                [S "sandbox"; S "none"];
                 [S "file"; S "build.sh"];
                 [S "file"; S "Cargo.toml"];
                 [S "file"; S "Cargo.lock"];
@@ -552,7 +560,13 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S "../kernel_sdk"];
                 [S "source_tree"; S "../../sdk/rust"];
               ];
-              [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+              [
+                S "action";
+                [
+                  S "no-infer";
+                  [S "run"; S "./build.sh"; cargo_target_dir "rust-deps"];
+                ];
+              ];
             ];
           ]
   in
@@ -853,6 +867,8 @@ let octez_libcrux_ml_dsa =
             ];
             [
               S "deps";
+              [S "sandbox"; S "none"];
+              [S "file"; S "build.sh"];
               [S "glob_files"; S "*.rs"];
               [S "file"; S "../Cargo.toml"];
               [S "file"; S "../Cargo.lock"];
@@ -862,24 +878,8 @@ let octez_libcrux_ml_dsa =
             [
               S "action";
               [
-                S "progn";
-                [S "run"; S "sh"; S "-c"; S "cargo build --release"];
-                [
-                  S "run";
-                  S "sh";
-                  S "-c";
-                  S
-                    "mv ../target/release/liboctez_libcrux_ml_dsa.so \
-                     ./dlloctez_libcrux_ml_dsa.so 2> /dev/null || mv \
-                     ../target/release/liboctez_libcrux_ml_dsa.dylib \
-                     ./dlloctez_libcrux_ml_dsa.so";
-                ];
-                [
-                  S "run";
-                  S "mv";
-                  S "../target/release/liboctez_libcrux_ml_dsa.a";
-                  S "liboctez_libcrux_ml_dsa.a";
-                ];
+                S "no-infer";
+                [S "run"; S "./build.sh"; cargo_target_dir "libcrux"];
               ];
             ];
           ];
@@ -3928,6 +3928,7 @@ let lib_rollup_node_rust_deps =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -3942,7 +3943,13 @@ let lib_rollup_node_rust_deps =
                  [S "source_tree"; S "../kernel_sdk"];
                  [S "source_tree"; S "../../sdk/rust"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [
+                   S "no-infer";
+                   [S "run"; S "./build.sh"; cargo_target_dir "rollup-node"];
+                 ];
+               ];
              ];
            ])
 
@@ -4030,6 +4037,7 @@ let octez_riscv_kernels =
             [S "mode"; [S "fallback"]];
             [
               S "deps";
+              [S "sandbox"; S "none"];
               [S "source_tree"; S ".cargo"];
               [S "source_tree"; S "echo"];
               [S "file"; S "Cargo.toml"];
@@ -4037,7 +4045,15 @@ let octez_riscv_kernels =
               [S "file"; S "Makefile"];
               [S "file"; S "rust-toolchain.toml"];
             ];
-            [S "action"; [S "progn"; [S "run"; S "sh"; S "-c"; S "make build"]]];
+            [
+              S "action";
+              [
+                S "setenv";
+                S "CARGO_TARGET_DIR";
+                cargo_target_dir "riscv-kernels";
+                [S "run"; S "make"; S "build"];
+              ];
+            ];
           ];
           [S "alias"; [S "name"; S "default"]; S "deps" :: targets];
         ]

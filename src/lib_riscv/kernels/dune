@@ -11,12 +11,17 @@
  (targets riscv-echo riscv-echo.checksum)
  (mode (fallback))
  (deps
+  (sandbox none)
   (source_tree .cargo)
   (source_tree echo)
   (file Cargo.toml)
   (file Cargo.lock)
   (file Makefile)
   (file rust-toolchain.toml))
- (action (progn (run sh -c "make build"))))
+ (action
+  (setenv
+   CARGO_TARGET_DIR
+   %{workspace_root}/../.cargo-target/%{context_name}/riscv-kernels
+   (run make build))))
 
 (alias (name default) (deps riscv-echo riscv-echo.checksum))

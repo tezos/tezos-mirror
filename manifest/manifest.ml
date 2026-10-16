@@ -106,6 +106,12 @@ module Dune = struct
     | []
     | ( :: ) of s_expr * s_expr
 
+  (* %{workspace_root} in our case is [_build/default], that is the workspace
+     root is the build directory used by dune for the current context
+     ([default]). *)
+  let cargo_target_dir component =
+    S ("%{workspace_root}/../.cargo-target/%{context_name}/" ^ component)
+
   type language = C
 
   type foreign_stubs = {

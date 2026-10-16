@@ -10,7 +10,8 @@
 set -e
 
 OUT_DIR=$(dirname "$0")
-CARGO_TARGET_DIR="${OCTEZ_RUSTZCASH_DEPS_TARGET_DIR:-$OUT_DIR/target}"
+# Dune passes a persistent cache outside its context directory.
+CARGO_TARGET_DIR="${1:?Dune must supply the Cargo cache directory}"
 
 # Make sure the subsequent processes have access to these.
 export OCTEZ_RUST_DEPS_NO_WASMER_HEADERS=1

@@ -60,6 +60,7 @@ let lib_etherlink_wasm_runtime =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -86,7 +87,13 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../../sdk/rust"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [
+                   S "no-infer";
+                   [S "run"; S "./build.sh"; cargo_target_dir "evm-runtime"];
+                 ];
+               ];
              ];
            ])
 

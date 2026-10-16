@@ -13,19 +13,13 @@
 (rule
  (targets liboctez_libcrux_ml_dsa.a dlloctez_libcrux_ml_dsa.so)
  (deps
+  (sandbox none)
+  (file build.sh)
   (glob_files *.rs)
   (file ../Cargo.toml)
   (file ../Cargo.lock)
   (file ../../../rust-toolchain)
   (source_tree ../.cargo))
  (action
-  (progn
-   (run sh -c "cargo build --release")
-   (run
-    sh
-    -c
-    "mv ../target/release/liboctez_libcrux_ml_dsa.so ./dlloctez_libcrux_ml_dsa.so 2> /dev/null || mv ../target/release/liboctez_libcrux_ml_dsa.dylib ./dlloctez_libcrux_ml_dsa.so")
-   (run
-    mv
-    ../target/release/liboctez_libcrux_ml_dsa.a
-    liboctez_libcrux_ml_dsa.a))))
+  (no-infer
+   (run ./build.sh %{workspace_root}/../.cargo-target/%{context_name}/libcrux))))

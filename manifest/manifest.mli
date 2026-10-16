@@ -89,6 +89,10 @@ module Dune : sig
   (** Pretty-print an S-expression. *)
   val pp : Format.formatter -> s_expr -> unit
 
+  (** Persistent Cargo cache for a component, outside Dune's context tree.
+      Rules using it must declare [(sandbox none)]. Removed by [dune clean]. *)
+  val cargo_target_dir : string -> s_expr
+
   (** Convert a list of [s_expr] to an [s_expr].
 
       [of_list [a; b; c]] is [(a b c)].

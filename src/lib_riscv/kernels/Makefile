@@ -4,7 +4,9 @@
 
 KERNELS=riscv-echo
 
-BUILD_DIR=target/riscv64gc-unknown-linux-musl/release
+CARGO_TARGET_DIR ?= target
+export CARGO_TARGET_DIR
+BUILD_DIR=$(CARGO_TARGET_DIR)/riscv64gc-unknown-linux-musl/release
 
 all: check build
 
@@ -14,7 +16,7 @@ cargo-build:
 	@cargo build --release
 
 riscv-echo: cargo-build
-	@mv $(BUILD_DIR)/$@ $@
+	@cp "$(BUILD_DIR)/$@" "$@"
 	@shasum -a 256 $@ > $@.checksum
 
 build-dev-deps:

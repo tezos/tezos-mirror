@@ -11,6 +11,7 @@
 (rule
  (targets liboctez_rollup_node_rust_deps.a dlloctez_rollup_node_rust_deps.so)
  (deps
+  (sandbox none)
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
@@ -24,4 +25,8 @@
   (source_tree ../rust_deps/rust_tezos_context)
   (source_tree ../kernel_sdk)
   (source_tree ../../sdk/rust))
- (action (no-infer (system ./build.sh))))
+ (action
+  (no-infer
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/rollup-node))))
