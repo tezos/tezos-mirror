@@ -8,7 +8,7 @@ use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
     interpreter::{CallInput, CallInputs, Gas, InstructionResult, InterpreterResult},
-    primitives::{Address, Bytes},
+    primitives::{Address, AddressSet, Bytes},
 };
 
 use tezosx_interfaces::Registry;
@@ -40,8 +40,9 @@ use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
-    pub builtins: EthPrecompiles,
+    builtins: EthPrecompiles,
     enable_debug_precompiles: bool,
+    warm_addresses: AddressSet,
 }
 
 impl Default for EtherlinkPrecompiles {
@@ -54,25 +55,33 @@ impl Default for EtherlinkPrecompiles {
 
 impl EtherlinkPrecompiles {
     pub fn new(enable_debug_precompiles: bool) -> Self {
+        let builtins = EthPrecompiles::new(EVMVersion::default().into());
+        let warm_addresses =
+            Self::compute_warm_addresses(&builtins, enable_debug_precompiles);
         Self {
-            builtins: EthPrecompiles::new(EVMVersion::default().into()),
+            builtins,
             enable_debug_precompiles,
+            warm_addresses,
         }
     }
 
-    fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
-        let debugs: &'static [Address] = if self.enable_debug_precompiles {
+    fn compute_warm_addresses(
+        builtins: &EthPrecompiles,
+        enable_debug_precompiles: bool,
+    ) -> AddressSet {
+        let debugs: &'static [Address] = if enable_debug_precompiles {
             &DEBUGS
         } else {
             &[]
         };
 
-        Box::new(
-            self.builtins
-                .warm_addresses()
-                .chain(CUSTOMS)
-                .chain(debugs.iter().copied()),
-        )
+        builtins
+            .warm_addresses()
+            .iter()
+            .copied()
+            .chain(CUSTOMS)
+            .chain(debugs.iter().copied())
+            .collect()
     }
 
     /// Whether `address` is an Ethereum or Etherlink precompile.
@@ -148,7 +157,7 @@ impl EtherlinkPrecompiles {
             },
             Err(CustomPrecompileError::OutOfGas) => InterpreterResult {
                 result: InstructionResult::OutOfGas,
-                gas: Gas::new_spent(inputs.gas_limit),
+                gas: Gas::new_spent_with_reservoir(inputs.gas_limit, 0),
                 output: Bytes::new(),
             },
             Err(CustomPrecompileError::Abort(abort)) => return Err(abort),
@@ -171,7 +180,17 @@ where
     type Output = InterpreterResult;
 
     fn set_spec(&mut self, spec: <CTX::Cfg as Cfg>::Spec) -> bool {
-        <EthPrecompiles as PrecompileProvider<CTX>>::set_spec(&mut self.builtins, spec)
+        let changed = <EthPrecompiles as PrecompileProvider<CTX>>::set_spec(
+            &mut self.builtins,
+            spec,
+        );
+        if changed {
+            self.warm_addresses = Self::compute_warm_addresses(
+                &self.builtins,
+                self.enable_debug_precompiles,
+            );
+        }
+        changed
     }
 
     fn run(
@@ -189,8 +208,8 @@ where
         self.builtins.run(context, inputs)
     }
 
-    fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
-        self.warm_addresses()
+    fn warm_addresses(&self) -> &AddressSet {
+        &self.warm_addresses
     }
 
     fn contains(&self, address: &Address) -> bool {
