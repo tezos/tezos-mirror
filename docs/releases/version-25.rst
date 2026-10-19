@@ -30,11 +30,16 @@ its robustness by:
 
 This release also adds the ``smart_rollups/all/signals`` RPC in the :doc:`protocol plugin <../active/plugins>` for the Ushuaia protocol.
 
+Octez v25.3 also deprecates Homebrew packages, which may be removed in Octez v26.
+As a reminder, Debian and Ubuntu packages are deprecated too (see
+:ref:`the Octez packages section <octez_packages_v25>`).
+
 Octez v25.2
 ~~~~~~~~~~~
 
 Octez version 25.2 hardens the Octez node against security threats and improves
 its robustness by:
+
 - introducing stricter validation that rejects ill-formed operations before they are applied
 - strengthening Micheline parsing to early reject too deeply nested values
 - improving DAL node robustness and resilience
@@ -74,6 +79,11 @@ Octez v25 deprecates Octez binary packages. They will be removed in Octez v26.
 Instead, the experimental ``octez-manager`` tool (see https://octez-manager.tezos.com) will handle installation, configuration,
 and running of static binaries in a more user-friendly way than source or binary packages.
 This tool is in early development and should be used for testnets only for now.
+
+- **Debian and Ubuntu packages** have been deprecated since Octez v25.0.
+  Users relying on these packages are encouraged to migrate to the packages
+  published by the Tezos Foundation; see
+  :doc:`the migration instructions <../introduction/tzinit-packages>`.
 
 .. _baker_v25:
 
@@ -163,14 +173,14 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v25.1
+  git checkout octez-v25.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v25.1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v25.3`` Docker images of Octez.
 
 Changelog
 ---------
