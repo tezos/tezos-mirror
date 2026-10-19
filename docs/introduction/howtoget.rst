@@ -100,6 +100,13 @@ Using the official Deb packages offers several advantages:
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. warning::
+
+   Starting from Octez version 26, Nomadic Labs no longer publishes Debian and
+   Ubuntu packages for Octez. Packages built along the same lines, called
+   Tzinit packages, are available instead. See :doc:`tzinit-packages` for
+   instructions on how to migrate.
+
 If you're using Ubuntu or Debian, you can install the Debian packages
 using ``apt`` directly from our APT repository.
 
@@ -538,5 +545,6 @@ Appendix
    :maxdepth: 2
 
    howtobuild
+   tzinit-packages
    cosign-verify
    get_troubleshooting
