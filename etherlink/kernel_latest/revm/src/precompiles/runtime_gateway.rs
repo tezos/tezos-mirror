@@ -2020,7 +2020,10 @@ mod tests {
         .unwrap();
         assert_eq!(output[31], ORIGIN_KIND_ALIAS as u8);
         assert_eq!(output[63], RuntimeId::Tezos as u8);
-        assert_eq!(gas.spent(), u64::from(EvmGas::from(ALIAS_LOOKUP_COST)));
+        assert_eq!(
+            gas.total_gas_spent(),
+            u64::from(EvmGas::from(ALIAS_LOOKUP_COST))
+        );
     }
 
     #[test]
@@ -2046,7 +2049,10 @@ mod tests {
             &mut gas,
         )
         .unwrap();
-        assert_eq!(gas.spent(), u64::from(EvmGas::from(ALIAS_LOOKUP_COST)));
+        assert_eq!(
+            gas.total_gas_spent(),
+            u64::from(EvmGas::from(ALIAS_LOOKUP_COST))
+        );
     }
 
     // ── ABI selector decode/encode round-trips ───────────────────────────────
@@ -3089,7 +3095,7 @@ mod tests {
         let mut gas = Gas::new(1_000_000);
         charge_consumed_gas(&mut gas, TezosXGas::new(944, RuntimeId::Tezos))
             .expect("affordable");
-        assert_eq!(gas.spent(), 43);
+        assert_eq!(gas.total_gas_spent(), 43);
     }
 
     #[test]
@@ -3097,7 +3103,7 @@ mod tests {
         // A cache hit / round-trip reports 0 consumed gas: no charge.
         let mut gas = Gas::new(1_000_000);
         charge_consumed_gas(&mut gas, TezosXGas::ZERO).expect("affordable");
-        assert_eq!(gas.spent(), 0);
+        assert_eq!(gas.total_gas_spent(), 0);
     }
 
     #[test]

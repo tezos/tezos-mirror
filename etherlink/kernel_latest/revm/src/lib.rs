@@ -1636,7 +1636,7 @@ mod test {
 
         // Verify the CRAC gas was actually charged (the mock's consumed
         // gas, plus the precompile base cost).
-        let gas_used = execution_result.result.gas_used();
+        let gas_used = execution_result.result.tx_gas_used();
         let mock_evm_gas =
             u64::from(tezosx_interfaces::EvmGas::from(MOCK_TEZOS_GAS_CONSUMED));
         assert!(
@@ -1738,7 +1738,7 @@ mod test {
         // Check the outcome of the transaction
         match execution_result.result {
             ExecutionResult::Success { gas, .. } => {
-                assert!(gas.spent() > 0);
+                assert!(gas.total_gas_spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -4522,7 +4522,7 @@ mod test {
                     "callMichelsonView should succeed, got {:?}",
                     res.result
                 );
-                res.result.gas_used()
+                res.result.tx_gas_used()
             }
 
             fn get_gas(body_len: usize) -> u64 {
@@ -4549,7 +4549,7 @@ mod test {
                     "call(GET) should succeed, got {:?}",
                     res.result
                 );
-                res.result.gas_used()
+                res.result.tx_gas_used()
             }
 
             let view_slope = view_gas(33) - view_gas(32);
@@ -4692,7 +4692,7 @@ mod test {
             .unwrap();
 
             assert!(!res.result.is_success(), "{:?}", res.result);
-            assert_eq!(res.result.gas_used(), limit);
+            assert_eq!(res.result.tx_gas_used(), limit);
         }
 
         // --- materializeAlias ------------------------------------------------
@@ -4915,7 +4915,7 @@ mod test {
                 );
                 assert_eq!(materialized_logs(&second), vec![]);
                 assert!(
-                    second.result.gas_used() < first.result.gas_used(),
+                    second.result.tx_gas_used() < first.result.tx_gas_used(),
                     "an existing alias must not be initialized again"
                 );
             }
@@ -5029,7 +5029,7 @@ mod test {
                 .unwrap();
 
                 assert!(!res.result.is_success(), "{:?}", res.result);
-                assert_eq!(res.result.gas_used(), limit);
+                assert_eq!(res.result.tx_gas_used(), limit);
                 let info = StorageAccount::from_address(&expected_alias())
                     .unwrap()
                     .info(rk.eth_accounts_mut())
@@ -5395,20 +5395,22 @@ mod test {
                 input: CallInput::Bytes(Bytes::new()),
                 return_memory_offset: 0..0,
                 gas_limit,
+                reservoir: 0,
                 bytecode_address: Address::ZERO,
-                known_bytecode: None,
+                known_bytecode: Default::default(),
                 target_address: Address::ZERO,
                 caller: Address::ZERO,
                 value: CallValue::Transfer(U256::ZERO),
                 scheme: CallScheme::Call,
                 is_static: false,
+                charged_new_account_state_gas: false,
             }
         }
 
         // A frame that closes successfully having spent `gas_spent`.
         fn call_outcome(gas_spent: u64) -> CallOutcome {
             let mut gas = Gas::new(1_000_000);
-            let _ = gas.record_cost(gas_spent);
+            let _ = gas.record_regular_cost(gas_spent);
             CallOutcome::new(
                 InterpreterResult {
                     result: InstructionResult::Return,
@@ -5444,9 +5446,11 @@ mod test {
             };
 
             let outer_initial =
-                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID).initial_gas;
+                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID, None)
+                    .initial_total_gas();
             let inner_initial =
-                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID).initial_gas;
+                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID, None)
+                    .initial_total_gas();
             assert_ne!(
                 outer_initial, inner_initial,
                 "the two legs must have distinct intrinsic gas for the test \
@@ -5535,7 +5539,7 @@ mod test {
             // The CallTracer ignores the outcome's content: any result does.
             let result = ExecutionResult::Success {
                 reason: SuccessReason::Stop,
-                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(outer_gas_spent),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             };
@@ -5664,7 +5668,7 @@ mod test {
 
             let result = ExecutionResult::Success {
                 reason: SuccessReason::Stop,
-                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(outer_gas_spent),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             };
@@ -5769,7 +5773,7 @@ mod test {
 
         match execution_result.result {
             ExecutionResult::Success { gas, .. } => {
-                assert!(gas.spent() > 0);
+                assert!(gas.total_gas_spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -6029,10 +6033,7 @@ mod test {
             .unwrap();
 
         let mut db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
-        let mut touched = Account {
-            info: info.into(),
-            ..Account::default()
-        };
+        let mut touched = Account::default().with_info(info.into());
         touched.status = AccountStatus::Touched;
         DatabaseCommit::commit(&mut db, AddressMap::from_iter([(eoa, touched)]));
 
