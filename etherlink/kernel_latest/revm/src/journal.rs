@@ -136,12 +136,12 @@ impl<
         unimplemented!("Use Journal::new_with_inner instead")
     }
 
-    fn db(&self) -> &Self::Database {
-        &self.database
+    fn db_and_state(&self) -> (&Self::Database, &Self::State) {
+        (&self.database, &self.journal.evm.inner.state)
     }
 
-    fn db_mut(&mut self) -> &mut Self::Database {
-        &mut self.database
+    fn db_and_state_mut(&mut self) -> (&mut Self::Database, &mut Self::State) {
+        (&mut self.database, &mut self.journal.evm.inner.state)
     }
 
     fn sload(
@@ -232,7 +232,7 @@ impl<
         self.journal.evm.inner.warm_addresses.set_coinbase(address);
     }
 
-    fn warm_precompiles(&mut self, precompiles: AddressSet) {
+    fn warm_precompiles(&mut self, precompiles: &AddressSet) {
         self.journal
             .evm
             .inner
@@ -257,9 +257,15 @@ impl<
     }
 
     #[inline]
-    fn set_eip7708_config(&mut self, disabled: bool, delayed_burn_disabled: bool) {
-        self.journal.evm.inner.cfg.eip7708_disabled = disabled;
-        self.journal.evm.inner.cfg.eip7708_delayed_burn_disabled = delayed_burn_disabled;
+    fn set_eip7708_config(
+        &mut self,
+        disabled: bool,
+        eip8246_delayed_clear_disabled: bool,
+    ) {
+        self.journal
+            .evm
+            .inner
+            .set_eip7708_config(disabled, eip8246_delayed_clear_disabled);
     }
 
     #[inline]
@@ -513,13 +519,13 @@ impl<
         skip_cold_load: bool,
     ) -> Result<
         StateLoad<Self::JournaledAccount<'_>>,
-        <Self::Database as RevmDatabase>::Error,
+        JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
-        self.journal
-            .evm
-            .inner
-            .load_account_mut_optional(&mut self.database, address, skip_cold_load)
-            .map_err(JournalLoadError::unwrap_db_error)
+        self.journal.evm.inner.load_account_mut_optional(
+            &mut self.database,
+            address,
+            skip_cold_load,
+        )
     }
 
     #[inline]
@@ -547,16 +553,6 @@ impl<
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
         &self.journal.evm.inner.journal
-    }
-
-    #[inline]
-    fn evm_state(&self) -> &EvmState {
-        &self.journal.evm.inner.state
-    }
-
-    #[inline]
-    fn evm_state_mut(&mut self) -> &mut EvmState {
-        &mut self.journal.evm.inner.state
     }
 }
 
