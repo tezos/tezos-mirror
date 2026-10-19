@@ -125,23 +125,35 @@ impl Transaction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Ord, Deserialize)]
+#[serde(from = "String")]
 pub enum SpecName {
     Shanghai,
     Cancun,
     Prague,
     Osaka,
-    #[serde(other)]
-    Unknown,
+    Unknown(String),
 }
 
-impl From<SpecName> for SpecId {
-    fn from(spec: SpecName) -> Self {
-        match spec {
-            SpecName::Shanghai => SpecId::SHANGHAI,
-            SpecName::Cancun => SpecId::CANCUN,
-            SpecName::Prague => SpecId::PRAGUE,
-            SpecName::Osaka => SpecId::OSAKA,
-            SpecName::Unknown => panic!("Unknown EVM spec id"),
+impl From<String> for SpecName {
+    fn from(name: String) -> Self {
+        match name.as_str() {
+            "Shanghai" => SpecName::Shanghai,
+            "Cancun" => SpecName::Cancun,
+            "Prague" => SpecName::Prague,
+            "Osaka" => SpecName::Osaka,
+            _ => SpecName::Unknown(name),
+        }
+    }
+}
+
+impl SpecName {
+    pub fn spec_id(&self) -> Option<SpecId> {
+        match self {
+            SpecName::Shanghai => Some(SpecId::SHANGHAI),
+            SpecName::Cancun => Some(SpecId::CANCUN),
+            SpecName::Prague => Some(SpecId::PRAGUE),
+            SpecName::Osaka => Some(SpecId::OSAKA),
+            SpecName::Unknown(_) => None,
         }
     }
 }

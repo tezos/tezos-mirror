@@ -360,6 +360,7 @@ struct Report {
     success: u64,
     failure: u64,
     skipped_invest: u64,
+    skipped_fork: u64,
 }
 
 pub fn main() {
@@ -413,11 +414,18 @@ pub fn main() {
             write_out!(output_file, "Running state transition test: {}", test_name);
 
             for (spec_name, post_entrys) in post {
+                let Some(spec_id) = spec_name.spec_id() else {
+                    write_out!(
+                        output_file,
+                        "Skipping {test_name}: unsupported EVM spec {spec_name:?}"
+                    );
+                    report.skipped_fork += post_entrys.len() as u64;
+                    continue;
+                };
                 for PostEntry { state, indexes, .. } in post_entrys {
                     let mut host = prepare_host();
                     let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
                     fill_state(rk.eth_accounts_mut(), pre.clone());
-                    let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
                     let block_constants =
                         get_block_constants(&env, config.chainid.into(), spec_id);
@@ -505,11 +513,13 @@ pub fn main() {
         "\n@================== FINAL REPORT ==================@\n            \
             Successful test(s): {}\n            \
             Failing test(s): {}\n     \
-            Skipped but need investigation test(s): {}\n\
+            Skipped but need investigation test(s): {}\n     \
+            Skipped for an unsupported fork test(s): {}\n\
            @==================================================@",
         report.success,
         report.failure,
-        report.skipped_invest
+        report.skipped_invest,
+        report.skipped_fork
     );
 
     if report.failure > 0 {
