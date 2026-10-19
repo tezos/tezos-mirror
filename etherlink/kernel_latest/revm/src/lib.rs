@@ -24,7 +24,9 @@ use revm::{
     context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
     handler::{instructions::EthInstructions, EthFrame, Handler},
     inspector::InspectorHandler,
-    interpreter::interpreter::EthInterpreter,
+    interpreter::{
+        interpreter::EthInterpreter, InstructionExecResult, InstructionResult,
+    },
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
     Context, ExecuteCommitEvm, MainBuilder,
 };
@@ -228,7 +230,7 @@ const ORIGIN_OPCODE: u8 = 0x32;
 
 /// Static gas cost of the `ORIGIN` opcode (2, the same `GAS_BASE` REVM
 /// uses for the stock handler — see `revm-interpreter` `instructions::ORIGIN`).
-const ORIGIN_STATIC_GAS: u64 = 2;
+const ORIGIN_STATIC_GAS: u16 = 2;
 
 /// Custom `ORIGIN` opcode handler: when an inbound CRAC carries an
 /// originator (`X-Tezos-Source`, exposed via
@@ -249,7 +251,8 @@ fn etherlink_origin<'a, 'host, Host, R>(
         EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
-) where
+) -> InstructionExecResult
+where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
@@ -261,8 +264,9 @@ fn etherlink_origin<'a, 'host, Host, R>(
         None => InterpHost::caller(context.host),
     };
     if !context.interpreter.stack.push(value.into_word().into()) {
-        context.interpreter.halt_overflow();
+        return Err(InstructionResult::StackOverflow);
     }
+    Ok(())
 }
 
 /// Install [`etherlink_origin`] in `evm.instruction` as the handler for
@@ -279,10 +283,8 @@ fn install_etherlink_origin<'a, 'host, Host, R, INSP>(
 {
     evm.instruction.insert_instruction(
         ORIGIN_OPCODE,
-        revm::interpreter::Instruction::new(
-            etherlink_origin::<Host, R>,
-            ORIGIN_STATIC_GAS,
-        ),
+        revm::interpreter::Instruction::new(etherlink_origin::<Host, R>),
+        ORIGIN_STATIC_GAS,
     );
 }
 
@@ -293,7 +295,7 @@ const GASPRICE_OPCODE: u8 = 0x3A;
 /// Static gas cost of the `GASPRICE` opcode (2, `GAS_BASE` — the same
 /// cost the stock `revm-interpreter` `instructions::gasprice` handler
 /// charges).
-const GASPRICE_STATIC_GAS: u64 = 2;
+const GASPRICE_STATIC_GAS: u16 = 2;
 
 /// Custom `GASPRICE` opcode handler, installed only when servicing a
 /// cross-runtime call. An inbound CRAC carries `gas_price = 0` on its
@@ -313,15 +315,17 @@ fn etherlink_gasprice<'a, 'host, Host, R>(
         EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
-) where
+) -> InstructionExecResult
+where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use revm::interpreter::Host as InterpHost;
     let value = InterpHost::basefee(context.host);
     if !context.interpreter.stack.push(value) {
-        context.interpreter.halt_overflow();
+        return Err(InstructionResult::StackOverflow);
     }
+    Ok(())
 }
 
 /// Install [`etherlink_gasprice`] as the `GASPRICE` handler. Called from
@@ -336,10 +340,8 @@ fn install_etherlink_gasprice<'a, 'host, Host, R, INSP>(
 {
     evm.instruction.insert_instruction(
         GASPRICE_OPCODE,
-        revm::interpreter::Instruction::new(
-            etherlink_gasprice::<Host, R>,
-            GASPRICE_STATIC_GAS,
-        ),
+        revm::interpreter::Instruction::new(etherlink_gasprice::<Host, R>),
+        GASPRICE_STATIC_GAS,
     );
 }
 
