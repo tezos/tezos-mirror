@@ -3,6 +3,51 @@
 Changelog
 '''''''''
 
+Version 25.3
+============
+
+General
+-------
+
+- **Security**: Improved the robustness of Base58Check decoding on unexpected
+  inputs.
+
+- **Security**: Improved the robustness of the handling of DAL attestations.
+
+Node
+----
+
+- **Security**, **Breaking change**: Made the validation of smart rollup
+  refutation game operations stricter. Some operations that could previously
+  be included in a block are now rejected for that block and must be injected
+  again in a later one. As a counterpart, several operations on the same
+  refutation game can now be included in the same block.
+
+- **Security**: A refutation move proving an inbox message must now be
+  accompanied, in the same operation batch, by a ``smart_rollup_add_messages``
+  operation carrying additional data about the inbox level it reads; upgraded
+  smart rollup nodes do this automatically.
+
+- Added the RPC ``GET /chains/<chain>/blocks/<block>/context/smart_rollups/all/signals``
+  for protocols Ushuaia (025) and Alpha, returning the signals recorded by the
+  protocol, each with the level of the block that recorded it. (MR :gl:`!22838`)
+
+Baker
+-----
+
+- **Security**: Improved the robustness of the baker's (pre)quorum accounting.
+
+- **Security**: For protocol Ushuaia (025), the baker now waits for a proposal
+  to be applied before (pre)attesting it, from the round set by
+  ``--force-apply-from-round`` (3 by default).
+
+Smart Rollup node
+-----------------
+
+- **Security**: For protocol Ushuaia (025), refutation moves are now injected
+  together with an additional ``smart_rollup_add_messages`` operation, required
+  by the new validation of refutation proofs.
+
 Version 25.2
 ============
 
