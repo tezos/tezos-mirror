@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol ushuaia RPC",
     "description": "The RPC API for protocol ushuaia served by the Octez node.",
-    "version": "Octez 25.2 (TBD)"
+    "version": "Octez 25.3 (TBD)"
   },
   "paths": {
     "/": {
@@ -8354,6 +8354,50 @@
                     "level",
                     "old_levels_messages"
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/smart_rollups/all/signals": {
+      "get": {
+        "description": "Signals recorded by the protocol when the canonical smart rollup executed a canonical_rollup_signal outbox message, each with the level of the block that recorded it. The list is not ordered: look signals up by name.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "$ref": "#/components/schemas/unistring"
+                      },
+                      "level": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "level"
+                    ]
+                  }
                 }
               }
             }
