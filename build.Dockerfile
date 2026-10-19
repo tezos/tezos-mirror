@@ -58,6 +58,9 @@ COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number
 COPY --chown=tezos:nogroup script-inputs/released-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
+# Included by the top-level dune file, so dune refuses to read any rule
+# without it.
+COPY --chown=tezos:nogroup script-inputs/cargo-dirs.sexp tezos/script-inputs/
 
 # Group 3: vendored/forked libraries (change infrequently)
 COPY --chown=tezos:nogroup vendors tezos/vendors
