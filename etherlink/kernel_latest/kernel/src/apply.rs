@@ -1098,13 +1098,13 @@ impl TezosExecutionInfo {
         if self.is_success() {
             ExecutionResult::Success {
                 reason: SuccessReason::Stop,
-                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(gas_used),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             }
         } else {
             ExecutionResult::Revert {
-                gas: ResultGas::new(gas_used, gas_used, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(gas_used),
                 logs: vec![],
                 output: Bytes::new(),
             }
@@ -1183,7 +1183,7 @@ where
 
             let tx_hash = transaction.tx_hash;
             let tx_type = transaction.type_();
-            let gas_used = execution_outcome.result.gas_used();
+            let gas_used = execution_outcome.result.tx_gas_used();
 
             let fee_updates = transaction
                 .content

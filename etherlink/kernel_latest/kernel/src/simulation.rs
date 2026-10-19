@@ -216,7 +216,7 @@ pub struct SimulationOutcome {
 
 impl From<ExecutionOutcome> for SimulationOutcome {
     fn from(outcome: ExecutionOutcome) -> Self {
-        let gas_used = outcome.result.gas_used();
+        let gas_used = outcome.result.tx_gas_used();
         Self { outcome, gas_used }
     }
 }
@@ -236,7 +236,7 @@ impl From<Result<ExecutionOutcome, RevmError>> for SimulationResult<CallResult, 
             Ok(ExecutionOutcome { result, .. }) if result.is_success() => {
                 Self::Ok(SimulationResult::Ok(ExecutionResult {
                     value: result.output().map(|x| x.to_vec()),
-                    gas_used: Some(result.gas_used()),
+                    gas_used: Some(result.tx_gas_used()),
                 }))
             }
             Ok(
