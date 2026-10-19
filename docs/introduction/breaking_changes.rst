@@ -60,6 +60,9 @@ Instead, the new ``octez-manager`` tool included in the Octez suite (see https:/
 
 Thus, in Octez v25, installing packages would display a warning about the deprecation and would link to ``octez-manager``.
 
+Alternatively, Debian and Ubuntu packages built along the same lines as the Octez packages, called Tzinit packages, are available.
+See :doc:`tzinit-packages` for instructions on how to migrate to these packages.
+
 
 Removal of Adaptive Issuance vote argument from the baker
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
