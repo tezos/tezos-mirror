@@ -52,15 +52,6 @@ let lib_etherlink_wasm_runtime =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               (* We need this stanza to ensure .cargo can be used as a
-                  dependency via source_tree. *)
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";
@@ -69,6 +60,7 @@ let lib_etherlink_wasm_runtime =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -95,7 +87,10 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../../sdk/rust"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [S "no-infer"; cargo_build ~root:"../.." "evm-runtime"];
+               ];
              ];
            ])
 

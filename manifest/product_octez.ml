@@ -500,15 +500,6 @@ let lib_rustzcash =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               (* We need this stanza to ensure .cargo can be used as a
-                  dependency via source_tree. *)
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";
@@ -517,6 +508,7 @@ let lib_rustzcash =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -526,7 +518,10 @@ let lib_rustzcash =
                  [S "source_tree"; S "include"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [S "no-infer"; cargo_build ~root:"../.." "rustzcash"];
+               ];
              ];
            ])
 
@@ -543,19 +538,11 @@ let octez_rust_deps, lib_wasmer_riscv =
         Dune.
           [
             [
-              S "dirs";
-              S ":standard";
-              (* We need this stanza to ensure .cargo can be used as a
-                 dependency via source_tree. *)
-              S ".cargo";
-              (* Do not track Cargo output directory. *)
-              [S "not"; S "target"];
-            ];
-            [
               S "rule";
               [S "targets"; S "liboctez_rust_deps.a"; S "dlloctez_rust_deps.so"];
               [
                 S "deps";
+                [S "sandbox"; S "none"];
                 [S "file"; S "build.sh"];
                 [S "file"; S "Cargo.toml"];
                 [S "file"; S "Cargo.lock"];
@@ -570,7 +557,9 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S "../kernel_sdk"];
                 [S "source_tree"; S "../../sdk/rust"];
               ];
-              [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+              [
+                S "action"; [S "no-infer"; cargo_build ~root:"../.." "rust-deps"];
+              ];
             ];
           ]
   in
@@ -871,35 +860,15 @@ let octez_libcrux_ml_dsa =
             ];
             [
               S "deps";
+              [S "sandbox"; S "none"];
+              [S "file"; S "build.sh"];
               [S "glob_files"; S "*.rs"];
               [S "file"; S "../Cargo.toml"];
               [S "file"; S "../Cargo.lock"];
               [S "file"; S "../../../rust-toolchain"];
               [S "source_tree"; S "../.cargo"];
             ];
-            [
-              S "action";
-              [
-                S "progn";
-                [S "run"; S "sh"; S "-c"; S "cargo build --release"];
-                [
-                  S "run";
-                  S "sh";
-                  S "-c";
-                  S
-                    "mv ../target/release/liboctez_libcrux_ml_dsa.so \
-                     ./dlloctez_libcrux_ml_dsa.so 2> /dev/null || mv \
-                     ../target/release/liboctez_libcrux_ml_dsa.dylib \
-                     ./dlloctez_libcrux_ml_dsa.so";
-                ];
-                [
-                  S "run";
-                  S "mv";
-                  S "../target/release/liboctez_libcrux_ml_dsa.a";
-                  S "liboctez_libcrux_ml_dsa.a";
-                ];
-              ];
-            ];
+            [S "action"; [S "no-infer"; cargo_build ~root:"../../.." "libcrux"]];
           ];
         ]
 
@@ -3938,13 +3907,6 @@ let lib_rollup_node_rust_deps =
          Dune.
            [
              [
-               S "dirs";
-               S ":standard";
-               S ".cargo";
-               (* Do not track Cargo output directory. *)
-               [S "not"; S "target"];
-             ];
-             [
                S "rule";
                [
                  S "targets";
@@ -3953,6 +3915,7 @@ let lib_rollup_node_rust_deps =
                ];
                [
                  S "deps";
+                 [S "sandbox"; S "none"];
                  [S "file"; S "build.sh"];
                  [S "file"; S "Cargo.toml"];
                  [S "file"; S "Cargo.lock"];
@@ -3967,7 +3930,10 @@ let lib_rollup_node_rust_deps =
                  [S "source_tree"; S "../kernel_sdk"];
                  [S "source_tree"; S "../../sdk/rust"];
                ];
-               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+               [
+                 S "action";
+                 [S "no-infer"; cargo_build ~root:"../.." "rollup-node"];
+               ];
              ];
            ])
 
@@ -4047,7 +4013,6 @@ let octez_riscv_kernels =
     ~dune:
       Dune.
         [
-          [S "dirs"; S ":standard"; S ".cargo"; [S "not"; S "target"]];
           [
             S "rule";
             S "targets" :: targets;
@@ -4056,6 +4021,7 @@ let octez_riscv_kernels =
             [S "mode"; [S "fallback"]];
             [
               S "deps";
+              [S "sandbox"; S "none"];
               [S "source_tree"; S ".cargo"];
               [S "source_tree"; S "echo"];
               [S "file"; S "Cargo.toml"];
@@ -4063,7 +4029,22 @@ let octez_riscv_kernels =
               [S "file"; S "Makefile"];
               [S "file"; S "rust-toolchain.toml"];
             ];
-            [S "action"; [S "progn"; [S "run"; S "sh"; S "-c"; S "make build"]]];
+            [
+              S "action";
+              [
+                S "setenv";
+                S "CARGO_TARGET_DIR";
+                cargo_target_dir "riscv-kernels";
+                [
+                  S "run";
+                  S "make";
+                  S "build";
+                  S "CARGO_BUILD_SCRIPT=%{dep:../../../scripts/cargo-build.sh}";
+                  S "DUNE_PROFILE=%{profile}";
+                  S "OCTEZ_RUST_INCREMENTAL=%{env:OCTEZ_RUST_INCREMENTAL=0}";
+                ];
+              ];
+            ];
           ];
           [S "alias"; [S "name"; S "default"]; S "deps" :: targets];
         ]

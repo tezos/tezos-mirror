@@ -8,11 +8,10 @@
  (foreign_archives octez_rollup_node_rust_deps)
  (c_library_flags ((:include %{workspace_root}/c++-stdlib-link-flags.sexp))))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_rollup_node_rust_deps.a dlloctez_rollup_node_rust_deps.so)
  (deps
+  (sandbox none)
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
@@ -26,4 +25,12 @@
   (source_tree ../rust_deps/rust_tezos_context)
   (source_tree ../kernel_sdk)
   (source_tree ../../sdk/rust))
- (action (no-infer (system ./build.sh))))
+ (action
+  (no-infer
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/rollup-node
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

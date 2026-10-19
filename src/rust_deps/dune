@@ -7,11 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (foreign_archives octez_rust_deps))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_rust_deps.a dlloctez_rust_deps.so)
  (deps
+  (sandbox none)
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
@@ -25,4 +24,12 @@
   (source_tree ../riscv)
   (source_tree ../kernel_sdk)
   (source_tree ../../sdk/rust))
- (action (no-infer (system ./build.sh))))
+ (action
+  (no-infer
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/rust-deps
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

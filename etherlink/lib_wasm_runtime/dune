@@ -7,11 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (foreign_archives octez_evm_node_rust_deps))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_evm_node_rust_deps.a dlloctez_evm_node_rust_deps.so)
  (deps
+  (sandbox none)
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
@@ -37,4 +36,12 @@
   (source_tree ../../src/kernel_sdk)
   (source_tree ../../sdk/rust)
   (source_tree src))
- (action (no-infer (system ./build.sh))))
+ (action
+  (no-infer
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/evm-runtime
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

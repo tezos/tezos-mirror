@@ -4,17 +4,22 @@
 
 KERNELS=riscv-echo
 
-BUILD_DIR=target/riscv64gc-unknown-linux-musl/release
+CARGO_TARGET_DIR ?= target
+export CARGO_TARGET_DIR
+BUILD_DIR=$(CARGO_TARGET_DIR)/riscv64gc-unknown-linux-musl/release
 
 all: check build
 
 build: ${KERNELS}
 
+# Shared with the other Dune-managed Rust components.
+CARGO_BUILD_SCRIPT ?= ../../../scripts/cargo-build.sh
+
 cargo-build:
-	@cargo build --release
+	@sh "$(CARGO_BUILD_SCRIPT)" "$(DUNE_PROFILE)" "$(OCTEZ_RUST_INCREMENTAL)" --release
 
 riscv-echo: cargo-build
-	@mv $(BUILD_DIR)/$@ $@
+	@cp "$(BUILD_DIR)/$@" "$@"
 	@shasum -a 256 $@ > $@.checksum
 
 build-dev-deps:

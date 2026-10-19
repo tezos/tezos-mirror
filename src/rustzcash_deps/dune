@@ -7,11 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (foreign_archives octez_rustzcash_deps))
 
-(dirs :standard .cargo (not target))
-
 (rule
  (targets liboctez_rustzcash_deps.a dlloctez_rustzcash_deps.so)
  (deps
+  (sandbox none)
   (file build.sh)
   (file Cargo.toml)
   (file Cargo.lock)
@@ -20,4 +19,12 @@
   (source_tree bin)
   (source_tree include)
   (source_tree src))
- (action (no-infer (system ./build.sh))))
+ (action
+  (no-infer
+   (run
+    ./build.sh
+    %{workspace_root}/../.cargo-target/%{context_name}/rustzcash
+    sh
+    %{dep:../../scripts/cargo-build.sh}
+    %{profile}
+    %{env:OCTEZ_RUST_INCREMENTAL=0}))))

@@ -2,6 +2,8 @@
 
 (data_only_dirs _opam-repo-for-release)
 
+(include script-inputs/cargo-dirs.sexp)
+
 (env
  (_
   (flags

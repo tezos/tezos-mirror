@@ -75,10 +75,6 @@ let exclude filename =
   | ["opam"; "mandatory-for-make.opam"] -> true
   (* opam-repository is used by scripts/opam-release.sh *)
   | "opam-repository" :: _ -> true
-  (* We need to tell Dune about excluding directories without defining targets
-     in those directories. Therefore we hand write some Dune in these. *)
-  | "src" :: "riscv" :: _ -> true
-  | ["src"; "rust_libcrux"; "dune"] -> true
   (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
   | "src" :: "dune" :: _ -> true
   (* [manifest/dune] serves for ocaml-lsp to handle the manifest. *)
@@ -274,5 +270,7 @@ let () =
      used when slim mode is active.@.; Otherwise it is ignored by the build \
      system.@.; For more information, see: scripts/slim-mode.sh@.@." ;
   Dune.pp fmt [S "data_only_dirs" :: Dune.of_atom_list ignored_dirs]
+
+let () = generate_cargo_exclusions ()
 
 let () = postcheck ~exclude ()

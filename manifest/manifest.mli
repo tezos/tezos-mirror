@@ -89,6 +89,15 @@ module Dune : sig
   (** Pretty-print an S-expression. *)
   val pp : Format.formatter -> s_expr -> unit
 
+  (** Persistent Cargo cache for a component, outside Dune's context tree.
+      Rules using it must declare [(sandbox none)]. Removed by [dune clean]. *)
+  val cargo_target_dir : string -> s_expr
+
+  (** Run a component's [build.sh] with its persistent cache and the shared
+      Cargo build command. [root] is the relative path to the repository root.
+      The command tracks the Dune profile and the incremental compilation opt-in. *)
+  val cargo_build : root:string -> string -> s_expr
+
   (** Convert a list of [s_expr] to an [s_expr].
 
       [of_list [a; b; c]] is [(a b c)].
@@ -1368,6 +1377,12 @@ val postcheck : ?exclude:(string -> bool) -> unit -> unit
     [dune] is a free form s-expression that will be included as is at the end of the file.
  *)
 val generate_workspace : Env.t -> Dune.s_expr -> unit
+
+(** Generate [script-inputs/cargo-dirs.sexp], excluding Cargo [target] directories
+    for every discovered [Cargo.toml]. Discovery skips hidden directories,
+    directories beginning with [_], [target], [node_modules], and symlinks.
+    The output is sorted. Discovery uses the filesystem, not the Git index. *)
+val generate_cargo_exclusions : unit -> unit
 
 (** [write filename f] writes a file relatively to the root directory of the repository.
 
