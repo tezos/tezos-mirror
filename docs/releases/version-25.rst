@@ -1,4 +1,4 @@
-Version 25.2
+Version 25.3
 ============
 
 Changes
@@ -14,6 +14,21 @@ Version 25 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v25 can be found :ref:`here <v25_breaking_changes>`.
+
+Octez v25.3
+~~~~~~~~~~~
+
+Octez version 25.3 hardens the Octez node against security threats and improves
+its robustness by:
+
+- introducing a stricter validation of smart rollup refutation game operations
+  and proofs
+- improving the robustness of Base58Check decoding and of the handling of DAL
+  attestations
+- improving the robustness of the baker, both in how it counts (pre)attestations
+  and in when it (pre)attests a proposal
+
+This release also adds the ``smart_rollups/all/signals`` RPC in the :doc:`protocol plugin <../active/plugins>` for the Ushuaia protocol.
 
 Octez v25.2
 ~~~~~~~~~~~
@@ -160,6 +175,7 @@ If you are using Docker instead, use the ``octez-v25.1`` Docker images of Octez.
 Changelog
 ---------
 
+- `Version 25.3 <../CHANGES.html#version-25-3>`_
 - `Version 25.2 <../CHANGES.html#version-25-2>`_
 - `Version 25.1 <../CHANGES.html#version-25-1>`_
 - `Version 25.0 <../CHANGES.html#version-25-0>`_
