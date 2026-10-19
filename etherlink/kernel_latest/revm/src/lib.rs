@@ -527,6 +527,7 @@ fn install_alias_delegation<
         journaled_state
             .load_account(alias)
             .map_err(EVMError::Database)?;
+        // Note: a revert restores the previous code (empty or a legacy forwarder).
         journaled_state.set_code_with_hash(
             alias,
             alias_forwarder_delegation(),
@@ -616,6 +617,7 @@ where
                 credit: Some((addr, amount)),
             } if amount > U256::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
+                // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
@@ -637,6 +639,7 @@ where
                 EtherlinkHandler::default()
             }
             .with_call_depth(call_depth);
+        // Note: an error can leave global checkpoints open; the blueprint then aborts.
         let result = match handler.inspect_run(&mut evm_context) {
             Ok(r) => r,
             Err(e) => {
@@ -693,6 +696,7 @@ where
                 credit: Some((addr, amount)),
             } if amount > U256::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
+                // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
@@ -704,6 +708,7 @@ where
         };
 
         let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        // Note: an error can leave global checkpoints open; the blueprint then aborts.
         let result = match execute_transaction(
             &mut evm_context,
             &tx,

@@ -91,6 +91,7 @@ impl EtherlinkPrecompiles {
             || (self.enable_debug_precompiles && DEBUGS.contains(address))
     }
 
+    // Note: Glamsterdam: set the EIP-8037 reservoir from inputs.reservoir here.
     fn run_custom_precompile<'j, 'host, CTX, Host, R>(
         &mut self,
         context: &mut CTX,
@@ -205,6 +206,7 @@ where
             return Ok(Some(custom_result));
         }
 
+        // Note: revm halts a builtin that reports too much gas with PrecompileOOG.
         self.builtins.run(context, inputs)
     }
 

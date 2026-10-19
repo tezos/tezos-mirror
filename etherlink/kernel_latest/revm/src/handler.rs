@@ -75,6 +75,7 @@ where
             .load_account(caller_address)?
             .info
             .nonce;
+        // Note: revm's validate_env rejects a tx nonce of u64::MAX (EIP-2681).
         validate_against_state_and_deduct_caller::<_, Self::Error>(evm.ctx())?;
         if self.call_depth != 0 {
             evm.ctx()
@@ -98,7 +99,9 @@ where
             SharedMemory::new_with_buffer(ctx.local().shared_memory_buffer().clone());
         memory.set_memory_limit(ctx.cfg().memory_limit());
 
+        // Note: an Err here leaves the revm pre-execution checkpoint open.
         let Some(mut frame_input) = create_init_frame(ctx, gas)? else {
+            // Note: EIP-2780 only (Amsterdam); revm then reverts its checkpoint.
             return Ok(None);
         };
 

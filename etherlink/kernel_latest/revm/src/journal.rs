@@ -163,6 +163,7 @@ impl<
         StateLoad<StorageValue>,
         JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
+        // Note: loads an absent account, unlike revm's sload_assume_account_present.
         self.journal
             .evm
             .inner
@@ -190,6 +191,7 @@ impl<
         StateLoad<SStoreResult>,
         JournalLoadError<<Self::Database as RevmDatabase>::Error>,
     > {
+        // Note: loads an absent account, unlike revm's sstore_assume_account_present.
         self.journal.evm.inner.sstore(
             &mut self.database,
             address,
@@ -431,6 +433,7 @@ impl<
         // JournalInner with the outer EVM transaction. Draining would
         // invalidate checkpoint.log_i indices held by outer CALL frames.
         // The logs are properly drained by finalize() at the top level.
+        // Note: Glamsterdam: cloning skips the EIP-8246 clear of revm's take_logs.
         self.journal.evm.inner.logs.clone()
     }
 
@@ -441,6 +444,7 @@ impl<
         // storage, warm addresses, selfdestructed addresses, transaction_id)
         // belongs to the outer frame and must not be reset.
         // Full cleanup happens in finalize() for top-level UserInput transactions.
+        // Note: revm resets slot original values only on a new transaction_id.
     }
 
     #[inline]

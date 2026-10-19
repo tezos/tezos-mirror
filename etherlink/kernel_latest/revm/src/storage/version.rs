@@ -9,6 +9,7 @@ use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, storage::Sto
 // Path to the EVM version.
 const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/world_state/evm_version");
 
+// Note: Glamsterdam: there is no Amsterdam variant yet.
 #[derive(Default, Clone, Copy)]
 #[repr(u32)]
 pub enum EVMVersion {
