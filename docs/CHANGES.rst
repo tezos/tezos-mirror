@@ -13,6 +13,7 @@ General
   inputs. (MR :gl:`!23026`)
 
 - **Security**: Improved the robustness of the handling of DAL attestations.
+  (MR :gl:`!23029`)
 
 Node
 ----
