@@ -749,6 +749,24 @@ let test_decode_last_bit_of_chunk () =
         [{lag_index = 0; slot_indices = [6]}]
         decoded
 
+(** A negative integer is not a valid attestation bitset: the encoding's
+    decoding guard must reject it, so a hostile value can never be parsed into
+    an operation. We encode the raw negative with the unguarded
+    [Data_encoding.z] and check the guarded encoding refuses to decode it. *)
+let test_negative_bitset_rejected () =
+  List.iter_es
+    (fun n ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Data_encoding.z (Z.of_int n)
+      in
+      match
+        Data_encoding.Binary.of_bytes_opt Dal_attestations_repr.encoding bytes
+      with
+      | None -> Lwt_result_syntax.return_unit
+      | Some _ ->
+          Alcotest.failf "decoding the negative bitset %d should have failed" n)
+    [-1; -2; -42]
+
 let tests =
   [
     Tztest.tztest "example encoding from interface" `Quick test_example_encoding;
@@ -776,6 +794,10 @@ let tests =
       "decode last bit of chunk"
       `Quick
       test_decode_last_bit_of_chunk;
+    Tztest.tztest
+      "negative bitset is rejected"
+      `Quick
+      test_negative_bitset_rejected;
   ]
 
 let () =

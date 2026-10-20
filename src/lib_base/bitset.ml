@@ -100,7 +100,9 @@ let to_list field =
       let acc = if Z.testbit field 0 then pos :: acc else acc in
       to_list (pos + 1) acc (Z.shift_right field 1)
   in
-  to_list 0 [] field |> List.rev
+  (* A negative integer is not a valid bitset: [Z.shift_right] on it never
+     reaches zero, so the loop above would not terminate. *)
+  if Z.sign field < 0 then [] else to_list 0 [] field |> List.rev
 
 let fill ~length =
   let open Result_syntax in
@@ -113,9 +115,13 @@ let diff b1 b2 = Z.logand b1 (Z.lognot b2)
 
 let occupied_size_in_bits = Z.numbits
 
-let cardinal =
-  (* The cardinal of a bitset is its hamming weight, i.e. the number of ones. *)
-  Z.popcount
+let cardinal z =
+  (* The cardinal of a bitset is its hamming weight, i.e. the number of ones.
+     A negative integer is not a valid bitset, but one can be produced when
+     decoding operator-supplied data.
+     [Z.popcount] raises [Z.Overflow] on negative inputs, so we guard against
+     it: we make [cardinal] total so that callers do not raise. *)
+  if Z.sign z < 0 then 0 else Z.popcount z
 
 let to_z z = z
 

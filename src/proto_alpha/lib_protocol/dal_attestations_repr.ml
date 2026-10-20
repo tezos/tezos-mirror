@@ -8,7 +8,13 @@
 (* A compact representation of multiple DAL attestations at different lags. *)
 type t = Bitset.t
 
-let encoding = Bitset.encoding
+let encoding =
+  Data_encoding.with_decoding_guard
+    (fun t ->
+      if Compare.Int.(Z.sign (Bitset.to_z t) < 0) then
+        Error "negative DAL attestation bitset"
+      else Ok ())
+    Bitset.encoding
 
 let rpc_arg =
   let construct t = Z.to_string (Bitset.to_z t) in

@@ -74,7 +74,8 @@ val shift_right : t -> offset:int -> t tzresult
     [positions]. *)
 val from_list : int list -> t tzresult
 
-(** [to_list t] returns the list of integers in the bitset. *)
+(** [to_list t] returns the list of integers in the bitset. Returns [[]] on
+    an (invalid) negative bitset. *)
 val to_list : t -> int list
 
 (** [fill ~length] is equivalent to setting all bits for positions in [0, length
@@ -98,7 +99,7 @@ val diff : t -> t -> t
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
 
-(** [cardinat bitset] returns the number of elements in the [bitsest]. *)
+(** [cardinat bitset] returns the number of elements in the [bitset]. *)
 val cardinal : t -> int
 
 (** [to_z t] returns the sum of powers of two of the integers in the given
