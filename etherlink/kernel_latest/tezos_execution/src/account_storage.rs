@@ -805,9 +805,15 @@ pub fn key_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<Key, KeyErro
     key_to_implicit_account_prefix(pub_key_hash)?.concat(&INFO_KEY)
 }
 
-/// Reads the info record at `key` as [`get_tezos_account_info`] does. `key`
-/// must come from [`key_to_tezos_account`].
-fn get_tezos_account_info_at(
+/// Returns the info record of an implicit account at `key` in `tez_accounts`.
+/// `key` must come from [`key_to_tezos_account`].
+///
+/// Returns `None` when the record is absent or when the host fails to read it.
+///
+/// Fails with [`RuntimeError::DecodingError`] inside
+/// [`TezosXRuntimeError::Runtime`] when the stored bytes do not decode into a
+/// [`TezosAccountInfo`].
+pub fn get_tezos_account_info_at(
     tez_accounts: &impl KeySpace,
     key: &Key,
 ) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
@@ -816,45 +822,22 @@ fn get_tezos_account_info_at(
         .map_err(|_| RuntimeError::DecodingError)?)
 }
 
-/// Returns the info record of the implicit account `pub_key_hash` in
-/// `tez_accounts`.
-///
-/// Returns `None` when the record is absent or when the host fails to read it.
-///
-/// Fails with [`TezosXRuntimeError::Key`] when the key of `pub_key_hash` is
-/// invalid. Fails with [`RuntimeError::DecodingError`] inside
-/// [`TezosXRuntimeError::Runtime`] when the stored bytes do not decode into a
-/// [`TezosAccountInfo`].
-pub fn get_tezos_account_info(
-    tez_accounts: &impl KeySpace,
-    pub_key_hash: &PublicKeyHash,
-) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
-    let key = key_to_tezos_account(pub_key_hash)?;
-    get_tezos_account_info_at(tez_accounts, &key)
-}
-
-/// Reads the implicit-account info record at `key`, as
-/// [`get_tezos_account_info_at`] does, and returns the default record when it
-/// is absent or when the host fails to read it.
-fn get_tezos_account_info_or_init_at(
+/// Returns the info record at `key` as [`get_tezos_account_info_at`] does, or
+/// the default record when the record is absent or when the host fails to
+/// read it. `key` must come from [`key_to_tezos_account`].
+pub fn get_tezos_account_info_or_init_at(
     tez_accounts: &impl KeySpace,
     key: &Key,
 ) -> Result<TezosAccountInfo, TezosXRuntimeError> {
     Ok(get_tezos_account_info_at(tez_accounts, key)?.unwrap_or_default())
 }
 
-/// Returns the info record of `pub_key_hash` as [`get_tezos_account_info`]
-/// does, or the default record when the record is absent or unreadable.
-pub fn get_tezos_account_info_or_init(
-    tez_accounts: &impl KeySpace,
-    pub_key_hash: &PublicKeyHash,
-) -> Result<TezosAccountInfo, TezosXRuntimeError> {
-    Ok(get_tezos_account_info(tez_accounts, pub_key_hash)?.unwrap_or_default())
-}
-
-/// Writes `info` at `key` as [`set_tezos_account_info`] does. `key` must come
-/// from [`key_to_tezos_account`].
-fn set_tezos_account_info_at(
+/// Replaces the info record of an implicit account at `key` in `tez_accounts`
+/// with the RLP encoding of `info`. `key` must come from
+/// [`key_to_tezos_account`].
+///
+/// Fails with [`TezosXRuntimeError::Custom`] when the write fails.
+pub fn set_tezos_account_info_at(
     tez_accounts: &mut impl KeySpace,
     key: &Key,
     info: TezosAccountInfo,
@@ -863,20 +846,6 @@ fn set_tezos_account_info_at(
         .store_rlp(key, &info)
         .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     Ok(())
-}
-
-/// Replaces the info record of the implicit account `pub_key_hash` in
-/// `tez_accounts` with the RLP encoding of `info`.
-///
-/// Fails with [`TezosXRuntimeError::Key`] when the key of `pub_key_hash` is
-/// invalid, and with [`TezosXRuntimeError::Custom`] when the write fails.
-pub fn set_tezos_account_info(
-    tez_accounts: &mut impl KeySpace,
-    pub_key_hash: &PublicKeyHash,
-    info: TezosAccountInfo,
-) -> Result<(), TezosXRuntimeError> {
-    let key = key_to_tezos_account(pub_key_hash)?;
-    set_tezos_account_info_at(tez_accounts, &key, info)
 }
 
 pub struct TezosImplicitAccount {
@@ -1111,7 +1080,7 @@ mod tests {
 mod test {
     use super::*;
     use crate::account_storage::{
-        narith_to_u256, set_tezos_account_info, TezosAccountInfo, TezosImplicitAccount,
+        narith_to_u256, TezosAccountInfo, TezosImplicitAccount,
     };
     use crate::context::{
         implicit_from_contract, implicit_from_public_key_hash, originated_from_contract,
@@ -2088,5 +2057,17 @@ mod test {
         assert_eq!(info.storage_size, Narith::from(20u64));
         assert_eq!(info.used_bytes, Zarith::from(50u64));
         assert_eq!(info.paid_bytes, Zarith::from(50u64));
+    }
+
+    fn set_tezos_account_info(
+        tez_accounts: &mut impl KeySpace,
+        pub_key_hash: &PublicKeyHash,
+        info: TezosAccountInfo,
+    ) -> Result<(), TezosXRuntimeError> {
+        set_tezos_account_info_at(
+            tez_accounts,
+            &key_to_tezos_account(pub_key_hash)?,
+            info,
+        )
     }
 }

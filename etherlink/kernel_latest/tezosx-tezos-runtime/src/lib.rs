@@ -64,8 +64,8 @@ use tezos_smart_rollup_host::path::OwnedPath;
 pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
-    get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info,
-    TezosOriginatedAccount,
+    get_tezos_account_info_or_init_at, key_to_tezos_account, narith_to_u256,
+    set_tezos_account_info_at, TezosOriginatedAccount,
 };
 
 pub struct TezosRuntime(pub ChainId);
@@ -1530,12 +1530,13 @@ impl TezosRuntime {
         pub_key_hash: &PublicKeyHash,
         amount: U256,
     ) -> Result<(), TezosXRuntimeError> {
-        let mut info = get_tezos_account_info_or_init(tez_accounts, pub_key_hash)?;
+        let key = key_to_tezos_account(pub_key_hash)?;
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &key)?;
         info.balance = info
             .balance
             .checked_add(amount)
             .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        set_tezos_account_info(tez_accounts, pub_key_hash, info)
+        set_tezos_account_info_at(tez_accounts, &key, info)
     }
 
     // Used for debug while we don't have our own originated account implementation.
