@@ -568,6 +568,12 @@ where
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V67 => {
+            // Starting version 67, the EVM alias of a tz1/tz2/tz3 account is
+            // its recoverable alias (RFC-26051). No data to migrate: the
+            // version is the signal the node gates its alias derivation on.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
