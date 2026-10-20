@@ -291,7 +291,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -303,7 +302,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test ~components:component_deploys);
       (Auto, job_docker_promote_to_latest `test_wait);
@@ -315,7 +313,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
@@ -327,7 +324,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test);
       (Auto, job_docker_promote_to_latest `test_wait);
@@ -339,7 +335,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_release `real);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -351,7 +346,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
-      (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test ~components:component_deploys);
     ] ;
@@ -362,7 +356,6 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_publish `non_release_tag);
-      (Auto, Homebrew.job_create_homebrew_formula);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag_test
@@ -371,7 +364,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `non_release_tag);
-      (Auto, Homebrew.job_create_homebrew_formula);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
@@ -381,7 +373,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `test);
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `scheduled_test);
-      (Auto, Homebrew.job_create_homebrew_formula);
     ] ;
   (* Octez Latest Release *)
   Cacio.register_jobs
