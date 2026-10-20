@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 mod headers;
+mod recoverable_alias;
 mod url;
 
-use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
+use recoverable_alias::{legacy_alias, recoverable_alias};
+
+use alloy_primitives::{hex::FromHex, Address, Bytes, U256 as AlloyU256};
 use alloy_primitives::{IntoLogData, Log};
 use alloy_sol_types::{sol, SolCall};
 use http::StatusCode;
@@ -734,18 +737,17 @@ impl RuntimeInterface for EthereumRuntime {
         let storage_info = alias_account.info(rk.eth_accounts_mut())?;
         match storage_info.origin {
             AccountOrigin::Alias(_) => Ok(true),
-            AccountOrigin::Native => Err(TezosXRuntimeError::Custom(format!(
-                "alias_exists: address {alias} is recorded as Native"
-            ))),
-            AccountOrigin::Unclassified => Ok(false),
+            // `alias` is a derived address: no key exists for it, so the
+            // only way it got classified Native is code deployed there,
+            // i.e. a rescue account deployed before the guard (RFC-26051).
+            // It is not materialized yet: `create_alias` overwrites it.
+            AccountOrigin::Native | AccountOrigin::Unclassified => Ok(false),
         }
     }
 
     fn compute_alias(&self, native_address: &[u8]) -> Result<String, TezosXRuntimeError> {
-        let mut hasher = Keccak256::new();
-        hasher.update(native_address);
-        let hash = hasher.finalize();
-        let alias = Address::from_slice(&hash[0..20]);
+        let alias = recoverable_alias(native_address)
+            .unwrap_or_else(|| legacy_alias(native_address));
         Ok(alias.to_string())
     }
 
@@ -1369,42 +1371,26 @@ mod tests {
         assert_eq!(journal.evm.revm_call_depth(), Some(7));
     }
 
-    /// Test that alias addresses are computed deterministically from native addresses.
+    /// Implicit tz1/tz2/tz3 accounts get the recoverable alias of
+    /// RFC-26051; anything else keeps the legacy Keccak-256 derivation.
     #[test]
-    fn test_alias_address_is_deterministic() {
-        let native_address = b"tz1abc123";
+    fn test_compute_alias_derivation_by_address_kind() {
+        let runtime = EthereumRuntime::default();
+        let alias = |native: &str| runtime.compute_alias(native.as_bytes()).unwrap();
 
-        // Compute alias address using the same algorithm as ensure_alias
+        // Vector from tz-alias-recovery's `artifacts/frozen.json`.
+        assert_eq!(
+            alias("tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh").to_lowercase(),
+            "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae"
+        );
+
+        let kt1 = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
         let mut hasher = Keccak256::new();
-        hasher.update(native_address);
-        let hash = hasher.finalize();
-        let alias = &hash[0..20];
-
-        // Verify it's 20 bytes
-        assert_eq!(alias.len(), 20);
-
-        // Compute again to verify determinism
-        let mut hasher2 = Keccak256::new();
-        hasher2.update(native_address);
-        let hash2 = hasher2.finalize();
-        let alias2 = &hash2[0..20];
-
-        assert_eq!(alias, alias2);
-    }
-
-    #[test]
-    fn test_different_native_addresses_produce_different_aliases() {
-        let compute_alias = |native: &[u8]| {
-            let mut hasher = Keccak256::new();
-            hasher.update(native);
-            let hash = hasher.finalize();
-            hash[0..20].to_vec()
-        };
-
-        let alias1 = compute_alias(b"tz1abc");
-        let alias2 = compute_alias(b"tz1xyz");
-
-        assert_ne!(alias1, alias2);
+        hasher.update(kt1);
+        assert_eq!(
+            alias(kt1),
+            Address::from_slice(&hasher.finalize()[0..20]).to_string()
+        );
     }
 
     mod build_response_tests {
@@ -3229,7 +3215,7 @@ mod tests {
         use primitive_types::U256;
         use revm::state::Bytecode;
         use revm_etherlink::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
-        use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Gas, RuntimeId};
+        use tezosx_interfaces::{AliasInfo, CrossRuntimeContext, Gas, Origin, RuntimeId};
 
         // Native address whose alias we materialize. The bytes are the
         // UTF-8 form of the address string, exactly as ensure_alias hashes.
@@ -3249,9 +3235,10 @@ mod tests {
 
         // Alias address, computed the same way ensure_alias does.
         fn alias_address(info: &AliasInfo) -> Address {
-            let mut hasher = Keccak256::new();
-            hasher.update(&info.native_address);
-            Address::from_slice(&hasher.finalize()[0..20])
+            let alias = EthereumRuntime::default()
+                .compute_alias(info.native_address.as_bytes())
+                .unwrap();
+            Address::from_hex(alias).unwrap()
         }
 
         // A failed init must write no durable state and, once the frame
@@ -3344,6 +3331,70 @@ mod tests {
             assert!(
                 retried.is_err(),
                 "a non-materialized alias must remain re-materializable, not bricked"
+            );
+        }
+
+        // A rescue account deployed at a recoverable alias before the guard
+        // gets classified Native at commit. It is not an alias yet: it must
+        // not brick the alias, and materialization overwrites it
+        // (RFC-26051).
+        #[test]
+        fn native_classified_alias_is_materialized() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let runtime = EthereumRuntime::default();
+            let registry = UnimplementedRegistry;
+            let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+            let info = alias_info();
+            let alias = alias_address(&info);
+            let alias_str = alias.to_string();
+
+            // Runtime code of the rescue clone, as left by its deployment.
+            let clone_code = Bytes::from_hex(
+                "0x363d3d373d3d3d363d73d532c0971e9c85e2468c8cc6c3949eae285cd5135af43d82803e903d91602b57fd5bf3",
+            )
+            .unwrap();
+            deploy_at(rk.eth_accounts_mut(), &alias, clone_code);
+            let mut account = StorageAccount::from_address(&alias).unwrap();
+            let clone_info = account.info(rk.eth_accounts_mut()).unwrap();
+            account
+                .set_info(
+                    rk.eth_accounts_mut(),
+                    AccountInfo {
+                        nonce: 1,
+                        origin: AccountOrigin::Native,
+                        ..clone_info
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(
+                runtime.alias_exists(&mut rk, &mut journal, &alias_str),
+                Ok(false),
+                "a Native account at a derived alias is not materialized yet"
+            );
+
+            runtime
+                .create_alias(
+                    &registry,
+                    &mut rk,
+                    &mut journal,
+                    &alias_str,
+                    info.clone(),
+                    Some([0xab; 32].as_slice()),
+                    context(),
+                    Gas::new(1_000_000, RuntimeId::Ethereum),
+                )
+                .expect("materialization must overwrite the Native account");
+
+            assert_eq!(
+                journal.evm.layered_state.pending_alias_origin(&alias),
+                Some(Origin::Alias(info)),
+            );
+            assert_eq!(
+                runtime.alias_exists(&mut rk, &mut journal, &alias_str),
+                Ok(true)
             );
         }
     }

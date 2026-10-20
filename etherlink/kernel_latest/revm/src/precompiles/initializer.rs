@@ -15,7 +15,8 @@ use crate::{
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
         FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        XTZ_BRIDGE_SOL_ADDR, XTZ_BRIDGE_SOL_CONTRACT,
+        RESCUE_GUARD_ADDRESS, RESCUE_GUARD_CONTRACT, XTZ_BRIDGE_SOL_ADDR,
+        XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
 };
@@ -42,6 +43,13 @@ pub fn init_precompile_bytecodes(
             eth_accounts,
             &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
             &ALIAS_FORWARDER_SOL_CONTRACT,
+        )?;
+        // RFC-26051: the deployment guard prevents the deployment of rescue
+        // contracts on Etherlink.
+        init_precompile_bytecode(
+            eth_accounts,
+            &RESCUE_GUARD_ADDRESS,
+            &RESCUE_GUARD_CONTRACT,
         )?;
     }
     Ok(())

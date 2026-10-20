@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{Address, FixedBytes, B256};
+use revm::primitives::{address, b256, Address, FixedBytes, B256};
 use revm::state::Bytecode;
 use tezosx_interfaces::EvmGas;
 
@@ -62,6 +62,40 @@ pub const ALIAS_FORWARDER_SOL_CONTRACT: PredeployedContract = PredeployedContrac
     ]),
 };
 
+/// RFC-26051 deployment guard: the single `INVALID` opcode, written at
+/// [`RESCUE_GUARD_ADDRESS`]. It has no `SELFDESTRUCT` path, so it can never
+/// be removed.
+pub const RESCUE_GUARD_CONTRACT: PredeployedContract = PredeployedContract {
+    code: &[0xfe],
+    code_hash: b256!("bcc90f2d6dada5b18e155c17a1c0a55920aae94f39857d39d0d8ed07ae8f228b"),
+};
+
+/// Rescue-account constants of RFC-26051 (recoverable EVM aliases).
+///
+/// The EVM alias of a tz1/tz2/tz3 account is the `CREATE2` address, through
+/// [`RESCUE_SAFE_FACTORY`] with [`RESCUE_SALT`], of a minimal clone of the
+/// account type's implementation carrying the account's key hash. Every
+/// value below is part of every such alias: they are taken verbatim from
+/// `artifacts/frozen.json` of trilitech/tz-alias-recovery (commit b410859)
+/// and must never change once released.
+///
+/// Safe singleton factory, at the same address on every chain Safe supports.
+pub const RESCUE_SAFE_FACTORY: Address =
+    address!("914d7Fec6aaC8cd542e72Bca78B30650d45643d7");
+
+/// `keccak256("tezosx.rescue.v1")`.
+pub const RESCUE_SALT: B256 =
+    b256!("9b8bb449a3d23b110d8c46424ba9b40748ac28bc7b99b7422a272950e17bb1d8");
+
+/// `TezosAccountTz1` implementation (ed25519).
+pub const RESCUE_IMPL_TZ1: Address = address!("d532c0971e9c85e2468c8cc6c3949eae285cd513");
+
+/// `TezosAccountTz2` implementation (secp256k1).
+pub const RESCUE_IMPL_TZ2: Address = address!("b47274809a09e0e0d565f1b50feba2a1cddc8199");
+
+/// `TezosAccountTz3` implementation (P-256).
+pub const RESCUE_IMPL_TZ3: Address = address!("924f65272e0b3531084b1539b96ed0522541f7d7");
+
 pub const SYSTEM_SOL_ADDR: Address = Address::ZERO;
 
 pub const XTZ_BRIDGE_SOL_ADDR: Address = Address(FixedBytes::new([
@@ -73,6 +107,12 @@ pub const FA_BRIDGE_SOL_ADDR: Address = Address(FixedBytes::new([
     0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 ]));
+
+/// Address of [`RESCUE_GUARD_CONTRACT`], the low 20 bytes of
+/// `keccak256("tezosx.rescue.guard")`. The rescue-account clone initcode
+/// reverts when this address has code (RFC-26051).
+pub const RESCUE_GUARD_ADDRESS: Address =
+    address!("3822d2fe3dcE6Ce4f4C7f274e2415fA3faE66C3e");
 
 pub const FEED_DEPOSIT_ADDR: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -295,7 +335,8 @@ pub(crate) const SEQUENCER_KEY_CHANGE_SIGN_TAG: &[u8] = b"sequencer_change";
 mod test {
     use super::{
         PredeployedContract, ALIAS_FORWARDER_SOL_CONTRACT, ALWAYS_REVERT_SOL_CONTRACT,
-        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, RESCUE_GUARD_CONTRACT,
+        XTZ_BRIDGE_SOL_CONTRACT,
     };
 
     use crate::helpers::storage::bytes_hash;
@@ -339,5 +380,10 @@ mod test {
     #[test]
     fn check_alias_forwarder_sol_code_hash() {
         check_code_hash_validity(&ALIAS_FORWARDER_SOL_CONTRACT)
+    }
+
+    #[test]
+    fn check_rescue_guard_code_hash() {
+        check_code_hash_validity(&RESCUE_GUARD_CONTRACT)
     }
 }
