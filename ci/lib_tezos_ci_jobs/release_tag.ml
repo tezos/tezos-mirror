@@ -295,8 +295,6 @@ let () =
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_major_release_tag_test
@@ -309,8 +307,6 @@ let () =
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test ~components:component_deploys);
       (Auto, job_docker_promote_to_latest `test_wait);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Minor *)
   Cacio.register_jobs
@@ -323,8 +319,6 @@ let () =
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_minor_release_tag_test
@@ -337,8 +331,6 @@ let () =
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test);
       (Auto, job_docker_promote_to_latest `test_wait);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Beta *)
   Cacio.register_jobs
@@ -351,8 +343,6 @@ let () =
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_beta_release_tag_test
@@ -364,8 +354,6 @@ let () =
       (Auto, Homebrew.job_create_homebrew_formula);
       (Manual, job_deploy_release_page_assets `test);
       (Auto, job_render_site `test ~components:component_deploys);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Non-release *)
   Cacio.register_jobs
@@ -375,8 +363,6 @@ let () =
       (Manual, job_docker_mirror_to_gitlab_registry `real);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag_test
@@ -386,8 +372,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
@@ -398,8 +382,6 @@ let () =
       (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `scheduled_test);
       (Auto, Homebrew.job_create_homebrew_formula);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Octez Latest Release *)
   Cacio.register_jobs
@@ -496,11 +478,6 @@ let () =
           `real
           ~needs:
             [(Job, job_deploy_release_page_assets_packaging_revision `real)] );
-      (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian Release);
-      (Manual, Debian_repository.job_build_ubuntu Release);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_packaging_revision_test
@@ -518,10 +495,5 @@ let () =
           `test
           ~needs:
             [(Job, job_deploy_release_page_assets_packaging_revision `test)] );
-      (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian Release);
-      (Manual, Debian_repository.job_build_ubuntu Release);
-      (Auto, Debian_repository.job_apt_repo_debian Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   ()
