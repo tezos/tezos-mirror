@@ -39,7 +39,7 @@ Baker
 
 - **Security**: For protocol Ushuaia (025), the baker now waits for a proposal
   to be applied before (pre)attesting it, from the round set by
-  ``--force-apply-from-round`` (3 by default).
+  ``--force-apply-from-round`` (3 by default). (MR :gl:`!23030`)
 
 Smart Rollup node
 -----------------
