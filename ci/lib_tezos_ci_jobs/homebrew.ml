@@ -89,11 +89,11 @@ let job_build_homebrew_formula_macosx =
       ]
 
 let () =
-  Tezos_ci_pipelines.register_merge_request_jobs
-    [
-      (Auto, job_build_homebrew_formula);
-      (Auto, job_build_homebrew_formula_macosx);
-    ] ;
+  (* No merge-request registration: the formula is deprecated and will not
+     ship in v26, so paying for it on every merge request -- on a macOS runner
+     at that -- and holding the merge train on it buys little. homebrew.daily,
+     below, is what catches breakage while v25-release is maintained.
+     See #8406. *)
   Cacio.register_jobs
     Tezos_ci_pipelines.homebrew_daily
     [

@@ -2319,81 +2319,6 @@ npm_audit:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-18884dda
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.create-homebrew-formula
-  dependencies: []
-  allow_failure: false
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cp images/ci/.cargo/config.toml .cargo/
-  - ./scripts/packaging/test_homebrew_install.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    DUNE_BUILD_JOBS: -j 12
-    HOMEBREW_KISSCACHE: http://kisscache.kisscache.svc.cluster.local
-    HOMEBREW_OPAMFETCH: scripts/kiss-fetch.sh
-
-oc.build-homebrew-formula-macosx:
-  image: $MACOS_IMAGE
-  stage: test
-  tags:
-  - $TAGS
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.create-homebrew-formula
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_install.sh
-  - eval $(/opt/homebrew/bin/brew shellenv)
-  - ./scripts/packaging/test_homebrew_install.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    TAGS: saas-macos-large-m2pro
-  parallel:
-    matrix:
-    - MACOS_IMAGE:
-      - macos-15-xcode-16
-      - macos-26-xcode-26
-
 oc.build:static-x86_64-linux-experimental-binaries:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
   stage: build
@@ -2959,38 +2884,6 @@ oc.compile_sources_doc:
     SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_IDLE_TIMEOUT: "0"
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-
-oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-18884dda
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - images/scripts/install-gcloud.sh
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/octez/homebrew/Formula/*
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/packaging/homebrew_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - public/homebrew/*
 
 oc.docker:amd64:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
