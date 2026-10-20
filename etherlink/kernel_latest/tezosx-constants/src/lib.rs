@@ -75,8 +75,15 @@ pub const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
 /// SSTORE non-zero→zero (EIP-2929 + YP).
 pub const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
 
-/// Per-hop cost of deriving an alias string (BLAKE2b-160 + base58check or
-/// hex encoding). Conservative against the actual hashing + encoding work.
+/// Per-hop cost of deriving an alias string. Conservative against the
+/// actual hashing + encoding work of the most expensive derivation.
+///
+/// Measured against `KECCAK256` (30 + 6/word gas) in native code for the
+/// recoverable EVM alias of RFC-26051 (base58check decode, two Keccak-256
+/// over 107 and 85 bytes): about 315 gas for a tz1/tz2/tz3, 190 for a KT1
+/// falling back to the legacy hash, and 220 for a Michelson alias
+/// (BLAKE2b-160 + base58check). The ~5x margin covers the different cost
+/// ratios of the WASM and RISC-V targets.
 pub const DERIVE_ALIAS_STRING_COST: u64 = 1_500;
 
 /// Max HTTP headers for a cross-runtime gateway call. Used by both the
