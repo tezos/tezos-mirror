@@ -22,6 +22,9 @@
 - Add an `Ext` variant to `ReadKind` and `WriteKind`. A crate outside the SDK
   can report its own read or write failures as a `KeySpaceError`, and
   `KeySpaceError::widen` carries the SDK failures into that error.
+- Add `ExtensionError`. When the failure type of an extension implements it,
+  `?` converts a `KeySpaceError` into the extended error, as
+  `KeySpaceError::widen` does.
 - Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
 - Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
