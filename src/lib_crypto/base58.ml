@@ -117,7 +117,7 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   let ress = Bytes.sub_string res (i + 1) (res_len - i - 1) in
   String.make zeros zero ^ ress
 
-let raw_decode ?(alphabet = Alphabet.default) s =
+let raw_decode_unbounded ~alphabet s =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
   let slen = String.length s in
   let rec decode acc index =
@@ -139,6 +139,29 @@ let raw_decode ?(alphabet = Alphabet.default) s =
   in
   return v
 
+(* Upper bound, with headroom above the longest Base58Check encoding the shell
+   registers ("mdesk", the encrypted ML-DSA-44 secret key, 5332 characters), on
+   the length of an input accepted by the decoders. [raw_decode] is quadratic in
+   its input length, so decoding is bounded to this value unconditionally, and
+   [register_encoding] refuses any encoding that would exceed it. *)
+let encoded_max_length = 8192
+
+(* Internal helper: rejects inputs longer than [min max_size encoded_max_length]
+   (or [encoded_max_length] when [max_size] is [None]) before decoding. Used by
+   {!simple_decode} and {!Make.decode} to apply a tighter, per-encoding bound.
+   The public {!raw_decode}/{!safe_decode} always bound to the generic
+   [encoded_max_length]; no caller ever needed a tighter external bound, so they
+   do not expose a [max_size] argument. *)
+let raw_decode_bounded ?(alphabet = Alphabet.default) ~max_size s =
+  let max_size =
+    match max_size with
+    | Some m -> min m encoded_max_length
+    | None -> encoded_max_length
+  in
+  if String.length s > max_size then None else raw_decode_unbounded ~alphabet s
+
+let raw_decode ?alphabet s = raw_decode_bounded ?alphabet ~max_size:None s
+
 let checksum s =
   let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
   Bytes.sub_string hash 0 4
@@ -146,9 +169,9 @@ let checksum s =
 (* Append a 4-bytes cryptographic checksum before encoding string s *)
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)
 
-let safe_decode ?alphabet s =
+let checked decoded =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
-  let* s = raw_decode ?alphabet s in
+  let* s = decoded in
   let len = String.length s in
   if len < 4 then fail
   else
@@ -156,6 +179,11 @@ let safe_decode ?alphabet s =
     let msg = String.sub s 0 (len - 4) in
     let msg_hash = String.sub s (len - 4) 4 in
     if msg_hash <> checksum msg then fail else return msg
+
+let safe_decode_bounded ?alphabet ~max_size s =
+  checked (raw_decode_bounded ?alphabet ~max_size s)
+
+let safe_decode ?alphabet s = safe_decode_bounded ?alphabet ~max_size:None s
 
 type data = ..
 
@@ -171,9 +199,14 @@ type 'a encoding = {
 
 let prefix {prefix; _} = prefix
 
-let simple_decode ?alphabet {prefix; of_raw; _} s =
+let simple_decode ?alphabet {prefix; of_raw; encoded_length; _} s =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
-  let* s = safe_decode ?alphabet s in
+  (* A valid input for this specific encoding is always exactly
+     [encoded_length] characters long (see [make_encoded_prefix]); reject
+     anything longer upfront rather than relying only on the generic
+     [encoded_max_length] cap, so callers that decode a single known
+     encoding fail fast on oversized garbage. *)
+  let* s = safe_decode_bounded ?alphabet ~max_size:(Some encoded_length) s in
   let* s = TzString.remove_prefix ~prefix s in
   of_raw s
 
@@ -225,10 +258,23 @@ struct
       s
     in
     let of_raw s =
-      assert (String.length s = length) ;
-      of_raw s
+      (* [s] comes from decoding untrusted input: a checksum-valid string
+         with the right binary prefix but a payload of the wrong length must
+         be rejected, not crash. The decode length bounds do not prevent
+         this: an undersized payload yields a text shorter than
+         [encoded_length], and the generic [decode] only bounds the text to
+         [max_encoded_size ()]. *)
+      if String.length s <> length then None else of_raw s
     in
     let encoded_prefix, encoded_length = make_encoded_prefix prefix length in
+    if encoded_length > encoded_max_length then
+      Format.ksprintf
+        invalid_arg
+        "Base58.register_encoding: encoded length %d of prefix %S exceeds the \
+         maximum %d"
+        encoded_length
+        encoded_prefix
+        encoded_max_length ;
     check_ambiguous_prefix encoded_prefix encoded_length !encodings ;
     let encoding =
       {prefix; length; encoded_prefix; encoded_length; to_raw; of_raw; wrap}
@@ -251,9 +297,25 @@ struct
         p
         enc.encoded_length
 
+  let max_encoded_size () =
+    List.fold_left
+      (fun acc (Encoding {encoded_length; _}) ->
+        if encoded_length > acc then encoded_length else acc)
+      0
+      !encodings
+
   let decode ?alphabet s =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
-    let* s = safe_decode ?alphabet s in
+    (* No single registered encoding is known ahead of time here (unlike
+       [simple_decode], which is handed one specific encoding), but no
+       valid decode of *any* currently-registered encoding can exceed
+       [max_encoded_size ()] either -- so bounding to it, instead of only
+       the much looser global [encoded_max_length], never rejects a valid
+       input, while still rejecting oversized garbage before the checksum
+       and per-encoding [of_raw] checks below ever run. *)
+    let* s =
+      safe_decode_bounded ?alphabet ~max_size:(Some (max_encoded_size ())) s
+    in
     List.find_map
       (fun (Encoding {prefix; of_raw; wrap; _}) ->
         let* msg = TzString.remove_prefix ~prefix s in
@@ -343,6 +405,14 @@ struct
   include MakeResolvers (struct
     type context = C.context
   end)
+end
+
+module Internal_for_tests = struct
+  let iter_encodings f =
+    List.iter
+      (fun (Encoding {prefix; length; encoded_length; _}) ->
+        f ~prefix ~length ~encoded_length)
+      !encodings
 end
 
 module Prefix = struct
