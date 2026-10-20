@@ -12,7 +12,6 @@ use crate::apply::revm_run_transaction;
 use crate::chains::{DebugFeatures, ExperimentalFeatures};
 use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
-use crate::journal::close_tezosx_journal;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
     read_sequencer_pool_address, read_tracer_input,
@@ -535,7 +534,9 @@ impl Evaluation {
         // simulation's tracer input carries no `tx_hash` filter, so
         // `get_tracer_configuration` honours it regardless of this value.
         let operation_hashes = journal::TezosXHashes::zero();
-        let mut journal = journal::prepare_tezosx_journal(
+        // Close before fee post-processing, including when execution fails.
+        let (run_result, traces) = journal::with_tezosx_journal(
+            rk,
             CracId::mock(RuntimeId::Ethereum),
             &operation_hashes,
             &constants,
@@ -543,37 +544,32 @@ impl Evaluation {
             &debug_features,
             0,
             tracer_input,
-        );
+            |rk, journal| {
+                let run_result = revm_run_transaction(
+                    rk,
+                    registry,
+                    journal,
+                    &constants,
+                    None,
+                    from,
+                    self.to,
+                    self.value.unwrap_or_default(),
+                    self.data.clone(),
+                    gas,
+                    gas_price,
+                    max_gas_limit,
+                    None,
+                    true,
+                    // TODO: Replace this by the decoded access lists if any.
+                    TransactionOrigin::UserInput {
+                        access_list: revm::context::transaction::AccessList::default(),
+                    },
+                );
 
-        let run_result = revm_run_transaction(
-            rk,
-            registry,
-            &mut journal,
-            &constants,
-            None,
-            from,
-            self.to,
-            self.value.unwrap_or_default(),
-            self.data.clone(),
-            gas,
-            gas_price,
-            max_gas_limit,
-            None,
-            true,
-            // TODO: Replace this by the decoded access lists if any.
-            TransactionOrigin::UserInput {
-                access_list: revm::context::transaction::AccessList::default(),
+                let traces = journal.take_http_traces();
+
+                Ok::<_, Error>((run_result, traces))
             },
-        );
-
-        let traces = journal.take_http_traces();
-
-        // Close before the fee post-processing below: a failure there must
-        // not skip the tracer finalization.
-        close_tezosx_journal(
-            rk.host_mut(),
-            journal,
-            run_result.as_ref().ok().map(|outcome| &outcome.result),
         )?;
 
         let sim_result = match run_result {

@@ -7,13 +7,15 @@ use std::str::FromStr;
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use revm::context::result::ExecutionResult;
 use revm::primitives::Address;
-use revm_etherlink::EvmRunError;
+use revm_etherlink::{EvmRunError, ExecutionOutcome};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{
     log,
     Level::{Debug, Error, Fatal},
 };
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::host::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::operation::ManagerOperationField;
 use tezosx_interfaces::{canonicalize_native_address, AliasInfo, Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
@@ -27,7 +29,7 @@ pub use tezosx_journal::TezosXHashes;
 /// Build the [`TezosXJournal`] for one transaction application. Every
 /// journal built here must eventually reach [`close_tezosx_journal`].
 #[allow(clippy::too_many_arguments)]
-pub fn prepare_tezosx_journal(
+fn prepare_tezosx_journal(
     crac_id: CracId,
     operation_hashes: &TezosXHashes,
     block_constants: &BlockConstants,
@@ -68,7 +70,7 @@ pub fn prepare_tezosx_journal(
 /// Also reports a leaked EVM frame checkpoint, which mis-points the CRAC receipt
 /// watermarks. A log and not an assertion: `run_transaction` leaks one until
 /// !22693 lands.
-pub fn close_tezosx_journal<Host>(
+fn close_tezosx_journal<Host>(
     host: &mut Host,
     mut journal: TezosXJournal,
     result: Option<&ExecutionResult>,
@@ -100,6 +102,76 @@ where
     } else {
         Ok(())
     }
+}
+
+pub trait HasExecutionResult {
+    fn result(&self) -> Option<&ExecutionResult>;
+}
+
+impl HasExecutionResult for ExecutionOutcome {
+    fn result(&self) -> Option<&ExecutionResult> {
+        Some(&self.result)
+    }
+}
+
+impl HasExecutionResult for ExecutionResult {
+    fn result(&self) -> Option<&ExecutionResult> {
+        Some(self)
+    }
+}
+
+impl<T: HasExecutionResult> HasExecutionResult for Option<T> {
+    fn result(&self) -> Option<&ExecutionResult> {
+        self.as_ref().and_then(HasExecutionResult::result)
+    }
+}
+
+impl<T: HasExecutionResult, E> HasExecutionResult for Result<T, E> {
+    fn result(&self) -> Option<&ExecutionResult> {
+        self.as_ref().ok().and_then(HasExecutionResult::result)
+    }
+}
+
+impl<T: HasExecutionResult, U> HasExecutionResult for (T, U) {
+    fn result(&self) -> Option<&ExecutionResult> {
+        self.0.result()
+    }
+}
+
+/// Prepare a journal, run the continuation, and close it on success or error.
+///
+/// The continuation supplies the EVM result used to finalize the tracer, or
+/// `None` for invalid operations. Errors close without finalizing the tracer.
+/// A close error takes precedence over the continuation's error, as at the
+/// explicit prepare/close call sites. Panics do not run the close step.
+#[allow(clippy::too_many_arguments)]
+pub fn with_tezosx_journal<'host, Host: StorageV1 + KeySpaceLoader, T, E>(
+    rk: &mut RuntimeKeyspaces<'host, Host>,
+    crac_id: CracId,
+    operation_hashes: &TezosXHashes,
+    block_constants: &BlockConstants,
+    http_trace_enabled: bool,
+    debug_features: &DebugFeatures,
+    internal_operations_base: u128,
+    tracer_input: Option<TracerInput>,
+    apply: impl FnOnce(&mut RuntimeKeyspaces<'host, Host>, &mut TezosXJournal) -> Result<T, E>,
+) -> Result<T, E>
+where
+    E: From<EvmRunError>,
+    T: HasExecutionResult,
+{
+    let mut journal = prepare_tezosx_journal(
+        crac_id,
+        operation_hashes,
+        block_constants,
+        http_trace_enabled,
+        debug_features,
+        internal_operations_base,
+        tracer_input,
+    );
+    let outcome = apply(rk, &mut journal);
+    close_tezosx_journal(rk.host_mut(), journal, outcome.result())?;
+    outcome
 }
 
 /// Open the tracer's top-level frame mirroring the fake EVM transaction
