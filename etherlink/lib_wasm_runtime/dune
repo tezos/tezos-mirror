@@ -5,13 +5,19 @@
  (name evm_node_rust_deps)
  (public_name octez-evm-node-libs.evm_node_rust_deps)
  (instrumentation (backend bisect_ppx))
+ (modules)
  (foreign_archives octez_evm_node_rust_deps))
 
 (rule
- (targets liboctez_evm_node_rust_deps.a dlloctez_evm_node_rust_deps.so)
+ (targets
+  liboctez_evm_node_rust_deps.a
+  dlloctez_evm_node_rust_deps.so
+  wasm_runtime_gen.ml
+  wasm_runtime_gen.mli)
  (deps
   (sandbox none)
   (file build.sh)
+  (file build.rs)
   (file Cargo.toml)
   (file Cargo.lock)
   (file ../../rust-toolchain)
