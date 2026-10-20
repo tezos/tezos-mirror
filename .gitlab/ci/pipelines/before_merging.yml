@@ -1080,7 +1080,7 @@ etherlink.lint_wasm_runtime:
   - gcp
   rules:
   - changes:
-    - src/lib_wasm_runtime/**/*.rs
+    - etherlink/lib_wasm_runtime/**/*.rs
     when: on_success
   needs:
   - trigger
