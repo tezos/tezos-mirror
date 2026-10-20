@@ -26,7 +26,7 @@ Node
 - **Security**: A refutation move proving an inbox message must now be
   accompanied, in the same operation batch, by a ``smart_rollup_add_messages``
   operation carrying additional data about the inbox level it reads; upgraded
-  smart rollup nodes do this automatically.
+  smart rollup nodes do this automatically. (MR :gl:`!23032`)
 
 - Added the RPC ``GET /chains/<chain>/blocks/<block>/context/smart_rollups/all/signals``
   for protocols Ushuaia (025) and Alpha, returning the signals recorded by the
@@ -47,7 +47,7 @@ Smart Rollup node
 
 - **Security**: For protocol Ushuaia (025), refutation moves are now injected
   together with an additional ``smart_rollup_add_messages`` operation, required
-  by the new validation of refutation proofs.
+  by the new validation of refutation proofs. (MR :gl:`!23032`)
 
 Version 25.2
 ============

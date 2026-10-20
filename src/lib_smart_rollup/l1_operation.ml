@@ -31,6 +31,10 @@ type t =
       rollup : Address.t;
       opponent : Signature.Public_key_hash.t;
       refutation : Game.refutation;
+      index_proof : string list;
+          (** Messages publishing the index proof of the inbox this refutation
+              reads. Protocol 025 asks for one and no other protocol does, so
+              every other protocol drops them. *)
     }
   | Timeout of {rollup : Address.t; stakers : Game.index}
   | Recover_bond of {rollup : Address.t; staker : Signature.Public_key_hash.t}
@@ -87,16 +91,17 @@ let encoding : t Data_encoding.t =
          case
            3
            "refute"
-           (obj3
+           (obj4
               (req "rollup" Address.encoding)
               (req "opponent" Signature.Public_key_hash.encoding)
-              (req "refutation" Game.refutation_encoding))
+              (req "refutation" Game.refutation_encoding)
+              (dft "index_proof" (list (string' Hex)) []))
            (function
-             | Refute {rollup; opponent; refutation} ->
-                 Some (rollup, opponent, refutation)
+             | Refute {rollup; opponent; refutation; index_proof} ->
+                 Some (rollup, opponent, refutation, index_proof)
              | _ -> None)
-           (fun (rollup, opponent, refutation) ->
-             Refute {rollup; opponent; refutation});
+           (fun (rollup, opponent, refutation, index_proof) ->
+             Refute {rollup; opponent; refutation; index_proof});
          case
            4
            "timeout"
@@ -160,7 +165,7 @@ let pp ppf = function
       Format.fprintf ppf "cementing commitment %a" Commitment.Hash.pp commitment
   | Publish {rollup = _; commitment = Commitment.{inbox_level; _}} ->
       Format.fprintf ppf "publish commitment for level %ld" inbox_level
-  | Refute {rollup = _; opponent; refutation = Start _} ->
+  | Refute {rollup = _; opponent; refutation = Start _; _} ->
       Format.fprintf
         ppf
         "start refutation game against %a"
@@ -171,6 +176,7 @@ let pp ppf = function
         rollup = _;
         opponent;
         refutation = Move {step = Dissection (first :: _ as d); _};
+        _;
       } ->
       let last = List.last first d in
       Format.fprintf
@@ -182,19 +188,31 @@ let pp ppf = function
         last.tick
         Signature.Public_key_hash.pp
         opponent
-  | Refute {rollup = _; opponent; refutation = Move {step = Dissection []; _}}
-    ->
+  | Refute
+      {rollup = _; opponent; refutation = Move {step = Dissection []; _}; _} ->
       Format.fprintf
         ppf
         "dissection (against %a)"
         Signature.Public_key_hash.pp
         opponent
-  | Refute {rollup = _; opponent; refutation = Move {choice; step = Proof _}} ->
+  | Refute
+      {
+        rollup = _;
+        opponent;
+        refutation = Move {choice; step = Proof _};
+        index_proof;
+      } ->
       Format.fprintf
         ppf
-        "proof for tick %a  (against %a)"
+        "proof for tick %a%s (against %a)"
         Z.pp_print
         choice
+        (match index_proof with
+        | [] -> ""
+        | messages ->
+            Format.sprintf
+              " with an index proof in %d message(s)"
+              (List.length messages))
         Signature.Public_key_hash.pp
         opponent
   | Timeout {rollup = _; stakers = _} -> Format.fprintf ppf "timeout"

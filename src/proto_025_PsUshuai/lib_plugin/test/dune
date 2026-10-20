@@ -18,7 +18,8 @@
   octez-protocol-025-PsUshuai-libs.plugin
   tezos-protocol-025-PsUshuai.protocol
   tezos-protocol-025-PsUshuai.parameters
-  octez-protocol-025-PsUshuai-libs.test-helpers)
+  octez-protocol-025-PsUshuai-libs.test-helpers
+  octez-protocol-025-PsUshuai-libs.smart-rollup)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -39,7 +40,8 @@
   test_conflict_handler
   test_consensus_filter
   test_fee_needed_to_overtake
-  test_fee_needed_to_replace_by_fee))
+  test_fee_needed_to_replace_by_fee
+  test_relabelled_inbox_proof))
 
 (executable
  (name main)

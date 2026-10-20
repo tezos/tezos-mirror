@@ -7147,6 +7147,9 @@ end = struct
                  older protocols have no such test, so the dependency is
                  scoped by protocol number. *)
               plugin |> if_some |> if_ N.(number >= 026) |> open_;
+              (* The inbox unit tests check the index proofs of
+                 [Inbox_index_proof], which only 025 defines. *)
+              octez_sc_rollup |> if_some |> if_ N.(number == 025) |> open_;
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotezt;
@@ -7888,13 +7891,14 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
       tezt
-        [
-          "helpers";
-          "test_conflict_handler";
-          "test_consensus_filter";
-          "test_fee_needed_to_overtake";
-          "test_fee_needed_to_replace_by_fee";
-        ]
+        ([
+           "helpers";
+           "test_conflict_handler";
+           "test_consensus_filter";
+           "test_fee_needed_to_overtake";
+           "test_fee_needed_to_replace_by_fee";
+         ]
+        @ if N.(number == 025) then ["test_relabelled_inbox_proof"] else [])
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
@@ -7913,6 +7917,9 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             main |> open_ |> open_ ~m:"Protocol";
             parameters |> if_some |> open_;
             test_helpers |> open_;
+            (* [test_relabelled_inbox_proof] builds the index proofs of
+               [Inbox_index_proof], which only 025 defines. *)
+            octez_sc_rollup |> if_some |> if_ N.(number == 025);
           ]
     in
     let _client_tests =
@@ -8484,7 +8491,8 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
     let _octez_sc_rollup_node_test =
       only_if (active && N.(number >= 016)) @@ fun () ->
       tezt
-        ["serialized_proofs"; "test_octez_conversions"]
+        (["serialized_proofs"; "test_octez_conversions"]
+        @ if N.(number == 025) then ["test_sc_rollup_injector"] else [])
         ~path:(path // "lib_sc_rollup_node/test")
         ~opam:"tezos-sc-rollup-node-test"
         ~synopsis:"Tests for the smart rollup node library"
@@ -8497,6 +8505,9 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             octez_test_helpers |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
             octez_sc_rollup_node |> if_some |> open_;
+            (* [test_sc_rollup_injector] reads the statuses the injector
+               reports, which only 025 collapses. *)
+            octez_injector_lib |> if_ N.(number == 025) |> open_;
             alcotezt;
           ]
     in

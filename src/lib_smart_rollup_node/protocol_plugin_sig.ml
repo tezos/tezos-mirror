@@ -217,13 +217,15 @@ end
 (** Protocol specific refutation helper functions.  *)
 module type REFUTATION_GAME_HELPERS = sig
   (** [generate_proof node_ctxt (game) start_state] generates a serialized proof
-    for the current [game] for the execution step starting with
-    [start_state]. *)
+    for the current [game] for the execution step starting with [start_state],
+    along with the messages publishing the index proof of the inbox it reads.
+    Only protocol 025 asks for such an index proof; the others return no
+    message. *)
   val generate_proof :
     _ Node_context.rw_context ->
     Game.t ->
     Access_mode.rw Context.pvmstate ->
-    string tzresult Lwt.t
+    (string * string list) tzresult Lwt.t
 
   (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
       ~our_stop_chunk ~default_number_of_sections ~commitment_period_tick_offset

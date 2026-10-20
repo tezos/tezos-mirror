@@ -126,9 +126,43 @@ module type S = sig
   module Make_monadic (M : MONAD) : MONADIC with type 'a result := 'a M.t
 end
 
+module type INDEX_CHECKS = sig
+  type ('content, 'ptr) cell
+
+  val produce_index_proof :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    cell_ptr:'ptr ->
+    'ptr list option
+
+  val verify_index_proof :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    cell_ptr:'ptr ->
+    inclusion_proof:'ptr list ->
+    'ptr list ->
+    bool
+
+  val valid_indices :
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    ('content, 'ptr) cell ->
+    bool
+
+  val valid_back_path_indices :
+    equal_ptr:('ptr -> 'ptr -> bool) ->
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    start_index:Z.t ->
+    'ptr list ->
+    bool
+end
+
 module Make (Parameters : sig
   val basis : int
-end) : S = struct
+end) : sig
+  include S
+
+  include INDEX_CHECKS with type ('content, 'ptr) cell := ('content, 'ptr) cell
+end = struct
   let () = assert (Compare.Int.(Parameters.basis >= 2))
 
   open Parameters
@@ -235,6 +269,133 @@ end) : S = struct
     match FallbackArray.get cell.back_pointers i with
     | Some ptr -> ptr
     | None -> (* By precondition and invariants of cells. *) assert false
+
+  let valid_indices ~deref cell =
+    let n = cell.index in
+    let length = FallbackArray.length cell.back_pointers in
+    let rec check i power =
+      if Compare.Z.(power > n) then Compare.Int.(i = length)
+      else if Compare.Int.(i >= length) then false
+      else
+        match back_pointer cell i with
+        | None -> false
+        | Some ptr -> (
+            match deref ptr with
+            | None -> false
+            | Some target ->
+                Compare.Z.(target.index = Z.(pred (sub n (rem n power))))
+                && check (i + 1) Z.(mul power (of_int basis)))
+    in
+    Compare.Z.(n >= Z.zero) && check 0 Z.one
+
+  let valid_back_path_indices ~equal_ptr ~deref ~start_index path =
+    let valid_count cell =
+      let length = FallbackArray.length cell.back_pointers in
+      let rec check i power =
+        if Compare.Z.(power > cell.index) then Compare.Int.(i = length)
+        else
+          Compare.Int.(i < length)
+          && Option.is_some (back_pointer cell i)
+          && check (i + 1) Z.(mul power (of_int basis))
+      in
+      Compare.Z.(cell.index >= Z.zero) && check 0 Z.one
+    in
+    let valid_step cell next_ptr next_cell =
+      let rec check i power =
+        if Compare.Int.(i >= FallbackArray.length cell.back_pointers) then false
+        else
+          let expected_index =
+            Z.(pred (sub cell.index (rem cell.index power)))
+          in
+          Compare.Z.(next_cell.index = expected_index)
+          && Option.fold
+               ~none:false
+               ~some:(fun candidate -> equal_ptr candidate next_ptr)
+               (back_pointer cell i)
+          || check (i + 1) Z.(mul power (of_int basis))
+      in
+      check 0 Z.one
+    in
+    let rec check cell = function
+      | [] -> valid_count cell
+      | next_ptr :: rest -> (
+          valid_count cell
+          &&
+          match deref next_ptr with
+          | None -> false
+          | Some next_cell ->
+              valid_step cell next_ptr next_cell && check next_cell rest)
+    in
+    match path with
+    | [] -> false
+    | ptr :: rest -> (
+        match deref ptr with
+        | None -> false
+        | Some cell -> Compare.Z.(cell.index = start_index) && check cell rest)
+
+  let next_index_scale ~equal_ptr cell k pointer =
+    match back_pointer cell (k + 1) with
+    | Some next when equal_ptr pointer next -> k + 1
+    | None | Some _ -> k
+
+  let produce_index_proof ~equal_ptr ~deref ~cell_ptr =
+    let rec collect acc k ptr =
+      match deref ptr with
+      | None -> None
+      | Some cell -> (
+          let acc = ptr :: acc in
+          match back_pointer cell k with
+          | None -> Some (List.rev acc)
+          | Some pointer ->
+              collect acc (next_index_scale ~equal_ptr cell k pointer) pointer)
+    in
+    collect [] 0 cell_ptr
+
+  let verify_index_proof ~equal_ptr ~deref ~cell_ptr ~inclusion_proof proof =
+    let basis = Z.of_int basis in
+    let rec derive k power offset visited ptr rest =
+      match deref ptr with
+      | None -> None
+      | Some cell -> (
+          let visited = (cell, offset) :: visited in
+          match (back_pointer cell k, rest) with
+          | None, [] ->
+              let head_index = Z.(add offset (pred power)) in
+              if
+                List.for_all
+                  (fun (cell, offset) ->
+                    Z.equal cell.index Z.(sub head_index offset))
+                  visited
+              then Some head_index
+              else None
+          | Some pointer, next :: rest when equal_ptr pointer next ->
+              let next_k = next_index_scale ~equal_ptr cell k pointer in
+              let next_power =
+                if Compare.Int.equal next_k k then power else Z.mul power basis
+              in
+              derive next_k next_power Z.(add offset power) visited next rest
+          | None, _ :: _ | Some _, [] | Some _, _ :: _ -> None)
+    in
+    match proof with
+    | first :: rest when equal_ptr first cell_ptr -> (
+        match derive 0 Z.one Z.zero [] first rest with
+        | None -> false
+        | Some head_index -> (
+            valid_back_path_indices
+              ~equal_ptr
+              ~deref
+              ~start_index:head_index
+              proof
+            &&
+            match inclusion_proof with
+            | first :: _ when equal_ptr first cell_ptr ->
+                valid_back_path_indices
+                  ~equal_ptr
+                  ~deref
+                  ~start_index:head_index
+                  inclusion_proof
+            | [] | _ :: _ -> false))
+    | [] | _ :: _ -> false
 
   let next ~prev_cell ~prev_cell_ptr content =
     let index = Z.succ prev_cell.index in

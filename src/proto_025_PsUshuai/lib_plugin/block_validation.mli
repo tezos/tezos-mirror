@@ -85,14 +85,54 @@ val check_execute_outbox_message :
   output_proof:string ->
   unit Environment.Error_monad.tzresult Lwt.t
 
-(** [check_refute_proof context ~rollup ~stakers ~choice ~proof] checks the
-    validity of a given refutation [proof] at tick [choice] for the game between
-    [stakers]. Returns an error if not the case. *)
+(** Errors for a refutation Proof move whose inbox proof comes without the
+    index proof of its head cell in the same batch, shows indices that index
+    proof contradicts, or holds cells this node cannot read back. *)
+type Environment.Error_monad.error +=
+  | Sc_rollup_inbox_proof_missing_index_proof of {
+      head :
+        Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
+    }
+  | Sc_rollup_inbox_proof_relabelled_indices of {
+      head :
+        Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
+    }
+  | Sc_rollup_inbox_proof_unreadable_cells of {
+      head :
+        Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t;
+    }
+
+(** [find_relabelled_inbox_proof op] returns the error of the first refutation
+    Proof move of [op] whose inbox proof its own batch does not back, or backs
+    with indices the skip list contradicts. Used by the mempool, so that a
+    forged move stops at the first node that reads it. *)
+val find_relabelled_inbox_proof :
+  Protocol.Alpha_context.packed_operation ->
+  Environment.Error_monad.error Environment.Error_monad.trace option
+
+(** [index_proofs_of_batch op] returns the index proofs published by the
+    [Sc_rollup_add_messages] operations of the manager batch [op], keyed by the
+    inbox cell whose index each of them establishes. *)
+val index_proofs_of_batch :
+  Protocol.Alpha_context.packed_operation ->
+  (Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+  * Inbox_index_proof.t)
+  list
+
+(** [check_refute_proof context ~rollup ~stakers ~choice ~index_proofs ~proof]
+    checks the validity of a given refutation [proof] at tick [choice] for the
+    game between [stakers]. [index_proofs] are the index proofs published by
+    the batch [proof] belongs to, as returned by {!index_proofs_of_batch}.
+    Returns an error if not the case. *)
 val check_refute_proof :
   Protocol.Alpha_context.t ->
   rollup:Protocol.Alpha_context.Sc_rollup.t ->
   stakers:Protocol.Alpha_context.Sc_rollup.Game.Index.t ->
   choice:Protocol.Alpha_context.Sc_rollup.Tick.t ->
+  index_proofs:
+    (Protocol.Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+    * Inbox_index_proof.t)
+    list ->
   proof:
     Protocol.Alpha_context.Sc_rollup.Proof.serialized
     Protocol.Alpha_context.Sc_rollup.Proof.t ->

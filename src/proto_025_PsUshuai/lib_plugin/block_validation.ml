@@ -11,6 +11,7 @@ module Sr = Sc_rollup
 module Game = Sr.Game
 module Proof = Sr.Proof
 module Inbox = Sr.Inbox
+module Payloads = Sr.Inbox_merkelized_payload_hashes
 
 (* [context] is the context at the START of the block: it is not updated as
    operations are applied. The proof check below is therefore only sound if no
@@ -40,6 +41,9 @@ type Environment.Error_monad.error +=
       claimed_level : Raw_level.t;
       proven_level : Raw_level.t;
     }
+  | Sc_rollup_inbox_proof_missing_index_proof of {head : Payloads.Hash.t}
+  | Sc_rollup_inbox_proof_relabelled_indices of {head : Payloads.Hash.t}
+  | Sc_rollup_inbox_proof_unreadable_cells of {head : Payloads.Hash.t}
 
 let () =
   let open Environment.Error_monad in
@@ -153,7 +157,69 @@ let () =
           Some (claimed_level, proven_level)
       | _ -> None)
     (fun (claimed_level, proven_level) ->
-      Sc_rollup_inbox_proof_claimed_level_mismatch {claimed_level; proven_level})
+      Sc_rollup_inbox_proof_claimed_level_mismatch {claimed_level; proven_level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.sc_rollup_inbox_proof_missing_index_proof"
+    ~title:"Inbox proof comes without the index proof of its level"
+    ~description:
+      "A refutation Proof move carries an inbox proof without the index proof \
+       of the head cell of its level. The cells of the shared inbox are \
+       authenticated by a hash that leaves their index out, and the protocol \
+       does not record how many messages a level holds, so that index proof is \
+       what establishes the position the proof claims. It has to be published \
+       by a Sc_rollup_add_messages operation of the same batch."
+    ~pp:(fun ppf head ->
+      Format.fprintf
+        ppf
+        "Inbox proof comes without the index proof of the head cell %a"
+        Payloads.Hash.pp
+        head)
+    Data_encoding.(obj1 (req "head" Payloads.Hash.encoding))
+    (function
+      | Sc_rollup_inbox_proof_missing_index_proof {head} -> Some head
+      | _ -> None)
+    (fun head -> Sc_rollup_inbox_proof_missing_index_proof {head}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.sc_rollup_inbox_proof_relabelled_indices"
+    ~title:"Inbox proof discloses indices its skip list does not prescribe"
+    ~description:
+      "A refutation Proof move carries an inbox proof whose cells declare \
+       indices that the shape of their skip list contradicts. Such a proof \
+       presents a message at a position it does not occupy, so the operation \
+       is rejected."
+    ~pp:(fun ppf head ->
+      Format.fprintf
+        ppf
+        "Inbox proof discloses relabelled payload hash indices below the head \
+         cell %a"
+        Payloads.Hash.pp
+        head)
+    Data_encoding.(obj1 (req "head" Payloads.Hash.encoding))
+    (function
+      | Sc_rollup_inbox_proof_relabelled_indices {head} -> Some head | _ -> None)
+    (fun head -> Sc_rollup_inbox_proof_relabelled_indices {head}) ;
+  register_error_kind
+    `Permanent
+    ~id:"block_validation_plugin.sc_rollup_inbox_proof_unreadable_cells"
+    ~title:"Inbox proof discloses cells this node cannot read back"
+    ~description:
+      "A refutation Proof move carries an inbox proof whose cells could not be \
+       read back from their own encoding, which leaves their indices \
+       unchecked. The operation is rejected rather than let through \
+       unverified."
+    ~pp:(fun ppf head ->
+      Format.fprintf
+        ppf
+        "Inbox proof discloses payload hash cells below the head cell %a that \
+         this node cannot read back"
+        Payloads.Hash.pp
+        head)
+    Data_encoding.(obj1 (req "head" Payloads.Hash.encoding))
+    (function
+      | Sc_rollup_inbox_proof_unreadable_cells {head} -> Some head | _ -> None)
+    (fun head -> Sc_rollup_inbox_proof_unreadable_cells {head})
 
 let game_key_equal (rollup1, stakers1) (rollup2, stakers2) =
   Sr.Address.equal rollup1 rollup2
@@ -223,6 +289,114 @@ let check_inbox_proof_level (proof : Proof.serialized Proof.t) =
   | _ ->
       (* Not an inbox proof (reveal / first inbox message / no input proof). *)
       return_unit
+
+(* A payload hash cell is hashed without its index, so
+   [Sc_rollup_inbox_repr.verify_proof] reads indices that nothing binds: a
+   proof showing a message at a place it does not hold still verifies.
+
+   The path is checked here against the shape a skip list must have, which
+   needs the index it starts at. Nothing records how many messages a level
+   holds, so that index comes from an index proof the batch publishes;
+   [index_proofs] holds those, keyed by the cell each one is about.
+
+   The level path needs no index check. [verify_inclusion_proof] follows
+   authenticated back pointers only, so the path ends at a true ancestor of the
+   game's snapshot; [check_inbox_proof_level] pins that cell's level, which its
+   hash covers; and the protocol appends one cell per level. Those three fix
+   which cell the path ends at, whatever indices it declares.
+
+   The check reads nothing but the operation, so the mempool runs it too. *)
+let check_payload_indices ~index_proofs (proof : Proof.serialized Proof.t) =
+  let open Environment.Error_monad.Result_syntax in
+  match proof.Proof.input_proof with
+  | Some (Proof.Inbox_proof {proof = serialized; _}) -> (
+      match Inbox.of_serialized_proof serialized with
+      | None ->
+          (* Malformed proof: leave rejection to the protocol. *)
+          return_unit
+      | Some inbox_proof -> (
+          let _inclusion_proof, payloads_proof =
+            Inbox.Internal_for_tests.expose_proof inbox_proof
+          in
+          match
+            (payloads_proof.Inbox.Internal_for_tests.proof :> Payloads.t list)
+          with
+          | [] ->
+              (* Empty proof: leave rejection to the protocol. *)
+              return_unit
+          | head :: _ as payloads_cells -> (
+              let head_hash = Payloads.hash head in
+              let* index_proof =
+                match
+                  List.assoc ~equal:Payloads.Hash.equal head_hash index_proofs
+                with
+                | Some index_proof -> return index_proof
+                | None ->
+                    tzfail
+                      (Sc_rollup_inbox_proof_missing_index_proof
+                         {head = head_hash})
+              in
+              match
+                Inbox_index_proof.verify_payloads_indices
+                  ~inclusion:payloads_cells
+                  ~index_proof
+              with
+              | Inbox_index_proof.Valid -> return_unit
+              | Inconsistent_indices ->
+                  tzfail
+                    (Sc_rollup_inbox_proof_relabelled_indices {head = head_hash})
+              | Unconvertible_cells ->
+                  tzfail
+                    (Sc_rollup_inbox_proof_unreadable_cells {head = head_hash}))
+          ))
+  | _ ->
+      (* Not an inbox proof (reveal / first inbox message / no input proof). *)
+      return_unit
+
+(* The index proofs a batch publishes, keyed by the cell each one is about. A
+   move may come before or after the operation carrying the index proof it
+   needs, as long as both sit in the same batch. *)
+let index_proofs_of_batch
+    ({protocol_data = Operation_data {contents; _}; _} : packed_operation) =
+  List.filter_map
+    (function
+      | [] -> None
+      | head :: _ as index_proof -> Some (Payloads.hash head, index_proof))
+    (List.concat_map
+       (function
+         | Contents
+             (Manager_operation
+                {operation = Sc_rollup_add_messages {messages}; _}) ->
+             Inbox_index_proof.of_messages messages
+         | _ -> [])
+       (Operation.to_list (Contents_list contents)))
+
+(* Whichever refutation Proof move of [op] carries an inbox proof its own batch
+   does not back, or backs with indices the skip list contradicts. The mempool
+   runs this so a forged move stops at the first node that reads it, instead of
+   travelling to a baker that would drop it at forging. *)
+let find_relabelled_inbox_proof
+    ({protocol_data = Operation_data {contents; _}; _} as op : packed_operation)
+    =
+  (* Only a batch with a refutation Proof move needs its index proofs. *)
+  let index_proofs = lazy (index_proofs_of_batch op) in
+  List.find_map
+    (function
+      | Contents
+          (Manager_operation
+             {
+               operation =
+                 Sc_rollup_refute
+                   {refutation = Game.Move {step = Game.Proof proof; _}; _};
+               _;
+             }) -> (
+          match
+            check_payload_indices ~index_proofs:(Lazy.force index_proofs) proof
+          with
+          | Ok () -> None
+          | Error trace -> Some trace)
+      | _ -> None)
+    (Operation.to_list (Contents_list contents))
 
 let protect_use_wasm_pvm ?config context rollup k =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -299,7 +473,7 @@ let check_proof context rollup game (proof : Proof.serialized Proof.t) =
       in
       return_unit
 
-let check_refute_proof context ~rollup ~stakers ~choice
+let check_refute_proof context ~rollup ~stakers ~choice ~index_proofs
     ~(proof : Proof.serialized Proof.t) :
     unit Environment.Error_monad.tzresult Lwt.t =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -310,6 +484,7 @@ let check_refute_proof context ~rollup ~stakers ~choice
   | None -> return_unit
   | Some game -> (
       let* () = check_inbox_proof_level proof in
+      let*? () = check_payload_indices ~index_proofs proof in
       let* () = check_proof context rollup game proof in
       match game.Game.game_state with
       | Game.Dissecting {dissection; _} -> (
@@ -650,6 +825,8 @@ let check_block_operation {context; seen_games}
         | _ -> return_unit)
       (Operation.to_list (Contents_list contents))
   in
+  (* Only a batch with a refutation Proof move needs its index proofs. *)
+  let index_proofs = lazy (index_proofs_of_batch packed_op) in
   let* seen_games =
     List.fold_left_es
       (fun seen_games op ->
@@ -666,7 +843,13 @@ let check_block_operation {context; seen_games}
             let* () =
               match refutation with
               | Game.Move {step = Game.Proof proof; choice} ->
-                  check_refute_proof context ~rollup ~stakers ~choice ~proof
+                  check_refute_proof
+                    context
+                    ~rollup
+                    ~stakers
+                    ~choice
+                    ~index_proofs:(Lazy.force index_proofs)
+                    ~proof
                   |> Lwt.map Environment.wrap_tzresult
               | _ -> return_unit
             in
