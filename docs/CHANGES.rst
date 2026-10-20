@@ -10,7 +10,7 @@ General
 -------
 
 - **Security**: Improved the robustness of Base58Check decoding on unexpected
-  inputs. (MR :gl:`!23026`)
+  inputs. (MR :gl:`!23026`) (MR :gl:`!23031`)
 
 - **Security**: Improved the robustness of the handling of DAL attestations.
   (MR :gl:`!23029`)
