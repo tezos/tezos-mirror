@@ -256,7 +256,7 @@ let job_publish =
         "./scripts/ci/doc_publish.sh";
       ]
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Immediate, job_rst_check);

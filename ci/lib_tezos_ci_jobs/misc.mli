@@ -5,5 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Register miscellaneous jobs. *)
-val register : unit -> unit
+(** Miscellaneous jobs.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)

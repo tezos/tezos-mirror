@@ -281,7 +281,7 @@ let job_cargo_audit =
       | `mr -> ["./scripts/ci/cargo_audit.sh || exit $?"]
       | `all -> ["./scripts/ci/cargo_audit.sh --all || exit $?"])
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Immediate, job_sanity_ci);

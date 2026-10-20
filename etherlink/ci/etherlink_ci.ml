@@ -591,7 +591,7 @@ let job_docker_promote_to_latest =
          ./scripts/ci/octez-evm-node-release.sh";
       ]
 
-let register () =
+let () =
   let open Runner.Arch in
   Tezos_ci_pipelines.register_merge_request_jobs
     [

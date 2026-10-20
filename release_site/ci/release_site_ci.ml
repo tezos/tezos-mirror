@@ -97,7 +97,7 @@ let job_render ?(needs = []) pipeline_type =
       ["eval $(opam env)"; "./release_site/scripts/render_release_site.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_test)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_extended_test

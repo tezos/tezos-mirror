@@ -479,7 +479,7 @@ let job_update_gitlab_release =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
-let register () =
+let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_packaging_revision
     [

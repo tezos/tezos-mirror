@@ -7,6 +7,7 @@
   gitlab_ci
   tezos_ci
   cacio)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Gitlab_ci.Base))

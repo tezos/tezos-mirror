@@ -14,6 +14,7 @@
   grafazos_ci
   teztale_ci
   rollup_node_ci)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Gitlab_ci.Base))

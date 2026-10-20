@@ -8,4 +8,5 @@
   tezos_ci
   cacio
   tezos_ci_pipelines
-  release_site_ci))
+  release_site_ci)
+ (library_flags (:standard -linkall)))

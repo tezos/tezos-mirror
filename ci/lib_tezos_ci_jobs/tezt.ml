@@ -167,7 +167,7 @@ let job_tezt_static_binaries =
     ~parallel_tests:3
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs
     [
       (Auto, job_tezt `merge_request);

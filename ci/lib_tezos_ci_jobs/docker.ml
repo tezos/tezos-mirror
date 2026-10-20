@@ -266,7 +266,7 @@ let job_script_docker_verify_image =
         "./scripts/ci/docker_verify_signature.sh";
       ]
 
-let register () =
+let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.before_merging
     [

@@ -174,7 +174,7 @@ module Release = struct
         [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
 end
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_test)] ;
   (* TODO: split into a new pipeline [sdk_bindings.daily] *)
   Cacio.register_jobs

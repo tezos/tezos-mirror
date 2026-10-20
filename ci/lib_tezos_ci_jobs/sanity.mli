@@ -5,5 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Register sanity jobs. *)
-val register : unit -> unit
+(** Sanity jobs.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)

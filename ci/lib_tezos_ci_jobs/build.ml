@@ -252,7 +252,7 @@ let job_build_static_linux_experimental_binaries =
         "./scripts/ci/build_static_binaries.sh";
       ]
 
-let register () =
+let () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
   Cacio.register_jobs

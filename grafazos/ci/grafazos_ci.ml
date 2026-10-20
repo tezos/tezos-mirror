@@ -80,7 +80,7 @@ let job_deploy_release_page_assets =
         "./grafazos/scripts/releases/deploy_release_page_assets.sh";
       ]
 
-let register () =
+let () =
   Tezos_ci_pipelines.register_merge_request_jobs [(Auto, job_build Test)] ;
   CI.register_scheduled_pipeline
     "daily"

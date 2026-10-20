@@ -5,5 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Register installation test jobs. *)
-val register : unit -> unit
+(** Installation test jobs.
+
+    They are registered when this module is initialized,
+    i.e. when this library is linked. *)

@@ -9,6 +9,7 @@
   cacio
   tezos_ci_pipelines
   release_site_ci)
+ (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Gitlab_ci.Base))
