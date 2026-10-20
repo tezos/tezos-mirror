@@ -36,6 +36,7 @@ Baker
 -----
 
 - **Security**: Improved the robustness of the baker's (pre)quorum accounting.
+  (MR :gl:`!23027`)
 
 - **Security**: For protocol Ushuaia (025), the baker now waits for a proposal
   to be applied before (pre)attesting it, from the round set by

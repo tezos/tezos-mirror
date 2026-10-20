@@ -309,6 +309,7 @@ let generic_attesting_power (filter : packed_operation list -> 'a list)
   let latest_proposal = state.level_state.latest_proposal in
   let block_round = latest_proposal.block.round in
   let shell_level = latest_proposal.block.shell.level in
+  let proposal_payload_hash = latest_proposal.block.payload_hash in
   let attestations =
     filter (Operation_pool.Operation_set.elements current_mempool.consensus)
   in
@@ -320,6 +321,8 @@ let generic_attesting_power (filter : packed_operation list -> 'a list)
           Round.(consensus_content.round = block_round)
           && Compare.Int32.(
                Raw_level.to_int32 consensus_content.level = shell_level)
+          && Block_payload_hash.(
+               consensus_content.block_payload_hash = proposal_payload_hash)
         then Some consensus_content
         else None)
       attestations
@@ -792,6 +795,9 @@ let rec baking_minimal_timestamp ~count state
              && Compare.Int32.(
                   Raw_level.to_int32 consensus_content.level
                   = latest_proposal.block.shell.level)
+             && Block_payload_hash.(
+                  consensus_content.block_payload_hash
+                  = latest_proposal.block.payload_hash)
            then Some consensus_content
            else None)
   in

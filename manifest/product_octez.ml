@@ -8159,7 +8159,11 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
       tezt
         (["test_scenario"]
         @
-        if N.(number >= 025) then ["test_dal_included_attestations_cache"]
+        if N.(number >= 025) then
+          [
+            "test_dal_included_attestations_cache";
+            "test_preattestation_quorum_amplification";
+          ]
         else [])
         ~path:(path // "lib_delegate/test")
         ~with_macos_security_framework:true

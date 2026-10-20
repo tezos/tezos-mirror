@@ -435,18 +435,12 @@ let update_pqc_monitoring ~pqc_watched ops =
     candidate_watched;
     get_slot_voting_power;
     current_voting_power;
-    preattestations_received;
     preattestations_count;
     _;
   } =
     pqc_watched
   in
   let preattestations = Operation_pool.filter_preattestations ops in
-  let fresh_preattestations =
-    List.filter
-      (fun op -> not (Preattestation_set.mem op preattestations_received))
-      preattestations
-  in
   List.iter
     (function
       | ({
@@ -455,7 +449,11 @@ let update_pqc_monitoring ~pqc_watched ops =
            shell = {branch};
          } as op :
           Kind.preattestation Operation.t) -> (
-          if is_eligible candidate_watched branch consensus_content then
+          if
+            (not
+               (Preattestation_set.mem op pqc_watched.preattestations_received))
+            && is_eligible candidate_watched branch consensus_content
+          then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 pqc_watched.preattestations_received <-
@@ -468,7 +466,7 @@ let update_pqc_monitoring ~pqc_watched ops =
                 (* preattestations that do not use the first slot of a
                    delegate are not added to the quorum *)
                 ()))
-    fresh_preattestations ;
+    preattestations ;
   let additional_voting_power =
     Int64.sub pqc_watched.current_voting_power current_voting_power
   in
@@ -489,18 +487,12 @@ let update_qc_monitoring ~qc_watched ops =
     candidate_watched;
     get_slot_voting_power;
     current_voting_power;
-    attestations_received;
     attestations_count;
     _;
   } =
     qc_watched
   in
   let attestations = Operation_pool.filter_attestations ops in
-  let fresh_attestations =
-    List.filter
-      (fun op -> not (Attestation_set.mem op attestations_received))
-      attestations
-  in
   List.iter
     (function
       | ({
@@ -509,7 +501,10 @@ let update_qc_monitoring ~qc_watched ops =
            shell = {branch};
          } as op :
           Kind.attestation Operation.t) -> (
-          if is_eligible candidate_watched branch consensus_content then
+          if
+            (not (Attestation_set.mem op qc_watched.attestations_received))
+            && is_eligible candidate_watched branch consensus_content
+          then
             match get_slot_voting_power ~slot:consensus_content.slot with
             | Some op_power ->
                 qc_watched.attestations_received <-
@@ -522,7 +517,7 @@ let update_qc_monitoring ~qc_watched ops =
                 (* attestations that do not use the first slot of a delegate
                    are not added to the quorum *)
                 ()))
-    fresh_attestations ;
+    attestations ;
   let additional_voting_power =
     Int64.sub qc_watched.current_voting_power current_voting_power
   in
@@ -914,4 +909,58 @@ let get_quorum_event_stream state = state.qc_event_stream.stream
 module Internal_for_tests = struct
   (* State creation *)
   let make_initial_state = make_initial_state
+
+  (* [account_preattestation_quorum ~get_slot_voting_power candidate_watched
+     batches] feeds each batch of [batches] to [update_pqc_monitoring] in turn,
+     over a single [pqc_watched] starting from an empty received-set — mirroring
+     the successive quorum-monitor updates the worker performs. Returns the final
+     [(voting_power, count, certificate)] where [certificate] is the set of
+     counted preattestations. A delegate's power must be counted at most once
+     across all batches. *)
+  let account_preattestation_quorum ~get_slot_voting_power candidate_watched
+      (batches : Kind.preattestation Operation.t list list) =
+    let pqc_watched =
+      {
+        candidate_watched;
+        get_slot_voting_power;
+        consensus_threshold = Int64.max_int;
+        consensus_committee = Int64.max_int;
+        current_voting_power = 0L;
+        preattestations_received = Preattestation_set.empty;
+        preattestations_count = 0;
+        previous_prequorum_progression = 0;
+      }
+    in
+    List.iter
+      (fun batch ->
+        let ops = List.map Operation.pack batch in
+        ignore (update_pqc_monitoring ~pqc_watched ops : int64 * int))
+      batches ;
+    ( pqc_watched.current_voting_power,
+      pqc_watched.preattestations_count,
+      Preattestation_set.elements pqc_watched.preattestations_received )
+
+  (* Attestation counterpart of {!account_preattestation_quorum}. *)
+  let account_attestation_quorum ~get_slot_voting_power candidate_watched
+      (batches : Kind.attestation Operation.t list list) =
+    let qc_watched =
+      {
+        candidate_watched;
+        get_slot_voting_power;
+        consensus_threshold = Int64.max_int;
+        consensus_committee = Int64.max_int;
+        current_voting_power = 0L;
+        attestations_received = Attestation_set.empty;
+        attestations_count = 0;
+        previous_quorum_progression = 0;
+      }
+    in
+    List.iter
+      (fun batch ->
+        let ops = List.map Operation.pack batch in
+        ignore (update_qc_monitoring ~qc_watched ops : int64 * int))
+      batches ;
+    ( qc_watched.current_voting_power,
+      qc_watched.attestations_count,
+      Attestation_set.elements qc_watched.attestations_received )
 end

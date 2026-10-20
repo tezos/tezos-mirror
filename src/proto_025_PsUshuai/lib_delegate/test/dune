@@ -34,7 +34,10 @@
   -open Tezos_025_PsUshuai_mockup_simulator
   -open Tezos_baking_025_PsUshuai
   -open Tezos_event_logging_test_helpers)
- (modules test_scenario test_dal_included_attestations_cache))
+ (modules
+  test_scenario
+  test_dal_included_attestations_cache
+  test_preattestation_quorum_amplification))
 
 (executable
  (name main)

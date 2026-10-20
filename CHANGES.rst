@@ -116,6 +116,10 @@ Baker
   asynchronously, off the consensus path, and is bounded by a timeout.
   (MR :gl:`!22538`)
 
+- Made the baker's (pre)quorum accounting more robust: the voting power of
+  each delegate is now counted exactly once when tracking the progress of a
+  (pre)quorum.
+
 Accuser
 -------
 
