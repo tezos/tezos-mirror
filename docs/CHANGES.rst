@@ -22,7 +22,7 @@ Node
   refutation game operations stricter. Some operations that could previously
   be included in a block are now rejected for that block and must be injected
   again in a later one. As a counterpart, several operations on the same
-  refutation game can now be included in the same block.
+  refutation game can now be included in the same block. (MR :gl:`!23028`)
 
 - **Security**: A refutation move proving an inbox message must now be
   accompanied, in the same operation batch, by a ``smart_rollup_add_messages``
