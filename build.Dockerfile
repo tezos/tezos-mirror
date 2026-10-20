@@ -48,6 +48,8 @@ COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
+# Depended on by the Rust build rules (src/rust_libcrux, src/rust_deps, ...).
+COPY --chown=tezos:nogroup scripts/cargo-build.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
 # Used by [make build-deps] below (install_build_deps.sh calls its .rust.sh).
 COPY --chown=tezos:nogroup scripts/install_build_deps.sh scripts/install_build_deps.rust.sh tezos/scripts/
@@ -58,6 +60,9 @@ COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number
 COPY --chown=tezos:nogroup script-inputs/released-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
+# Included by the top-level dune file, so dune refuses to read any rule
+# without it.
+COPY --chown=tezos:nogroup script-inputs/cargo-dirs.sexp tezos/script-inputs/
 
 # Group 3: vendored/forked libraries (change infrequently)
 COPY --chown=tezos:nogroup vendors tezos/vendors
