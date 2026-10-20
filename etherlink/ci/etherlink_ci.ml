@@ -12,7 +12,7 @@ open Tezos_ci
 module Files = struct
   let sdks = ["src/kernel_sdk/**/*"; "sdk/rust/**/*"]
 
-  let lib_wasm_runtime_rust = ["src/lib_wasm_runtime/**/*.rs"]
+  let lib_wasm_runtime_rust = ["etherlink/lib_wasm_runtime/**/*.rs"]
 
   let node = ["etherlink/**/*"]
 
