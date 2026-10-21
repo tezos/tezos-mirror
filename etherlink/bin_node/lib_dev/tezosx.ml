@@ -139,29 +139,48 @@ module Tezos_runtime = struct
       (Tezlink_imports.Imported_protocol.Contract_hash.of_bytes_exn hash)
 end
 
-module Foreign_address = struct
-  type t =
-    [`Tezos of Tezos_runtime.address | `Ethereum of Ethereum_types.address]
+(* Kernel IPC for `tezosx_compute_alias`: [input_encoding] mirrors the
+   kernel's [ComputeAliasInput] and [result_encoding] its
+   [ComputeAliasResult] union ([evm_node_entrypoint.rs]), whose unit tests
+   pin the wire bytes. *)
+module Compute_alias = struct
+  type target = [`Tezos | `Ethereum]
 
-  let encode =
-    let open Rlp in
-    function
-    | `Ethereum (Ethereum_types.Address (Hex hex)) ->
-        encode
-          (List
-             [
-               Value (Bytes.unsafe_of_string "\x00");
-               Value (Hex.to_bytes_exn (`Hex hex));
-             ])
-    | `Tezos pkh ->
-        encode
-          (List
-             [
-               Value (Bytes.unsafe_of_string "\x01");
-               Value
-                 (Bytes.of_string
-                    (Signature.V3.Public_key_hash.to_b58check pkh));
-             ])
+  let input_encoding =
+    Data_encoding.(
+      obj2 (req "target_runtime" uint8) (req "native_address" string))
+
+  let encode_input ~(target : target) ~native_address =
+    let target_runtime = match target with `Tezos -> 0 | `Ethereum -> 1 in
+    Data_encoding.Binary.to_bytes_exn
+      input_encoding
+      (target_runtime, native_address)
+
+  let result_encoding =
+    Data_encoding.(
+      union
+        [
+          case
+            (Tag 0)
+            ~title:"success"
+            string
+            (function Ok alias -> Some alias | Error _ -> None)
+            (fun alias -> Ok alias);
+          case
+            (Tag 1)
+            ~title:"error"
+            string
+            (function Error msg -> Some msg | Ok _ -> None)
+            (fun msg -> Error msg);
+        ])
+
+  let decode_result bytes =
+    let open Result_syntax in
+    match Data_encoding.Binary.of_bytes_opt result_encoding bytes with
+    | Some (Ok alias) -> return alias
+    | Some (Error msg) ->
+        tzfail (error_of_fmt "The kernel could not compute the alias: %s" msg)
+    | None -> tzfail (error_of_fmt "Invalid tezosx_compute_alias result")
 end
 
 module Durable_storage_path = struct
@@ -171,14 +190,6 @@ module Durable_storage_path = struct
         Durable_storage_path.michelson_ledger_root ^ "/"
         ^ Signature.V3.Public_key_hash.to_b58check pkh
         ^ "/info"
-
-      let ethereum_alias pkh =
-        let (Address (Hex alias)) =
-          Ethereum_runtime.generate_alias
-            (Signature.V3.Public_key_hash.to_b58check pkh)
-        in
-        Durable_storage_path.michelson_ledger_root ^ "/native/ethereum/0x"
-        ^ alias
     end
   end
 end

@@ -429,6 +429,7 @@ let _octez_evm_node_tests =
       "test_compact_receipt_encoding";
       "test_entrypoints_decoder";
       "test_run_code_codec";
+      "test_compute_alias_codec";
       "test_tezlink_prevalidation";
       "test_transaction_object";
     ]
