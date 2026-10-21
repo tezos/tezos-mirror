@@ -788,7 +788,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?native_contracts_enable
-    ?tz5_account_enable () =
+    ?tz5_account_enable ?swrr_new_baker_lottery_enable () =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? accounts = Account.generate_accounts ?rng_state n in
@@ -832,6 +832,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?adaptive_issuance
       ?native_contracts_enable
       ?tz5_account_enable
+      ?swrr_new_baker_lottery_enable
       bootstrap_accounts
   in
   (blk, tup_get tup contracts)

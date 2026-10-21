@@ -457,6 +457,7 @@ type 'accounts init :=
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?native_contracts_enable:bool ->
   ?tz5_account_enable:bool ->
+  ?swrr_new_baker_lottery_enable:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

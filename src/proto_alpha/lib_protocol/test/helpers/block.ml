@@ -623,7 +623,8 @@ let prepare_initial_context_params ?consensus_committee_size
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
-    ?native_contracts_enable ?tz5_account_enable () =
+    ?native_contracts_enable ?tz5_account_enable ?swrr_new_baker_lottery_enable
+    () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -709,6 +710,11 @@ let prepare_initial_context_params ?consensus_committee_size
   let tz5_account_enable =
     Option.value ~default:constants.tz5_account_enable tz5_account_enable
   in
+  let swrr_new_baker_lottery_enable =
+    Option.value
+      ~default:constants.swrr_new_baker_lottery_enable
+      swrr_new_baker_lottery_enable
+  in
   let cache_sampler_state_cycles =
     consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_distribution_cycles =
@@ -753,6 +759,7 @@ let prepare_initial_context_params ?consensus_committee_size
       cache_swrr_selected_distribution_cycles;
       native_contracts_enable;
       tz5_account_enable;
+      swrr_new_baker_lottery_enable;
     }
   in
   let* () = check_constants_consistency constants in
@@ -787,8 +794,8 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?native_contracts_enable
-    ?tz5_account_enable (bootstrap_accounts : Parameters.bootstrap_account list)
-    =
+    ?tz5_account_enable ?swrr_new_baker_lottery_enable
+    (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
     prepare_initial_context_params
@@ -813,6 +820,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
       ?adaptive_issuance
       ?native_contracts_enable
       ?tz5_account_enable
+      ?swrr_new_baker_lottery_enable
       ()
   in
   let* () =
