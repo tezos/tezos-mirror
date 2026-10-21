@@ -1842,6 +1842,113 @@ mod tests {
         );
     }
 
+    /// A delayed operation whose gas limits overflow `u64` when summed is
+    /// dropped, and the next operations of the blueprint are applied.
+    #[test]
+    fn test_tezosx_delayed_op_gas_limit_sum_overflow_dropped() {
+        use tezos_execution::account_storage::TezosAccountInfo;
+
+        let mut host = MockKernelHost::default();
+
+        let bootstrap1 = bootstrap1();
+        let src_pkh = bootstrap1.pkh.clone();
+        let bootstrap2 = bootstrap2();
+        let dst_pkh = bootstrap2.pkh.clone();
+
+        // The accounts are set up through `rk`, which is dropped before `bk`
+        // loads the world states again.
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            context::implicit_from_public_key_hash(&dst_pkh)
+                .expect("Account interface should be correct")
+                .allocate(rk.tez_accounts_mut())
+                .expect("Contract initialization should have succeeded");
+
+            set_tezos_account_info(
+                rk.tez_accounts_mut(),
+                &src_pkh,
+                TezosAccountInfo {
+                    balance: Mutez::try_from(10000_u64).unwrap(),
+                    nonce: 0,
+                    pub_key: None,
+                },
+            )
+            .expect("Should have set bootstrap1 account info");
+            set_tezos_account_info(
+                rk.tez_accounts_mut(),
+                &dst_pkh,
+                TezosAccountInfo {
+                    balance: Mutez::ZERO,
+                    nonce: 0,
+                    pub_key: None,
+                },
+            )
+            .expect("Should have set bootstrap2 account info");
+        }
+
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
+        let mut config = dummy_configuration();
+
+        let transfer = |amount: u64| {
+            OperationContent::Transfer(TransferContent {
+                amount: amount.into(),
+                destination: Contract::Implicit(dst_pkh.clone()),
+                parameters: Parameters::default(),
+            })
+        };
+        // Two contents of 2^63 gas each: each limit fits in u64, their sum
+        // does not.
+        let overflowing = make_operation(
+            1000,
+            1,
+            1 << 63,
+            0,
+            bootstrap1.clone(),
+            vec![transfer(1000), transfer(1000)],
+        );
+        let reveal = make_reveal_operation(1000, 1, 500, 0, bootstrap1.clone());
+        let transfer_amount = 35_u64;
+        let valid = make_operation(
+            1000,
+            2,
+            3000,
+            0,
+            bootstrap1.clone(),
+            vec![transfer(transfer_amount)],
+        );
+
+        store_blueprints(
+            bk.base_mut(),
+            vec![tezos_blueprint(
+                vec![overflowing, reveal, valid],
+                Timestamp::from(0i64),
+            )],
+        );
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Only the valid transfer was applied.
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let dst_info = get_tezos_account_info(rk.tez_accounts(), &dst_pkh)
+            .expect("account info read should succeed")
+            .expect("bootstrap2 should be allocated");
+        assert_eq!(
+            dst_info.balance,
+            Mutez::try_from(transfer_amount).unwrap(),
+            "bootstrap2 balance must equal the valid transfer's amount"
+        );
+    }
+
     /// Regression (L2-1748): delayed native operations are branch-checked only
     /// at delayed-inbox entry, not at inclusion. A transfer whose branch is a
     /// foreign hash (not a recent block of this instance) that reaches inclusion
