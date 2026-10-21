@@ -278,7 +278,7 @@ let () =
   CI.register_scheduled_pipeline
     "update"
     ~description:
-      "Generate and push the documentation to octez.com/docs without being \
-       interrupted."
+      "Generate and push the documentation to octez.tezos.com/docs without \
+       being interrupted."
     [(Auto, job_publish)] ;
   ()
