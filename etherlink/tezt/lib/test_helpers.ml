@@ -43,10 +43,53 @@ let remove_0x s =
   else s
 
 let evm_alias_of_tezos_address address =
-  let hash =
-    Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string address)
+  let keccak s =
+    Bytes.to_string
+      (Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string s))
   in
-  add_0x (Hex.show (Hex.of_bytes (Bytes.sub hash 0 20)))
+  let of_hex h = Hex.to_string (`Hex h) in
+  (* RFC-26051: tz1/tz2/tz3 aliases are the CREATE2 address, through the
+     Safe singleton factory, of the rescue-account clone of their key
+     hash. Constants from tz-alias-recovery's [artifacts/frozen.json]. *)
+  let recoverable =
+    let open Tezos_crypto.Signature in
+    match Public_key_hash.of_b58check_opt address with
+    | Some (Ed25519 pkh) ->
+        Some
+          ( "d532c0971e9c85e2468c8cc6c3949eae285cd513",
+            Ed25519.Public_key_hash.to_string pkh )
+    | Some (Secp256k1 pkh) ->
+        Some
+          ( "b47274809a09e0e0d565f1b50feba2a1cddc8199",
+            Secp256k1.Public_key_hash.to_string pkh )
+    | Some (P256 pkh) ->
+        Some
+          ( "924f65272e0b3531084b1539b96ed0522541f7d7",
+            P256.Public_key_hash.to_string pkh )
+    | Some _ | None -> None
+  in
+  let alias =
+    match recoverable with
+    | Some (implementation, pkh) ->
+        let initcode =
+          of_hex
+            ("733822d2fe3dce6ce4f4c7f274e2415fa3fae66c3e3b15601e57600080fd5b604180602a6000396000f3"
+           ^ "363d3d373d3d3d363d73" ^ implementation
+           ^ "5af43d82803e903d91602b57fd5bf3")
+          ^ pkh
+        in
+        let create2 =
+          keccak
+            (of_hex
+               ("ff" ^ "914d7fec6aac8cd542e72bca78b30650d45643d7"
+              ^ "9b8bb449a3d23b110d8c46424ba9b40748ac28bc7b99b7422a272950e17bb1d8"
+               )
+            ^ keccak initcode)
+        in
+        String.sub create2 12 20
+    | None -> String.sub (keccak address) 0 20
+  in
+  add_0x (Hex.show (Hex.of_string alias))
 
 let mapping_position index map_position =
   Tezos_crypto.Hacl.Hash.Keccak_256.digest

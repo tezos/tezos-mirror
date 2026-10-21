@@ -36,9 +36,11 @@ val add_0x : string -> string
 val remove_0x : string -> string
 
 (** [evm_alias_of_tezos_address address] computes the EVM alias the
-    kernel derives for a Tezos address: the first 20 bytes of the
-    Keccak-256 digest of the UTF-8 bytes of the b58check string,
-    returned as a lowercase [0x]-prefixed hex string. *)
+    kernel derives for a Tezos address, as a lowercase [0x]-prefixed hex
+    string: for a tz1/tz2/tz3, the RFC-26051 recoverable alias (CREATE2
+    address of the rescue-account clone of its key hash); otherwise the
+    first 20 bytes of the Keccak-256 digest of the UTF-8 bytes of the
+    b58check string. *)
 val evm_alias_of_tezos_address : string -> string
 
 (** [mapping_position key map_position] computes the storage position for

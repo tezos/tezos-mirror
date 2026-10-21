@@ -1485,7 +1485,7 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
   let* () =
     check_rpc_result
       "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      (Some "0xccef676171871a48bbd6e2be75bbcc09d38830c5")
+      (Some "0xb7b04289f755c3deb013f04d4b7ca960b297c7b1")
   in
   check_rpc_result
     "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ"
