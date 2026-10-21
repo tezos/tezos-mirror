@@ -479,8 +479,9 @@ impl Evaluation {
             revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
                 &Address::from_slice(&from.0),
             )?;
-        let max_gas_limit = read_or_set_maximum_gas_per_transaction(rk.host_mut())
-            .unwrap_or(MAXIMUM_GAS_LIMIT);
+        let max_gas_limit =
+            read_or_set_maximum_gas_per_transaction(rk.evm_world_state_mut())
+                .unwrap_or(MAXIMUM_GAS_LIMIT);
         let gas = self
             .gas
             .map_or(max_gas_limit, |gas| u64::min(gas, max_gas_limit));
