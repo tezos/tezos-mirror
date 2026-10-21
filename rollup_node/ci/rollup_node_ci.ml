@@ -209,20 +209,6 @@ let () =
           `real
           ~needs:[(Job, job_deploy_release_page_assets `real)] );
     ] ;
-  Tezos_ci_pipelines.register_release_jobs
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_deploy_release_page_assets `real);
-    ] ;
-  Tezos_ci_pipelines.register_test_release_jobs
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `test);
-      (Manual, job_deploy_release_page_assets `test);
-    ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag
     [

@@ -255,7 +255,6 @@ let component_deploys =
   [
     Grafazos_ci.job_deploy_release_page_assets;
     Teztale_ci.job_deploy_release_page_assets;
-    Rollup_node_ci.job_deploy_release_page_assets;
   ]
 
 let job_dispatch_call =
