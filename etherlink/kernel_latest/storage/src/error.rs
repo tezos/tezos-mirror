@@ -9,26 +9,9 @@ use tezos_data_encoding::nom::error::DecodeError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
+pub use tezosx_types::StorageReadErrorKind;
 use tezosx_types::{KernelStorageError, TezosXRuntimeError};
 use thiserror::Error;
-
-/// What a read of this crate can fail on, on top of the read failures of the
-/// SDK.
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum StorageReadErrorKind {
-    /// A bounded read found a value longer than its bound.
-    #[error("value of {length} bytes exceeds the bound of {max_bytes} bytes")]
-    ValueExceedsBound {
-        /// Length of the stored value, in bytes.
-        length: usize,
-        /// Bound of the read, in bytes.
-        max_bytes: usize,
-    },
-
-    /// The key holds no value, and the caller requires one.
-    #[error("no value at the key")]
-    NotFound,
-}
 
 #[derive(Error, Debug, Eq, PartialEq)]
 pub enum Error {
@@ -38,7 +21,7 @@ pub enum Error {
     #[error(transparent)]
     Key(#[from] KeyError),
     /// An operation at a keyspace key failed, as [`KeySpaceError`] describes:
-    /// a failure of the SDK, or a [`StorageReadErrorKind`] of this crate.
+    /// a failure of the SDK, or a [`StorageReadErrorKind`].
     #[error(transparent)]
     KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error(transparent)]

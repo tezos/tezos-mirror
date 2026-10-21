@@ -1367,9 +1367,7 @@ mod tests {
     #[test]
     // Test that a TezBlock is created and stored when Tezos operations are executed via EVM chain config
     fn test_tezblock_stored_after_tezos_operation() {
-        use tezos_execution::account_storage::{
-            set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -1435,9 +1433,7 @@ mod tests {
 
     #[test]
     fn test_tezblocks_are_chained() {
-        use tezos_execution::account_storage::{
-            set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -1618,9 +1614,7 @@ mod tests {
     /// back via `get_tezos_account_info`.
     #[test]
     fn test_tezosx_michelson_reveal_sets_manager() {
-        use tezos_execution::account_storage::{
-            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -1700,9 +1694,7 @@ mod tests {
     /// the manager is revealed.
     #[test]
     fn test_tezosx_michelson_reveal_and_transfer_balances() {
-        use tezos_execution::account_storage::{
-            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -1835,9 +1827,7 @@ mod tests {
     /// covered by `delayed_inbox::tests::test_delayed_inbox_tezos_dropped_on_stale_branch`.
     #[test]
     fn test_tezosx_delayed_op_foreign_branch_applied_at_inclusion() {
-        use tezos_execution::account_storage::{
-            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -1939,9 +1929,7 @@ mod tests {
     #[test]
     fn test_tezosx_michelson_chain_id_now_level() {
         use mir::gas::Gas;
-        use tezos_execution::account_storage::{
-            set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut tez_accounts = host
@@ -2099,9 +2087,7 @@ mod tests {
         use revm_etherlink::storage::world_state_handler::AccountInfo;
         use std::collections::VecDeque;
         use tezos_crypto_rs::hash::ContractKt1Hash;
-        use tezos_execution::account_storage::{
-            get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
         use tezos_tezlink::operation_result::{
             Balance, BalanceUpdate, ContentResult, InternalOperationSum,
             OperationDataAndMetadata, OperationResultSum, TransferTarget, UpdateOrigin,
@@ -2319,9 +2305,7 @@ mod tests {
         use mir::gas::Gas;
         use mir::interpreter::{compute_contract_address, MAX_INTERNAL_OPERATIONS};
         use std::collections::VecDeque;
-        use tezos_execution::account_storage::{
-            set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
         use tezos_tezlink::block::OperationsWithReceipts;
         use tezos_tezlink::operation_result::{
             ContentResult, OperationDataAndMetadata, OperationResult, OperationResultSum,
@@ -3004,9 +2988,7 @@ mod tests {
         // rejected and repushed. Revert `host.add_execution_gas` and
         // op2 instead sees the original (still-fitting) counter and
         // is incorrectly applied — this test fails.
-        use tezos_execution::account_storage::{
-            set_tezos_account_info, TezosAccountInfo,
-        };
+        use tezos_execution::account_storage::TezosAccountInfo;
 
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
@@ -3906,5 +3888,36 @@ mod tests {
             BlockInProgressComputationResult::RebootNeeded,
             "Tezos operation should not fit when gas is nearly exhausted"
         );
+    }
+
+    fn get_tezos_account_info(
+        tez_accounts: &impl tezos_smart_rollup_keyspace::KeySpace,
+        pub_key_hash: &PublicKeyHash,
+    ) -> Result<
+        Option<tezos_execution::account_storage::TezosAccountInfo>,
+        tezosx_types::TezosXRuntimeError,
+    > {
+        use tezos_execution::account_storage::{
+            get_tezos_account_info_at, key_to_tezos_account,
+        };
+        Ok(get_tezos_account_info_at(
+            tez_accounts,
+            &key_to_tezos_account(pub_key_hash)?,
+        )?)
+    }
+
+    fn set_tezos_account_info(
+        tez_accounts: &mut impl tezos_smart_rollup_keyspace::KeySpace,
+        pub_key_hash: &PublicKeyHash,
+        info: tezos_execution::account_storage::TezosAccountInfo,
+    ) -> Result<(), tezosx_types::TezosXRuntimeError> {
+        use tezos_execution::account_storage::{
+            key_to_tezos_account, set_tezos_account_info_at,
+        };
+        Ok(set_tezos_account_info_at(
+            tez_accounts,
+            &key_to_tezos_account(pub_key_hash)?,
+            info,
+        )?)
     }
 }

@@ -1712,7 +1712,8 @@ where
             | TezosXRuntimeError::MethodNotAllowed(_)
             | TezosXRuntimeError::HeaderError(_)
             | TezosXRuntimeError::CheckNativeAddressError(_)
-            | TezosXRuntimeError::Key(_) => {
+            | TezosXRuntimeError::Key(_)
+            | TezosXRuntimeError::KeySpace(_) => {
                 mir::interpreter::EnshrinedViewDispatchError::AliasResolution.into()
             }
         })?;

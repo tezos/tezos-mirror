@@ -65,7 +65,7 @@ pub fn read_origin_for_address(
         AddressHash::Implicit(_) => Ok(Some(Origin::Native)),
         AddressHash::Kt1(kt1) => {
             let originated = TezosOriginatedAccount::from_kt1(kt1)?;
-            originated.origin(tez_accounts)
+            Ok(originated.origin(tez_accounts)?)
         }
         AddressHash::Sr1(_) => Ok(None),
     }

@@ -64,8 +64,8 @@ use tezos_smart_rollup_host::path::OwnedPath;
 pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
-    get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info,
-    TezosOriginatedAccount,
+    get_tezos_account_info_or_init_at, key_to_tezos_account, narith_to_u256,
+    set_tezos_account_info_at, TezosOriginatedAccount,
 };
 
 pub struct TezosRuntime(pub ChainId);
@@ -759,10 +759,7 @@ where
     let source_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
         TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
     })?;
-    let source_account =
-        context::implicit_from_public_key_hash(&source_pkh).map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to fetch source account: {e:?}"))
-        })?;
+    let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
 
     let mut tc_ctx = TcCtx {
         rk: &mut *rk,
@@ -880,12 +877,7 @@ where
             )
         }
         Contract::Implicit(pkh) => {
-            let sender_account =
-                context::implicit_from_public_key_hash(pkh).map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to fetch sender account: {e:?}"
-                    ))
-                })?;
+            let sender_account = context::implicit_from_public_key_hash(pkh)?;
             cross_runtime_transfer(
                 &mut tc_ctx,
                 &mut operation_ctx,
@@ -1214,12 +1206,7 @@ impl RuntimeInterface for TezosRuntime {
         let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!("Failed to parse null PKH: {e}"))
         })?;
-        let source_account =
-            context::implicit_from_public_key_hash(&null_pkh).map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to fetch null source account: {e:?}"
-                ))
-            })?;
+        let source_account = context::implicit_from_public_key_hash(&null_pkh)?;
 
         let script = Script { code, storage };
         let origin = Origin::Alias(alias_info);
@@ -1530,12 +1517,13 @@ impl TezosRuntime {
         pub_key_hash: &PublicKeyHash,
         amount: U256,
     ) -> Result<(), TezosXRuntimeError> {
-        let mut info = get_tezos_account_info_or_init(tez_accounts, pub_key_hash)?;
+        let key = key_to_tezos_account(pub_key_hash)?;
+        let mut info = get_tezos_account_info_or_init_at(tez_accounts, &key)?;
         info.balance = info
             .balance
             .checked_add(amount)
             .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        set_tezos_account_info(tez_accounts, pub_key_hash, info)
+        Ok(set_tezos_account_info_at(tez_accounts, &key, info)?)
     }
 
     // Used for debug while we don't have our own originated account implementation.
