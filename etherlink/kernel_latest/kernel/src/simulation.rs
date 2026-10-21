@@ -401,8 +401,8 @@ impl Evaluation {
     {
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
         let minimum_base_fee_per_gas =
-            crate::retrieve_minimum_base_fee_per_gas(rk.host_mut());
-        let da_fee = crate::retrieve_da_fee(rk.host_mut())?;
+            crate::retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
+        let da_fee = crate::retrieve_da_fee(rk.evm_world_state_mut())?;
         let coinbase = read_sequencer_pool_address(rk.host()).unwrap_or_default();
         let experimental_features = ExperimentalFeatures::read_from_storage(base);
         let debug_features = DebugFeatures::read_from_storage(base);
@@ -843,7 +843,7 @@ mod tests {
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
-        let block_fees = retrieve_block_fees(rk.host_mut());
+        let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(
             timestamp,

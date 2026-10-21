@@ -193,16 +193,13 @@ fn init_storage_versioning(
     }
 }
 
-fn retrieve_minimum_base_fee_per_gas<Host>(host: &mut Host) -> U256
-where
-    Host: StorageV1,
-{
-    match read_minimum_base_fee_per_gas(host) {
-        Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
-        Err(_) => {
+fn retrieve_minimum_base_fee_per_gas(evm_world_state: &mut impl KeySpace) -> U256 {
+    match read_minimum_base_fee_per_gas(evm_world_state) {
+        Some(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
+        None => {
             let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
             if let Err(err) =
-                store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)
+                store_minimum_base_fee_per_gas(evm_world_state, minimum_base_fee_per_gas)
             {
                 log!(Error, "Can't store the default minimum_base_fee: {:?}", err);
             }
@@ -229,12 +226,12 @@ fn retrieve_base_fee_per_gas(
     }
 }
 
-fn retrieve_da_fee(host: &mut impl StorageV1) -> Result<U256, Error> {
-    match read_da_fee(host) {
-        Ok(da_fee) => Ok(da_fee),
-        Err(_) => {
+fn retrieve_da_fee(evm_world_state: &mut impl KeySpace) -> Result<U256, Error> {
+    match read_da_fee(evm_world_state) {
+        Some(da_fee) => Ok(da_fee),
+        None => {
             let da_fee = U256::from(fees::DA_FEE_PER_BYTE);
-            store_da_fee(host, da_fee)?;
+            store_da_fee(evm_world_state, da_fee)?;
             Ok(da_fee)
         }
     }
@@ -242,14 +239,16 @@ fn retrieve_da_fee(host: &mut impl StorageV1) -> Result<U256, Error> {
 
 #[cfg(test)]
 fn retrieve_block_fees<Host>(
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
 ) -> Result<tezos_ethereum::block::BlockFees, Error>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
-    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
-    let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
-    let da_fee = retrieve_da_fee(host)?;
+    let minimum_base_fee_per_gas =
+        retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
+    let base_fee_per_gas =
+        retrieve_base_fee_per_gas(rk.host_mut(), minimum_base_fee_per_gas);
+    let da_fee = retrieve_da_fee(rk.evm_world_state_mut())?;
     let block_fees = tezos_ethereum::block::BlockFees::new(
         minimum_base_fee_per_gas,
         base_fee_per_gas,
@@ -584,7 +583,6 @@ mod tests {
     use tezos_smart_rollup::types::Entrypoint;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
-    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezos_smart_rollup_mock::TransferMetadata;
@@ -633,7 +631,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Act
-        let result = crate::retrieve_block_fees(rk.host_mut());
+        let result = crate::retrieve_block_fees(&mut rk);
 
         // Assert
         let expected = BlockFees::new(
@@ -648,18 +646,19 @@ mod tests {
 
     #[test]
     fn load_min_block_fees() {
-        let min_path =
-            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
-
         // Arrange
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let min_base_fee = U256::from(17);
-        tezos_storage::write_u256_le(rk.host_mut(), &min_path, min_base_fee).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            min_base_fee,
+        )
+        .unwrap();
 
         // Act
-        let result = crate::retrieve_block_fees(rk.host_mut());
+        let result = crate::retrieve_block_fees(&mut rk);
 
         // Assert
         let expected =

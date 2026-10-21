@@ -535,7 +535,7 @@ pub fn produce<Host>(
 where
     Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
 {
-    let da_fee_per_byte = crate::retrieve_da_fee(host)?;
+    let da_fee_per_byte = crate::retrieve_da_fee(bk.evm_world_state_mut())?;
 
     // Read the HTTP-trace replay flag once, before any [SafeStorage]
     // wrapping, and thread the resulting boolean through [compute_bip] →
@@ -765,7 +765,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
-        TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
+        EVM_WORLD_STATE_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -998,7 +998,9 @@ mod tests {
     fn sub_block_host() -> MockKernelHost {
         let mut host = MockKernelHost::default();
         init_safe_storage_roots(&mut host);
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        let mut evm_world_state =
+            host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME).unwrap();
+        store_block_fees(&mut evm_world_state, &dummy_block_fees()).unwrap();
         // The run reads its chain configuration from storage: the dummy
         // transactions are signed for `DUMMY_CHAIN_ID`.
         crate::storage::store_evm_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
@@ -1281,14 +1283,14 @@ mod tests {
     }
 
     fn store_block_fees(
-        host: &mut impl StorageV1,
+        evm_world_state: &mut impl KeySpace,
         block_fees: &BlockFees,
     ) -> anyhow::Result<()> {
         storage::store_minimum_base_fee_per_gas(
-            host,
+            evm_world_state,
             block_fees.minimum_base_fee_per_gas(),
         )?;
-        storage::store_da_fee(host, block_fees.da_fee_per_byte())?;
+        storage::store_da_fee(evm_world_state, block_fees.da_fee_per_byte())?;
         Ok(())
     }
 
@@ -1325,7 +1327,7 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        store_block_fees(host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(eth_accounts);
 
         produce(
@@ -1415,7 +1417,7 @@ mod tests {
         };
 
         store_blueprints(bk.base_mut(), vec![blueprint(vec![tezos_tx])]);
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         // Produce the block
         produce(&mut host, bk, &chain_config, &mut config, None, None)
@@ -1480,10 +1482,10 @@ mod tests {
         };
 
         store_blueprints(&mut base, vec![blueprint(vec![tezos_tx])]);
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         drop(base);
 
-        let bk = load_keyspaces(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         let bk = load_keyspaces(&mut host).unwrap();
@@ -1576,7 +1578,7 @@ mod tests {
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
         store_blueprints(bk.base_mut(), vec![blueprint(vec![])]);
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         let produced = produce(&mut host, bk, &chain_config, &mut config, None, None);
 
@@ -1671,9 +1673,9 @@ mod tests {
             );
         }
 
-        // Disable DA fees so the low-fee reveal operation is not rejected.
-        storage::store_da_fee(&mut host, U256::zero()).unwrap();
         let mut bk = load_keyspaces(&mut host).unwrap();
+        // Disable DA fees so the low-fee reveal operation is not rejected.
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
         let chain_config =
             { dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut()) };
         let mut config = dummy_configuration();
@@ -1683,7 +1685,7 @@ mod tests {
             bk.base_mut(),
             vec![tezos_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
@@ -1771,10 +1773,9 @@ mod tests {
             assert_eq!(info_before.pub_key, None);
         }
 
-        // Disable DA fees so the low-fee operations are not rejected.
-        storage::store_da_fee(&mut host, U256::zero()).unwrap();
-
         let mut bk = load_keyspaces(&mut host).unwrap();
+        // Disable DA fees so the low-fee operations are not rejected.
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -1802,7 +1803,7 @@ mod tests {
                 Timestamp::from(0i64),
             )],
         );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
@@ -1891,9 +1892,8 @@ mod tests {
             .expect("Should have set bootstrap2 account info");
         }
 
-        storage::store_da_fee(&mut host, U256::zero()).unwrap();
-
         let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -1924,7 +1924,7 @@ mod tests {
                 Timestamp::from(0i64),
             )],
         );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
@@ -1988,9 +1988,9 @@ mod tests {
             .expect("Should have set bootstrap1 account info");
         }
 
-        // Disable DA fees so the test operations are not rejected.
-        storage::store_da_fee(&mut host, U256::zero()).unwrap();
         let mut bk = load_keyspaces(&mut host).unwrap();
+        // Disable DA fees so the test operations are not rejected.
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -2052,7 +2052,7 @@ mod tests {
                 tezos_blueprint(vec![call], Timestamp::from(timestamp_of_call)),
             ],
         );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         // Block 0 (origination), block 1 (call), then drain.
         produce(&mut host, bk, &chain_config, &mut config, None, None)
@@ -2125,11 +2125,12 @@ mod tests {
         use tezosx_interfaces::{AliasInfo, Origin, Registry, RuntimeId};
 
         let mut host = MockKernelHost::default();
-        storage::store_da_fee(&mut host, U256::zero()).unwrap();
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        let mut base_ks = load_base(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         let chain_config =
-            dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base_ks);
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
+        let base_ks = bk.into_base();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         context::implicit_from_public_key_hash(&bootstrap2().pkh)
             .unwrap()
@@ -2366,9 +2367,9 @@ mod tests {
                 .unwrap();
             }
 
-            storage::store_da_fee(&mut host, U256::zero()).unwrap();
-            store_block_fees(&mut host, &dummy_block_fees()).unwrap();
             let mut bk = load_keyspaces(&mut host).unwrap();
+            storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+            store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
             let chain_config =
                 dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
             let mut config = dummy_configuration();
@@ -2519,7 +2520,7 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -2536,7 +2537,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         set_balance(rk.eth_accounts_mut(), &sender, U256::from(30000u64));
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
         drop(base);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -2564,7 +2565,7 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -2585,7 +2586,7 @@ mod tests {
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
         drop(base);
@@ -2633,7 +2634,7 @@ mod tests {
             &sender,
             U256::from(5000000000000000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
         drop(base);
@@ -2665,13 +2666,13 @@ mod tests {
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
         let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
+            bk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
-        let bk = load_keyspaces(&mut host).unwrap();
         produce_block_with_several_valid_txs(&mut host, bk);
 
         let dest_address =
@@ -2689,7 +2690,7 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -2718,7 +2719,7 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         // Produce block for blueprint containing transaction_0
         drop(rk);
@@ -2795,7 +2796,7 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees).unwrap();
 
         drop(rk);
         drop(base);
@@ -2855,7 +2856,7 @@ mod tests {
         let sender = dummy_eth_caller();
         let initial_sender_balance = U256::from(10000000000000000000u64);
         set_balance(rk.eth_accounts_mut(), &sender, initial_sender_balance);
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
         drop(base);
@@ -2898,7 +2899,7 @@ mod tests {
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
         let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
-        let block_fees = retrieve_block_fees(rk.host_mut());
+        let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block fees should be defined");
         TezosXBlockConstants {
             evm_runtime_block_constants: BlockConstants::first_block(
@@ -3173,7 +3174,7 @@ mod tests {
         store_blueprints(&mut base, vec![blueprint(vec![transaction])]);
 
         // Apply the transaction
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
         drop(base);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -3231,7 +3232,7 @@ mod tests {
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut base, blueprint).expect("Should store a blueprint");
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
         drop(base);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -3398,7 +3399,7 @@ mod tests {
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
         drop(base);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -3449,7 +3450,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -3496,7 +3497,7 @@ mod tests {
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
         drop(base);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -3639,7 +3640,7 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -3662,7 +3663,7 @@ mod tests {
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         // The block must be produced despite the poison transaction.
         drop(rk);
@@ -3712,7 +3713,7 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
@@ -3746,7 +3747,7 @@ mod tests {
             &sender,
             U256::from(1_000_000_000_000_000_000u64),
         );
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
         drop(base);
@@ -3814,7 +3815,7 @@ mod tests {
         // First block: protocol = previous (from stored header),
         // next_protocol = current (TARGET_TEZOS_PROTOCOL)
         store_blueprints(&mut base, vec![blueprint(vec![])]);
-        store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
         drop(base);

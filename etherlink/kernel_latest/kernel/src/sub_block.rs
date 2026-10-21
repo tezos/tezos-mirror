@@ -147,6 +147,7 @@ pub fn read_single_tx_execution_input(
 
 fn block_constants<Host>(
     host: &mut Host,
+    evm_world_state: &mut impl KeySpace,
     config: &TezosXChainConfig,
     timestamp: Timestamp,
     number: U256,
@@ -155,7 +156,7 @@ where
     Host: StorageV1,
 {
     let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-    let da_fee_per_byte = retrieve_da_fee(host)?;
+    let da_fee_per_byte = retrieve_da_fee(evm_world_state)?;
     let minimum_base_fee_per_gas = config.get_limits().minimum_base_fee_per_gas;
     let base_fee_per_gas = base_fee_per_gas(host, timestamp, minimum_base_fee_per_gas);
     let block_fees =
@@ -220,8 +221,13 @@ where
     __trace_kernel_add_attrs!(__attrs);
 
     let config = fetch_tezosx_configuration(host, &mut bk)?;
-    let block_constants =
-        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
+    let block_constants = block_constants(
+        host,
+        bk.evm_world_state_mut(),
+        &config,
+        input_data.timestamp,
+        input_data.block_number,
+    )?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
         != H160::default())
     .then_some(block_constants.evm_runtime_block_constants.coinbase);
@@ -358,8 +364,13 @@ where
     __trace_kernel_add_attrs!(__attrs);
 
     let config = fetch_tezosx_configuration(host, &mut bk)?;
-    let block_constants =
-        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
+    let block_constants = block_constants(
+        host,
+        bk.evm_world_state_mut(),
+        &config,
+        input_data.timestamp,
+        input_data.block_number,
+    )?;
 
     let mut configuration = fetch_configuration(host, bk.base());
     let mut base = bk.into_base();

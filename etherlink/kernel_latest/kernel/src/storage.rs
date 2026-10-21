@@ -169,12 +169,13 @@ const ENABLE_DEBUG_PRECOMPILES_KEY: Key =
     Key::from_static(b"/debug_features_flags/enable_debug_precompiles");
 // EOF Debug Features
 
-const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
+// Key to the minimum base fee per gas, inside the `/evm/world_state` keyspace.
+const EVM_MINIMUM_BASE_FEE_PER_GAS_KEY: Key =
+    Key::from_static(b"/fees/minimum_base_fee_per_gas");
 const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/michelson_to_evm_gas_multiplier");
-const EVM_DA_FEE: RefPath =
-    RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
+// Key to the DA fee per byte, inside the `/evm/world_state` keyspace.
+const EVM_DA_FEE_KEY: Key = Key::from_static(b"/fees/da_fee_per_byte");
 const BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
 const BACKLOG_TIMESTAMP_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
@@ -644,8 +645,10 @@ pub fn read_michelson_runtime_chain_id(
     tez_world_state.read_nom(&MICHELSON_RUNTIME_CHAIN_ID_KEY)
 }
 
-pub fn read_minimum_base_fee_per_gas(host: &impl StorageV1) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
+/// Reads the minimum base fee per gas from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 32 bytes.
+pub fn read_minimum_base_fee_per_gas(evm_world_state: &impl KeySpace) -> Option<U256> {
+    evm_world_state.get_u256_le(&EVM_MINIMUM_BASE_FEE_PER_GAS_KEY)
 }
 
 pub fn read_backlog(host: &impl StorageV1) -> Result<u64, Error> {
@@ -668,11 +671,13 @@ pub fn store_backlog_timestamp(
     Ok(())
 }
 
+/// Writes the minimum base fee per gas to the `/evm/world_state` keyspace.
+/// Errors when the write fails.
 pub fn store_minimum_base_fee_per_gas(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     price: U256,
-) -> Result<(), Error> {
-    write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS, price).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_u256_le(&EVM_MINIMUM_BASE_FEE_PER_GAS_KEY, price)
 }
 
 pub fn read_michelson_to_evm_gas_multiplier(host: &impl StorageV1) -> Result<u64, Error> {
@@ -686,15 +691,19 @@ pub fn store_michelson_to_evm_gas_multiplier(
     write_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER, value).map_err(Error::from)
 }
 
+/// Writes the DA fee per byte to the `/evm/world_state` keyspace.
+/// Errors when the write fails.
 pub fn store_da_fee(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     base_fee_per_gas: U256,
-) -> Result<(), Error> {
-    write_u256_le(host, &EVM_DA_FEE, base_fee_per_gas).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_u256_le(&EVM_DA_FEE_KEY, base_fee_per_gas)
 }
 
-pub fn read_da_fee(host: &impl StorageV1) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_DA_FEE).map_err(Error::from)
+/// Reads the DA fee per byte from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 32 bytes.
+pub fn read_da_fee(evm_world_state: &impl KeySpace) -> Option<U256> {
+    evm_world_state.get_u256_le(&EVM_DA_FEE_KEY)
 }
 
 /// Adds `burned_fee` to the burned-fees total of the `/evm/world_state`
@@ -1806,5 +1815,53 @@ mod tests {
             bytes
         );
         assert_eq!(super::read_burned_fees(rk.evm_world_state()), burned);
+    }
+
+    /// The minimum base fee per gas resolves to
+    /// `/evm/world_state/fees/minimum_base_fee_per_gas`.
+    #[test]
+    fn evm_minimum_base_fee_per_gas_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let price = primitive_types::U256::from(17);
+
+        super::store_minimum_base_fee_per_gas(rk.evm_world_state_mut(), price).unwrap();
+
+        let mut bytes = [0u8; 32];
+        price.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/fees/minimum_base_fee_per_gas"
+                ))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(
+            super::read_minimum_base_fee_per_gas(rk.evm_world_state()),
+            Some(price)
+        );
+    }
+
+    /// The DA fee per byte resolves to `/evm/world_state/fees/da_fee_per_byte`.
+    #[test]
+    fn evm_da_fee_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let da_fee = primitive_types::U256::from(29);
+
+        super::store_da_fee(rk.evm_world_state_mut(), da_fee).unwrap();
+
+        let mut bytes = [0u8; 32];
+        da_fee.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/fees/da_fee_per_byte"
+                ))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(super::read_da_fee(rk.evm_world_state()), Some(da_fee));
     }
 }
