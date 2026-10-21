@@ -345,7 +345,7 @@ where
     //    configuration if it fails.
     let chain_configuration = fetch_tezosx_configuration(host, &mut bk)?;
     let mut configuration = fetch_configuration(host, bk.base());
-    let sequencer_pool_address = read_sequencer_pool_address(host);
+    let sequencer_pool_address = read_sequencer_pool_address(bk.evm_world_state());
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.

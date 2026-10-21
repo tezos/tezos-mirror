@@ -188,8 +188,9 @@ const BACKLOG_TIMESTAMP_KEY: Key = Key::from_static(b"/fees/last_timestamp");
 ///
 /// This may be updated by the governance mechanism over time. If it is not set, the data-availability
 /// fees are instead burned.
-pub const SEQUENCER_POOL_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/sequencer_pool_address");
+///
+/// The key sits inside the `/evm/world_state` keyspace.
+const SEQUENCER_POOL_KEY: Key = Key::from_static(b"/sequencer_pool_address");
 
 /// Key to the last L1 level seen, inside the `/base` keyspace. Resolves to
 /// the durable path `/base/l1_level`.
@@ -747,12 +748,11 @@ pub fn read_burned_fees(evm_world_state: &impl KeySpace) -> U256 {
     evm_world_state.get_u256_le_or(&EVM_BURNED_FEES_KEY, U256::zero())
 }
 
-pub fn read_sequencer_pool_address<Host>(host: &Host) -> Option<H160>
-where
-    Host: StorageV1,
-{
-    let mut bytes = [0; std::mem::size_of::<H160>()];
-    let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice())
+/// Reads the sequencer pool address from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 20 bytes.
+pub fn read_sequencer_pool_address(evm_world_state: &impl KeySpace) -> Option<H160> {
+    let Some(bytes) = evm_world_state
+        .get_prefix_exact::<{ std::mem::size_of::<H160>() }>(&SEQUENCER_POOL_KEY)
     else {
         log!(Debug, "No sequencer pool address set");
         return None;
@@ -760,13 +760,13 @@ where
     Some(bytes.into())
 }
 
+/// Writes the sequencer pool address to the `/evm/world_state` keyspace.
+/// Errors when the write fails.
 pub fn store_sequencer_pool_address(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     address: H160,
-) -> Result<(), Error> {
-    let bytes = address.to_fixed_bytes();
-    host.store_write(&SEQUENCER_POOL_PATH, bytes.as_slice(), 0)?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    evm_world_state.set(&SEQUENCER_POOL_KEY, address.to_fixed_bytes())
 }
 
 /// The error a missing key reads as, for the integer accessors that require
@@ -1950,6 +1950,30 @@ mod tests {
         assert_eq!(
             super::read_michelson_to_evm_gas_multiplier(rk.evm_world_state()),
             Some(7)
+        );
+    }
+
+    /// The sequencer pool address resolves to
+    /// `/evm/world_state/sequencer_pool_address`.
+    #[test]
+    fn sequencer_pool_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pool = primitive_types::H160::from_low_u64_be(42);
+
+        super::store_sequencer_pool_address(rk.evm_world_state_mut(), pool).unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/sequencer_pool_address"
+                ))
+                .unwrap(),
+            pool.as_bytes()
+        );
+        assert_eq!(
+            super::read_sequencer_pool_address(rk.evm_world_state()),
+            Some(pool)
         );
     }
 }

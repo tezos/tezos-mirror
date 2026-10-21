@@ -567,9 +567,9 @@ where
                 (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
-                // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
-                // because the sequencer pool address is located outside of `/evm/world_state`.
-                upgrade::possible_sequencer_upgrade(safe_host.host, bk.base_mut())?;
+                // The upgrade writes through `safe_host.host` and `bk`, which address
+                // the durable roots: `safe_host.start` below copies them into the mirror.
+                upgrade::possible_sequencer_upgrade(safe_host.host, &mut bk)?;
 
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
