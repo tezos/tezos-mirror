@@ -1087,7 +1087,9 @@ etherlink.test_revm_compatibility:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
-  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
+  - git init evm_fixtures
+  - git -C evm_fixtures fetch --depth 1 https://github.com/functori/evm-fixtures 9eaf35cdd9d1422ef56b78d5ba7b1232ccef25e6
+  - git -C evm_fixtures checkout FETCH_HEAD
   - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

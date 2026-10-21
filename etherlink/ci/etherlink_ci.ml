@@ -337,6 +337,9 @@ let job_test_evm_compatibility =
          ./etherlink/kernel_latest/evm_evaluation/resources/ -c";
       ]
 
+(* [job_test_revm_compatibility] tests this functori/evm-fixtures commit. *)
+let evm_fixtures_commit = "9eaf35cdd9d1422ef56b78d5ba7b1232ccef25e6"
+
 let job_test_revm_compatibility =
   CI.job
     "test_revm_compatibility"
@@ -353,8 +356,12 @@ let job_test_revm_compatibility =
       [
         "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
          revm-evaluation-assessor";
-        "git clone --depth 1 https://github.com/functori/evm-fixtures \
-         evm_fixtures";
+        "git init evm_fixtures";
+        sf
+          "git -C evm_fixtures fetch --depth 1 \
+           https://github.com/functori/evm-fixtures %s"
+          evm_fixtures_commit;
+        "git -C evm_fixtures checkout FETCH_HEAD";
         "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
       ]
 
