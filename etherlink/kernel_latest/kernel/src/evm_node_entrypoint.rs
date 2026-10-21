@@ -341,7 +341,7 @@ where
     );
 
     let block_constants = match chain_config.constants(
-        rk.host_mut(),
+        rk.evm_world_state_mut(),
         &block_in_progress,
         U256::zero(),
         H160::zero(),
@@ -841,7 +841,12 @@ where
         },
     );
     let mut block_constants = chain_config
-        .constants(host, &block_in_progress, U256::zero(), H160::zero())
+        .constants(
+            bk.evm_world_state_mut(),
+            &block_in_progress,
+            U256::zero(),
+            H160::zero(),
+        )
         .map_err(|err| {
             RunCodeError::Host(format!("cannot build block constants: {err:?}"))
         })?;

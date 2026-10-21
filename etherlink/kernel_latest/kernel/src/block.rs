@@ -313,7 +313,7 @@ where
     Host: StorageV1 + WithGas + KeySpaceLoader,
 {
     let constants = chain_config.constants(
-        rk.host_mut(),
+        rk.evm_world_state_mut(),
         &block_in_progress,
         da_fee_per_byte,
         coinbase,

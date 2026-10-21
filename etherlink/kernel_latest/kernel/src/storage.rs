@@ -172,8 +172,10 @@ const ENABLE_DEBUG_PRECOMPILES_KEY: Key =
 // Key to the minimum base fee per gas, inside the `/evm/world_state` keyspace.
 const EVM_MINIMUM_BASE_FEE_PER_GAS_KEY: Key =
     Key::from_static(b"/fees/minimum_base_fee_per_gas");
-const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
-    RefPath::assert_from(b"/evm/world_state/fees/michelson_to_evm_gas_multiplier");
+// Key to the Michelson-to-EVM gas multiplier, inside the `/evm/world_state`
+// keyspace.
+const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER_KEY: Key =
+    Key::from_static(b"/fees/michelson_to_evm_gas_multiplier");
 // Key to the DA fee per byte, inside the `/evm/world_state` keyspace.
 const EVM_DA_FEE_KEY: Key = Key::from_static(b"/fees/da_fee_per_byte");
 // Key to the gas backlog, inside the `/evm/world_state` keyspace.
@@ -694,15 +696,23 @@ pub fn store_minimum_base_fee_per_gas(
     evm_world_state.store_u256_le(&EVM_MINIMUM_BASE_FEE_PER_GAS_KEY, price)
 }
 
-pub fn read_michelson_to_evm_gas_multiplier(host: &impl StorageV1) -> Result<u64, Error> {
-    read_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER).map_err(Error::from)
+/// Reads the Michelson-to-EVM gas multiplier from the `/evm/world_state`
+/// keyspace.
+/// Returns `None` when it is absent or shorter than 8 bytes.
+pub fn read_michelson_to_evm_gas_multiplier(
+    evm_world_state: &impl KeySpace,
+) -> Option<u64> {
+    evm_world_state.get_le(&EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER_KEY)
 }
 
+/// Writes the Michelson-to-EVM gas multiplier to the `/evm/world_state`
+/// keyspace.
+/// Errors when the write fails.
 pub fn store_michelson_to_evm_gas_multiplier(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     value: u64,
-) -> Result<(), Error> {
-    write_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER, value).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_le(&EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER_KEY, value)
 }
 
 /// Writes the DA fee per byte to the `/evm/world_state` keyspace.
@@ -1916,6 +1926,30 @@ mod tests {
         assert_eq!(
             super::read_backlog_timestamp(rk.evm_world_state()),
             Some(1_000)
+        );
+    }
+
+    /// The Michelson-to-EVM gas multiplier resolves to
+    /// `/evm/world_state/fees/michelson_to_evm_gas_multiplier`.
+    #[test]
+    fn evm_michelson_to_evm_gas_multiplier_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        super::store_michelson_to_evm_gas_multiplier(rk.evm_world_state_mut(), 7)
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/fees/michelson_to_evm_gas_multiplier"
+                ))
+                .unwrap(),
+            7u64.to_le_bytes()
+        );
+        assert_eq!(
+            super::read_michelson_to_evm_gas_multiplier(rk.evm_world_state()),
+            Some(7)
         );
     }
 }
