@@ -35,7 +35,7 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
@@ -526,7 +526,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub fn produce<Host>(
     host: &mut Host,
-    mut base: impl KeySpace,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
     chain_config: &TezosXChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
@@ -543,15 +543,15 @@ where
     // the [SafeStorage]-mirrored world state subtree, and the common
     // (unset) case costs a single [store_has] per block instead of one
     // per transaction.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(&base);
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
-    let kernel_upgrade = upgrade::read_kernel_upgrade(&base)?;
+    let kernel_upgrade = upgrade::read_kernel_upgrade(bk.base())?;
 
     // If there's a pool address, the coinbase in block constants and miner
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (next_bip_number, timestamp, chain_header) = get_next_bip_info(&base);
+    let (next_bip_number, timestamp, chain_header) = get_next_bip_info(bk.base());
 
     let world_states = chain_config.world_states(next_bip_number);
 
@@ -571,13 +571,13 @@ where
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
                 // because the sequencer pool address is located outside of `/evm/world_state`.
-                upgrade::possible_sequencer_upgrade(safe_host.host, &mut base)?;
+                upgrade::possible_sequencer_upgrade(safe_host.host, bk.base_mut())?;
 
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match build_next_bip_from_blueprints(
                     safe_host.host,
-                    &mut base,
+                    bk.base_mut(),
                     chain_config,
                     next_bip_number,
                     timestamp,
@@ -611,6 +611,9 @@ where
 
     let processed_blueprint = block_in_progress.number;
 
+    // The block runs on the mirror: only `/base`, which is not mirrored,
+    // stays in hand.
+    let mut base = bk.into_base();
     let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     let computation_result = compute_bip(
         &mut rk,
@@ -731,7 +734,6 @@ mod tests {
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
-    use crate::load_base;
     use crate::registry_impl::RegistryImpl;
     use crate::retrieve_block_fees;
     use crate::storage::read_block_in_progress;
@@ -740,6 +742,7 @@ mod tests {
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
+    use crate::{load_base, load_keyspaces};
     use primitive_types::{H160, U256};
     use revm::primitives::hardfork::SpecId;
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
@@ -1025,17 +1028,17 @@ mod tests {
     fn sub_block_run_resumes_the_mirrored_block() {
         let mut host = sub_block_host();
 
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         crate::sub_block::handle_run_transaction(
             &mut host,
-            base,
+            bk,
             sub_block_input(dummy_eth_transaction_zero(), 0, 1),
         )
         .expect("the first transaction runs");
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         crate::sub_block::handle_run_transaction(
             &mut host,
-            base,
+            bk,
             sub_block_input(dummy_eth_transaction_one(), 1, 1),
         )
         .expect("the second transaction runs");
@@ -1051,10 +1054,10 @@ mod tests {
     fn failed_sub_block_run_drops_the_block_in_progress() {
         let mut host = sub_block_host();
 
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         crate::sub_block::handle_run_transaction(
             &mut host,
-            base,
+            bk,
             sub_block_input(dummy_eth_transaction_zero(), 0, 1),
         )
         .expect("the first transaction runs");
@@ -1070,10 +1073,10 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         let result = crate::sub_block::handle_run_transaction(
             &mut host,
-            base,
+            bk,
             sub_block_input(dummy_eth_transaction_one(), 1, 1),
         );
         drop(held);
@@ -1288,7 +1291,7 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host>(
         host: &mut Host,
-        mut base: impl KeySpace,
+        mut bk: BlueprintKeyspaces<impl KeySpace>,
     ) where
         Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
     {
@@ -1306,7 +1309,7 @@ mod tests {
             },
         ];
 
-        store_blueprints(&mut base, vec![blueprint(transactions)]);
+        store_blueprints(bk.base_mut(), vec![blueprint(transactions)]);
 
         let mut eth_accounts = host
             .load_or_create(
@@ -1324,7 +1327,7 @@ mod tests {
 
         produce(
             host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -1381,8 +1384,9 @@ mod tests {
             .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeed");
 
-        let mut base = load_base(&mut host).unwrap();
-        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1405,16 +1409,15 @@ mod tests {
             content: TransactionContent::TezosDelayed(reveal),
         };
 
-        store_blueprints(&mut base, vec![blueprint(vec![tezos_tx])]);
+        store_blueprints(bk.base_mut(), vec![blueprint(vec![tezos_tx])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce the block
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // Verify that a TezBlock was stored (under /tez/world_state)
@@ -1473,13 +1476,12 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         drop(base);
 
-        let base = load_base(&mut host).unwrap();
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // Record block 0 hash
@@ -1515,13 +1517,12 @@ mod tests {
         .expect("Should have stored blueprint");
         drop(base);
 
-        let base = load_base(&mut host).unwrap();
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // Block 1 hash should be different from block 0
@@ -1563,13 +1564,14 @@ mod tests {
         let registry_counter =
             RefPath::assert_from(b"/tez/tez_accounts/address_registry/counter");
         host.store_write_all(&registry_counter, &[1]).unwrap();
-        let mut base = load_base(&mut host).unwrap();
-        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
-        store_blueprints(&mut base, vec![blueprint(vec![])]);
+        store_blueprints(bk.base_mut(), vec![blueprint(vec![])]);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        let produced = produce(&mut host, base, &chain_config, &mut config, None, None);
+        let produced = produce(&mut host, bk, &chain_config, &mut config, None, None);
 
         assert!(produced.is_err());
         assert!(crate::storage::read_michelson_runtime_sunrise_level(&host).is_none());
@@ -1630,9 +1632,9 @@ mod tests {
             .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
-        let mut base = load_base(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         let chain_config =
-            { dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base) };
+            { dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut()) };
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1663,17 +1665,16 @@ mod tests {
 
         let reveal = make_reveal_operation(1000, 1, 500, 0, bootstrap);
         store_blueprints(
-            &mut base,
+            bk.base_mut(),
             vec![tezos_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // After the reveal, the manager is the bootstrap's public key.
@@ -1703,8 +1704,9 @@ mod tests {
         // Disable DA fees so the low-fee operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let mut base = load_base(&mut host).unwrap();
-        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
 
         let bootstrap1 = bootstrap1();
@@ -1773,7 +1775,7 @@ mod tests {
         );
 
         store_blueprints(
-            &mut base,
+            bk.base_mut(),
             vec![tezos_blueprint(
                 vec![reveal, transfer],
                 Timestamp::from(0i64),
@@ -1781,12 +1783,11 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // bootstrap1 should be revealed.
@@ -1835,8 +1836,9 @@ mod tests {
             .expect("the accounts keyspace loads on a fresh host");
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let mut base = load_base(&mut host).unwrap();
-        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
 
         let bootstrap1 = bootstrap1();
@@ -1891,7 +1893,7 @@ mod tests {
         transfer.branch = foreign_branch;
 
         store_blueprints(
-            &mut base,
+            bk.base_mut(),
             vec![tezos_blueprint(
                 vec![reveal, transfer],
                 Timestamp::from(0i64),
@@ -1899,12 +1901,11 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         // The foreign-branch transfer was force-included and applied.
@@ -1945,8 +1946,9 @@ mod tests {
             .allocate(&mut tez_accounts)
             .expect("Contract initialization should have succeeded");
 
-        let mut base = load_base(&mut host).unwrap();
-        let chain_config = dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
 
         // A contract storing the chain id, the level and the timestamp of the
@@ -2016,7 +2018,7 @@ mod tests {
 
         let timestamp_of_call = 10i64;
         store_blueprints(
-            &mut base,
+            bk.base_mut(),
             vec![
                 tezos_blueprint(vec![origination], Timestamp::from(0i64)),
                 tezos_blueprint(vec![call], Timestamp::from(timestamp_of_call)),
@@ -2025,15 +2027,14 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Block 0 (origination), block 1 (call), then drain.
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
         let expected_level = 1;
@@ -2331,9 +2332,9 @@ mod tests {
                 .allocate(&mut tez_accounts)
                 .unwrap();
 
-            let mut base_ks = load_base(&mut host).unwrap();
+            let mut bk = load_keyspaces(&mut host).unwrap();
             let chain_config =
-                dummy_tezosx_config_with_tezos_runtime(&mut host, &mut base_ks);
+                dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
             let mut config = dummy_configuration();
 
             let bootstrap = bootstrap1();
@@ -2385,10 +2386,10 @@ mod tests {
                 0,
             ));
             store_blueprints(
-                &mut base_ks,
+                bk.base_mut(),
                 vec![tezos_blueprint(vec![origination], Timestamp::from(0i64))],
             );
-            produce(&mut host, base_ks, &chain_config, &mut config, None, None)
+            produce(&mut host, bk, &chain_config, &mut config, None, None)
                 .expect("origination block must be produced");
 
             // Build the delayed call to the emitter (counter 2: after the
@@ -2515,9 +2516,11 @@ mod tests {
         set_balance(rk.eth_accounts_mut(), &sender, U256::from(30000u64));
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2563,9 +2566,11 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2609,9 +2614,11 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2642,8 +2649,8 @@ mod tests {
         )
         .unwrap();
 
-        let base = load_base(&mut host).unwrap();
-        produce_block_with_several_valid_txs(&mut host, base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce_block_with_several_valid_txs(&mut host, bk);
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -2698,10 +2705,10 @@ mod tests {
         // Produce block for blueprint containing transaction_0
         drop(rk);
         drop(base);
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2711,10 +2718,10 @@ mod tests {
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Produce block for blueprint containing transaction_1
         drop(rk);
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2773,9 +2780,11 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees).unwrap();
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -2800,9 +2809,9 @@ mod tests {
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
-        let base = load_base(&mut host).unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
 
-        produce_block_with_several_valid_txs(&mut host, base);
+        produce_block_with_several_valid_txs(&mut host, bk);
 
         assert_current_block_reading_validity(&mut host);
     }
@@ -2831,9 +2840,11 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -3146,9 +3157,11 @@ mod tests {
         // Apply the transaction
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -3202,9 +3215,11 @@ mod tests {
         store_inbox_blueprint(&mut base, blueprint).expect("Should store a blueprint");
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &chain_config,
             &mut dummy_configuration(),
             None,
@@ -3219,9 +3234,11 @@ mod tests {
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut base, blueprint).expect("Should store a blueprint");
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &chain_config,
             &mut dummy_configuration(),
             None,
@@ -3236,9 +3253,11 @@ mod tests {
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut base, blueprint).expect("Should store a blueprint");
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &chain_config,
             &mut dummy_configuration(),
             None,
@@ -3363,15 +3382,11 @@ mod tests {
 
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
-        let computation_result = produce(
-            &mut host,
-            base,
-            &chain_config,
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation_result =
+            produce(&mut host, bk, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
         let base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3465,30 +3480,20 @@ mod tests {
 
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
         drop(rk);
-        let computation_result = produce(
-            &mut host,
-            base,
-            &chain_config,
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation_result =
+            produce(&mut host, bk, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // test reboot is set
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         drop(rk);
-        let base = load_base(&mut host).unwrap();
-        let computation_result = produce(
-            &mut host,
-            base,
-            &chain_config,
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation_result =
+            produce(&mut host, bk, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
         let base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3579,9 +3584,11 @@ mod tests {
         );
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -3641,9 +3648,11 @@ mod tests {
 
         // The block must be produced despite the poison transaction.
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -3722,9 +3731,11 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
         produce(
             &mut host,
-            base,
+            bk,
             &dummy_tezosx_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
@@ -3788,14 +3799,15 @@ mod tests {
         store_block_fees(rk.host_mut(), &dummy_block_fees()).unwrap();
 
         drop(rk);
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         drop(rk);
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
@@ -3810,14 +3822,15 @@ mod tests {
             .expect("Should have stored blueprint");
 
         drop(rk);
-        produce(&mut host, base, &chain_config, &mut config, None, None)
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         drop(rk);
-        let base = load_base(&mut host).unwrap();
-        let computation =
-            produce(&mut host, base, &chain_config, &mut config, None, None)
-                .expect("The block production should have succeeded.");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
 

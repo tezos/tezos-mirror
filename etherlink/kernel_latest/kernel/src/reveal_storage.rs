@@ -13,6 +13,7 @@ use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -63,11 +64,12 @@ pub fn is_revealed_storage(base: &impl KeySpace) -> bool {
 
 pub fn reveal_storage(
     host: &mut impl StorageV1,
-    base: &mut impl KeySpace,
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
 ) {
     log!(Info, "Starting the reveal dump");
+    let base = bk.base_mut();
 
     let config_bytes = base
         .get(&CONFIG_KEY)
@@ -105,8 +107,8 @@ pub fn reveal_storage(
 
     log!(Info, "Done revealing");
 
-    let chain_config = fetch_tezosx_configuration(host, base);
-    let configuration = fetch_configuration(host, base);
+    let chain_config = fetch_tezosx_configuration(host, bk);
+    let configuration = fetch_configuration(host, bk.base());
     log!(Info, "Chain Configuration {chain_config:?}");
     log!(Info, "Configuration {}", configuration);
 }

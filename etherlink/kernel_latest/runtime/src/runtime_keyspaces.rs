@@ -13,11 +13,20 @@
 //! The keyspaces are `/evm/eth_accounts` and `/tez/tez_accounts`, the account
 //! state of the two runtimes, and `/tez/world_state`, the chain-level state of
 //! the Michelson runtime.
+//!
+//! [`BlueprintKeyspaces`] is the handle of the stages before block production:
+//! it holds `/base` and `/tez/world_state`, loaded on the live host, and
+//! [`BlueprintKeyspaces::into_base`] keeps only `/base` once the execution
+//! loads a [`RuntimeKeyspaces`].
 
 use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
 
 use crate::runtime::MockKernelHost;
+
+/// Name of the `/base` keyspace, holding kernel configuration and
+/// node-interaction values that do not belong to any world state.
+pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
 
 /// Durable root of the `/evm/eth_accounts` keyspace.
 const ETH_ACCOUNTS_ROOT: &str = "/evm/eth_accounts";
@@ -132,6 +141,61 @@ struct Keyspaces<KS> {
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
 pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 
+/// The keyspaces the kernel holds from the inbox to the blueprint, before
+/// block production: `/base` and `/tez/world_state`.
+///
+/// The handles address the durable roots, not the `/tmp` mirror of a block.
+/// The kernel does not write through the world state while a mirror is
+/// active, and calls [`Self::into_base`] before it loads a
+/// [`RuntimeKeyspaces`] on the same host, which holds the world state again.
+pub struct BlueprintKeyspaces<KS> {
+    base: KS,
+    tez_world_state: KS,
+}
+
+impl<KS: KeySpace> BlueprintKeyspaces<KS> {
+    /// Loads `/base` then `/tez/world_state` from `host`.
+    ///
+    /// Errors with the loader's error: a keyspace already held elsewhere, or
+    /// a name the loader cannot accept.
+    pub fn load<Host: KeySpaceLoader<KeySpace = KS>>(
+        host: &mut Host,
+    ) -> Result<Self, KeySpaceLoaderError> {
+        let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
+        let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
+        Ok(Self {
+            base,
+            tez_world_state,
+        })
+    }
+
+    /// The `/base` keyspace.
+    pub fn base(&self) -> &KS {
+        &self.base
+    }
+
+    /// The `/base` keyspace, for the writers.
+    pub fn base_mut(&mut self) -> &mut KS {
+        &mut self.base
+    }
+
+    /// The `/tez/world_state` keyspace.
+    pub fn tez_world_state(&self) -> &KS {
+        &self.tez_world_state
+    }
+
+    /// The `/tez/world_state` keyspace, for the writers.
+    pub fn tez_world_state_mut(&mut self) -> &mut KS {
+        &mut self.tez_world_state
+    }
+
+    /// Keeps `/base` and drops the world state, so that a
+    /// [`RuntimeKeyspaces::init`] on the same host can load it again.
+    pub fn into_base(self) -> KS {
+        self.base
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +259,31 @@ mod tests {
         for probe_path in &probe_paths {
             assert_eq!(safe.host.store_read_all(probe_path).unwrap(), b"inside");
         }
+    }
+
+    #[test]
+    fn load_holds_the_live_roots_until_into_base() {
+        let mut host = MockKernelHost::default();
+        let mut bk = BlueprintKeyspaces::load(&mut host).unwrap();
+        assert_eq!(bk.base().name().to_string(), "/base");
+        assert_eq!(bk.tez_world_state().name().to_string(), "/tez/world_state");
+        bk.tez_world_state_mut().set(&PROBE, b"live").unwrap();
+        assert_eq!(
+            host.store_read_all(&RefPath::assert_from(b"/tez/world_state/probe"))
+                .unwrap(),
+            b"live"
+        );
+        // `/tez/world_state` is still held: `init` cannot load it again.
+        assert!(matches!(
+            RuntimeKeyspaces::init(&mut host),
+            Err(KeySpaceLoaderError::AlreadyLoaded)
+        ));
+        let base = bk.into_base();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(
+            rk.tez_world_state().get(&PROBE).as_deref(),
+            Some(&b"live"[..])
+        );
+        assert_eq!(base.name().to_string(), "/base");
     }
 }

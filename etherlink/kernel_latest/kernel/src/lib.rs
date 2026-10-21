@@ -32,18 +32,16 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{
+    BlueprintKeyspaces, RuntimeKeyspaces, BASE_KEYSPACE_NAME,
+};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
+use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError};
 use tezos_tracing::trace_kernel;
-
-/// Name of the `/base` keyspace, holding kernel configuration and
-/// node-interaction values that do not belong to any world state.
-const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
 
 /// Loads the `/base` keyspace and applies the log verbosity it records.
 pub(crate) fn load_base<Host: KeySpaceLoader>(
@@ -61,6 +59,26 @@ pub(crate) fn load_base_or_log<Host: KeySpaceLoader>(
 ) -> Option<Host::KeySpace> {
     load_base(host)
         .inspect_err(|err| log!(Error, "Failed to load the /base keyspace: {err:?}"))
+        .ok()
+}
+
+/// Loads the keyspaces of the stages before block production and applies
+/// the log verbosity `/base` records.
+pub(crate) fn load_keyspaces<Host: KeySpaceLoader>(
+    host: &mut Host,
+) -> Result<BlueprintKeyspaces<Host::KeySpace>, KeySpaceLoaderError> {
+    let bk = BlueprintKeyspaces::load(host)?;
+    set_global_verbosity(read_logs_verbosity(bk.base()));
+    Ok(bk)
+}
+
+/// [`load_keyspaces`] for the entrypoints that return instead of failing:
+/// the error is logged and becomes `None`.
+pub(crate) fn load_keyspaces_or_log<Host: KeySpaceLoader>(
+    host: &mut Host,
+) -> Option<BlueprintKeyspaces<Host::KeySpace>> {
+    load_keyspaces(host)
+        .inspect_err(|err| log!(Error, "Failed to load the keyspaces: {err:?}"))
         .ok()
 }
 
@@ -125,7 +143,7 @@ where
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host>(
     host: &mut Host,
-    base: &mut impl KeySpace,
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::TezosXChainConfig,
     configuration: &mut Configuration,
@@ -137,9 +155,9 @@ where
     log!(Debug, "Chain Configuration: {chain_config:?}");
     log!(Debug, "Configuration: {}", configuration);
 
-    enter_stage_one(base)?;
-    let res = fetch_blueprints(host, base, smart_rollup_address, configuration);
-    leave_stage_one(base)?;
+    enter_stage_one(bk.base_mut())?;
+    let res = fetch_blueprints(host, bk.base_mut(), smart_rollup_address, configuration);
+    leave_stage_one(bk.base_mut())?;
     res
 }
 
@@ -241,7 +259,10 @@ where
     Ok(block_fees)
 }
 
-pub fn run<Host>(host: &mut Host, base: impl KeySpace) -> Result<(), anyhow::Error>
+pub fn run<Host>(
+    host: &mut Host,
+    bk: BlueprintKeyspaces<impl KeySpace>,
+) -> Result<(), anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
 {
@@ -249,7 +270,7 @@ where
     // the same L1 level
     host.mark_for_reboot()
         .expect("This function should never fail");
-    match single_run(host, base) {
+    match single_run(host, bk) {
         Ok(SingleRunStatus::Reboot) => Ok(()),
         Ok(SingleRunStatus::Finished) => {
             host.clear_reboot_mark()
@@ -271,20 +292,20 @@ pub enum SingleRunStatus {
 
 pub fn single_run<Host>(
     host: &mut Host,
-    mut base: impl KeySpace,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
 ) -> Result<SingleRunStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost + WithGas + KeySpaceLoader,
 {
     // We always start by doing the migration if needed.
-    match stage_zero(host, &mut base) {
+    match stage_zero(host, bk.base_mut()) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
             // at every kernel run.
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
-            set_kernel_version(&mut base)?;
+            set_kernel_version(bk.base_mut())?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -294,15 +315,15 @@ where
         Ok(MigrationStatus::Done) => {
             // If a migration was finished, we update the kernel version
             // in the storage.
-            set_kernel_version(&mut base)?;
-            let configuration = fetch_configuration(host, &base);
+            set_kernel_version(bk.base_mut())?;
+            let configuration = fetch_configuration(host, bk.base());
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
         Err(Error::UpgradeError(Fallback)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(host, &mut base)?;
+            fallback_backup_kernel(host, bk.base_mut())?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
@@ -323,14 +344,14 @@ where
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let chain_configuration = fetch_tezosx_configuration(host, &base);
-    let mut configuration = fetch_configuration(host, &base);
+    let chain_configuration = fetch_tezosx_configuration(host, &bk);
+    let mut configuration = fetch_configuration(host, bk.base());
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
     // before the stage one because stage one reboots and would clear the flag.
     if !configuration.common.evm_node_flag {
-        health_check(host, &mut base, &mut configuration)?;
+        health_check(host, bk.base_mut(), &mut configuration)?;
     }
 
     let mut eth_accounts = host.load_or_create(
@@ -348,7 +369,7 @@ where
     // inbox.
     let stage_one_status = stage_one(
         host,
-        &mut base,
+        &mut bk,
         smart_rollup_address,
         &chain_configuration,
         &mut configuration,
@@ -362,6 +383,7 @@ where
         }
         StageOneStatus::Simulation => {
             drop(eth_accounts);
+            let mut base = bk.into_base();
             let mut rk = RuntimeKeyspaces::init(host)?;
             let registry = chain_configuration.init_registry();
             chain_configuration.start_simulation_mode(&mut rk, &mut base, &registry)?;
@@ -370,7 +392,7 @@ where
         StageOneStatus::Done | StageOneStatus::Skipped => (),
     };
 
-    let trace_input = read_tracer_input(&base)?;
+    let trace_input = read_tracer_input(bk.base())?;
 
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
@@ -379,7 +401,7 @@ where
         drop(eth_accounts);
         if let block::ComputationResult::Finished = block::produce(
             host,
-            base,
+            bk,
             &chain_configuration,
             &mut configuration,
             sequencer_pool_address,
@@ -495,13 +517,13 @@ where
             .unwrap();
     }
 
-    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
-    if is_revealed_storage(&base) {
+    if is_revealed_storage(bk.base()) {
         reveal_storage(
             &mut kernel_host,
-            &mut base,
+            &mut bk,
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
@@ -510,7 +532,7 @@ where
             }),
         );
     }
-    match run(&mut kernel_host, base) {
+    match run(&mut kernel_host, bk) {
         Ok(()) => (),
         Err(err) => {
             log!(Fatal, "The kernel produced an error: {:?}", err);
@@ -730,10 +752,10 @@ mod tests {
         }
 
         // run kernel twice to get to the stage with block creation:
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
 
         // verify outbox is not empty
         let outbox = host.host.outbox_at(level + 1);
@@ -823,11 +845,11 @@ mod tests {
         }
 
         // run kernel
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -981,11 +1003,11 @@ mod tests {
         }
 
         // run kernel
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        let base = crate::load_base(&mut host).unwrap();
-        run(&mut host, base).expect("Kernel error");
+        let bk = crate::load_keyspaces(&mut host).unwrap();
+        run(&mut host, bk).expect("Kernel error");
 
         host.host.outbox_at(level + 1)
     }

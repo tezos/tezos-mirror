@@ -26,6 +26,7 @@ use tezos_crypto_rs::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::evm_node_flag;
+use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
@@ -276,7 +277,7 @@ fn fetch_michelson_runtime_chain_id(
 
 pub fn fetch_tezosx_configuration(
     host: &mut impl StorageV1,
-    base: &impl KeySpace,
+    bk: &BlueprintKeyspaces<impl KeySpace>,
 ) -> TezosXChainConfig {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
@@ -284,8 +285,8 @@ pub fn fetch_tezosx_configuration(
     let evm_chain_id = fetch_evm_chain_id(host);
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
-    let experimental_features = ExperimentalFeatures::read_from_storage(base);
-    let debug_features = DebugFeatures::read_from_storage(base);
+    let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());
+    let debug_features = DebugFeatures::read_from_storage(bk.base());
     let michelson_chain_id = fetch_michelson_runtime_chain_id(host, evm_chain_id);
     TezosXChainConfig::create_config(
         evm_chain_id,

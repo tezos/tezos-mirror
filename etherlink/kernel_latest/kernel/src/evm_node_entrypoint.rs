@@ -21,7 +21,7 @@ use crate::{
     configuration::{fetch_common_config, fetch_tezosx_configuration},
     delayed_inbox::DelayedInbox,
     journal::{with_tezosx_journal, TezosXHashes},
-    load_base_or_log, sub_block,
+    load_base_or_log, load_keyspaces_or_log, sub_block,
     transaction::Transaction,
 };
 use mir::ast::{Entrypoint, IntoMicheline, Type};
@@ -45,7 +45,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_evm_runtime::runtime_keyspaces::{
-    RuntimeKeyspaces, TEZ_ACCOUNTS_KEYSPACE_NAME,
+    BlueprintKeyspaces, RuntimeKeyspaces, TEZ_ACCOUNTS_KEYSPACE_NAME,
 };
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
@@ -143,10 +143,10 @@ pub fn single_tx_execution_fn<Host>(host: &mut Host)
 where
     Host: StorageV1 + KeySpaceLoader + CoreStorage + WithGas,
 {
-    let Some(mut base) = load_base_or_log(host) else {
+    let Some(mut bk) = load_keyspaces_or_log(host) else {
         return;
     };
-    let tx_input = match sub_block::read_single_tx_execution_input(&mut base) {
+    let tx_input = match sub_block::read_single_tx_execution_input(bk.base_mut()) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(
@@ -164,7 +164,7 @@ where
             return;
         }
     };
-    match sub_block::handle_run_transaction(host, base, tx_input) {
+    match sub_block::handle_run_transaction(host, bk, tx_input) {
         Ok(()) => (),
         Err(err) => {
             log!(
@@ -190,10 +190,10 @@ pub fn assemble_block_fn<Host>(host: &mut Host)
 where
     Host: StorageV1 + CoreStorage + WasmHost + KeySpaceLoader,
 {
-    let Some(mut base) = load_base_or_log(host) else {
+    let Some(mut bk) = load_keyspaces_or_log(host) else {
         return;
     };
-    let assemble_block_input = match sub_block::read_assemble_block_input(&mut base) {
+    let assemble_block_input = match sub_block::read_assemble_block_input(bk.base_mut()) {
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(Error, "No assemble block input found in storage");
@@ -204,7 +204,7 @@ where
             return;
         }
     };
-    match sub_block::assemble_block(host, base, assemble_block_input) {
+    match sub_block::assemble_block(host, bk, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
             log!(Error, "Error while assembling block: {:?}", err);
@@ -225,17 +225,10 @@ where
     Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+    let Some(bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
-    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
-        Ok(rk) => rk,
-        Err(err) => {
-            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
-            return;
-        }
-    };
-    let input = match base.get(&TEZOSX_SIMULATION_INPUT_KEY) {
+    let input = match bk.base().get(&TEZOSX_SIMULATION_INPUT_KEY) {
         Some(bytes) => bytes,
         None => {
             log!(Error, "Tezos X simulation input not found");
@@ -285,7 +278,15 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = fetch_tezosx_configuration(rk.host_mut(), &base);
+    let chain_config = fetch_tezosx_configuration(&mut kernel_host, &bk);
+    let mut base = bk.into_base();
+    let mut rk = match RuntimeKeyspaces::init(&mut kernel_host) {
+        Ok(rk) => rk,
+        Err(err) => {
+            log!(Error, "Failed to init the runtime keyspaces: {:?}", err);
+            return;
+        }
+    };
     let blueprint_header = match read_current_blueprint_header(&base) {
         Ok(h) => h,
         Err(err) => {
@@ -687,15 +688,15 @@ where
     Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
-    let result = match base.get(&TEZOSX_RUN_CODE_INPUT_KEY) {
+    let result = match bk.base().get(&TEZOSX_RUN_CODE_INPUT_KEY) {
         // Reported through the error channel rather than leaving the node
         // to fail on an absent result key. `Host`, not `Execution`: the
         // caller's script is not what is wrong.
         None => RunCodeResult::HostError("run_code input not found".to_string()),
-        Some(payload) => run_code_from_input(&mut kernel_host, &base, &payload).into(),
+        Some(payload) => run_code_from_input(&mut kernel_host, &bk, &payload).into(),
     };
     let mut bytes = Vec::new();
     if let Err(err) = result.bin_write(&mut bytes) {
@@ -706,7 +707,7 @@ where
         );
         return;
     }
-    if let Err(err) = base.set(&TEZOSX_RUN_CODE_RESULT_KEY, bytes) {
+    if let Err(err) = bk.base_mut().set(&TEZOSX_RUN_CODE_RESULT_KEY, bytes) {
         log!(
             Error,
             "Error writing the Tezos X run_code result: {:?}",
@@ -786,7 +787,7 @@ fn run_code_params(
 /// the script.
 fn run_code_from_input<Host>(
     host: &mut Host,
-    base: &impl KeySpace,
+    bk: &BlueprintKeyspaces<impl KeySpace>,
     payload: &[u8],
 ) -> Result<tezos_execution::RunCodeOutput, tezos_execution::RunCodeError>
 where
@@ -797,11 +798,11 @@ where
     let input = RunCodeInput::nom_read_exact(payload)
         .map_err(|e| RunCodeError::Execution(format!("cannot decode the input: {e}")))?;
 
-    let chain_config = fetch_tezosx_configuration(host, base);
+    let chain_config = fetch_tezosx_configuration(host, bk);
 
     // Reading the block header is durable-storage work: a failure here is
     // infrastructure, not the caller's script being wrong.
-    let blueprint_header = read_current_blueprint_header(base).map_err(|err| {
+    let blueprint_header = read_current_blueprint_header(bk.base()).map_err(|err| {
         RunCodeError::Host(format!("cannot read the blueprint header: {err:?}"))
     })?;
 
@@ -1063,7 +1064,7 @@ mod tests {
             store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
             EVMBlockHeader,
         };
-        use crate::load_base;
+        use crate::load_keyspaces;
         use mir::ast::big_map::BigMapId;
         use mir::ast::Micheline;
         use mir::gas::Gas;
@@ -1169,9 +1170,9 @@ mod tests {
             ] {
                 host.store_write_all(&root, b"seed").unwrap();
             }
-            let mut base = load_base(&mut host).unwrap();
+            let mut bk = load_keyspaces(&mut host).unwrap();
             store_current_block_header(
-                &mut base,
+                bk.base_mut(),
                 &BlockHeader {
                     blueprint_header: BlueprintHeader {
                         number: 7.into(),
@@ -1202,7 +1203,7 @@ mod tests {
                 ..full_input()
             });
 
-            let result = run_code_from_input(&mut host, &base, &payload);
+            let result = run_code_from_input(&mut host, &bk, &payload);
 
             // The returned storage names the big map the run allocated.
             assert_eq!(
