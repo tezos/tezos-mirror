@@ -204,18 +204,15 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn bip_from_blueprint<Host>(
-    host: &Host,
+pub fn bip_from_blueprint(
+    evm_world_state: &impl KeySpace,
     chain_config: &TezosXChainConfig,
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
     blueprint: Blueprint,
-) -> BlockInProgress
-where
-    Host: StorageV1,
-{
-    let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
+) -> BlockInProgress {
+    let gas_price = chain_config.base_fee_per_gas(evm_world_state, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
         blueprint,
@@ -251,7 +248,7 @@ fn get_next_bip_info(base: &impl KeySpace) -> (U256, Timestamp, EVMBlockHeader) 
 #[cfg_attr(feature = "benchmark", inline(never))]
 fn build_next_bip_from_blueprints<Host>(
     host: &mut Host,
-    base: &mut impl KeySpace,
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     chain_config: &TezosXChainConfig,
     next_bip_number: U256,
     timestamp: Timestamp,
@@ -263,6 +260,7 @@ where
     Host: HostReveal + StorageV1 + WasmHost,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
+    let base = bk.base_mut();
     let (blueprint, size) =
         { read_blueprint(base, config, next_bip_number, timestamp, chain_header)? };
     log!(Benchmarking, "Size of blueprint: {}", size);
@@ -284,7 +282,7 @@ where
                 H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
             });
             let bip: BlockInProgress = bip_from_blueprint(
-                host,
+                bk.evm_world_state(),
                 chain_config,
                 next_bip_number,
                 chain_header.hash(),
@@ -341,7 +339,7 @@ where
             included_delayed_transactions,
         } => {
             crate::gas_price::register_block(
-                rk.host_mut(),
+                rk.evm_world_state_mut(),
                 block_in_progress.cumulative_execution_gas,
                 block_in_progress.timestamp,
                 block_in_progress.queue_length(),
@@ -577,7 +575,7 @@ where
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match build_next_bip_from_blueprints(
                     safe_host.host,
-                    bk.base_mut(),
+                    &mut bk,
                     chain_config,
                     next_bip_number,
                     timestamp,

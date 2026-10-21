@@ -329,7 +329,7 @@ where
         };
 
     let block_in_progress = bip_from_blueprint(
-        rk.host(),
+        rk.evm_world_state(),
         &chain_config,
         blueprint_header.number,
         H256::zero(),
@@ -830,7 +830,7 @@ where
 
     let registry = chain_config.init_registry();
     let block_in_progress = bip_from_blueprint(
-        host,
+        bk.evm_world_state(),
         &chain_config,
         blueprint_header.number,
         H256::zero(),

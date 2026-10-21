@@ -176,9 +176,11 @@ const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/michelson_to_evm_gas_multiplier");
 // Key to the DA fee per byte, inside the `/evm/world_state` keyspace.
 const EVM_DA_FEE_KEY: Key = Key::from_static(b"/fees/da_fee_per_byte");
-const BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
-const BACKLOG_TIMESTAMP_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
+// Key to the gas backlog, inside the `/evm/world_state` keyspace.
+const BACKLOG_KEY: Key = Key::from_static(b"/fees/backlog");
+// Key to the timestamp of the last block counted in the gas backlog, inside
+// the `/evm/world_state` keyspace.
+const BACKLOG_TIMESTAMP_KEY: Key = Key::from_static(b"/fees/last_timestamp");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
 ///
@@ -651,24 +653,36 @@ pub fn read_minimum_base_fee_per_gas(evm_world_state: &impl KeySpace) -> Option<
     evm_world_state.get_u256_le(&EVM_MINIMUM_BASE_FEE_PER_GAS_KEY)
 }
 
-pub fn read_backlog(host: &impl StorageV1) -> Result<u64, Error> {
-    read_u64_le(host, &BACKLOG_PATH).map_err(Error::from)
+/// Reads the gas backlog from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 8 bytes.
+pub fn read_backlog(evm_world_state: &impl KeySpace) -> Option<u64> {
+    evm_world_state.get_le(&BACKLOG_KEY)
 }
 
-pub fn store_backlog(host: &mut impl StorageV1, value: u64) -> Result<(), Error> {
-    write_u64_le(host, &BACKLOG_PATH, value).map_err(Error::from)
-}
-
-pub fn read_backlog_timestamp(host: &impl StorageV1) -> Result<u64, Error> {
-    read_u64_le(host, &BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
-}
-
-pub fn store_backlog_timestamp(
-    host: &mut impl StorageV1,
+/// Writes the gas backlog to the `/evm/world_state` keyspace.
+/// Errors when the write fails.
+pub fn store_backlog(
+    evm_world_state: &mut impl KeySpace,
     value: u64,
-) -> Result<(), Error> {
-    write_u64_le(host, &BACKLOG_TIMESTAMP_PATH, value)?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_le(&BACKLOG_KEY, value)
+}
+
+/// Reads the timestamp of the last block counted in the gas backlog from the
+/// `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 8 bytes.
+pub fn read_backlog_timestamp(evm_world_state: &impl KeySpace) -> Option<u64> {
+    evm_world_state.get_le(&BACKLOG_TIMESTAMP_KEY)
+}
+
+/// Writes the timestamp of the last block counted in the gas backlog to the
+/// `/evm/world_state` keyspace.
+/// Errors when the write fails.
+pub fn store_backlog_timestamp(
+    evm_world_state: &mut impl KeySpace,
+    value: u64,
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_le(&BACKLOG_TIMESTAMP_KEY, value)
 }
 
 /// Writes the minimum base fee per gas to the `/evm/world_state` keyspace.
@@ -1863,5 +1877,45 @@ mod tests {
             bytes
         );
         assert_eq!(super::read_da_fee(rk.evm_world_state()), Some(da_fee));
+    }
+
+    /// The gas backlog resolves to `/evm/world_state/fees/backlog`.
+    #[test]
+    fn backlog_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        super::store_backlog(rk.evm_world_state_mut(), 42).unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(b"/evm/world_state/fees/backlog"))
+                .unwrap(),
+            42u64.to_le_bytes()
+        );
+        assert_eq!(super::read_backlog(rk.evm_world_state()), Some(42));
+    }
+
+    /// The timestamp of the gas backlog resolves to
+    /// `/evm/world_state/fees/last_timestamp`.
+    #[test]
+    fn backlog_timestamp_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        super::store_backlog_timestamp(rk.evm_world_state_mut(), 1_000).unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/fees/last_timestamp"
+                ))
+                .unwrap(),
+            1_000u64.to_le_bytes()
+        );
+        assert_eq!(
+            super::read_backlog_timestamp(rk.evm_world_state()),
+            Some(1_000)
+        );
     }
 }

@@ -7,7 +7,7 @@
 use primitive_types::U256;
 use softfloat::F64;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 const CAPACITY: u64 = 27_000_000;
 const TARGET: u64 = CAPACITY / 2;
@@ -19,7 +19,7 @@ const ALPHA: F64 = softfloat::f64!(0.000_000_000_99);
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     bip_cumulative_execution_gas: U256,
     bip_timestamp: Timestamp,
     bip_queue_length: usize,
@@ -35,14 +35,14 @@ pub fn register_block(
         bip_cumulative_execution_gas.low_u64()
     };
 
-    update_backlog(host, cumulative_execution_gas, bip_timestamp)?;
+    update_backlog(evm_world_state, cumulative_execution_gas, bip_timestamp)?;
 
     Ok(())
 }
 
 /// Retrieve *base fee per gas*, according to the current timestamp.
 pub fn base_fee_per_gas(
-    host: &impl StorageV1,
+    evm_world_state: &impl KeySpace,
     timestamp: Timestamp,
     minimum_gas_price: U256,
 ) -> U256 {
@@ -50,15 +50,16 @@ pub fn base_fee_per_gas(
     let minimum_gas_price = minimum_gas_price.as_u64();
 
     let last_timestamp =
-        crate::storage::read_backlog_timestamp(host).unwrap_or(timestamp);
+        crate::storage::read_backlog_timestamp(evm_world_state).unwrap_or(timestamp);
 
-    let backlog = backlog_with_time_elapsed(host, 0, timestamp, last_timestamp);
+    let backlog =
+        backlog_with_time_elapsed(evm_world_state, 0, timestamp, last_timestamp);
 
     price_from_backlog(backlog, minimum_gas_price).into()
 }
 
 fn backlog_with_time_elapsed(
-    host: &impl StorageV1,
+    evm_world_state: &impl KeySpace,
     extra_gas: u64,
     current_timestamp: u64,
     last_timestamp: u64,
@@ -67,34 +68,34 @@ fn backlog_with_time_elapsed(
         .saturating_sub(last_timestamp)
         .saturating_mul(TARGET);
 
-    crate::storage::read_backlog(host)
+    crate::storage::read_backlog(evm_world_state)
         .unwrap_or_default()
         .saturating_sub(diff) // first take into account time elapsed
         .saturating_add(extra_gas) // then add the extra ticks just consumed
 }
 
 fn update_backlog(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     cumulative_execution_gas: u64,
     timestamp: Timestamp,
 ) -> anyhow::Result<()> {
     let timestamp = timestamp.as_u64();
 
-    let last_timestamp_opt = crate::storage::read_backlog_timestamp(host).ok();
+    let last_timestamp_opt = crate::storage::read_backlog_timestamp(evm_world_state);
     let last_timestamp = last_timestamp_opt.unwrap_or(timestamp);
 
     if last_timestamp_opt.is_none() || timestamp > last_timestamp {
-        crate::storage::store_backlog_timestamp(host, timestamp)?;
+        crate::storage::store_backlog_timestamp(evm_world_state, timestamp)?;
     }
 
     let backlog = backlog_with_time_elapsed(
-        host,
+        evm_world_state,
         cumulative_execution_gas,
         timestamp,
         last_timestamp,
     );
 
-    crate::storage::store_backlog(host, backlog)?;
+    crate::storage::store_backlog(evm_world_state, backlog)?;
 
     Ok(())
 }
@@ -233,7 +234,7 @@ mod test {
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
 
         register_block(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             bip.cumulative_execution_gas,
             bip.timestamp,
             bip.queue_length(),
@@ -246,7 +247,7 @@ mod test {
         let (min, gas_price) = load_gas_price(&mut rk);
         assert_eq!(min, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         assert_eq!(gas_price, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
-        let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
+        let gas_price_now = base_fee_per_gas(rk.evm_world_state(), timestamp.into(), min);
         assert_eq!(gas_price, gas_price_now);
 
         // register more blocks - now double tolerance
@@ -261,7 +262,7 @@ mod test {
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
         bip.number = 1.into();
         register_block(
-            rk.host_mut(),
+            rk.evm_world_state_mut(),
             bip.cumulative_execution_gas,
             bip.timestamp,
             bip.queue_length(),
@@ -269,7 +270,7 @@ mod test {
         .unwrap();
         bip.finalize_and_store(&mut rk, &dummy_block_constants, false)
             .unwrap();
-        let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
+        let gas_price_now = base_fee_per_gas(rk.evm_world_state(), timestamp.into(), min);
 
         let (min, gas_price) = load_gas_price(&mut rk);
         assert!(gas_price > min);
@@ -277,7 +278,7 @@ mod test {
 
         // after 10 seconds, reduces back to tolerance
         let gas_price_after_10 =
-            base_fee_per_gas(rk.host(), (timestamp + 10).into(), min);
+            base_fee_per_gas(rk.evm_world_state(), (timestamp + 10).into(), min);
         assert_eq!(
             gas_price_after_10,
             crate::fees::MINIMUM_BASE_FEE_PER_GAS.into()
