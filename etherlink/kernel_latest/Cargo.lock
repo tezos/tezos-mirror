@@ -1266,7 +1266,6 @@ dependencies = [
  "revm",
  "revm-etherlink",
  "rlp",
- "ruint",
  "sha3",
  "softfloat",
  "tezos-evm-logging-latest",
@@ -2833,9 +2832,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.17.2"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c141e807189ad38a07276942c6623032d3753c8859c146104ac2e4d68865945a"
+checksum = "2973657b5127d510e230f5c63d2d106af9c8f79393d8b9f4647323e8196bdde5"
 dependencies = [
  "alloy-rlp",
  "proptest",
