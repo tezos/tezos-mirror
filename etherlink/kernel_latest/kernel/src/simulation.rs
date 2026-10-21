@@ -399,7 +399,7 @@ impl Evaluation {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut())?;
         let minimum_base_fee_per_gas =
             crate::retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
         let da_fee = crate::retrieve_da_fee(rk.evm_world_state_mut())?;
@@ -844,7 +844,7 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut()).unwrap();
         let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(

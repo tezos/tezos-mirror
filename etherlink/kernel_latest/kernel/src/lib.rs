@@ -156,7 +156,13 @@ where
     log!(Debug, "Configuration: {}", configuration);
 
     enter_stage_one(bk.base_mut())?;
-    let res = fetch_blueprints(host, bk.base_mut(), smart_rollup_address, configuration);
+    let res = fetch_blueprints(
+        host,
+        bk.base_mut(),
+        smart_rollup_address,
+        configuration,
+        chain_config.get_evm_chain_id(),
+    );
     leave_stage_one(bk.base_mut())?;
     res
 }
@@ -681,7 +687,7 @@ mod tests {
                     b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
                 )
                 .unwrap();
-            store_evm_chain_id(rk.host_mut(), DUMMY_CHAIN_ID).unwrap();
+            store_evm_chain_id(rk.evm_world_state_mut(), DUMMY_CHAIN_ID).unwrap();
 
             // run level in order to initialize outbox counter (by SOL message)
             level = rk.host_mut().host.run_level(|_| ());

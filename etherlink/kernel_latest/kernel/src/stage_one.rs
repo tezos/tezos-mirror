@@ -10,7 +10,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::TezosXTransaction;
 use crate::configuration::{
-    fetch_evm_chain_id, CommonConfig, Configuration, ConfigurationMode, SequencerConfig,
+    CommonConfig, Configuration, ConfigurationMode, SequencerConfig,
 };
 use crate::delayed_inbox::DelayedInbox;
 use crate::event::Event;
@@ -18,6 +18,7 @@ use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
+use primitive_types::U256;
 use std::ops::Add;
 use tezos_evm_logging::{log, Level::*};
 
@@ -114,6 +115,7 @@ fn fetch_sequencer_blueprints<Host>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config_common: &CommonConfig,
     config_sequencer: &mut SequencerConfig,
+    evm_chain_id: U256,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost,
@@ -130,7 +132,7 @@ where
             // Check if there are timed-out transactions in the delayed inbox
             let timed_out = config_sequencer
                 .delayed_inbox
-                .first_has_timed_out(base, fetch_evm_chain_id(host))?;
+                .first_has_timed_out(base, evm_chain_id)?;
             if timed_out {
                 fetch_delayed_transactions(
                     base,
@@ -155,6 +157,7 @@ pub fn fetch_blueprints<Host>(
     base: &mut impl KeySpace,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config: &mut Configuration,
+    evm_chain_id: U256,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
     Host: StorageV1 + HostReveal + WasmHost,
@@ -166,6 +169,7 @@ where
             smart_rollup_address,
             &config.common,
             seq,
+            evm_chain_id,
         ),
         ConfigurationMode::Proxy => {
             fetch_proxy_blueprints(host, base, smart_rollup_address, &config.common)
@@ -175,6 +179,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::configuration::EVM_CHAIN_ID;
     use crate::load_base;
     use crate::{
         blueprint_storage::EVMBlockHeader,
@@ -390,8 +395,14 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -419,8 +430,14 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -441,8 +458,14 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -477,8 +500,14 @@ mod tests {
             .host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -507,8 +536,14 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
@@ -544,8 +579,14 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -620,8 +661,14 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -658,8 +705,14 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -697,8 +750,14 @@ mod tests {
         for message in dummy_delayed_transaction() {
             rk.host_mut().host.add_transfer(message, &metadata)
         }
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -724,8 +783,14 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -756,8 +821,14 @@ mod tests {
             ),
             &metadata,
         );
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         match read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -785,8 +856,14 @@ mod tests {
             dummy_deposit(conf.common.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -863,8 +940,14 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(rk.host_mut(), filled_slots);
 
-        fetch_blueprints(rk.host_mut(), base, DEFAULT_SR_ADDRESS, conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            base,
+            DEFAULT_SR_ADDRESS,
+            conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
     }
 
     #[test]
@@ -966,9 +1049,14 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut conf = dummy_proxy_configuration();
-        let status =
-            fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-                .expect("fetch failed");
+        let status = fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1005,9 +1093,14 @@ mod tests {
                 .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         }
         let mut conf = dummy_proxy_configuration();
-        let status =
-            fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-                .expect("fetch failed");
+        let status = fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1053,9 +1146,14 @@ mod tests {
             &metadata,
         );
 
-        let status =
-            fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-                .expect("fetch failed");
+        let status = fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         assert!(
             matches!(status, StageOneStatus::Reboot),
@@ -1092,8 +1190,14 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
 
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(rk.host_mut(), &mut base, DEFAULT_SR_ADDRESS, &mut conf)
-            .expect("fetch failed");
+        fetch_blueprints(
+            rk.host_mut(),
+            &mut base,
+            DEFAULT_SR_ADDRESS,
+            &mut conf,
+            U256::from(EVM_CHAIN_ID),
+        )
+        .expect("fetch failed");
 
         // Read back the timestamp that fetch_blueprints stored from
         // the info-per-level message.
