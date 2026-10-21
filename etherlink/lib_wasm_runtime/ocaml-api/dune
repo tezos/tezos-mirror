@@ -12,3 +12,11 @@
   (:standard)
   -w -66
   -open Tezos_layer2_irmin_context))
+
+(rule
+ (targets wasm_runtime_gen.ml wasm_runtime_gen.mli)
+ (mode fallback)
+ (action
+  (progn
+   (copy ../wasm_runtime_gen.ml wasm_runtime_gen.ml)
+   (copy ../wasm_runtime_gen.mli wasm_runtime_gen.mli))))

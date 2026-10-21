@@ -9,15 +9,16 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LINT");
     println!("cargo:rerun-if-env-changed=INSIDE_DUNE");
 
-    let dune = std::env::var("INSIDE_DUNE").is_err();
+    let inside_dune = std::env::var("INSIDE_DUNE").is_ok();
     let lint = std::env::var("LINT").is_ok();
 
-    if lint || dune {
-        ocaml_build::Sigs::new(format!(
-            "ocaml-api/{}wasm_runtime_gen.ml",
-            if lint { ".expected-" } else { "" }
-        ))
-        .generate()
-        .unwrap();
-    }
+    let output = if lint {
+        "ocaml-api/.expected-wasm_runtime_gen.ml"
+    } else if inside_dune {
+        // These are targets of the same Dune rule as the Rust library.
+        "wasm_runtime_gen.ml"
+    } else {
+        "ocaml-api/wasm_runtime_gen.ml"
+    };
+    ocaml_build::Sigs::new(output).generate().unwrap();
 }

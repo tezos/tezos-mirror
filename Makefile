@@ -578,12 +578,13 @@ clean-kernels:
 	$(MAKE) -f etherlink.mk clean
 	$(MAKE) -C src/riscv clean
 
-.PHONY: wasm_runtime_gen_files
-wasm_runtime_gen_files::
-	@echo 'Generating etherlink/lib_wasm_runtime OCaml API'
-	@cd etherlink/lib_wasm_runtime; cargo check
-
-octez-evm-node: wasm_runtime_gen_files
-
 evm-node-static:
 	@$(MAKE) PROFILE=static build OCTEZ_EXECUTABLES?="$(EVM_EXECUTABLES)"
+
+.PHONY: gen_wasm_runtime_bindings
+gen_wasm_runtime_bindings: BINDINGS_DIR := etherlink/lib_wasm_runtime/ocaml-api
+gen_wasm_runtime_bindings: BINDINGS_FILES := $(addprefix $(BINDINGS_DIR)/,wasm_runtime_gen.ml wasm_runtime_gen.mli)
+gen_wasm_runtime_bindings:
+	@rm -f $(BINDINGS_FILES)
+	@dune build $(BINDINGS_FILES)
+	@cp $(addprefix _build/default/,$(BINDINGS_FILES)) $(BINDINGS_DIR)/

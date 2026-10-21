@@ -20,6 +20,10 @@ shift
 export OCTEZ_RUST_DEPS_NO_WASMER_HEADERS=1
 export CARGO_TARGET_DIR
 
+# Dune may rerun this rule after removing its outputs while retaining the Cargo
+# cache. Ensure Cargo regenerates the OCaml bindings in that case as well.
+touch "$OUT_DIR/build.rs"
+
 # Build the Rust project.
 "$@" --release --locked --target-dir="$CARGO_TARGET_DIR"
 
