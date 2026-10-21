@@ -14,17 +14,26 @@ module Inbox = Sr.Inbox
 module Payloads = Sr.Inbox_merkelized_payload_hashes
 
 (* [context] is the context at the START of the block: it is not updated as
-   operations are applied. The proof check below is therefore only sound if no
-   earlier operation in the same block may have changed the game state it reads
-   — hence [seen_games]: at most one operation per refutation game per block. *)
-type block_validation_state = {
-  context : context;
-  seen_games : (Sr.Address.t * Game.Index.t) list;
-}
+   operations are applied. The refutation checks below therefore describe the
+   state a move will actually meet only as long as no earlier operation in the
+   block has moved that game.
+
+   That is what [check_refute_move_expected] buys, with no state to thread:
+   only the player the game expects at the start of the block may play a [Move]
+   on it. Every move [Sc_rollup_game_repr.play] accepts flips the turn, so once
+   one has applied, every other [Move] on that game fails the protocol's own
+   [Sc_rollup_wrong_turn] check before reaching [play]. At most one [Move] per
+   game per block can therefore change anything, and it is the one this context
+   describes.
+
+   [Start] is deliberately left alone: it has no turn to be out of, no check
+   here reads the state for it, and before the game exists both players may
+   legitimately open it — a race the plugin must not arbitrate. *)
+type block_validation_state = {context : context}
 
 let init_block_validation_state validation_state : block_validation_state =
   let context = Validate.get_initial_ctxt validation_state in
-  {context; seen_games = []}
+  {context}
 
 let shell_fail err : 'a Environment.Error_monad.shell_tzresult Lwt.t =
   Lwt.return_error [Environment.wrap_tzerror err]
@@ -32,7 +41,17 @@ let shell_fail err : 'a Environment.Error_monad.shell_tzresult Lwt.t =
 type Environment.Error_monad.error +=
   | Sc_rollup_proof_on_multi_tick_section_during_dissecting of Z.t
   | Sc_rollup_proof_on_missing_start_state_during_dissecting of Z.t
-  | Sc_rollup_multiple_operations_for_game_in_block of {
+  | Sc_rollup_refute_move_out_of_turn of {
+      rollup : Sr.Address.t;
+      stakers : Game.Index.t;
+      source : Sr.Staker.t;
+      expected : Sr.Staker.t;
+    }
+  | Sc_rollup_refute_move_on_absent_game of {
+      rollup : Sr.Address.t;
+      stakers : Game.Index.t;
+    }
+  | Sc_rollup_proof_on_game_started_in_same_operation of {
       rollup : Sr.Address.t;
       stakers : Game.Index.t;
     }
@@ -89,20 +108,53 @@ let () =
       | _ -> None)
     (fun tick -> Sc_rollup_proof_on_missing_start_state_during_dissecting tick) ;
   register_error_kind
-    `Permanent
-    ~id:
-      "block_validation_plugin.sc_rollup_multiple_operations_for_game_in_block"
-    ~title:"Multiple operations for the same refutation game in a block"
+    `Temporary
+    ~id:"block_validation_plugin.sc_rollup_refute_move_out_of_turn"
+    ~title:"Refutation Move from a player the game does not expect"
     ~description:
-      "A block contains more than one refutation operation targeting the same \
-       smart rollup refutation game. At most one refutation operation per game \
-       per block is allowed, so that refutation moves are always checked \
-       against an up-to-date game state."
+      "A block contains a smart rollup refutation Move from a player other \
+       than the one whose turn it was at the start of the block. The player \
+       may inject it again in a later block."
+    ~pp:(fun ppf (rollup, stakers, source, expected) ->
+      Format.fprintf
+        ppf
+        "Refutation Move from %a on the game between %a and %a on rollup %a, \
+         which expects a move from %a"
+        Sr.Staker.pp
+        source
+        Sr.Staker.pp
+        stakers.Game.Index.alice
+        Sr.Staker.pp
+        stakers.Game.Index.bob
+        Sr.Address.pp
+        rollup
+        Sr.Staker.pp
+        expected)
+    Data_encoding.(
+      obj4
+        (req "rollup" Sr.Address.encoding)
+        (req "stakers" Game.Index.encoding)
+        (req "source" Sr.Staker.encoding)
+        (req "expected" Sr.Staker.encoding))
+    (function
+      | Sc_rollup_refute_move_out_of_turn {rollup; stakers; source; expected} ->
+          Some (rollup, stakers, source, expected)
+      | _ -> None)
+    (fun (rollup, stakers, source, expected) ->
+      Sc_rollup_refute_move_out_of_turn {rollup; stakers; source; expected}) ;
+  register_error_kind
+    `Temporary
+    ~id:"block_validation_plugin.sc_rollup_refute_move_on_absent_game"
+    ~title:"Refutation Move on a game that does not exist yet"
+    ~description:
+      "A block contains a smart rollup refutation Move on a refutation game \
+       that did not exist at the start of the block. The player may inject it \
+       again in a later block."
     ~pp:(fun ppf (rollup, stakers) ->
       Format.fprintf
         ppf
-        "Multiple operations for the refutation game between %a and %a on \
-         rollup %a in the same block"
+        "Refutation Move on the game between %a and %a on rollup %a, which \
+         does not exist at the start of the block"
         Sr.Staker.pp
         stakers.Game.Index.alice
         Sr.Staker.pp
@@ -114,11 +166,42 @@ let () =
         (req "rollup" Sr.Address.encoding)
         (req "stakers" Game.Index.encoding))
     (function
-      | Sc_rollup_multiple_operations_for_game_in_block {rollup; stakers} ->
+      | Sc_rollup_refute_move_on_absent_game {rollup; stakers} ->
           Some (rollup, stakers)
       | _ -> None)
     (fun (rollup, stakers) ->
-      Sc_rollup_multiple_operations_for_game_in_block {rollup; stakers}) ;
+      Sc_rollup_refute_move_on_absent_game {rollup; stakers}) ;
+  register_error_kind
+    `Permanent
+    ~id:
+      "block_validation_plugin.sc_rollup_proof_on_game_started_in_same_operation"
+    ~title:"Refutation Proof move on a game opened by the same operation"
+    ~description:
+      "A block contains an operation that both opens a smart rollup refutation \
+       game and plays a Proof move in it. That move is applied to a game the \
+       block did not start from, so it cannot be checked against the state the \
+       block started from, and it is rejected."
+    ~pp:(fun ppf (rollup, stakers) ->
+      Format.fprintf
+        ppf
+        "Refutation Proof move on the game between %a and %a on rollup %a, \
+         opened by the same operation"
+        Sr.Staker.pp
+        stakers.Game.Index.alice
+        Sr.Staker.pp
+        stakers.Game.Index.bob
+        Sr.Address.pp
+        rollup)
+    Data_encoding.(
+      obj2
+        (req "rollup" Sr.Address.encoding)
+        (req "stakers" Game.Index.encoding))
+    (function
+      | Sc_rollup_proof_on_game_started_in_same_operation {rollup; stakers} ->
+          Some (rollup, stakers)
+      | _ -> None)
+    (fun (rollup, stakers) ->
+      Sc_rollup_proof_on_game_started_in_same_operation {rollup; stakers}) ;
   register_error_kind
     `Permanent
     ~id:"block_validation_plugin.invalid_double_baking_evidence"
@@ -221,20 +304,76 @@ let () =
       | Sc_rollup_inbox_proof_unreadable_cells {head} -> Some head | _ -> None)
     (fun head -> Sc_rollup_inbox_proof_unreadable_cells {head})
 
+(* The refutation games a [Start] in this operation opens.
+
+   A game can be destroyed and reopened under the same key inside one block --
+   [Sc_rollup_timeout] removes it, a [Start] creates a new one -- and the two
+   are then different games with the same stakers. [start_game] puts its own
+   sender on turn, so only that sender can play in the game it just opened, and
+   [1M] gives a manager one operation per block: the [Start] and the move that
+   exploits it are necessarily contents of the same operation. Looking no
+   further than this operation is therefore enough. *)
+let games_started_in_operation contents =
+  List.filter_map
+    (function
+      | Contents
+          (Manager_operation
+             {
+               source;
+               operation = Sc_rollup_refute {rollup; opponent; refutation};
+               _;
+             }) -> (
+          match refutation with
+          | Game.Start _ -> Some (rollup, Game.Index.make source opponent)
+          | Game.Move _ -> None)
+      | _ -> None)
+    contents
+
 let game_key_equal (rollup1, stakers1) (rollup2, stakers2) =
   Sr.Address.equal rollup1 rollup2
   && Sr.Staker.equal stakers1.Game.Index.alice stakers2.Game.Index.alice
   && Sr.Staker.equal stakers1.Game.Index.bob stakers2.Game.Index.bob
 
-(* Reject the operation if [seen_games] already contains an operation for the
-   game [stakers] on [rollup] in the current block; otherwise record it. *)
-let check_game_not_seen seen_games rollup stakers :
-    (Sr.Address.t * Game.Index.t) list Environment.Error_monad.shell_tzresult
-    Lwt.t =
-  if List.exists (game_key_equal (rollup, stakers)) seen_games then
-    shell_fail
-      (Sc_rollup_multiple_operations_for_game_in_block {rollup; stakers})
-  else Lwt_result_syntax.return ((rollup, stakers) :: seen_games)
+(* [check_refute_move_expected] accepts a refutation [Move] only from the player
+   the game expects at the start of the block.
+
+   Refusing the others costs them nothing they cannot recover: a move played out
+   of turn can only fail at application ([Sc_rollup_wrong_turn]), and its sender
+   may inject it again once the turn is theirs — one block out of the
+   [timeout_period_in_blocks] their clock is measured in.
+
+   What it buys is that the start-of-block [context] describes the state the
+   accepted move will meet. Every move [play] accepts flips the turn, so the
+   first one to apply makes every later [Move] on that game fail before [play];
+   only one of them can change anything, and it is the one checked here. *)
+let check_refute_move_expected context rollup stakers source :
+    unit Environment.Error_monad.shell_tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let*! find_result = Sr.Refutation_storage.find_game context rollup stakers in
+  match find_result with
+  | Error _ ->
+      (* The read itself failed. That is not a missing game or a missing
+         rollup, both of which answer [Ok None]. [game_move] makes the same
+         read, so this move cannot change the game either, and nothing it does
+         can mislead a check on a later operation. Leave it in the block. *)
+      return_unit
+  | Ok (_ctxt, None) ->
+      (* No game, hence no player to expect this move from. An earlier
+         operation in the block may still have opened one — [start_game] puts
+         its own sender on turn, and a batch can hold the [Start] and the
+         [Move] — in which case the move applies against a game this context
+         knows nothing about. *)
+      shell_fail (Sc_rollup_refute_move_on_absent_game {rollup; stakers})
+  | Ok (_ctxt, Some game) ->
+      let expected =
+        match game.Game.turn with
+        | Game.Alice -> stakers.Game.Index.alice
+        | Game.Bob -> stakers.Game.Index.bob
+      in
+      if Sr.Staker.equal expected source then return_unit
+      else
+        shell_fail
+          (Sc_rollup_refute_move_out_of_turn {rollup; stakers; source; expected})
 
 let find_section_around_choice dissection choice =
   let rec traverse = function
@@ -791,11 +930,12 @@ let check_execute_outbox_message context ~rollup ~output_proof =
   let*! _ = PVM.verify_output_proof output_proof in
   return_unit
 
-let check_block_operation {context; seen_games}
+let check_block_operation {context}
     ({protocol_data = Operation_data {contents; _}; _} as packed_op :
       packed_operation) :
     block_validation_state Environment.Error_monad.shell_tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let contents_list = Operation.to_list (Contents_list contents) in
   let current_level = (Level.current context).level in
   (* Reject un-appliable smart-rollup refutations (see
      [find_future_dal_refute]) before the protocol-specific checks below. *)
@@ -823,42 +963,63 @@ let check_block_operation {context; seen_games}
             in
             return_unit
         | _ -> return_unit)
-      (Operation.to_list (Contents_list contents))
+      contents_list
   in
   (* Only a batch with a refutation Proof move needs its index proofs. *)
   let index_proofs = lazy (index_proofs_of_batch packed_op) in
-  let* seen_games =
-    List.fold_left_es
-      (fun seen_games op ->
-        match op with
+  let games_started = games_started_in_operation contents_list in
+  let* () =
+    List.iter_es
+      (function
         | Contents
             (Manager_operation
                {
                  source;
                  operation = Sc_rollup_refute {rollup; opponent; refutation};
                  _;
-               }) ->
-            let stakers = Game.Index.make source opponent in
-            let* seen_games = check_game_not_seen seen_games rollup stakers in
-            let* () =
-              match refutation with
-              | Game.Move {step = Game.Proof proof; choice} ->
-                  check_refute_proof
-                    context
-                    ~rollup
-                    ~stakers
-                    ~choice
-                    ~index_proofs:(Lazy.force index_proofs)
-                    ~proof
-                  |> Lwt.map Environment.wrap_tzresult
-              | _ -> return_unit
-            in
-            return seen_games
+               }) -> (
+            match refutation with
+            | Game.Start _ ->
+                (* No state-dependent check reads the game for a [Start], and
+                   before the game exists both players may legitimately send
+                   one. *)
+                return_unit
+            | Game.Move {step; choice} -> (
+                let stakers = Game.Index.make source opponent in
+                let* () =
+                  check_refute_move_expected context rollup stakers source
+                in
+                match step with
+                | Game.Proof proof ->
+                    if
+                      List.exists
+                        (game_key_equal (rollup, stakers))
+                        games_started
+                    then
+                      (* This operation also opens the game, so the move is
+                         applied to one the start-of-block context never
+                         held. *)
+                      shell_fail
+                        (Sc_rollup_proof_on_game_started_in_same_operation
+                           {rollup; stakers})
+                    else
+                      (* The move is the one the game expects, and it is that
+                         same game, so the start-of-block state is the state it
+                         will be applied to. *)
+                      check_refute_proof
+                        context
+                        ~rollup
+                        ~stakers
+                        ~choice
+                        ~index_proofs:(Lazy.force index_proofs)
+                        ~proof
+                      |> Lwt.map Environment.wrap_tzresult
+                | Game.Dissection _ -> return_unit))
         | Contents
             (Double_baking_evidence {bh1 : Block_header.t; bh2 : Block_header.t})
           -> (
             match check_double_baking_evidence bh1 bh2 with
-            | Ok () -> return seen_games
+            | Ok () -> return_unit
             | Error err -> shell_fail err)
         | Contents
             (Manager_operation
@@ -868,8 +1029,7 @@ let check_block_operation {context; seen_games}
                    Increase_paid_storage {amount_in_bytes; destination = _};
                  _;
                }) ->
-            let* () = check_increase_paid_storage_amount amount_in_bytes in
-            return seen_games
+            check_increase_paid_storage_amount amount_in_bytes
         | Contents
             (Manager_operation
                {
@@ -897,9 +1057,8 @@ let check_block_operation {context; seen_games}
               if delegate_stake_from_slashed_unstake then
                 shell_fail
                   Delegate_cannot_stake_during_finalization_of_slashed_period
-              else return seen_games
-        | _ -> return seen_games)
-      seen_games
-      (Operation.to_list (Contents_list contents))
+              else return_unit
+        | _ -> return_unit)
+      contents_list
   in
-  return {context; seen_games}
+  return {context}
