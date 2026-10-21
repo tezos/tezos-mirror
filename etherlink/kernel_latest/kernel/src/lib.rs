@@ -158,7 +158,7 @@ where
     enter_stage_one(bk.base_mut())?;
     let res = fetch_blueprints(
         host,
-        bk.base_mut(),
+        bk,
         smart_rollup_address,
         configuration,
         chain_config.get_evm_chain_id(),

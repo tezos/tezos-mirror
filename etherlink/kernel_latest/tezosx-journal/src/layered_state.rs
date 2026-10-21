@@ -353,10 +353,8 @@ mod tests {
             )?)
         }
 
-        fn governance_sequencer_upgrade_exists(
-            &self,
-        ) -> Result<bool, PrecompileStateError> {
-            Ok(false)
+        fn governance_sequencer_upgrade_exists(&self) -> bool {
+            false
         }
 
         fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {

@@ -2078,4 +2078,42 @@ mod tests {
             Some(evm_chain_id)
         );
     }
+
+    /// The governance sequencer upgrade resolves to
+    /// `/evm/world_state/sequencer_upgrade`.
+    #[test]
+    fn governance_sequencer_upgrade_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let upgrade = crate::upgrade::SequencerUpgrade {
+            sequencer: tezos_smart_rollup_encoding::public_key::PublicKey::from_b58check(
+                "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+            )
+            .unwrap(),
+            pool_address: primitive_types::H160::from_low_u64_be(42),
+            activation_timestamp: tezos_smart_rollup_encoding::timestamp::Timestamp::from(
+                100i64,
+            ),
+        };
+
+        rk.evm_world_state_mut()
+            .set(
+                &revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_KEY,
+                rlp::encode(&upgrade),
+            )
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/sequencer_upgrade"
+                ))
+                .unwrap(),
+            rlp::encode(&upgrade).to_vec()
+        );
+        assert_eq!(
+            crate::upgrade::read_sequencer_upgrade(rk.evm_world_state()).unwrap(),
+            Some(upgrade)
+        );
+    }
 }

@@ -121,11 +121,7 @@ where
                 ));
             };
 
-            if context
-                .db()
-                .governance_sequencer_upgrade_exists()
-                .map_err(|e| e.into_with_remainder(gas))?
-            {
+            if context.db().governance_sequencer_upgrade_exists() {
                 return Err(CustomPrecompileError::Revert(
                     String::from(
                         "can't override an existing governance sequencer upgrade",

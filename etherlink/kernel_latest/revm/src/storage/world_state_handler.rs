@@ -32,9 +32,9 @@ pub const KT1_B58_SIZE: usize = 36;
 pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
 
-/// Path where waiting governance sequencer upgrades are stored.
-pub const GOVERNANCE_SEQUENCER_UPGRADE_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/sequencer_upgrade");
+/// Key of the waiting governance sequencer upgrade, inside the
+/// `/evm/world_state` keyspace.
+pub const GOVERNANCE_SEQUENCER_UPGRADE_KEY: Key = Key::from_static(b"/sequencer_upgrade");
 
 /// Path where the sequencer key is stored.
 pub const SEQUENCER_KEY_PATH: RefPath =
