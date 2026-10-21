@@ -15,7 +15,7 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -152,7 +152,7 @@ grafazos.build:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -187,7 +187,7 @@ oc.build:static-arm64-linux-released-binaries:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -233,7 +233,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -272,7 +272,7 @@ oc.docker:amd64:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -306,7 +306,7 @@ oc.docker:arm64:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -346,7 +346,7 @@ teztale.build-arm64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -394,7 +394,7 @@ teztale.build-x86_64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh

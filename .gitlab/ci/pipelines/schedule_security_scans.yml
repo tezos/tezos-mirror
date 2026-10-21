@@ -27,7 +27,7 @@ container_scanning_merge_reports:
   - container_scanning_tezos-ubuntu-24.04-master-18884dda
   - container_scanning_tezos-ubuntu-26.04-master-18884dda
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -55,7 +55,7 @@ container_scanning_slack_notification_tezos-tezos-latest:
   dependencies:
   - container_scanning_tezos-tezos-latest
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -78,7 +78,7 @@ container_scanning_slack_notification_tezos-tezos-master:
   dependencies:
   - container_scanning_tezos-tezos-master
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -101,7 +101,7 @@ container_scanning_slack_notification_tezos-tezos-octez-evm-node-latest:
   dependencies:
   - container_scanning_tezos-tezos-octez-evm-node-latest
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -122,7 +122,7 @@ container_scanning_tezos-debian-trixie-master-18884dda:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -155,7 +155,7 @@ container_scanning_tezos-tezos-latest:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -188,7 +188,7 @@ container_scanning_tezos-tezos-master:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -221,7 +221,7 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -254,7 +254,7 @@ container_scanning_tezos-ubuntu-22.04-master-18884dda:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -287,7 +287,7 @@ container_scanning_tezos-ubuntu-24.04-master-18884dda:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -320,7 +320,7 @@ container_scanning_tezos-ubuntu-26.04-master-18884dda:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -354,7 +354,7 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
