@@ -87,8 +87,14 @@ COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup etherlink tezos/etherlink
 # sccache configuration for Rust compilation caching (via GCS backend).
 # When SCCACHE_GCS_BUCKET is non-empty, RUSTC_WRAPPER=sccache is activated.
-# Authentication uses GCP Application Default Credentials (ADC) via the
-# instance metadata service, which requires --network=host on the RUN step.
+# Authentication: when the build is given the [sccache_gcs_key] secret (a GCP
+# service-account key file, mounted for the duration of the RUN step only and
+# never written to a layer), sccache uses it; otherwise it falls back to GCP
+# Application Default Credentials (ADC) via the instance metadata service.
+# Either way the RUN step needs --network=host (ADC and the cargo mirror).
+# The CI passes the secret on protected refs (scripts/ci/docker_release.sh):
+# there the bucket is the protected one, which ADC -- the node service
+# account -- may not read. On unprotected refs ADC is enough. See #8424.
 # All other ARGs have sensible defaults and are effectively constants.
 # Note: Docker ARGs are automatically available as environment variables
 # during RUN instructions, so sccache picks them up without explicit ENV.
@@ -114,9 +120,18 @@ ENV GIT_VERSION=${GIT_VERSION}
 # and installs only the delta when the base has drifted. Kept in the [release]
 # RUN rather than a separate one: with no layer cache a separate layer would
 # buy nothing.
+# The secret is mounted with uid=1000 because this step runs as [tezos]
+# (uid 1000 in the alpine-build image); BuildKit's default is root-only 0400.
 # hadolint ignore=DL3059
 RUN --network=host \
+    --mount=type=secret,id=sccache_gcs_key,uid=1000,mode=0400 \
     if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
+      if [ -r /run/secrets/sccache_gcs_key ]; then \
+        export SCCACHE_GCS_KEY_PATH=/run/secrets/sccache_gcs_key; \
+        echo "### sccache: using the mounted service-account key"; \
+      else \
+        echo "### sccache: no key mounted, using ADC"; \
+      fi; \
       if sccache --start-server 2>&1; then \
         export RUSTC_WRAPPER=sccache; \
         echo "### sccache enabled (bucket: ${SCCACHE_GCS_BUCKET})"; \

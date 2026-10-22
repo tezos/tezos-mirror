@@ -63,11 +63,30 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 # signed until [docker_sign.sh] runs -- so a consumer verifying the cosign
 # signature never trusts a tag that failed the smoke test.
 
+# On protected refs GCP_SCCACHE_BUCKET is the protected bucket, which only
+# protected-registry@ may read. The sccache server runs inside the image build
+# (build.Dockerfile), where the credentials activated in this job are out of
+# reach, so the key is handed to the build as a BuildKit secret: decoded to a
+# private temp file here, mounted for the compile step only, never written to
+# a layer, and removed when this script exits. On unprotected refs the bucket
+# is the unprotected one and Application Default Credentials (the node
+# service account) are enough, as for every other job. See #8424.
+sccache_key_file=""
+if [ -n "${GCP_SCCACHE_BUCKET:-}" ] && [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
+  sccache_key_file="${TMPDIR:-/tmp}/sccache_docker_sa.json"
+  umask 077
+  echo "${GCP_PROTECTED_SERVICE_ACCOUNT:?"Error: GCP_PROTECTED_SERVICE_ACCOUNT is empty on a protected ref."}" |
+    base64 -d > "$sccache_key_file"
+  umask 022
+  trap 'rm -f "$sccache_key_file"' EXIT
+  echo "### sccache: protected ref, passing the protected-registry@ key to the build as a secret"
+fi
+
 # --cargo-mirror is unconditional: this script only runs in the CI, where the
 # crates-io mirror proxy resolves. Local builds call create_docker_image.sh
 # directly and leave it off.
 # Disable the quote-warning from shellcheck so that we can pass the
-# optional --sccache-bucket argument.
+# optional --sccache-bucket / --sccache-key-file arguments.
 # shellcheck disable=SC2046
 ./scripts/create_docker_image.sh \
   --push \
@@ -81,6 +100,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   $(
     # GCP_SCCACHE_BUCKET is defined in the GitLab CI/CD settings.
     if [ -n "${GCP_SCCACHE_BUCKET:-}" ]; then echo "--sccache-bucket ${GCP_SCCACHE_BUCKET}"; fi
+    if [ -n "${sccache_key_file}" ]; then echo "--sccache-key-file ${sccache_key_file}"; fi
   )
 
 # Test bare image. [create_docker_image.sh --push] already published it to
