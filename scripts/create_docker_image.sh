@@ -25,6 +25,7 @@ variants="debug bare minimal"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 sccache_bucket=""
+sccache_key_file=""
 cargo_mirror=""
 # Full image references (name:tag) for the runtime and build-dependencies images
 # the distribution builds FROM; overridable via --runtime-image /
@@ -47,6 +48,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
   [--sccache-bucket <BUCKET> ]
+  [--sccache-key-file <PATH> ]
   [--cargo-mirror]
   [--push]
 
@@ -121,7 +123,16 @@ OPTIONS
         --sccache-bucket BUCKET
             GCS bucket for sccache Rust compilation caching. When set,
             RUSTC_WRAPPER=sccache is activated in build.Dockerfile,
-            caching Rust artifacts in GCS across builds.
+            caching Rust artifacts in GCS across builds. Without
+            --sccache-key-file, sccache authenticates with GCP Application
+            Default Credentials (the instance metadata service).
+
+        --sccache-key-file PATH
+            GCP service-account key file (JSON) for sccache. Handed to the
+            build as a BuildKit secret: mounted for the compile step only,
+            never written to a layer. The CI passes it on protected refs,
+            where the bucket cannot be read with Application Default
+            Credentials. Requires --sccache-bucket.
 
         --cargo-mirror
             Route crates.io through the CI mirror proxy. The proxy is an
@@ -144,6 +155,7 @@ CURRENT VALUES
     COMMIT_DATETIME: $commit_datetime
     COMMIT_TAG: $commit_tag
     SCCACHE_BUCKET: $sccache_bucket
+    SCCACHE_KEY_FILE: $sccache_key_file
     CARGO_MIRROR: $cargo_mirror
     PUSH: $push
 
@@ -162,7 +174,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,commit-datetime:,commit-tag:,sccache-bucket:,cargo-mirror,push -- "$@")
+  -l help,image-name:,image-version:,runtime-image:,build-deps-image:,executables:,commit-short-sha:,variants:,commit-datetime:,commit-tag:,sccache-bucket:,sccache-key-file:,cargo-mirror,push -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -217,6 +229,10 @@ while true; do
     shift
     sccache_bucket="$1"
     ;;
+  --sccache-key-file)
+    shift
+    sccache_key_file="$1"
+    ;;
   --cargo-mirror)
     cargo_mirror="true"
     ;;
@@ -244,6 +260,17 @@ while true; do
   esac
   shift
 done
+
+if [ -n "$sccache_key_file" ]; then
+  if [ -z "$sccache_bucket" ]; then
+    echo "--sccache-key-file requires --sccache-bucket. See --help." >&2
+    exit 1
+  fi
+  if [ ! -r "$sccache_key_file" ]; then
+    echo "sccache key file '$sccache_key_file' is not readable." >&2
+    exit 1
+  fi
+fi
 
 echo "Executables to include in Docker images:"
 for executable in $executables; do
@@ -295,6 +322,9 @@ fi
 # - [--allow network.host] is needed because build.Dockerfile has
 #   [RUN --network=host] (for sccache). Cf. the matching comment in
 #   build.Dockerfile.
+# - $SCCACHE_GCS_KEY_FILE, when set, becomes the [sccache_gcs_key] secret of
+#   the build target (docker-bake.hcl); BuildKit reads the file on the client
+#   side and exposes it to the compile step as a mount, never as a layer.
 # - CI_PIPELINE_ID / CI_PIPELINE_URL / CI_JOB_ID / CI_JOB_URL / CI_COMMIT_SHA
 #   are exported by GitLab CI and picked up by bake automatically.
 
@@ -332,6 +362,7 @@ IMAGE_NAME="$image_name" \
   GIT_VERSION="$commit_tag" \
   COMMIT_SHORT_SHA="$commit_short_sha" \
   SCCACHE_GCS_BUCKET="$sccache_bucket" \
+  SCCACHE_GCS_KEY_FILE="$sccache_key_file" \
   CARGO_MIRROR="$cargo_mirror" \
   PUSH="$push" \
   docker buildx bake \

@@ -33,6 +33,11 @@ variable "GIT_DATETIME" { default = "" }
 variable "GIT_VERSION" { default = "" }
 variable "COMMIT_SHORT_SHA" { default = "" }
 variable "SCCACHE_GCS_BUCKET" { default = "" }
+# Path to a GCP service-account key file, handed to build.Dockerfile as the
+# [sccache_gcs_key] BuildKit secret (mounted for the compile step only, never
+# written to a layer). Empty outside the CI and on unprotected refs, where
+# sccache authenticates with ADC instead. See #8424.
+variable "SCCACHE_GCS_KEY_FILE" { default = "" }
 # When non-empty, build.Dockerfile installs the CI crates-io mirror config.
 # The mirror is an in-cluster service, so this is empty outside the CI.
 variable "CARGO_MIRROR" { default = "" }
@@ -67,6 +72,7 @@ target "build" {
   # bake requires the entitlement to be declared per target; the CLI also
   # passes `--allow network.host` to confirm it non-interactively.
   entitlements = ["network.host"]
+  secret = SCCACHE_GCS_KEY_FILE != "" ? ["id=sccache_gcs_key,src=${SCCACHE_GCS_KEY_FILE}"] : []
   # Intermediate only: keep it in the build cache, do not export an image.
   output = ["type=cacheonly"]
 }
@@ -102,8 +108,10 @@ target "_variant" {
     "localhost/octez-build:local" = "target:build"
   }
   # The variant solve embeds the linked `build` target's LLB, which uses
-  # host networking, so the entitlement must be granted here too.
+  # host networking, so the entitlement must be granted here too. Same for
+  # the secret: it is consumed by the embedded build step.
   entitlements = ["network.host"]
+  secret = SCCACHE_GCS_KEY_FILE != "" ? ["id=sccache_gcs_key,src=${SCCACHE_GCS_KEY_FILE}"] : []
   labels = {
     "com.tezos.build-pipeline-id"    = CI_PIPELINE_ID
     "com.tezos.build-pipeline-url"   = CI_PIPELINE_URL
