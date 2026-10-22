@@ -1,29 +1,29 @@
 .PHONY: all
 all: manifest # Regenerate GitLab CI configuration.
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe
 
 .PHONY: verbose
 verbose: manifest # Regenerate GitLab CI configuration with verbose output.
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --verbose
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --verbose
 
 .PHONY: inline-source-info
 inline-source-info: manifest # Regenerate GitLab CI configuration, inlining source information in generated files.
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --inline-source-info
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --inline-source-info
 
 .PHONY: remove-extra-files
 remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any non-generated files.
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
 
 .PHONY: list-pipelines
 list-pipelines: manifest # List and describe the set of registered pipelines
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --list-pipelines
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --list-pipelines
 
 .PHONY: overview-pipelines
 overview-pipelines: manifest # List and describe the set of registered pipelines
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --overview-pipelines
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --overview-pipelines
 
 %.describe-pipeline: manifest # List and describe the set of registered pipelines
-	cd .. && . ./scripts/version.sh && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --describe-pipeline $*
+	cd .. && . ./ci/ci_version.sh && dune exec ci/bin/main.exe -- --describe-pipeline $*
 
 .PHONY: manifest
 manifest:
