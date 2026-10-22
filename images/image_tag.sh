@@ -2,6 +2,16 @@
 
 set -eu
 
+# This script and the images/ci/inputs file it reads are what is left of the
+# input-hash machinery. The images it tags -- the dynamic ci/* images -- are
+# gone, so its two remaining callers, ci/makefile and
+# devtools/testnet_experiment_tools/docker/create_docker_image.sh, compute a tag
+# for an image that no longer exists. Once both name the static alpine-* images
+# instead, this script and images/ci/inputs can be deleted. See #8383.
+#
+# The note lives here rather than in images/ci/inputs because every line of that
+# file has to be an existing path: see the sanity check below.
+
 images_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$images_dir")"
 
