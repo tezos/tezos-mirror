@@ -119,16 +119,11 @@ type tezos_job = {
   description : string option;
   stage : Stage.t;
   template : Gitlab_ci.Types.template option;
-  image_builders : tezos_job list;
 }
 
-type tezos_image =
-  | Internal of {
-      image : Gitlab_ci.Types.image;
-      builder_amd64 : tezos_job;
-      builder_arm64 : tezos_job option;
-    }
-  | External of Gitlab_ci.Types.image
+(* Images are built outside of the pipelines that use them (see the
+   [base_images] pipelines) and referenced by their path. *)
+type tezos_image = Gitlab_ci.Types.image
 
 let name_of_generic_job (generic_job : Gitlab_ci.Types.generic_job) =
   match generic_job with Job {name; _} | Trigger_job {name; _} -> name
@@ -272,10 +267,6 @@ module Pipeline = struct
   let default = function
     | Pipeline _ -> default_config
     | Child_pipeline {default; _} -> default
-
-  let set_jobs jobs = function
-    | Child_pipeline pl -> Child_pipeline {pl with jobs}
-    | Pipeline pl -> Pipeline {pl with jobs}
 
   let path : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
@@ -426,33 +417,6 @@ module Pipeline = struct
             dependency ) ;
     ()
 
-  (* Pre-process the pipeline:
-
-     - Find usage of internal images. For each internal image
-       dependency, add the appropriate builder job to the pipeline. *)
-  let add_image_builders (pipeline : t) =
-    (* Note: one job can create many different image paths.
-
-       If two different image paths are required that are built by the
-       same job, then make sure it is only include once. *)
-    let image_builders =
-      (* TODO: we currently do not support image_builders that use internal images *)
-      (* [image_builder_jobs] maps image builder job names to the actual job. *)
-      let image_builder_jobs : (string, tezos_job) Hashtbl.t =
-        Hashtbl.create 5
-      in
-      let image_dependencies =
-        List.concat_map
-          (fun {image_builders; _} -> image_builders)
-          (jobs pipeline)
-      in
-      ( Fun.flip List.iter image_dependencies @@ fun builder ->
-        let builder_name = name_of_tezos_job builder in
-        Hashtbl.replace image_builder_jobs builder_name builder ) ;
-      image_builder_jobs |> Hashtbl.to_seq_values |> List.of_seq
-    in
-    set_jobs (image_builders @ jobs pipeline) pipeline
-
   (* Splits the set of registered non-child pipelines into workflow
      rules and includes. Used by the function [write]. *)
   let workflow_includes () :
@@ -517,7 +481,6 @@ module Pipeline = struct
     Hashtbl.to_seq_keys templates |> List.of_seq
 
   let write_registered_pipeline pipeline =
-    let pipeline = add_image_builders pipeline in
     let jobs = jobs pipeline in
     let name = name pipeline in
     if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
@@ -609,7 +572,6 @@ module Pipeline = struct
     open_vbox 0 ;
     Printf.printf "Registered pipeline types:\n\n" ;
     ( Fun.flip List.iter pipelines @@ fun pipeline ->
-      let pipeline = add_image_builders pipeline in
       let jobs = jobs pipeline in
       let name = name pipeline in
       let filename = path ~name in
@@ -680,7 +642,6 @@ module Pipeline = struct
       List.find_opt (fun pipeline -> name pipeline = pipeline_name) pipelines
     with
     | Some pipeline ->
-        let pipeline = add_image_builders pipeline in
         let jobs = jobs pipeline in
         let name = name pipeline in
         let filename = path ~name in
@@ -719,64 +680,10 @@ end
 module Image = struct
   type t = tezos_image
 
-  (* Track image builders to avoid name collisions. *)
-  let image_builders : (string, tezos_job) Hashtbl.t = Hashtbl.create 5
+  let mk_external ~image_path : t = Image image_path
 
-  let mk_external ~image_path : t = External (Image image_path)
-
-  (** Register internal image for [image_path] built by [image_builder_amd64].
-
-      Optionally, a builder for an arm64 version of the image can be
-      registered by supplying [image_builder_arm64]. If
-      [image_builder_arm64] is supplied, then it must have a distinct
-      name from [image_builder_amd64].
-
-      Note: the name of the image builder(s) must uniquely identify the
-      job definition. If two image builders with the same name but
-      differing job definitions (as per polymorphic comparison of the
-      underlying {!Gitlab_ci.Types.job}) are registered, then this
-      function throws a run-time error. *)
-  let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
-    let image =
-      Internal
-        {
-          builder_amd64 = image_builder_amd64;
-          builder_arm64 = image_builder_arm64;
-          image = Image image_path;
-        }
-    in
-    let register_builder image_builder =
-      let builder_name = name_of_tezos_job image_builder in
-      match Hashtbl.find_opt image_builders builder_name with
-      | None -> Hashtbl.add image_builders builder_name image_builder
-      | Some image_builder' when image_builder = image_builder' -> ()
-      | Some _ ->
-          failwith
-            "The image builder '%s' for image '%s' was registered twice with \
-             differing definitions."
-            builder_name
-            image_path
-    in
-    (match
-       ( name_of_tezos_job image_builder_amd64,
-         Option.map name_of_tezos_job image_builder_arm64 )
-     with
-    | name, Some name' when name = name' ->
-        failwith
-          "The the image builders for multi-arch image '%s' must have distinct \
-           names (both are called '%s')."
-          image_path
-          name
-    | _ -> ()) ;
-    register_builder image_builder_amd64 ;
-    Option.iter register_builder image_builder_arm64 ;
-    image
-
-  let image = function Internal {image; _} | External image -> image
-
-  let pp ppf img =
-    match image img with
-    | Image image_name -> Format.fprintf ppf "%s" image_name
+  let pp ppf (img : t) =
+    match img with Image image_name -> Format.fprintf ppf "%s" image_name
 end
 
 module Changeset = struct
@@ -930,21 +837,6 @@ let validate_template_image ~name template image =
         name
   | None, _ | _, None -> ()
 
-(** Reject an [Internal] image on a tag whose architecture is not statically
-    known. *)
-let validate_image_arch ~name (image : tezos_image option)
-    (arch : Runner.Arch.t option) (tag : Runner.Tag.t) =
-  match (image, arch) with
-  | Some (Internal {image = Image image_path; _}), None ->
-      failwith
-        "[job] the job '%s' has tag '%s' whose architecture is not statically \
-         known cannot use the image '%s' since it is Internal. Set a static \
-         tag or use an external image."
-        name
-        (Runner.Tag.show tag)
-        image_path
-  | _ -> ()
-
 (** Reject margebot merging a configuration that relies on development
     runners. *)
 let validate_margebot ~name tag =
@@ -1027,8 +919,8 @@ let select_runner_tag ~name ~dev_infra ~arch ~cpu ~storage
 
 let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
-    ?(dependencies = Dependent []) ?(image_dependencies = []) ?services
-    ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
+    ?(dependencies = Dependent []) ?services ?variables
+    ?(rules : Gitlab_ci.Types.job_rule list option)
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
     ?interruptible_runner ?git_strategy ?retry ?parallel ?environment
@@ -1047,49 +939,9 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       tag
   in
   validate_rules ~name rules ;
-  let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
-  validate_image_arch ~name image arch tag ;
   let tags = Some [Runner.Tag.show tag] in
   validate_parallel ~name parallel ;
-  let image_dependencies =
-    (match image with
-    | Some (Internal image) -> [Internal image]
-    | Some (External _) | None -> [])
-    @ image_dependencies
-  in
   validate_template_image ~name template image ;
-  let dependencies, image_builders =
-    ( Fun.flip List.iter image_dependencies @@ function
-      | External (Image image_path) ->
-          failwith
-            "It doesn't make any sense for job %s to depend on the external \
-             image %s"
-            name
-            image_path
-      | Internal _ -> () ) ;
-    let add_builder (dependencies, image_builders) = function
-      | External _ -> (dependencies, image_builders)
-      | Internal {builder_amd64; builder_arm64; _} ->
-          let builder =
-            match (arch, builder_arm64) with
-            | Some Amd64, _ -> builder_amd64
-            | Some Arm64, Some builder_arm64 -> builder_arm64
-            | Some Arm64, None ->
-                failwith "requested arm64 image for which there is no builder"
-            | None, _ -> failwith "unknown arch"
-          in
-          let image_builders = builder :: image_builders in
-          let dependencies =
-            match dependencies with
-            | Staged artifact_dependencies ->
-                Staged (builder :: artifact_dependencies)
-            | Dependent dependencies ->
-                Dependent (Artifacts builder :: dependencies)
-          in
-          (dependencies, image_builders)
-    in
-    List.fold_left add_builder (dependencies, []) image_dependencies
-  in
   let needs, dependencies = resolve_dependencies name dependencies in
   let variables =
     match git_strategy with
@@ -1122,7 +974,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
            else before_script);
       cache;
       id_tokens;
-      image = Option.map Image.image image;
+      image;
       interruptible;
       needs;
       (* Note that [dependencies] is always filled, because we want to
@@ -1145,14 +997,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       environment;
     }
   in
-  {
-    job = Job job;
-    source_position = __POS__;
-    description;
-    stage;
-    image_builders;
-    template;
-  }
+  {job = Job job; source_position = __POS__; description; stage; template}
 
 (* Convenience retry policies used across job builders. *)
 let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
@@ -1227,9 +1072,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
    manual and non-manual jobs. *)
 module Stages = struct
   let start = Stage.register "start"
-
-  (* All automatic image creation is done in the stage [images]. *)
-  let images = Stage.register "images"
 
   let sanity = Stage.register "sanity"
 
@@ -1427,52 +1269,6 @@ module Base_images = struct
   let alpine_e2etest = mk_alpine_ci_img "e2etest"
 end
 
-let opt_var name f = function Some value -> [(name, f value)] | None -> []
-
-(** {2 Job makers} *)
-
-(** Helper to create jobs that uses the Docker daemon.
-
-    It sets the appropriate image. Furthermore, it:
-    - activates the Docker daemon as a service;
-    - sets up authentification with Docker registries
-    in the job's [before_script] section.
-
-    If [ci_docker_hub] is set to [true], then the job will
-    authenticate with Docker Hub provided the environment variable
-    [CI_DOCKER_AUTH] contains the appropriate credentials. *)
-let job_docker_authenticated ?ci_docker_hub ?artifacts ?(variables = []) ?rules
-    ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
-    ?allow_failure ?parallel ?environment ?timeout ?(retry = dind_retry)
-    ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
-  let docker_version = Base_images.docker_version in
-  job
-    ?rules
-    ~dependencies
-    ?image_dependencies
-    ?artifacts
-    ?arch
-    ?storage
-    ?tag
-    ?allow_failure
-    ?parallel
-    ?environment
-    ?timeout
-    ~retry
-    ?description
-    ?dev_infra
-    ~__POS__
-    ~image:Base_images.alpine_docker_ci
-    ~variables:
-      ([("DOCKER_VERSION", docker_version)]
-      @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
-      @ variables)
-    ~before_script:["./scripts/ci/docker_initialize.sh"]
-    ~services:[{name = Base_images.dind_service}]
-    ~stage
-    ~name
-    script
-
 module Cargo = struct
   let home =
     (* Note:
@@ -1498,80 +1294,6 @@ module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
   module Base_images = Base_images
-
-  (* Internal images are built in the stage {!Stages.images}. *)
-  let stage = Stages.images
-
-  module CI = struct
-    (* The job that builds the CI images.
-       This job is automatically included in any pipeline that uses any of these images. *)
-    let job_docker_ci arch ?storage () =
-      let variables =
-        Some
-          [
-            ("ARCH", Runner.Arch.show_uniform arch);
-            ("GCLOUD_VERSION", "543.0.0");
-          ]
-      in
-      job_docker_authenticated
-        ?variables
-        ~__POS__
-        ~arch
-        ?storage
-        ~stage
-        ~timeout:(Minutes 90)
-        ~name:("oc.docker:ci:" ^ Runner.Arch.show_uniform arch)
-        ~description:
-          ("Build internal CI images for " ^ Runner.Arch.show_uniform arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
-        ["./images/ci_create_ci_images.sh"]
-
-    let mk_ci_image ~image_path =
-      Image.mk_internal
-        ~image_builder_amd64:(job_docker_ci Amd64 ())
-        ~image_builder_arm64:(job_docker_ci Arm64 ~storage:Ramfs ())
-        ~image_path
-        ()
-
-    (* To use static images from the protected registry. *)
-    let mk_ci_image_master name =
-      Image.mk_external
-        ~image_path:
-          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/" ^ name ^ ":amd64--master")
-
-    (* Reuse the same image_builder job [job_docker_ci] for all
-       the below images, since they're all produced in that same job.
-
-       Depending on any of these images ensures that the job
-       [job_docker_ci] is included exactly once in the pipeline. *)
-    let runtime =
-      mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
-
-    let monitoring =
-      mk_ci_image ~image_path:"${ci_image_name}/monitoring:${ci_image_tag}"
-
-    let prebuild =
-      mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
-
-    let build = mk_ci_image ~image_path:"${ci_image_name}/build:${ci_image_tag}"
-
-    let test = mk_ci_image ~image_path:"${ci_image_name}/test:${ci_image_tag}"
-
-    let e2etest =
-      mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
-
-    let release_page =
-      mk_ci_image ~image_path:"${ci_image_name}/release-page:${ci_image_tag}"
-
-    (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
-    let prebuild_master = mk_ci_image_master "prebuild"
-
-    let build_master = mk_ci_image_master "build"
-
-    let test_master = mk_ci_image_master "test"
-  end
 end
 
 let docker_release_script =

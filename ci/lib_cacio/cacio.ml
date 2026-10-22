@@ -218,7 +218,6 @@ type job = {
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   timeout : Gitlab_ci.Types.time_interval option;
-  image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
   id_tokens : Gitlab_ci.Types.id_tokens option;
   environment : Gitlab_ci.Types.environment option;
@@ -618,7 +617,6 @@ let convert_graph ?(interruptible_pipeline = true)
                     allow_failure;
                     retry;
                     timeout;
-                    image_dependencies;
                     services;
                     id_tokens;
                     environment;
@@ -718,7 +716,6 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?storage
                 ?tag
                 ?image
-                ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?parallel
                 ?environment
@@ -808,7 +805,6 @@ module type COMPONENT_API = sig
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
-    ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
     ?script:string list ->
@@ -1089,8 +1085,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(force_if_label = []) ?(needs = []) ?parallel ?environment
       ?(variables = []) ?artifacts ?(cache = []) ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
-      name =
+      ?timeout ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     let before_script = [] in
@@ -1234,7 +1229,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       allow_failure;
       retry;
       timeout;
-      image_dependencies;
       services;
       id_tokens;
       environment;

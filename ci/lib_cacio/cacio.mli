@@ -195,10 +195,6 @@ module type COMPONENT_API = sig
       If [dune_cache] is [true], the resulting job uses dune's cache,
       stored in GitLab's cache. The cache is per job name. Default is [false].
 
-      [?image_dependencies] is temporary,
-      it will be removed once the image feature is implemented in Cacio.
-      See the Future work section for more details.
-
       [?script] is used to specify the job's script.
 
       See {!Tezos_ci.job} for information about other arguments.
@@ -232,7 +228,6 @@ module type COMPONENT_API = sig
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
-    ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
     ?script:string list ->
@@ -542,8 +537,3 @@ val output_tezt_job_list : string -> unit
     (renamed into [new_pipeline]) and registered by {!close} like global
     pipelines, which would unify the two code paths. The value of doing so is
     low though: it would not make Cacio more modular. *)
-
-(** The function [job] currently takes [?image_dependencies] as an optional argument.
-    This is temporary and should be replaced by ~needs:[job_to_build_image]
-    once all the images have been migrated to Cacio.
-    In that case, Cacio would add the [job_to_build_image] in the pipeline, as a dependency. *)

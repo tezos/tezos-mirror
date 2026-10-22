@@ -1,6 +1,4 @@
 images/ci
-images/create_ci_images.sh
-images/ci_create_ci_images.sh
 pyproject.toml
 poetry.lock
 opam/virtual/octez-deps.opam.locked

@@ -7,9 +7,11 @@
 
 module CI = Cacio.Shared
 
-(* This constant is meant to replace similar constants that are defined elsewhere,
-   in particular the one in [job_docker_authenticated] in [ci/lib_tezos_ci/tezos_ci.ml].
-   During the migration to Cacio however, those other instances will continue to exist. *)
+(* Short name for the Docker version these jobs run under. It is defined by the
+   [alpine-docker-ci] base image they use: the DOCKER_VERSION they pass, that
+   image's tag and the [dind] service built from it all have to agree, which is
+   why they share one definition (see [Base_images] in [tezos_ci.ml]). Also
+   read as [Docker.version] by [debian_repository.ml] and [release_tag.ml]. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
