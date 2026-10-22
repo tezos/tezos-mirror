@@ -1,4 +1,4 @@
-use alloy_sol_types::{sol, SolError, SolInterface, SolValue};
+use alloy_sol_types::{abi::Decoder, sol, SolCall, SolError, SolInterface, SolValue};
 use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use http::header::HeaderMap;
 use primitive_types::U256 as PU256;
@@ -950,6 +950,46 @@ where
     )
 }
 
+/// Position, in the argument head of `call`, of the offset to `headers`: the
+/// second argument, after `url`, with one 32-byte word per argument.
+const CALL_HEADERS_HEAD_OFFSET: usize = 32;
+
+/// Reject a `call` whose `headers` array is not empty. Only the offset to the
+/// array and its length word are read, so this costs nothing whatever the
+/// calldata looks like, and the full decode that follows never has entries to
+/// copy: aliased offsets on a real array of dynamic elements would
+/// materialise an owned copy per entry before any gas is charged.
+///
+/// `args` is the calldata without its selector.
+fn reject_user_supplied_headers(args: &[u8]) -> Result<(), alloy_sol_types::Error> {
+    let decoder = Decoder::new(args);
+    let headers_offset = decoder.peek_offset_at(CALL_HEADERS_HEAD_OFFSET)?;
+    let headers_count = decoder.peek_offset_at(headers_offset)?;
+    if headers_count != 0 {
+        return Err(alloy_sol_types::Error::custom(
+            "call: user-supplied headers are not supported",
+        ));
+    }
+    Ok(())
+}
+
+/// Decode the gateway calldata. A `call` carrying user-supplied headers is
+/// rejected before it is decoded.
+//
+// TODO: L2-2216
+// Re-opening user-supplied headers requires a bounded decode of the headers
+// array (strict ABI decoding and/or a decoded-size cap) first.
+fn decode_gateway_calldata(
+    calldata: &[u8],
+) -> Result<RuntimeGatewayCalls, alloy_sol_types::Error> {
+    if let Some((selector, args)) = calldata.split_first_chunk::<4>() {
+        if *selector == RuntimeGateway::callCall::SELECTOR {
+            reject_user_supplied_headers(args)?;
+        }
+    }
+    RuntimeGatewayCalls::abi_decode(calldata)
+}
+
 pub(crate) fn runtime_gateway_precompile<'j, 'host, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
@@ -989,7 +1029,7 @@ where
         ));
     }
 
-    let Ok(function_call) = RuntimeGatewayCalls::abi_decode(calldata) else {
+    let Ok(function_call) = decode_gateway_calldata(calldata) else {
         return Err(CustomPrecompileError::Revert(
             String::from("invalid input encoding"),
             gas,
@@ -2173,34 +2213,89 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_call_abi_decode() {
-        use alloy_sol_types::SolCall;
-
-        let call = RuntimeGateway::callCall {
+    fn encoded_call(headers: Vec<(String, String)>) -> Vec<u8> {
+        RuntimeGateway::callCall {
             url: "http://michelson/KT1abc/transfer".to_string(),
-            headers: vec![(
-                "Content-Type".to_string(),
-                "application/micheline".to_string(),
-            )],
+            headers,
             body: vec![0x01, 0x02].into(),
             method: 1,
-        };
-        let encoded = call.abi_encode();
+        }
+        .abi_encode()
+    }
 
-        // Decode via the dispatcher
-        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+    #[test]
+    fn test_decode_call_accepts_empty_headers() {
+        let decoded = decode_gateway_calldata(&encoded_call(vec![])).unwrap();
         match decoded {
-            RuntimeGatewayCalls::call(decoded_call) => {
-                assert_eq!(decoded_call.url, "http://michelson/KT1abc/transfer");
-                assert_eq!(decoded_call.headers.len(), 1);
-                assert_eq!(decoded_call.headers[0].0, "Content-Type");
-                assert_eq!(decoded_call.headers[0].1, "application/micheline");
-                assert_eq!(decoded_call.body.as_ref(), &[0x01, 0x02]);
-                assert_eq!(decoded_call.method, 1);
+            RuntimeGatewayCalls::call(c) => {
+                assert_eq!(c.url, "http://michelson/KT1abc/transfer");
+                assert!(c.headers.is_empty());
+                assert_eq!(c.body.as_ref(), &[0x01, 0x02]);
+                assert_eq!(c.method, 1);
             }
             _ => panic!("expected call variant"),
         }
+    }
+
+    #[test]
+    fn test_decode_call_rejects_non_empty_headers() {
+        let headers = vec![("Content-Type".to_string(), "text/plain".to_string())];
+        assert!(decode_gateway_calldata(&encoded_call(headers)).is_err());
+    }
+
+    #[test]
+    fn test_decode_call_rejects_truncated_calldata() {
+        let calldata = encoded_call(vec![]);
+        // Cut inside the argument head, then right after the selector.
+        assert!(decode_gateway_calldata(&calldata[..4 + 40]).is_err());
+        assert!(decode_gateway_calldata(&calldata[..4]).is_err());
+    }
+
+    #[test]
+    fn test_decode_call_rejects_aliased_headers() {
+        // Every header entry points at the same (name, value) tuple, which
+        // holds a 64 KiB value: a real array would decode to 2 * N owned
+        // copies of the region.
+        let n = 256usize;
+        let region = 64 * 1024;
+        let mut data = encoded_call(vec![]);
+        // Layout after the selector: url offset, headers offset, body offset,
+        // method, then the tails. Rebuild the tail by hand.
+        let mut args: Vec<u8> = Vec::new();
+        let word = |v: usize| {
+            let mut w = [0u8; 32];
+            w[24..].copy_from_slice(&(v as u64).to_be_bytes());
+            w
+        };
+        let pad = |len: usize| len.div_ceil(32) * 32;
+        // head: url, headers, body, method
+        let url_off = 4 * 32;
+        let url_len = 0;
+        let headers_off = url_off + 32;
+        // headers array: length n, n offsets (relative to after the length)
+        let arr_size = 32 + n * 32;
+        let tuple_off_in_arr = n * 32; // all share one tuple placed after offsets
+                                       // tuple: (string name, string value): two offsets, then two strings
+        let tuple_size = 2 * 32 + 32 + 32 + pad(region);
+        let body_off = headers_off + arr_size + tuple_size;
+        args.extend(word(url_off));
+        args.extend(word(headers_off));
+        args.extend(word(body_off));
+        args.extend(word(1));
+        args.extend(word(url_len));
+        args.extend(word(n));
+        for _ in 0..n {
+            args.extend(word(tuple_off_in_arr));
+        }
+        args.extend(word(2 * 32)); // name offset
+        args.extend(word(2 * 32 + 32)); // value offset
+        args.extend(word(0)); // name length
+        args.extend(word(region)); // value length
+        args.extend(vec![0u8; pad(region)]);
+        args.extend(word(0)); // body length
+        data.truncate(4);
+        data.extend(args);
+        assert!(decode_gateway_calldata(&data).is_err());
     }
 
     #[test]
