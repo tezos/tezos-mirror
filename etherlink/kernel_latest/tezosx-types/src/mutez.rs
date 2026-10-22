@@ -9,6 +9,10 @@
 
 use std::fmt;
 
+use tezos_data_encoding::enc::{BinResult, BinWriter};
+use tezos_data_encoding::encoding::{Encoding, HasEncoding};
+use tezos_data_encoding::nom::error::{BoundedEncodingKind, DecodeError};
+use tezos_data_encoding::nom::{NomReader, NomResult};
 use tezos_data_encoding::types::Narith;
 use thiserror::Error;
 
@@ -121,6 +125,34 @@ impl From<Mutez> for i64 {
     }
 }
 
+/// Encoded as a `Narith`, the encoding of a mutez amount on L1.
+impl HasEncoding for Mutez {
+    fn encoding() -> Encoding {
+        Encoding::N
+    }
+}
+
+/// Decodes a `Narith`, and fails on a value outside the mutez domain.
+impl NomReader<'_> for Mutez {
+    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
+        let (rest, narith) = Narith::nom_read(bytes)?;
+        match Mutez::try_from(&narith) {
+            Ok(mutez) => Ok((rest, mutez)),
+            Err(_) => Err(nom::Err::Error(DecodeError::limit(
+                bytes,
+                BoundedEncodingKind::Bounded,
+            ))),
+        }
+    }
+}
+
+/// Encodes as a `Narith`.
+impl BinWriter for Mutez {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        self.to_narith().bin_write(output)
+    }
+}
+
 impl fmt::Display for Mutez {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -130,6 +162,31 @@ impl fmt::Display for Mutez {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binary_encoding_roundtrip() {
+        for value in [0u64, 1, 127, 128, 1_000_000, i64::MAX as u64] {
+            let mutez = Mutez::try_from(value).unwrap();
+            let bytes = mutez.to_bytes().unwrap();
+            assert_eq!(
+                Mutez::nom_read_exact(&bytes),
+                Ok(mutez),
+                "round-trip failed for {value}"
+            );
+            assert_eq!(
+                bytes,
+                Narith::from(value).to_bytes().unwrap(),
+                "not the Narith encoding of {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn binary_decoding_rejects_above_max() {
+        let bytes = Narith::from(i64::MAX as u64 + 1).to_bytes().unwrap();
+        let error = Mutez::nom_read_exact(&bytes).unwrap_err();
+        assert!(error.to_string().contains("boundary violation"));
+    }
 
     #[test]
     fn try_from_u64_accepts_max() {
