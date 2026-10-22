@@ -21,4 +21,9 @@ RUN cargo +1.88.0 install --locked cargo-audit --version 0.22.0 && \
     cargo audit --version
 
 # Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
-RUN cargo +1.88.0 install cargo-expand
+# The version is pinned and --locked is passed so that the build does not depend
+# on crates.io: an unpinned install re-resolves the dependency graph at build
+# time and breaks as soon as a transitive dependency raises its MSRV above the
+# toolchain used here.
+RUN cargo +1.88.0 install cargo-expand --version 1.0.126 --locked && \
+    cargo expand --version
