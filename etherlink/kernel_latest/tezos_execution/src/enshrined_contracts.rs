@@ -1112,33 +1112,17 @@ fn extract_http_call_request(
             "http_call: expected list for headers".into(),
         ))
     );
-    let headers: Vec<(String, String)> = headers_list
-        .into_iter()
-        .map(|item| {
-            let (name_rc, val_rc) = take_payload!(
-                item.unwrap_or_clone(),
-                TypedValue::Pair(name_rc, val_rc),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected pair (name, value) in headers list".into(),
-                ))
-            );
-            let name = take_payload!(
-                name_rc.unwrap_or_clone(),
-                TypedValue::String(name),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected string for header name".into(),
-                ))
-            );
-            let val = take_payload!(
-                val_rc.unwrap_or_clone(),
-                TypedValue::String(val),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected string for header value".into(),
-                ))
-            );
-            Ok((name, val))
-        })
-        .collect::<Result<_, _>>()?;
+    // User-supplied headers are not supported: the runtimes never read them.
+    //
+    // TODO: L2-2216
+    // Re-opening headers requires a bounded decode first, and the EVM gateway
+    // must stay in step.
+    if headers_list.len() != 0 {
+        return Err(TransferError::GatewayError(
+            "http_call: user-supplied headers are not supported".into(),
+        ));
+    }
+    let headers: Vec<(String, String)> = Vec::new();
     let (body_rc, method_callback_rc) = take_payload!(
         body_method_rc.unwrap_or_clone(),
         TypedValue::Pair(body_rc, method_callback_rc),
@@ -2912,7 +2896,7 @@ pub(crate) mod tests {
         let value = build_http_call_micheline(
             &arena,
             "http://michelson/KT1abc/transfer",
-            &[("Content-Type", "application/micheline")],
+            &[],
             &[0x01, 0x02],
             1,
         );
@@ -2922,10 +2906,7 @@ pub(crate) mod tests {
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
-        assert_eq!(
-            request.headers().get("Content-Type").unwrap(),
-            "application/micheline"
-        );
+        assert!(request.headers().is_empty());
         assert_eq!(request.body(), &vec![0x01, 0x02]);
     }
 
@@ -2945,30 +2926,23 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_multiple_headers() {
+    fn test_http_call_rejects_user_supplied_headers() {
         let arena = typed_arena::Arena::new();
         let value = build_http_call_micheline(
             &arena,
             "http://michelson/KT1abc",
-            &[
-                ("Content-Type", "application/micheline"),
-                ("X-Custom", "some-value"),
-            ],
+            &[("Content-Type", "application/micheline")],
             &[0xDE, 0xAD],
-            42,
+            1,
         );
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let typed = typecheck_call(&value, &mut rk).unwrap();
-        let (request, _) = extract_http_call_request(typed).unwrap();
-        // Unknown method defaults to POST
-        assert_eq!(request.method(), http::Method::POST);
-        assert_eq!(
-            request.headers().get("Content-Type").unwrap(),
-            "application/micheline"
+        let err = extract_http_call_request(typed).unwrap_err();
+        assert!(
+            err.to_string().contains("headers are not supported"),
+            "unexpected error: {err}"
         );
-        assert_eq!(request.headers().get("X-Custom").unwrap(), "some-value");
-        assert_eq!(request.body(), &vec![0xDE, 0xAD]);
     }
 
     #[test]
@@ -3065,21 +3039,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_rejects_x_tezos_headers() {
-        let arena = typed_arena::Arena::new();
-        let value = build_http_call_micheline(
-            &arena,
-            "http://michelson/KT1abc",
-            &[("X-Tezos-Sender", "attacker")],
-            &[],
-            0,
-        );
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let typed = typecheck_call(&value, &mut rk).unwrap();
-        let result = extract_http_call_request(typed);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
+    fn test_build_http_request_rejects_x_tezos_headers() {
+        let headers = vec![("X-Tezos-Sender".to_string(), "attacker".to_string())];
+        let err =
+            build_http_request("http://michelson/KT1abc", &headers, &[], 0u32.into())
+                .unwrap_err();
         assert!(
             err.to_string().contains("X-Tezos-"),
             "error should mention the header name: {err}"
@@ -3087,20 +3051,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_rejects_x_tezos_headers_case_insensitive() {
-        let arena = typed_arena::Arena::new();
-        let value = build_http_call_micheline(
-            &arena,
+    fn test_build_http_request_rejects_x_tezos_headers_case_insensitive() {
+        let headers = vec![("x-tezos-amount".to_string(), "999".to_string())];
+        assert!(build_http_request(
             "http://michelson/KT1abc",
-            &[("x-tezos-amount", "999")],
+            &headers,
             &[],
-            0,
-        );
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let typed = typecheck_call(&value, &mut rk).unwrap();
-        let result = extract_http_call_request(typed);
-        assert!(result.is_err());
+            0u32.into()
+        )
+        .is_err());
     }
 
     // --- Cross-runtime call: amount edge cases ---
