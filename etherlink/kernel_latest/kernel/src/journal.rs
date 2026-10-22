@@ -21,7 +21,8 @@ use tezosx_interfaces::{canonicalize_native_address, AliasInfo, Registry, Runtim
 use tezosx_journal::{CracId, TezosXJournal};
 
 use crate::chains::{
-    tezos_op_evm_gas_limit, DebugFeatures, TezlinkContent, TezlinkOperation,
+    michelson_milligas_to_evm_gas, tezos_op_evm_gas_limit, DebugFeatures, TezlinkContent,
+    TezlinkOperation,
 };
 
 pub use tezosx_journal::TezosXHashes;
@@ -174,26 +175,70 @@ where
     outcome
 }
 
+/// Run a Tezos operation inside the tracer frame of its fake EVM transaction.
+///
+/// The continuation owns the operation and borrows the journal. A successfully
+/// opened frame is kept only for a valid operation with EVM effects; all other
+/// outcomes discard it. Panics do not run frame cleanup.
+pub fn inside_top_level_call_from_tezos_operation(
+    journal: &mut TezosXJournal,
+    registry: &impl Registry,
+    operation: TezlinkOperation,
+    michelson_to_evm_gas_multiplier: u64,
+    apply: impl FnOnce(
+        &mut TezosXJournal,
+        TezlinkOperation,
+    ) -> anyhow::Result<
+        crate::apply::ExecutionResult<crate::apply::TezosExecutionInfo>,
+    >,
+) -> anyhow::Result<crate::apply::ExecutionResult<crate::apply::TezosExecutionInfo>> {
+    let opened = fake_top_level_call_from_tezos_operation(
+        journal,
+        registry,
+        &operation,
+        michelson_to_evm_gas_multiplier,
+    );
+    let outcome = apply(journal, operation);
+    if opened {
+        match &outcome {
+            Ok(crate::apply::ExecutionResult::Valid(res))
+                if res.cross_runtime_effects.iter().any(|effect| {
+                    matches!(effect, crate::apply::CrossRuntimeEffect::Evm(_))
+                }) =>
+            {
+                journal.fake_top_level_call_end(
+                    michelson_milligas_to_evm_gas(
+                        res.consumed_milligas,
+                        michelson_to_evm_gas_multiplier,
+                    ),
+                    res.is_success(),
+                );
+            }
+            _ => journal.discard_fake_top_level_call(),
+        }
+    }
+    outcome
+}
+
 /// Open the tracer's top-level frame mirroring the fake EVM transaction
 /// [op] registers if it CRACs into the EVM runtime, so the frames of the
-/// EVM calls it dispatches nest below it. Balanced by
-/// [`TezosXJournal::fake_top_level_call_end`] at the apply site.
-pub fn fake_top_level_call_from_tezos_operation(
+/// EVM calls it dispatches nest below it. Returns whether a frame was opened.
+fn fake_top_level_call_from_tezos_operation(
     journal: &mut TezosXJournal,
     registry: &impl Registry,
     op: &TezlinkOperation,
     michelson_to_evm_gas_multiplier: u64,
-) {
+) -> bool {
     if !journal.evm.has_tracer() {
-        return;
+        return false;
     }
     // Deposits carry no Michelson source and issue no CRAC, so there is
     // no envelope to mirror.
     let TezlinkContent::Tezos(operation) = &op.content else {
-        return;
+        return false;
     };
     let Some(Ok(source)) = operation.content.first().map(|c| c.source()) else {
-        return;
+        return false;
     };
     let alias = registry.compute_alias(&AliasInfo {
         runtime: RuntimeId::Ethereum,
@@ -210,7 +255,7 @@ pub fn fake_top_level_call_from_tezos_operation(
                 "Tracing: could not derive the EVM alias of {}: {failure:?}",
                 source.to_b58check()
             );
-            return;
+            return false;
         }
     };
     let gas_limit = match tezos_op_evm_gas_limit(op, michelson_to_evm_gas_multiplier) {
@@ -220,9 +265,10 @@ pub fn fake_top_level_call_from_tezos_operation(
                 Debug,
                 "Tracing: could not derive the EVM gas limit of the operation: {err:?}"
             );
-            return;
+            return false;
         }
     };
 
     journal.fake_top_level_call(caller, gas_limit);
+    true
 }

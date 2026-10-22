@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    apply::{
-        extract_cross_runtime_effects, CrossRuntimeEffect, RuntimeExecutionInfo,
-        TezosExecutionInfo,
-    },
+    apply::{extract_cross_runtime_effects, RuntimeExecutionInfo, TezosExecutionInfo},
     block_in_progress::BlockInProgress,
     blueprint_storage::{DelayedTransactionFetchingResult, EVMBlockHeader},
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
@@ -15,7 +12,7 @@ use crate::{
     error,
     fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
     journal::{
-        fake_top_level_call_from_tezos_operation, with_tezosx_journal, TezosXHashes,
+        inside_top_level_call_from_tezos_operation, with_tezosx_journal, TezosXHashes,
     },
     l2block::L2Block,
     registry_impl::RegistryImpl,
@@ -30,7 +27,7 @@ use evm_inspectors::TracerInput;
 use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
-use revm::{context::result::ExecutionResult, primitives::hardfork::SpecId};
+use revm::primitives::hardfork::SpecId;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     storage::block::BLOCKS_STORED,
@@ -802,51 +799,55 @@ impl TezosXChainConfig {
             0,
             tracer_input,
             |rk, journal| {
-                fake_top_level_call_from_tezos_operation(
+                let result = inside_top_level_call_from_tezos_operation(
                     journal,
                     registry,
-                    &operation,
+                    operation,
                     block_constants
                         .michelson_runtime_block_constants
                         .michelson_to_evm_gas_multiplier,
-                );
-                let result = apply_tezos_operation(
-                    &self.michelson_chain_id,
-                    block_in_progress,
-                    rk,
-                    registry,
-                    &block_constants.michelson_runtime_block_constants,
-                    operation,
-                    sequencer_pool_address,
-                    skip_signature_check,
-                    skip_fees_check,
-                    skip_branch_check,
-                    Some(outbox_queue),
-                    Some(&block_constants.evm_runtime_block_constants),
-                    journal,
-                    self.experimental_features.is_michelson_gas_refund_enabled(),
-                    tracer_input.is_some(),
-                    http_trace_enabled,
-                    da_fees_enabled,
-                );
-                // Persist HTTP traces regardless of [result] so that partial
-                // traces from an operation that failed mid-execution remain
-                // observable through the [http_trace*] RPCs. Matches the
-                // Ethereum / TezosDelayed apply sites in apply.rs.
-                //
-                // TODO: https://linear.app/tezos/issue/L2-1243
-                // The Tezlink-submitted path stores traces under the Tezos
-                // operation hash only, so [http_traceTransaction] queries
-                // that pass the fake Ethereum hash of a Tezos→EVM CRAC
-                // (the hash users see in [eth_getBlockByNumber]) return
-                // the empty list. Extend this site to dual-index the
-                // traces under each generated Ethereum fake hash once the
-                // mapping is available here.
-                crate::storage::maybe_store_http_traces_for_tx(
-                    rk.host_mut(),
-                    http_trace_enabled,
-                    &tx_hash,
-                    journal,
+                    |journal, operation| {
+                        let result = apply_tezos_operation(
+                            &self.michelson_chain_id,
+                            block_in_progress,
+                            rk,
+                            registry,
+                            &block_constants.michelson_runtime_block_constants,
+                            operation,
+                            sequencer_pool_address,
+                            skip_signature_check,
+                            skip_fees_check,
+                            skip_branch_check,
+                            Some(outbox_queue),
+                            Some(&block_constants.evm_runtime_block_constants),
+                            journal,
+                            self.experimental_features.is_michelson_gas_refund_enabled(),
+                            tracer_input.is_some(),
+                            http_trace_enabled,
+                            da_fees_enabled,
+                        );
+                        // Persist HTTP traces regardless of [result] so that partial
+                        // traces from an operation that failed mid-execution remain
+                        // observable through the [http_trace*] RPCs. Matches the
+                        // Ethereum / TezosDelayed apply sites in apply.rs.
+                        //
+                        // TODO: https://linear.app/tezos/issue/L2-1243
+                        // The Tezlink-submitted path stores traces under the Tezos
+                        // operation hash only, so [http_traceTransaction] queries
+                        // that pass the fake Ethereum hash of a Tezos→EVM CRAC
+                        // (the hash users see in [eth_getBlockByNumber]) return
+                        // the empty list. Extend this site to dual-index the
+                        // traces under each generated Ethereum fake hash once the
+                        // mapping is available here.
+                        crate::storage::maybe_store_http_traces_for_tx(
+                            rk.host_mut(),
+                            http_trace_enabled,
+                            &tx_hash,
+                            journal,
+                        );
+
+                        result
+                    },
                 );
 
                 match result {
@@ -854,26 +855,6 @@ impl TezosXChainConfig {
                         let result = res.to_execution_result(
                             self.michelson_to_evm_gas_multiplier(block_constants),
                         );
-                        // Keep the fake top-level frame iff the operation registered
-                        // a fake transaction, so the block holds exactly one
-                        // top-level trace per transaction.
-                        if res
-                            .cross_runtime_effects
-                            .iter()
-                            .any(|effect| matches!(effect, CrossRuntimeEffect::Evm(_)))
-                        {
-                            journal.fake_top_level_call_end(
-                                michelson_milligas_to_evm_gas(
-                                    res.consumed_milligas,
-                                    block_constants
-                                        .michelson_runtime_block_constants
-                                        .michelson_to_evm_gas_multiplier,
-                                ),
-                                matches!(result, ExecutionResult::Success { .. }),
-                            );
-                        } else {
-                            journal.discard_fake_top_level_call();
-                        }
                         Ok((
                             Some(result),
                             crate::apply::ExecutionResult::Valid(
