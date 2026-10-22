@@ -6411,6 +6411,88 @@ mod tests {
         )
     }
 
+    /// BB-118: the receipt of a transfer to a contract failing with a large
+    /// number carries the binary Micheline of the number, encoded in linear
+    /// time, and never its decimal form, whose computation is quadratic.
+    #[test]
+    fn apply_transfer_failing_with_large_number() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
+
+        let large = num_bigint::BigUint::from(1u8) << 1000_usize;
+        let script = format!(
+            "parameter unit; storage unit; code {{ DROP; PUSH nat {large}; FAILWITH }}"
+        );
+        init_contract(&mut rk, &dest, &script, &Micheline::from(()), &0_u64.into());
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1040,
+            5,
+            src,
+            0_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        let receipt = ProcessedOperation::into_receipts(processed);
+
+        let OperationResultSum::Transfer(OperationResult { result, .. }) =
+            &receipt[0].receipt
+        else {
+            panic!("expected a transfer receipt, got {receipt:?}");
+        };
+        let with = Micheline::Int(large.into())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            *result,
+            ContentResult::Failed(
+                vec![ApplyOperationError::Transfer(
+                    TransferError::MichelsonContractInterpretError(
+                        mir::interpreter::ContractInterpretError::InterpretError(
+                            mir::interpreter::InterpretError::FailedWith {
+                                // The type `nat` in binary Micheline.
+                                ty: mir::interpreter::MichelineBytes(vec![0x03, 0x62]),
+                                with: mir::interpreter::MichelineBytes(with),
+                            },
+                        ),
+                    )
+                )]
+                .into()
+            )
+        );
+    }
+
     #[test]
     fn apply_transfer_with_argument_to_implicit_fails() {
         let mut host = test_host();

@@ -4258,15 +4258,12 @@ mod interpreter_tests {
             .expect("worker thread completes");
     }
 
-    /// Regression: `FAILWITH` of a deep runtime-built value embeds the value
-    /// in `InterpretError::FailedWith(_, TypedValue<'a>)`. Pre-fix the
-    /// resulting `Err` propagates through `fn interpret`'s leftover-stack /
-    /// frame drain — both of which target the value *stack*, not the error
-    /// variant — and lands at the caller's `drop` site with the deep value
-    /// still recursive. The auto-derived `TypedValue` destructor overflows
-    /// the kernel's ~1 MiB Rust stack. Drain the embedded value at the
-    /// driver-error boundary so `Err` propagation is safe for any caller
-    /// (L2-1446 + the multi-agent review BLOCKER).
+    /// Regression: `FAILWITH` of a deep runtime-built value must not overflow
+    /// the kernel's ~1 MiB Rust stack. Pre-fix, the error embedded the value
+    /// itself, and its auto-derived `TypedValue` destructor recursed when the
+    /// `Err` was dropped (L2-1446). Now `FAILWITH` unparses and encodes the
+    /// value into flat bytes, so this checks that the unparsing, the encoding
+    /// and the drop of the error stay iterative.
     #[test]
     fn failwith_with_deep_value_does_not_overflow_on_drop() {
         const DEPTH: usize = 100_000;
@@ -6525,6 +6522,93 @@ mod interpreter_tests {
             FAILWITH_PLACEHOLDER_TYPE_BYTES,
             encode(Micheline::prim0_uncarbonated(Prim::string))
         );
+    }
+
+    /// BB-118: a `FAILWITH` on a large number must not convert it to decimal,
+    /// which is quadratic and not metered. The payload is the binary Micheline
+    /// of the number, encoded in linear time under gas, and the error text
+    /// shows its hex, bounded by the render cap.
+    #[test]
+    fn failwith_large_number_is_not_rendered_in_decimal() {
+        use crate::bounded_fmt::{
+            display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
+        };
+        // About 37 KiB of zarith: large enough for a slow decimal conversion,
+        // and below the cap above which FAILWITH reports a placeholder.
+        let n = BigUint::from(1u8) << (256 * 1024_usize);
+        // The types in binary Micheline: the tag of a primitive without
+        // arguments, then the code of `nat` or `int`.
+        for (ty, ty_bytes, v, i) in [
+            (
+                Type::Nat,
+                vec![0x03, 0x62],
+                V::Nat(n.clone()),
+                BigInt::from(n.clone()),
+            ),
+            (
+                Type::Int,
+                vec![0x03, 0x5b],
+                V::Int(-BigInt::from(n.clone())),
+                -BigInt::from(n),
+            ),
+        ] {
+            let err =
+                interpret_one(&Failwith(ty.clone()), &mut Ctx::default(), &mut stk![v])
+                    .unwrap_err();
+            let expected = Micheline::Int(i)
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                err,
+                InterpretError::FailedWith {
+                    ty: MichelineBytes(ty_bytes),
+                    with: MichelineBytes(expected),
+                }
+            );
+            let rendered = display_bounded(&ContractInterpretError::from(err), CAP);
+            assert!(
+                rendered.starts_with(
+                    "runtime failure while running the script: failed with: 0x"
+                ),
+                "{}",
+                &rendered[..rendered.len().min(80)]
+            );
+            assert!(rendered.len() <= CAP + TRUNCATION_SUFFIX.len());
+        }
+    }
+
+    /// Unparsing and encoding the `FAILWITH` payload are charged: with less
+    /// gas than they cost, `FAILWITH` returns `OutOfGas` instead of
+    /// `FailedWith`.
+    #[test]
+    fn failwith_out_of_gas_while_unparsing() {
+        let payload = || {
+            V::List(MichelsonList::from(
+                (0..1000).map(V::int).collect::<Vec<_>>(),
+            ))
+        };
+        let ty = Type::new_list(Type::Int);
+        let run = |milligas: u32| {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(milligas);
+            let res =
+                interpret_one(&Failwith(ty.clone()), &mut ctx, &mut stk![payload()]);
+            (res, ctx.gas.milligas().unwrap_or(0))
+        };
+        let full = Gas::default().milligas().unwrap();
+        let (res, left) = run(full);
+        assert!(
+            matches!(res, Err(InterpretError::FailedWith { .. })),
+            "{res:?}"
+        );
+        let cost = full - left;
+        assert!(cost > 0, "unparsing the payload must be charged");
+        assert!(matches!(
+            run(cost).0,
+            Err(InterpretError::FailedWith { .. })
+        ));
+        assert_eq!(run(cost - 1).0, Err(InterpretError::OutOfGas));
     }
 
     #[test]

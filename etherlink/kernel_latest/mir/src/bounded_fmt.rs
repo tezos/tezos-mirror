@@ -11,19 +11,19 @@
 //! printed*. A `{ DUP; DUP; PAIR }` loop of `K` steps is a shared-pointer
 //! DAG of `K + 1` heap nodes (built for `O(K)` gas, since `DUP` is an
 //! `Rc::clone` and `PAIR` stores both children as the same `Rc`), but its
-//! *unfolded* form is `2^(K+1) - 1` nodes. When such a value reaches a
-//! `FAILWITH`, the interpreter embeds it in
-//! [`crate::interpreter::InterpretError::FailedWith`], whose error text
-//! renders the value through the (sharing-unaware) iterative `Debug` walk
-//! in [`crate::ast`]. That walk visits *both* children of every `Pair`, so
-//! a value built for a few thousand milligas materialises a `2^K`-byte
-//! string — `K ≈ 30` is enough to OOM the kernel for a fraction of a tez.
+//! *unfolded* form is `2^(K+1) - 1` nodes. Rendering such a value with a
+//! sharing-unaware walk visits *both* children of every `Pair`, so a value
+//! built for a few thousand milligas materialises a `2^K`-byte string —
+//! `K ≈ 30` is enough to OOM the kernel for a fraction of a tez. A per-byte
+//! gas charge cannot prevent this, because the string is built in full
+//! before the charge can observe its length.
 //!
-//! The `Debug` walk is *stack*-safe (iterative) and the `FailedWith` payload
-//! is drained before `Drop`, but neither bounds the *work/size*
-//! amplification: the string is still built in full before any per-byte gas
-//! charge can observe its length, so charging after the fact cannot prevent
-//! the allocation.
+//! `FAILWITH` unparses and encodes its payload to binary Micheline
+//! ([`crate::interpreter::MichelineBytes`]) in
+//! [`crate::interpreter::InterpretError::FailedWith`], which charges gas
+//! for every node and byte of the unfolded value. Its error text renders
+//! those bytes as hex, one byte at a time, so this writer stops the render
+//! at the cap.
 //!
 //! A related — but *gas-bounded* — vector exists on *types*: the
 //! typechecker embeds `Type` / `TypeStack` in

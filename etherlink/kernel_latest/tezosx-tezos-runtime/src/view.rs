@@ -88,13 +88,7 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
 /// routes to [`TezosXRuntimeError::OutOfGas`]; everything else defaults to
 /// [`TezosXRuntimeError::BadRequest`].
 fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
-    // Match by reference: `InterpretError` implements `Drop` (a deep
-    // `FailedWith` payload is flattened iteratively when the error is
-    // finally dropped — see L2-1446 + !22025), so Rust forbids partial-move
-    // destructuring. The arms borrow the variant fields and observe the
-    // original payload; `e` falls out of scope at function end and its
-    // `Drop` runs then, after any `format!("{other:?}")` above has already
-    // serialised the value into the response body.
+    // The arms borrow the variant fields; `e` is dropped at function end.
     match &e {
         // All flavours of resource exhaustion → OutOfGas, single-sourced in
         // MIR so that this cannot drift from `classify_tc_error`.

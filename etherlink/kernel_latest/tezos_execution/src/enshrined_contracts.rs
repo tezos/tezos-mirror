@@ -528,10 +528,9 @@ fn charge_persisted_bytes(
 /// (`test_crac_failwith_receipt_is_gas_bounded`). It is therefore kept at the
 /// per-byte rate rather than the ~145× cheaper EVM per-word crossing rate;
 /// the two were the same constant before L2-1726 and are now deliberately
-/// decoupled. The drop-time / observation-time overflow on a deep
-/// structurally-shared value is a separate rendering concern, closed by the
-/// iterative `Debug for TypedValue` and the `FailedWith` `Drop` drain
-/// (L2-1436 / L2-1446).
+/// decoupled. The rendering of a deep or structurally-shared `FAILWITH`
+/// payload is a separate concern: `FAILWITH` unparses and encodes it to
+/// binary Micheline under gas, and its error text is bounded.
 ///
 /// On success the **original** error is returned wrapped in
 /// [`CracError::Operation`] so the receipt body is unchanged.  On gas
