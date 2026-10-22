@@ -52,7 +52,7 @@ These labels can be extracted from a locally pulled image using
 ## Usage in the Tezos CI
 
 Images are referenced in the CI by the shared tag `base_images_tag` in
-`ci/lib_tezos_ci/tezos_ci.ml`. This tag should contain the commit hash
+`ci/ci_version.sh`. This tag should contain the commit hash
 for which a `base_images.daily` ran. The CI uses then the images
 produced by the latest `base_images.daily` pipeline that ran on this
 commit.
@@ -170,11 +170,11 @@ Like the Octez Docker distribution, the CI images are also built in
 the tezos/tezos CI, by the `images.alpine-ci-all` jobs. To build the
 distribution FROM a specific build of those images, pass their full
 references. For the images the CI currently uses, the tag is the value
-of `base_images_tag` in `ci/lib_tezos_ci/tezos_ci.ml`:
+of `base_images_tag` in `ci/ci_version.sh`:
 
 ```
 $ registry="$(. ./scripts/version.sh; echo "$GCP_PROTECTED_REGISTRY")/tezos/tezos"
-$ tag=<base_images_tag>
+$ tag="$(. ./ci/ci_version.sh; echo "$base_images_tag")"
 $ ./scripts/create_docker_image.sh \
     --runtime-image "${registry}/alpine-runtime:${tag}" \
     --build-deps-image "${registry}/alpine-build:${tag}"
