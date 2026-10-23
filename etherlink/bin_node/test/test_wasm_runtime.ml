@@ -59,6 +59,41 @@ let test_wasm_runtime_id () =
     (number = Z.zero) z_typ ~error_msg:"Block number should be %R, but got %L") ;
   unit
 
+(* The kernel reads the DA fee as a 32-byte little-endian number: a shorter
+   value counts as absent, and the kernel writes its default fee back. *)
+let test_disabled_da_fee_is_the_u256_zero () =
+  register
+    ~tags:["replay"]
+    ~title:"replay with disabled DA fees writes the DA fee as the u256 zero"
+  @@ fun () ->
+  let* state =
+    Evm_state.init
+      ~kernel:
+        (On_disk
+           "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm")
+  in
+  let state = expect_ok "Should be able to create an initial state" state in
+  let* state =
+    Replay.alter_evm_state
+      ~disable_da_fees:true
+      ~kernel:None
+      ~kernel_verbosity:None
+      state
+  in
+  let state = expect_ok "Should be able to disable the DA fee" state in
+  let* da_fee =
+    Durable_storage.(read (Raw_path "/evm/world_state/fees/da_fee_per_byte"))
+      state
+  in
+  let da_fee = expect_ok "Should be able to read the DA fee" da_fee in
+  Check.(
+    (Bytes.to_string da_fee = String.make 32 '\000')
+      string
+      ~error_msg:"The disabled DA fee should be %R, but is %L") ;
+  unit
+
 let () = test_wasm_runtime_id ()
+
+let () = test_disabled_da_fee_is_the_u256_zero ()
 
 let () = Test.run ()

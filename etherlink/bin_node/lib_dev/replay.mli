@@ -5,6 +5,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state]
+    patches [evm_state] before a replay.
+
+    [disable_da_fees] If [true], writes a zero fee per byte at
+    [/evm/world_state/fees/da_fee_per_byte], as the 32-byte little-endian
+    number the kernel reads.
+    [kernel] If present, replaces the kernel of [evm_state].
+    [kernel_verbosity] If present, sets the verbosity of the kernel logs.
+*)
+val alter_evm_state :
+  disable_da_fees:bool ->
+  kernel:Pvm_types.kernel option ->
+  kernel_verbosity:Events.kernel_log_level option ->
+  Evm_state.t ->
+  Evm_state.t tzresult Lwt.t
+
 (** [replay_blueprint ~profile ~disable_da_fees ?kernel ?kernel_verbosity ~number ?upto config]
     Replays the blueprint at the given [number] (Ethereum block level) on top of the expected context.
 

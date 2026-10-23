@@ -8,7 +8,7 @@
 let patch_da_fees evm_state =
   Durable_storage.write
     (Raw_path "/evm/world_state/fees/da_fee_per_byte")
-    (Bytes.of_string (Int.to_string 0))
+    (Ethereum_types.encode_u256_le (Qty Z.zero))
     evm_state
 
 let patch_kernel ~kernel evm_state =
