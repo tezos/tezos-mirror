@@ -151,7 +151,7 @@ module Files = struct
      everything they COPY from the build context (repository root). *)
   let ci_images =
     [
-      "images/ci/**";
+      "images/ci/**/*";
       "opam/virtual/*.opam.locked";
       "pyproject.toml";
       "poetry.lock";
