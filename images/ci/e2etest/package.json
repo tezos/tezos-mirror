@@ -14,13 +14,51 @@
     "solc": "^0.8.31"
   },
   "overrides": {
-    "elliptic": "^6.6.1",
+    "elliptic": {
+      ".": "^6.6.1",
+      "bn.js": "^4.12.3"
+    },
     "form-data": "^2.5.4",
     "pbkdf2": "^3.1.3",
     "sha.js": "^2.4.12",
     "underscore": "^1.13.8",
     "tar": "^7.5.21",
     "web3-bzz": "^1.10.3",
-    "proxy-addr": "^2.0.8"
+    "proxy-addr": "^2.0.8",
+    "tmp": "^0.2.7",
+    "qs": "^6.16.1",
+    "tough-cookie": "^4.1.3",
+    "ws": "^5.2.4",
+    "uuid": "^11.1.1",
+    "web3-eth-accounts": {
+      "semver": "^6.3.1"
+    },
+    "asn1.js": {
+      "bn.js": "^4.12.3"
+    },
+    "create-ecdh": {
+      "bn.js": "^4.12.3"
+    },
+    "diffie-hellman": {
+      "bn.js": "^4.12.3"
+    },
+    "ethjs-unit": {
+      "bn.js": "^4.12.3"
+    },
+    "number-to-bn": {
+      "bn.js": "^4.12.3"
+    },
+    "eth-lib": {
+      "bn.js": "^4.12.3"
+    },
+    "ethereumjs-util": {
+      "bn.js": "^4.12.3"
+    },
+    "web3-eth-iban": {
+      "bn.js": "^4.12.3"
+    },
+    "web3-utils": {
+      "bn.js": "^4.12.3"
+    }
   }
 }
