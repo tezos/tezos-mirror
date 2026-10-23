@@ -186,7 +186,6 @@ tempfile = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 xz = { workspace = true, optional = true }
-zip = { workspace = true, optional = true, features = ["deflate"] }
 
 # Octez patch: made optional and gated behind `v8`. build.rs only touches
 # bindgen under `#[cfg(feature = "v8")]`, but an unconditional build-dependency

@@ -290,7 +290,6 @@ which = "8.0.0"
 windows-sys = { version = "0.61.2", default-features = false }
 xxhash-rust = { version = "0.8.10", default-features = false }
 xz = "0.1.0"
-zip = { version = "8.1.0", default-features = false }
 
 [features]
 default = ["wat", "middlewares"]
