@@ -540,7 +540,7 @@ mod tests {
         OriginationContent, Parameters, Script, TransferContent,
     };
     use tezos_tezlink::operation_result::{
-        ApplyOperationErrors, Balance, BalanceTooLow, BalanceUpdate,
+        ApplyOperationErrors, BacktrackedResult, Balance, BalanceTooLow, BalanceUpdate,
         InternalContentWithMetadata, Originated, RevealSuccess, TransferSuccess,
         UpdateOrigin,
     };
@@ -1529,5 +1529,280 @@ mod tests {
         )
         .expect_err("insufficient balance must surface CannotPayStorageFee");
         assert!(matches!(err, ApplyOperationError::CannotPayStorageFee(_)));
+    }
+
+    fn update(balance: Balance, changes: i64) -> BalanceUpdate {
+        BalanceUpdate {
+            balance,
+            changes,
+            update_origin: UpdateOrigin::BlockApplication,
+        }
+    }
+
+    /// The `Debited(payer) / Credited(StorageFees)` pair of a fee of
+    /// `mutez`.
+    fn fee_pair(payer: &Contract, mutez: u64) -> Vec<BalanceUpdate> {
+        vec![
+            update(Balance::Account(payer.clone()), -(mutez as i64)),
+            update(Balance::StorageFees, mutez as i64),
+        ]
+    }
+
+    fn originated_contract() -> Contract {
+        Contract::Originated(ContractKt1Hash::from_base58_check(ORIGINATED_KT1).unwrap())
+    }
+
+    /// Two updates that a transfer can carry before its storage fees are
+    /// charged: 30 mutez moved from an originated contract to the block fees.
+    fn payload_pair() -> Vec<BalanceUpdate> {
+        vec![
+            update(Balance::Account(originated_contract()), -30),
+            update(Balance::BlockFees, 30),
+        ]
+    }
+
+    /// An internal transfer of 0 mutez from `sender` to itself.
+    fn internal_transfer(
+        sender: &Contract,
+        nonce: u16,
+        result: ContentResult<TransferContent>,
+    ) -> InternalOperationSum {
+        InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: sender.clone(),
+            nonce,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: sender.clone(),
+                parameters: Parameters::default(),
+            },
+            result,
+        })
+    }
+
+    /// Runs [`crate::burn_pass`] on a parent that allocated nothing and on
+    /// `op`, tagged as an own internal with `delegated_storage_cost`.
+    /// Returns the internal as the pass left it, and the outcome of the pass.
+    fn burn_own_internal(
+        tez_accounts: &mut impl KeySpace,
+        payer: &impl TezosAccount,
+        storage_limit_remaining: &mut BigUint,
+        op: InternalOperationSum,
+        delegated_storage_cost: u64,
+    ) -> (InternalOperationSum, Result<(), ApplyOperationError>) {
+        let mut parent = applied_transfer(TransferSuccess::default());
+        let (mut internals, outcome) = crate::burn_pass::<TransferContent, _>(
+            tez_accounts,
+            payer,
+            storage_limit_remaining,
+            &mut parent,
+            vec![crate::TaggedInternalOp::own(op, delegated_storage_cost)],
+        );
+        assert_eq!(internals.len(), 1);
+        (internals.pop().unwrap(), outcome)
+    }
+
+    /// A top-level content that is BackTracked, Skipped or Failed is not
+    /// charged, and neither is an own internal with that status and a
+    /// delegated cost of 5. The receipts, the payer balance and the storage
+    /// limit stay as they were.
+    #[test]
+    fn non_applied_content_is_not_charged() {
+        let statuses: [fn() -> ContentResult<TransferContent>; 3] = [
+            || {
+                ContentResult::BackTracked(BacktrackedResult {
+                    errors: None,
+                    result: TransferTarget::ToContract(TransferSuccess {
+                        paid_storage_size_diff: 10_u64.into(),
+                        allocated_destination_contract: true,
+                        ..Default::default()
+                    }),
+                })
+            },
+            || ContentResult::Skipped,
+            || ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
+        ];
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 1_000);
+        let mut storage_limit_remaining = BigUint::from(100_u64);
+
+        for status in statuses {
+            let mut content = status();
+            burn_content_storage_fees(
+                rk.tez_accounts_mut(),
+                &payer,
+                &mut storage_limit_remaining,
+                &mut content,
+            )
+            .unwrap();
+            assert_eq!(content, status());
+
+            let (op, outcome) = burn_own_internal(
+                rk.tez_accounts_mut(),
+                &payer,
+                &mut storage_limit_remaining,
+                internal_transfer(&payer.contract(), 0, status()),
+                5,
+            );
+            outcome.unwrap();
+            assert_eq!(op, internal_transfer(&payer.contract(), 0, status()));
+        }
+
+        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(storage_limit_remaining, BigUint::from(100_u64));
+    }
+
+    /// An own internal with a delegated cost of 7 gets the pair of that cost
+    /// after its storage fees: after the slot pair of a Transfer, after the
+    /// updates it already carried for an Origination. The delegated cost is
+    /// not debited here, and an Event is left as it was.
+    #[test]
+    fn internal_charge_appends_delegated_pair_per_kind() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let payer = init_payer(rk.tez_accounts_mut(), 10_000);
+        let c = payer.contract();
+
+        let mut storage_limit_remaining = BigUint::from(4 + ORIGINATION_SIZE);
+        let (op, outcome) = burn_own_internal(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            internal_transfer(
+                &c,
+                0,
+                applied_transfer(TransferSuccess {
+                    balance_updates: payload_pair(),
+                    paid_storage_size_diff: 4_u64.into(),
+                    allocated_destination_contract: true,
+                    ..Default::default()
+                }),
+            ),
+            7,
+        );
+        outcome.unwrap();
+        assert_eq!(
+            op,
+            internal_transfer(
+                &c,
+                0,
+                applied_transfer(TransferSuccess {
+                    balance_updates: [
+                        fee_pair(&c, 4 * COST_PER_BYTES),
+                        payload_pair(),
+                        fee_pair(&c, SLOT_BURN),
+                        fee_pair(&c, 7),
+                    ]
+                    .concat(),
+                    paid_storage_size_diff: 4_u64.into(),
+                    allocated_destination_contract: true,
+                    ..Default::default()
+                }),
+            )
+        );
+        assert!(storage_limit_remaining.is_zero());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (10_000 - 4 * COST_PER_BYTES - SLOT_BURN).into()
+        );
+
+        let mut storage_limit_remaining = BigUint::ZERO;
+        let (op, outcome) = burn_own_internal(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            internal_transfer(&c, 0, applied_transfer(TransferSuccess::default())),
+            7,
+        );
+        outcome.unwrap();
+        assert_eq!(
+            op,
+            internal_transfer(
+                &c,
+                0,
+                applied_transfer(TransferSuccess {
+                    balance_updates: fee_pair(&c, 7),
+                    ..Default::default()
+                }),
+            )
+        );
+        assert!(storage_limit_remaining.is_zero());
+
+        let initial_balance_pair = || {
+            vec![
+                update(Balance::Account(c.clone()), -50),
+                update(Balance::Account(originated_contract()), 50),
+            ]
+        };
+        let internal_origination = |balance_updates| {
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                sender: c.clone(),
+                nonce: 0,
+                content: OriginationContent {
+                    balance: 50_u64.into(),
+                    delegate: None,
+                    script: Script {
+                        code: vec![],
+                        storage: vec![],
+                    },
+                },
+                result: ContentResult::Applied(OriginationSuccess {
+                    balance_updates,
+                    ..origination_success(10)
+                }),
+            })
+        };
+        let mut storage_limit_remaining = BigUint::from(10 + ORIGINATION_SIZE);
+        let (op, outcome) = burn_own_internal(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            internal_origination(initial_balance_pair()),
+            7,
+        );
+        outcome.unwrap();
+        assert_eq!(
+            op,
+            internal_origination(
+                [
+                    fee_pair(&c, 10 * COST_PER_BYTES),
+                    fee_pair(&c, SLOT_BURN),
+                    initial_balance_pair(),
+                    fee_pair(&c, 7),
+                ]
+                .concat()
+            )
+        );
+        assert!(storage_limit_remaining.is_zero());
+
+        let internal_event = || {
+            InternalOperationSum::Event(InternalContentWithMetadata {
+                sender: c.clone(),
+                nonce: 0,
+                content: EventContent {
+                    ty: mir::serializer::MichelineExpr(vec![]),
+                    tag: None,
+                    payload: None,
+                },
+                result: ContentResult::Applied(EventSuccess {
+                    consumed_milligas: 0_u64.into(),
+                }),
+            })
+        };
+        let mut storage_limit_remaining = BigUint::ZERO;
+        let (op, outcome) = burn_own_internal(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            internal_event(),
+            7,
+        );
+        outcome.unwrap();
+        assert_eq!(op, internal_event());
+
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (10_000 - (4 + 10) * COST_PER_BYTES - 2 * SLOT_BURN).into()
+        );
     }
 }
