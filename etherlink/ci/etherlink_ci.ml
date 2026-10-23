@@ -337,8 +337,9 @@ let job_test_evm_compatibility =
          ./etherlink/kernel_latest/evm_evaluation/resources/ -c";
       ]
 
-(* [job_test_revm_compatibility] tests this functori/evm-fixtures commit. *)
-let evm_fixtures_commit = "9eaf35cdd9d1422ef56b78d5ba7b1232ccef25e6"
+(* [Files.revm_compatibility] covers this file, so a pin bump runs the job. *)
+let evm_fixtures_commit_file =
+  "etherlink/kernel_latest/revm_evaluation/fixtures/evm-fixtures.commit"
 
 let job_test_revm_compatibility =
   CI.job
@@ -359,8 +360,8 @@ let job_test_revm_compatibility =
         "git init evm_fixtures";
         sf
           "git -C evm_fixtures fetch --depth 1 \
-           https://github.com/functori/evm-fixtures %s"
-          evm_fixtures_commit;
+           https://github.com/functori/evm-fixtures \"$(cat %s)\""
+          evm_fixtures_commit_file;
         "git -C evm_fixtures checkout FETCH_HEAD";
         "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
       ]
