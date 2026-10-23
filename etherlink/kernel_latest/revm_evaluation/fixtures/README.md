@@ -31,3 +31,9 @@ uv run fill -v tests/osaka/ --fork=Osaka -m state_test --clean
 3. Clone [evm-fixtures](https://github.com/functori/evm-fixtures).
 
 4. Once fixture generated, make a pull request on [evm-fixtures](https://github.com/functori/evm-fixtures).
+
+## Fixtures tested in the CI
+
+The `etherlink.test_revm_compatibility` job tests the functori/evm-fixtures
+commit in `evm-fixtures.commit`. A change in that file runs the job. After a
+change in evm-fixtures, update the commit in that file.
