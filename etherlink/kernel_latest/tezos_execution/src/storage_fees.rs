@@ -138,42 +138,6 @@ pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageF
     Ok(())
 }
 
-/// Append the `Debited(payer) / Credited(StorageFees)` pair for a
-/// delegated storage cost to the operation's `balance_updates`,
-/// dispatching on its [`InternalOperationSum`] variant. No-op on
-/// `mutez_cost == 0`, on non-Applied content, and on variants
-/// whose success carries no `balance_updates` field
-/// ([`EventSuccess`]).
-pub fn add_delegated_storage_fee_balance_updates(
-    payer: &impl TezosAccount,
-    op: &mut InternalOperationSum,
-    mutez_cost: u64,
-) -> Result<(), ApplyOperationError> {
-    match op {
-        InternalOperationSum::Transfer(meta) => {
-            add_delegated_storage_fee_balance_updates_to_content(
-                payer,
-                &mut meta.result,
-                mutez_cost,
-            )
-        }
-        InternalOperationSum::Origination(meta) => {
-            add_delegated_storage_fee_balance_updates_to_content(
-                payer,
-                &mut meta.result,
-                mutez_cost,
-            )
-        }
-        InternalOperationSum::Event(meta) => {
-            add_delegated_storage_fee_balance_updates_to_content(
-                payer,
-                &mut meta.result,
-                mutez_cost,
-            )
-        }
-    }
-}
-
 /// Returns the mutez cost of allocating `nb_consumed_bytes`:
 /// `nb_consumed_bytes × COST_PER_BYTES`. Pure: no payer debit, no
 /// `storage_limit` consumption, no host access. Errors on a
@@ -264,48 +228,68 @@ pub fn burn_content_storage_fees<KS: KeySpace, M: OperationStorageFees>(
     }
 }
 
-fn burn_internal_meta_storage_fees<KS: KeySpace, M: OperationStorageFees>(
-    tez_accounts: &mut KS,
+/// Charge the payer for the storage that `content` allocated, and
+/// return the `balance_updates` that it carries once charged: the fee
+/// pairs spliced in the order of the kind. Walks the per-kind
+/// byte-burn sequence, debiting the payer and decrementing
+/// `storage_limit_remaining` at each step; the first error stops the
+/// walk. `content` is not written. `None` when `content` is not
+/// `Applied`: it allocated nothing.
+fn charge_content_storage_fees<M: OperationStorageFees>(
+    tez_accounts: &mut impl KeySpace,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
-    meta: &mut InternalContentWithMetadata<M>,
-) -> Result<(), ApplyOperationError> {
-    burn_content_storage_fees(
-        tez_accounts,
-        payer,
-        storage_limit_remaining,
-        &mut meta.result,
-    )
+    content: &ContentResult<M>,
+) -> Result<Option<Vec<BalanceUpdate>>, ApplyOperationError> {
+    let ContentResult::Applied(success) = content else {
+        return Ok(None);
+    };
+    let storage_fees = M::build_storage_fees(success, |bytes| {
+        burn_storage_fee(tez_accounts, payer, storage_limit_remaining, bytes)
+    })?;
+    let updates = M::render_balance_updates(success, storage_fees, |fee| {
+        compute_storage_balance_updates(payer, fee.into())
+    })?;
+    Ok(Some(updates))
 }
 
-/// Charge the payer for the storage allocated by a single internal
-/// operation, dispatching on its [`InternalOperationSum`] variant.
-pub fn burn_internal_op_storage_fees<KS: KeySpace>(
-    tez_accounts: &mut KS,
+/// Charge the payer for the storage that the internal operation `op`
+/// allocated, see [`charge_content_storage_fees`], and return the
+/// `balance_updates` that its receipt carries once charged: the fee
+/// pairs, then the pair of `delegated_storage_cost`, which is not
+/// burned here. `op` is not written. `None` when the receipt is left
+/// as it is: `op` is not `Applied`, or it is an event, which has no
+/// `balance_updates`.
+pub fn charge_internal_op_storage_fees(
+    tez_accounts: &mut impl KeySpace,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
-    op: &mut InternalOperationSum,
-) -> Result<(), ApplyOperationError> {
-    match op {
-        InternalOperationSum::Transfer(meta) => burn_internal_meta_storage_fees(
+    op: &InternalOperationSum,
+    delegated_storage_cost: u64,
+) -> Result<Option<Vec<BalanceUpdate>>, ApplyOperationError> {
+    let charged = match op {
+        InternalOperationSum::Transfer(meta) => charge_content_storage_fees(
             tez_accounts,
             payer,
             storage_limit_remaining,
-            meta,
+            &meta.result,
         ),
-        InternalOperationSum::Origination(meta) => burn_internal_meta_storage_fees(
+        InternalOperationSum::Origination(meta) => charge_content_storage_fees(
             tez_accounts,
             payer,
             storage_limit_remaining,
-            meta,
+            &meta.result,
         ),
-        InternalOperationSum::Event(meta) => burn_internal_meta_storage_fees(
-            tez_accounts,
-            payer,
-            storage_limit_remaining,
-            meta,
-        ),
-    }
+        InternalOperationSum::Event(_) => return Ok(None),
+    }?;
+    let Some(mut updates) = charged else {
+        return Ok(None);
+    };
+    updates.extend(compute_storage_balance_updates(
+        payer,
+        delegated_storage_cost.into(),
+    )?);
+    Ok(Some(updates))
 }
 
 pub fn compute_storage_fees<M: OperationStorageFees>(
@@ -376,19 +360,41 @@ pub trait OperationStorageFees: OperationKind {
     where
         F: FnMut(&Zarith) -> Result<StorageFee, E>;
 
-    /// Render `storage_fees` onto `success.balance_updates`. Each
-    /// [`StorageFee`] is turned into balance updates via
-    /// `fee_to_updates`, the success's pre-existing
-    /// `balance_updates` are spliced at the kind-specific position,
-    /// and the assembled list is written back to
-    /// `success.balance_updates`.
+    /// Render `storage_fees` as the `balance_updates` that `success`
+    /// carries once charged. Each [`StorageFee`] is turned into
+    /// balance updates via `fee_to_updates`, and the success's
+    /// pre-existing `balance_updates` are spliced at the
+    /// kind-specific position. `success` is not written. Empty for
+    /// kinds whose success has no `balance_updates` field.
+    fn render_balance_updates<F, E>(
+        success: &Self::Success,
+        storage_fees: Self::StorageFees,
+        fee_to_updates: F,
+    ) -> Result<Vec<BalanceUpdate>, E>
+    where
+        F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>;
+
+    /// Replace `success.balance_updates` with `updates`, the result of
+    /// [`Self::render_balance_updates`]. No-op for kinds whose success
+    /// has no such field.
+    fn set_balance_updates(success: &mut Self::Success, updates: Vec<BalanceUpdate>);
+
+    /// Render `storage_fees` and write the result on `success`, see
+    /// [`Self::render_balance_updates`] and
+    /// [`Self::set_balance_updates`].
     fn write_balance_updates<F, E>(
         success: &mut Self::Success,
         storage_fees: Self::StorageFees,
         fee_to_updates: F,
     ) -> Result<(), E>
     where
-        F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>;
+        F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
+    {
+        let updates =
+            Self::render_balance_updates(success, storage_fees, fee_to_updates)?;
+        Self::set_balance_updates(success, updates);
+        Ok(())
+    }
 
     /// Append `pair` to `success.balance_updates` when the kind's
     /// success carries one. No-op for kinds whose success has no
@@ -426,11 +432,11 @@ impl OperationStorageFees for TransferContent {
         Ok(TransferStorageFees { content, slot })
     }
 
-    fn write_balance_updates<F, E>(
-        success: &mut TransferTarget,
+    fn render_balance_updates<F, E>(
+        success: &TransferTarget,
         storage_fees: TransferStorageFees,
         fee_to_updates: F,
-    ) -> Result<(), E>
+    ) -> Result<Vec<BalanceUpdate>, E>
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
     {
@@ -440,8 +446,11 @@ impl OperationStorageFees for TransferContent {
         if let Some(slot) = storage_fees.slot {
             updates.extend(fee_to_updates(slot)?);
         }
-        success.balance_updates = updates;
-        Ok(())
+        Ok(updates)
+    }
+
+    fn set_balance_updates(success: &mut TransferTarget, updates: Vec<BalanceUpdate>) {
+        success.set_balance_updates(updates);
     }
 
     fn extend_success_balance_updates(
@@ -473,19 +482,25 @@ impl OperationStorageFees for OriginationContent {
         Ok(OriginationStorageFees { content, slot })
     }
 
-    fn write_balance_updates<F, E>(
-        success: &mut OriginationSuccess,
+    fn render_balance_updates<F, E>(
+        success: &OriginationSuccess,
         storage_fees: OriginationStorageFees,
         fee_to_updates: F,
-    ) -> Result<(), E>
+    ) -> Result<Vec<BalanceUpdate>, E>
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
     {
         let mut updates = fee_to_updates(storage_fees.content)?;
         updates.extend(fee_to_updates(storage_fees.slot)?);
         updates.extend(success.balance_updates.iter().cloned());
-        success.balance_updates = updates;
-        Ok(())
+        Ok(updates)
+    }
+
+    fn set_balance_updates(
+        success: &mut OriginationSuccess,
+        updates: Vec<BalanceUpdate>,
+    ) {
+        success.set_balance_updates(updates);
     }
 
     fn extend_success_balance_updates(
@@ -515,12 +530,18 @@ impl<M: NoStorageFees> OperationStorageFees for M {
         Ok(())
     }
 
-    fn write_balance_updates<F, E>(_: &mut M::Success, _: (), _: F) -> Result<(), E>
+    fn render_balance_updates<F, E>(
+        _: &M::Success,
+        _: (),
+        _: F,
+    ) -> Result<Vec<BalanceUpdate>, E>
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
     {
-        Ok(())
+        Ok(vec![])
     }
+
+    fn set_balance_updates(_: &mut M::Success, _: Vec<BalanceUpdate>) {}
 
     fn extend_success_balance_updates(_: &mut M::Success, _: Vec<BalanceUpdate>) {}
 }
@@ -614,8 +635,10 @@ mod tests {
         compute_storage_balance_updates(payer, fee.into())
     }
 
-    /// Test wrapper around [`burn_internal_op_storage_fees`] that
-    /// builds the `storage_limit_remaining` accumulator from a `u64`.
+    /// Test wrapper around [`charge_internal_op_storage_fees`] that
+    /// builds the `storage_limit_remaining` accumulator from a `u64`,
+    /// delegates no storage cost, and writes the charged updates on
+    /// `op`.
     fn burn_internal_op(
         tez_accounts: &mut impl KeySpace,
         payer: &impl TezosAccount,
@@ -623,12 +646,17 @@ mod tests {
         op: &mut InternalOperationSum,
     ) -> Result<(), ApplyOperationError> {
         let mut storage_limit_remaining = BigUint::from(storage_limit);
-        burn_internal_op_storage_fees(
+        let charged = charge_internal_op_storage_fees(
             tez_accounts,
             payer,
             &mut storage_limit_remaining,
             op,
-        )
+            0,
+        )?;
+        if let Some(updates) = charged {
+            op.set_balance_updates(updates);
+        }
+        Ok(())
     }
 
     /// On a zero-byte input, `burn_storage_fee` returns no balance

@@ -293,11 +293,11 @@ fn finalize_statuses<M: OperationKind>(
 /// Entries tagged [`InternalOpOrigin::Crac`] pass through unchanged
 /// — their storage cost belongs to a foreign-runtime caller.
 ///
-/// On a per-entry burn failure, the receipt entries
-/// (clone-then-rebuild) carry the pre-burn internals — no stray
-/// balance_updates survive. Host-side debits applied by `burn_tez`
-/// are rolled back out-of-band by the caller's `SafeStorage`
-/// transaction.
+/// The internals are all charged before any of their receipts is
+/// written, so a per-entry burn failure returns the pre-burn
+/// internals: no stray balance_updates survive. Host-side debits
+/// applied by `burn_tez` are rolled back out-of-band by the
+/// caller's `SafeStorage` transaction.
 fn burn_pass<M, A>(
     tez_accounts: &mut impl KeySpace,
     payer: &A,
@@ -319,37 +319,32 @@ where
         return (untag_internals(internal_operation_results), parent_outcome);
     }
 
-    let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> =
-        internal_operation_results
-            .iter()
-            .map(|tagged_op| {
-                let mut op = tagged_op.op.clone();
-                match &tagged_op.origin {
-                    InternalOpOrigin::Own {
-                        delegated_storage_cost,
-                    } => {
-                        storage_fees::burn_internal_op_storage_fees(
-                            tez_accounts,
-                            payer,
-                            storage_limit_remaining,
-                            &mut op,
-                        )?;
-                        storage_fees::add_delegated_storage_fee_balance_updates(
-                            payer,
-                            &mut op,
-                            *delegated_storage_cost,
-                        )?;
-                    }
-                    InternalOpOrigin::Crac => {}
-                }
-                Ok(op)
-            })
-            .collect();
-
-    match burned {
-        Ok(burned) => (burned, Ok(())),
-        Err(e) => (untag_internals(internal_operation_results), Err(e)),
-    }
+    // One slot per internal: the balance updates its receipt will
+    // carry, or `None` when the receipt is left as it is.
+    let charged = internal_operation_results
+        .iter()
+        .map(|tagged_op| match tagged_op.origin {
+            InternalOpOrigin::Own {
+                delegated_storage_cost,
+            } => storage_fees::charge_internal_op_storage_fees(
+                tez_accounts,
+                payer,
+                storage_limit_remaining,
+                &tagged_op.op,
+                delegated_storage_cost,
+            ),
+            InternalOpOrigin::Crac => Ok(None),
+        })
+        .collect::<Result<Vec<_>, _>>();
+    let mut internals = untag_internals(internal_operation_results);
+    let outcome = charged.map(|charged| {
+        for (op, updates) in internals.iter_mut().zip(charged) {
+            if let Some(updates) = updates {
+                op.set_balance_updates(updates);
+            }
+        }
+    });
+    (internals, outcome)
 }
 
 /// Build the wire [`OperationResult`] for a manager operation:
@@ -14465,9 +14460,8 @@ mod tests {
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
-        // The returned internal must be the pre-burn one: no
-        // storage-fee balance_updates survived the clone-then-rebuild
-        // rollback.
+        // The returned internal must be the pre-burn one: the pass
+        // writes no receipt when a charge fails.
         let InternalOperationSum::Transfer(inner) = &internals[0] else {
             panic!("expected internal Transfer");
         };
@@ -14482,10 +14476,9 @@ mod tests {
     }
 
     /// [`burn_pass`]: two internals compete for a shared budget that
-    /// fits the first slot burn but not the second. The
-    /// clone-then-rebuild pass discards the first internal's
-    /// half-applied burn so no storage-fees / payer-debit entry
-    /// survives on any internal.
+    /// fits the first slot burn but not the second. The pass charges
+    /// both before it writes any receipt, so no storage-fees /
+    /// payer-debit entry survives on any internal.
     #[test]
     fn burn_pass_two_internals_share_budget_with_rollback() {
         let mut host = test_host();
