@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 release_site.render:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible

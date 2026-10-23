@@ -18,5 +18,5 @@
 
 ## Version tag shared by all base images (built together by the
 ## [base_images.daily] pipeline). Current version created by
-## https://gitlab.com/tezos/tezos/-/pipelines/2791229003 (commit 18884dda).
-export base_images_tag=master-18884dda
+## https://gitlab.com/tezos/tezos/-/pipelines/2979588822 (commit d74b3dc3).
+export base_images_tag=master-d74b3dc3
