@@ -241,9 +241,12 @@ impl CallTracer {
 
     #[inline]
     fn initial_gas(&self, tx: impl Transaction) -> u64 {
-        let InitialAndFloorGas { initial_gas, .. } =
-            calculate_initial_tx_gas_for_tx(tx, self.spec_id);
-        initial_gas
+        let InitialAndFloorGas {
+            initial_regular_gas,
+            initial_state_gas,
+            ..
+        } = calculate_initial_tx_gas_for_tx(tx, self.spec_id, None);
+        initial_regular_gas + initial_state_gas
     }
 
     fn end_transaction_layer(
@@ -407,7 +410,7 @@ where
 
     fn call_end(&mut self, _: &mut CTX, _: &CallInputs, outcome: &mut CallOutcome) {
         self.end_transaction_layer(
-            outcome.gas().spent(),
+            outcome.gas().total_gas_spent(),
             outcome.output(),
             outcome.instruction_result(),
         );
@@ -460,7 +463,7 @@ where
             call_trace.add_to(outcome.address);
         }
         self.end_transaction_layer(
-            outcome.gas().spent(),
+            outcome.gas().total_gas_spent(),
             outcome.output(),
             outcome.instruction_result(),
         );

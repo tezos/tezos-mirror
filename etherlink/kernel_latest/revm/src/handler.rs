@@ -16,9 +16,9 @@ use revm::{
     inspector::InspectorHandler,
     interpreter::{
         interpreter::EthInterpreter, interpreter_action::FrameInit, CallScheme,
-        FrameInput, SharedMemory,
+        FrameInput, GasTracker, InitialAndFloorGas, SharedMemory,
     },
-    state::{Bytecode, EvmState},
+    state::EvmState,
     Inspector,
 };
 
@@ -63,12 +63,10 @@ where
     /// Contrary to vanilla REVM, bumping the caller nonce only happens when
     /// the call is top-level (depth is 0). Cross-runtime calls should not have
     /// nonce bump.
-    ///
-    /// **When bumping REVM to 38** — check the upstream implemention consists in
-    /// calling validate_against_state_and_deduct_caller and nothing more.
     fn validate_against_state_and_deduct_caller(
         &self,
         evm: &mut Self::Evm,
+        _init_and_floor_gas: &mut InitialAndFloorGas,
     ) -> Result<(), Self::Error> {
         let caller_address = evm.ctx().tx().caller();
         let nonce_before = evm
@@ -77,6 +75,7 @@ where
             .load_account(caller_address)?
             .info
             .nonce;
+        // Note: revm's validate_env rejects a tx nonce of u64::MAX (EIP-2681).
         validate_against_state_and_deduct_caller::<_, Self::Error>(evm.ctx())?;
         if self.call_depth != 0 {
             evm.ctx()
@@ -88,45 +87,23 @@ where
         Ok(())
     }
 
-    /// Flip `is_static = true` on the top-level call frame when built
-    /// via [`Self::new_static`]. The rest of the body is a verbatim
-    /// copy of the default in `revm-handler` 17.0.0 (load bytecode +
-    /// EIP-7702 resolution + `create_init_frame`) because Rust does
-    /// not let us reuse the default while overriding it. **Re-sync
-    /// this body when bumping REVM to 38** — the upstream default
-    /// will likely have drifted.
+    /// Upstream default, plus the `call_depth` seed and the static flag of
+    /// [`Self::new_static`] on the top-level call frame.
     fn first_frame_input(
         &mut self,
         evm: &mut Self::Evm,
-        gas_limit: u64,
-    ) -> Result<FrameInit, Self::Error> {
+        gas: &mut GasTracker,
+    ) -> Result<Option<FrameInit>, Self::Error> {
         let ctx = evm.ctx_mut();
         let mut memory =
             SharedMemory::new_with_buffer(ctx.local().shared_memory_buffer().clone());
         memory.set_memory_limit(ctx.cfg().memory_limit());
 
-        let (tx, journal) = ctx.tx_journal_mut();
-        let bytecode = if let Some(&to) = tx.kind().to() {
-            let account = &journal.load_account_with_code(to)?.info;
-            if let Some(delegated_address) =
-                account.code.as_ref().and_then(Bytecode::eip7702_address)
-            {
-                let account = &journal.load_account_with_code(delegated_address)?.info;
-                Some((
-                    account.code.clone().unwrap_or_default(),
-                    account.code_hash(),
-                ))
-            } else {
-                Some((
-                    account.code.clone().unwrap_or_default(),
-                    account.code_hash(),
-                ))
-            }
-        } else {
-            None
+        // Note: an Err here leaves the revm pre-execution checkpoint open.
+        let Some(mut frame_input) = create_init_frame(ctx, gas)? else {
+            // Note: EIP-2780 only (Amsterdam); revm then reverts its checkpoint.
+            return Ok(None);
         };
-
-        let mut frame_input = create_init_frame(tx, bytecode, gas_limit);
 
         if self.is_static_top_frame {
             // `Create` is incompatible with static (code write); only
@@ -141,11 +118,11 @@ where
             }
         }
 
-        Ok(FrameInit {
+        Ok(Some(FrameInit {
             depth: self.call_depth,
             memory,
             frame_input,
-        })
+        }))
     }
 }
 

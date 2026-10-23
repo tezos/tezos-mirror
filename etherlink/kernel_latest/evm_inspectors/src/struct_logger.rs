@@ -219,7 +219,7 @@ impl StructLogger {
             host,
             result.is_success(),
             result.output(),
-            result.gas_used(),
+            result.tx_gas_used(),
             self.transaction_hash,
         )
     }

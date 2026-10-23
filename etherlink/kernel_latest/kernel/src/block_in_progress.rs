@@ -412,7 +412,8 @@ impl BlockInProgress {
                 tx_object,
                 pending_crac_receipts,
             }) => {
-                let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
+                let execution_gas_used =
+                    receipt_info.execution_outcome.result.tx_gas_used();
                 // account for gas
                 rk.host_mut().add_execution_gas(execution_gas_used);
                 self.add_gas(receipt_info.overall_gas_used)?;

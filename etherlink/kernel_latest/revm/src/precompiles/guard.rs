@@ -47,7 +47,7 @@ pub(crate) fn charge(
     gas: &mut Gas,
     cost: impl Into<EvmGas>,
 ) -> Result<(), CustomPrecompileError> {
-    if gas.record_cost(u64::from(cost.into())) {
+    if gas.record_regular_cost(u64::from(cost.into())) {
         Ok(())
     } else {
         Err(CustomPrecompileError::OutOfGas)

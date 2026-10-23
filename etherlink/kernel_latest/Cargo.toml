@@ -59,9 +59,9 @@ nom = { version = "7.1", default-features = false }
 serde = { version = "1.0", features = ["derive", "rc"] }
 
 # ethereum VM
-revm = { version = "36.0.0", default-features = false, features = [ "optional_eip3607", "optional_no_base_fee" ] }
-revm-database-interface = { version = "10", default-features = false }
-revm-interpreter = { version = "34.0.0", default-features = false }
+revm = { version = "43.0.3", default-features = false, features = [ "optional_eip3607", "optional_no_base_fee" ] }
+revm-database-interface = { version = "43", default-features = false }
+revm-interpreter = { version = "43.0.2", default-features = false }
 aurora-engine-modexp = { version = "1.0", default-features = false }
 bn = { package = "substrate-bn", version = "0.6", default-features = false }
 

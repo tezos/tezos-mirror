@@ -24,7 +24,9 @@ use revm::{
     context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
     handler::{instructions::EthInstructions, EthFrame, Handler},
     inspector::InspectorHandler,
-    interpreter::interpreter::EthInterpreter,
+    interpreter::{
+        interpreter::EthInterpreter, InstructionExecResult, InstructionResult,
+    },
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
     Context, ExecuteCommitEvm, MainBuilder,
 };
@@ -228,7 +230,7 @@ const ORIGIN_OPCODE: u8 = 0x32;
 
 /// Static gas cost of the `ORIGIN` opcode (2, the same `GAS_BASE` REVM
 /// uses for the stock handler — see `revm-interpreter` `instructions::ORIGIN`).
-const ORIGIN_STATIC_GAS: u64 = 2;
+const ORIGIN_STATIC_GAS: u16 = 2;
 
 /// Custom `ORIGIN` opcode handler: when an inbound CRAC carries an
 /// originator (`X-Tezos-Source`, exposed via
@@ -249,7 +251,8 @@ fn etherlink_origin<'a, 'host, Host, R>(
         EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
-) where
+) -> InstructionExecResult
+where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
@@ -261,8 +264,9 @@ fn etherlink_origin<'a, 'host, Host, R>(
         None => InterpHost::caller(context.host),
     };
     if !context.interpreter.stack.push(value.into_word().into()) {
-        context.interpreter.halt_overflow();
+        return Err(InstructionResult::StackOverflow);
     }
+    Ok(())
 }
 
 /// Install [`etherlink_origin`] in `evm.instruction` as the handler for
@@ -279,10 +283,8 @@ fn install_etherlink_origin<'a, 'host, Host, R, INSP>(
 {
     evm.instruction.insert_instruction(
         ORIGIN_OPCODE,
-        revm::interpreter::Instruction::new(
-            etherlink_origin::<Host, R>,
-            ORIGIN_STATIC_GAS,
-        ),
+        revm::interpreter::Instruction::new(etherlink_origin::<Host, R>),
+        ORIGIN_STATIC_GAS,
     );
 }
 
@@ -293,7 +295,7 @@ const GASPRICE_OPCODE: u8 = 0x3A;
 /// Static gas cost of the `GASPRICE` opcode (2, `GAS_BASE` — the same
 /// cost the stock `revm-interpreter` `instructions::gasprice` handler
 /// charges).
-const GASPRICE_STATIC_GAS: u64 = 2;
+const GASPRICE_STATIC_GAS: u16 = 2;
 
 /// Custom `GASPRICE` opcode handler, installed only when servicing a
 /// cross-runtime call. An inbound CRAC carries `gas_price = 0` on its
@@ -313,15 +315,17 @@ fn etherlink_gasprice<'a, 'host, Host, R>(
         EVMInnerContext<'a, 'host, Host, R>,
         EthInterpreter,
     >,
-) where
+) -> InstructionExecResult
+where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     use revm::interpreter::Host as InterpHost;
     let value = InterpHost::basefee(context.host);
     if !context.interpreter.stack.push(value) {
-        context.interpreter.halt_overflow();
+        return Err(InstructionResult::StackOverflow);
     }
+    Ok(())
 }
 
 /// Install [`etherlink_gasprice`] as the `GASPRICE` handler. Called from
@@ -336,10 +340,8 @@ fn install_etherlink_gasprice<'a, 'host, Host, R, INSP>(
 {
     evm.instruction.insert_instruction(
         GASPRICE_OPCODE,
-        revm::interpreter::Instruction::new(
-            etherlink_gasprice::<Host, R>,
-            GASPRICE_STATIC_GAS,
-        ),
+        revm::interpreter::Instruction::new(etherlink_gasprice::<Host, R>),
+        GASPRICE_STATIC_GAS,
     );
 }
 
@@ -525,6 +527,7 @@ fn install_alias_delegation<
         journaled_state
             .load_account(alias)
             .map_err(EVMError::Database)?;
+        // Note: a revert restores the previous code (empty or a legacy forwarder).
         journaled_state.set_code_with_hash(
             alias,
             alias_forwarder_delegation(),
@@ -614,6 +617,7 @@ where
                 credit: Some((addr, amount)),
             } if amount > U256::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
+                // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
@@ -635,6 +639,7 @@ where
                 EtherlinkHandler::default()
             }
             .with_call_depth(call_depth);
+        // Note: an error can leave global checkpoints open; the blueprint then aborts.
         let result = match handler.inspect_run(&mut evm_context) {
             Ok(r) => r,
             Err(e) => {
@@ -691,6 +696,7 @@ where
                 credit: Some((addr, amount)),
             } if amount > U256::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
+                // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
@@ -702,6 +708,7 @@ where
         };
 
         let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
+        // Note: an error can leave global checkpoints open; the blueprint then aborts.
         let result = match execute_transaction(
             &mut evm_context,
             &tx,
@@ -1634,7 +1641,7 @@ mod test {
 
         // Verify the CRAC gas was actually charged (the mock's consumed
         // gas, plus the precompile base cost).
-        let gas_used = execution_result.result.gas_used();
+        let gas_used = execution_result.result.tx_gas_used();
         let mock_evm_gas =
             u64::from(tezosx_interfaces::EvmGas::from(MOCK_TEZOS_GAS_CONSUMED));
         assert!(
@@ -1736,7 +1743,7 @@ mod test {
         // Check the outcome of the transaction
         match execution_result.result {
             ExecutionResult::Success { gas, .. } => {
-                assert!(gas.spent() > 0);
+                assert!(gas.total_gas_spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -4520,7 +4527,7 @@ mod test {
                     "callMichelsonView should succeed, got {:?}",
                     res.result
                 );
-                res.result.gas_used()
+                res.result.tx_gas_used()
             }
 
             fn get_gas(body_len: usize) -> u64 {
@@ -4547,7 +4554,7 @@ mod test {
                     "call(GET) should succeed, got {:?}",
                     res.result
                 );
-                res.result.gas_used()
+                res.result.tx_gas_used()
             }
 
             let view_slope = view_gas(33) - view_gas(32);
@@ -4690,7 +4697,7 @@ mod test {
             .unwrap();
 
             assert!(!res.result.is_success(), "{:?}", res.result);
-            assert_eq!(res.result.gas_used(), limit);
+            assert_eq!(res.result.tx_gas_used(), limit);
         }
 
         // --- materializeAlias ------------------------------------------------
@@ -4913,7 +4920,7 @@ mod test {
                 );
                 assert_eq!(materialized_logs(&second), vec![]);
                 assert!(
-                    second.result.gas_used() < first.result.gas_used(),
+                    second.result.tx_gas_used() < first.result.tx_gas_used(),
                     "an existing alias must not be initialized again"
                 );
             }
@@ -5027,7 +5034,7 @@ mod test {
                 .unwrap();
 
                 assert!(!res.result.is_success(), "{:?}", res.result);
-                assert_eq!(res.result.gas_used(), limit);
+                assert_eq!(res.result.tx_gas_used(), limit);
                 let info = StorageAccount::from_address(&expected_alias())
                     .unwrap()
                     .info(rk.eth_accounts_mut())
@@ -5393,20 +5400,22 @@ mod test {
                 input: CallInput::Bytes(Bytes::new()),
                 return_memory_offset: 0..0,
                 gas_limit,
+                reservoir: 0,
                 bytecode_address: Address::ZERO,
-                known_bytecode: None,
+                known_bytecode: Default::default(),
                 target_address: Address::ZERO,
                 caller: Address::ZERO,
                 value: CallValue::Transfer(U256::ZERO),
                 scheme: CallScheme::Call,
                 is_static: false,
+                charged_new_account_state_gas: false,
             }
         }
 
         // A frame that closes successfully having spent `gas_spent`.
         fn call_outcome(gas_spent: u64) -> CallOutcome {
             let mut gas = Gas::new(1_000_000);
-            let _ = gas.record_cost(gas_spent);
+            let _ = gas.record_regular_cost(gas_spent);
             CallOutcome::new(
                 InterpreterResult {
                     result: InstructionResult::Return,
@@ -5442,9 +5451,11 @@ mod test {
             };
 
             let outer_initial =
-                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID).initial_gas;
+                calculate_initial_tx_gas_for_tx(&outer_tx, DEFAULT_SPEC_ID, None)
+                    .initial_total_gas();
             let inner_initial =
-                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID).initial_gas;
+                calculate_initial_tx_gas_for_tx(&inner_tx, DEFAULT_SPEC_ID, None)
+                    .initial_total_gas();
             assert_ne!(
                 outer_initial, inner_initial,
                 "the two legs must have distinct intrinsic gas for the test \
@@ -5533,7 +5544,7 @@ mod test {
             // The CallTracer ignores the outcome's content: any result does.
             let result = ExecutionResult::Success {
                 reason: SuccessReason::Stop,
-                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(outer_gas_spent),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             };
@@ -5662,7 +5673,7 @@ mod test {
 
             let result = ExecutionResult::Success {
                 reason: SuccessReason::Stop,
-                gas: ResultGas::new(1_000_000, outer_gas_spent, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(outer_gas_spent),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             };
@@ -5767,7 +5778,7 @@ mod test {
 
         match execution_result.result {
             ExecutionResult::Success { gas, .. } => {
-                assert!(gas.spent() > 0);
+                assert!(gas.total_gas_spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -6027,10 +6038,7 @@ mod test {
             .unwrap();
 
         let mut db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
-        let mut touched = Account {
-            info: info.into(),
-            ..Account::default()
-        };
+        let mut touched = Account::default().with_info(info.into());
         touched.status = AccountStatus::Touched;
         DatabaseCommit::commit(&mut db, AddressMap::from_iter([(eoa, touched)]));
 

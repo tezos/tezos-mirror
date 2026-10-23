@@ -164,7 +164,7 @@ impl EthereumRuntime {
         .map_err(|e| classify_evm_run_error("EVM execution failed", e))?;
 
         // Check that the call succeeded; return remaining EVM gas.
-        let gas_used = outcome.result.gas_used();
+        let gas_used = outcome.result.tx_gas_used();
         let remaining_after = gas_remaining.saturating_sub(gas_used);
         match outcome.result {
             // The classification was staged by the caller; the forwarder
@@ -211,7 +211,7 @@ fn build_response(
         Ok(outcome) => {
             // X-Tezos-Gas-Consumed is in the called runtime's units (EVM here).
             // The caller is responsible for converting to its own units.
-            let gas = outcome.result.gas_used();
+            let gas = outcome.result.tx_gas_used();
             match outcome.result {
                 ExecutionResult::Success { output, .. } => {
                     let body = match output {
@@ -362,7 +362,7 @@ where
 /// `Custom`, the storage/runtime variants reuse the typed `EvmDbError` /
 /// `EvmKernelError` → `TezosXRuntimeError` translations (c840d70cfcc4) so a
 /// storage fault stays tagged `Storage`/`Runtime`; only the genuinely
-/// opaque `EVMError::Header`/`Custom` fall back to `Custom`. The match is
+/// opaque `EVMError::Header`/`Custom`/`CustomAny` fall back to `Custom`. The match is
 /// intentionally exhaustive (no `_`): a new `EvmRunError`/`EVMError`
 /// variant must fail to compile so a human classifies it instead of
 /// silently defaulting to a block-aborting `500` — mirroring the
@@ -380,7 +380,10 @@ fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
         EvmRunError::Kernel(kernel) => kernel.into(),
         // No richer typing available for these → keep them opaque.
         EvmRunError::RevmDB(EVMError::Header(_))
-        | EvmRunError::RevmDB(EVMError::Custom(_)) => TezosXRuntimeError::Custom(message),
+        | EvmRunError::RevmDB(EVMError::Custom(_))
+        | EvmRunError::RevmDB(EVMError::CustomAny(_)) => {
+            TezosXRuntimeError::Custom(message)
+        }
     }
 }
 
@@ -1418,7 +1421,7 @@ mod tests {
             ExecutionOutcome {
                 result: ExecutionResult::Success {
                     reason: SuccessReason::Return,
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    gas: ResultGas::default().with_total_gas_spent(21000),
                     output: Output::Call(output.into()),
                     logs: vec![],
                 },
@@ -1445,7 +1448,7 @@ mod tests {
             let outcome = ExecutionOutcome {
                 result: ExecutionResult::Revert {
                     logs: vec![],
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    gas: ResultGas::default().with_total_gas_spent(21000),
                     output: b"revert reason".to_vec().into(),
                 },
                 withdrawals: vec![],
@@ -1463,7 +1466,7 @@ mod tests {
                         revm::context::result::OutOfGasError::Basic,
                     ),
                     logs: vec![],
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    gas: ResultGas::default().with_total_gas_spent(21000),
                 },
                 withdrawals: vec![],
             };
@@ -1503,7 +1506,7 @@ mod tests {
                     result: ExecutionResult::Halt {
                         reason: reason.clone(),
                         logs: vec![],
-                        gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                        gas: ResultGas::default().with_total_gas_spent(21000),
                     },
                     withdrawals: vec![],
                 };
@@ -1540,8 +1543,8 @@ mod tests {
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         }
 
-        // Gas header tests: make_success uses ResultGas::new(u64::MAX, 21000, 0, 0, 0)
-        // so gas_used() = 21000 EVM gas. `X-Tezos-Gas-Consumed` carries the
+        // Gas header tests: make_success spends 21000 gas, so
+        // tx_gas_used() = 21000 EVM gas. `X-Tezos-Gas-Consumed` carries the
         // canonical wire unit, so the header reads 21000 EVM gas expressed
         // in milligas.
 
@@ -1561,7 +1564,7 @@ mod tests {
             let outcome = ExecutionOutcome {
                 result: ExecutionResult::Revert {
                     logs: vec![],
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    gas: ResultGas::default().with_total_gas_spent(21000),
                     output: vec![].into(),
                 },
                 withdrawals: vec![],
@@ -1583,7 +1586,7 @@ mod tests {
                         revm::context::result::OutOfGasError::Basic,
                     ),
                     logs: vec![],
-                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    gas: ResultGas::default().with_total_gas_spent(21000),
                 },
                 withdrawals: vec![],
             };

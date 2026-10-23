@@ -550,7 +550,7 @@ mod tests {
             withdrawals: vec![],
             result: ExecutionResult::Success {
                 reason: revm::context::result::SuccessReason::Return,
-                gas: ResultGas::new(1_000_000, gas_used, 0, 0, 0),
+                gas: ResultGas::default().with_total_gas_spent(gas_used),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             },
