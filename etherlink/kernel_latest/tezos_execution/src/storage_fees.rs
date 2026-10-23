@@ -9,7 +9,6 @@
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{ops::checked::CheckedSub, Zero};
 use tezos_data_encoding::types::Zarith;
-use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
@@ -73,29 +72,47 @@ fn burn_storage_fee(
     Ok(StorageFee(to_burn))
 }
 
-/// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
+/// Converts a signed balance delta into the `changes` field of a
+/// balance update. Fails with `FailedToComputeBalanceUpdate` when
+/// `delta` does not fit in an `i64`.
+fn balance_update_changes(delta: BigInt) -> Result<i64, ApplyOperationError> {
+    delta.try_into().map_err(|e: TryFromBigIntError<BigInt>| {
+        ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
+            e.to_string(),
+        ))
+    })
+}
+
+/// Builds the two balance updates that record a storage fee of `fee`
+/// mutez in a Tezos receipt: a debit of `payer` and a credit of
+/// `StorageFees`.
+///
+/// Returns an empty vector when `fee` is zero. Fails with
+/// `FailedToComputeBalanceUpdate` when `fee` does not fit in the
+/// `changes` field of a balance update.
 fn compute_storage_balance_updates(
-    source_contract: Contract,
+    payer: &impl TezosAccount,
     fee: BigUint,
-) -> Result<Vec<BalanceUpdate>, TryFromBigIntError<BigInt>> {
+) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
     if fee.is_zero() {
         return Ok(vec![]);
     };
-    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
-    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
-
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source_contract),
-        changes: source_delta.try_into()?,
+        balance: Balance::Account(payer.contract()),
+        changes: balance_update_changes(BigInt::from_biguint(
+            num_bigint::Sign::Minus,
+            fee.clone(),
+        ))?,
         update_origin: UpdateOrigin::BlockApplication,
     };
-
     let block_fees = BalanceUpdate {
         balance: Balance::StorageFees,
-        changes: block_fees.try_into()?,
+        changes: balance_update_changes(BigInt::from_biguint(
+            num_bigint::Sign::Plus,
+            fee,
+        ))?,
         update_origin: UpdateOrigin::BlockApplication,
     };
-
     Ok(vec![source_update, block_fees])
 }
 
@@ -115,13 +132,7 @@ pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageF
         return Ok(());
     }
     if let ContentResult::Applied(success) = content {
-        let pair =
-            compute_storage_balance_updates(payer.contract(), BigUint::from(mutez_cost))
-                .map_err(|e| {
-                    ApplyOperationError::Transfer(
-                        TransferError::FailedToComputeBalanceUpdate(e.to_string()),
-                    )
-                })?;
+        let pair = compute_storage_balance_updates(payer, BigUint::from(mutez_cost))?;
         M::extend_success_balance_updates(success, pair);
     }
     Ok(())
@@ -227,11 +238,7 @@ where
         burn_storage_fee(tez_accounts, payer, storage_limit_remaining, bytes)
     })?;
     M::write_balance_updates(success, storage_fees, |fee| {
-        compute_storage_balance_updates(payer.contract(), fee.into()).map_err(|e| {
-            ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
-                e.to_string(),
-            ))
-        })
+        compute_storage_balance_updates(payer, fee.into())
     })?;
     Ok(())
 }
@@ -535,6 +542,7 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_tezlink::operation::{
         OriginationContent, Parameters, Script, TransferContent,
@@ -614,11 +622,7 @@ mod tests {
             storage_limit_remaining,
             nb_consumed_bytes,
         )?;
-        compute_storage_balance_updates(payer.contract(), fee.into()).map_err(|e| {
-            ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
-                e.to_string(),
-            ))
-        })
+        compute_storage_balance_updates(payer, fee.into())
     }
 
     /// Test wrapper around [`burn_internal_op_storage_fees`] that
