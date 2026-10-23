@@ -981,6 +981,14 @@ impl From<TransferTarget> for TransferSuccess {
     }
 }
 
+impl TransferTarget {
+    /// Replaces the `balance_updates` of the success with `updates`.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        let TransferTarget::ToContract(success) = self;
+        success.balance_updates = updates;
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
@@ -1064,6 +1072,13 @@ pub struct OriginationSuccess {
     pub storage_size: Zarith,
     pub paid_storage_size_diff: Zarith,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+}
+
+impl OriginationSuccess {
+    /// Replaces the `balance_updates` of the success with `updates`.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        self.balance_updates = updates;
+    }
 }
 
 impl HasConsumedMilligas for OriginationSuccess {
@@ -1384,6 +1399,25 @@ impl InternalOperationSum {
             Self::Transfer(inner) => inner.nonce = nonce,
             Self::Origination(inner) => inner.nonce = nonce,
             Self::Event(inner) => inner.nonce = nonce,
+        }
+    }
+
+    /// Replaces the `balance_updates` of an `Applied` result with
+    /// `updates`. No-op on a non-Applied result and on an event, which
+    /// has no balance updates.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        match self {
+            Self::Transfer(inner) => {
+                if let ContentResult::Applied(success) = &mut inner.result {
+                    success.set_balance_updates(updates);
+                }
+            }
+            Self::Origination(inner) => {
+                if let ContentResult::Applied(success) = &mut inner.result {
+                    success.set_balance_updates(updates);
+                }
+            }
+            Self::Event(_) => {}
         }
     }
 }
