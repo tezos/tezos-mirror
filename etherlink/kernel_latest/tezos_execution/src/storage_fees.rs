@@ -13,8 +13,8 @@ use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
 use tezos_tezlink::operation_result::{
     ApplyOperationError, Balance, BalanceUpdate, ContentResult, EventContent,
-    EventSuccess, InternalContentWithMetadata, InternalOperationSum, OperationKind,
-    OriginationSuccess, RevealSuccess, TransferError, TransferTarget, UpdateOrigin,
+    InternalContentWithMetadata, InternalOperationSum, OperationKind, OriginationSuccess,
+    TransferError, TransferTarget, UpdateOrigin,
 };
 
 use crate::account_storage::TezosAccount;
@@ -496,44 +496,33 @@ impl OperationStorageFees for OriginationContent {
     }
 }
 
-impl OperationStorageFees for RevealContent {
+/// A kind whose operations allocate no storage: [`RevealContent`] and
+/// [`EventContent`]. Such a kind implements [`OperationStorageFees`]
+/// with nothing to charge and nothing to write.
+pub trait NoStorageFees: OperationKind {}
+
+impl NoStorageFees for RevealContent {}
+
+impl NoStorageFees for EventContent {}
+
+impl<M: NoStorageFees> OperationStorageFees for M {
     type StorageFees = ();
 
-    fn build_storage_fees<F, E>(_: &RevealSuccess, _: F) -> Result<(), E>
+    fn build_storage_fees<F, E>(_: &M::Success, _: F) -> Result<(), E>
     where
         F: FnMut(&Zarith) -> Result<StorageFee, E>,
     {
         Ok(())
     }
 
-    fn write_balance_updates<F, E>(_: &mut RevealSuccess, _: (), _: F) -> Result<(), E>
+    fn write_balance_updates<F, E>(_: &mut M::Success, _: (), _: F) -> Result<(), E>
     where
         F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
     {
         Ok(())
     }
 
-    fn extend_success_balance_updates(_: &mut RevealSuccess, _: Vec<BalanceUpdate>) {}
-}
-
-impl OperationStorageFees for EventContent {
-    type StorageFees = ();
-
-    fn build_storage_fees<F, E>(_: &EventSuccess, _: F) -> Result<(), E>
-    where
-        F: FnMut(&Zarith) -> Result<StorageFee, E>,
-    {
-        Ok(())
-    }
-
-    fn write_balance_updates<F, E>(_: &mut EventSuccess, _: (), _: F) -> Result<(), E>
-    where
-        F: Fn(StorageFee) -> Result<Vec<BalanceUpdate>, E>,
-    {
-        Ok(())
-    }
-
-    fn extend_success_balance_updates(_: &mut EventSuccess, _: Vec<BalanceUpdate>) {}
+    fn extend_success_balance_updates(_: &mut M::Success, _: Vec<BalanceUpdate>) {}
 }
 
 #[cfg(test)]
@@ -549,8 +538,8 @@ mod tests {
     };
     use tezos_tezlink::operation_result::{
         ApplyOperationErrors, BacktrackedResult, Balance, BalanceTooLow, BalanceUpdate,
-        InternalContentWithMetadata, Originated, RevealSuccess, TransferSuccess,
-        UpdateOrigin,
+        EventSuccess, InternalContentWithMetadata, Originated, RevealSuccess,
+        TransferSuccess, UpdateOrigin,
     };
 
     use crate::account_storage::TezosImplicitAccount;
