@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 module Image = Images.Image
-module Images_external = Images.Images_external
 module Images = Images
 module Rules = Rules
 module Runner = Runner
