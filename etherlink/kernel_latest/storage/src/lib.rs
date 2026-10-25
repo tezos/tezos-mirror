@@ -15,7 +15,7 @@ use helpers::is_incomplete;
 use nom::error::ParseError;
 use nom::Finish;
 use primitive_types::{H256, U256};
-use rlp::{Decodable, Encodable};
+use rlp::Decodable;
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
@@ -168,17 +168,6 @@ pub fn write_u64_le(
         .map_err(Error::from)
 }
 
-/// Store `src` (which must be encodable) as rlp bytes into storage
-/// at the given `path`.
-pub fn store_rlp<T: Encodable>(
-    src: &T,
-    host: &mut impl StorageV1,
-    path: &impl Path,
-) -> Result<(), Error> {
-    host.store_write_all(path, &src.rlp_bytes())
-        .map_err(Error::from)
-}
-
 /// Return a decodable value from storage as rlp bytes
 /// at the given `path`.
 pub fn read_rlp<T: Decodable>(
@@ -286,26 +275,8 @@ pub fn read_nom_value_bounded<T: for<'a> NomReader<'a>>(
     decode_nom_value(&bytes)
 }
 
-/// Return an optional decoded value using NomReader
-/// at the given `path`
-pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> Result<Option<T>, Error> {
-    // Read directly and map a missing path to `None`, avoiding the extra
-    // `store_has` probe (same pattern as [`read_optional_nom_value_bounded`]).
-    match host.store_read_all(path) {
-        Ok(bytes) => decode_nom_value(&bytes).map(Some),
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
-    }
-}
-
-/// Like [`read_optional_nom_value`], but reads at most `max_bytes` in a
-/// single `store_read` host call. A missing path yields `Ok(None)`,
-/// avoiding the extra `store_has` probe — so this is one host call where
-/// [`read_optional_nom_value`] needs two (or three, counting the
-/// `store_value_size` inside `store_read_all`).
+/// Decodes the value at `path`, reading at most `max_bytes` in a single
+/// `store_read` host call. A missing path yields `Ok(None)`.
 ///
 /// See [`read_nom_value_bounded`] for the `max_bytes` contract.
 pub fn read_optional_nom_value_bounded<T: for<'a> NomReader<'a>>(

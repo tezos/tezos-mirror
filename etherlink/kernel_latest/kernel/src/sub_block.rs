@@ -38,7 +38,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -191,7 +191,7 @@ where
 #[trace_kernel]
 pub fn handle_run_transaction<Host>(
     host: &mut Host,
-    base: impl KeySpace,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
@@ -218,7 +218,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &base);
+    let config = fetch_tezosx_configuration(host, &mut bk)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
     let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
@@ -227,7 +227,7 @@ where
 
     // Read the HTTP-trace replay flag before wrapping the host in
     // [SafeStorage] — see [block::produce] for the rationale.
-    let http_trace_enabled = crate::storage::is_http_trace_enabled(&base);
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
     let mut safe_host = SafeStorage {
         host,
@@ -270,7 +270,7 @@ where
                 cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
                 tezos_parent_hash: crate::block_storage::read_current_hash(
                     &safe_host,
-                    &crate::chains::TEZ_SAFE_STORAGE_ROOT_PATH,
+                    &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
                 )
                 .unwrap_or_else(|_| {
                     H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
@@ -281,7 +281,7 @@ where
 
     block_in_progress.repush_tx(input_data.tx);
 
-    drop(base);
+    drop(bk);
     let computed = RuntimeKeyspaces::init(&mut safe_host)
         .map_err(anyhow::Error::from)
         .and_then(|mut rk| {
@@ -336,7 +336,7 @@ fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
 #[trace_kernel]
 pub fn assemble_block<Host>(
     host: &mut Host,
-    mut base: impl KeySpace,
+    mut bk: BlueprintKeyspaces<impl KeySpace>,
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
@@ -356,11 +356,12 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &base);
+    let config = fetch_tezosx_configuration(host, &mut bk)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
-    let mut configuration = fetch_configuration(host, &base);
+    let mut configuration = fetch_configuration(host, bk.base());
+    let mut base = bk.into_base();
     let mut safe_host = SafeStorage {
         host,
         world_states: config.world_states(input_data.block_number),

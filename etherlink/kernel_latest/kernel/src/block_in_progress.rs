@@ -15,7 +15,6 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{
     TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-    TEZ_SAFE_STORAGE_ROOT_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -39,7 +38,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -544,9 +543,11 @@ impl BlockInProgress {
         );
 
         if enable_tezos_runtime {
-            let protocol = match read_current_tez_block_header(rk.host()) {
-                Ok(previous_header) => previous_header.next_protocol,
-                Err(_) => TARGET_TEZOS_PROTOCOL,
+            let protocol = match read_current_tez_block_header(rk.tez_world_state())
+                .context("Failed to read the current TezBlockHeader")?
+            {
+                Some(previous_header) => previous_header.next_protocol,
+                None => TARGET_TEZOS_PROTOCOL,
             };
             let mut tezos_ops = self.cumulative_tezos_operation_receipts.list;
             crate::apply::renumber_nonces(&mut tezos_ops).map_err(|e| {
@@ -577,12 +578,12 @@ impl BlockInProgress {
             // Maintain the live_blocks set for the Michelson runtime (branch validation).
             block_storage::store_current(
                 rk.host_mut(),
-                &TEZ_SAFE_STORAGE_ROOT_PATH,
+                &TEZ_WORLD_STATE_ROOT_PATH,
                 &tez_block,
                 true, // maintain_live_blocks
             )
             .context("Failed to store the Tezos block")?;
-            store_current_tez_block_header(rk.host_mut(), &new_header)
+            store_current_tez_block_header(rk.tez_world_state_mut(), &new_header)
                 .context("Failed to store the current TezBlockHeader")?;
         }
 
