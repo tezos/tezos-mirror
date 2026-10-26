@@ -80,6 +80,7 @@ val job :
   ?retry:retry ->
   ?parallel:parallel ->
   ?environment:environment ->
+  ?resource_group:string ->
   name:string ->
   script:string list ->
   unit ->

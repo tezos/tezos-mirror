@@ -314,6 +314,7 @@ let enc_job : job -> value =
        retry;
        parallel;
        environment;
+       resource_group;
      } ->
   obj_flatten
     [
@@ -333,6 +334,7 @@ let enc_job : job -> value =
       opt "services" enc_services services;
       opt "variables" enc_variables variables;
       opt "environment" enc_environment environment;
+      opt "resource_group" string resource_group;
       opt "artifacts" enc_artifacts artifacts;
       opt "id_tokens" enc_id_tokens id_tokens;
       opt "when" enc_when_job when_;
