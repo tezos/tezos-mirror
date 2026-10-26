@@ -13113,6 +13113,170 @@ mod tests {
              returned {fat_bytes} B"
         );
     }
+
+    /// The symmetric guarantee for the destination's **code**: a transfer must
+    /// charge the code read before performing it, so a fat script cannot be
+    /// read for free. Same witness as the storage test — the bytes the host
+    /// hands back must not grow with the code size. The code is read before the
+    /// storage, so inflating the code and keeping storage tiny isolates it.
+    #[test]
+    fn transfer_charges_code_read_before_reading() {
+        // A valid, runnable contract whose code blob is inflated to ~`code_len`
+        // bytes by an unused `PUSH bytes` literal; storage stays unit (tiny).
+        let script = |code_len: usize| -> String {
+            format!(
+                "parameter unit; storage unit; \
+                 code {{ DROP; PUSH bytes 0x{}; DROP; UNIT; NIL operation; PAIR }}",
+                "00".repeat(code_len)
+            )
+        };
+        const FAT: usize = 1_000_000;
+        const FOUR_TIMES_FAT: usize = 4_000_000;
+        const TINY: usize = 8;
+
+        // One amount-0 call; reports the receipt and the bytes the host read.
+        let run = |code_len: usize, gas_limit: u64| -> (OperationResultSum, u64) {
+            let mut host = CountingHost::default();
+            let bytes_read = host.bytes_read_handle();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let src = bootstrap1();
+            let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+            init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+            reveal_account(rk.tez_accounts_mut(), &src);
+            init_contract(
+                &mut rk,
+                &dest,
+                &script(code_len),
+                &Micheline::from(()),
+                &0_u64.into(),
+            );
+
+            let operation = make_transfer_operation(
+                15,
+                1,
+                gas_limit,
+                100,
+                src.clone(),
+                0_u64.into(),
+                Contract::Originated(dest),
+                Parameters {
+                    entrypoint: Entrypoint::default(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                },
+            );
+
+            // Measure the operation, not the state setup that precedes it.
+            rk.host().reset_bytes_read();
+            let processed = validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel \
+                 error",
+            );
+            let mut receipts = ProcessedOperation::into_receipts(processed);
+            assert_eq!(receipts.len(), 1, "expected a single top-level receipt");
+            (receipts.remove(0).receipt, bytes_read.get())
+        };
+
+        let is_applied = |receipt: &OperationResultSum| {
+            matches!(
+                receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Calibrated rather than hardcoded, so the test survives a gas-model
+        // change. The tiny-code call reads a minimal script and its unit storage.
+        const VALIDATES_BUT_TOO_LOW: u64 = 200;
+        const AMPLE: u64 = 100_000;
+        let mut too_low = VALIDATES_BUT_TOO_LOW;
+        let mut enough = AMPLE;
+        assert!(
+            is_applied(&run(TINY, enough).0),
+            "the tiny-code call must apply at the calibration ceiling"
+        );
+        assert!(
+            !is_applied(&run(TINY, too_low).0),
+            "the tiny-code call must not apply at the calibration floor"
+        );
+        while enough - too_low > 1 {
+            let probe = too_low + (enough - too_low) / 2;
+            if is_applied(&run(TINY, probe).0) {
+                enough = probe;
+            } else {
+                too_low = probe;
+            }
+        }
+        let minimal_gas_limit = enough;
+
+        // Negative control: the same call over a tiny code is applied.
+        let (tiny, _) = run(TINY, minimal_gas_limit);
+        assert!(
+            is_applied(&tiny),
+            "the tiny-code call must apply at its calibrated limit, got {tiny:?}"
+        );
+
+        // An operation that cannot afford the read must not get it.
+        for size in [FAT, FOUR_TIMES_FAT] {
+            assert!(
+                storage_read_cost_milligas(1, size as u64) > minimal_gas_limit * 1000,
+                "a {size} B code read must not fit in {minimal_gas_limit} gas, or \
+                 the test is measuring an affordable read"
+            );
+        }
+
+        let (fat, fat_bytes) = run(FAT, minimal_gas_limit);
+        let (four_times_fat, four_times_fat_bytes) =
+            run(FOUR_TIMES_FAT, minimal_gas_limit);
+
+        for (label, receipt) in [("1 MB", &fat), ("4 MB", &four_times_fat)] {
+            match receipt {
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                    ..
+                }) => assert!(
+                    errors.iter().any(|e| matches!(
+                        e,
+                        ApplyOperationError::Transfer(TransferError::OutOfGas(_))
+                    )),
+                    "expected the {label} call to fail out of gas, got {errors:?}"
+                ),
+                other => panic!(
+                    "expected the {label} call to have failed out of gas, got {other:?}"
+                ),
+            }
+        }
+
+        // The out-of-gas is reached without reading the code.
+        assert_eq!(
+            fat_bytes, four_times_fat_bytes,
+            "bytes read must not depend on the destination's code size: \
+             {FAT} B code read {fat_bytes} B, {FOUR_TIMES_FAT} B code read \
+             {four_times_fat_bytes} B"
+        );
+        assert!(
+            fat_bytes < FAT as u64,
+            "the out-of-gas call must not read the {FAT} B code, but the host \
+             returned {fat_bytes} B"
+        );
+    }
     /// Same for a `VIEW`, whose script and storage reads were charged nothing
     /// at all. Same witness: the bytes the host hands back must not grow with
     /// the viewed contract's storage.
