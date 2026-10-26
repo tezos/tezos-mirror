@@ -64,6 +64,15 @@ val non_release_tag : Cacio.global_pipeline
 (** Dry-run pipeline for {!non_release_tag}. *)
 val non_release_tag_test : Cacio.global_pipeline
 
+(** Release pipeline for Octez.
+
+    Jobs of this pipeline do not depend on the kind of release (major, minor,
+    release candidate, beta, packaging revision).
+    Jobs that publish are manual: the release manager decides what to publish.
+    Jobs that publish somewhere visible are only included in the pipelines in
+    which they actually publish there. *)
+val octez_release : Cacio.global_pipeline
+
 (** Add jobs to the release pipelines.
 
     This is equivalent to registering the jobs into both
