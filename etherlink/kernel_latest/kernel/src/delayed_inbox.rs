@@ -4,14 +4,14 @@
 use crate::{
     bridge::Deposit,
     chains::TezosXTransaction,
-    configuration::CommonConfig,
+    configuration::{CommonConfig, EVM_CHAIN_ID},
     event::Event,
     linked_list::LinkedList,
     storage::{self, read_last_info_per_level_timestamp},
     transaction::{Transaction, TransactionContent},
 };
 use anyhow::Result;
-use primitive_types::H256;
+use primitive_types::{H256, U256};
 use revm_etherlink::helpers::legacy::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
@@ -50,6 +50,9 @@ const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY: Key =
 /// of the EVM node is unaffected. Once the sunset has passed on mainnet,
 /// this constant and the flooring in [DelayedInbox::first_has_timed_out]
 /// can be removed.
+///
+/// [EVM_CHAIN_ID], the sandbox chain the test suites run on, is exempt so
+/// tests keep exercising the configured timeout.
 pub const DELAYED_INBOX_TIMEOUT_FLOOR: u64 = 14 * 24 * 60 * 60;
 
 /// End of the [DELAYED_INBOX_TIMEOUT_FLOOR] mitigation window:
@@ -385,12 +388,18 @@ impl DelayedInbox {
     }
 
     /// Returns whether the oldest tx in the delayed inbox has timed out.
-    pub fn first_has_timed_out(&mut self, base: &impl KeySpace) -> Result<bool> {
+    pub fn first_has_timed_out(
+        &mut self,
+        base: &impl KeySpace,
+        evm_chain_id: U256,
+    ) -> Result<bool> {
         // Every read below resolves against the threaded `/base` handle.
         let now = read_last_info_per_level_timestamp(base)?;
         let configured_timeout = storage::delayed_inbox_timeout(base)?;
-        // See [DELAYED_INBOX_TIMEOUT_FLOOR]: two-week floor until the sunset.
-        let timeout = if now.as_u64() < DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET {
+        // Apply the two-week floor until the sunset, except on the sandbox chain.
+        let floored = evm_chain_id != U256::from(EVM_CHAIN_ID)
+            && now.as_u64() < DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET;
+        let timeout = if floored {
             u64::max(configured_timeout, DELAYED_INBOX_TIMEOUT_FLOOR)
         } else {
             configured_timeout
@@ -456,7 +465,7 @@ mod tests {
     use super::DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET;
     use crate::block_storage;
     use crate::chains::make_test_operation;
-    use crate::configuration::CommonConfig;
+    use crate::configuration::{CommonConfig, EVM_CHAIN_ID};
     use crate::load_base;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
@@ -553,14 +562,17 @@ mod tests {
     }
 
     /// Until [super::DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET], the effective
-    /// timeout is floored at two weeks even when the configured (here:
-    /// default, 12h) timeout is shorter; the floor itself still fires; and
-    /// once the sunset has passed the configured timeout applies again.
+    /// timeout is floored at two weeks on a deployed network even when the
+    /// configured (here: default, 12h) timeout is shorter; the floor itself
+    /// still fires; and once the sunset has passed the configured timeout
+    /// applies again.
     #[test]
     fn test_delayed_inbox_timeout_floored_until_sunset() {
         use super::{DELAYED_INBOX_TIMEOUT_FLOOR, DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET};
         use crate::storage::{store_l1_level, store_last_info_per_level_timestamp};
 
+        // Etherlink mainnet; any chain id but the sandbox one would do.
+        let deployed = U256::from(42793);
         let day = 86_400i64;
 
         // Before the sunset: one day > the 12h default timeout, but the
@@ -583,9 +595,18 @@ mod tests {
         store_l1_level(&mut base, 10_000).unwrap();
         store_last_info_per_level_timestamp(&mut base, Timestamp::from(day)).unwrap();
         assert!(
-            !delayed_inbox.first_has_timed_out(&base).unwrap(),
+            !delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
             "before the sunset, a one-day-old delayed transaction must not \
              time out: the two-week floor applies"
+        );
+
+        // The same transaction times out on the sandbox chain using its
+        // configured timeout, without waiting for the two-week floor.
+        assert!(
+            delayed_inbox
+                .first_has_timed_out(&base, U256::from(EVM_CHAIN_ID))
+                .unwrap(),
+            "the sandbox chain is exempt from the floor"
         );
 
         // Still before the sunset: once the transaction is two weeks old,
@@ -596,7 +617,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            delayed_inbox.first_has_timed_out(&base).unwrap(),
+            delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
             "the two-week floor must still force-include old transactions"
         );
 
@@ -624,7 +645,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            delayed_inbox.first_has_timed_out(&base).unwrap(),
+            delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
             "after the sunset, the configured 12h timeout must apply again"
         );
     }

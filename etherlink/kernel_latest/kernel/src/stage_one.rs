@@ -10,7 +10,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::TezosXTransaction;
 use crate::configuration::{
-    CommonConfig, Configuration, ConfigurationMode, SequencerConfig,
+    fetch_evm_chain_id, CommonConfig, Configuration, ConfigurationMode, SequencerConfig,
 };
 use crate::delayed_inbox::DelayedInbox;
 use crate::event::Event;
@@ -128,7 +128,9 @@ where
         StageOneStatus::Done => {
             log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
-            let timed_out = config_sequencer.delayed_inbox.first_has_timed_out(base)?;
+            let timed_out = config_sequencer
+                .delayed_inbox
+                .first_has_timed_out(base, fetch_evm_chain_id(host))?;
             if timed_out {
                 fetch_delayed_transactions(
                     base,
