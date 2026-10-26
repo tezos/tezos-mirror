@@ -3860,7 +3860,7 @@ mod tests {
             &Micheline::from(()),
             &0_u64.into(),
         );
-        let code_len = context::originated_from_kt1(&kt1)
+        let code_len = TezosOriginatedAccount::from_kt1(&kt1)
             .unwrap()
             .code(rk.tez_accounts())
             .map(|code| match code {
