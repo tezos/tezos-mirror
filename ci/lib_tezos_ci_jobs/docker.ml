@@ -14,6 +14,24 @@ module CI = Cacio.Shared
    read as [Docker.version] by [debian_repository.ml] and [release_tag.ml]. *)
 let version = Tezos_ci.Images.Base_images.docker_version
 
+(* Variables and environment of jobs that build or merge Docker images,
+   depending on where they push the images:
+   - [`real]: Docker Hub on protected refs of tezos/tezos, GCP otherwise;
+   - [`test]: GCP, signed with the dev-only signer;
+   - [`release]: GCP, signed with the production signer on protected refs
+     (see [docker_sign.sh]), so that the images can then be copied
+     to Docker Hub by another job.
+   Docker Hub credentials (CI_DOCKER_AUTH) and the production signer are
+   scoped to the [docker-publish] environment. *)
+let docker_hub_variable mode =
+  ( "CI_DOCKER_HUB",
+    match mode with `real -> "true" | `test | `release -> "false" )
+
+let docker_publish_environment = function
+  | `real | `release ->
+      Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+  | `test -> None
+
 let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
   let arch_str = Tezos_ci.Runner.Arch.show_uniform arch in
   CI.job
@@ -42,7 +60,7 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
     ~variables:
       [
         ("DOCKER_VERSION", version);
-        ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
+        docker_hub_variable mode;
         ("IMAGE_ARCH_PREFIX", arch_str ^ "_");
         ( "EXECUTABLE_FILES",
           match contents with
@@ -51,14 +69,7 @@ let make_job_docker ~__POS__ ~name ~description ~scripts contents mode arch =
                script-inputs/experimental-executables"
           | `released -> "script-inputs/released-executables" );
       ]
-      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
-       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
-       authenticate and thus need access. *)
-    ?environment:
-      (match mode with
-      | `real ->
-          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
-      | `test -> None)
+    ?environment:(docker_publish_environment mode)
     ~script:scripts
 
 let job_docker_snapshot =
@@ -112,16 +123,8 @@ let make_job_docker_merge_manifests ~__POS__ ~name ~description ~needs ~scripts
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
     ~needs
     ~services:[{name = Tezos_ci.Images.Base_images.dind_service}]
-    ~variables:
-      [
-        ("DOCKER_VERSION", version);
-        ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
-      ]
-    ?environment:
-      (match mode with
-      | `real ->
-          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
-      | `test -> None)
+    ~variables:[("DOCKER_VERSION", version); docker_hub_variable mode]
+    ?environment:(docker_publish_environment mode)
     ~script:scripts
 
 let job_docker_merge_manifests_snapshot =
@@ -187,13 +190,8 @@ let job_docker_mirror_to_gitlab_registry =
       (* No dind service, and no docker_initialize.sh: the job copies registry
          to registry with regctl, which talks to the registry API directly and
          never needs a Docker daemon. docker_image_names.sh is pure shell. *)
-    ~variables:
-      [("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false")]
-    ?environment:
-      (match mode with
-      | `real ->
-          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
-      | `test -> None)
+    ~variables:[docker_hub_variable mode]
+    ?environment:(docker_publish_environment mode)
     ~script:
       [
         "./scripts/ci/docker_image_names.sh";

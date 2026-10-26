@@ -47,8 +47,7 @@ let job_docker_container_scanning =
          ~reports:
            (Gitlab_ci.Util.reports ~container_scanning:scanning_report ())
          [vuln_predicate])
-    ~variables:
-      [("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true")]
+    ~variables:[Docker.docker_hub_variable mode]
     ~script:
       [
         "./scripts/ci/docker_image_names.sh";
@@ -394,18 +393,8 @@ let job_docker_promote_to_version =
     ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
-      [
-        ("DOCKER_VERSION", Docker.version);
-        ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
-      ]
-      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
-       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
-       authenticate and thus need access. *)
-    ?environment:
-      (match mode with
-      | `real ->
-          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
-      | `test -> None)
+      [("DOCKER_VERSION", Docker.version); Docker.docker_hub_variable mode]
+    ?environment:(Docker.docker_publish_environment mode)
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
