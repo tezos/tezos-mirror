@@ -1778,6 +1778,8 @@ pub fn get_contract_entrypoint(
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
+    // Unmetered by design: the RPC bills no operation, so there is no counter.
+    #[allow(clippy::disallowed_methods)]
     let code = contract_account.code(tez_accounts).ok()?;
     entrypoints_of_code(code, gas)
 }
@@ -1928,6 +1930,8 @@ pub fn get_enshrined_contract_views(
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
+    // Unmetered by design: same RPC inspection path as above.
+    #[allow(clippy::disallowed_methods)]
     let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(_) => None,
@@ -3380,6 +3384,9 @@ pub(crate) mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    // Tests read blobs directly; there is no operation to charge.
+    #![allow(clippy::disallowed_methods)]
+
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_journal::TezosXHashes;
 

@@ -1252,6 +1252,9 @@ mod tests {
 
 #[cfg(test)]
 mod test {
+    // Tests read blobs directly; there is no operation to charge.
+    #![allow(clippy::disallowed_methods)]
+
     use super::*;
     use crate::account_storage::{
         narith_to_u256, TezosAccountInfo, TezosImplicitAccount,
