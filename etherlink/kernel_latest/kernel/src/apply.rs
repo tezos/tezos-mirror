@@ -1768,6 +1768,20 @@ pub(crate) mod tests {
         amount: u64,
     ) -> tezos_tezlink::operation_result::InternalOperationSum {
         use tezos_crypto_rs::hash::ContractKt1Hash;
+        let contract = tezos_protocol::contract::Contract::Originated(
+            ContractKt1Hash::from_base58_check("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+                .unwrap(),
+        );
+        make_transfer_with_contract(contract, nonce, amount)
+    }
+
+    /// An applied internal transfer of `amount` mutez from `contract`
+    /// to itself, with nonce `nonce`.
+    pub fn make_transfer_with_contract(
+        contract: tezos_protocol::contract::Contract,
+        nonce: u16,
+        amount: u64,
+    ) -> tezos_tezlink::operation_result::InternalOperationSum {
         use tezos_data_encoding::types::Narith;
         use tezos_tezlink::operation::{Parameters, TransferContent};
         use tezos_tezlink::operation_result::{
@@ -1775,21 +1789,11 @@ pub(crate) mod tests {
             TransferSuccess, TransferTarget,
         };
         InternalOperationSum::Transfer(InternalContentWithMetadata {
-            sender: tezos_protocol::contract::Contract::Originated(
-                ContractKt1Hash::from_base58_check(
-                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
-                )
-                .unwrap(),
-            ),
+            sender: contract.clone(),
             nonce,
             content: TransferContent {
                 amount: Narith(amount.into()),
-                destination: tezos_protocol::contract::Contract::Originated(
-                    ContractKt1Hash::from_base58_check(
-                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
-                    )
-                    .unwrap(),
-                ),
+                destination: contract,
                 parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
                     value: vec![],
@@ -2120,17 +2124,24 @@ pub(crate) mod tests {
     #[test]
     fn test_renumber_nonces_rejects_at_cap() {
         use mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezos_tezlink::operation_result::ApplyOperationError;
         let cap = MAX_INTERNAL_OPERATIONS as usize; // 65_535
 
         let block_of = |total: usize| {
             // Spread internal ops across two operations to exercise the
             // cross-operation, never-reset block counter.
-            let proto = make_transfer(0, 0);
             let first = total / 2;
+            let contract = tezos_protocol::contract::Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+            );
+            let transfer = |_| make_transfer_with_contract(contract.clone(), 0, 0);
             vec![
-                dummy_crac_receipt(vec![proto.clone(); first]),
-                dummy_crac_receipt(vec![proto; total - first]),
+                dummy_crac_receipt((0..first).map(transfer).collect()),
+                dummy_crac_receipt((first..total).map(transfer).collect()),
             ]
         };
 

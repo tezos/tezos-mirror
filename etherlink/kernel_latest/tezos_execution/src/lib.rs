@@ -293,11 +293,11 @@ fn finalize_statuses<M: OperationKind>(
 /// Entries tagged [`InternalOpOrigin::Crac`] pass through unchanged
 /// — their storage cost belongs to a foreign-runtime caller.
 ///
-/// On a per-entry burn failure, the receipt entries
-/// (clone-then-rebuild) carry the pre-burn internals — no stray
-/// balance_updates survive. Host-side debits applied by `burn_tez`
-/// are rolled back out-of-band by the caller's `SafeStorage`
-/// transaction.
+/// The internals are all charged before any of their receipts is
+/// written, so a per-entry burn failure returns the pre-burn
+/// internals: no stray balance_updates survive. Host-side debits
+/// applied by `burn_tez` are rolled back out-of-band by the
+/// caller's `SafeStorage` transaction.
 fn burn_pass<M, A>(
     tez_accounts: &mut impl KeySpace,
     payer: &A,
@@ -319,37 +319,32 @@ where
         return (untag_internals(internal_operation_results), parent_outcome);
     }
 
-    let burned: Result<Vec<InternalOperationSum>, ApplyOperationError> =
-        internal_operation_results
-            .iter()
-            .map(|tagged_op| {
-                let mut op = tagged_op.op.clone();
-                match &tagged_op.origin {
-                    InternalOpOrigin::Own {
-                        delegated_storage_cost,
-                    } => {
-                        storage_fees::burn_internal_op_storage_fees(
-                            tez_accounts,
-                            payer,
-                            storage_limit_remaining,
-                            &mut op,
-                        )?;
-                        storage_fees::add_delegated_storage_fee_balance_updates(
-                            payer,
-                            &mut op,
-                            *delegated_storage_cost,
-                        )?;
-                    }
-                    InternalOpOrigin::Crac => {}
-                }
-                Ok(op)
-            })
-            .collect();
-
-    match burned {
-        Ok(burned) => (burned, Ok(())),
-        Err(e) => (untag_internals(internal_operation_results), Err(e)),
-    }
+    // One slot per internal: the balance updates its receipt will
+    // carry, or `None` when the receipt is left as it is.
+    let charged = internal_operation_results
+        .iter()
+        .map(|tagged_op| match tagged_op.origin {
+            InternalOpOrigin::Own {
+                delegated_storage_cost,
+            } => storage_fees::charge_internal_op_storage_fees(
+                tez_accounts,
+                payer,
+                storage_limit_remaining,
+                &tagged_op.op,
+                delegated_storage_cost,
+            ),
+            InternalOpOrigin::Crac => Ok(None),
+        })
+        .collect::<Result<Vec<_>, _>>();
+    let mut internals = untag_internals(internal_operation_results);
+    let outcome = charged.map(|charged| {
+        for (op, updates) in internals.iter_mut().zip(charged) {
+            if let Some(updates) = updates {
+                op.set_balance_updates(updates);
+            }
+        }
+    });
+    (internals, outcome)
 }
 
 /// Build the wire [`OperationResult`] for a manager operation:
@@ -3402,6 +3397,7 @@ mod tests {
     use mir::context::TypecheckingCtx;
     use mir::gas::{self, Gas};
     use mir::parser::Parser;
+    use mir::serializer::MichelineExpr;
     use mir::typechecker::{typecheck_value, AllowForgedLazyStorageId};
     use num_traits::ops::checked::CheckedSub;
     use num_traits::ToPrimitive;
@@ -3426,10 +3422,10 @@ mod tests {
         },
         operation_result::{
             ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
-            BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
-            InternalContentWithMetadata, InternalOperationSum, OperationKind,
-            OperationResult, OperationResultSum, OperationWithMetadata, Originated,
-            OriginationError, OriginationSuccess, RevealError, RevealSuccess,
+            BalanceTooLow, BalanceUpdate, ContentResult, CounterError, EventContent,
+            EventSuccess, InternalContentWithMetadata, InternalOperationSum,
+            OperationKind, OperationResult, OperationResultSum, OperationWithMetadata,
+            Originated, OriginationError, OriginationSuccess, RevealError, RevealSuccess,
             TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
@@ -7346,7 +7342,7 @@ mod tests {
                         result: ContentResult::Applied(_),
                         internal_operation_results,
                         ..
-                    }) => internal_operation_results.clone(),
+                    }) => internal_operation_results,
                     other => panic!(
                         "Top-level operation should be an applied transfer but is {other:?}"
                     ),
@@ -14464,9 +14460,8 @@ mod tests {
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
-        // The returned internal must be the pre-burn one: no
-        // storage-fee balance_updates survived the clone-then-rebuild
-        // rollback.
+        // The returned internal must be the pre-burn one: the pass
+        // writes no receipt when a charge fails.
         let InternalOperationSum::Transfer(inner) = &internals[0] else {
             panic!("expected internal Transfer");
         };
@@ -14481,10 +14476,9 @@ mod tests {
     }
 
     /// [`burn_pass`]: two internals compete for a shared budget that
-    /// fits the first slot burn but not the second. The
-    /// clone-then-rebuild pass discards the first internal's
-    /// half-applied burn so no storage-fees / payer-debit entry
-    /// survives on any internal.
+    /// fits the first slot burn but not the second. The pass charges
+    /// both before it writes any receipt, so no storage-fees /
+    /// payer-debit entry survives on any internal.
     #[test]
     fn burn_pass_two_internals_share_budget_with_rollback() {
         let mut host = test_host();
@@ -14648,6 +14642,225 @@ mod tests {
         // (d) The vec order is preserved (Own first, Crac second).
         assert_eq!(own_after.nonce, 0);
         assert_eq!(crac_after.nonce, 1);
+    }
+
+    /// The `Debited(payer) / Credited(StorageFees)` pair of a fee of
+    /// `mutez`.
+    fn fee_pair(payer: &Contract, mutez: u64) -> Vec<BalanceUpdate> {
+        let update = |balance, changes| BalanceUpdate {
+            balance,
+            changes,
+            update_origin: UpdateOrigin::BlockApplication,
+        };
+        vec![
+            update(Balance::Account(payer.clone()), -(mutez as i64)),
+            update(Balance::StorageFees, mutez as i64),
+        ]
+    }
+
+    /// An internal transfer of 0 mutez from `sender` to itself.
+    fn internal_transfer(
+        sender: &Contract,
+        nonce: u16,
+        result: ContentResult<TransferContent>,
+    ) -> InternalOperationSum {
+        InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: sender.clone(),
+            nonce,
+            content: TransferContent {
+                amount: 0_u64.into(),
+                destination: sender.clone(),
+                parameters: Parameters::default(),
+            },
+            result,
+        })
+    }
+
+    /// A transfer success that grew the storage by `paid_storage_size_diff`
+    /// bytes and carries `balance_updates`.
+    fn transfer_target(
+        paid_storage_size_diff: u64,
+        balance_updates: Vec<BalanceUpdate>,
+    ) -> TransferTarget {
+        TransferTarget::ToContract(TransferSuccess {
+            balance_updates,
+            paid_storage_size_diff: paid_storage_size_diff.into(),
+            ..Default::default()
+        })
+    }
+
+    /// [`burn_pass`]: the parent of 10 bytes is charged first and the payer,
+    /// with a balance of 5 mutez, cannot pay. The pass stops there: the own
+    /// internal of 3 bytes is not charged and no receipt gets a fee.
+    #[test]
+    fn burn_pass_parent_failure_charges_no_internal() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 5);
+        let c = payer.contract();
+        let internal = || {
+            internal_transfer(&c, 0, ContentResult::Applied(transfer_target(3, vec![])))
+        };
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Applied(transfer_target(10, vec![]));
+        let mut storage_limit_remaining = num_bigint::BigUint::from(100_u64);
+
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            vec![TaggedInternalOp::own(internal(), 0)],
+        );
+
+        assert_eq!(
+            outcome,
+            Err(ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
+                contract: c.clone(),
+                balance: 5_u64.into(),
+                amount: (10 * COST_PER_BYTES).into(),
+            }))
+        );
+        assert_eq!(content, ContentResult::Applied(transfer_target(10, vec![])));
+        assert_eq!(internals, vec![internal()]);
+        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(storage_limit_remaining, num_bigint::BigUint::from(90_u64));
+    }
+
+    /// [`burn_pass`]: with a storage limit of 8, the parent of 4 bytes is
+    /// charged, then the first own internal of 5 bytes fails with
+    /// `OperationQuotaExceeded`. The second internal is not charged, the
+    /// internals keep their receipts and the limit stays at 4.
+    #[test]
+    fn burn_pass_charges_parent_first_and_stops_at_failing_entry() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 1_000);
+        let c = payer.contract();
+        let internals_in = || {
+            vec![
+                internal_transfer(
+                    &c,
+                    0,
+                    ContentResult::Applied(transfer_target(5, vec![])),
+                ),
+                internal_transfer(
+                    &c,
+                    1,
+                    ContentResult::Applied(transfer_target(1, vec![])),
+                ),
+            ]
+        };
+        let mut content: ContentResult<TransferContent> =
+            ContentResult::Applied(transfer_target(4, vec![]));
+        let mut storage_limit_remaining = num_bigint::BigUint::from(8_u64);
+
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            internals_in()
+                .into_iter()
+                .map(|op| TaggedInternalOp::own(op, 0))
+                .collect(),
+        );
+
+        assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
+        assert_eq!(
+            content,
+            ContentResult::Applied(transfer_target(4, fee_pair(&c, 4 * COST_PER_BYTES)))
+        );
+        assert_eq!(internals, internals_in());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (1_000 - 4 * COST_PER_BYTES).into()
+        );
+        assert_eq!(storage_limit_remaining, num_bigint::BigUint::from(4_u64));
+    }
+
+    /// [`burn_pass`]: a BackTracked parent, a CRAC internal, a Failed own
+    /// internal and an own Event are not charged. Only the Applied own
+    /// Transfer of 4 bytes gets its fee pair, then its delegated pair of 3,
+    /// and the internals keep their order.
+    #[test]
+    fn burn_pass_aligns_updates_with_mixed_entries() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
+        let payer = init_account(rk.tez_accounts_mut(), &pkh, 1_000);
+        let c = payer.contract();
+        let parent = || -> ContentResult<TransferContent> {
+            ContentResult::BackTracked(BacktrackedResult {
+                errors: None,
+                result: transfer_target(10, vec![]),
+            })
+        };
+        let crac = || {
+            internal_transfer(&c, 0, ContentResult::Applied(transfer_target(7, vec![])))
+        };
+        let failed = || {
+            internal_transfer(
+                &c,
+                1,
+                ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
+            )
+        };
+        let own = |balance_updates| {
+            internal_transfer(
+                &c,
+                2,
+                ContentResult::Applied(transfer_target(4, balance_updates)),
+            )
+        };
+        let event = || {
+            InternalOperationSum::Event(InternalContentWithMetadata {
+                sender: c.clone(),
+                nonce: 3,
+                content: EventContent {
+                    ty: MichelineExpr(vec![]),
+                    tag: None,
+                    payload: None,
+                },
+                result: ContentResult::Applied(EventSuccess {
+                    consumed_milligas: 0_u64.into(),
+                }),
+            })
+        };
+        let mut content = parent();
+        let mut storage_limit_remaining = num_bigint::BigUint::from(4_u64);
+
+        let (internals, outcome) = burn_pass::<TransferContent, _>(
+            rk.tez_accounts_mut(),
+            &payer,
+            &mut storage_limit_remaining,
+            &mut content,
+            vec![
+                TaggedInternalOp::from_crac(crac()),
+                TaggedInternalOp::own(failed(), 5),
+                TaggedInternalOp::own(own(vec![]), 3),
+                TaggedInternalOp::own(event(), 2),
+            ],
+        );
+
+        outcome.expect("only the Applied own Transfer must be charged");
+        assert_eq!(content, parent());
+        assert_eq!(
+            internals,
+            vec![
+                crac(),
+                failed(),
+                own([fee_pair(&c, 4 * COST_PER_BYTES), fee_pair(&c, 3)].concat()),
+                event(),
+            ]
+        );
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            (1_000 - 4 * COST_PER_BYTES).into()
+        );
+        assert_eq!(storage_limit_remaining, num_bigint::BigUint::ZERO);
     }
 
     /// Pins the unparser contract the receipt sites in

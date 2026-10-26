@@ -381,7 +381,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -981,6 +981,14 @@ impl From<TransferTarget> for TransferSuccess {
     }
 }
 
+impl TransferTarget {
+    /// Replaces the `balance_updates` of the success with `updates`.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        let TransferTarget::ToContract(success) = self;
+        success.balance_updates = updates;
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
@@ -1066,6 +1074,13 @@ pub struct OriginationSuccess {
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
+impl OriginationSuccess {
+    /// Replaces the `balance_updates` of the success with `updates`.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        self.balance_updates = updates;
+    }
+}
+
 impl HasConsumedMilligas for OriginationSuccess {
     fn consumed_milligas(&self) -> &Narith {
         &self.consumed_milligas
@@ -1140,7 +1155,7 @@ impl Default for TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -1162,7 +1177,7 @@ impl From<ApplyOperationError> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -1170,7 +1185,7 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(BacktrackedResult<M>),
 }
 
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct BacktrackedResult<M: OperationKind> {
     pub errors: Option<ApplyOperationErrors>,
     pub result: M::Success,
@@ -1275,7 +1290,7 @@ impl<M: OperationKind> OperationResult<M> {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
     pub nonce: u16,
@@ -1312,7 +1327,7 @@ pub struct EventContent {
     pub payload: Option<MichelineExpr>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
@@ -1384,6 +1399,25 @@ impl InternalOperationSum {
             Self::Transfer(inner) => inner.nonce = nonce,
             Self::Origination(inner) => inner.nonce = nonce,
             Self::Event(inner) => inner.nonce = nonce,
+        }
+    }
+
+    /// Replaces the `balance_updates` of an `Applied` result with
+    /// `updates`. No-op on a non-Applied result and on an event, which
+    /// has no balance updates.
+    pub fn set_balance_updates(&mut self, updates: Vec<BalanceUpdate>) {
+        match self {
+            Self::Transfer(inner) => {
+                if let ContentResult::Applied(success) = &mut inner.result {
+                    success.set_balance_updates(updates);
+                }
+            }
+            Self::Origination(inner) => {
+                if let ContentResult::Applied(success) = &mut inner.result {
+                    success.set_balance_updates(updates);
+                }
+            }
+            Self::Event(_) => {}
         }
     }
 }
