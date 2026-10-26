@@ -4,7 +4,7 @@
 
 //! A precompile whose sole purpose is to deliberately trigger kernel-level
 //! failures, used to exercise the kernel's behaviour when a transaction cannot
-//! complete normally. It exposes four methods. The first three raise
+//! complete normally. It exposes five methods. The first three raise
 //! unrecoverable WASM traps (PVM-level):
 //!
 //! - `panic()` aborts execution (via `panic!`), which compiles down to an
@@ -17,7 +17,7 @@
 //!   stack instead. See [`stack_overflow`] for why that distinction decides
 //!   what the test proves.
 //!
-//! The fourth is a *recoverable* failure, not a trap:
+//! The last two are *recoverable* failures, not traps:
 //!
 //! - `block_abort()` returns a cross-runtime block abort
 //!   ([`CustomPrecompileAbort::Crac`]) -- the same error the runtime gateway
@@ -26,10 +26,23 @@
 //!   block production), delayed transaction or not. A delayed one is not
 //!   replayed after a forced flush: dropping the failed single-transaction
 //!   blueprint also removes its transaction from the delayed inbox.
+//! - `leak_snapshot()` opens a Michelson journal snapshot and never closes it.
+//!   The transaction itself succeeds; the imbalance is caught by
+//!   `close_tezosx_journal`, which aborts the block the same way.
 
 use alloy_sol_types::{sol, SolInterface};
 use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
-use revm::interpreter::{CallInputs, Gas, InterpreterResult};
+use revm::{
+    context::ContextTr,
+    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
+    primitives::Bytes,
+};
+use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
+use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezosx_interfaces::Registry;
+
+use crate::{database::EtherlinkVMDB, journal::Journal};
 
 sol! {
     contract Panic {
@@ -37,6 +50,7 @@ sol! {
         function oom() external;
         function stack_overflow() external;
         function block_abort() external;
+        function leak_snapshot() external;
     }
 }
 
@@ -71,10 +85,20 @@ fn stack_overflow(depth: u64) -> u64 {
     std::hint::black_box(deeper).wrapping_add(1)
 }
 
-pub(crate) fn panic_precompile(
+pub(crate) fn panic_precompile<'j, 'host, CTX, Host, R>(
     calldata: &[u8],
+    context: &mut CTX,
     inputs: &CallInputs,
-) -> Result<InterpreterResult, CustomPrecompileError> {
+) -> Result<InterpreterResult, CustomPrecompileError>
+where
+    'host: 'j,
+    Host: StorageV1 + KeySpaceLoader + 'host,
+    R: Registry<Journal = tezosx_journal::TezosXJournal> + 'j,
+    CTX: ContextTr<
+        Db = EtherlinkVMDB<'j, 'host, Host, R>,
+        Journal = Journal<'j, 'host, Host, R>,
+    >,
+{
     let gas = Gas::new(inputs.gas_limit);
 
     let interface = Panic::PanicCalls::abi_decode(calldata)
@@ -112,6 +136,29 @@ pub(crate) fn panic_precompile(
             Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(
                 "block_abort precompile invoked".to_string(),
             )))
+        }
+        Panic::PanicCalls::leak_snapshot(Panic::leak_snapshotCall {}) => {
+            let journal = context.journal_mut();
+            journal.journal.michelson.push_external_checkpoint();
+            journal
+                .journal
+                .michelson
+                .checkpoint(
+                    journal.database.rk.host_mut(),
+                    &OwnedPath::from(&TEZ_ACCOUNTS_ROOT_PATH),
+                )
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(
+                        format!("leak_snapshot precompile failed: {e:?}"),
+                        gas,
+                    )
+                })?;
+
+            Ok(InterpreterResult {
+                result: InstructionResult::Return,
+                gas,
+                output: Bytes::new(),
+            })
         }
     }
 }

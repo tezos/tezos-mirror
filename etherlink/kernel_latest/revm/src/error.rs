@@ -98,6 +98,8 @@ pub enum EvmKernelError {
     TxEnvBuild(#[from] TxEnvBuildError),
     #[error("Indexable storage push failed: {0}")]
     IndexableStorage(#[from] IndexableStorageError),
+    #[error("Michelson journal closed with {open_frames} frame(s) still open")]
+    UnbalancedMichelsonJournal { open_frames: usize },
 }
 
 /// Top-level error from an EVM transaction run

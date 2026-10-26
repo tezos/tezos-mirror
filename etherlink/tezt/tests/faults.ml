@@ -19,12 +19,13 @@
 open Test_helpers
 open Rpc.Syntax
 
-type fault = Panic | Stack_overflow | Block_abort
+type fault = Panic | Stack_overflow | Block_abort | Leak_snapshot
 
 let string_of_fault = function
   | Panic -> "panic"
   | Stack_overflow -> "stack_overflow"
   | Block_abort -> "block_abort"
+  | Leak_snapshot -> "leak_snapshot"
 
 (** [craft_tx ~fault ~sequencer ~nonce] builds a signed transaction from the
     first bootstrap account that calls the [fault] method of the debug
@@ -115,7 +116,7 @@ let send_raw_tx_to_delayed_inbox ~sc_rollup_node ~client ~l1_contracts
     ~sc_rollup_address raw_tx =
   let* () =
     Client.transfer
-      ~arg:(sf "Pair %S 0x%s" sc_rollup_address raw_tx)
+      ~arg:(sf "Pair %S 0x01%s" sc_rollup_address raw_tx)
       ~amount:Tez.one
       ~giver:Constant.bootstrap2.public_key_hash
       ~receiver:l1_contracts.Setup.delayed_transaction_bridge
@@ -151,6 +152,8 @@ let test_recover_crashing_delayed_transaction fault =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_debug_precompiles:true
+    ~rpc_server:Resto
+    ~with_runtimes:[Tezos]
     ~da_fee:Wei.zero
     ~tags:
       [
@@ -236,4 +239,4 @@ let () =
   Self_tests.register () ;
   List.iter
     (fun fault -> test_recover_crashing_delayed_transaction fault [Alpha])
-    [Panic; Stack_overflow; Block_abort]
+    [Panic; Stack_overflow; Block_abort; Leak_snapshot]

@@ -7,11 +7,11 @@ use std::str::FromStr;
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use revm::context::result::ExecutionResult;
 use revm::primitives::Address;
-use revm_etherlink::{EvmRunError, ExecutionOutcome};
+use revm_etherlink::{EvmKernelError, EvmRunError, ExecutionOutcome};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{
     log,
-    Level::{Debug, Error, Fatal},
+    Level::{Debug, Error},
 };
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::host::StorageV1;
@@ -69,8 +69,7 @@ fn prepare_tezosx_journal(
 /// prevents use after close.
 ///
 /// Also reports a leaked EVM frame checkpoint, which mis-points the CRAC receipt
-/// watermarks. A log and not an assertion: `run_transaction` leaks one until
-/// !22693 lands.
+/// watermarks, by returning an error that aborts the block.
 fn close_tezosx_journal<Host>(
     host: &mut Host,
     mut journal: TezosXJournal,
@@ -81,13 +80,7 @@ where
 {
     let open_frames = journal.michelson.open_frame_count();
     if open_frames > 0 {
-        log!(
-            Fatal,
-            "closing the journal with {} EVM frame checkpoint(s) still open: a \
-             frame was neither committed nor reverted, so the cross-runtime call \
-             receipt watermarks no longer match the receipts they index.",
-            open_frames
-        );
+        return Err(EvmKernelError::UnbalancedMichelsonJournal { open_frames }.into());
     }
     // Michelson temporary big maps are scoped to the transaction, not just to
     // the frame that allocated them. Failing to clear them leaves dead entries
@@ -143,8 +136,8 @@ impl<T: HasExecutionResult, U> HasExecutionResult for (T, U) {
 ///
 /// The continuation supplies the EVM result used to finalize the tracer, or
 /// `None` for invalid operations. Errors close without finalizing the tracer.
-/// A close error takes precedence over the continuation's error, as at the
-/// explicit prepare/close call sites. Panics do not run the close step.
+/// The continuation's error takes precedence over a close error.
+/// Panics do not run the close step.
 #[allow(clippy::too_many_arguments)]
 pub fn with_tezosx_journal<'host, Host: StorageV1 + KeySpaceLoader, T, E>(
     rk: &mut RuntimeKeyspaces<'host, Host>,
@@ -171,8 +164,11 @@ where
         tracer_input,
     );
     let outcome = apply(rk, &mut journal);
-    close_tezosx_journal(rk.host_mut(), journal, outcome.result())?;
-    outcome
+    let close_outcome = close_tezosx_journal(rk.host_mut(), journal, outcome.result());
+
+    let res = outcome?;
+    close_outcome?;
+    Ok(res)
 }
 
 /// Run a Tezos operation inside the tracer frame of its fake EVM transaction.
