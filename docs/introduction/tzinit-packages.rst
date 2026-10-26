@@ -10,8 +10,8 @@ https://packages.tzinit.org/. These packages are documented at
 https://chrispinnock.com/tezos/packages/.
 
 This page explains how to migrate an installation of the Nomadic Labs packages
-for Octez v25.2 (abbreviated as *NL packages* hereafter) to the Tzinit
-packages.
+for Octez v25.2 or v25.3 (abbreviated as *NL packages* hereafter) to the
+Tzinit packages.
 
 The migration is an in-place upgrade: chain data, wallets and baker state are
 left untouched. However, the configuration of the baker changes, and some
@@ -124,20 +124,13 @@ confirming, check that ``apt-get`` does not plan to remove any package.
 When a configuration file that you modified is kept, the default version
 shipped by the Tzinit package is saved next to it, with suffix ``.dpkg-dist``.
 
-.. warning::
-
-   Files ``/etc/default/octez-accuser`` and ``/etc/default/octez-vdf`` are
-   overwritten by the Tzinit ``octez-baker`` package, without keeping any
-   previous version. If you created ``/etc/default/octez-accuser`` yourself,
-   restore its contents from your backup and check it after each upgrade.
-
 Check that all Octez packages now come from the Tzinit repository:
 
 .. code:: shell
 
    dpkg -l 'octez*'
 
-All packages should be at version ``25.2-10`` or later, except
+All packages should be at version ``25.3-1`` or later, except
 ``octez-smart-rollup-node`` which uses a date-based version such as
 ``20260724-10``.
 
@@ -286,18 +279,17 @@ place:
 - the smart rollup node data directory,
   ``/var/tezos/.tezos-smart-rollup-node``.
 
-The ``octez-node`` binary of the Tzinit packages for v25.2 is built from the
+The ``octez-node`` binary of the Tzinit packages for v25.3 is built from the
 same commit as the NL one, so the node data needs no conversion. The Tzinit
 ``octez-smart-rollup-node`` package ships a standalone release of the smart
-rollup node instead of the one from Octez v25.2, but both use the same storage
+rollup node instead of the one from Octez v25.3, but both use the same storage
 format.
 
 Configuration files
 -------------------
 
-Except for ``/etc/default/octez-accuser`` and ``/etc/default/octez-vdf``, files
-``/etc/default/octez-*`` are configuration files: when you have modified one of
-them, the upgrade does not overwrite it (thanks to option
+Files ``/etc/default/octez-*`` are configuration files: when you have modified
+one of them, the upgrade does not overwrite it (thanks to option
 ``--force-confold``). Files ``/etc/default/octez-node`` and
 ``/etc/default/octez-dal-node`` use the same variables in the NL and Tzinit
 packages. File ``/etc/default/octez-baker`` does not, hence step 5.
