@@ -221,6 +221,7 @@ type job = {
   services : Gitlab_ci.Types.service list option;
   id_tokens : Gitlab_ci.Types.id_tokens option;
   environment : Gitlab_ci.Types.environment option;
+  resource_group : string option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -620,6 +621,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     services;
                     id_tokens;
                     environment;
+                    resource_group;
                   };
                 trigger;
                 only_if;
@@ -719,6 +721,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ~dependencies:(Dependent dependencies)
                 ?parallel
                 ?environment
+                ?resource_group
                 ?rules
                 ?services
                 ?id_tokens
@@ -795,6 +798,7 @@ module type COMPONENT_API = sig
     ?needs:(need * job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
+    ?resource_group:string ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cache:Gitlab_ci.Types.cache list ->
@@ -1083,9 +1087,10 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ?tag ?image ?only_if_changed ?(force = false)
       ?(force_if_label = []) ?(needs = []) ?parallel ?environment
-      ?(variables = []) ?artifacts ?(cache = []) ?(cargo_cache = false) ?sccache
-      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?services ?id_tokens ?(script = []) name =
+      ?resource_group ?(variables = []) ?artifacts ?(cache = [])
+      ?(cargo_cache = false) ?sccache ?(dune_cache = false)
+      ?(disable_datadog = false) ?allow_failure ?retry ?timeout ?services
+      ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     let before_script = [] in
@@ -1232,6 +1237,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       services;
       id_tokens;
       environment;
+      resource_group;
     }
 
   module SH = struct
