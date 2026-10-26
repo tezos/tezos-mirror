@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    Code, MeteredReadError, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::context::{address_registry, big_maps::*};
 use crate::get_contract_entrypoint;
@@ -488,9 +488,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // failure (read, decode, balance overflow) means corruption or
         // I/O on a known contract and must surface as an error rather
         // than impersonate "view not found".
+        // Read both blobs through their gas charge; they used to be free.
         let serialized_script = account
-            .code(self.tc_ctx.rk.tez_accounts())
-            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+            .code_metered(self.tc_ctx.rk.tez_accounts(), self.tc_ctx.operation_gas)
+            .map_err(metered_read_to_lookup_view)?;
         match serialized_script {
             Code::Code(serialized_script) => {
                 let decoded = Micheline::decode_raw(
@@ -513,8 +514,11 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     code: view.code.clone(),
                 };
                 let storage = account
-                    .storage(self.tc_ctx.rk.tez_accounts())
-                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                    .storage_metered(
+                        self.tc_ctx.rk.tez_accounts(),
+                        self.tc_ctx.operation_gas,
+                    )
+                    .map_err(metered_read_to_lookup_view)?;
                 let balance = account
                     .balance(self.tc_ctx.rk.tez_accounts())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
@@ -1220,6 +1224,17 @@ fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStora
     LazyStorageError::BinWriteError(std::rc::Rc::new(
         tezos_data_encoding::enc::BinError::custom(e.into().to_string()),
     ))
+}
+
+/// Route a metered read's failure to the view-lookup error it means. Keeping
+/// out-of-gas apart from a store failure is what lets the runtime answer an
+/// over-budget view with a catchable 429 instead of a kernel fault.
+fn metered_read_to_lookup_view(err: MeteredReadError) -> mir::context::LookupViewError {
+    use mir::context::LookupViewError;
+    match err {
+        MeteredReadError::OutOfGas(err) => LookupViewError::OutOfGas(err),
+        MeteredReadError::Storage(err) => LookupViewError::HostError(err.to_string()),
+    }
 }
 
 /// Charge for and read a big_map entry value, returning `None` when absent.

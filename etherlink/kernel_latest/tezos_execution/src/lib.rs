@@ -13008,6 +13008,172 @@ mod tests {
              returned {fat_bytes} B"
         );
     }
+    /// Same for a `VIEW`, whose script and storage reads were charged nothing
+    /// at all. Same witness: the bytes the host hands back must not grow with
+    /// the viewed contract's storage.
+    #[test]
+    fn view_charges_storage_read_before_reading() {
+        const VIEWED_SCRIPT: &str = r#"
+            parameter unit ;
+            storage bytes ;
+            code { CDR ; NIL operation ; PAIR } ;
+            view "get_size" unit nat { CDR ; SIZE }
+        "#;
+        const CALLER_SCRIPT: &str = r#"
+            parameter unit ;
+            storage address ;
+            code { CDR ;
+                DUP ;
+                UNIT ;
+                VIEW "get_size" nat ;
+                IF_NONE { PUSH string "View failed" ; FAILWITH }
+                        { DROP ; NIL operation ; PAIR } }
+        "#;
+        const FAT: usize = 1_000_000;
+        const FOUR_TIMES_FAT: usize = 4_000_000;
+        const TINY: usize = 8;
+
+        // Views a contract holding `storage_len` bytes; reports bytes read.
+        let run = |storage_len: usize, gas_limit: u64| -> (OperationResultSum, u64) {
+            let mut host = CountingHost::default();
+            let bytes_read = host.bytes_read_handle();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut gas = Gas::default();
+            let arena = Arena::new();
+
+            let src = bootstrap1();
+            let mut origination_nonce =
+                OriginationNonce::initial(OperationHash::default());
+            let viewed_addr = origination_nonce.generate_kt1();
+            let caller_addr = origination_nonce.generate_kt1();
+
+            init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+            reveal_account(rk.tez_accounts_mut(), &src);
+            init_contract(
+                &mut rk,
+                &viewed_addr,
+                VIEWED_SCRIPT,
+                &Micheline::Bytes(vec![0u8; storage_len]),
+                &0.into(),
+            );
+            let viewed_micheline = TypedValue::Address(Address {
+                hash: mir::ast::AddressHash::Kt1(viewed_addr),
+                entrypoint: Entrypoint::default(),
+            })
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+            init_contract(
+                &mut rk,
+                &caller_addr,
+                CALLER_SCRIPT,
+                &viewed_micheline,
+                &0.into(),
+            );
+
+            let operation = make_transfer_operation(
+                15,
+                1,
+                gas_limit,
+                100,
+                src.clone(),
+                0.into(),
+                Contract::Originated(caller_addr),
+                Parameters::default(),
+            );
+
+            // Measure the operation, not the state setup that precedes it.
+            rk.host().reset_bytes_read();
+            let processed = validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel \
+                 error",
+            );
+            let mut receipts = ProcessedOperation::into_receipts(processed);
+            assert_eq!(receipts.len(), 1, "expected a single top-level receipt");
+            (receipts.remove(0).receipt, bytes_read.get())
+        };
+
+        let is_applied = |receipt: &OperationResultSum| {
+            matches!(
+                receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Calibrated, so the test survives a gas-model change.
+        const VALIDATES_BUT_TOO_LOW: u64 = 200;
+        const AMPLE: u64 = 100_000;
+        let mut too_low = VALIDATES_BUT_TOO_LOW;
+        let mut enough = AMPLE;
+        assert!(
+            is_applied(&run(TINY, enough).0),
+            "the tiny-storage view must apply at the calibration ceiling"
+        );
+        assert!(
+            !is_applied(&run(TINY, too_low).0),
+            "the tiny-storage view must not apply at the calibration floor"
+        );
+        while enough - too_low > 1 {
+            let probe = too_low + (enough - too_low) / 2;
+            if is_applied(&run(TINY, probe).0) {
+                enough = probe;
+            } else {
+                too_low = probe;
+            }
+        }
+        let minimal_gas_limit = enough;
+
+        // Negative control: the same call over a tiny storage is applied.
+        let (tiny, _) = run(TINY, minimal_gas_limit);
+        assert!(
+            is_applied(&tiny),
+            "the tiny-storage view must apply at its calibrated limit, got {tiny:?}"
+        );
+
+        // Unaffordable at this limit, so a correct charge order reads neither.
+        for size in [FAT, FOUR_TIMES_FAT] {
+            assert!(
+                storage_read_cost_milligas(1, size as u64) > minimal_gas_limit * 1000,
+                "a {size} B storage read must not fit in {minimal_gas_limit} gas, or \
+                 the test is measuring an affordable read"
+            );
+        }
+
+        let (fat, fat_bytes) = run(FAT, minimal_gas_limit);
+        let (four_times_fat, four_times_fat_bytes) =
+            run(FOUR_TIMES_FAT, minimal_gas_limit);
+
+        for (label, receipt) in [("1 MB", &fat), ("4 MB", &four_times_fat)] {
+            assert!(
+                !is_applied(receipt),
+                "expected the {label} view to fail, got {receipt:?}"
+            );
+        }
+        assert_eq!(
+            fat_bytes, four_times_fat_bytes,
+            "bytes read must not depend on the viewed contract's storage size: \
+             {FAT} B storage read {fat_bytes} B, {FOUR_TIMES_FAT} B storage read \
+             {four_times_fat_bytes} B"
+        );
+        assert!(
+            fat_bytes < FAT as u64,
+            "the failing view must not read the {FAT} B storage, but the host \
+             returned {fat_bytes} B"
+        );
+    }
     /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
     /// payload length.  The exact delta matches the sum of three
     /// contributions that grow with `n`:
