@@ -8,7 +8,7 @@ use crate::account_storage::{
     Code, MeteredReadError, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::context::{address_registry, big_maps::*};
-use crate::get_contract_entrypoint;
+use crate::get_contract_entrypoint_metered;
 use crate::{
     consume_storage_read_milligas, consume_storage_write_milligas, contract_from_address,
     COUNTER_SIZE,
@@ -257,11 +257,15 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(
+    ) -> Result<
+        Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>>,
+        mir::gas::OutOfGas,
+    > {
+        // Charged, unlike the RPC variant: this runs inside an operation.
+        get_contract_entrypoint_metered(
             self.rk.tez_accounts(),
             address,
-            &mut self.operation_gas.remaining,
+            self.operation_gas,
         )
     }
 
@@ -308,7 +312,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> TypecheckingCtx<'a>
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    ) -> Result<
+        Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>>,
+        mir::gas::OutOfGas,
+    > {
         self.tc_ctx.lookup_entrypoints(address)
     }
 
@@ -3668,8 +3675,8 @@ pub(crate) mod mock {
         fn lookup_entrypoints(
             &mut self,
             _address: &AddressHash,
-        ) -> Option<HashMap<Entrypoint, Type>> {
-            None
+        ) -> Result<Option<HashMap<Entrypoint, Type>>, mir::gas::OutOfGas> {
+            Ok(None)
         }
 
         fn big_map_get_type(

@@ -1758,6 +1758,19 @@ fn get_originated_contract_entrypoint(
     typecheck_originated_script(&code, gas).map(|(entrypoints, _)| entrypoints)
 }
 
+fn entrypoints_of_code(
+    code: Code,
+    gas: &mut Gas,
+) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    match code {
+        Code::Code(code) => get_originated_contract_entrypoint(code, gas),
+        Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
+    }
+}
+
+/// Entrypoints of the contract at `address`, reading its code **without
+/// charging**. Only for the RPC path, which bills no operation; anything
+/// reachable from one must use [`get_contract_entrypoint_metered`].
 pub fn get_contract_entrypoint(
     tez_accounts: &impl KeySpace,
     address: &AddressHash,
@@ -1766,10 +1779,30 @@ pub fn get_contract_entrypoint(
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
     let code = contract_account.code(tez_accounts).ok()?;
-    match code {
-        Code::Code(code) => get_originated_contract_entrypoint(code, gas),
-        Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
-    }
+    entrypoints_of_code(code, gas)
+}
+
+/// [`get_contract_entrypoint`], with the code read charged before it happens.
+/// `Ok(None)` keeps `None`'s meaning: no contract, or a script that does not
+/// typecheck. A read the operation cannot pay for is `Err(OutOfGas)`, so gas
+/// exhaustion does not surface as a missing contract.
+pub fn get_contract_entrypoint_metered(
+    tez_accounts: &impl KeySpace,
+    address: &AddressHash,
+    operation_gas: &mut TezlinkOperationGas,
+) -> Result<Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>>, mir::gas::OutOfGas> {
+    let Ok(contract) = contract_from_address(address.clone()) else {
+        return Ok(None);
+    };
+    let Ok(contract_account) = context::originated_from_contract(&contract) else {
+        return Ok(None);
+    };
+    let code = match contract_account.code_metered(tez_accounts, operation_gas) {
+        Ok(code) => code,
+        Err(MeteredReadError::OutOfGas(err)) => return Err(err),
+        Err(MeteredReadError::Storage(_)) => return Ok(None),
+    };
+    Ok(entrypoints_of_code(code, &mut operation_gas.remaining))
 }
 
 /// Errors returned by [`upgrade_alias_implementation`].
@@ -3800,6 +3833,78 @@ mod tests {
             PAIR
         }"#;
 
+    /// Resolving a contract's entrypoints reads its code, and under an
+    /// operation that read must be charged: a counter one milligas short of
+    /// its cost is refused, as `OutOfGas` and not as an absent contract.
+    #[test]
+    fn metered_entrypoint_lookup_charges_the_code_read_upfront() {
+        use crate::get_contract_entrypoint_metered;
+        use mir::ast::{AddressHash, Entrypoint, Type};
+
+        let mut host = CountingHost::default();
+        let bytes_read = host.bytes_read_handle();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &kt1,
+            UNIT_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+        let code_len = context::originated_from_kt1(&kt1)
+            .unwrap()
+            .code(rk.tez_accounts())
+            .map(|code| match code {
+                Code::Code(bytes) => bytes.len(),
+                Code::Enshrined(_) => panic!("the fixture is an ordinary contract"),
+            })
+            .unwrap();
+        let read_cost = storage_read_cost_milligas(1, code_len as u64);
+
+        // One milligas short: refused before the bytes move.
+        let mut too_poor = TezlinkOperationGas::start_milligas(read_cost - 1).unwrap();
+        rk.host().reset_bytes_read();
+        assert_eq!(
+            get_contract_entrypoint_metered(
+                rk.tez_accounts(),
+                &AddressHash::Kt1(kt1.clone()),
+                &mut too_poor
+            ),
+            Err(mir::gas::OutOfGas),
+            "a counter that cannot pay for the code read must report out of gas, \
+             not a missing contract"
+        );
+        assert_eq!(
+            bytes_read.get(),
+            0,
+            "the refused lookup must not have read the code"
+        );
+
+        // Enough to pay for the read, and for the typechecking that follows.
+        let mut rich = TezlinkOperationGas::default();
+        rk.host().reset_bytes_read();
+        let entrypoints = get_contract_entrypoint_metered(
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1),
+            &mut rich,
+        )
+        .expect("an ample counter must not run out of gas")
+        .expect("the fixture's entrypoints must resolve");
+        assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+        assert_eq!(
+            bytes_read.get(),
+            code_len as u64,
+            "the successful lookup reads the code blob exactly once"
+        );
+        assert!(
+            u64::from(rich.total_milligas_consumed()) >= read_cost,
+            "the lookup must charge at least the code read ({read_cost} milligas), \
+             consumed {}",
+            rich.total_milligas_consumed()
+        );
+    }
     /// The entrypoints RPC (`get_contract_entrypoint`) goes through
     /// `code()`, so a code-less alias transparently exposes the entrypoints of
     /// the shared implementation — here the `default : unit` of `UNIT_SCRIPT`.

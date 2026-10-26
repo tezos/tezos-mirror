@@ -87,10 +87,13 @@ pub enum AddressRegistryError {
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
 
+    /// Entrypoints of the contract at `address`, `None` when there is none.
+    /// Fallible because a host-backed context reads the contract's code to
+    /// answer and charges for it, so it must be able to report out of gas.
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
+    ) -> Result<Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>, OutOfGas>;
 
     /// Get key and value types of the map.
     /// This returns None if the map with such ID is not present in the storage.
@@ -117,8 +120,8 @@ impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
     fn lookup_entrypoints(
         &mut self,
         _address: &AddressHash,
-    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        None
+    ) -> Result<Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>, OutOfGas> {
+        Ok(None)
     }
 
     fn big_map_get_type(
@@ -415,8 +418,8 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        self.lookup_entrypoints.get(address).cloned()
+    ) -> Result<Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>, OutOfGas> {
+        Ok(self.lookup_entrypoints.get(address).cloned())
     }
 
     fn big_map_get_type(
