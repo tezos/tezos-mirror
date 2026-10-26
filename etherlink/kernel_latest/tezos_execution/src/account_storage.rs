@@ -6,8 +6,10 @@
 
 //! Tezos account state and storage
 
+use crate::consume_storage_read_milligas;
 use crate::context::{code, contracts};
 use crate::enshrined_contracts::{self, EnshrinedContracts};
+use crate::gas::TezlinkOperationGas;
 use num_bigint::BigInt;
 use primitive_types::U256;
 use rlp::{Decodable, Encodable, Rlp};
@@ -202,6 +204,48 @@ pub fn write_alias_implementation(
     code: &[u8],
 ) -> Result<(), KeySpaceError> {
     tez_accounts.set(&ALIAS_IMPLEMENTATION_KEY, code)
+}
+
+/// Failure of a gas-metered durable read: the gas could not be paid, or the
+/// store failed. Kept apart so callers map each to their own error.
+#[derive(Debug)]
+pub enum MeteredReadError {
+    OutOfGas(mir::gas::OutOfGas),
+    Storage(KeySpaceError<StorageReadErrorKind>),
+}
+
+impl From<mir::gas::OutOfGas> for MeteredReadError {
+    fn from(err: mir::gas::OutOfGas) -> Self {
+        Self::OutOfGas(err)
+    }
+}
+
+impl From<KeySpaceError<StorageReadErrorKind>> for MeteredReadError {
+    fn from(err: KeySpaceError<StorageReadErrorKind>) -> Self {
+        Self::Storage(err)
+    }
+}
+
+impl From<KeySpaceError> for MeteredReadError {
+    fn from(err: KeySpaceError) -> Self {
+        Self::Storage(err.widen())
+    }
+}
+
+/// Charge for, then read, the whole value at `key`. `None` when `key` holds
+/// no value, having charged nothing. Probing the size first is what makes gas
+/// *bound* the read: charging afterwards cannot un-read the bytes. Same shape
+/// as [`crate::mir_ctx::read_big_map_value_metered`].
+fn read_all_metered(
+    tez_accounts: &impl KeySpace,
+    operation_gas: &mut TezlinkOperationGas,
+    key: &Key,
+) -> Result<Option<Vec<u8>>, MeteredReadError> {
+    let Some(size) = tez_accounts.value_length(key) else {
+        return Ok(None);
+    };
+    consume_storage_read_milligas(operation_gas, 1, size as u64)?;
+    Ok(tez_accounts.get(key))
 }
 
 /// Snapshot of a contract's storage-space.
@@ -402,6 +446,42 @@ impl TezosOriginatedAccount {
         }
     }
 
+    /// [Self::code], with the durable read charged before it happens, at the
+    /// same cost. Prefer it wherever an operation gas counter is at hand:
+    /// [Self::code] reads an unbounded blob before its caller can charge.
+    pub fn code_metered(
+        &self,
+        tez_accounts: &impl KeySpace,
+        operation_gas: &mut TezlinkOperationGas,
+    ) -> Result<Code, MeteredReadError> {
+        if let Some(c) = enshrined_contracts::from_kt1(self.kt1()) {
+            // Synthetic code: nothing is read, nothing is charged.
+            return Ok(Code::Enshrined(c));
+        }
+        if let Some(code) = read_all_metered(tez_accounts, operation_gas, &self.code_key)?
+        {
+            return Ok(Code::Code(code));
+        }
+        // No `/data/code`: an alias resolves to the shared implementation.
+        if !self.is_alias(tez_accounts)? {
+            return Err(KeySpaceError::read(
+                tez_accounts.name(),
+                &self.code_key,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+            .into());
+        }
+        read_all_metered(tez_accounts, operation_gas, &ALIAS_IMPLEMENTATION_KEY)?
+            .map(Code::Code)
+            .ok_or_else(|| {
+                MeteredReadError::Storage(KeySpaceError::read(
+                    tez_accounts.name(),
+                    &ALIAS_IMPLEMENTATION_KEY,
+                    ReadKind::Ext(StorageReadErrorKind::NotSeeded),
+                ))
+            })
+    }
+
     /// Reads the classification record ([`Origin`]) at the account's `/origin`
     /// key. Returns `None` when the account carries no classification, or when
     /// the host fails to read it. Fails when the bytes are not exactly one
@@ -571,6 +651,30 @@ impl TezosOriginatedAccount {
     /// Returns the code size that the `/info` record of the contract holds.
     ///
     /// Fails as [`Self::read_info`] does.
+    /// [Self::storage], with the durable read charged before it happens, at
+    /// the same cost — the base charge included on an enshrined contract,
+    /// whose storage is synthetic. Prefer it over [Self::storage] likewise.
+    pub fn storage_metered(
+        &self,
+        tez_accounts: &impl KeySpace,
+        operation_gas: &mut TezlinkOperationGas,
+    ) -> Result<Vec<u8>, MeteredReadError> {
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            consume_storage_read_milligas(operation_gas, 1, 0)?;
+            return Ok(vec![]);
+        }
+        // `init` always writes the blob: an absent one is a corrupt account.
+        read_all_metered(tez_accounts, operation_gas, &self.storage_key)?.ok_or_else(
+            || {
+                MeteredReadError::from(KeySpaceError::read(
+                    tez_accounts.name(),
+                    &self.storage_key,
+                    ReadKind::Ext(StorageReadErrorKind::NotFound),
+                ))
+            },
+        )
+    }
+
     pub fn code_size(
         &self,
         tez_accounts: &impl KeySpace,
