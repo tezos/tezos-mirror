@@ -43,6 +43,19 @@ pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
 const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_KEY: Key =
     Key::from_static(b"/max_delayed_inbox_blueprint_length");
 
+/// Temporary floor on the delayed inbox timeout: until
+/// [DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET], delayed transactions are only
+/// force-included once they are at least two weeks old, regardless of the
+/// timeout configured at `/base/delayed_inbox_timeout`. The `--force` flush
+/// of the EVM node is unaffected. Once the sunset has passed on mainnet,
+/// this constant and the flooring in [DelayedInbox::first_has_timed_out]
+/// can be removed.
+pub const DELAYED_INBOX_TIMEOUT_FLOOR: u64 = 14 * 24 * 60 * 60;
+
+/// End of the [DELAYED_INBOX_TIMEOUT_FLOOR] mitigation window:
+/// 2026-11-27T00:00:00Z, three months after the mitigation was written.
+pub const DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET: u64 = 1_795_737_600;
+
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;
 
@@ -375,7 +388,13 @@ impl DelayedInbox {
     pub fn first_has_timed_out(&mut self, base: &impl KeySpace) -> Result<bool> {
         // Every read below resolves against the threaded `/base` handle.
         let now = read_last_info_per_level_timestamp(base)?;
-        let timeout = storage::delayed_inbox_timeout(base)?;
+        let configured_timeout = storage::delayed_inbox_timeout(base)?;
+        // See [DELAYED_INBOX_TIMEOUT_FLOOR]: two-week floor until the sunset.
+        let timeout = if now.as_u64() < DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET {
+            u64::max(configured_timeout, DELAYED_INBOX_TIMEOUT_FLOOR)
+        } else {
+            configured_timeout
+        };
         let current_level = storage::read_l1_level(base)?;
         let min_levels = storage::delayed_inbox_min_levels(base)?;
         let popped =
@@ -434,12 +453,14 @@ mod tests {
     use super::DelayedInbox;
     use super::DelayedTransaction;
     use super::Hash;
+    use super::DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET;
     use crate::block_storage;
     use crate::chains::make_test_operation;
     use crate::configuration::CommonConfig;
     use crate::load_base;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
+    use chrono::DateTime;
     use primitive_types::{H160, H256, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::{
@@ -529,6 +550,83 @@ mod tests {
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
+    }
+
+    /// Until [super::DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET], the effective
+    /// timeout is floored at two weeks even when the configured (here:
+    /// default, 12h) timeout is shorter; the floor itself still fires; and
+    /// once the sunset has passed the configured timeout applies again.
+    #[test]
+    fn test_delayed_inbox_timeout_floored_until_sunset() {
+        use super::{DELAYED_INBOX_TIMEOUT_FLOOR, DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET};
+        use crate::storage::{store_l1_level, store_last_info_per_level_timestamp};
+
+        let day = 86_400i64;
+
+        // Before the sunset: one day > the 12h default timeout, but the
+        // two-week floor must keep the transaction in the inbox.
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let tx: Transaction = dummy_transaction(0);
+        delayed_inbox
+            .save_transaction(
+                &host,
+                &mut base,
+                tx.into(),
+                Timestamp::from(0i64),
+                0,
+                &CommonConfig::default(),
+            )
+            .unwrap();
+        // Satisfy the min-levels side of the condition (default: 720).
+        store_l1_level(&mut base, 10_000).unwrap();
+        store_last_info_per_level_timestamp(&mut base, Timestamp::from(day)).unwrap();
+        assert!(
+            !delayed_inbox.first_has_timed_out(&base).unwrap(),
+            "before the sunset, a one-day-old delayed transaction must not \
+             time out: the two-week floor applies"
+        );
+
+        // Still before the sunset: once the transaction is two weeks old,
+        // the floored timeout fires.
+        store_last_info_per_level_timestamp(
+            &mut base,
+            Timestamp::from(DELAYED_INBOX_TIMEOUT_FLOOR as i64),
+        )
+        .unwrap();
+        assert!(
+            delayed_inbox.first_has_timed_out(&base).unwrap(),
+            "the two-week floor must still force-include old transactions"
+        );
+
+        // After the sunset: the configured (default, 12h) timeout applies
+        // again, so a 13h-old transaction times out.
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let tx: Transaction = dummy_transaction(1);
+        let saved_at = DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET as i64;
+        delayed_inbox
+            .save_transaction(
+                &host,
+                &mut base,
+                tx.into(),
+                Timestamp::from(saved_at),
+                0,
+                &CommonConfig::default(),
+            )
+            .unwrap();
+        store_l1_level(&mut base, 10_000).unwrap();
+        store_last_info_per_level_timestamp(
+            &mut base,
+            Timestamp::from(saved_at + 13 * 3_600),
+        )
+        .unwrap();
+        assert!(
+            delayed_inbox.first_has_timed_out(&base).unwrap(),
+            "after the sunset, the configured 12h timeout must apply again"
+        );
     }
 
     #[test]
@@ -679,6 +777,18 @@ mod tests {
                 super::DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH
             ),
             42
+        );
+    }
+
+    // The sunset is documented as a calendar date but stored as an epoch, so
+    // pin the two together.
+    #[test]
+    fn delayed_inbox_timeout_floor_sunset_date() {
+        let expected = DateTime::parse_from_rfc3339("2026-11-27T00:00:00Z").unwrap();
+
+        assert_eq!(
+            DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET,
+            expected.timestamp() as u64
         );
     }
 }
