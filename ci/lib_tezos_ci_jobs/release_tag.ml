@@ -238,10 +238,7 @@ let job_deploy_release_page_assets_packaging_revision =
       ]
     ~variables:(release_page_variables ~mode)
     ~script:
-      [
-        "eval $(opam env)";
-        "./scripts/releases/deploy-release-page-assets-packaging-revision.sh";
-      ]
+      ["eval $(opam env)"; "./scripts/releases/deploy-release-page-assets.sh"]
 
 (* [release_site.render] needs every [deploy-assets] job in the pipeline. *)
 let job_render_site ?(components = []) mode =
