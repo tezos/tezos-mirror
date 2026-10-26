@@ -473,3 +473,18 @@ let () =
             [(Job, job_deploy_release_page_assets_packaging_revision `test)] );
     ] ;
   ()
+
+(* Jobs of the [octez_release] pipeline.
+
+   This pipeline does not depend on the kind of release.
+   Build jobs are automatic. They push Docker images to the GCP registry.
+   Jobs that publish are manual. *)
+let () =
+  Cacio.register_jobs
+    Tezos_ci_pipelines.octez_release
+    [
+      (Auto, Build.job_build_static_linux_released_binaries Amd64 `release);
+      (Auto, Build.job_build_static_linux_released_binaries Arm64 `release);
+      (Auto, job_docker_merge_manifests `release);
+      (Auto, job_docker_container_scanning `release);
+    ]
