@@ -566,6 +566,13 @@ where
             // version is the signal the node gates the entrypoint on.
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V68 => {
+            // Enable the Michelson runtime gas refund.
+            const ENABLE_MICHELSON_GAS_REFUND_V68: RefPath =
+                RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
+            host.store_write(&ENABLE_MICHELSON_GAS_REFUND_V68, &[], 0)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
@@ -1063,5 +1070,17 @@ mod tests {
             ))
             .unwrap()
             .is_none());
+    }
+
+    /// V68 enables the Michelson runtime gas refund.
+    #[test]
+    fn v68_migration_enables_michelson_gas_refund() {
+        let mut host = MockKernelHost::default();
+
+        let status = migrate_to(&mut host, StorageVersion::V68).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+
+        let base = crate::load_base(&mut host).unwrap();
+        assert!(crate::storage::enable_michelson_gas_refund(&base));
     }
 }
