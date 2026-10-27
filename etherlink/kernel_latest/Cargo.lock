@@ -144,6 +144,7 @@ dependencies = [
  "ruint",
  "serde",
  "sha3 0.11.0",
+ "tiny-keccak",
 ]
 
 [[package]]
