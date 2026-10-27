@@ -118,9 +118,7 @@ fn get_revealed_key(
             Ok(pk)
         }
         _ => {
-            let manager = account
-                .manager(tez_accounts)
-                .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+            let manager = account.manager(tez_accounts)?;
             match manager {
                 Manager::Revealed(public_key) => Ok(public_key),
                 Manager::NotRevealed(public_key_hash) => {
@@ -155,14 +153,10 @@ fn validate_source(
         }
     }
 
-    let account = context::implicit_from_public_key_hash(source)
-        .map_err(|_| ValidityError::FailedToFetchAccount)?;
+    let account = context::implicit_from_public_key_hash(source)?;
 
     // Account must exist in the durable storage
-    if !account
-        .allocated(tez_accounts)
-        .map_err(|_| ValidityError::FailedToFetchBalance)?
-    {
+    if !account.allocated(tez_accounts)? {
         return Err(ValidityError::EmptyImplicitContract);
     }
 
@@ -297,12 +291,8 @@ pub fn execute_validation(
         .map(<ManagerOperation<OperationContent>>::try_from_manager_operation_content)
         .collect::<Result<_, _>>()?;
 
-    let mut source_balance = source_account
-        .balance(tez_accounts)
-        .map_err(|_| ValidityError::FailedToFetchBalance)?;
-    let mut source_counter = source_account
-        .counter(tez_accounts)
-        .map_err(|_| ValidityError::FailedToFetchCounter)?;
+    let mut source_balance = source_account.balance(tez_accounts)?;
+    let mut source_counter = source_account.counter(tez_accounts)?;
 
     let mut validated_operations = Vec::new();
 
@@ -348,17 +338,13 @@ pub fn execute_validation(
         }
     }
 
-    source_account
-        .set_balance(tez_accounts, &source_balance)
-        .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+    source_account.set_balance(tez_accounts, &source_balance)?;
 
-    source_account
-        .increment_counter(tez_accounts, validated_operations.len())
-        .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+    source_account.increment_counter(tez_accounts, validated_operations.len())?;
 
     let mut source_public_key = Vec::new();
     pk.bin_write(&mut source_public_key)
-        .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+        .map_err(ValidityError::PublicKeyEncoding)?;
 
     Ok(ValidatedBatch {
         source_account,

@@ -83,20 +83,17 @@ pub enum ValidityError {
     StorageLimitTooHigh,
     #[error("Invalid signature.")]
     InvalidSignature,
-    #[error("Failed to fetch account")]
-    FailedToFetchAccount,
+    /// A read or a write of the source account failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
+    /// The key of the source account is not valid.
+    #[error(transparent)]
+    Context(#[from] ContextError),
+    /// The public key of the source does not encode.
+    #[error("the public key does not encode: {0}")]
+    PublicKeyEncoding(tezos_enc::BinError),
     #[error("Failed to compute fee balance update")]
     FailedToComputeFeeBalanceUpdate,
-    #[error("Failed to fetch counter")]
-    FailedToFetchCounter,
-    #[error("Failed to fetch manager key")]
-    FailedToFetchManagerKey,
-    #[error("Failed to fetch balance")]
-    FailedToFetchBalance,
-    #[error("Failed to update balance")]
-    FailedToUpdateBalance,
-    #[error("Failed to increment counter.")]
-    FailedToIncrementCounter,
     #[error("Batch is empty.")]
     EmptyBatch,
     #[error("Batch contains operations from multiple sources.")]
@@ -113,6 +110,18 @@ pub enum ValidityError {
     InsufficientFee,
     #[error("The public key hash {0} is inconsistent with the public key provided.")]
     InconsistentPublicKey(PublicKeyHash),
+}
+
+impl From<KeySpaceError> for ValidityError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
+}
+
+impl From<KeyError> for ValidityError {
+    fn from(e: KeyError) -> Self {
+        Self::Context(e.into())
+    }
 }
 
 impl From<gas::OutOfGas> for ValidityError {
