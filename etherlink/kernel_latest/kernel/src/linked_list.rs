@@ -260,16 +260,16 @@ where
         self.pointers.is_none()
     }
 
-    /// Appends an element to the back of a list.
+    /// Appends an element to the back of a list. Returns if the delayed inbox was mutated.
     ///
     /// An element cannot be mutated.
     /// The Id has to be unique by element.
     /// The Id will be later use to retrieve the element
     /// (example: it can be the hash of the element).
-    pub fn push(&mut self, ks: &mut impl KeySpace, id: &Id, elt: &Elt) -> Result<()> {
+    pub fn push(&mut self, ks: &mut impl KeySpace, id: &Id, elt: &Elt) -> Result<bool> {
         // Check if the pointer already exists
         if (Pointer::read(ks, &self.prefix, id)? as Option<Pointer<Id, Elt>>).is_some() {
-            return Ok(());
+            return Ok(false);
         }
         match &self.pointers {
             Some(LinkedListPointer { front, back }) => {
@@ -328,7 +328,8 @@ where
                 });
             }
         };
-        self.save(ks)
+        self.save(ks)?;
+        Ok(true)
     }
 
     /// Returns an element at a given index.

@@ -249,14 +249,20 @@ impl DelayedInbox {
                     level,
                 };
 
-                Event::NewDelayedTransaction(tx).store(base, common)?;
-
-                self.0.push(base, &Hash(tx_hash), &item)?;
-                log!(
-                    Info,
-                    "Saved transaction {} in the delayed inbox",
-                    hex::encode(tx_hash)
-                );
+                if self.0.push(base, &Hash(tx_hash), &item)? {
+                    Event::NewDelayedTransaction(tx).store(base, common)?;
+                    log!(
+                        Info,
+                        "Saved transaction {} in the delayed inbox",
+                        hex::encode(tx_hash)
+                    );
+                } else {
+                    log!(
+                        Info,
+                        "Transaction {} was already present in the delayed inbox",
+                        hex::encode(tx_hash)
+                    );
+                }
                 Ok(())
             }
             TezosXTransaction::Tezos(op) => {
