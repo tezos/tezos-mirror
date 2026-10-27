@@ -3679,6 +3679,147 @@ let test_michelson_gateway_evm_revert () =
       ~error_msg:"Expected reverter balance 0 but got %L") ;
   unit
 
+(** Net fee (in mutez) the sender of the last operation paid, i.e. the
+    declared fee minus the refund of the unused gas, given the balances
+    before and after. The transfers measured with it carry no amount. *)
+let net_fee_paid ~balance_before ~balance_after =
+  Tez.to_mutez balance_before - Tez.to_mutez balance_after
+
+(** Sum of the [consumed_milligas] of the single manager operation of the
+    head block, over its main result and its internal results. *)
+let head_operation_consumed_milligas client =
+  let* ops = Client.RPC.call client (Node.RPC.get_chain_block_operations ()) in
+  let milligas result =
+    match JSON.(result |-> "consumed_milligas" |> as_string_opt) with
+    | Some s -> int_of_string s
+    | None -> 0
+  in
+  match JSON.as_list ops |> List.concat_map JSON.as_list with
+  | [op] ->
+      let metadata = JSON.(op |-> "contents" |=> 0 |-> "metadata") in
+      let main = milligas JSON.(metadata |-> "operation_result") in
+      let internals =
+        JSON.(metadata |-> "internal_operation_results" |> as_list_opt)
+        |> Option.value ~default:[]
+        |> List.fold_left
+             (fun acc internal -> acc + milligas JSON.(internal |-> "result"))
+             0
+      in
+      return (main + internals)
+  | _ -> Test.fail "Expected exactly one operation in the head block"
+
+(** BB-178: a Michelson->EVM gateway call from an account without an alias
+    first creates the alias. When the budget runs out during that creation,
+    the work done must be billed, as the [%materialize_alias] and EVM
+    gateway sites do, otherwise it can be repeated for the price of the
+    lookups.
+
+    1. A cold call (fresh source) and a warm call (alias now present) both
+       succeed: they give the full cost, and the cost without creation.
+    2. A cold call from another fresh source is given a budget between the
+       two, so the creation runs out of gas. The operation fails and its
+       sender must be charged at least what the warm call costs, since the
+       whole budget exceeds it. *)
+let test_michelson_gateway_alias_creation_oog_is_charged () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Michelson gateway: alias creation out of gas is charged"
+    ~tags:["cross_runtime"; "gateway"; "alias"; "out_of_gas"; "bb178"]
+    ~with_runtimes:[Tezos]
+    ~enable_michelson_gas_refund:true
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~init_code:evm_storer_init_code
+      ()
+  in
+  let* tez_client = tezlink_client sandbox in
+  let fee = Tez.of_int 1 in
+  let arg_data =
+    sf
+      {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
+      evm_contract
+      abi_encoded_uint256_42
+  in
+  (* Call the gateway from [source] with [gas_limit] (in gas units), and
+     return the net fee paid and the milligas reported by the receipt. The
+     fee and the gas limit are always given, so that every operation has the
+     same size, hence the same data-availability fee. *)
+  let call ~source ~gas_limit ~expected_status =
+    let account = source.Account.public_key_hash in
+    let* balance_before = Client.get_balance_for ~account tez_client in
+    let* () =
+      sandbox_call_michelson_contract
+        ~source
+        ~dest:gateway_address
+        ~entrypoint:"call_evm"
+        ~arg_data
+        ~force:true
+        ~gas_limit
+        ~storage_limit:1000
+        ~fee
+        sandbox
+    in
+    let* () = check_block_op_status ~index:0 ~expected_status tez_client in
+    let* balance_after = Client.get_balance_for ~account tez_client in
+    let* milligas = head_operation_consumed_milligas tez_client in
+    return (net_fee_paid ~balance_before ~balance_after, milligas)
+  in
+  let max_gas_limit = 500_000 in
+  let* cold_fee, cold_milligas =
+    call
+      ~source:Constant.bootstrap1
+      ~gas_limit:max_gas_limit
+      ~expected_status:"applied"
+  in
+  let* warm_fee, warm_milligas =
+    call
+      ~source:Constant.bootstrap1
+      ~gas_limit:max_gas_limit
+      ~expected_status:"applied"
+  in
+  Log.info
+    "cold: %d mutez, %d milligas; warm: %d mutez, %d milligas"
+    cold_fee
+    cold_milligas
+    warm_fee
+    warm_milligas ;
+  Check.(
+    (cold_milligas > warm_milligas)
+      int
+      ~error_msg:
+        "Expected the cold call (%L milligas) to cost more than the warm call \
+         (%R milligas)") ;
+  (* A budget, in gas units, that covers the warm call and a part of the
+     alias creation. *)
+  let budget_gas = (warm_milligas + cold_milligas) / 2 / 1000 in
+  Log.info "Out-of-gas budget: %d gas" budget_gas ;
+  let attempt source =
+    let* fee_paid, _ =
+      call ~source ~gas_limit:budget_gas ~expected_status:"failed"
+    in
+    Log.info
+      "Out-of-gas attempt from %s: %d mutez"
+      source.Account.alias
+      fee_paid ;
+    Check.(
+      (fee_paid >= warm_fee)
+        int
+        ~error_msg:
+          "Alias creation ran out of gas on a budget larger than the whole \
+           warm call, but the sender was charged %L mutez, less than the %R \
+           mutez of the warm call: the work done is not billed") ;
+    unit
+  in
+  let* () = attempt Constant.bootstrap2 in
+  (* Repeatable from another fresh address. *)
+  attempt Constant.bootstrap3
+
 let test_tx_queue_mixed_transaction_types ~runtime () =
   Setup.register_sandbox_with_oberver_test
     ~title:
@@ -8280,6 +8421,7 @@ let () =
   test_cross_runtime_view_call_negative () ;
   test_cross_runtime_call_from_michelson_to_evm () ;
   test_michelson_gateway_evm_revert () ;
+  test_michelson_gateway_alias_creation_oog_is_charged () ;
   test_cross_runtime_call_from_michelson_contract_to_evm () ;
   test_cross_runtime_call_from_michelson_contract_to_evm_revert () ;
   test_cross_runtime_transfer_from_michelson_contract_to_evm () ;
