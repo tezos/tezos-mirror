@@ -1,0 +1,13 @@
+# cargo-audit configuration. Each ignored advisory documents the accepted
+# risk and what its fix needs.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2026-0387: crypto-bigint 0.2.5, timing variability in operations
+  # that must run in constant time. It reaches us through p256 0.9 in
+  # tezos_crypto_rs, which only verifies P-256 signatures over public data
+  # and never signs, so no secret goes through the affected code. The fix
+  # needs p256 0.14 in sdk/rust/crypto, which conflicts with the subtle
+  # bound of the Zcash stack in src/rustzcash_deps.
+  "RUSTSEC-2026-0387",
+]
