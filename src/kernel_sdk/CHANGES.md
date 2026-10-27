@@ -25,6 +25,8 @@
 - Add `ExtensionError`. When the failure type of an extension implements it,
   `?` converts a `KeySpaceError` into the extended error, as
   `KeySpaceError::widen` does.
+- `KeySpaceError` is the size of one pointer, so a `Result` that holds it is
+  small.
 - Add support for the `DalAttestedSlots` inbox message behind the `proto-alpha` flag.
 - Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
