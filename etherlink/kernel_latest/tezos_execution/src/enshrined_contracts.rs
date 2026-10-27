@@ -1243,6 +1243,27 @@ fn inject_context_headers_raw(
     Ok(())
 }
 
+/// Map a failed alias creation to the error of the gateway call.
+///
+/// An alias creation that runs out of gas used the whole budget it was given:
+/// the call is charged for it, not only for the lookups done before, so that
+/// the failed attempt can't be repeated for cheap.
+fn alias_creation_error(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    budget: Gas,
+    error: TezosXRuntimeError,
+) -> TransferError {
+    match error {
+        TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(
+            operation_gas
+                .cast_and_consume_milligas(budget)
+                .err()
+                .unwrap_or(OutOfGas),
+        ),
+        _ => TransferError::GatewayError(error.to_string()),
+    }
+}
+
 /// Inject trusted X-Tezos-* context headers derived from `ctx` into `request`.
 ///
 /// The target runtime is derived from the request URI host (e.g. `"ethereum"`,
@@ -1366,23 +1387,20 @@ where
         } else {
             None
         };
-        let (sender_alias, sender_resolution) = {
+        let sender_resolution = {
             let (rk, journal, registry) = ctx.cross_runtime_split();
-            registry
-                .ensure_alias(
-                    rk,
-                    journal,
-                    alias_info,
-                    sender_pubkey,
-                    target_runtime,
-                    context.clone(),
-                    target_budget,
-                )
-                .map_err(|e| match e {
-                    TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(OutOfGas),
-                    _ => TransferError::GatewayError(e.to_string()),
-                })?
+            registry.ensure_alias(
+                rk,
+                journal,
+                alias_info,
+                sender_pubkey,
+                target_runtime,
+                context.clone(),
+                target_budget,
+            )
         };
+        let (sender_alias, sender_resolution) = sender_resolution
+            .map_err(|e| alias_creation_error(ctx.operation_gas(), target_budget, e))?;
         if let Some(v) = sender_resolution.delegated_storage_cost {
             ctx.add_delegated_storage_cost(v)
                 .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
@@ -1424,20 +1442,21 @@ where
             let source_runtime = alias_info.runtime;
             let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
             let target_budget = Gas::new(remaining_milligas, RuntimeId::Tezos);
-            let (source_alias, source_resolution) = {
+            let source_resolution = {
                 let (rk, journal, registry) = ctx.cross_runtime_split();
-                registry
-                    .ensure_alias(
-                        rk,
-                        journal,
-                        alias_info,
-                        Some(&source_public_key),
-                        target_runtime,
-                        context,
-                        target_budget,
-                    )
-                    .map_err(|e| TransferError::GatewayError(e.to_string()))?
+                registry.ensure_alias(
+                    rk,
+                    journal,
+                    alias_info,
+                    Some(&source_public_key),
+                    target_runtime,
+                    context,
+                    target_budget,
+                )
             };
+            let (source_alias, source_resolution) = source_resolution.map_err(|e| {
+                alias_creation_error(ctx.operation_gas(), target_budget, e)
+            })?;
             if let Some(v) = source_resolution.delegated_storage_cost {
                 ctx.add_delegated_storage_cost(v)
                     .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
