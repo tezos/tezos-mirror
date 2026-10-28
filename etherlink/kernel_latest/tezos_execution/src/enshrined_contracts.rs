@@ -2800,6 +2800,51 @@ pub(crate) mod tests {
         );
     }
 
+    // An alias creation that runs out of gas used the whole budget it was
+    // given: the call is charged for it, not only for the lookups done
+    // before, so that the failed attempt can't be repeated for cheap.
+    // `calls_before_out_of_gas` picks the sender alias (0) or the source
+    // alias (1), which resolve one after the other.
+    fn dispatch_with_alias_creation_out_of_gas(calls_before_out_of_gas: usize) {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string())
+            .with_alias_creation_out_of_gas_after(calls_before_out_of_gas);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 500);
+
+        let err =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
+                .unwrap_err();
+        assert!(
+            matches!(err, CracError::Operation(TransferError::OutOfGas(_))),
+            "{err}"
+        );
+        assert_eq!(ctx.operation_gas().remaining.milligas(), Some(0));
+        assert_eq!(
+            registry.ensure_alias_calls.borrow().len(),
+            calls_before_out_of_gas
+        );
+    }
+
+    #[test]
+    fn test_sender_alias_out_of_gas_is_charged_the_whole_budget() {
+        dispatch_with_alias_creation_out_of_gas(0)
+    }
+
+    #[test]
+    fn test_source_alias_out_of_gas_is_charged_the_whole_budget() {
+        dispatch_with_alias_creation_out_of_gas(1)
+    }
+
     #[test]
     fn test_alias_lookup_cost_caps_per_transfer() {
         let mut host = MockKernelHost::default();
