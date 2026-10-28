@@ -96,6 +96,14 @@ module Tezosx_run_code = struct
   let result = path ^ "/result"
 end
 
+module Tezosx_compute_alias = struct
+  let path = BASE.make "/tezosx_compute_alias"
+
+  let input = path ^ "/input"
+
+  let result = path ^ "/result"
+end
+
 let delayed_input ~storage_version =
   if Storage_version.ipc_paths_moved_to_base ~storage_version then
     BASE.make "/__delayed_input"

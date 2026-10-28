@@ -632,6 +632,28 @@ let rpc_ok result = Lwt_result.return @@ Ok result
 
 let rpc_error err = Lwt_result.return @@ Error err
 
+(* [kernel_alias ro_ctxt ~target ~native_address] is the alias the kernel
+   derives for [native_address] in [target], or [None] for a kernel older
+   than the [tezosx_compute_alias] entrypoint (storage version 67), whose
+   derivation the node mirrors instead. *)
+let kernel_alias ro_ctxt ~target ~native_address =
+  let open Lwt_result_syntax in
+  let* state = Evm_ro_context.get_state ro_ctxt () in
+  let* storage_version = Durable_storage.storage_version state in
+  if Storage_version.tezosx_compute_alias ~storage_version then
+    let* bytes =
+      Evm_ro_context.execute_entrypoint
+        ro_ctxt
+        state
+        ~input_path:Durable_storage_path.Tezosx_compute_alias.input
+        ~input:(Tezosx_mod.Compute_alias.encode_input ~target ~native_address)
+        ~output_path:Durable_storage_path.Tezosx_compute_alias.result
+        ~entrypoint:"tezosx_compute_alias"
+    in
+    let*? alias = Tezosx_mod.Compute_alias.decode_result bytes in
+    return_some alias
+  else return_none
+
 let missing_parameter () = rpc_error Rpc_errors.invalid_input
 
 let expect_input input f =
@@ -1067,14 +1089,34 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Tezosx.Get_tezos_ethereum_address.Method ->
             let f tezos_address =
-              tezos_address |> Tezos_types.Contract.to_b58check
-              |> Tezosx_mod.Ethereum_runtime.generate_alias |> rpc_ok
+              let native_address =
+                Tezos_types.Contract.to_b58check tezos_address
+              in
+              let* alias =
+                kernel_alias ro_ctxt ~target:`Ethereum ~native_address
+              in
+              match alias with
+              | Some alias -> rpc_ok (Ethereum_types.Address.of_string alias)
+              | None ->
+                  rpc_ok
+                    (Tezosx_mod.Ethereum_runtime.generate_alias native_address)
             in
             build_with_input ~f module_ parameters
         | Tezosx.Get_ethereum_tezos_address.Method ->
             let f ethereum_address =
-              ethereum_address |> Ethereum_types.Address.to_string
-              |> Tezosx_mod.Tezos_runtime.generate_alias |> rpc_ok
+              let native_address =
+                Ethereum_types.Address.to_string ethereum_address
+              in
+              let* alias =
+                kernel_alias ro_ctxt ~target:`Tezos ~native_address
+              in
+              match alias with
+              | Some alias ->
+                  let*? contract = Tezos_types.Contract.of_b58check alias in
+                  rpc_ok contract
+              | None ->
+                  rpc_ok
+                    (Tezosx_mod.Tezos_runtime.generate_alias native_address)
             in
             build_with_input ~f module_ parameters
         | Rpc_encodings.Tezosx.Trace_call.Method ->

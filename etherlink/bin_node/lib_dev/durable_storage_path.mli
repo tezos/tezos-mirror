@@ -206,6 +206,12 @@ module Tezosx_run_code : sig
   val result : path
 end
 
+module Tezosx_compute_alias : sig
+  val input : path
+
+  val result : path
+end
+
 val delayed_input : storage_version:int -> path
 
 (** Kernel communication canal for block assembling (instant confirmations) *)

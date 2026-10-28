@@ -164,6 +164,24 @@ where
         }
     }
 
+    /// Code hash of `address` before this commit: the cached original
+    /// info when the run loaded the account, otherwise the durable record,
+    /// which the commit has not overwritten yet.
+    fn previous_code_hash(
+        &mut self,
+        address: &Address,
+    ) -> Result<Option<B256>, EvmDbError> {
+        match self.original_account_infos.get(address) {
+            Some(info) => Ok(Some(info.code_hash)),
+            None => {
+                let storage_account = StorageAccount::from_address(address)?;
+                Ok(storage_account
+                    .info_without_migration(self.rk.eth_accounts())?
+                    .map(|info| info.code_hash))
+            }
+        }
+    }
+
     fn update_account(&mut self, address: Address, account_state: AccountState) {
         let existing_origin = match self.existing_origin(&address) {
             Ok(origin) => origin,
@@ -200,6 +218,38 @@ where
                     // its forwarder account is being created in this
                     // very commit.
                     let staged_alias = self.staged_alias_origins.remove(&address);
+                    // An alias materialized over an account that holds
+                    // code (a rescue account deployed before the guard,
+                    // RFC-26051) replaces that code: release its
+                    // reference so the hash-consed code storage stays
+                    // accurate.
+                    if staged_alias.is_some() {
+                        let previous_code_hash = match self.previous_code_hash(&address) {
+                            Ok(previous_code_hash) => previous_code_hash,
+                            Err(err) => {
+                                self.abort();
+                                log!(
+                                    Level::Error,
+                                    "DatabaseCommit `previous_code_hash` error: {err:?}"
+                                );
+                                return;
+                            }
+                        };
+                        if let Some(previous_code_hash) = previous_code_hash {
+                            if previous_code_hash != KECCAK_EMPTY
+                                && previous_code_hash != info.code_hash
+                            {
+                                abort_on_error!(
+                                    self,
+                                    CodeStorage::delete(
+                                        self.rk.eth_accounts_mut(),
+                                        &previous_code_hash
+                                    ),
+                                    "DatabaseCommit `CodeStorage::delete`"
+                                );
+                            }
+                        }
+                    }
                     let has_code = info.code_hash != KECCAK_EMPTY;
                     let final_origin = if let Some(alias_info) = staged_alias {
                         AccountOrigin::Alias(alias_info)

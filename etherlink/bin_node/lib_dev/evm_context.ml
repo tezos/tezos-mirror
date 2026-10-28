@@ -3810,19 +3810,6 @@ let provision_balance ?block_number ~storage_version address value =
                 | None -> Some (new_info u));
               block_number;
             };
-          Patch_state
-            {
-              commit = false;
-              key =
-                Tezosx.Durable_storage_path.Accounts.Tezos.ethereum_alias
-                  address;
-              patch =
-                (fun _ ->
-                  Some
-                    (Bytes.to_string
-                       (Tezosx.Foreign_address.encode (`Tezos address))));
-              block_number;
-            };
         ]
   in
   List.iter_es worker_wait_for_request patch_requests

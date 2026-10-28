@@ -61,19 +61,27 @@ module Tezos_runtime : sig
   val generate_alias : string -> Tezos_types.Contract.t
 end
 
-module Foreign_address : sig
-  type t =
-    [`Tezos of Tezos_runtime.address | `Ethereum of Ethereum_types.address]
+(** Codec of the kernel's [tezosx_compute_alias] entrypoint, which derives
+    the alias of a native address exactly as the kernel does. Available
+    from storage version 67 ({!Storage_version.tezosx_compute_alias}). *)
+module Compute_alias : sig
+  (** The runtime the alias lives in. *)
+  type target = [`Tezos | `Ethereum]
 
-  val encode : t -> bytes
+  (** [encode_input ~target ~native_address] is the entrypoint input for the
+      alias of [native_address], given in the human-readable form of the
+      other runtime. *)
+  val encode_input : target:target -> native_address:string -> bytes
+
+  (** [decode_result bytes] is the alias, in the human-readable form of the
+      target runtime, or the error the kernel reported. *)
+  val decode_result : bytes -> string tzresult
 end
 
 module Durable_storage_path : sig
   module Accounts : sig
     module Tezos : sig
       val info : Tezos_runtime.address -> Durable_storage_path.path
-
-      val ethereum_alias : Tezos_runtime.address -> Durable_storage_path.path
     end
   end
 end

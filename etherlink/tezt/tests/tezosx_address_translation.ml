@@ -1237,7 +1237,7 @@ let test_michelson_resolve_address_implicit_derived () =
   let implicit_addr = Constant.bootstrap3.public_key_hash in
   (* The VIEW returns the EIP-55 checksummed alias; pin the constant to
      bootstrap3's pkh by cross-checking the raw (lowercase) derivation. *)
-  let alias = "0x2BfC5de2b03599a6C8107ab2D9dA4B7daeE3352E" in
+  let alias = "0xe50E7F2C16C2E357BD19e0C8814e8Be626F86011" in
   Check.(
     (String.lowercase_ascii alias
     = Test_helpers.evm_alias_of_tezos_address implicit_addr)

@@ -103,10 +103,13 @@ let michelson_blocks_at_world_state_root ~storage_version =
    export — the call would leave the IPC result path empty and surface as
    an opaque failure. [tezosx_michelson_entrypoints] exists from V51 on
    (added under V50, so V51 is the first version every kernel carrying it
-   holds), [tezosx_run_code] from V64 on. *)
+   holds), [tezosx_run_code] from V64 on, [tezosx_compute_alias] from V67
+   on. *)
 let tezosx_michelson_entrypoints ~storage_version = storage_version >= 51
 
 let tezosx_run_code ~storage_version = storage_version >= 64
+
+let tezosx_compute_alias ~storage_version = storage_version >= 67
 
 let michelson_runtime_target_sunrise_level_moved_to_base_version = 66
 

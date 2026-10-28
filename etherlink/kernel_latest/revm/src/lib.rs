@@ -5864,49 +5864,150 @@ mod test {
         );
     }
 
-    /// ensure_alias must refuse an address whose info record is tagged
-    /// Native — a natively signing account cannot become an alias.
+    /// ensure_alias must materialize an alias whose address is tagged
+    /// Native: no key exists for a derived address, so the tag can only
+    /// come from a rescue account deployed there before the guard
+    /// (RFC-26051), which the alias overwrites.
     #[test]
-    fn test_ensure_alias_refuses_native_tagged_address() {
+    fn test_ensure_alias_overwrites_native_tagged_address() {
+        use crate::precompiles::constants::alias_forwarder_delegation_code_hash;
+
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
 
-        let native_address = "tz1NativeTagged";
-        let alias = {
-            let hash = bytes_hash(native_address.as_bytes());
-            Address::from_slice(&hash.0[0..20])
+        let registry = Registry::new();
+        let alias_info = AliasInfo {
+            runtime: tezosx_interfaces::RuntimeId::Tezos,
+            native_address: "tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh".to_string(),
         };
-        StorageAccount::from_address(&alias)
+        let alias = registry
+            .compute_alias(&AliasInfo {
+                runtime: RuntimeId::Ethereum,
+                native_address: alias_info.native_address.clone(),
+            })
+            .unwrap();
+        let alias_address: Address = alias.parse().unwrap();
+
+        // A rescue clone deployed at the alias before the guard: it holds
+        // the only reference to its code, and the commit tagged it Native.
+        let clone_code = hex::decode(
+            "363d3d373d3d3d363d73d532c0971e9c85e2468c8cc6c3949eae285cd5135af43d82803e903d91602b57fd5bf3",
+        )
+        .unwrap();
+        let clone_code_hash =
+            CodeStorage::add(rk.eth_accounts_mut(), &clone_code, None).unwrap();
+        StorageAccount::from_address(&alias_address)
             .unwrap()
             .set_info_without_code(
                 rk.eth_accounts_mut(),
                 AccountInfo {
                     nonce: 1,
+                    code_hash: clone_code_hash,
                     origin: AccountOrigin::Native,
                     ..AccountInfo::default()
                 },
             )
             .unwrap();
 
-        let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
-        let result = registry.ensure_alias(
+        let (materialized, _) = registry
+            .ensure_alias(
+                &mut rk,
+                &mut journal,
+                alias_info.clone(),
+                None,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+                tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
+            )
+            .expect("a Native-tagged derived address must be materialized");
+        assert_eq!(materialized, alias);
+
+        crate::journal::commit_evm_journal_from_external(
             &mut rk,
+            &registry,
+            &BlockConstants::test_block_with_no_fees(),
             &mut journal,
-            AliasInfo {
-                runtime: tezosx_interfaces::RuntimeId::Tezos,
-                native_address: native_address.to_string(),
-            },
             None,
-            tezosx_interfaces::RuntimeId::Ethereum,
-            test_alias_creation_context(),
-            tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
+        )
+        .expect("flush evm journal");
+
+        // The alias replaced the clone, and the clone's code, no longer
+        // referenced, left the code storage.
+        let info = StorageAccount::from_address(&alias_address)
+            .unwrap()
+            .info(rk.eth_accounts_mut())
+            .unwrap();
+        assert_eq!(info.code_hash, alias_forwarder_delegation_code_hash());
+        assert_eq!(info.origin, AccountOrigin::Alias(alias_info));
+        assert_eq!(
+            CodeStorage::new(&clone_code_hash)
+                .unwrap()
+                .get_code(rk.eth_accounts())
+                .unwrap(),
+            None,
+            "the overwritten clone code must be released"
         );
+    }
+
+    /// The rescue-account initcode reverts once the guard holds code, and
+    /// deploys the clone when it does not.
+    #[test]
+    fn test_rescue_guard_blocks_rescue_account_deployment() {
+        use crate::precompiles::constants::{
+            RESCUE_GUARD_ADDRESS, RESCUE_GUARD_CONTRACT, RESCUE_IMPL_TZ1,
+        };
+
+        let initcode = [
+            &[0x73][..],
+            RESCUE_GUARD_ADDRESS.as_slice(),
+            &hex::decode("3b15601e57600080fd5b604180602a6000396000f3").unwrap(),
+            &hex::decode("363d3d373d3d3d363d73").unwrap(),
+            RESCUE_IMPL_TZ1.as_slice(),
+            &hex::decode("5af43d82803e903d91602b57fd5bf3").unwrap(),
+            &[0x11; 20],
+        ]
+        .concat();
+        let deploy = |tezosx_enabled: bool| {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            init_precompile_bytecodes(rk.eth_accounts_mut(), tezosx_enabled).unwrap();
+            let guard_code_hash = StorageAccount::from_address(&RESCUE_GUARD_ADDRESS)
+                .unwrap()
+                .info(rk.eth_accounts_mut())
+                .unwrap()
+                .code_hash;
+            let outcome = run_transaction(
+                &mut rk,
+                &Registry::new(),
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                &BlockConstants::test_block_with_no_fees(),
+                None,
+                Address::from_hex("1111111111111111111111111111111111111111").unwrap(),
+                None,
+                Bytes::from(initcode.clone()),
+                GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+                U256::ZERO,
+                None,
+                false,
+                TransactionOrigin::UserInput {
+                    access_list: AccessList::default(),
+                },
+            )
+            .unwrap();
+            (guard_code_hash, outcome.result)
+        };
+
+        let (guard_code_hash, result) = deploy(true);
+        assert_eq!(guard_code_hash, RESCUE_GUARD_CONTRACT.code_hash);
         assert!(
-            result.is_err(),
-            "a Native-tagged address must not be aliased"
+            matches!(result, ExecutionResult::Revert { .. }),
+            "{result:?}"
         );
+
+        let (_, result) = deploy(false);
+        assert!(result.is_success(), "{result:?}");
     }
 
     /// Branch 2: a legacy forwarder already has the delegation code but no

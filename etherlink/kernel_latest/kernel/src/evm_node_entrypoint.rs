@@ -53,6 +53,8 @@ use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
+use tezosx_interfaces::{AliasInfo, Registry};
+use tezosx_types::{canonicalize_native_address, RuntimeId};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -73,6 +75,11 @@ pub(crate) const TEZOSX_RUN_CODE_INPUT_KEY: Key =
     Key::from_static(b"/tezosx_run_code/input");
 pub(crate) const TEZOSX_RUN_CODE_RESULT_KEY: Key =
     Key::from_static(b"/tezosx_run_code/result");
+
+pub(crate) const TEZOSX_COMPUTE_ALIAS_INPUT_KEY: Key =
+    Key::from_static(b"/tezosx_compute_alias/input");
+pub(crate) const TEZOSX_COMPUTE_ALIAS_RESULT_KEY: Key =
+    Key::from_static(b"/tezosx_compute_alias/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -1051,6 +1058,114 @@ fn encode_entrypoints_result(
     Ok(stream.out().to_vec())
 }
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn tezosx_compute_alias() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    tezosx_compute_alias_fn(&mut sdk_host);
+}
+
+/// Input of the `tezosx_compute_alias` entrypoint. Mirrors the node's
+/// `Compute_alias.input_encoding` (`tezosx.ml`); the unit tests below pin
+/// the wire bytes.
+#[derive(NomReader)]
+#[cfg_attr(test, derive(Debug, PartialEq, BinWriter))]
+struct ComputeAliasInput {
+    /// The runtime the alias lives in.
+    target_runtime: RuntimeId,
+    /// The native address, in the human-readable form of the other
+    /// runtime (b58check for Tezos, hex for Ethereum).
+    native_address: String,
+}
+
+/// Result of `tezosx_compute_alias`, decoded by the node's
+/// `Compute_alias.result_encoding`. The variant order is the union tag.
+#[derive(BinWriter)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+enum ComputeAliasResult {
+    /// The alias, in the human-readable form of the target runtime.
+    Success(String),
+    /// The input could not be decoded or the alias derived.
+    Error(String),
+}
+
+/// Derive the alias of a native address in another runtime, exactly as
+/// the kernel does when it materializes it. Lets the node follow the
+/// kernel's derivation instead of mirroring it, so a kernel changing the
+/// derivation (RFC-26051 from storage version 67) needs no node change.
+///
+/// Pure: reads only the input and the chain configuration, writes only
+/// the result.
+#[allow(dead_code)]
+pub fn tezosx_compute_alias_fn<Host>(host: &mut Host)
+where
+    Host: StorageV1 + CoreStorage,
+{
+    let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
+    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
+        return;
+    };
+    let result = match bk.base().get(&TEZOSX_COMPUTE_ALIAS_INPUT_KEY) {
+        None => ComputeAliasResult::Error("compute_alias input not found".to_string()),
+        Some(payload) => match fetch_tezosx_configuration(&mut kernel_host, &mut bk) {
+            Ok(chain_config) => {
+                compute_alias_from_input(&chain_config.init_registry(), &payload)
+            }
+            Err(err) => ComputeAliasResult::Error(format!(
+                "cannot read the chain configuration: {err:?}"
+            )),
+        },
+    };
+    let mut bytes = Vec::new();
+    if let Err(err) = result.bin_write(&mut bytes) {
+        log!(
+            Error,
+            "Error encoding the Tezos X compute_alias result: {:?}",
+            err
+        );
+        return;
+    }
+    if let Err(err) = bk.base_mut().set(&TEZOSX_COMPUTE_ALIAS_RESULT_KEY, bytes) {
+        log!(
+            Error,
+            "Error writing the Tezos X compute_alias result: {:?}",
+            err
+        );
+    }
+}
+
+fn compute_alias_from_input(
+    registry: &impl Registry,
+    payload: &[u8],
+) -> ComputeAliasResult {
+    let input = match ComputeAliasInput::nom_read_exact(payload) {
+        Ok(input) => input,
+        Err(err) => {
+            return ComputeAliasResult::Error(format!("cannot decode the input: {err}"))
+        }
+    };
+    let source_runtime = match input.target_runtime {
+        RuntimeId::Tezos => RuntimeId::Ethereum,
+        RuntimeId::Ethereum => RuntimeId::Tezos,
+    };
+    let alias_info = AliasInfo {
+        runtime: input.target_runtime,
+        native_address: canonicalize_native_address(
+            source_runtime,
+            &input.native_address,
+        ),
+    };
+    match registry.compute_alias(&alias_info) {
+        // The EVM runtime renders aliases EIP-55 checksummed; return the
+        // canonical lowercase form. A b58check alias is case-sensitive.
+        Ok(alias) => ComputeAliasResult::Success(canonicalize_native_address(
+            input.target_runtime,
+            &alias,
+        )),
+        Err(err) => ComputeAliasResult::Error(format!("{err:?}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use mir::ast::{Entrypoint, Micheline, Type};
@@ -1727,5 +1842,113 @@ mod tests {
         let result = run_entrypoints_query(&unknown_kt1);
         // RLP empty list: 0xc0
         assert_eq!(result, vec![0xc0], "unknown contract should encode as None");
+    }
+}
+
+#[cfg(test)]
+mod compute_alias_tests {
+    use super::{
+        compute_alias_from_input, ComputeAliasInput, ComputeAliasResult, RuntimeId,
+    };
+    use crate::registry_impl::RegistryImpl;
+    use primitive_types::U256;
+    use tezos_crypto_rs::hash::ChainId;
+    use tezos_data_encoding::enc::BinWriter;
+    use tezos_data_encoding::nom::NomReader;
+
+    const TZ1: &str = "tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh";
+    /// Recoverable alias of [`TZ1`], from tz-alias-recovery's `frozen.json`.
+    const TZ1_ALIAS: &str = "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae";
+
+    /// `target_runtime = Ethereum`, `native_address = TZ1`.
+    const INPUT: &str =
+        "0100000024747a3161796756706f636f65454d55383976586b3932734d48715059464e5a5667767268";
+    /// `Success(TZ1_ALIAS)`.
+    const SUCCESS_RESULT: &str =
+        "000000002a307830346539626139383862613837626264376237356535616138313363353263613363333165396165";
+    /// `Error("bad input")`.
+    const ERROR_RESULT: &str = "010000000962616420696e707574";
+
+    fn registry() -> RegistryImpl {
+        RegistryImpl::new(U256::from(1337), ChainId::default())
+    }
+
+    fn compute(target_runtime: RuntimeId, native_address: &str) -> ComputeAliasResult {
+        let mut payload = Vec::new();
+        ComputeAliasInput {
+            target_runtime,
+            native_address: native_address.to_string(),
+        }
+        .bin_write(&mut payload)
+        .expect("the input encodes");
+        compute_alias_from_input(&registry(), &payload)
+    }
+
+    #[test]
+    fn input_wire_format_is_pinned() {
+        let input = ComputeAliasInput {
+            target_runtime: RuntimeId::Ethereum,
+            native_address: TZ1.to_string(),
+        };
+        let mut bytes = Vec::new();
+        input.bin_write(&mut bytes).expect("the input encodes");
+        assert_eq!(hex::encode(&bytes), INPUT);
+        let decoded =
+            ComputeAliasInput::nom_read_exact(&hex::decode(INPUT).expect("valid hex"))
+                .expect("the pinned input decodes");
+        assert_eq!(decoded, input);
+    }
+
+    #[test]
+    fn result_wire_format_is_pinned() {
+        let encode = |result: ComputeAliasResult| {
+            let mut bytes = Vec::new();
+            result.bin_write(&mut bytes).expect("the result encodes");
+            hex::encode(bytes)
+        };
+        assert_eq!(
+            encode(ComputeAliasResult::Success(TZ1_ALIAS.to_string())),
+            SUCCESS_RESULT
+        );
+        assert_eq!(
+            encode(ComputeAliasResult::Error("bad input".to_string())),
+            ERROR_RESULT
+        );
+    }
+
+    #[test]
+    fn evm_alias_of_an_implicit_account_is_recoverable() {
+        assert_eq!(
+            compute(RuntimeId::Ethereum, TZ1),
+            ComputeAliasResult::Success(TZ1_ALIAS.to_string())
+        );
+    }
+
+    #[test]
+    fn michelson_alias_ignores_the_evm_address_case() {
+        let lower = compute(
+            RuntimeId::Tezos,
+            "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae",
+        );
+        let ComputeAliasResult::Success(alias) = &lower else {
+            panic!("expected an alias, got {lower:?}")
+        };
+        assert!(alias.starts_with("KT1"), "unexpected alias {alias}");
+        assert_eq!(
+            compute(
+                RuntimeId::Tezos,
+                "0x04E9BA988BA87BBD7B75E5AA813C52CA3C31E9AE"
+            ),
+            lower
+        );
+    }
+
+    #[test]
+    fn undecodable_input_is_an_error() {
+        let result = compute_alias_from_input(&registry(), &[0x07]);
+        assert!(
+            matches!(result, ComputeAliasResult::Error(_)),
+            "expected an error, got {result:?}"
+        );
     }
 }

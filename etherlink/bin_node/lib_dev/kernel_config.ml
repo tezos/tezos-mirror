@@ -261,15 +261,8 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
           }
       in
       let address = Signature.V3.Public_key.hash manager in
-      let (Address (Hex alias)) =
-        Tezosx.Ethereum_runtime.generate_alias
-          (Signature.V3.Public_key_hash.to_b58check address)
-      in
       let payload =
         Tezosx.Tezos_runtime.encode_account_info tezos_account_info
-      in
-      let rlp_address =
-        Bytes.to_string (Tezosx.Foreign_address.encode (`Tezos address))
       in
       make_instr
         ~path_prefix:
@@ -279,10 +272,7 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
             "tezosx";
             Signature.V3.Public_key_hash.to_b58check address;
           ]
-        (Some ("info", Bytes.to_string payload))
-      @ make_instr
-          ~path_prefix:["tez"; "tez_accounts"; "tezosx"; "native"; "ethereum"]
-          (Some ("0x" ^ alias, rlp_address)))
+        (Some ("info", Bytes.to_string payload)))
     tez_bootstrap_accounts
   |> List.flatten
 
