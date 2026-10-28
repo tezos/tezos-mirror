@@ -153,6 +153,7 @@ type t = {
   publish_slots_regularly : publish_slots_regularly option;
   profiling : Tezos_profiler.Profiler.profiling_config option;
   rpc_acl_policy : Tezos_rpc_http_server.RPC_server.Acl.policy;
+  rpc_max_request_body_size : int64;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -207,6 +208,12 @@ let default_fetch_trusted_setup = true
    time but if those values are reduced a lot, this might become an issue.*)
 let default_batching_configuration = Enabled {time_interval = 100}
 
+(* Posting a slot carries slot_size bytes of arbitrary data, which
+   data-encoding renders in JSON as one decimal number per byte. With the
+   default protocol parameters (380_832 bytes per slot) that is already around
+   1.5 MiB per request. *)
+let default_rpc_max_request_body_size = 16_777_216L (* 16 MiB *)
+
 let default =
   {
     data_dir = default_data_dir;
@@ -235,6 +242,7 @@ let default =
     publish_slots_regularly = None;
     profiling = None;
     rpc_acl_policy = Tezos_rpc_http_server.RPC_server.Acl.empty_policy;
+    rpc_max_request_body_size = default_rpc_max_request_body_size;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -284,6 +292,7 @@ let encoding : t Data_encoding.t =
            publish_slots_regularly;
            profiling;
            rpc_acl_policy;
+           rpc_max_request_body_size;
          }
        ->
       ( ( ( data_dir,
@@ -309,7 +318,8 @@ let encoding : t Data_encoding.t =
           batching_configuration,
           publish_slots_regularly,
           profiling,
-          rpc_acl_policy ) ))
+          rpc_acl_policy,
+          rpc_max_request_body_size ) ))
     (fun ( ( ( data_dir,
                rpc_addr,
                listen_addr,
@@ -333,7 +343,8 @@ let encoding : t Data_encoding.t =
              batching_configuration,
              publish_slots_regularly,
              profiling,
-             rpc_acl_policy ) )
+             rpc_acl_policy,
+             rpc_max_request_body_size ) )
        ->
       {
         data_dir;
@@ -362,6 +373,7 @@ let encoding : t Data_encoding.t =
         publish_slots_regularly;
         profiling;
         rpc_acl_policy;
+        rpc_max_request_body_size;
       })
     (merge_objs
        (merge_objs
@@ -475,7 +487,7 @@ let encoding : t Data_encoding.t =
                    ~description:"Disable amplification"
                    bool
                    default.disable_amplification))))
-       (obj5
+       (obj6
           (dft
              "banned_addrs"
              ~description:
@@ -505,7 +517,16 @@ let encoding : t Data_encoding.t =
                 matches the configured rpc-addr, its ACL replaces the default \
                 dal_secure (public) / allow_all (loopback) policy."
              Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
-             default.rpc_acl_policy)))
+             default.rpc_acl_policy)
+          (dft
+             "rpc-max-request-body-size"
+             ~description:
+               "The maximum size, in bytes, of an RPC request body the server \
+                will read into memory. Requests whose body exceeds this size \
+                are rejected with HTTP 413 before routing or ACL checks are \
+                performed."
+             int64
+             default_rpc_max_request_body_size)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

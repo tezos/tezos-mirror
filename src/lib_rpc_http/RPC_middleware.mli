@@ -57,6 +57,17 @@ val proxy_server_query_forwarder :
   RPC_server.callback ->
   RPC_server.callback
 
+(** Default cap, in bytes, on the request body a single RPC call is allowed
+    to materialize. See {!limit_body_size}. *)
+val default_max_body_size : int64
+
+(** A Resto middleware that rejects (413 Request Entity Too Large) any
+    request whose body exceeds [max_body_size], before the wrapped
+    [callback] runs. Bounds memory even when the client lies about or
+    omits [Content-Length] (chunked / unknown-length transfer). *)
+val limit_body_size :
+  max_body_size:int64 -> RPC_server.callback -> RPC_server.callback
+
 (** A Resto middleware that transforms any server callback to an other
     that handles RPC metrics *)
 val rpc_metrics_transform_callback :

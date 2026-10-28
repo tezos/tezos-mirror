@@ -43,13 +43,14 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args24
+       (args25
           force_switch
           data_dir_arg
           config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
+          rpc_max_request_body_arg
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg
@@ -89,6 +90,7 @@ let config_init_command =
              rpc_addr,
              rpc_port,
              acl_override,
+             rpc_max_request_body_size,
              metrics_addr,
              enable_performance_metrics,
              disable_performance_metrics,
@@ -133,6 +135,7 @@ let config_init_command =
           ~rpc_addr
           ~rpc_port
           ~acl_override
+          ~rpc_max_request_body_size
           ~metrics_addr
           ~disable_performance_metrics
           ~loser_mode
@@ -181,7 +184,7 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args12
+       (args13
           data_dir_arg
           config_file_arg
           mode_arg
@@ -190,6 +193,7 @@ let legacy_run_command =
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
+          rpc_max_request_body_arg
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg
@@ -227,6 +231,7 @@ let legacy_run_command =
              rpc_addr,
              rpc_port,
              acl_override,
+             rpc_max_request_body_size,
              metrics_addr,
              enable_performance_metrics,
              disable_performance_metrics,
@@ -270,6 +275,7 @@ let legacy_run_command =
           ~rpc_addr
           ~rpc_port
           ~acl_override
+          ~rpc_max_request_body_size
           ~metrics_addr
           ~disable_performance_metrics
           ~loser_mode
@@ -317,12 +323,13 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args14
+       (args15
           data_dir_arg
           config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
+          rpc_max_request_body_arg
           etherlink_switch
           metrics_addr_arg
           enable_performance_metrics_arg
@@ -361,6 +368,7 @@ let run_command =
              rpc_addr,
              rpc_port,
              acl_override,
+             rpc_max_request_body_size,
              force_etherlink,
              metrics_addr,
              enable_performance_metrics,
@@ -408,6 +416,7 @@ let run_command =
           ~rpc_addr
           ~rpc_port
           ~acl_override
+          ~rpc_max_request_body_size
           ~metrics_addr
           ~disable_performance_metrics
           ~loser_mode

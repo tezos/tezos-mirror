@@ -234,6 +234,50 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
+(* Default cap, in bytes, on the request body a single RPC call may
+   materialize. *)
+let default_max_body_size = 16_777_216L (* 16 MiB *)
+
+let request_entity_too_large_response () =
+  (* [Connection: close] lets cohttp close the socket instead of relying on
+     draining the remaining bytes to keep it reusable. *)
+  let headers = Cohttp.Header.init_with "connection" "close" in
+  let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
+  ( Cohttp.Response.make ~status:`Request_entity_too_large ~encoding ~headers (),
+    body )
+
+(* Rejects a request whose body exceeds [max_body_size] before the wrapped
+   [callback] runs. A declared [Content-Length] over the cap is rejected
+   without reading the body; a chunked or unknown-length body is read and
+   capped as it streams in. *)
+let limit_body_size ~max_body_size callback conn req body =
+  let open Lwt_syntax in
+  match Cohttp.Request.encoding req with
+  | Cohttp.Transfer.Fixed len when Int64.compare len max_body_size > 0 ->
+      Lwt.return (`Response (request_entity_too_large_response ()))
+  | Cohttp.Transfer.Fixed _ -> callback conn req body
+  | Cohttp.Transfer.Chunked | Cohttp.Transfer.Unknown ->
+      let stream = Cohttp_lwt.Body.to_stream body in
+      let buf = Buffer.create 4096 in
+      let exception Body_too_large in
+      Lwt.catch
+        (fun () ->
+          let* () =
+            Lwt_stream.iter_s
+              (fun chunk ->
+                Buffer.add_string buf chunk ;
+                if Int64.of_int (Buffer.length buf) > max_body_size then
+                  raise Body_too_large
+                else Lwt.return_unit)
+              stream
+          in
+          callback conn req (Cohttp_lwt.Body.of_string (Buffer.contents buf)))
+        (function
+          | Body_too_large ->
+              let* () = Lwt_stream.junk_while (fun _ -> true) stream in
+              Lwt.return (`Response (request_entity_too_large_response ()))
+          | exn -> Lwt.fail exn)
+
 let proxy_server_query_forwarder ?acl ?ctx ?forwarder_events forwarder_resources
     forwarding_endpoint =
   match acl with

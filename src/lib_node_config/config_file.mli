@@ -84,6 +84,7 @@ and rpc = {
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
   max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
+  max_request_body_size : int64;
   enable_http_cache_headers : bool;
 }
 
@@ -98,6 +99,8 @@ val default_p2p_port : int
 val default_rpc_port : int
 
 val default_max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t
+
+val default_max_request_body_size : int64
 
 val default_p2p : p2p
 
@@ -127,6 +130,7 @@ val update :
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
   ?max_active_rpc_connections:RPC_server.Max_active_rpc_connections.t ->
+  ?max_request_body_size:int64 ->
   ?metrics_addr:string list ->
   ?operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   ?private_mode:bool ->

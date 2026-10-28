@@ -71,6 +71,8 @@ module Dal = struct
 
   let metrics_addr = arg_to_clic metrics_addr_arg
 
+  let rpc_max_request_body_size = arg_to_clic rpc_max_request_body_size_arg
+
   let history_mode = arg_to_clic history_mode_arg
 
   let service_name = arg_to_clic service_name_arg
@@ -302,67 +304,73 @@ module Dal = struct
     let run =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args27
-          data_dir
-          config_file
-          rpc_addr
-          expected_pow
-          net_addr
-          public_addr
-          endpoint
-          slots_backup_uris
-          trust_slots_backup_uris
-          metrics_addr
-          attester_profile
-          operator_profile
-          observer_profile
-          bootstrap_profile
-          peers
-          history_mode
-          service_name
-          service_namespace
-          fetch_trusted_setup
-          disable_shard_validation
-          verbose
-          ignore_l1_config_peers
-          disable_amplification
-          ignore_topics
-          banned_addrs
-          batching_configuration
-          publish_slots_regularly
+        (* [args27] is the largest combinator available, so the arguments are
+           provided in two groups. *)
+        Tezos_clic.merge_options
+          (Tezos_clic.args24
+             data_dir
+             config_file
+             rpc_addr
+             expected_pow
+             net_addr
+             public_addr
+             endpoint
+             slots_backup_uris
+             trust_slots_backup_uris
+             metrics_addr
+             attester_profile
+             operator_profile
+             observer_profile
+             bootstrap_profile
+             peers
+             history_mode
+             service_name
+             service_namespace
+             fetch_trusted_setup
+             disable_shard_validation
+             verbose
+             ignore_l1_config_peers
+             disable_amplification
+             ignore_topics)
+          (Tezos_clic.args4
+             banned_addrs
+             batching_configuration
+             publish_slots_regularly
+             rpc_max_request_body_size)
       in
       command
         ~group
         ~desc:"Run the Octez DAL"
         args
         (prefixes ["dal"; "run"] @@ stop)
-        (fun ( data_dir,
-               config_file,
-               rpc_addr,
-               expected_pow,
-               net_addr,
-               public_addr,
-               endpoint,
-               slots_backup_uris,
-               trust_slots_backup_uris,
-               metrics_addr,
-               attesters,
-               operators,
-               observers,
-               bootstrap,
-               peers,
-               history_mode,
-               service_name,
-               service_namespace,
-               fetch_trusted_setup,
-               disable_shard_validation,
-               verbose,
-               ignore_l1_config_peers,
-               disable_amplification,
-               ignore_topics,
-               banned_addrs,
-               batching_configuration,
-               publish_slots_regularly )
+        (fun ( ( data_dir,
+                 config_file,
+                 rpc_addr,
+                 expected_pow,
+                 net_addr,
+                 public_addr,
+                 endpoint,
+                 slots_backup_uris,
+                 trust_slots_backup_uris,
+                 metrics_addr,
+                 attesters,
+                 operators,
+                 observers,
+                 bootstrap,
+                 peers,
+                 history_mode,
+                 service_name,
+                 service_namespace,
+                 fetch_trusted_setup,
+                 disable_shard_validation,
+                 verbose,
+                 ignore_l1_config_peers,
+                 disable_amplification,
+                 ignore_topics ),
+               ( banned_addrs,
+                 batching_configuration,
+                 publish_slots_regularly,
+                 rpc_max_request_body_size ) )
              _cctxt
            ->
           Cli.Action.run
@@ -393,12 +401,13 @@ module Dal = struct
             ?banned_addrs
             ?batching_configuration
             ?publish_slots_regularly
+            ?rpc_max_request_body_size
             ())
     in
     let mk_config_command ~prefix:p ~desc action =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args24
+        Tezos_clic.args25
           data_dir
           config_file
           rpc_addr
@@ -423,6 +432,7 @@ module Dal = struct
           disable_amplification
           banned_addrs
           batching_configuration
+          rpc_max_request_body_size
       in
       command
         ~group
@@ -452,7 +462,8 @@ module Dal = struct
                ignore_l1_config_peers,
                disable_amplification,
                banned_addrs,
-               batching_configuration )
+               batching_configuration,
+               rpc_max_request_body_size )
              _cctxt
            ->
           action
@@ -480,6 +491,7 @@ module Dal = struct
             ?disable_amplification:(Some disable_amplification)
             ?banned_addrs
             ?batching_configuration
+            ?rpc_max_request_body_size
             ())
     in
     let config_init =

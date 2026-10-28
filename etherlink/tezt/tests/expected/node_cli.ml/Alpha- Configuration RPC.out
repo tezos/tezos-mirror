@@ -58,7 +58,8 @@
     "cors_headers": [],
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
-    "max_active_connections": "unlimited"
+    "max_active_connections": "unlimited",
+    "max_request_body_size": "33554432"
   },
   "finalized_view": false,
   "db": {
@@ -153,7 +154,8 @@
     "cors_headers": [],
     "batch_limit": "unlimited",
     "restricted_rpcs": "unrestricted",
-    "max_active_connections": "unlimited"
+    "max_active_connections": "unlimited",
+    "max_request_body_size": "33554432"
   },
   "finalized_view": false,
   "db": {

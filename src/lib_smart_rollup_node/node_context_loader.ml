@@ -245,6 +245,8 @@ module For_snapshots = struct
           rpc_addr = Configuration.default_rpc_addr;
           rpc_port = Configuration.default_rpc_port;
           acl = Configuration.default_acl;
+          rpc_max_request_body_size =
+            Configuration.default_rpc_max_request_body_size;
           metrics_addr = None;
           performance_metrics = false;
           reconnection_delay = 1.;
@@ -372,6 +374,8 @@ module Internal_for_tests = struct
           rpc_addr = Configuration.default_rpc_addr;
           rpc_port = Configuration.default_rpc_port;
           acl = Configuration.default_acl;
+          rpc_max_request_body_size =
+            Configuration.default_rpc_max_request_body_size;
           metrics_addr = None;
           performance_metrics = false;
           reconnection_delay = 5.;

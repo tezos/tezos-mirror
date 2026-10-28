@@ -104,10 +104,18 @@ type t = {
       (** Per-bind-address ACL overrides for the RPC server. When a configured
           entry matches the bind address, its ACL replaces the default
           [dal_secure] (public) / [allow_all] (loopback) policy. *)
+  rpc_max_request_body_size : int64;
+      (** Maximum size, in bytes, of an RPC request body the server reads into
+          memory. Requests whose body exceeds this size are rejected with HTTP
+          413 before routing or ACL checks are performed. *)
 }
 
 (** [default] is the default configuration. *)
 val default : t
+
+(** [default_rpc_max_request_body_size] is the default value for
+    [rpc_max_request_body_size]. *)
+val default_rpc_max_request_body_size : int64
 
 (** [default_metrics_port] is the default network port opened for metrics *)
 val default_metrics_port : int

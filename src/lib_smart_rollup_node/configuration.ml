@@ -82,6 +82,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
+  rpc_max_request_body_size : int64;
   metrics_addr : string option;
   performance_metrics : bool;
   reconnection_delay : float;
@@ -155,6 +156,15 @@ let default_rpc_port = 8932
 let default_metrics_port = 9933
 
 let default_acl = Tezos_rpc_http_server.RPC_server.Acl.empty_policy
+
+(* Larger than the shared default (16 MiB), because the DAL batcher injection
+   endpoint legitimately carries many slots' worth of messages. Messages are
+   arbitrary bytes, and data-encoding represents a non-UTF8 string in JSON as
+   one decimal number per byte, so a request costs about four times the payload
+   it carries: with the default protocol parameters (380_832 bytes per slot) one
+   slot's worth of messages is already around 1.5 MiB of JSON. This leaves room
+   for roughly twenty slots per request. *)
+let default_rpc_max_request_body_size = 33_554_432L (* 32 MiB *)
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
@@ -581,6 +591,7 @@ let encoding default_display : t Data_encoding.t =
            rpc_addr;
            rpc_port;
            acl;
+           rpc_max_request_body_size;
            metrics_addr;
            performance_metrics;
            reconnection_delay;
@@ -655,7 +666,8 @@ let encoding default_display : t Data_encoding.t =
               bail_on_disagree,
               commit_on,
               opentelemetry,
-              dal_slot_status_max_fetch_attempts ) ) ) ))
+              dal_slot_status_max_fetch_attempts,
+              rpc_max_request_body_size ) ) ) ))
     (fun ( ( ( sc_rollup_address,
                etherlink,
                boot_sector_file,
@@ -695,7 +707,8 @@ let encoding default_display : t Data_encoding.t =
                  bail_on_disagree,
                  commit_on,
                  opentelemetry,
-                 dal_slot_status_max_fetch_attempts ) ) ) )
+                 dal_slot_status_max_fetch_attempts,
+                 rpc_max_request_body_size ) ) ) )
        ->
       {
         sc_rollup_address;
@@ -708,6 +721,7 @@ let encoding default_display : t Data_encoding.t =
         rpc_addr;
         rpc_port;
         acl;
+        rpc_max_request_body_size;
         metrics_addr;
         performance_metrics;
         reconnection_delay;
@@ -854,7 +868,7 @@ let encoding default_display : t Data_encoding.t =
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj9
+             (obj10
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
                    "slow-vm-fallback"
@@ -883,7 +897,16 @@ let encoding default_display : t Data_encoding.t =
                 (dft
                    "dal_slot_status_max_fetch_attempts"
                    Data_encoding.uint8
-                   default_dal_slot_status_max_fetch_attempts)))))
+                   default_dal_slot_status_max_fetch_attempts)
+                (dft
+                   "rpc-max-request-body-size"
+                   ~description:
+                     "The maximum size, in bytes, of an RPC request body the \
+                      server will read into memory. Requests whose body \
+                      exceeds this size are rejected with HTTP 413 before \
+                      routing or ACL checks are performed."
+                   Data_encoding.int64
+                   default_rpc_max_request_body_size)))))
 
 let encoding_no_default = encoding `Show
 
@@ -992,15 +1015,16 @@ module Cli = struct
       ([], None)
       operators
 
-  let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
-      ~disable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
-      ~commit_on ~profiling ~force_etherlink ~l1_monitor_finalized =
+  let configuration_from_args ~rpc_addr ~rpc_port ~acl_override
+      ~rpc_max_request_body_size ~metrics_addr ~disable_performance_metrics
+      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
+      ~slow_vm_fallback ~commit_on ~profiling ~force_etherlink
+      ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -1024,6 +1048,10 @@ module Cli = struct
         rpc_addr;
         rpc_port;
         acl;
+        rpc_max_request_body_size =
+          Option.value
+            ~default:default_rpc_max_request_body_size
+            rpc_max_request_body_size;
         reconnection_delay =
           Option.value ~default:default_reconnection_delay reconnection_delay;
         dal_node_endpoint;
@@ -1088,15 +1116,15 @@ module Cli = struct
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~acl_override ~metrics_addr ~disable_performance_metrics ~loser_mode
-      ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
-      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
-      ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
-      ~slow_vm_fallback ~commit_on ~profiling ~force_etherlink
-      ~l1_monitor_finalized =
+      ~acl_override ~rpc_max_request_body_size ~metrics_addr
+      ~disable_performance_metrics ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
+      ~commit_on ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1135,6 +1163,10 @@ module Cli = struct
         rpc_addr;
         rpc_port;
         acl;
+        rpc_max_request_body_size =
+          Option.value
+            ~default:configuration.rpc_max_request_body_size
+            rpc_max_request_body_size;
         dal_node_endpoint =
           Option.either dal_node_endpoint configuration.dal_node_endpoint;
         pre_images_endpoint =
@@ -1213,14 +1245,15 @@ module Cli = struct
       }
 
   let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
-      ~metrics_addr ~disable_performance_metrics ~loser_mode ~reconnection_delay
-      ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
-      ~commit_on ~profiling ~force_etherlink ~l1_monitor_finalized =
+      ~rpc_max_request_body_size ~metrics_addr ~disable_performance_metrics
+      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
+      ~slow_vm_fallback ~commit_on ~profiling ~force_etherlink
+      ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1233,6 +1266,7 @@ module Cli = struct
           ~rpc_addr
           ~rpc_port
           ~acl_override
+          ~rpc_max_request_body_size
           ~metrics_addr
           ~disable_performance_metrics
           ~loser_mode
@@ -1290,6 +1324,7 @@ module Cli = struct
           ~rpc_addr
           ~rpc_port
           ~acl_override
+          ~rpc_max_request_body_size
           ~metrics_addr
           ~disable_performance_metrics
           ~loser_mode

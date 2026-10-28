@@ -118,6 +118,10 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
+  rpc_max_request_body_size : int64;
+      (** Maximum size, in bytes, of an RPC request body the server reads into
+          memory. Requests whose body exceeds this size are rejected with HTTP
+          413 before routing or ACL checks are performed. *)
   metrics_addr : string option;
   performance_metrics : bool;
   reconnection_delay : float;
@@ -191,6 +195,10 @@ val default_rpc_port : int
 
 (** [default_acl] is the default value for [acl]. *)
 val default_acl : Tezos_rpc_http_server.RPC_server.Acl.policy
+
+(** [default_rpc_max_request_body_size] is the default value for
+    [rpc_max_request_body_size]. *)
+val default_rpc_max_request_body_size : int64
 
 (** [default_metrics_port] is the default port for the metrics server. *)
 val default_metrics_port : int
@@ -322,6 +330,7 @@ module Cli : sig
     rpc_addr:string option ->
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
+    rpc_max_request_body_size:int64 option ->
     metrics_addr:string option ->
     disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->
@@ -362,6 +371,7 @@ module Cli : sig
     rpc_addr:string option ->
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
+    rpc_max_request_body_size:int64 option ->
     metrics_addr:string option ->
     disable_performance_metrics:bool ->
     loser_mode:Loser_mode.t option ->

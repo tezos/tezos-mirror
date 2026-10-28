@@ -1086,6 +1086,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       ~rpc_addr:configuration.rpc_addr
       ~rpc_port:configuration.rpc_port
       ~acl:configuration.acl
+      ~rpc_max_request_body_size:configuration.rpc_max_request_body_size
       ~cors:configuration.cors
       dir
   in
@@ -1171,6 +1172,7 @@ module Replay = struct
         ~rpc_addr:None
         ~rpc_port:None
         ~acl_override:None
+        ~rpc_max_request_body_size:None
         ~metrics_addr:None
         ~disable_performance_metrics:false
         ~loser_mode:None
