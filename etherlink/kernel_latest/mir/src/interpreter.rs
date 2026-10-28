@@ -1144,6 +1144,8 @@ fn run_interp_driver<'a, 'b>(
                 let prev_key = current_key.ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
+                ctx.gas()
+                    .consume(interpret_cost::map_update(&prev_key, acc.size())?)?;
                 acc.insert_mut(prev_key, new_val);
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
@@ -6071,7 +6073,9 @@ mod interpreter_tests {
                     V::new_option(Some(V::new_pair(V::int(2), V::String("b".into()))))
                 )
             ]))],
-            interpret_cost::MAP_MAP,
+            interpret_cost::MAP_MAP
+                + interpret_cost::map_update(&V::int(1), 0).unwrap()
+                + interpret_cost::map_update(&V::int(2), 1).unwrap(),
         );
     }
 
