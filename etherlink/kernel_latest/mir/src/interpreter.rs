@@ -5291,6 +5291,147 @@ mod interpreter_tests {
         }
     }
 
+    // ENG-100: MAP over a `map` re-inserts every key into a fresh
+    // accumulator, and each insertion compares the key with the keys on
+    // its path in the tree. The keys below share all their bytes but the
+    // last two, so every comparison scans the whole key and the work is
+    // the number of comparisons times the key length.
+
+    /// Number of key comparisons done by MAP on a map of `n` keys: the
+    /// accumulator is a `RedBlackTreeMap` filled in key order, and the
+    /// comparisons it does only depend on that order, so they are counted
+    /// on the same insertions with keys that count their comparisons.
+    fn map_on_map_comparisons(n: u16) -> u64 {
+        struct Counted<'c>(u16, &'c Cell<u64>);
+        impl PartialEq for Counted<'_> {
+            fn eq(&self, other: &Self) -> bool {
+                self.cmp(other).is_eq()
+            }
+        }
+        impl std::cmp::Eq for Counted<'_> {}
+        impl PartialOrd for Counted<'_> {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl Ord for Counted<'_> {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.1.set(self.1.get() + 1);
+                self.0.cmp(&other.0)
+            }
+        }
+        let count = Cell::new(0);
+        let mut acc = RedBlackTreeMap::new();
+        for i in 0..n {
+            acc.insert_mut(Counted(i, &count), ());
+        }
+        count.get()
+    }
+
+    /// Key `i` of `len` bytes: a common prefix then `i` in big endian, so
+    /// the keys sort like their indices.
+    fn map_on_map_key(len: usize, i: u16) -> V<'static> {
+        let mut b = vec![0x41u8; len];
+        b[len - 2..].copy_from_slice(&i.to_be_bytes());
+        V::Bytes(b)
+    }
+
+    /// Milligas consumed by MAP on a map of `n` keys of `len` bytes.
+    fn map_on_map_gas(n: u16, len: usize) -> u64 {
+        let map = V::Map(rc_map((0..n).map(|i| (map_on_map_key(len, i), V::int(0)))));
+        let mut stack = stk![map];
+        let mut ctx = Ctx::default();
+        interpret(
+            &[Map(overloads::Map::Map, vec![ISome])],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        u64::from(Gas::default().milligas().unwrap() - ctx.gas().milligas().unwrap())
+    }
+
+    /// Milligas charged by COMPARE on two keys of `len` bytes, the
+    /// protocol's price for one comparison of such keys.
+    fn compare_gas(len: usize) -> u64 {
+        let mut gas = Gas::default();
+        interpret_cost::compare(
+            &mut gas,
+            &map_on_map_key(len, 0),
+            &map_on_map_key(len, 1),
+        )
+        .unwrap();
+        u64::from(Gas::default().milligas().unwrap() - gas.milligas().unwrap())
+    }
+
+    /// Checks that, from keys of `len` to keys of `2 * len` bytes, the gas
+    /// of MAP on `n` keys grows at least as much as the price of the
+    /// comparisons it does, and returns that growth.
+    fn assert_map_on_map_gas_covers_comparisons(n: u16, len: usize) -> u64 {
+        let charged = map_on_map_gas(n, 2 * len) - map_on_map_gas(n, len);
+        let comparisons = map_on_map_comparisons(n);
+        let work = comparisons * (compare_gas(2 * len) - compare_gas(len));
+        assert!(
+            charged >= work,
+            "MAP on {n} keys charges {charged} milligas for {len} more bytes per \
+             key, below the {work} milligas of its {comparisons} comparisons"
+        );
+        charged
+    }
+
+    // The gas must grow linearly with the size of the keys: the extra gas
+    // per extra key byte must not decrease as the keys grow.
+    #[test]
+    fn map_on_map_gas_grows_linearly_with_key_length() {
+        let n = 64;
+        let mut previous_per_byte = 0;
+        for len in [256, 1024, 4096] {
+            let per_byte = assert_map_on_map_gas_covers_comparisons(n, len) / len as u64;
+            assert!(
+                per_byte >= previous_per_byte,
+                "MAP on {n} keys charges {per_byte} milligas per key byte at \
+                 {len} bytes, less than {previous_per_byte} for shorter keys"
+            );
+            previous_per_byte = per_byte;
+        }
+    }
+
+    // The gas must grow with the number of comparisons, which grows like
+    // `n log n` with the number `n` of keys: inserting the `i`-th key costs
+    // about `log i` comparisons.
+    //
+    // To check this, the test divides the gas by the number of comparisons
+    // and checks that this gas per comparison does not drop much as `n` grows.
+    // - `map_update` charges each insertion for the key size times
+    //   `log(size + 1) + 2`, so its gas also grows like `n log n` and its gas
+    //   per comparison tends to a constant. It still drops a little because
+    //   of the `+ 2`: from 128 to 4096 keys it keeps about 86% of its value.
+    // - A charge per key that ignores the depth of the tree grows like `n`,
+    //   so its gas per comparison drops like `1 / log n`: from 128 to 4096
+    //   keys it keeps about 50% of its value.
+    // - A single charge per MAP keeps almost nothing.
+    // The 3/4 threshold sits between 86% and 50%: it accepts the current
+    // model with some margin and rejects a charge that ignores the depth.
+    #[test]
+    fn map_on_map_gas_grows_with_the_number_of_comparisons() {
+        let len = 256;
+        let per_comparison = |n| {
+            assert_map_on_map_gas_covers_comparisons(n, len) / map_on_map_comparisons(n)
+        };
+        for n in [2, 16] {
+            assert_map_on_map_gas_covers_comparisons(n, len);
+        }
+        // The larger maps are compared to the gas per comparison on 128 keys.
+        let reference = per_comparison(128);
+        for n in [1024, 4096] {
+            let current = per_comparison(n);
+            assert!(
+                4 * current >= 3 * reference,
+                "MAP on {n} keys charges {current} milligas per comparison, \
+                 less than 3/4 of the {reference} it charges on 128 keys"
+            );
+        }
+    }
+
     // A large operand kept live by extra copies on the stack must not be
     // copied by the op. A reintroduced operand copy shows up as one extra buffer.
     #[test]
