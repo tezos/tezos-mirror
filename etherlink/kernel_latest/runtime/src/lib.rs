@@ -6,4 +6,3 @@ pub mod extensions;
 pub mod runtime;
 pub mod runtime_keyspaces;
 pub mod safe_storage;
-pub mod snapshot;
