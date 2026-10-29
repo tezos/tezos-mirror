@@ -192,20 +192,20 @@ let check_contract_storage ~sequencer ~tez_client kt1 expected =
       ~error_msg:"Expected contract storage %R but got %L") ;
   unit
 
-(** [check_michelson_op_failed_with ~sequencer ~tez_client expected_rex] reads
+(** [check_michelson_op_failed_with ~sequencer ~tez_client expected_with] reads
     the head block's first manager operation via the typed tezlink RPC, asserts
-    the operation failed, and asserts one of its error messages matches the
-    regexp [expected_rex].  Confirms a Michelson call rolled back for the
-    expected reason rather than silently doing nothing — a strictly stronger
-    signal than "storage unchanged", which any failure (gas, wrong view, …)
-    would also produce.
+    the operation failed, and asserts that it was rejected by a [FAILWITH] on
+    exactly the Micheline value [expected_with].  Confirms a Michelson call
+    rolled back for the expected reason rather than silently doing nothing — a
+    strictly stronger signal than "storage unchanged", which any failure (gas,
+    wrong view, …) would also produce.
 
-    A [FAILWITH] surfaces in the tezlink receipt as an error whose
-    [error_message] embeds the failed-with Michelson value, so the match is on
-    [error_message] rather than a structured [with] payload.  The operation was
-    just included by {!call_contract}'s [produce_block], so it is the head
-    block's first manager operation. *)
-let check_michelson_op_failed_with ~sequencer ~tez_client expected_rex =
+    A [FAILWITH] surfaces in the tezlink receipt as L1's
+    [michelson_v1.script_rejected] error, whose [with] field is the failed
+    value as a Micheline expression.  The operation was just included by
+    {!call_contract}'s [produce_block], so it is the head block's first
+    manager operation. *)
+let check_michelson_op_failed_with ~sequencer ~tez_client expected_with =
   let* op =
     Client.RPC.call ~endpoint:(tezlink_endpoint sequencer) tez_client
     @@ RPC.get_chain_block_operations_validation_pass
@@ -221,20 +221,38 @@ let check_michelson_op_failed_with ~sequencer ~tez_client expected_rex =
     (status = "failed")
       string
       ~error_msg:"Expected Michelson call to fail (status %R) but got %L") ;
-  let error_messages =
+  let script_rejected_id =
+    Michelson_contracts.error_id "michelson_v1.script_rejected"
+  in
+  let rejected_values =
     JSON.(op_result |-> "errors" |> as_list)
     |> List.filter_map (fun err ->
-           JSON.(err |-> "error_message" |> as_string_opt))
+           match JSON.(err |-> "id" |> as_string_opt) with
+           | Some id when String.equal id script_rejected_id ->
+               Some JSON.(err |-> "with" |> encode)
+           | _ -> None)
   in
-  Check.is_true
-    ~__LOC__
-    (List.exists (fun msg -> msg =~ rex expected_rex) error_messages)
-    ~error_msg:
-      (sf
-         "Expected an error message matching %S among [%s]"
-         expected_rex
-         (String.concat "; " error_messages)) ;
+  Check.(
+    (rejected_values = [JSON.encode_u expected_with])
+      (list string)
+      ~__LOC__
+      ~error_msg:"Expected the operation to be rejected with %R, got %L") ;
   unit
+
+(** [invalid_runtime_id_failure id] is the Micheline of
+    [Pair "INVALID_RUNTIME_ID" id], the value a gateway view [FAILWITH]s with
+    when it receives the invalid runtime ID [id]. *)
+let invalid_runtime_id_failure id =
+  `O
+    [
+      ("prim", `String "Pair");
+      ( "args",
+        `A
+          [
+            `O [("string", `String "INVALID_RUNTIME_ID")];
+            `O [("int", `String id)];
+          ] );
+    ]
 
 (* ── EVM contract deployment helper ──────────────────────────────────── *)
 
@@ -1696,10 +1714,10 @@ let test_michelson_resolve_address_recorded_after_crac () =
     call (it does not make VIEW return None), so the caller's own [IF_NONE]
     branch never runs and the operation fails with the view's payload.  This is
     the Michelson counterpart of the EVM precompile reverting [InvalidRuntimeId].
-    Two complementary checks: the operation receipt must report a failure
-    mentioning [INVALID_RUNTIME_ID] (proving the call rolled back for the
-    expected reason), and the sentinel initial storage [Right (Left 1)] — which
-    the success path WOULD overwrite — must be preserved (proving no value was
+    Two complementary checks: the operation receipt must report the script
+    rejection of that payload (proving the call rolled back for the expected
+    reason), and the sentinel initial storage [Right (Left 1)] — which the
+    success path WOULD overwrite — must be preserved (proving no value was
     written). *)
 let test_michelson_origin_of_invalid_runtime_id () =
   Test_helpers.register_sandbox
@@ -1732,10 +1750,9 @@ let test_michelson_origin_of_invalid_runtime_id () =
       ()
   in
   (* Step 2: Call with an invalid runtime ID (99).
-     Inside the kernel, runtime_id_from_nat(99) raises
-     InterpretError::FailedWith("INVALID_RUNTIME_ID", 99) within the view,
-     which aborts the call.  The operation is Failed with that payload and
-     storage stays at Right (Left 1). *)
+     Inside the kernel, runtime_id_from_nat(99) makes the view FAILWITH with
+     [Pair "INVALID_RUNTIME_ID" 99], which aborts the call.  The operation is
+     Failed with that payload and storage stays at Right (Left 1). *)
   let invalid_runtime_id = "99" in
   let addr = Constant.bootstrap5.public_key_hash in
   let* () =
@@ -1751,7 +1768,10 @@ let test_michelson_origin_of_invalid_runtime_id () =
       ()
   in
   let* () =
-    check_michelson_op_failed_with ~sequencer ~tez_client "INVALID_RUNTIME_ID"
+    check_michelson_op_failed_with
+      ~sequencer
+      ~tez_client
+      (invalid_runtime_id_failure invalid_runtime_id)
   in
   (* Step 3: Storage must remain Right (Left 1) — the FAILWITH rolled back the
      call.  The sentinel being preserved proves FAILWITH occurred rather than
@@ -1778,8 +1798,8 @@ let test_michelson_origin_of_invalid_runtime_id () =
     view FAILWITH with [Pair "INVALID_RUNTIME_ID" id], which aborts the call
     (it does not make VIEW return None), so the operation fails with the view's
     payload, leaving storage unchanged.  Two complementary checks: the operation
-    receipt must report a failure mentioning [INVALID_RUNTIME_ID] (proving the
-    call rolled back for the expected reason), and the sentinel initial storage
+    receipt must report the script rejection of that payload (proving the call
+    rolled back for the expected reason), and the sentinel initial storage
     [Some (Pair 1 "sentinel")] — which the success path WOULD overwrite — must
     be preserved (proving no value was written). *)
 let test_michelson_resolve_address_invalid_runtime_id () =
@@ -1814,8 +1834,9 @@ let test_michelson_resolve_address_invalid_runtime_id () =
       ()
   in
   (* Step 2: Call with an invalid sourceRuntime (99).
-     runtime_id_from_nat(99) raises InterpretError::FailedWith("INVALID_RUNTIME_ID", 99)
-     inside the view, which aborts the call and rolls back storage. *)
+     runtime_id_from_nat(99) makes the view FAILWITH with
+     [Pair "INVALID_RUNTIME_ID" 99], which aborts the call and rolls back
+     storage. *)
   let invalid_runtime_id = "99" in
   let addr = Constant.bootstrap5.public_key_hash in
   let* () =
@@ -1832,7 +1853,10 @@ let test_michelson_resolve_address_invalid_runtime_id () =
       ()
   in
   let* () =
-    check_michelson_op_failed_with ~sequencer ~tez_client "INVALID_RUNTIME_ID"
+    check_michelson_op_failed_with
+      ~sequencer
+      ~tez_client
+      (invalid_runtime_id_failure invalid_runtime_id)
   in
   (* Step 3: Storage must remain Some (Pair 1 "sentinel") — the FAILWITH rolled
      back the call.  The sentinel being preserved proves rollback occurred. *)

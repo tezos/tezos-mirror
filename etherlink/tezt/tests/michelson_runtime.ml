@@ -730,6 +730,128 @@ let test_balance_too_low_error =
         "Expected the transfer of the balance minus the fee to be %R, got %L") ;
   unit
 
+(* A FAILWITH is reported with the failed value as a Micheline expression, as
+   the [with] field of the L1 [script_rejected] error, both when the operation
+   is simulated and in the receipts of the block that includes it. *)
+let test_script_rejected_error =
+  register_tezosx_test
+    ~title:"Michelson runtime reports the FAILWITH value as Micheline"
+    ~tags:["rpc"; "simulate"; "error"; "failwith"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint sequencer in
+  let source = Constant.bootstrap1 in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"always_fails"
+      ~src:source.public_key_hash
+      ~init:"Unit"
+      ~prg:
+        {|parameter unit ;
+storage unit ;
+code { DROP ; PUSH (pair int string) (Pair 1 "oops") ; FAILWITH }|}
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let check_script_rejected op_result =
+    Check.(
+      (JSON.(op_result |-> "status" |> as_string) = "failed")
+        string
+        ~error_msg:"Expected the call to be %R, got %L") ;
+    let errors = JSON.(op_result |-> "errors" |> as_list) in
+    Check.((List.length errors = 1) int ~error_msg:"Expected %R error, got %L") ;
+    let err = List.hd errors in
+    Check.(
+      (JSON.(err |-> "kind" |> as_string) = "temporary")
+        string
+        ~error_msg:"Expected kind %R, got %L") ;
+    Check.(
+      (JSON.(err |-> "id" |> as_string)
+      = Michelson_contracts.error_id "michelson_v1.script_rejected")
+        string
+        ~error_msg:"Expected id %R, got %L") ;
+    (* MIR does not track the location of the failure yet (L2-363), so the
+       node reports [Micheline.dummy_location]. *)
+    Check.(
+      (JSON.(err |-> "location" |> as_int)
+      = Tezos_micheline.Micheline.dummy_location)
+        int
+        ~error_msg:"Expected location %R, got %L") ;
+    let expected_with =
+      `O
+        [
+          ("prim", `String "Pair");
+          ( "args",
+            `A [`O [("int", `String "1")]; `O [("string", `String "oops")]] );
+        ]
+    in
+    Check.(
+      (JSON.(err |-> "with" |> encode) = JSON.encode_u expected_with)
+        string
+        ~error_msg:"Expected the failed value %R, got %L")
+  in
+  (* Simulated. *)
+  let* counter =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let* branch = RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash () in
+  let* op =
+    Operation.Manager.(
+      operation
+        ~branch
+        ~signer:source
+        [
+          make
+            ~source
+            ~counter:(JSON.as_int counter + 1)
+            ~fee:100_000
+            ~gas_limit:10_000
+            ~storage_limit:0
+            (call ~dest:contract ~arg:(`O [("prim", `String "Unit")]) ());
+        ]
+        client)
+  in
+  let* data = Operation.make_run_operation_input op client in
+  let* response =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.post_chain_block_helpers_scripts_simulate_operation
+         ~data:(RPC_core.Data data)
+         ()
+  in
+  check_script_rejected
+    JSON.(response |-> "contents" |=> 0 |-> "metadata" |-> "operation_result") ;
+  (* Included in a block. *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~force:true
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int 100_000)
+      ~gas_limit:10_000
+      ~storage_limit:0
+      ~giver:source.alias
+      ~receiver:contract
+      ~arg:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* operations =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_operations ()
+  in
+  check_script_rejected
+    JSON.(
+      operations |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result") ;
+  unit
+
 let test_version =
   register_tezosx_test ~title:"Test of the version rpc" ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
@@ -4351,7 +4473,7 @@ code {
    value is only carried for reporting, so the kernel must hold it behind its
    shared [Rc] rather than deep-copy it. Without that, the extra copy pushes
    past the WASM heap and traps the kernel; with it, the operation fails
-   cleanly with the FAILWITH error (L2-1837). *)
+   cleanly, running out of gas while unparsing the failed value (L2-1837). *)
 let test_michelson_oom_failwith =
   register_tezosx_test
     ~title:"Michelson FAILWITH does not exhaust memory on a shared operand"
@@ -4400,8 +4522,10 @@ code {
       client
   in
   let* err = Process.check_and_read_stderr ~expect_failure:true process in
-  Check.(err =~ rex "runtime failure while running the script")
-    ~error_msg:"Expected a clean FAILWITH failure, got %L" ;
+  (* The failed value is unparsed at the expense of the operation gas, as on
+     L1, which this one cannot pay. *)
+  Check.(err =~ rex "Gas limit exceeded")
+    ~error_msg:"Expected a clean gas exhaustion, got %L" ;
   unit
 
 (* Returns a storage holding a large value twice, [Pair (Pair V V) W], built
@@ -7254,6 +7378,7 @@ let () =
   test_counter [Alpha] ;
   test_submitted_counter [Alpha] ;
   test_balance_too_low_error [Alpha] ;
+  test_script_rejected_error [Alpha] ;
   test_protocols [Alpha] ;
   test_genesis_block_arg [Alpha] ;
   test_expected_issuance [Alpha] ;
