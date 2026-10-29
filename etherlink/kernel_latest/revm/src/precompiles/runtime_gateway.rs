@@ -154,21 +154,25 @@ fn charge_consumed_gas(
     Ok(())
 }
 
-/// Charge the gateway's flat base cost plus the per-word payload
-/// surcharge on the inbound calldata and the outgoing request body.
-///
-/// Shared by every CRAC entrypoint (`callMichelson`,
-/// `callMichelsonView`, `call`) so the upfront gas model stays identical
-/// across them. The per-word helper charges nothing for an empty body.
-fn charge_gateway_request(
+/// Charge the per-word surcharge on the inbound calldata, before the
+/// calldata is decoded, so the decode work is paid for whatever the calldata
+/// looks like. The CRAC entrypoints (`callMichelson`, `callMichelsonView`,
+/// `call`), identified by their selector, also pay the gateway's flat base
+/// cost here. The outgoing request body is charged once it is known, with
+/// [`charge_payload`].
+fn precharge_gateway_request(
     gas: &mut Gas,
-    calldata_len: usize,
-    body_len: usize,
+    calldata: &[u8],
 ) -> Result<(), CustomPrecompileError> {
-    charge(gas, RUNTIME_GATEWAY_BASE_COST)?;
-    charge_payload(gas, calldata_len)?;
-    charge_payload(gas, body_len)?;
-    Ok(())
+    let is_crac = calldata.first_chunk::<4>().is_some_and(|selector| {
+        *selector == RuntimeGateway::callMichelsonCall::SELECTOR
+            || *selector == RuntimeGateway::callMichelsonViewCall::SELECTOR
+            || *selector == RuntimeGateway::callCall::SELECTOR
+    });
+    if is_crac {
+        charge(gas, RUNTIME_GATEWAY_BASE_COST)?;
+    }
+    charge_payload(gas, calldata.len())
 }
 
 /// Classify the CRAC response (charging the converted callee gas), then
@@ -1029,6 +1033,10 @@ where
         ));
     }
 
+    // Pay for the decode before doing it: it copies fields proportionally to
+    // the calldata, and a caller can repeat the call forwarding almost no gas.
+    precharge_gateway_request(&mut gas, calldata)?;
+
     let Ok(function_call) = decode_gateway_calldata(calldata) else {
         return Err(CustomPrecompileError::Revert(
             String::from("invalid input encoding"),
@@ -1058,7 +1066,7 @@ where
                     gas,
                 ));
             }
-            charge_gateway_request(&mut gas, calldata.len(), call.parameters.len())?;
+            charge_payload(&mut gas, call.parameters.len())?;
 
             let destination = call.destination;
             let entrypoint = call.entrypoint;
@@ -1115,7 +1123,7 @@ where
             )?;
         }
         RuntimeGatewayCalls::callMichelsonView(call) => {
-            charge_gateway_request(&mut gas, calldata.len(), call.input.len())?;
+            charge_payload(&mut gas, call.input.len())?;
 
             let destination = call.destination;
             let view_name = call.viewName;
@@ -1218,7 +1226,7 @@ where
             });
         }
         RuntimeGatewayCalls::call(call) => {
-            charge_gateway_request(&mut gas, calldata.len(), call.body.len())?;
+            charge_payload(&mut gas, call.body.len())?;
 
             let mut request = build_http_request(
                 &call.url,
@@ -2211,6 +2219,107 @@ mod tests {
             result,
             Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("unsupported HTTP method")
         ));
+    }
+
+    fn precharge_cost(calldata: &[u8]) -> u64 {
+        u64::from(RUNTIME_GATEWAY_BASE_COST)
+            + RUNTIME_GATEWAY_PER_WORD_COST * (calldata.len() as u64).div_ceil(32)
+    }
+
+    fn crac_calldatas() -> Vec<Vec<u8>> {
+        vec![
+            RuntimeGateway::callMichelsonCall {
+                destination: "KT1abc".to_string(),
+                entrypoint: "ep".to_string(),
+                parameters: vec![0u8; 100].into(),
+            }
+            .abi_encode(),
+            RuntimeGateway::callMichelsonViewCall {
+                destination: "KT1abc".to_string(),
+                viewName: "view".to_string(),
+                input: vec![0u8; 100].into(),
+            }
+            .abi_encode(),
+            encoded_call(vec![]),
+        ]
+    }
+
+    #[test]
+    fn test_precharge_charges_base_and_calldata_words_on_crac_selectors() {
+        for calldata in crac_calldatas() {
+            let mut gas = Gas::new(u64::MAX);
+            precharge_gateway_request(&mut gas, &calldata).unwrap();
+            assert_eq!(gas.total_gas_spent(), precharge_cost(&calldata));
+        }
+    }
+
+    #[test]
+    fn test_precharge_runs_out_of_gas_before_decoding_a_large_calldata() {
+        // A `call` whose calldata is large, forwarded with almost no gas.
+        let mut calldata = encoded_call(vec![]);
+        calldata.extend(vec![0u8; 1024 * 1024]);
+        let mut gas = Gas::new(1);
+        let result = precharge_gateway_request(&mut gas, &calldata);
+        assert!(matches!(result, Err(CustomPrecompileError::OutOfGas)));
+    }
+
+    #[test]
+    fn test_precharge_scales_with_calldata_length() {
+        let small = encoded_call(vec![]);
+        let mut large = small.clone();
+        large.extend(vec![0u8; 64 * 1024]);
+        let (mut g_small, mut g_large) = (Gas::new(u64::MAX), Gas::new(u64::MAX));
+        precharge_gateway_request(&mut g_small, &small).unwrap();
+        precharge_gateway_request(&mut g_large, &large).unwrap();
+        assert!(g_large.total_gas_spent() > g_small.total_gas_spent());
+        assert_eq!(g_large.total_gas_spent(), precharge_cost(&large));
+    }
+
+    #[test]
+    fn test_precharge_charges_only_calldata_words_on_other_selectors() {
+        let origin_of = RuntimeGateway::originOfCall {
+            addr: "KT1abc".to_string(),
+            sourceRuntime: 0,
+        }
+        .abi_encode();
+        for calldata in [origin_of.as_slice(), &[0xde, 0xad], &[]] {
+            let mut gas = Gas::new(u64::MAX);
+            precharge_gateway_request(&mut gas, calldata).unwrap();
+            assert_eq!(
+                gas.total_gas_spent(),
+                RUNTIME_GATEWAY_PER_WORD_COST * (calldata.len() as u64).div_ceil(32)
+            );
+        }
+    }
+
+    #[test]
+    fn test_precharge_runs_out_of_gas_before_decoding_a_large_non_crac_calldata() {
+        let mut calldata = RuntimeGateway::originOfCall {
+            addr: "KT1abc".to_string(),
+            sourceRuntime: 0,
+        }
+        .abi_encode();
+        calldata.extend(vec![0u8; 1024 * 1024]);
+        let mut gas = Gas::new(1);
+        assert!(matches!(
+            precharge_gateway_request(&mut gas, &calldata),
+            Err(CustomPrecompileError::OutOfGas)
+        ));
+    }
+
+    #[test]
+    fn test_precharge_plus_body_equals_the_previous_upfront_charge() {
+        // The base cost and the calldata words moved before the decode; the
+        // total for a successful call is what it was.
+        let calldata = encoded_call(vec![]);
+        let body_len = 100usize;
+        let mut gas = Gas::new(u64::MAX);
+        precharge_gateway_request(&mut gas, &calldata).unwrap();
+        charge_payload(&mut gas, body_len).unwrap();
+        let expected = u64::from(RUNTIME_GATEWAY_BASE_COST)
+            + RUNTIME_GATEWAY_PER_WORD_COST
+                * ((calldata.len() as u64).div_ceil(32) + (body_len as u64).div_ceil(32));
+        assert_eq!(gas.total_gas_spent(), expected);
     }
 
     fn encoded_call(headers: Vec<(String, String)>) -> Vec<u8> {
