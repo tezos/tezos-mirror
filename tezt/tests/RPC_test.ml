@@ -1707,6 +1707,13 @@ let curl_status ?(timeout = 30) ?(stdin = "/dev/null") args url =
   Process.spawn ~log_output:false "sh" ["-c"; command]
   |> Process.check_and_read_stdout
 
+(* Waits for the warning [event] the node emits when it rejects a [POST
+   /version] for its body, and returns the event's fields. *)
+let wait_for_body_rejection node event =
+  Node.wait_for node (event ^ ".v0") @@ fun json ->
+  if JSON.(json |-> "request" |> as_string) = "POST /version" then Some json
+  else None
+
 let test_rpc_max_request_body () =
   Test.register
     ~__FILE__
@@ -1721,11 +1728,19 @@ let test_rpc_max_request_body () =
   let over = Temp.file "over_cap_body" in
   write_file under ~contents:(String.make (max_request_body - 1_000) 'a') ;
   write_file over ~contents:(String.make (max_request_body * 2) 'a') ;
+  let rejected = wait_for_body_rejection node "request_body_too_large" in
   let* status = curl_status ["-X"; "POST"; "--data-binary"; "@" ^ over] url in
   Check.((String.trim status = "413") string)
     ~error_msg:
       "a POST body over the --rpc-max-request-body cap returned %L but must \
        return 413" ;
+  let* event = rejected in
+  Check.((JSON.(event |-> "max_body_size" |> as_int) = max_request_body) int)
+    ~error_msg:"the rejection warning reports a cap of %L, expected %R" ;
+  Check.(
+    (JSON.(event |-> "declared_length" |> as_int) = max_request_body * 2) int)
+    ~error_msg:
+      "the rejection warning reports a declared length of %L, expected %R" ;
   let* status = curl_status ["-X"; "POST"; "--data-binary"; "@" ^ under] url in
   Check.((String.trim status <> "413") string)
     ~error_msg:
@@ -2057,6 +2072,7 @@ let test_rpc_max_request_body_timeout_response () =
     ~uses_admin_client:false
   @@ fun () ->
   let* node = Node.init [Node.Max_request_body max_request_body] in
+  let timed_out = wait_for_body_rejection node "request_body_timeout" in
   let* response =
     raw_post_truncated
       node
@@ -2064,6 +2080,7 @@ let test_rpc_max_request_body_timeout_response () =
       ~body:"a"
       ~half_close:false
   in
+  let* (_ : JSON.t) = timed_out in
   Check.is_true
     (String.starts_with ~prefix:"http/1.1 408" response
     && response =~ rex "connection: *close")
@@ -2174,6 +2191,7 @@ let test_rpc_max_request_body_under_cap_truncated () =
     ~uses_admin_client:false
   @@ fun () ->
   let* node = Node.init [Node.Max_request_body max_request_body] in
+  let truncated = wait_for_body_rejection node "request_body_truncated" in
   let* response =
     raw_post_truncated
       node
@@ -2181,6 +2199,14 @@ let test_rpc_max_request_body_under_cap_truncated () =
       ~body:"a"
       ~half_close:true
   in
+  let* event = truncated in
+  Check.((JSON.(event |-> "received_length" |> as_int) = 1) int)
+    ~error_msg:
+      "the truncation warning reports a received length of %L, expected %R" ;
+  Check.(
+    (JSON.(event |-> "declared_length" |> as_int) = max_request_body / 2) int)
+    ~error_msg:
+      "the truncation warning reports a declared length of %L, expected %R" ;
   Check.is_true
     (String.starts_with ~prefix:"http/1.1 400" response
     && response =~ rex "connection: *close")

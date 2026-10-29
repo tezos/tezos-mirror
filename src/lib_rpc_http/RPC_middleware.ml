@@ -35,6 +35,50 @@ module Events = struct
       ("pid", Data_encoding.int32)
       ("con", Data_encoding.string)
       ("path", Data_encoding.string)
+
+  let request_body_too_large =
+    declare_4
+      ~section
+      ~name:"request_body_too_large"
+      ~msg:
+        "rejected {request} from {peer} with 413: its body exceeds the \
+         {max_body_size}-byte cap (declared length: {declared_length})"
+      ~level:Warning
+      ~pp1:Format.pp_print_string
+      ("request", Data_encoding.string)
+      ("peer", Data_encoding.string)
+      ("max_body_size", Data_encoding.int64)
+      ~pp4:
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.pp_print_string ppf "none")
+           (fun ppf -> Format.fprintf ppf "%Ld"))
+      ("declared_length", Data_encoding.(option int64))
+
+  let request_body_timeout =
+    declare_2
+      ~section
+      ~name:"request_body_timeout"
+      ~msg:
+        "rejected {request} from {peer} with 408: its body was not received in \
+         time"
+      ~level:Warning
+      ~pp1:Format.pp_print_string
+      ("request", Data_encoding.string)
+      ("peer", Data_encoding.string)
+
+  let request_body_truncated =
+    declare_4
+      ~section
+      ~name:"request_body_truncated"
+      ~msg:
+        "rejected {request} from {peer} with 400: its body ended after \
+         {received_length} of the {declared_length} bytes it declared"
+      ~level:Warning
+      ~pp1:Format.pp_print_string
+      ("request", Data_encoding.string)
+      ("peer", Data_encoding.string)
+      ("received_length", Data_encoding.int64)
+      ("declared_length", Data_encoding.int64)
 end
 
 module ForwarderConnMap = Map.Make (Cohttp.Connection)
@@ -494,6 +538,20 @@ let error_response ~status ~connection_closing () =
   let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
   (Cohttp.Response.make ~status ~encoding ~headers (), body)
 
+(* How a rejected request and its sender are shown in the events above. *)
+let describe_request req =
+  Format.sprintf
+    "%s %s"
+    (Cohttp.Code.string_of_method (Cohttp.Request.meth req))
+    (Uri.path (Cohttp.Request.uri req))
+
+let describe_peer (conn : Cohttp_lwt_unix.Server.conn) =
+  match fst conn with
+  | Conduit_lwt_unix.TCP {ip; port; _} ->
+      Format.asprintf "%a:%d" Ipaddr.pp ip port
+  | Conduit_lwt_unix.Domain_socket {path; _} -> path
+  | Conduit_lwt_unix.Tunnel _ | Conduit_lwt_unix.Vchan _ -> "unknown"
+
 (* Answers 413 after a bounded lingering read, so that a client which is done
    sending still gets a readable response on a reusable connection, while an
    endless body cannot hold the connection -- and hence one of the
@@ -502,8 +560,14 @@ let error_response ~status ~connection_closing () =
 
    [expected], when known, is the length the client declared for the whole
    body, none of which has been read yet. *)
-let reject_oversized_body ?expected ~max_body_size conn stream =
+let reject_oversized_body ?expected ~max_body_size conn req stream =
   let open Lwt_syntax in
+  let* () =
+    Events.(
+      emit
+        request_body_too_large
+        (describe_request req, describe_peer conn, max_body_size, expected))
+  in
   let max_bytes = lingering_read_max_bytes ~max_body_size in
   let* fully_received =
     match expected with
@@ -549,6 +613,7 @@ let limit_body_size ~max_body_size callback conn req body =
         ~expected:len
         ~max_body_size
         conn
+        req
         (Cohttp_lwt.Body.to_stream body)
   | Cohttp.Transfer.Fixed 0L | Cohttp.Transfer.Unknown ->
       (* No body to bound. [Unknown] -- neither [Content-Length] nor
@@ -565,7 +630,7 @@ let limit_body_size ~max_body_size callback conn req body =
       | Received contents -> (
           match truncation req contents with
           | None -> callback conn req (Cohttp_lwt.Body.of_string contents)
-          | Some _ ->
+          | Some (received, declared) ->
               (* The client half-closed, or went away, before sending all it
                  declared: [Cohttp.Transfer] ends the stream on that end of
                  file exactly as on a complete body. Passing the prefix on
@@ -573,6 +638,15 @@ let limit_body_size ~max_body_size callback conn req body =
                  out of [123] -- to a value the client never sent. Nothing is
                  left to read, so the connection only needs to be announced as
                  closing. *)
+              let* () =
+                Events.(
+                  emit
+                    request_body_truncated
+                    ( describe_request req,
+                      describe_peer conn,
+                      received,
+                      declared ))
+              in
               Lwt.return
                 (`Response
                    (error_response
@@ -584,11 +658,19 @@ let limit_body_size ~max_body_size callback conn req body =
              cannot exceed it. No [expected]: cohttp does not tell us the length
              of a chunked body, so the end of the stream is the only completion
              signal available. *)
-          reject_oversized_body ~max_body_size conn stream
+          reject_oversized_body ~max_body_size conn req stream
       | Timed_out ->
           (* The request was not received in full, so the connection is not
              reusable, and leaving the remainder to cohttp's drain would hold
              the connection for as long as the client cares to. *)
+          let* () =
+            Events.(
+              emit
+                request_body_timeout
+                (describe_request req, describe_peer conn))
+          in
+          (* The event goes out first: nothing may yield between the shutdown
+             and returning the response, see {!shutdown_read}. *)
           shutdown_read conn ;
           Lwt.return
             (`Response
