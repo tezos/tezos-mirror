@@ -18,6 +18,9 @@ use core::convert::Infallible;
 /// returns this error with both parameters [`Infallible`]: no value of that
 /// type exists, so the error holds only the failures that the SDK defines.
 ///
+/// The error is the size of one pointer. Building it allocates the key space
+/// name, the key and the failure on the heap.
+///
 /// A crate outside the SDK that adds its own reads or writes over a key space
 /// can report its own failures in this error. It sets `R` to its read
 /// failures, `W` to its write failures, or both, and builds them with
@@ -46,8 +49,12 @@ use core::convert::Infallible;
 ///
 /// [`KeySpace`]: crate::KeySpace
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error(transparent)]
+pub struct KeySpaceError<R = Infallible, W = Infallible>(Box<Inner<R, W>>);
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("at key {key} of key space {keyspace}: {kind}")]
-pub struct KeySpaceError<R = Infallible, W = Infallible> {
+struct Inner<R, W> {
     keyspace: Name,
     key: Key,
     kind: ErrorKind<R, W>,
@@ -68,15 +75,15 @@ impl<R, W> KeySpaceError<R, W> {
 
     /// Returns what the operation failed on.
     pub fn kind(&self) -> &ErrorKind<R, W> {
-        &self.kind
+        &self.0.kind
     }
 
     fn new(keyspace: &Name, key: &Key, kind: ErrorKind<R, W>) -> Self {
-        Self {
+        Self(Box::new(Inner {
             keyspace: keyspace.clone(),
             key: key.clone(),
             kind,
-        }
+        }))
     }
 }
 
@@ -84,15 +91,20 @@ impl KeySpaceError {
     /// Returns the same failure, at the same key, as an error whose read and
     /// write failures an extension extends.
     pub fn widen<R, W>(self) -> KeySpaceError<R, W> {
-        let kind = match self.kind {
+        let Inner {
+            keyspace,
+            key,
+            kind,
+        } = *self.0;
+        let kind = match kind {
             ErrorKind::Read(kind) => ErrorKind::Read(kind.widen()),
             ErrorKind::Write(kind) => ErrorKind::Write(kind.widen()),
         };
-        KeySpaceError {
-            keyspace: self.keyspace,
-            key: self.key,
+        KeySpaceError(Box::new(Inner {
+            keyspace,
+            key,
             kind,
-        }
+        }))
     }
 }
 
@@ -224,4 +236,17 @@ pub enum KeySpaceLoaderError {
     #[cfg(not(feature = "irmin-compat"))]
     #[error("Could not allocated database for the given name - ran out of db indices.")]
     TooManyDatabases,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_space_error_is_the_size_of_a_pointer() {
+        assert_eq!(
+            core::mem::size_of::<KeySpaceError<u128, u128>>(),
+            core::mem::size_of::<usize>()
+        );
+    }
 }
