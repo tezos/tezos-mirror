@@ -2024,6 +2024,62 @@ let test_rpc_max_request_body_closes_connection () =
   check ~scenario:"half-closed below the byte ceiling" response ;
   unit
 
+(* The size cap answers before resto, which is what normally adds the CORS
+   headers. A browser hides a response without [Access-Control-Allow-Origin]
+   from the page, which would then see an opaque network failure instead of
+   the 413: the rejection must be allowed cross-origin as resto's own responses
+   are, and only for an allowed origin. *)
+let test_rpc_max_request_body_cors () =
+  Test.register
+    ~__FILE__
+    ~title:"Test RPC request body size cap answers with CORS headers"
+    ~tags:["rpc"; "body"; "limit"; "cors"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let allowed = "http://allowed.example" in
+  let* node =
+    Node.init [Node.Max_request_body max_request_body; Node.Cors_origin allowed]
+  in
+  let post ~origin =
+    raw_exchange
+      node
+      ~request:
+        (Printf.sprintf
+           "POST /version HTTP/1.1\r\n\
+            Host: %s\r\n\
+            Origin: %s\r\n\
+            Content-Type: application/json\r\n\
+            Content-Length: %d\r\n\
+            \r\n\
+            %s"
+           Constant.default_host
+           origin
+           (max_request_body * 3 / 2)
+           (String.make (max_request_body * 3 / 2) 'a'))
+      ~half_close:false
+  in
+  let* response = post ~origin:allowed in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 413" response
+    && response =~ rex ("access-control-allow-origin: *" ^ allowed))
+    ~error_msg:
+      (Printf.sprintf
+         "an oversized request from an allowed origin got %S, expected a 413 \
+          with [Access-Control-Allow-Origin: %s]"
+         response
+         allowed) ;
+  let* response = post ~origin:"http://other.example" in
+  Check.is_true
+    (String.starts_with ~prefix:"http/1.1 413" response
+    && not (response =~ rex "access-control-allow-origin"))
+    ~error_msg:
+      (Printf.sprintf
+         "an oversized request from a disallowed origin got %S, expected a 413 \
+          without [Access-Control-Allow-Origin]"
+         response) ;
+  unit
+
 (* A body within the cap is not rejected, so it never reaches the lingering
    read: before its read was bounded too, a client that declared such a body
    and then sent a single byte of it held its connection, and one of the
@@ -2461,6 +2517,7 @@ let register protocols =
   test_rpc_max_request_body_keeps_connection () ;
   test_rpc_max_request_body_closes_connection () ;
   test_rpc_max_request_body_chunked () ;
+  test_rpc_max_request_body_cors () ;
   test_rpc_max_request_body_under_cap_stall () ;
   test_rpc_max_request_body_timeout_response () ;
   test_rpc_max_request_body_endless () ;

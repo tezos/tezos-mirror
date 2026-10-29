@@ -521,7 +521,10 @@ let read_body_within_bounds ~max_body_size stream =
       loop ();
     ]
 
-let error_response ~status ~connection_closing () =
+(* [cors] and [req] are used to allow the response cross-origin as resto would
+   have: without [Access-Control-Allow-Origin], a browser hides the status from
+   the page, which then sees an opaque network failure instead of a 413. *)
+let error_response ~cors ~req ~status ~connection_closing () =
   let headers =
     if connection_closing then
       (* We did not read the request out in full, so the connection is
@@ -534,6 +537,12 @@ let error_response ~status ~connection_closing () =
       (* The request was received in full, so the connection is still usable
          and saying otherwise would cost the client a handshake. *)
       Cohttp.Header.init ()
+  in
+  let headers =
+    Resto_cohttp.Cors.add_allow_origin
+      headers
+      cors
+      (Cohttp.Header.get (Cohttp.Request.headers req) "origin")
   in
   let body, encoding = (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L) in
   (Cohttp.Response.make ~status ~encoding ~headers (), body)
@@ -560,7 +569,7 @@ let describe_peer (conn : Cohttp_lwt_unix.Server.conn) =
 
    [expected], when known, is the length the client declared for the whole
    body, none of which has been read yet. *)
-let reject_oversized_body ?expected ~max_body_size conn req stream =
+let reject_oversized_body ?expected ~cors ~max_body_size conn req stream =
   let open Lwt_syntax in
   let* () =
     Events.(
@@ -590,7 +599,12 @@ let reject_oversized_body ?expected ~max_body_size conn req stream =
   if connection_closing then shutdown_read conn ;
   Lwt.return
     (`Response
-       (error_response ~status:`Request_entity_too_large ~connection_closing ()))
+       (error_response
+          ~cors
+          ~req
+          ~status:`Request_entity_too_large
+          ~connection_closing
+          ()))
 
 (* Rejects a request whose body exceeds [max_body_size] before the wrapped
    [callback] runs. A declared [Content-Length] over the cap is rejected
@@ -605,12 +619,14 @@ let reject_oversized_body ?expected ~max_body_size conn req stream =
    413 before the connection goes away. Buffering a body within the cap, on the
    other hand, costs nothing: resto reads it in full before dispatching
    anyway. *)
-let limit_body_size ~max_body_size callback conn req body =
+let limit_body_size ?(cors = Resto_cohttp.Cors.default) ~max_body_size callback
+    conn req body =
   let open Lwt_syntax in
   match Cohttp.Request.encoding req with
   | Cohttp.Transfer.Fixed len when Int64.compare len max_body_size > 0 ->
       reject_oversized_body
         ~expected:len
+        ~cors
         ~max_body_size
         conn
         req
@@ -650,6 +666,8 @@ let limit_body_size ~max_body_size callback conn req body =
               Lwt.return
                 (`Response
                    (error_response
+                      ~cors
+                      ~req
                       ~status:`Bad_request
                       ~connection_closing:true
                       ())))
@@ -658,7 +676,7 @@ let limit_body_size ~max_body_size callback conn req body =
              cannot exceed it. No [expected]: cohttp does not tell us the length
              of a chunked body, so the end of the stream is the only completion
              signal available. *)
-          reject_oversized_body ~max_body_size conn req stream
+          reject_oversized_body ~cors ~max_body_size conn req stream
       | Timed_out ->
           (* The request was not received in full, so the connection is not
              reusable, and leaving the remainder to cohttp's drain would hold
@@ -675,6 +693,8 @@ let limit_body_size ~max_body_size callback conn req body =
           Lwt.return
             (`Response
                (error_response
+                  ~cors
+                  ~req
                   ~status:`Request_timeout
                   ~connection_closing:true
                   ())))

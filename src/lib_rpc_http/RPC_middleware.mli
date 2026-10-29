@@ -73,9 +73,16 @@ val default_max_body_size : int64
     best effort, so that an oversized request stops holding its connection --
     and hence one of the server's active connection slots. Best effort because
     the shutdown needs a file descriptor: on a connection that does not expose
-    one, cohttp's own unbounded drain is left to run and nothing bounds it. *)
+    one, cohttp's own unbounded drain is left to run and nothing bounds it.
+
+    [cors] (default: {!Resto_cohttp.Cors.default}, which allows no origin)
+    should be the server's own CORS policy, so that the 413 and 408 responses
+    are allowed cross-origin exactly as resto's responses are. *)
 val limit_body_size :
-  max_body_size:int64 -> RPC_server.callback -> RPC_server.callback
+  ?cors:Resto_cohttp.Cors.t ->
+  max_body_size:int64 ->
+  RPC_server.callback ->
+  RPC_server.callback
 
 (** A Resto middleware that transforms any server callback to an other
     that handles RPC metrics *)

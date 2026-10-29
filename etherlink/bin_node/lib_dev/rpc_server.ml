@@ -94,6 +94,7 @@ module Resto = struct
         server
         ~callback:
           (RPC_middleware.limit_body_size
+             ~cors
              ~max_body_size:max_request_body_size
              (callback ~port server directory))
         ~conn_closed
