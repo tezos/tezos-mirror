@@ -3237,11 +3237,14 @@ mod tests {
         const SOURCE_KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
         // alias(E_1): immediate EVM caller alias — internal-op sender.
         const SENDER_KT1: &str = "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2";
-        // Never originated in this host → ContractDoesNotExist on transfer.
-        const MISSING_DEST_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+        // Never originated in this host, and not an enshrined contract →
+        // ContractDoesNotExist on transfer.
+        const MISSING_DEST_KT1: &str = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
 
         let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        // The accounts root must exist for the transfer's checkpoint to
+        // succeed and the transfer to run at all.
+        let mut rk = test_rk(&mut host);
         let runtime = test_runtime();
         let registry = NotWiredRegistry;
 
@@ -3255,25 +3258,24 @@ mod tests {
 
         // Non-empty body holding an encoded Unit: skips the empty-body
         // Unit fallback (which would itself draw on the tight gas) and
-        // decodes cheaply, so essentially the whole budget is still
-        // available for the would-be event encode after the transfer
-        // fails.
+        // decodes cheaply.
         let body = mir::ast::micheline::Micheline::from(())
             .encode(&mut Gas::default())
             .unwrap()
             .unwrap();
 
-        // Enough milligas to decode the Unit body and reach the
-        // (storage-read-only, uncharged) destination-existence guard,
-        // but below the cost of Micheline-encoding the synthetic CRAC
-        // event — the window in which the unfixed builder ran out of gas
-        // and dropped the receipt (the L2-1464 repro found the boundary
-        // around 230 milligas).
+        // The smallest gas limit that decodes the Unit body, reaches the
+        // (storage-read-only, uncharged) destination-existence guard and
+        // pays for the persisted `ContractDoesNotExist` error: one less
+        // and that charge fails with `OutOfGas`. Nothing is left for
+        // Micheline-encoding the synthetic CRAC event — the window in
+        // which the unfixed builder ran out of gas and dropped the
+        // receipt.
         let request = http::Request::builder()
             .method(http::Method::POST)
             .uri(format!("http://tezos/{MISSING_DEST_KT1}"))
             .header(X_TEZOS_AMOUNT, "0")
-            .header(X_TEZOS_GAS_LIMIT, "150")
+            .header(X_TEZOS_GAS_LIMIT, "41440")
             .header(X_TEZOS_TIMESTAMP, "1000000")
             .header(X_TEZOS_BLOCK_NUMBER, "1")
             .header(X_TEZOS_SENDER, SENDER_KT1)
