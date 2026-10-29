@@ -76,6 +76,9 @@ mir.workspace = true
 typed-arena.workspace = true
 
 [dev-dependencies]
+# Test-only: pin the delayed inbox sunset to its calendar date.
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-panic-hook.workspace = true
 proptest.workspace = true

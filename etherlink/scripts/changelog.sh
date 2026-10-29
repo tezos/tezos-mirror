@@ -41,6 +41,7 @@ sections() {
 evm_runtime|EVM Runtime
 michelson_runtime|Michelson Runtime
 nac|Native Atomic Composability
+bridge|L1/L2 Bridge
 storage_versions|Storage versions
 internals|Internals
 EOF
