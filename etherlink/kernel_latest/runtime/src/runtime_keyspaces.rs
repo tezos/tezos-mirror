@@ -11,8 +11,8 @@
 //! covers the keyspaces.
 //!
 //! The keyspaces are `/evm/eth_accounts` and `/tez/tez_accounts`, the account
-//! state of the two runtimes, and `/tez/world_state`, the chain-level state of
-//! the Michelson runtime.
+//! state of the two runtimes, and `/evm/world_state` and `/tez/world_state`,
+//! their chain-level state.
 //!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
 //! it holds `/base` and `/tez/world_state`, loaded on the live host, and
@@ -53,6 +53,10 @@ pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
 
 /// Durable root of the `/evm/world_state` keyspace.
 const EVM_WORLD_STATE_ROOT: &str = "/evm/world_state";
+
+/// Name of the `/evm/world_state` keyspace, which holds the chain-level state
+/// of the EVM runtime.
+pub const EVM_WORLD_STATE_KEYSPACE_NAME: Name = Name::from_static(EVM_WORLD_STATE_ROOT);
 
 /// The durable path of the `/evm/world_state` root.
 pub const EVM_WORLD_STATE_ROOT_PATH: RefPath =
@@ -99,6 +103,16 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
         &mut self.keyspaces.tez_accounts
     }
 
+    /// Returns the `/evm/world_state` keyspace.
+    pub fn evm_world_state(&self) -> &Host::KeySpace {
+        &self.keyspaces.evm_world_state
+    }
+
+    /// Returns the `/evm/world_state` keyspace for writing.
+    pub fn evm_world_state_mut(&mut self) -> &mut Host::KeySpace {
+        &mut self.keyspaces.evm_world_state
+    }
+
     /// Returns the `/tez/world_state` keyspace.
     pub fn tez_world_state(&self) -> &Host::KeySpace {
         &self.keyspaces.tez_world_state
@@ -126,12 +140,14 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     pub fn init(host: &'host mut Host) -> Result<Self, KeySpaceLoaderError> {
         let eth_accounts = host.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME)?;
         let tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)?;
+        let evm_world_state = host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME)?;
         let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
         Ok(Self {
             host,
             keyspaces: Keyspaces {
                 eth_accounts,
                 tez_accounts,
+                evm_world_state,
                 tez_world_state,
             },
         })
@@ -142,6 +158,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
 struct Keyspaces<KS> {
     eth_accounts: KS,
     tez_accounts: KS,
+    evm_world_state: KS,
     tez_world_state: KS,
 }
 
@@ -219,6 +236,7 @@ mod tests {
         let roots = [
             ETH_ACCOUNTS_ROOT_PATH,
             TEZ_ACCOUNTS_ROOT_PATH,
+            EVM_WORLD_STATE_ROOT_PATH,
             TEZ_WORLD_STATE_ROOT_PATH,
         ];
         // `start` copies the roots, so they have to exist.
@@ -242,11 +260,16 @@ mod tests {
                 "/tmp/tez/tez_accounts"
             );
             assert_eq!(
+                rk.evm_world_state().name().to_string(),
+                "/tmp/evm/world_state"
+            );
+            assert_eq!(
                 rk.tez_world_state().name().to_string(),
                 "/tmp/tez/world_state"
             );
             rk.eth_accounts_mut().set(&PROBE, b"inside").unwrap();
             rk.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
+            rk.evm_world_state_mut().set(&PROBE, b"inside").unwrap();
             rk.tez_world_state_mut().set(&PROBE, b"inside").unwrap();
         }
         let probe_paths = roots.map(|root| {
