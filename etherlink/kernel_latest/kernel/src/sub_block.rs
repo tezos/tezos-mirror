@@ -14,8 +14,7 @@ use crate::{
     block_in_progress::BlockInProgress,
     block_storage,
     chains::{
-        TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig,
-        TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig, TezosXTransaction,
     },
     configuration::{fetch_configuration, fetch_tezosx_configuration},
     error::{Error, StorageError},
@@ -38,7 +37,9 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
+use tezos_evm_runtime::runtime_keyspaces::{
+    BlueprintKeyspaces, RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH,
+};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -303,7 +304,7 @@ where
             storage::store_block_in_progress(&mut safe_host, &block_in_progress)?;
             block_storage::store_current_transactions_receipts(
                 &mut safe_host,
-                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                &EVM_WORLD_STATE_ROOT_PATH,
                 &block_in_progress.cumulative_receipts,
             )?;
             return Ok(());
@@ -324,7 +325,7 @@ where
 }
 
 fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
-    match block_storage::read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH) {
+    match block_storage::read_current_hash(host, &EVM_WORLD_STATE_ROOT_PATH) {
         Ok(block_hash) => Ok(block_hash),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
             Ok(H256::zero())

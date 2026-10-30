@@ -51,6 +51,13 @@ pub const TEZ_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(TEZ_ACCOUNTS_ROOT
 pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
     RefPath::assert_from(TEZ_ACCOUNTS_ROOT.as_bytes());
 
+/// Durable root of the `/evm/world_state` keyspace.
+const EVM_WORLD_STATE_ROOT: &str = "/evm/world_state";
+
+/// The durable path of the `/evm/world_state` root.
+pub const EVM_WORLD_STATE_ROOT_PATH: RefPath =
+    RefPath::assert_from(EVM_WORLD_STATE_ROOT.as_bytes());
+
 /// Durable root of the `/tez/world_state` keyspace.
 const TEZ_WORLD_STATE_ROOT: &str = "/tez/world_state";
 

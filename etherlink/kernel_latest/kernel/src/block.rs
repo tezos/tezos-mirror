@@ -763,10 +763,10 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
         TEZ_ACCOUNTS_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
-    use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
@@ -1094,7 +1094,7 @@ mod tests {
     /// produces blocks. Mirrors the production bootstrap performed by
     /// [`crate::kernel`].
     fn init_safe_storage_roots(host: &mut impl StorageV1) {
-        host.store_write_all(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+        host.store_write_all(&EVM_WORLD_STATE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(
             &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,

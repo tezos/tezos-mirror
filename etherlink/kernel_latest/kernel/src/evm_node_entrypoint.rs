@@ -1197,11 +1197,10 @@ mod tests {
         use tezos_data_encoding::nom::NomReader;
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH;
+        use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
         use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
         use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
-        use tezos_evm_runtime::safe_storage::{
-            ETHERLINK_SAFE_STORAGE_ROOT_PATH, TMP_PATH,
-        };
+        use tezos_evm_runtime::safe_storage::TMP_PATH;
         use tezos_execution::context::big_maps::big_map_path;
         use tezos_execution::TezlinkOperationGas;
         use tezos_protocol::contract::Contract;
@@ -1286,7 +1285,7 @@ mod tests {
             host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
                 .unwrap();
             for root in [
-                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                EVM_WORLD_STATE_ROOT_PATH,
                 TEZ_WORLD_STATE_ROOT_PATH,
                 TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
