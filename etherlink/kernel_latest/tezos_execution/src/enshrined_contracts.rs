@@ -22,7 +22,8 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+use tezos_smart_rollup_keyspace::{KeyError, KeySpace, KeySpaceError, KeySpaceLoader};
+use tezos_storage::error::StorageReadErrorKind;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation_result::{
     ApplyOperationError, ContentResult, InternalOperationSum, TransferError,
@@ -82,23 +83,18 @@ impl From<TransferError> for CracError {
             // own outer EVMError channel (revm/src/lib.rs:362+,
             // apply.rs:716-721).
             //
-            // The cause discarded by .map_err(|_| TransferError::FailedTo*)?
-            // at each construction site is a tezos_storage::error::Error,
-            // none of whose variants is recoverable user input. A non-existent
-            // originated destination is caught upstream by the
+            // KeySpace carries the failed account read or write. Context
+            // carries an invalid key, or a deposit receiver of the wrong
+            // kind, which no CRAC transfer produces.
+            // FailedToComputeBalanceUpdate comes from a failed balance update
+            // conversion. None of these causes is recoverable user input.
+            // A non-existent originated destination is caught upstream by the
             // `dest_account.exists(tez_accounts)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist
-            // instead, so FailedToFetchContractCode here can only fire
-            // from genuine kernel-internal causes.
-            TransferError::FailedToApplyBalanceChanges
-            | TransferError::FailedToAllocateDestination
-            | TransferError::FailedToFetchDestinationAccount
-            | TransferError::FailedToFetchContractCode
-            | TransferError::FailedToFetchContractStorage
-            | TransferError::FailedToFetchDestinationBalance
-            | TransferError::FailedToFetchSenderBalance
-            | TransferError::FailedToUpdateContractStorage
-            | TransferError::FailedToUpdateDestinationBalance
+            // instead, so a missing code here can only come from a
+            // kernel-internal cause.
+            TransferError::KeySpace(_)
+            | TransferError::Context(_)
             | TransferError::FailedToComputeBalanceUpdate(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
             }
@@ -115,6 +111,24 @@ impl From<TransferError> for CracError {
             }
             _ => CracError::Operation(e),
         }
+    }
+}
+
+impl From<KeySpaceError<StorageReadErrorKind>> for CracError {
+    fn from(e: KeySpaceError<StorageReadErrorKind>) -> Self {
+        TransferError::KeySpace(e).into()
+    }
+}
+
+impl From<KeySpaceError> for CracError {
+    fn from(e: KeySpaceError) -> Self {
+        TransferError::from(e).into()
+    }
+}
+
+impl From<KeyError> for CracError {
+    fn from(e: KeyError) -> Self {
+        TransferError::from(e).into()
     }
 }
 
@@ -1628,18 +1642,14 @@ where
     let account = ctx.contract_account().clone();
     let current = {
         let (rk, _, _) = ctx.cross_runtime_split();
-        account
-            .balance(rk.tez_accounts())
-            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?
+        account.balance(rk.tez_accounts())?
     };
     if !current.0.is_zero() {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
         let (rk, _, _) = ctx.cross_runtime_split();
-        account
-            .set_balance(rk.tez_accounts_mut(), &0u64.into())
-            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+        account.set_balance(rk.tez_accounts_mut(), &0u64.into())?;
     }
     Ok(response_body)
 }
@@ -5204,16 +5214,20 @@ pub(crate) mod tests {
     /// If a new infra variant is added, add it here too.
     #[test]
     fn test_infra_variants_route_to_block_abort() {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_smart_rollup_keyspace::{Key, Name, ReadKind};
+        use tezos_tezlink::operation_result::OriginatedToImplicit;
+        let kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap();
         let infra: Vec<TransferError> = vec![
-            TransferError::FailedToApplyBalanceChanges,
-            TransferError::FailedToAllocateDestination,
-            TransferError::FailedToFetchDestinationAccount,
-            TransferError::FailedToFetchContractCode,
-            TransferError::FailedToFetchContractStorage,
-            TransferError::FailedToFetchDestinationBalance,
-            TransferError::FailedToFetchSenderBalance,
-            TransferError::FailedToUpdateContractStorage,
-            TransferError::FailedToUpdateDestinationBalance,
+            TransferError::KeySpace(KeySpaceError::read(
+                &Name::from_static("/tez/tez_accounts"),
+                &Key::from_static(b"/info"),
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )),
+            TransferError::Context(KeyError::KeyTooLarge.into()),
+            TransferError::Context(OriginatedToImplicit(kt1).into()),
             TransferError::FailedToComputeBalanceUpdate(String::new()),
         ];
         for variant in infra {
@@ -6213,13 +6227,13 @@ pub(crate) mod tests {
         let msg = "x".repeat(10);
         let err = TransferError::MichelsonContractInterpretError(msg.clone());
         // Persisted once in the receipt (alias→target internal op only).
-        let wrapped_len = ApplyOperationError::Transfer(err.clone()).persisted_len();
+        let wrapped_len = err.persisted_len();
         let expected_cost =
             u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);
 
         let ample = expected_cost + 1_000_000;
         let mut gas = make_operation_gas(ample);
-        let result = charge_persisted_error(&mut gas, err.clone());
+        let result = charge_persisted_error(&mut gas, err);
 
         // Original error is returned on success.
         assert!(

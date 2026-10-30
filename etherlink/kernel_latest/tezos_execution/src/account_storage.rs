@@ -318,7 +318,7 @@ impl OriginatedContractInfo {
     /// it sizes the read from the length the store returned (see
     /// [TezosOriginatedAccount::read_info_with_len]), so this only runs once
     /// per write, on the post-update record that has not been persisted yet.
-    pub(crate) fn encoded_len(&self) -> Result<u64, tezos_storage::error::Error> {
+    pub(crate) fn encoded_len(&self) -> Result<u64, BinError> {
         // `BinWriter` has no length-only path, so we serialise into a
         // throwaway buffer and read its length. The record is four small
         // counters (bounded by `INFO_MAX_BYTES`), so the allocation is
@@ -468,6 +468,24 @@ impl TezosOriginatedAccount {
         tez_accounts: &impl KeySpace,
     ) -> Result<OriginatedContractInfo, KeySpaceError<StorageReadErrorKind>> {
         Ok(self.read_info_with_len(tez_accounts)?.0)
+    }
+
+    /// Returns the number of bytes that `info` takes once stored at the
+    /// `/info` key of the account.
+    ///
+    /// Fails with a write error at that key when `info` does not encode.
+    pub fn info_len(
+        &self,
+        tez_accounts: &impl KeySpace,
+        info: &OriginatedContractInfo,
+    ) -> Result<u64, KeySpaceError<StorageReadErrorKind>> {
+        info.encoded_len().map_err(|e| {
+            KeySpaceError::write(
+                tez_accounts.name(),
+                &self.info_key,
+                WriteKind::Encode(e),
+            )
+        })
     }
 
     /// Like [Self::read_info], but also returns the number of bytes read

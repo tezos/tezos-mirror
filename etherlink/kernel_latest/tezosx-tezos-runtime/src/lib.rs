@@ -926,10 +926,10 @@ where
             // variants → 400 (catchable revert); BlockAbort → 500 (abort
             // the EVM caller's frame, then the block).
             //
-            // The infra-class TransferError variants (FailedTo*) are routed
-            // to BlockAbort upstream by `From<TransferError> for CracError`
-            // — see `enshrined_contracts.rs:56-`. They never appear here as
-            // CracError::Operation, so this match doesn't enumerate them.
+            // The infra-class TransferError variants, the ones of the
+            // BlockAbort arm of `From<TransferError> for CracError`, never
+            // appear here as CracError::Operation, so this match does not
+            // enumerate them.
             let rt_err = match &error {
                 CracError::Operation(TransferError::OutOfGas(OutOfGas)) => {
                     TezosXRuntimeError::OutOfGas
