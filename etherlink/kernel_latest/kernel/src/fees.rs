@@ -192,17 +192,18 @@ impl FeeUpdates {
             "Applying {self:?} for {caller}"
         );
 
+        let evm_world_state = rk.evm_world_state_mut();
         let sequencer = match sequencer_pool_address {
             None => {
                 let burned_fee = self
                     .burn_amount
                     .saturating_add(self.compensate_sequencer_amount);
 
-                crate::storage::update_burned_fees(rk.host_mut(), burned_fee)?;
+                crate::storage::update_burned_fees(evm_world_state, burned_fee)?;
                 return Ok(());
             }
             Some(sequencer) => {
-                crate::storage::update_burned_fees(rk.host_mut(), self.burn_amount)?;
+                crate::storage::update_burned_fees(evm_world_state, self.burn_amount)?;
                 sequencer
             }
         };
@@ -420,7 +421,7 @@ mod tests {
         let new_balance = get_balance(rk.eth_accounts_mut(), address);
         assert_eq!(balance / 2, new_balance);
 
-        let burned = crate::storage::read_burned_fees(rk.host_mut());
+        let burned = crate::storage::read_burned_fees(rk.evm_world_state());
 
         // no sequencer reward address set - so everything is burned
         assert_eq!(burn_amount + compensate_sequencer_amount, burned);
@@ -465,7 +466,7 @@ mod tests {
         let new_balance = get_balance(rk.eth_accounts_mut(), address);
         assert_eq!(balance / 2, new_balance);
 
-        let burned = crate::storage::read_burned_fees(rk.host_mut());
+        let burned = crate::storage::read_burned_fees(rk.evm_world_state());
         assert_eq!(burn_amount, burned);
 
         let sequencer_new_balance = get_balance(rk.eth_accounts_mut(), sequencer_address);

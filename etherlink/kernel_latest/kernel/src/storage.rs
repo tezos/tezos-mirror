@@ -190,7 +190,8 @@ pub const SEQUENCER_POOL_PATH: RefPath =
 /// the durable path `/base/l1_level`.
 const L1_LEVEL_KEY: Key = Key::from_static(b"/l1_level");
 
-const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
+// Total of the burned fees, inside the `/evm/world_state` keyspace.
+const EVM_BURNED_FEES_KEY: Key = Key::from_static(b"/fees/burned");
 
 /// Key to the last info per level timestamp seen, inside the `/base`
 /// keyspace. Resolves to the durable path `/base/info_per_level/timestamp`.
@@ -696,20 +697,21 @@ pub fn read_da_fee(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_DA_FEE).map_err(Error::from)
 }
 
+/// Adds `burned_fee` to the burned-fees total of the `/evm/world_state`
+/// keyspace, with saturation. A total that is absent or shorter than 32 bytes
+/// counts as zero. Errors when the write fails.
 pub fn update_burned_fees(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     burned_fee: U256,
-) -> Result<(), Error> {
-    let path = &EVM_BURNED_FEES;
-    let current = read_u256_le(host, path).unwrap_or_else(|_| U256::zero());
+) -> Result<(), KeySpaceError> {
+    let current = evm_world_state.get_u256_le_or(&EVM_BURNED_FEES_KEY, U256::zero());
     let new = current.saturating_add(burned_fee);
-    write_u256_le(host, path, new).map_err(Error::from)
+    evm_world_state.store_u256_le(&EVM_BURNED_FEES_KEY, new)
 }
 
 #[cfg(test)]
-pub fn read_burned_fees(host: &mut impl StorageV1) -> U256 {
-    let path = &EVM_BURNED_FEES;
-    read_u256_le(host, path).unwrap_or_else(|_| U256::zero())
+pub fn read_burned_fees(evm_world_state: &impl KeySpace) -> U256 {
+    evm_world_state.get_u256_le_or(&EVM_BURNED_FEES_KEY, U256::zero())
 }
 
 pub fn read_sequencer_pool_address<Host>(host: &Host) -> Option<H160>
@@ -1556,19 +1558,20 @@ mod tests {
     fn update_burned_fees() {
         // Arrange
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let fst = 17.into();
         let snd = 19.into();
 
         // Act
-        let result_fst = super::update_burned_fees(&mut host, fst);
-        let result_snd = super::update_burned_fees(&mut host, snd);
+        let result_fst = super::update_burned_fees(rk.evm_world_state_mut(), fst);
+        let result_snd = super::update_burned_fees(rk.evm_world_state_mut(), snd);
 
         // Assert
         assert!(result_fst.is_ok());
         assert!(result_snd.is_ok());
 
-        let burned = super::read_burned_fees(&mut host);
+        let burned = super::read_burned_fees(rk.evm_world_state());
         assert_eq!(fst + snd, burned);
     }
 
@@ -1783,5 +1786,25 @@ mod tests {
             super::read_michelson_runtime_chain_id(rk.tez_world_state()).unwrap(),
             Some(chain_id)
         );
+    }
+
+    /// The burned fees resolve to `/evm/world_state/fees/burned`.
+    #[test]
+    fn evm_burned_fees_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let burned = primitive_types::U256::from(23);
+
+        super::update_burned_fees(rk.evm_world_state_mut(), burned).unwrap();
+
+        let mut bytes = [0u8; 32];
+        burned.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(b"/evm/world_state/fees/burned"))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(super::read_burned_fees(rk.evm_world_state()), burned);
     }
 }
