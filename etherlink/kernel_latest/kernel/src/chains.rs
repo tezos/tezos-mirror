@@ -49,8 +49,8 @@ use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 use tezos_evm_runtime::{
     extensions::WithGas,
     runtime_keyspaces::{
-        RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH, TEZ_ACCOUNTS_ROOT_PATH,
-        TEZ_WORLD_STATE_ROOT_PATH,
+        RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH, EVM_WORLD_STATE_ROOT_PATH,
+        TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     },
 };
 use tezos_execution::{
@@ -75,8 +75,6 @@ use tezosx_journal::TezosXJournal;
 
 use crate::apply::push_withdrawals_to_outbox;
 use revm_etherlink::journal::commit_evm_journal_from_external;
-
-pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
 /// True if `branch` is a recent block of this instance; genesis is accepted only while the chain is under [`BLOCKS_STORED`] blocks.
 pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
@@ -734,13 +732,13 @@ impl TezosXChainConfig {
     pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath<'_>> {
         if self.is_tezos_runtime_enabled(block_number) {
             vec![
-                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                EVM_WORLD_STATE_ROOT_PATH,
                 TEZ_WORLD_STATE_ROOT_PATH,
                 TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
             ]
         } else {
-            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH]
+            vec![EVM_WORLD_STATE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH]
         }
     }
 }

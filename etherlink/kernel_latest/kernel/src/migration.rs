@@ -5,13 +5,13 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_storage::read_current_number;
-use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{read_evm_chain_id, StorageVersion};
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
@@ -107,11 +107,11 @@ where
         StorageVersion::V48 => {
             // Clean remaining leftover block indexes from V41.
             if let Ok(current_number) =
-                read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+                read_current_number(host, &EVM_WORLD_STATE_ROOT_PATH)
             {
                 let last_to_keep = current_number.as_u64().saturating_sub(BLOCKS_STORED);
                 let paths_indexed_blocks = concat(
-                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &EVM_WORLD_STATE_ROOT_PATH,
                     &RefPath::assert_from(b"/indexes/blocks"),
                 )?;
                 // We keep the last BLOCKS_STORED block hashes.

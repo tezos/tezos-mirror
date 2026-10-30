@@ -18,8 +18,6 @@ const TMP: &str = "/tmp";
 pub const TMP_PATH: RefPath = RefPath::assert_from(TMP.as_bytes());
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/base/trace");
 pub const HTTP_TRACE_PATH: RefPath = RefPath::assert_from(b"/base/__http_trace");
-pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state");
 
 pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
@@ -228,7 +226,9 @@ impl<Host: WithGas> WithGas for SafeStorage<&mut Host> {
 mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
-    use crate::runtime_keyspaces::{ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH};
+    use crate::runtime_keyspaces::{
+        ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH, EVM_WORLD_STATE_ROOT_PATH,
+    };
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
 
@@ -325,7 +325,7 @@ mod tests {
 
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
         // First start: copy world state to /tmp
@@ -382,7 +382,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
         // Write through the SafeStorage wrap, so the data lands in /tmp.
@@ -418,7 +418,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
         // No writes done — promote must be a no-op.
@@ -438,7 +438,7 @@ mod tests {
 
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
         // Simulate an interrupted block that left a /tmp/base/__http_trace entry.
@@ -471,7 +471,7 @@ mod tests {
 
         let mut safe = SafeStorage {
             host: &mut host,
-            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
         // First start on a clean host (no stale /tmp)

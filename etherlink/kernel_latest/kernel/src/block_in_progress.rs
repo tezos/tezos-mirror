@@ -13,9 +13,7 @@ use crate::block_storage;
 use crate::blueprint_storage::{
     read_current_tez_block_header, store_current_tez_block_header, TezBlockHeader,
 };
-use crate::chains::{
-    TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-};
+use crate::chains::{TezosXBlockConstants, TezosXTransaction};
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
@@ -38,7 +36,9 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH};
+use tezos_evm_runtime::runtime_keyspaces::{
+    RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
+};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -524,13 +524,13 @@ impl BlockInProgress {
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
             rk.host_mut(),
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &EVM_WORLD_STATE_ROOT_PATH,
             &self.cumulative_receipts,
         )?;
         let transactions_root = self.transactions_root();
         block_storage::store_current_transactions_objects(
             rk.host_mut(),
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &EVM_WORLD_STATE_ROOT_PATH,
             &self.cumulative_tx_objects,
         )?;
         let base_fee_per_gas = base_fee_per_gas(
@@ -603,7 +603,7 @@ impl BlockInProgress {
         let new_block = L2Block::Etherlink(Box::new(new_block));
         block_storage::store_current(
             rk.host_mut(),
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &EVM_WORLD_STATE_ROOT_PATH,
             &new_block,
             false, // maintain_live_blocks
         )

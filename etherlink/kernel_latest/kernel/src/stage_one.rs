@@ -178,7 +178,6 @@ mod tests {
     use crate::load_base;
     use crate::{
         blueprint_storage::EVMBlockHeader,
-        chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH,
         configuration::{DalConfiguration, TezosContracts},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
@@ -196,6 +195,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
@@ -587,12 +587,8 @@ mod tests {
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(
-            rk.host_mut(),
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            U256::from(9),
-        )
-        .unwrap();
+        store_current_number(rk.host_mut(), &EVM_WORLD_STATE_ROOT_PATH, U256::from(9))
+            .unwrap();
         if read_next_blueprint(&mut base, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0

@@ -11,11 +11,12 @@ use tezos_ethereum::{
     transaction::{TransactionObject, TransactionReceipt},
 };
 use tezos_evm_logging::{log, Level::Info};
+use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
 
-use crate::{chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH, l2block::L2Block};
+use crate::l2block::L2Block;
 use rlp::Encodable;
 
 mod path {
@@ -210,7 +211,7 @@ pub fn store_current_transactions_receipts(
 pub fn read_current_etherlink_block(
     host: &mut impl StorageV1,
 ) -> anyhow::Result<EthBlock> {
-    let block_path = path::current_block(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+    let block_path = path::current_block(&EVM_WORLD_STATE_ROOT_PATH)?;
     let bytes = &host.store_read_all(&block_path)?;
     let block_from_bytes = EthBlock::from_bytes(bytes)?;
     Ok(block_from_bytes)
@@ -247,7 +248,7 @@ pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u
 pub mod internal_for_tests {
     use tezos_ethereum::transaction::{TransactionHash, TransactionStatus};
 
-    use crate::{chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH, error::Error};
+    use crate::error::Error;
 
     use super::*;
 
@@ -275,7 +276,7 @@ pub mod internal_for_tests {
         tx_hash: &TransactionHash,
     ) -> Result<TransactionReceipt, Error> {
         let receipts_path =
-            path::current_block_transactions_receipts(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+            path::current_block_transactions_receipts(&EVM_WORLD_STATE_ROOT_PATH)?;
         let bytes = &host.store_read_all(&receipts_path)?;
         let rlp = rlp::Rlp::new(bytes);
         for i in 0..rlp.item_count()? {

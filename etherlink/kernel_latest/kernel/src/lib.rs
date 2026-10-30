@@ -15,7 +15,6 @@ use crate::stage_one::fetch_blueprints;
 use crate::storage::read_sequencer_pool_address;
 use anyhow::Context;
 use block::health_check;
-use chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use delayed_inbox::DelayedInbox;
 use fallback_upgrade::fallback_backup_kernel;
 use inbox::StageOneStatus;
@@ -32,6 +31,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
+use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_evm_runtime::runtime_keyspaces::{
     BlueprintKeyspaces, RuntimeKeyspaces, BASE_KEYSPACE_NAME,
 };
@@ -451,7 +451,7 @@ where
     }
 
     let world_state_subkeys = kernel_host
-        .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+        .store_count_subkeys(&EVM_WORLD_STATE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
     // In order to setup the temporary directory, we need to move something
@@ -460,7 +460,7 @@ where
     if world_state_subkeys == 0 {
         kernel_host
             .store_write(
-                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                &EVM_WORLD_STATE_ROOT_PATH,
                 "Un festival de GADT".as_bytes(),
                 0,
             )
