@@ -210,7 +210,7 @@ let job_resto_unit =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~timeout:(Minutes 10)
-    ~only_if_changed:["resto/**"]
+    ~only_if_changed:["resto/**/*"]
     ~script:["eval $(opam env)"; "dune runtest resto"]
 
 (* "de" stands for "data-encoding". *)
@@ -224,7 +224,7 @@ let job_de_unit =
     ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
-    ~only_if_changed:["data-encoding/**"]
+    ~only_if_changed:["data-encoding/**/*"]
     ~script:["eval $(opam env)"; "dune runtest data-encoding"]
 
 let job_oc_unit_protocol_compiles =

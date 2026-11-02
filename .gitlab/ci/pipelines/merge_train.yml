@@ -312,7 +312,7 @@ de.unit:arm64:
   - gcp_arm64
   rules:
   - changes:
-    - data-encoding/**
+    - data-encoding/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -336,7 +336,7 @@ de.unit:x86_64:
   - gcp
   rules:
   - changes:
-    - data-encoding/**
+    - data-encoding/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3996,7 +3996,7 @@ resto.unit:arm64:
   - gcp_arm64
   rules:
   - changes:
-    - resto/**
+    - resto/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -4020,7 +4020,7 @@ resto.unit:x86_64:
   - gcp
   rules:
   - changes:
-    - resto/**
+    - resto/**/*
     when: on_success
   needs: []
   dependencies: []
