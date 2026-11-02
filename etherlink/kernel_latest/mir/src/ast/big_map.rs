@@ -1136,6 +1136,15 @@ impl<'a> TypedValue<'a> {
                         let mut new = orig.clone();
                         for ((k, _), new_v) in orig.iter().zip(results.drain(at..)) {
                             if let Some(new_v) = new_v {
+                                storage.consume_gas(
+                                    crate::gas::interpret_cost::map_update(
+                                        k.as_ref(),
+                                        new.size(),
+                                    )
+                                    .map_err(
+                                        |_| LazyStorageError::OutOfGasError(OutOfGas),
+                                    )?,
+                                )?;
                                 new.insert_mut(k.clone(), new_v);
                             }
                         }
