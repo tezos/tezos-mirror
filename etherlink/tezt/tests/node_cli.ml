@@ -865,12 +865,17 @@ let test_kernel_configs_use_node_paths () =
       "0x9b49c988b5817be31dfb00f7a5a4671772dcce2b";
     ]
   in
+  let chain_id = ["--chain-id"; "1337"] in
   let benchmarking =
     accounts ["0xd9e5c94a12f78a96640757ac97ba0c257e8aa262"]
-    @ ticketer @ ["--enable-fa-bridge"]
+    @ ticketer @ ["--enable-fa-bridge"] @ chain_id
   in
-  let* () = check dev_kernel_config (ticketer @ accounts dev_accounts) in
-  let* () = check sequencer_kernel_config (accounts dev_accounts @ sequencer) in
+  let* () =
+    check dev_kernel_config (ticketer @ accounts dev_accounts @ chain_id)
+  in
+  let* () =
+    check sequencer_kernel_config (accounts dev_accounts @ sequencer @ chain_id)
+  in
   let* () = check benchmarking_kernel_config benchmarking in
   let* () =
     check benchmarking_sequencer_kernel_config (benchmarking @ sequencer)
@@ -878,7 +883,8 @@ let test_kernel_configs_use_node_paths () =
   let* () =
     check
       dailynet_kernel_config
-      (["--ticketer"; "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW"]
+      (chain_id
+      @ ["--ticketer"; "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW"]
       @ accounts
           (dev_accounts
           @ [

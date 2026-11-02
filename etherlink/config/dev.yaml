@@ -1,5 +1,9 @@
 instructions:
   - set:
+      # EVM chain id 1337
+      value: 3905000000000000000000000000000000000000000000000000000000000000
+      to: /evm/world_state/chain_id
+  - set:
       # KT1DXADSWXucAJ6PujZeUSK9brpToFtC9fz6
       value: 4b5431445841445357587563414a3650756a5a6555534b39627270546f46744339667a36
       to: /evm/world_state/ticketer
