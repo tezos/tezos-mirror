@@ -13,7 +13,7 @@ instructions:
       to: /evm/world_state/sequencer
   - set:
       value: 01
-      to: /evm/feature_flags/enable_fa_bridge
+      to: /base/feature_flags/enable_fa_bridge
   - set:
       value: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F
       to: /evm/eth_accounts/0000000000000000000000000000000000000000/ticket_table/8cddc35907a9062880f22f5c815bb5f808ddfc4839363eb2762a4f0300917cbe/f0affc80a5f69f4a9a3ee01a640873b6ba53e539
