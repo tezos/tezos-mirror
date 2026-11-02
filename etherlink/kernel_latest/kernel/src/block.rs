@@ -2511,6 +2511,104 @@ mod tests {
         );
     }
 
+    /// A failing EVM -> Michelson call records 4 receipt entries that are not
+    /// MIR operations (begin/end markers, synthetic transfer, alias
+    /// origination). On a block with room for only 3, the call must be
+    /// rejected without a receipt, rather than abort the block at
+    /// finalization (`renumber_nonces`).
+    #[test]
+    fn evm_failing_crac_receipts_count_towards_internal_operation_cap() {
+        use crate::apply::tests::{dummy_crac_receipt, make_transfer};
+        use crate::apply::{renumber_nonces, ExecutionResult, RuntimeExecutionInfo};
+        use alloy_sol_types::SolCall;
+        use mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        use revm_etherlink::precompiles::runtime_gateway::RuntimeGateway;
+
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        storage::store_evm_chain_id(bk.evm_world_state_mut(), DUMMY_CHAIN_ID).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
+        let base_ks = bk.into_base();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
+            rk.tez_accounts_mut(),
+        )
+        .unwrap();
+        tezos_execution::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &dummy_eth_caller(),
+            U256::from(10u64).pow(U256::from(21)),
+        );
+
+        // The destination does not exist, so the call fails (catchably).
+        let calldata = RuntimeGateway::callMichelsonCall {
+            destination: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".to_string(),
+            entrypoint: String::new(),
+            parameters: Default::default(),
+        }
+        .abi_encode();
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let gas_for_fees =
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &calldata, &[], 0)
+                .unwrap();
+        let tx = sign_transaction(EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            2_000_000 + gas_for_fees,
+            Some(address_from_str("ff00000000000000000000000000000000000007").unwrap()),
+            U256::zero(),
+            calldata,
+            vec![],
+            None,
+            None,
+        ));
+
+        let block_constants = first_block(&mut rk, &base_ks);
+        let mut bip = BlockInProgress::new(
+            block_constants.evm_runtime_block_constants.number,
+            std::collections::VecDeque::new(),
+            U256::from(MINIMUM_BASE_FEE_PER_GAS),
+        );
+        let base = (MAX_INTERNAL_OPERATIONS - 3) as usize;
+        bip.cumulative_tezos_operation_receipts.list = vec![dummy_crac_receipt(
+            (0..base).map(|_| make_transfer(0, 0)).collect(),
+        )];
+
+        let result = chain_config
+            .apply_transaction(
+                &bip,
+                &mut rk,
+                &RegistryImpl::default(),
+                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+                &block_constants,
+                TezosXTransaction::Ethereum(Box::new(Transaction {
+                    tx_hash: hash_from_nonce(0),
+                    content: Ethereum(tx),
+                })),
+                0,
+                None,
+                None,
+                false,
+                false,
+                false,
+            )
+            .unwrap();
+        let ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(info)) = result else {
+            panic!("the EVM transaction must be applied");
+        };
+        assert!(info.pending_crac_receipts.is_empty());
+        let mut receipts = bip.cumulative_tezos_operation_receipts.list;
+        receipts.extend(info.pending_crac_receipts);
+        renumber_nonces(&mut receipts).expect("the block must finalize");
+    }
+
     #[test]
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
