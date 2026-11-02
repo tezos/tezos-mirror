@@ -196,11 +196,22 @@ fn fetch_tezos_contracts(host: &impl StorageV1, base: &impl KeySpace) -> TezosCo
     }
 }
 
-pub fn fetch_evm_limits(host: &mut impl StorageV1) -> EvmLimits {
+/// Reads the EVM limits.
+///
+/// The maximum gas per transaction is read from `host`. When it is absent,
+/// the default is written there, and a failed write is ignored.
+///
+/// The minimum base fee per gas is read from `evm_world_state`, the
+/// `/evm/world_state` keyspace. When it is absent, the default is written
+/// there, and a failed write is only logged.
+pub fn fetch_evm_limits(
+    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
+) -> EvmLimits {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
-    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(evm_world_state);
 
     EvmLimits {
         maximum_gas_limit,
@@ -265,6 +276,10 @@ fn fetch_michelson_runtime_chain_id(
 /// The Michelson chain id is read from the `/tez/world_state` keyspace of
 /// `bk`. When it is absent, the id is derived from the EVM chain id and
 /// written there. Errors when that read or write fails.
+///
+/// The minimum base fee per gas is read from the `/evm/world_state` keyspace
+/// of `bk`. When it is absent, the default is written there, and a failed
+/// write is only logged.
 pub fn fetch_tezosx_configuration(
     host: &mut impl StorageV1,
     bk: &mut BlueprintKeyspaces<impl KeySpace>,
@@ -273,7 +288,7 @@ pub fn fetch_tezosx_configuration(
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
     let evm_chain_id = fetch_evm_chain_id(host);
-    let limits = fetch_evm_limits(host);
+    let limits = fetch_evm_limits(host, bk.evm_world_state_mut());
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());
     let debug_features = DebugFeatures::read_from_storage(bk.base());

@@ -170,6 +170,7 @@ mod test {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     proptest! {
         #[test]
@@ -202,7 +203,7 @@ mod test {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let timestamp = 0_i64;
-        let block_fees = crate::retrieve_block_fees(rk.host_mut()).unwrap();
+        let block_fees = crate::retrieve_block_fees(&mut rk).unwrap();
         let dummy_block_constants = TezosXBlockConstants {
             evm_runtime_block_constants: BlockConstants::first_block(
                 timestamp.into(),
@@ -242,7 +243,7 @@ mod test {
             .unwrap();
 
         // At tolerance, gas price should be min.
-        let (min, gas_price) = load_gas_price(rk.host_mut());
+        let (min, gas_price) = load_gas_price(&mut rk);
         assert_eq!(min, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         assert_eq!(gas_price, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
@@ -270,7 +271,7 @@ mod test {
             .unwrap();
         let gas_price_now = base_fee_per_gas(rk.host(), timestamp.into(), min);
 
-        let (min, gas_price) = load_gas_price(rk.host_mut());
+        let (min, gas_price) = load_gas_price(&mut rk);
         assert!(gas_price > min);
         assert_eq!(gas_price, gas_price_now);
 
@@ -283,11 +284,11 @@ mod test {
         );
     }
 
-    fn load_gas_price<Host>(host: &mut Host) -> (U256, U256)
+    fn load_gas_price<Host>(rk: &mut RuntimeKeyspaces<'_, Host>) -> (U256, U256)
     where
-        Host: StorageV1,
+        Host: StorageV1 + KeySpaceLoader,
     {
-        let bf = crate::retrieve_block_fees(host).unwrap();
+        let bf = crate::retrieve_block_fees(rk).unwrap();
 
         (bf.minimum_base_fee_per_gas(), bf.base_fee_per_gas())
     }
