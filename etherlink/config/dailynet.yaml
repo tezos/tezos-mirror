@@ -20,4 +20,4 @@ instructions:
   - set:
       # KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW
       value: 4B543146487173766337765253337535344C363644644D5834676236514B71784A314A57
-      to: /evm/ticketer
+      to: /evm/world_state/ticketer
