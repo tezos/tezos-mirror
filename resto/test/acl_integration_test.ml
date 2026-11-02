@@ -162,6 +162,43 @@ let parent pid =
 
 module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
+(* Sends a raw HTTP request with the given request target, so that
+   absolute-form targets are sent verbatim, and returns the status code. *)
+let raw_request_status ?(port = port) ?(meth = "GET") target =
+  let body = if meth = "POST" then "{}" else "" in
+  let addr = Unix.ADDR_INET (Unix.inet_addr_loopback, port) in
+  Lwt_io.with_connection addr (fun (ic, oc) ->
+      Lwt_io.write
+        oc
+        (Printf.sprintf
+           "%s %s HTTP/1.1\r\n\
+            Host: localhost\r\n\
+            Content-Type: application/json\r\n\
+            Content-Length: %d\r\n\
+            Connection: close\r\n\
+            \r\n\
+            %s"
+           meth
+           target
+           (String.length body)
+           body)
+      >>= fun () ->
+      Lwt_io.read_line ic >>= fun status_line ->
+      match String.split_on_char ' ' status_line with
+      | _ :: code :: _ -> Lwt.return (int_of_string code)
+      | _ -> Lwt.fail_with ("Unexpected status line: " ^ status_line))
+
+let check_raw_status ?port ?meth target expected =
+  raw_request_status ?port ?meth target >>= fun status ->
+  if status <> expected then
+    Format.kasprintf
+      failwith
+      "Request %S: got status %d, expected %d"
+      target
+      status
+      expected ;
+  Lwt.return_unit
+
 (* A signal setup with both soft and hard exits to test both behaviours *)
 let main () =
   (* set up and start the server *)
@@ -230,6 +267,56 @@ let main () =
       child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
   | pid -> parent pid)
   >>= fun () ->
+  (* fifth test: absolute-form request targets are handled as their
+     origin-form equivalent. *)
+  Server.set_acl server
+  @@ Resto_acl.Acl.Allow_all
+       {except = [{meth = Any; path = Exact [Literal "foo"; Wildcard]}]} ;
+  check_raw_status "/foo/bar" 401 >>= fun () ->
+  check_raw_status "/blue/../foo/bar" 401 >>= fun () ->
+  check_raw_status "http://localhost/foo/bar" 401 >>= fun () ->
+  check_raw_status "http://localhost/blue/../foo/bar" 401 >>= fun () ->
+  check_raw_status "http://localhost/blue/%2e%2e/foo/bar" 401 >>= fun () ->
+  check_raw_status "http://localhost/../foo/bar" 401 >>= fun () ->
+  check_raw_status "http:../foo/bar" 401 >>= fun () ->
+  check_raw_status "http:blue/../../foo/bar" 401 >>= fun () ->
+  check_raw_status "HTTP:%2e%2e/foo/bar" 401 >>= fun () ->
+  check_raw_status
+    ~meth:"POST"
+    "http://localhost/foo/../blue/white/red/and/fuchsia"
+    200
+  >>= fun () ->
+  Server.set_acl server
+  @@ Resto_acl.Acl.Deny_all
+       {except = [{meth = Any; path = FollowedByAnySuffix [Literal "foo"]}]} ;
+  check_raw_status "http://localhost/foo/bar" 200 >>= fun () ->
+  check_raw_status "http://localhost/blue/../foo/bar" 200 >>= fun () ->
+  check_raw_status
+    ~meth:"POST"
+    "http://localhost/foo/../blue/white/red/and/fuchsia"
+    401
+  >>= fun () ->
+  (* sixth test: a custom callback given to [launch] gets the normalized
+     request, so that layers running before [resto_callback] (here, an
+     extra endpoint looked up by path) see the same path as resto. *)
+  let extra_port = port + 1 in
+  let extra_server = Server.init_server ~media_types directory in
+  let callback conn req body =
+    match Uri.path (Cohttp.Request.uri req) with
+    | "/extra" ->
+        Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body:"" ()
+        >>= fun response -> Lwt.return (`Response response)
+    | _ -> Server.resto_callback extra_server conn req body
+  in
+  Server.launch extra_server ~callback (`TCP (`Port extra_port)) >>= fun () ->
+  check_raw_status ~port:extra_port "/blue/../extra" 200 >>= fun () ->
+  check_raw_status ~port:extra_port "http://localhost/extra" 200 >>= fun () ->
+  check_raw_status ~port:extra_port "http://localhost/blue/../extra" 200
+  >>= fun () ->
+  check_raw_status ~port:extra_port "http:../extra" 200 >>= fun () ->
+  check_raw_status ~port:extra_port "http://localhost/blue/../foo/bar" 200
+  >>= fun () ->
+  Server.shutdown extra_server >>= fun () ->
   (* end of tests *)
   Lwt.return ()
 

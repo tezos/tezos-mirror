@@ -178,6 +178,14 @@ let _resto_acl_integration_test =
       ]
     ~modules:["acl_integration_test"]
 
+let _resto_request_target_property_test =
+  test
+    "request_target_property_test"
+    ~opam:"octez-libs"
+    ~path:"resto/test"
+    ~deps:[cohttp_lwt; uri; qcheck_core; resto; resto_cohttp_server]
+    ~modules:["request_target_property_test"]
+
 let _chunked_output_integration_test =
   test
     "chunked_output_integration_test"

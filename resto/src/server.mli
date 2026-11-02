@@ -26,6 +26,27 @@
 
 (** Serving a directory of registered services. *)
 
+(** [normalize_request_target req] rewrites an absolute-form request
+    target (e.g. [http://host/a/../b?q], RFC 9112 §3.2.2) into the
+    equivalent origin-form target ([/b?q]).
+
+    Cohttp removes dot segments ([.] and [..]) from origin-form targets
+    when computing {!Cohttp.Request.uri}, but keeps them verbatim for
+    absolute-form targets. Without this normalization, the same resource
+    could be addressed through two different paths depending on the
+    request target form.
+
+    {!Make.launch} applies it to every request before calling its
+    callback, and {!Make.resto_callback} applies it as well for callers
+    that use it directly.
+
+    The host and port of an absolute-form target replace the [Host]
+    header, as required by RFC 9112 §3.2.2; its userinfo and fragment are
+    dropped, and its query is kept verbatim. Origin-form, asterisk-form ([*]) and
+    authority-form ([CONNECT]) requests are returned unchanged. This
+    function is idempotent. *)
+val normalize_request_target : Cohttp.Request.t -> Cohttp.Request.t
+
 module type LOGGING = sig
   val log_debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
@@ -136,7 +157,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
      [listening_protocol].
 
      @param [callback] overwrites (if given) the default handler of
-     Resto each HTTP query will be treated by.
+     Resto each HTTP query will be treated by. The request it is given
+     has already been normalized with {!normalize_request_target}.
 
      @param [conn_closed] is an optional function that is called when
      a connection is closed.

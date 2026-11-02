@@ -44,5 +44,5 @@ val add_allow_origin : Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 val add_headers : Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 
 (** [check_host header t] is [true] if one of [t]'s members matches the
-    [header]'s [Host] field. *)
+    [header]'s [Host] field. The comparison is case-insensitive. *)
 val check_host : Cohttp.Header.t -> t -> bool

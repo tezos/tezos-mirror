@@ -58,6 +58,59 @@ let rec wseq ic oc seq =
           Lwt.pause () >>= fun () -> (wseq [@ocaml.tailcall]) ic oc seq)
         (fun exc -> drain seq >>= fun () -> raise exc)
 
+let normalize_request_target (req : Cohttp.Request.t) =
+  match req.meth with
+  | `CONNECT -> req
+  | _ -> (
+      match Uri.scheme (Uri.of_string req.resource) with
+      | None -> req
+      | Some _ ->
+          (* Absolute-form target: turn it into an origin-form target, so
+             that [Cohttp.Request.uri] resolves its path against the root
+             and removes dot segments, exactly as for any origin-form
+             target.
+
+             The leading [/] added to the path below is required. Calling
+             [Uri.resolve] on the absolute-form URI directly is not
+             enough: on a path that does not start with [/], ocaml-uri
+             keeps leading [..] segments ([http:../a] stays [http:../a]),
+             whereas RFC 3986 §5.2.4 removes them. The path would then
+             differ from the one obtained once the request is re-parsed as
+             origin-form ([/../a] becomes [/a]). *)
+          let uri = Cohttp.Request.uri req in
+          let path =
+            match Uri.path uri with
+            | "" -> "/"
+            | p when p.[0] <> '/' -> "/" ^ p
+            | p -> p
+          in
+          let resource =
+            match Uri.verbatim_query uri with
+            | None -> path
+            | Some q -> path ^ "?" ^ q
+          in
+          (* RFC 9112 §3.2.2: the host of an absolute-form target overrides
+             the [Host] header. The target itself no longer carries it, so
+             it is moved to the [Host] header (e.g. for the CORS check). *)
+          let headers =
+            match Uri.host uri with
+            | None | Some "" -> req.headers
+            | Some host ->
+                let authority =
+                  Uri.to_string (Uri.make ~host ?port:(Uri.port uri) ())
+                in
+                (* [authority] is [//host[:port]]. It must be built with
+                   [Uri.to_string], which percent-encodes the host again:
+                   [Uri.host] returns it decoded, so it may contain CR or LF,
+                   which would then be injected in the headers forwarded by
+                   RPC middlewares. *)
+                let authority =
+                  String.sub authority 2 (String.length authority - 2)
+                in
+                Cohttp.Header.replace req.headers "host" authority
+          in
+          {req with resource; headers})
+
 let wseq ic oc seq =
   Lwt.finalize (fun () -> wseq ic oc seq) (fun () -> Lwt_io.close ic)
 
@@ -388,6 +441,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   let resto_callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body
       =
+    let req = normalize_request_target req in
     let con_string = Connection.to_string con in
     let uri = Request.uri req in
     let path_and_query = Uri.path_and_query uri in
@@ -569,6 +623,10 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
          let con_string = Connection.to_string con in
          Log.log_debug "server (%s) connection accepted" con_string ;
          set_tcp_keepalive io ;
+         (* Normalize the request target before [callback], so that every
+            layer it is made of sees the same path, whatever the form of
+            the request target. *)
+         let req = normalize_request_target req in
          Lwt.catch
            (fun () -> callback (io, con) req body)
            (function

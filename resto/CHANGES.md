@@ -1,5 +1,14 @@
 dev
 
+* Added `Server.normalize_request_target`, which rewrites absolute-form
+  request targets (`http://host/path`) into their origin-form equivalent,
+  and made `launch` and `resto_callback` use it: absolute-form targets are
+  now handled exactly as their origin-form equivalent. A custom callback
+  given to `launch` now receives the normalized request. As required by
+  RFC 9112 §3.2.2, the `Host` header of such a request is replaced by the
+  host and port of its target.
+* Made `Cors.check_host` compare hosts case-insensitively (RFC 3986
+  §3.2.2), so that its decision does not depend on the request target form.
 * Fixed a file descriptor leak in the client when following redirects: the
   body of each intermediate redirect response is now drained so that its
   connection is released.

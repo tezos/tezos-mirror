@@ -55,6 +55,21 @@
  (action (run %{dep:./acl_integration_test.exe})))
 
 (executable
+ (name request_target_property_test)
+ (libraries
+  cohttp-lwt
+  uri
+  qcheck-core
+  octez-libs.resto
+  octez-libs.resto-cohttp-server)
+ (modules request_target_property_test))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (action (run %{dep:./request_target_property_test.exe})))
+
+(executable
  (name chunked_output_integration_test)
  (libraries
   lwt

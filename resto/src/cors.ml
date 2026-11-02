@@ -72,6 +72,15 @@ let check_host headers cors =
   match Cohttp.Header.get headers "Host" with
   | None -> List.mem "*" cors.allowed_origins
   | Some host -> (
-      match find_matching_origin cors.allowed_origins host with
+      (* Host names are case-insensitive (RFC 3986 §3.2.2). This also makes
+         the decision independent of the request target form: the [Host]
+         header of an absolute-form request is taken from its target, whose
+         host is lowercased when parsed. *)
+      let lowercase = String.lowercase_ascii in
+      match
+        find_matching_origin
+          (List.map lowercase cors.allowed_origins)
+          (lowercase host)
+      with
       | None -> false
       | Some _ -> true)
