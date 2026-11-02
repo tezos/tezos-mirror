@@ -54,13 +54,6 @@ struct ExternalCheckpoint {
     /// the saved value is dropped (the index already reflects the
     /// post-frame state).
     origination_index: u32,
-    /// `internal_operation_counter` at the time the checkpoint was
-    /// created.  Threaded identically to `origination_index`: on
-    /// revert it is rolled back so MIR counters consumed inside the
-    /// reverted EVM frame are released, and on commit the saved value
-    /// is dropped (the counter already reflects the post-frame state).
-    /// See the field of the same name on [`MichelsonJournal`] (L2-1676).
-    internal_operation_counter: u128,
     /// Length of `pending_alias_origination_internals` at the time the
     /// checkpoint was created. On revert the list is truncated back to
     /// this count; on commit the saved value is dropped.
@@ -213,7 +206,12 @@ pub struct MichelsonJournal {
     /// [`internal_operation_counter`](Self::internal_operation_counter),
     /// written back with
     /// [`set_internal_operation_counter`](Self::set_internal_operation_counter),
-    /// rolled back on `revert_frame`, kept on `commit_frame`.
+    /// kept on both `revert_frame` and `commit_frame`.
+    ///
+    /// It is also the position checked against the per-block
+    /// internal-operation cap: it counts the synthetic entries of CRAC
+    /// receipts too, and it is never rolled back because receipts of
+    /// reverted frames stay in the block.
     internal_operation_counter: u128,
     /// Temporary big map IDs of this manager operation, shared by every
     /// one of its Michelson frames.
@@ -483,7 +481,6 @@ impl MichelsonJournal {
             snapshot_watermark: self.snapshots.len(),
             receipt_count: self.pending_crac_receipts.len(),
             origination_index: self.origination_index,
-            internal_operation_counter: self.internal_operation_counter,
             alias_internals_count: self.pending_alias_origination_internals.len(),
         });
     }
@@ -586,7 +583,6 @@ impl MichelsonJournal {
                 snapshot_watermark: 0,
                 receipt_count: 0,
                 origination_index: 0,
-                internal_operation_counter: 0,
                 alias_internals_count: 0,
             });
         // The saved origination index is dropped on commit: any
@@ -594,11 +590,6 @@ impl MichelsonJournal {
         // CRAC in the same synthetic op continues from the post-frame
         // value rather than re-using already-burned indices.
         let _ = checkpoint.origination_index;
-        // Likewise the saved MIR internal-operation counter is dropped
-        // on commit: counters consumed in this frame stay consumed, so
-        // a later reentrant frame keeps a monotonic, collision-free
-        // replay identity (L2-1676).
-        let _ = checkpoint.internal_operation_counter;
         let _ = checkpoint.alias_internals_count;
         // Clamp both branches. The `+ 1` overshoots on purpose: the snapshot
         // at the watermark is left for the parent.
@@ -637,7 +628,6 @@ impl MichelsonJournal {
                 snapshot_watermark: 0,
                 receipt_count: 0,
                 origination_index: 0,
-                internal_operation_counter: 0,
                 alias_internals_count: 0,
             });
         // Roll the origination-nonce index back to its value at
@@ -650,12 +640,10 @@ impl MichelsonJournal {
         // followed by a caller-side EVM revert does not leak burned
         // indices.
         self.origination_index = checkpoint.origination_index;
-        // Roll the MIR internal-operation counter back the same way:
-        // the internal operations applied inside the reverted frame are
-        // backtracked, so their replay identities are released and the
-        // next reentrant frame resumes from the pre-frame counter
-        // (L2-1676).
-        self.internal_operation_counter = checkpoint.internal_operation_counter;
+        // The MIR internal-operation counter is NOT rolled back: the
+        // receipts of the reverted frame stay in the block (as
+        // backtracked or failed), so their entries must keep counting
+        // towards the per-block internal-operation cap.
         self.pending_alias_origination_internals
             .truncate(checkpoint.alias_internals_count);
         // Drain (not truncate) the CRAC receipts pushed during this
@@ -1977,12 +1965,12 @@ mod tests {
         assert_eq!(journal.internal_operation_counter(), 3);
     }
 
-    // Reverting an EVM frame rolls the MIR counter back to the value at
-    // frame entry: the internal operations applied inside the reverted
-    // frame are backtracked, so their replay identities are released and
-    // the next reentrant frame resumes from the pre-frame counter.
+    // Reverting an EVM frame keeps the MIR counter: the
+    // receipts of the reverted frame stay in the block as backtracked or
+    // failed entries, so they must keep counting towards the per-block
+    // internal-operation cap.
     #[test]
-    fn test_internal_operation_counter_rolls_back_on_revert_frame() {
+    fn test_internal_operation_counter_persists_on_revert_frame() {
         let mut host = MockHost::default();
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         // Outer EVM frame enters at counter 0.
@@ -1990,9 +1978,9 @@ mod tests {
         // Inbound CRAC inside that frame emitted two internal ops.
         journal.set_internal_operation_counter(2);
         assert_eq!(journal.internal_operation_counter(), 2);
-        // Outer frame reverts: counter must drop back to 0.
+        // Outer frame reverts: counter stays at 2.
         journal.revert_frame(&mut host).unwrap();
-        assert_eq!(journal.internal_operation_counter(), 0);
+        assert_eq!(journal.internal_operation_counter(), 2);
     }
 
     // Committing an EVM frame keeps the increments performed inside it.
@@ -2004,26 +1992,6 @@ mod tests {
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.set_internal_operation_counter(2);
-        journal.commit_frame(&mut host).unwrap();
-        assert_eq!(journal.internal_operation_counter(), 2);
-    }
-
-    // Nested frames: an inner revert only rolls back the inner frame's
-    // increments; the outer frame's prior increments survive.
-    #[test]
-    fn test_internal_operation_counter_nested_revert_only_inner() {
-        let mut host = MockHost::default();
-        let mut journal = MichelsonJournal::new(dummy_hash(0x42));
-        // Outer frame
-        journal.push_external_checkpoint();
-        journal.set_internal_operation_counter(2); // outer frame emitted 2
-                                                   // Inner frame
-        journal.push_external_checkpoint();
-        journal.set_internal_operation_counter(5); // inner frame emitted 3 more
-                                                   // Inner reverts: counter back to 2 (outer's tail), NOT to 0.
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(journal.internal_operation_counter(), 2);
-        // Outer commits: counter stays at 2.
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.internal_operation_counter(), 2);
     }
