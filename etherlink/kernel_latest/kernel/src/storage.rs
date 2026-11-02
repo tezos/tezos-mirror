@@ -33,8 +33,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtNum};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::{
-    get_b58_kt1, read_b58_kt1, read_u256_le, read_u64_le, store_read_slice,
-    write_u256_le, write_u64_le,
+    get_b58_kt1, read_b58_kt1, read_u256_le, store_read_slice, write_u256_le,
 };
 
 use crate::error::{Error, StorageError};
@@ -120,8 +119,10 @@ const MAXIMUM_ALLOWED_TICKS_KEY: Key = Key::from_static(b"/maximum_allowed_ticks
 
 const STAGE_ONE_WITNESS_KEY: Key = Key::from_static(b"/stage_one_witness");
 
-pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
-    RefPath::assert_from(b"/evm/world_state/maximum_gas_per_transaction");
+// Key to the maximum gas per transaction, inside the `/evm/world_state`
+// keyspace.
+const MAXIMUM_GAS_PER_TRANSACTION_KEY: Key =
+    Key::from_static(b"/maximum_gas_per_transaction");
 
 // Path to the block in progress, used between reboots
 pub const EVM_BLOCK_IN_PROGRESS: RefPath =
@@ -836,16 +837,20 @@ pub fn inside_stage_one(base: &impl KeySpace) -> bool {
     base.contains(&STAGE_ONE_WITNESS_KEY)
 }
 
-/// Reads the maximum gas per transaction. If the value cannot found in the storage,
-/// we write the kernel default value in the storage. The value becomes accessible
-/// from outside the kernel.
+/// Reads the maximum gas per transaction from `evm_world_state`, the
+/// `/evm/world_state` keyspace, as a little-endian `u64`. A value longer than
+/// 8 bytes counts its first 8 bytes only, and a shorter one is padded with
+/// zeros. When it is absent, writes the kernel default there and returns it.
+/// Errors when that write fails.
 pub fn read_or_set_maximum_gas_per_transaction(
-    host: &mut impl StorageV1,
-) -> anyhow::Result<u64> {
-    match read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION) {
-        Ok(gas_limit) => Ok(gas_limit),
-        Err(_) => {
-            write_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION, MAXIMUM_GAS_LIMIT)?;
+    evm_world_state: &mut impl KeySpace,
+) -> Result<u64, KeySpaceError> {
+    let mut bytes = [0u8; 8];
+    match evm_world_state.read(&MAXIMUM_GAS_PER_TRANSACTION_KEY, 0, &mut bytes) {
+        Some(_) => Ok(u64::from_le_bytes(bytes)),
+        None => {
+            evm_world_state
+                .store_le(&MAXIMUM_GAS_PER_TRANSACTION_KEY, MAXIMUM_GAS_LIMIT)?;
             Ok(MAXIMUM_GAS_LIMIT)
         }
     }
@@ -1160,6 +1165,7 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
     use tezosx_journal::{CracId, TezosXJournal};
@@ -1974,6 +1980,76 @@ mod tests {
         assert_eq!(
             super::read_sequencer_pool_address(rk.evm_world_state()),
             Some(pool)
+        );
+    }
+
+    /// The maximum gas per transaction resolves to
+    /// `/evm/world_state/maximum_gas_per_transaction`.
+    #[test]
+    fn maximum_gas_per_transaction_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let gas_limit: u64 = 17;
+
+        rk.evm_world_state_mut()
+            .store_le(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY, gas_limit)
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/maximum_gas_per_transaction"
+                ))
+                .unwrap(),
+            gas_limit.to_le_bytes()
+        );
+        assert_eq!(
+            super::read_or_set_maximum_gas_per_transaction(rk.evm_world_state_mut())
+                .unwrap(),
+            gas_limit
+        );
+    }
+
+    /// An absent maximum gas per transaction reads as the default, and the
+    /// default is written in its place.
+    #[test]
+    fn maximum_gas_per_transaction_absent_is_set_to_the_default() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert_eq!(
+            super::read_or_set_maximum_gas_per_transaction(rk.evm_world_state_mut())
+                .unwrap(),
+            super::MAXIMUM_GAS_LIMIT
+        );
+        assert_eq!(
+            rk.evm_world_state()
+                .get(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY),
+            Some(super::MAXIMUM_GAS_LIMIT.to_le_bytes().to_vec())
+        );
+    }
+
+    /// A stored maximum gas per transaction shorter than 8 bytes is read
+    /// padded with zeros, and is not replaced by the default.
+    #[test]
+    fn maximum_gas_per_transaction_shorter_than_8_bytes_is_kept() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let short_value = 30_000u32.to_le_bytes();
+
+        rk.evm_world_state_mut()
+            .set(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY, short_value)
+            .unwrap();
+
+        assert_eq!(
+            super::read_or_set_maximum_gas_per_transaction(rk.evm_world_state_mut())
+                .unwrap(),
+            30_000
+        );
+        assert_eq!(
+            rk.evm_world_state()
+                .get(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY),
+            Some(short_value.to_vec())
         );
     }
 }
