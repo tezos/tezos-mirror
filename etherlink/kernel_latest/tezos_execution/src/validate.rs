@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use num_bigint::{BigInt, Sign, TryFromBigIntError};
-use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::{PublicKeySignatureVerifier, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
@@ -26,6 +24,7 @@ use crate::{
     storage_fees::HARD_STORAGE_LIMIT_PER_OPERATION,
     BalanceUpdate,
 };
+use tezosx_types::Mutez;
 
 /// Inspired from `contract_storage.ml` in the Tezos protocol
 /// This function verifies that the counter given in argument is the
@@ -66,29 +65,26 @@ fn check_and_increment_counter(
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
+/// No updates on a zero amount.
 fn compute_fees_balance_updates(
     source: &PublicKeyHash,
-    amount: &Narith,
-) -> Result<Vec<BalanceUpdate>, TryFromBigIntError<BigInt>> {
-    if amount.eq(&0_u64.into()) {
-        return Ok(vec![]);
-    };
-    let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
-    let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
-
+    amount: Mutez,
+) -> Vec<BalanceUpdate> {
+    if amount == Mutez::ZERO {
+        return vec![];
+    }
+    let changes: i64 = amount.into();
     let source_update = BalanceUpdate {
         balance: Balance::Account(Contract::Implicit(source.clone())),
-        changes: source_delta.try_into()?,
+        changes: -changes,
         update_origin: UpdateOrigin::BlockApplication,
     };
-
     let block_fees = BalanceUpdate {
         balance: Balance::BlockFees,
-        changes: block_fees.try_into()?,
+        changes,
         update_origin: UpdateOrigin::BlockApplication,
     };
-
-    Ok(vec![source_update, block_fees])
+    vec![source_update, block_fees]
 }
 
 /// In order to validate an operation, we need to check its signature,
@@ -168,8 +164,9 @@ fn validate_source(
 fn validate_individual_operation(
     content: ManagerOperation<OperationContent>,
     account_pkh: &PublicKeyHash,
-    account_balance: &mut Narith,
+    account_balance: &mut Mutez,
     account_counter: &mut Narith,
+    total_fees: &mut Mutez,
     mut gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
     gas.consume(crate::gas::Cost::manager_operation())?;
@@ -185,12 +182,40 @@ fn validate_individual_operation(
         HARD_STORAGE_LIMIT_PER_OPERATION
     );
 
+    // A crafted `fee`, `amount` (Transaction) or `balance` (Origination)
+    // outside the mutez domain is invalid here, rather than surfacing
+    // later as a downstream conversion failure deep in the apply path
+    // (`CantPayFees`, `BalanceTooLow`).
+    let fee = Mutez::try_from(&content.fee)
+        .map_err(|_| ValidityError::AmountOutOfDomain(content.fee.clone()))?;
+    let amount = match &content.operation {
+        OperationContent::Transfer(transfer) => Mutez::try_from(&transfer.amount)
+            .map_err(|_| ValidityError::AmountOutOfDomain(transfer.amount.clone()))?,
+        OperationContent::Origination(origination) => {
+            Mutez::try_from(&origination.balance).map_err(|_| {
+                ValidityError::AmountOutOfDomain(origination.balance.clone())
+            })?
+        }
+        OperationContent::Reveal(_) => Mutez::ZERO,
+    };
+
+    // Every individual fee is validated into the mutez domain above; only
+    // the running batch total can still overflow it. Checked independent
+    // of the solvency debit below, so a batch that merely *declares* an
+    // out-of-domain total is invalid regardless of what the source can
+    // actually pay — never a raw sum left to overflow later and abort
+    // the block.
+    let new_total_fees = total_fees.checked_add(fee).map_err(|_| {
+        ValidityError::AmountOutOfDomain(Narith(
+            &total_fees.to_narith().0 + &content.fee.0,
+        ))
+    })?;
+    *total_fees = new_total_fees;
+
     // The manager account must be solvent to pay the announced fees.
     *account_balance = account_balance
-        .0
-        .checked_sub(&content.fee.0)
-        .ok_or(ValidityError::CantPayFees(content.fee.clone()))?
-        .into();
+        .checked_sub(fee)
+        .map_err(|_| ValidityError::CantPayFees(fee))?;
 
     log!(Debug,
         "Validation: OK - the source can pay {:?} in fees, being left with a new balance of {:?}.",
@@ -198,13 +223,13 @@ fn validate_individual_operation(
         account_balance
     );
 
-    let balance_updates = compute_fees_balance_updates(account_pkh, &content.fee)
-        .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
+    let balance_updates = compute_fees_balance_updates(account_pkh, fee);
 
     Ok(ValidatedOperation {
         balance_updates,
         gas,
         content,
+        amount,
     })
 }
 
@@ -216,6 +241,10 @@ pub struct ValidatedOperation {
     /// during validation.
     pub gas: TezlinkOperationGas,
     pub content: ManagerOperation<OperationContent>,
+    /// The operation's amount (Transaction) or initial balance
+    /// (Origination), already validated to lie in the mutez domain.
+    /// `Mutez::ZERO` for Reveal, which carries neither.
+    pub amount: Mutez,
 }
 
 pub struct ValidatedBatch {
@@ -223,6 +252,9 @@ pub struct ValidatedBatch {
     // Used in TezosX to produce aliases
     pub source_public_key: Vec<u8>,
     pub validated_operations: Vec<ValidatedOperation>,
+    /// Sum of every validated operation's fee, checked against the
+    /// mutez domain.
+    pub total_fees: Mutez,
 }
 
 pub fn verify_signature(
@@ -252,7 +284,7 @@ pub fn execute_validation(
     tez_accounts: &mut impl KeySpace,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
-    required_fees: Option<u64>,
+    required_fees: Option<Mutez>,
 ) -> Result<ValidatedBatch, ValidityError> {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
@@ -295,6 +327,7 @@ pub fn execute_validation(
     let mut source_counter = source_account.counter(tez_accounts)?;
 
     let mut validated_operations = Vec::new();
+    let mut total_fees = Mutez::ZERO;
 
     // Charge the gas for the validation on the first operation of the batch
     let gas_charged_operation = unvalidated_operation.remove(0);
@@ -303,6 +336,7 @@ pub fn execute_validation(
         source_account.pkh(),
         &mut source_balance,
         &mut source_counter,
+        &mut total_fees,
         validation_gas,
     )?);
     for content in unvalidated_operation {
@@ -313,6 +347,7 @@ pub fn execute_validation(
             source_account.pkh(),
             &mut source_balance,
             &mut source_counter,
+            &mut total_fees,
             operation_gas,
         )?;
         validated_operations.push(validated_operation);
@@ -322,12 +357,7 @@ pub fn execute_validation(
     // operation to L1 but also the execution gas cost that will be used.
     // During simulation, this check is omitted.
     if let Some(required_fees) = required_fees {
-        let total_fees: Narith = validated_operations
-            .iter()
-            .fold(Narith::from(0_u64), |acc, op| {
-                Narith(acc.0 + &op.content.fee.0)
-            });
-        if total_fees < Narith(required_fees.into()) {
+        if total_fees < required_fees {
             log!(
                 Error,
                 "Insufficient fees: batch provides {:?} mutez but needs {:?} mutez",
@@ -350,5 +380,6 @@ pub fn execute_validation(
         source_account,
         source_public_key,
         validated_operations,
+        total_fees,
     })
 }

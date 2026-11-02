@@ -31,9 +31,8 @@ use mir::{
     },
 };
 use mir_ctx::clear_temporary_big_maps;
-use num_bigint::{BigInt, BigUint};
-use num_traits::ops::checked::CheckedSub;
-use num_traits::{ToPrimitive, Zero};
+use num_bigint::BigUint;
+use num_traits::Zero;
 use primitive_types::U256;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tezos_crypto_rs::{
@@ -41,7 +40,6 @@ use tezos_crypto_rs::{
     PublicKeyWithHash,
 };
 use tezos_data_encoding::types::Narith;
-use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::safe_storage::SafeStorage;
@@ -63,15 +61,16 @@ use tezos_tezlink::operation_result::{
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
-        ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, EventContent,
-        EventSuccess, OperationError, OperationResultSum, OriginationError, RevealError,
-        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
+        ApplyOperationError, Balance, BalanceOverflow, BalanceTooLow, BalanceUpdate,
+        EventContent, EventSuccess, OperationError, OperationResultSum, OriginationError,
+        RevealError, RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 use tezosx_interfaces::Milligas;
 use tezosx_interfaces::{Origin, Registry};
 use tezosx_journal::TemporaryBigMapIdAllocator;
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Mutez;
 
 use crate::account_storage::{
     OriginatedContractInfo, StorageSpace, TezosImplicitAccount,
@@ -127,7 +126,7 @@ impl ProcessedOperation {
 /// Fee pricing parameters for computing refunds inside
 /// `validate_and_apply_operation`.
 pub struct FeeRefundConfig {
-    pub da_fees: u64,
+    pub da_fees: Mutez,
     pub base_fee_per_gas: U256,
     pub michelson_to_evm_gas_multiplier: u64,
 }
@@ -137,24 +136,37 @@ pub struct FeeRefundConfig {
 /// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
 /// where consumed_gas_fees = michelson_gas_to_mutez(base_fee, multiplier, consumed_gas)
 /// and consumed_gas = ceil(total_consumed_milligas / 1000).
+///
+/// A consumed cost past the mutez domain (or a `da_fees + consumed_gas_fees`
+/// sum past it) yields a zero refund rather than propagating the error: the
+/// declared `total_operation_fees` is itself mutez-domain-bounded, so the
+/// surplus is zero by construction whenever the cost side cannot even be
+/// represented.
 fn compute_fee_refund(
-    total_operation_fees: u64,
+    total_operation_fees: Mutez,
     processed_operations: &[ProcessedOperation],
     config: &FeeRefundConfig,
-) -> u64 {
+) -> Mutez {
     let consumed_milligas =
         ProcessedOperation::total_consumed_milligas(processed_operations);
     // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
     let consumed_gas = consumed_milligas.div_ceil(1000);
-    let consumed_gas_fees = michelson_gas_to_mutez(
+    let Ok(consumed_gas_fees) = tezosx_types::michelson_gas_to_mutez(
         config.base_fee_per_gas,
         config.michelson_to_evm_gas_multiplier,
         consumed_gas,
-    );
+    ) else {
+        return Mutez::ZERO;
+    };
+    let Ok(costs) = config.da_fees.checked_add(consumed_gas_fees) else {
+        return Mutez::ZERO;
+    };
 
-    // saturating_sub ensures the refund is non-negative and smaller than the fees
+    // saturating ensures the refund is non-negative and smaller than the fees
     // paid by the source account at the beginning of the application.
-    total_operation_fees.saturating_sub(config.da_fees.saturating_add(consumed_gas_fees))
+    total_operation_fees
+        .checked_sub(costs)
+        .unwrap_or(Mutez::ZERO)
 }
 
 extern crate alloc;
@@ -192,7 +204,7 @@ enum InternalOpOrigin {
     /// Operation directly emitted by the current frame.
     Own {
         /// Storage cost delegated to the operation.
-        delegated_storage_cost: u64,
+        delegated_storage_cost: Mutez,
     },
     /// Operation surfaced by the CRAC drain mechanism.
     Crac,
@@ -207,7 +219,7 @@ struct TaggedInternalOp {
 }
 
 impl TaggedInternalOp {
-    fn own(op: InternalOperationSum, delegated_storage_cost: u64) -> Self {
+    fn own(op: InternalOperationSum, delegated_storage_cost: Mutez) -> Self {
         Self {
             op,
             origin: InternalOpOrigin::Own {
@@ -363,8 +375,8 @@ fn finalize_and_burn<M, A>(
     payer: &A,
     storage_limit: &Narith,
     balance_updates: Vec<BalanceUpdate>,
-    delegated_storage_cost: u64,
-    top_level_delegated_delta: u64,
+    delegated_storage_cost: Mutez,
+    top_level_delegated_delta: Mutez,
     result: Result<M::Success, ApplyOperationError>,
     mut internal_operation_results: Vec<TaggedInternalOp>,
     internals: SubtreeStatus,
@@ -394,7 +406,8 @@ where
             payer,
             &mut content,
             top_level_delegated_delta,
-        )
+        );
+        Ok(())
     });
     if let Err(errors) = burn_outcome {
         log!(Debug, "Storage burn failed: {errors:?}");
@@ -521,14 +534,13 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
 fn transfer_tez(
     tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
     let balance_updates =
-        compute_balance_updates(giver_account, receiver_account, amount)
-            .map_err(|e| TransferError::FailedToComputeBalanceUpdate(e.to_string()))?;
+        compute_balance_updates(giver_account, receiver_account, amount);
 
-    apply_balance_changes(tez_accounts, giver_account, receiver_account, &amount.0)?;
+    apply_balance_changes(tez_accounts, giver_account, receiver_account, amount)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -551,10 +563,10 @@ fn transfer_tez(
 /// and the sender was already debited in that runtime.
 fn credit_destination_without_debiting_sender(
     tez_accounts: &mut impl KeySpace,
-    amount: &Narith,
+    amount: Mutez,
     receiver_account: &impl TezosAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    if amount.eq(&0_u64.into()) {
+    if amount == Mutez::ZERO {
         return Ok(TransferSuccess {
             storage: None,
             lazy_storage_diff: None,
@@ -568,21 +580,22 @@ fn credit_destination_without_debiting_sender(
             address_registry_diff: vec![],
         });
     }
-    let receiver_balance = receiver_account.balance(tez_accounts)?.0;
-    let new_receiver_balance = (&receiver_balance + &amount.0).into();
+    let receiver_balance = receiver_account.balance(tez_accounts)?;
+    let new_receiver_balance = receiver_balance.checked_add(amount).map_err(|_| {
+        TransferError::BalanceOverflow(BalanceOverflow {
+            contract: receiver_account.contract(),
+            balance: receiver_balance,
+            amount,
+        })
+    })?;
     receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
-    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
         // TODO: L2-882 design CRAC receipts
         balance_updates: vec![BalanceUpdate {
             balance: Balance::Account(receiver_account.contract()),
-            changes: receiver_delta.try_into().map_err(
-                |e: num_bigint::TryFromBigIntError<num_bigint::BigInt>| {
-                    TransferError::FailedToComputeBalanceUpdate(e.to_string())
-                },
-            )?,
+            changes: amount.into(),
             update_origin: UpdateOrigin::BlockApplication,
         }],
         ticket_receipt: vec![],
@@ -598,19 +611,16 @@ fn credit_destination_without_debiting_sender(
 fn burn_tez(
     tez_accounts: &mut impl KeySpace,
     account: &impl TezosAccount,
-    amount: &num_bigint::BigUint,
-) -> Result<Narith, TransferError> {
+    amount: Mutez,
+) -> Result<Mutez, TransferError> {
     let balance = account.balance(tez_accounts)?;
-    let new_balance = match balance.0.checked_sub(amount) {
-        None => {
-            return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: account.contract(),
-                balance: balance.clone(),
-                amount: amount.into(),
-            }));
-        }
-        Some(new_balance) => new_balance.into(),
-    };
+    let new_balance = balance.checked_sub(amount).map_err(|_| {
+        TransferError::BalanceTooLow(BalanceTooLow {
+            contract: account.contract(),
+            balance,
+            amount,
+        })
+    })?;
     account.set_balance(tez_accounts, &new_balance)?;
     Ok(new_balance)
 }
@@ -690,7 +700,7 @@ struct PendingParent {
     /// and has to place these receipts differently.
     receipt_at: usize,
     /// Storage cost the transfer delegated, dropped if the subtree raises.
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     /// `(pending, failed, backtracked)` CRAC list lengths, and the number of
     /// pending alias originations, captured before the subtree ran; see
     /// [`splice_reentrant_crac_ops`].
@@ -811,7 +821,7 @@ fn settle_parent_transfer(
             // The transfer's own `TransferSuccess` and delegated storage cost
             // are dropped on this path, exactly as they were when the error
             // travelled out of `transfer` instead.
-            (false, 0)
+            (false, Mutez::ZERO)
         }
     };
     if !applied {
@@ -999,11 +1009,8 @@ where
                 destination_address,
                 amount,
             }) => {
-                let amount = Narith(amount.try_into().map_err(
-                    |err: num_bigint::TryFromBigIntError<()>| {
-                        TransferError::MirAmountToNarithError(err.to_string())
-                    },
-                )?);
+                let amount_mutez = Mutez::try_from(amount)
+                    .map_err(|e| TransferError::MirAmountToNarithError(e.to_string()))?;
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 // Unparsed through the borrowed walk, which reads through the
                 // `Rc` and clones only leaf payloads, charging before it
@@ -1026,7 +1033,7 @@ where
                     TransferError::MichelineSerializationError(e.to_string())
                 })?;
                 let content = TransferContent {
-                    amount,
+                    amount: amount_mutez.to_narith(),
                     destination: dest_contract,
                     parameters: Parameters {
                         entrypoint: destination_address.entrypoint,
@@ -1034,12 +1041,12 @@ where
                     },
                 };
                 let (result, delegated_storage_cost_delta, subtree) = match disposition {
-                    Disposition::Skip => (ContentResult::Skipped, 0, None),
+                    Disposition::Skip => (ContentResult::Skipped, Mutez::ZERO, None),
                     Disposition::Replay => (
                         ContentResult::Failed(
                             ApplyOperationError::InternalOperationReplay.into(),
                         ),
-                        0,
+                        Mutez::ZERO,
                         None,
                     ),
                     Disposition::Apply => {
@@ -1057,7 +1064,7 @@ where
                             registry,
                             journal,
                             &frame.sender,
-                            &content.amount,
+                            amount_mutez,
                             &content.destination,
                             &content.parameters.entrypoint,
                             value,
@@ -1088,7 +1095,7 @@ where
                                     ContentResult::Failed(
                                         ApplyOperationError::from(err).into(),
                                     ),
-                                    0,
+                                    Mutez::ZERO,
                                     None,
                                 )
                             }
@@ -1132,7 +1139,7 @@ where
                 micheline_code,
                 address,
             }) => {
-                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let amount_mutez = Mutez::try_from(amount).unwrap_or(Mutez::ZERO);
                 let encode_err = |e: tezos_data_encoding::enc::BinError| {
                     ApplyOperationError::Origination(
                         OriginationError::MichelineSerializationError(e.to_string()),
@@ -1164,12 +1171,13 @@ where
                             tc_ctx,
                             address,
                             &frame.sender,
-                            &amount,
+                            amount_mutez,
                             Some(&script.code),
-                            // Shared, not unwrapped: the other occurrences of
-                            // a `DUP`ed operation hold the same payload, so
-                            // `unwrap_or_clone` here would deep-copy it, unmetered
-                            // and before anything charges for it (L2-1836).
+                            // Shared, not unwrapped: the other occurrences
+                            // of a `DUP`ed operation hold the same
+                            // payload, so `unwrap_or_clone` here would
+                            // deep-copy it, unmetered and before anything
+                            // charges for it (L2-1836).
                             storage,
                             &Origin::Native,
                         );
@@ -1188,7 +1196,7 @@ where
                 all_internal_receipts.push(TaggedInternalOp::own(
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
-                            balance: amount,
+                            balance: amount_mutez.to_narith(),
                             delegate,
                             script,
                         },
@@ -1196,7 +1204,7 @@ where
                         nonce,
                         result,
                     }),
-                    0,
+                    Mutez::ZERO,
                 ));
             }
             mir::ast::Operation::SetDelegate(set_delegate) => {
@@ -1282,7 +1290,7 @@ where
                         nonce,
                         result,
                     }),
-                    0,
+                    Mutez::ZERO,
                 ));
             }
         }
@@ -1310,7 +1318,7 @@ type Subtree<'a> = Option<(
 /// execute.
 struct TransferStep<'a> {
     success: TransferSuccess,
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     emitted: Subtree<'a>,
 }
 
@@ -1319,7 +1327,7 @@ struct TransferStep<'a> {
 /// the enclosing operation's status, see [`SubtreeStatus`].
 struct TransferOutcome {
     success: TransferSuccess,
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     subtree: SubtreeStatus,
 }
 
@@ -1337,7 +1345,7 @@ fn transfer<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
@@ -1447,7 +1455,7 @@ fn transfer_step<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender_account: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
@@ -1484,7 +1492,7 @@ where
                 .into());
             }
             // Transfers of 0 tez to an implicit contract are rejected.
-            if amount.eq(&0_u64.into()) {
+            if amount == Mutez::ZERO {
                 return Err(
                     TransferError::EmptyImplicitTransfer(dest_contract.clone()).into()
                 );
@@ -1516,7 +1524,7 @@ where
                         .map_err(TransferError::OutOfGas)?,
                     ..receipt
                 },
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
                 // No code runs for an implicit destination, so there is
                 // nothing to emit.
                 emitted: None,
@@ -1605,8 +1613,10 @@ where
                 let address_registry_diff = ctx.address_registry_diff;
                 (internal_operations, new_storage, address_registry_diff)
             };
-            let delegated_storage_cost =
-                operation_ctx.delegated_storage_cost - delegated_storage_cost_before;
+            let delegated_storage_cost = operation_ctx
+                .delegated_storage_cost
+                .checked_sub(delegated_storage_cost_before)
+                .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
 
             // `interpret_context` holds this operation's lazy-storage size
             // delta, accumulated by the `LazyStorage` hooks during execution.
@@ -1983,10 +1993,10 @@ pub struct RunCodeParams {
     /// all-zero `tz1`, L1's `Implicit_account_repr.zero`).
     pub payer: Option<PublicKeyHash>,
     /// Value of `AMOUNT`, in mutez.
-    pub amount: u64,
+    pub amount: Mutez,
     /// Value of `BALANCE`, in mutez. Defaults to `self_address`'s own
     /// balance, which is zero if that account does not exist.
-    pub balance: Option<u64>,
+    pub balance: Option<Mutez>,
     /// Gas budget, in milligas.
     pub milligas: u64,
     /// Value of `CHAIN_ID`.
@@ -2105,24 +2115,12 @@ where
     let mut operation_gas = TezlinkOperationGas::start_milligas(params.milligas)
         .map_err(|e| RunCodeError::Execution(e.to_string()))?;
 
-    let balance = match params.balance {
+    let balance: Mutez = match params.balance {
         Some(balance) => balance,
-        None => account
-            .balance(rk.tez_accounts())
-            .map_err(host_err)?
-            .0
-            .try_into()
-            .map_err(|_| {
-                RunCodeError::Execution("Contract balance overflows u64".to_string())
-            })?,
+        None => account.balance(rk.tez_accounts()).map_err(host_err)?,
     };
-    let balance: i64 = balance
-        .try_into()
-        .map_err(|_| RunCodeError::Execution("Balance overflows i64".to_string()))?;
-    let amount: i64 = params
-        .amount
-        .try_into()
-        .map_err(|_| RunCodeError::Execution("Amount overflows i64".to_string()))?;
+    let balance: i64 = balance.into();
+    let amount: i64 = params.amount.into();
 
     // L1 defaults `SOURCE` to `Implicit_account_repr.zero` — the all-zero
     // `tz1`, which is what `ContractTz1Hash::default()` yields.
@@ -2164,7 +2162,7 @@ where
         source_public_key: &[],
         crac_chain_depth: 0,
         crac_origin: None,
-        delegated_storage_cost: 0,
+        delegated_storage_cost: Mutez::ZERO,
     };
     let mut ctx = Ctx {
         tc_ctx: &mut tc_ctx,
@@ -2234,18 +2232,18 @@ fn transfer_external<'a, Host>(
     operation_ctx: &mut OperationCtx<'a>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
-    amount: &Narith,
+    amount: Mutez,
     dest: &Contract,
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<TaggedInternalOp>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
-) -> Result<(TransferTarget, u64, SubtreeStatus), CracError>
+) -> Result<(TransferTarget, Mutez, SubtreeStatus), CracError>
 where
     Host: KeySpaceLoader + StorageV1,
 {
     log!(Debug,
-        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
+        "Applying an external transfer operation from {} to {dest:?} of {amount} mutez with parameters {parameters:?}",
         operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
@@ -2295,7 +2293,7 @@ pub struct CrossRuntimeTransferResult {
     /// cost is reported upward by those sub-executions through
     /// their own `X-Tezos-Storage-Cost` header, accumulated on the
     /// caller frame's [`OperationCtx::delegated_storage_cost`]).
-    pub own_storage_cost: BigUint,
+    pub own_storage_cost: Mutez,
 }
 
 /// Error from [`cross_runtime_transfer`], carrying both the transfer
@@ -2345,7 +2343,7 @@ pub fn cross_runtime_transfer<'a, Host>(
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     journal: &mut TezosXJournal,
     sender: &impl TezosAccount,
-    amount: &Narith,
+    amount: Mutez,
     dest: &Contract,
     parameters: &Parameters,
     parser: &'a Parser<'a>,
@@ -2408,12 +2406,14 @@ where
                 let target: TransferTarget = success.into();
                 let own_storage_cost =
                     storage_fees::compute_storage_fees::<TransferContent>(&target)?;
-                let own_storage_cost: BigUint = internal_receipts
+                let own_storage_cost: Mutez = internal_receipts
                     .iter()
                     .filter(|t| t.is_own())
                     .try_fold(own_storage_cost, |acc, t| {
                         let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
-                        Ok::<BigUint, TransferError>(acc + fee)
+                        acc.checked_add(fee).map_err(|e| {
+                            TransferError::StorageFeesConversion(e.to_string())
+                        })
                     })?;
 
                 Ok(CrossRuntimeTransferResult {
@@ -2622,7 +2622,7 @@ pub fn originate_contract<'a, Host>(
     ctx: &mut TcCtx<'a, '_, Host>,
     contract: ContractKt1Hash,
     sender_account: &impl TezosAccount,
-    initial_balance: &Narith,
+    initial_balance: Mutez,
     script_code: Option<&[u8]>,
     script_storage: RcTypedValue<'a>,
     origin: &Origin,
@@ -2707,8 +2707,7 @@ where
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let balance_updates =
-        compute_balance_updates(sender_account, &smart_contract, initial_balance)
-            .map_err(|e| OriginationError::FailedToComputeBalanceUpdate(e.to_string()))?;
+        compute_balance_updates(sender_account, &smart_contract, initial_balance);
 
     // `apply_balance_changes` writes and reads the giver and receiver balances,
     // two reads and writes each for an amount, so 4 reads and 4 writes in total.
@@ -2722,7 +2721,7 @@ where
         ctx.rk.tez_accounts_mut(),
         sender_account,
         &smart_contract,
-        &initial_balance.0,
+        initial_balance,
     )
     .map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
@@ -2748,54 +2747,44 @@ where
 }
 
 /// Prepares balance updates in the format expected by the Tezos operation.
+/// No updates on a zero amount.
 fn compute_balance_updates(
     giver: &impl TezosAccount,
     receiver: &impl TezosAccount,
-    amount: &Narith,
-) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
-    if amount.eq(&0_u64.into()) {
-        return Ok(vec![]);
-    };
-
-    let giver_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
-
-    let giver_update = BalanceUpdate {
-        balance: Balance::Account(giver.contract()),
-        changes: giver_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    let receiver_update = BalanceUpdate {
-        balance: Balance::Account(receiver.contract()),
-        changes: receiver_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    Ok(vec![giver_update, receiver_update])
+    amount: Mutez,
+) -> Vec<BalanceUpdate> {
+    if amount == Mutez::ZERO {
+        return vec![];
+    }
+    BalanceUpdate::transfer(giver.contract(), receiver.contract(), amount)
 }
 
 /// Applies balance changes by updating both source and destination accounts.
+/// Checked: an underflow on the giver or an overflow on the receiver is an
+/// error rather than an unbounded update.
 fn apply_balance_changes(
     tez_accounts: &mut impl KeySpace,
     giver_account: &impl TezosAccount,
     receiver_account: &impl TezosAccount,
-    amount: &num_bigint::BigUint,
+    amount: Mutez,
 ) -> Result<(), TransferError> {
     let giver_balance = giver_account.balance(tez_accounts)?;
-    let new_giver_balance = match giver_balance.0.checked_sub(amount) {
-        None => {
-            return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: giver_account.contract(),
-                balance: giver_balance,
-                amount: amount.into(),
-            }));
-        }
-        Some(new_source_balance) => new_source_balance.into(),
-    };
+    let new_giver_balance = giver_balance.checked_sub(amount).map_err(|_| {
+        TransferError::BalanceTooLow(BalanceTooLow {
+            contract: giver_account.contract(),
+            balance: giver_balance,
+            amount,
+        })
+    })?;
     giver_account.set_balance(tez_accounts, &new_giver_balance)?;
-    let receiver_balance = receiver_account.balance(tez_accounts)?.0;
-    let new_receiver_balance = (&receiver_balance + amount).into();
+    let receiver_balance = receiver_account.balance(tez_accounts)?;
+    let new_receiver_balance = receiver_balance.checked_add(amount).map_err(|_| {
+        TransferError::BalanceOverflow(BalanceOverflow {
+            contract: receiver_account.contract(),
+            balance: receiver_balance,
+            amount,
+        })
+    })?;
     receiver_account.set_balance(tez_accounts, &new_receiver_balance)?;
 
     log!(Debug,
@@ -2910,20 +2899,34 @@ fn interpret_encoded_script<'a>(
     Ok((internal_operations, new_storage))
 }
 
+/// Why the DA fee of an operation cannot be computed.
+#[derive(Debug, thiserror::Error)]
+pub enum DaFeesError {
+    /// The operation cannot be encoded to measure its size.
+    #[error("cannot map the operation to its raw size: {0}")]
+    Unserializable(tezos_data_encoding::enc::BinError),
+    /// The DA fee lies outside the mutez domain.
+    #[error("DA fee outside the mutez domain: {0}")]
+    OutOfDomain(tezosx_types::MutezError),
+}
+
 pub fn get_required_da_fees(
     operation: &Operation,
-    da_fee_per_byte_mutez: u64,
-) -> anyhow::Result<u64> {
+    da_fee_per_byte_mutez: Mutez,
+) -> Result<Mutez, DaFeesError> {
     let op_raw_size = operation
         .to_bytes()
         .map(|bytes| bytes.len())
-        .map_err(|_| anyhow::anyhow!("Cannot map operation to its raw size"))?;
+        .map_err(DaFeesError::Unserializable)?;
     // TODO: See: L2-939.
     // It is needed for the fees to be updated but without
     // a proper gas system 'à-la-Ethereum' we can't use for `FeeUpdates`
     // for now.
-    Ok(da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64))
+    da_fee_per_byte_mutez
+        .checked_mul(op_raw_size as u64)
+        .map_err(DaFeesError::OutOfDomain)
 }
+
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
@@ -2932,32 +2935,13 @@ pub fn validate_and_apply_operation<Host>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
-    required_fees: Option<u64>,
+    required_fees: Option<Mutez>,
     fee_refund_config: Option<FeeRefundConfig>,
     safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    // Sum declared fees (mutez) from all operation contents before
-    // `operation` is moved into validation.
-    // Saturating is safe: validation debits every fee from the source
-    // balance with exact arithmetic, so a batch whose total does not fit in
-    // u64 is rejected as invalid and the saturated value is never used.
-    // Failing here instead would abort the block on an unvalidated operation.
-    let fee_refund_config = if let Some(config) = fee_refund_config {
-        let total_fees: u64 = operation
-            .content
-            .iter()
-            .map(|c| &c.fee().0)
-            .sum::<BigUint>()
-            .to_u64()
-            .unwrap_or(u64::MAX);
-        Some((config, total_fees))
-    } else {
-        None
-    };
-
     let mut safe_host = SafeStorage {
         host: rk.host_mut(),
         world_states: safe_roots.to_vec(),
@@ -2986,6 +2970,9 @@ where
             return Err(OperationError::Validation(validity_err));
         }
     };
+
+    let fee_refund_config =
+        fee_refund_config.map(|config| (config, validation_info.total_fees));
 
     log!(Debug, "Batch is valid!");
 
@@ -3066,6 +3053,10 @@ where
     // keeps the refund. A rollback of the storage under `rk` drops the refund too.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
+        // The refund credit is a `BlockAbort` on failure: it runs after
+        // application, outside any operation's frame, and a refund cannot
+        // push the source's balance past the domain the fee was debited
+        // from earlier in this same batch.
         apply_fee_refund(rk.tez_accounts_mut(), &mut processed_ops, fee_refund)
             .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
@@ -3079,14 +3070,13 @@ where
 fn apply_fee_refund(
     tez_accounts: &mut impl KeySpace,
     processed_operations: &mut [ProcessedOperation],
-    fee_refund: u64,
+    fee_refund: Mutez,
 ) -> Result<(), anyhow::Error> {
-    if fee_refund == 0 {
+    if fee_refund == Mutez::ZERO {
         return Ok(());
     }
 
-    // Validate conversions before any storage mutation.
-    let source_delta: i64 = i64::try_from(fee_refund)?;
+    let source_delta: i64 = fee_refund.into();
     let block_fees_delta: i64 = -source_delta;
 
     // Safe: validate_and_apply_operation rejects empty batches (ValidityError::EmptyBatch).
@@ -3096,9 +3086,10 @@ fn apply_fee_refund(
 
     let source_pkh = first_op.operation_with_metadata.content.source()?.clone();
 
-    // Credit source account with the refund.
+    // Credit source account with the refund. Fallible (a checked add), but
+    // classified as a block abort by the caller — see the comment there.
     let source_account = context::implicit_from_public_key_hash(&source_pkh)?;
-    source_account.add_balance(tez_accounts, fee_refund)?;
+    account_storage::add_balance(&source_account, tez_accounts, fee_refund)?;
 
     log!(
         Debug,
@@ -3140,6 +3131,9 @@ where
         source_account,
         source_public_key,
         validated_operations,
+        // Read by the caller, off `execute_validation`'s result, before
+        // `validation_info` is moved in here.
+        total_fees: _,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
     let mut processed_ops = Vec::with_capacity(validated_operations.len());
@@ -3250,8 +3244,8 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
-                0,
-                0,
+                Mutez::ZERO,
+                Mutez::ZERO,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
                 // A reveal emits no internal operation.
@@ -3259,7 +3253,9 @@ where
             ))
         }
         OperationContent::Transfer(TransferContent {
-            amount,
+            // Already validated into `validated_operation.amount`
+            // (mutez-domain-checked); the wire `Narith` is unused here.
+            amount: _,
             destination,
             parameters,
         }) => {
@@ -3273,7 +3269,7 @@ where
                 source_public_key,
                 crac_chain_depth: 0,
                 crac_origin: None,
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
             };
             let (transfer_result, top_level_delegated_delta, internals) =
                 match transfer_external(
@@ -3281,7 +3277,7 @@ where
                     &mut operation_ctx,
                     registry,
                     journal,
-                    amount,
+                    validated_operation.amount,
                     destination,
                     parameters,
                     &mut internal_operations_receipts,
@@ -3291,7 +3287,7 @@ where
                     Ok((target, delta, internals)) => (Ok(target), delta, internals),
                     // The verdict is unused on this path: a failed transfer
                     // backtracks every internal receipt regardless.
-                    Err(e) => (Err(e), 0, SubtreeStatus::AllApplied),
+                    Err(e) => (Err(e), Mutez::ZERO, SubtreeStatus::AllApplied),
                 };
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
@@ -3320,7 +3316,9 @@ where
             ))
         }
         OperationContent::Origination(OriginationContent {
-            ref balance,
+            // Already validated into `validated_operation.amount`
+            // (mutez-domain-checked); the wire `Narith` is unused here.
+            balance: _,
             delegate: _,
             ref script,
         }) => {
@@ -3338,7 +3336,7 @@ where
                     &mut tc_ctx,
                     address,
                     source_account,
-                    balance,
+                    validated_operation.amount,
                     Some(&script.code),
                     RcTypedValue::new(storage),
                     &Origin::Native,
@@ -3351,8 +3349,8 @@ where
                 source_account,
                 storage_limit,
                 balance_updates,
-                0,
-                0,
+                Mutez::ZERO,
+                Mutez::ZERO,
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
                 // An origination emits no internal operation.
@@ -3440,6 +3438,7 @@ mod tests {
     };
     use tezosx_interfaces::RuntimeId;
     use tezosx_journal::TezosXJournal;
+    use tezosx_types::Mutez;
     use typed_arena::Arena;
 
     use crate::enshrined_contracts::{CracError, PERSISTED_ERROR_PER_BYTE_MILLIGAS};
@@ -3507,6 +3506,7 @@ mod tests {
         use tezosx_interfaces::testing::NotWiredRegistry;
         use tezosx_interfaces::RuntimeId;
         use tezosx_journal::TezosXJournal;
+        use tezosx_types::Mutez;
 
         const KT1: &str = "KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye";
         const KT1_SENDER: &str = "KT1Lc9a9E7vqt6XYtkUbrErDGLQ55HztXV5N";
@@ -3538,8 +3538,8 @@ mod tests {
                 self_address: ContractKt1Hash::from_b58check(KT1).expect("valid KT1"),
                 sender,
                 payer,
-                amount: 0,
-                balance: Some(0),
+                amount: Mutez::ZERO,
+                balance: Some(Mutez::ZERO),
                 milligas: TezlinkOperationGas::MAX_LIMIT,
                 chain_id: ChainId::from([0u8; 4]),
                 level: BlockNumber { block_number: 1 },
@@ -4366,7 +4366,7 @@ mod tests {
 
         // Setting the balance to pass the validity check
         account
-            .set_balance(tez_accounts, &amount.into())
+            .set_balance(tez_accounts, &Mutez::try_from(amount).unwrap())
             .expect("Set balance should have succeed");
 
         account
@@ -4415,7 +4415,7 @@ mod tests {
             .expect("Account initialisation should have succeeded");
 
         account
-            .set_balance(rk.tez_accounts_mut(), balance)
+            .set_balance(rk.tez_accounts_mut(), &Mutez::try_from(balance).unwrap())
             .expect("Set balance should have succeeded");
 
         account
@@ -4502,8 +4502,9 @@ mod tests {
             &test_safe_roots(),
         );
 
-        let expected_error =
-            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
+        let expected_error = OperationError::Validation(ValidityError::CantPayFees(
+            Mutez::try_from(100_u64).unwrap(),
+        ));
 
         assert_eq!(
             src_account.counter(rk.tez_accounts()).unwrap(),
@@ -4544,6 +4545,142 @@ mod tests {
                 expected: 1_u64.into(),
                 found: 15_u64.into(),
             }));
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    // A crafted transfer amount above the mutez domain (i64::MAX) is
+    // rejected at validation, before it can reach the apply path and
+    // fail there as a BalanceTooLow.
+    #[test]
+    fn apply_operation_amount_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let dest = bootstrap2();
+
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1000,
+            5,
+            source,
+            above_domain.into(),
+            Contract::Implicit(dest.pkh),
+            Parameters::default(),
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    // A crafted fee above the mutez domain is rejected the same way.
+    #[test]
+    fn apply_operation_fee_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_reveal_operation(above_domain, 1, 1000, 5, source);
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
+
+        assert_eq!(
+            src_account.counter(rk.tez_accounts()).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
+        assert_eq!(result, Err(expected_error));
+    }
+
+    #[test]
+    fn apply_operation_origination_balance_out_of_domain_is_invalid() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+        let src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let above_domain: u64 = i64::MAX as u64 + 1;
+        let operation = make_origination_operation(
+            15,
+            1,
+            5000,
+            500,
+            source,
+            above_domain,
+            Script {
+                code: vec![],
+                storage: vec![],
+            },
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        let expected_error = OperationError::Validation(
+            ValidityError::AmountOutOfDomain(above_domain.into()),
+        );
 
         assert_eq!(
             src_account.counter(rk.tez_accounts()).unwrap(),
@@ -4822,7 +4959,7 @@ mod tests {
 
         // The victim's fee must not be charged and its counter must not move.
         assert_eq!(
-            account.balance(rk.tez_accounts()).unwrap(),
+            account.balance(rk.tez_accounts()).unwrap().to_narith(),
             50_u64.into(),
             "Victim balance must not be debited"
         );
@@ -4970,8 +5107,8 @@ mod tests {
                 result: ContentResult::Failed(
                     vec![TransferError::BalanceTooLow(BalanceTooLow {
                         contract: Contract::Implicit(source.pkh),
-                        balance: 35_u64.into(),
-                        amount: 100_u64.into(),
+                        balance: Mutez::try_from(35_u64).unwrap(),
+                        amount: Mutez::try_from(100_u64).unwrap(),
                     })
                     .into()]
                     .into(),
@@ -4984,11 +5121,17 @@ mod tests {
 
         // Verify that source only paid the fees and the destination balance is unchanged
         assert_eq!(
-            source_account.balance(rk.tez_accounts()).unwrap(),
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             35.into()
         );
         assert_eq!(
-            destination_account.balance(rk.tez_accounts()).unwrap(),
+            destination_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             50_u64.into()
         );
 
@@ -4996,6 +5139,93 @@ mod tests {
             source_account.counter(rk.tez_accounts()).unwrap(),
             1.into(),
             "Counter should have been incremented"
+        );
+    }
+
+    #[test]
+    fn apply_transfer_to_full_balance_fails_with_balance_overflow() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let source = bootstrap1();
+
+        let dest = bootstrap2();
+
+        let source_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let destination_account =
+            init_account(rk.tez_accounts_mut(), &dest.pkh, Mutez::MAX.as_u64());
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21040,
+            5,
+            source.clone(),
+            1_u64.into(),
+            Contract::Implicit(dest.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation.clone(),
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        let receipt = ProcessedOperation::into_receipts(processed);
+
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![TransferError::BalanceOverflow(
+                        tezos_tezlink::operation_result::BalanceOverflow {
+                            contract: Contract::Implicit(dest.pkh),
+                            balance: Mutez::MAX,
+                            amount: Mutez::try_from(1u64).unwrap(),
+                        },
+                    )
+                    .into()]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
+
+        assert_eq!(receipt, expected_receipt);
+
+        assert_eq!(
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            35.into()
+        );
+        assert_eq!(
+            destination_account.balance(rk.tez_accounts()).unwrap(),
+            Mutez::MAX
         );
     }
 
@@ -5088,9 +5318,12 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
-        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
         assert_eq!(
-            destination.balance(rk.tez_accounts()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
+            5_u64.into()
+        );
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap().to_narith(),
             80_u64.into()
         );
 
@@ -5188,7 +5421,10 @@ mod tests {
         }];
 
         // Verify that balance was only debited for fees
-        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
+            35_u64.into()
+        );
 
         assert_eq!(receipt, expected_receipt);
 
@@ -5355,11 +5591,11 @@ mod tests {
             }
         );
         assert_eq!(
-            faucet.balance(rk.tez_accounts()).unwrap(),
+            faucet.balance(rk.tez_accounts()).unwrap().to_narith(),
             (faucet_balance - requested_amount).into()
         );
         assert_eq!(
-            requester.balance(rk.tez_accounts()).unwrap(),
+            requester.balance(rk.tez_accounts()).unwrap().to_narith(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
 
@@ -5453,7 +5689,7 @@ mod tests {
 
         // Source paid the manager fee but not the transfer amount.
         assert_eq!(
-            requester.balance(rk.tez_accounts()).unwrap(),
+            requester.balance(rk.tez_accounts()).unwrap().to_narith(),
             (50_u64 - 15).into()
         );
         assert_eq!(
@@ -5581,9 +5817,12 @@ mod tests {
 
         // Verify that source and destination balances changed:
         // 54 - 15 fee - 30 transfer - 4 burn (4 × COST_PER_BYTES) = 5.
-        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
         assert_eq!(
-            destination.balance(rk.tez_accounts()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
+            5_u64.into()
+        );
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap().to_narith(),
             80_u64.into()
         );
 
@@ -5748,8 +5987,8 @@ mod tests {
                         errors: vec![ApplyOperationError::CannotPayStorageFee(
                             BalanceTooLow {
                                 contract: source.contract(),
-                                balance: 3_u64.into(), // 48 - 15 fee - 30 transfer
-                                amount: (4 * COST_PER_BYTES).into(), // 4
+                                balance: Mutez::try_from(3_u64).unwrap(), // 48 - 15 fee - 30 transfer
+                                amount: Mutez::try_from(4 * COST_PER_BYTES).unwrap(), // 4
                             },
                         )],
                     }),
@@ -5790,7 +6029,7 @@ mod tests {
         // SafeStorage rollback: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
         assert_eq!(
-            source.balance(rk.tez_accounts()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
             (48_u64 - 15).into()
         );
         assert_eq!(
@@ -5908,11 +6147,14 @@ mod tests {
         let dest_account =
             context::implicit_from_public_key_hash(&dest.pkh).expect("dest account");
         assert_eq!(
-            dest_account.balance(rk.tez_accounts()).unwrap(),
+            dest_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             30_u64.into()
         );
         // Source: 307 - 15 fee - 30 transfer - 257 slot burn = 5.
-        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
+            5_u64.into()
+        );
     }
 
     #[test]
@@ -5973,9 +6215,9 @@ mod tests {
                             BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
                                 // 50 - 15 fee - 30 transfer = 5
-                                balance: 5_u64.into(),
+                                balance: Mutez::try_from(5_u64).unwrap(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 257_u64.into(),
+                                amount: Mutez::try_from(257_u64).unwrap(),
                             },
                         )],
                     }),
@@ -6017,7 +6259,7 @@ mod tests {
         // SafeStorage rolled back the allocation: the destination
         // account is gone again, and the source paid only the fee.
         assert_eq!(
-            source.balance(rk.tez_accounts()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
             (50_u64 - 15).into()
         );
         let dest_account =
@@ -6110,9 +6352,12 @@ mod tests {
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
-        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), 35_u64.into());
         assert_eq!(
-            destination.balance(rk.tez_accounts()).unwrap(),
+            source.balance(rk.tez_accounts()).unwrap().to_narith(),
+            35_u64.into()
+        );
+        assert_eq!(
+            destination.balance(rk.tez_accounts()).unwrap().to_narith(),
             50_u64.into()
         );
 
@@ -6302,7 +6547,10 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
+        println!(
+            "Balance: {:?}",
+            src_acc.balance(rk.tez_accounts()).unwrap().to_narith()
+        );
 
         // op‑2: transfer 10ꜩ to dest
         let transfer_content_1 = OperationContent::Transfer(TransferContent {
@@ -6465,12 +6713,12 @@ mod tests {
         // counter updated, balances moved
         // initial_balance: 50 tez, fee amount: (3*5)tez, transfer amount: (10 + 20)tez
         assert_eq!(
-            src_acc.balance(rk.tez_accounts()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap().to_narith(),
             5u64.into(),
             "Source account should have 5ꜩ left after fees and transfers."
         );
         assert_eq!(
-            dest_acc.balance(rk.tez_accounts()).unwrap(),
+            dest_acc.balance(rk.tez_accounts()).unwrap().to_narith(),
             80u64.into(),
             "Destination account should have 80ꜩ after transfers."
         );
@@ -6528,8 +6776,9 @@ mod tests {
             &test_safe_roots(),
         );
 
-        let expected_error =
-            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
+        let expected_error = OperationError::Validation(ValidityError::CantPayFees(
+            Mutez::try_from(100_u64).unwrap(),
+        ));
 
         assert_eq!(receipts, Err(expected_error));
 
@@ -6537,7 +6786,8 @@ mod tests {
             context::implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .balance(rk.tez_accounts())
-                .unwrap(),
+                .unwrap()
+                .to_narith(),
             50u64.into()
         );
 
@@ -6692,7 +6942,7 @@ mod tests {
         // Initial balance: 1050 tez, paid in fees: (3*10) tez,
         // transfer + storage burn reverted via SafeStorage.
         assert_eq!(
-            src_acc.balance(rk.tez_accounts()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap().to_narith(),
             1020.into(),
             "Fees should have been paid for failed operation"
         );
@@ -6713,7 +6963,8 @@ mod tests {
         // Retrieve initial balance for the end of the test
         let initial_balance = src_account
             .balance(rk.tez_accounts())
-            .expect("Should have found a balance");
+            .expect("Should have found a balance")
+            .to_narith();
 
         let fee = 15u64;
         let smart_contract_balance = 30u64;
@@ -6843,7 +7094,8 @@ mod tests {
         // Balance of the source
         let current_balance = src_account
             .balance(rk.tez_accounts())
-            .expect("Should have found a balance for the source");
+            .expect("Should have found a balance for the source")
+            .to_narith();
 
         let expected_balance = initial_balance
             .0
@@ -6872,7 +7124,7 @@ mod tests {
 
         assert_eq!(
             current_kt1_balance,
-            smart_contract_balance.into(),
+            Mutez::try_from(smart_contract_balance).unwrap(),
             "Smart contract current balance doesn't match the expected one"
         );
 
@@ -8632,9 +8884,9 @@ mod tests {
                             BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
                                 // 283 - 15 fee - 30 transfer - 38 variable burn = 200
-                                balance: 200_u64.into(),
+                                balance: Mutez::try_from(200_u64).unwrap(),
                                 // ORIGINATION_SIZE × COST_PER_BYTES
-                                amount: 257_u64.into(),
+                                amount: Mutez::try_from(257_u64).unwrap(),
                             },
                         )],
                     }),
@@ -8676,7 +8928,7 @@ mod tests {
         let src_account =
             context::implicit_from_public_key_hash(&src.pkh).expect("source account");
         assert_eq!(
-            src_account.balance(rk.tez_accounts()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             (funded - fee).into()
         );
 
@@ -8692,7 +8944,10 @@ mod tests {
 
         // Initial-balance transfer rolled back too.
         assert_eq!(
-            originated_account.balance(rk.tez_accounts()).unwrap(),
+            originated_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             0_u64.into(),
             "originated contract balance must be 0 (initial transfer rolled back)"
         );
@@ -8880,17 +9135,23 @@ mod tests {
                  // (paid_storage_size_diff = 27 bytes × COST_PER_BYTES)
             - 1000; // amount sent to the originated contract
         assert_eq!(
-            src_account.balance(rk.tez_accounts()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             expected_src_balance.into(),
             "Source balance should be correct"
         );
         assert_eq!(
-            init_contract_account.balance(rk.tez_accounts()).unwrap(),
+            init_contract_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             expected_init_contract_balance.into(),
             "Init contract balance should be correct"
         );
         assert_eq!(
-            originated_account.balance(rk.tez_accounts()).unwrap(),
+            originated_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             1000u64.into(),
             "Originated contract balance should be correct"
         );
@@ -9366,7 +9627,10 @@ mod tests {
             proof: None,
         });
 
-        println!("Balance: {:?}", src_acc.balance(rk.tez_accounts()).unwrap());
+        println!(
+            "Balance: {:?}",
+            src_acc.balance(rk.tez_accounts()).unwrap().to_narith()
+        );
 
         // op‑2 orgination: create a contract with 15ꜩ balance successfully
         let origination_content_1 = OperationContent::Origination(OriginationContent {
@@ -9644,8 +9908,8 @@ mod tests {
                         ApplyOperationError::Origination(
                             OriginationError::BalanceTooLow(BalanceTooLow {
                                 contract: Contract::Implicit(src.pkh.clone()),
-                                balance: 399_366_u64.into(),
-                                amount: 999_999_u64.into(),
+                                balance: Mutez::try_from(399_366_u64).unwrap(),
+                                amount: Mutez::try_from(999_999_u64).unwrap(),
                             }),
                         )
                         .into(),
@@ -9678,7 +9942,7 @@ mod tests {
         );
         // Check the balances
         assert_eq!(
-            src_acc.balance(rk.tez_accounts()).unwrap(),
+            src_acc.balance(rk.tez_accounts()).unwrap().to_narith(),
             399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
@@ -11397,7 +11661,10 @@ mod tests {
         // Verify that source balance decreased by fee (15) + transfer amount (50)
         // Initial: 100, Final: 100 - 15 - 50 = 35
         assert_eq!(
-            source_account.balance(rk.tez_accounts()).unwrap(),
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             35_u64.into(),
             "Source balance should have decreased by fee + transfer amount"
         );
@@ -11411,7 +11678,10 @@ mod tests {
             account_storage::TezosOriginatedAccount::from_kt1(&gateway_kt1)
                 .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.tez_accounts()).unwrap(),
+            gateway_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             0_u64.into(),
             "Gateway balance should be 0 after successful serve call"
         );
@@ -11492,7 +11762,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
@@ -11511,12 +11781,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000 per op × 2 ops = 20_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.tez_accounts()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             979_990_u64.into(),
             "Source balance should be 1_000_000 - 20_000 (fees) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.tez_accounts()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -11546,7 +11816,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
@@ -11568,12 +11838,12 @@ mod tests {
 
         // Initial: 1_000_000, fee: 10_000, transfer: 10
         assert_eq!(
-            src_account.balance(rk.tez_accounts()).unwrap(),
+            src_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             989_990_u64.into(),
             "Source balance should be 1_000_000 - 10_000 (fee) - 10 (amount)"
         );
         assert_eq!(
-            dst_account.balance(rk.tez_accounts()).unwrap(),
+            dst_account.balance(rk.tez_accounts()).unwrap().to_narith(),
             10_u64.into(),
             "Destination should have received 10 mutez"
         );
@@ -11601,7 +11871,7 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: for any operation > 0 bytes, 1 mutez is insufficient.
-        let da_fee_per_byte_mutez = 4;
+        let da_fee_per_byte_mutez = Mutez::try_from(4u64).unwrap();
         let required_da_fees =
             get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
@@ -11619,6 +11889,119 @@ mod tests {
         assert_eq!(
             result,
             Err(OperationError::Validation(ValidityError::InsufficientFee))
+        );
+    }
+
+    // A crafted batch whose fees are each individually within the mutez
+    // domain, but whose sum is not, must be rejected as an invalid batch
+    // — never a reason to abort the block.
+    #[test]
+    fn batch_fee_sum_out_of_domain_is_invalid_not_aborted() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let source = bootstrap1();
+        // Enough to pay the first operation's fee (2^62), so the second
+        // operation's fee-sum check — not a solvency check — is what
+        // rejects the batch.
+        let _src_account =
+            init_account(rk.tez_accounts_mut(), &source.pkh, i64::MAX as u64);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        // Two fees of 2^62 mutez each: individually within the mutez
+        // domain (< i64::MAX), but their sum (2^63) is not.
+        let fee: u64 = 1u64 << 62;
+        let transfer_content = || {
+            OperationContent::Transfer(TransferContent {
+                amount: 10_u64.into(),
+                destination: Contract::Implicit(bootstrap2().pkh),
+                parameters: Parameters::default(),
+            })
+        };
+        let batch = make_operation(
+            fee,
+            1,     // counter
+            21000, // gas_limit
+            0,     // storage_limit
+            source,
+            vec![transfer_content(), transfer_content()],
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            batch,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        );
+
+        assert!(
+            matches!(
+                result,
+                Err(OperationError::Validation(
+                    ValidityError::AmountOutOfDomain(_)
+                ))
+            ),
+            "a batch whose fee sum overflows the mutez domain must be rejected \
+             as invalid, not abort the block: {result:?}"
+        );
+    }
+
+    #[test]
+    fn batch_fee_sum_past_u64_with_fee_refund_is_invalid_not_aborted() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let source = bootstrap1();
+        let _src_account =
+            init_account(rk.tez_accounts_mut(), &source.pkh, i64::MAX as u64);
+        reveal_account(rk.tez_accounts_mut(), &source);
+
+        let fee = i64::MAX as u64;
+        let transfer_content = || {
+            OperationContent::Transfer(TransferContent {
+                amount: 10_u64.into(),
+                destination: Contract::Implicit(bootstrap2().pkh),
+                parameters: Parameters::default(),
+            })
+        };
+        let batch = make_operation(
+            fee,
+            1,
+            21000,
+            0,
+            source,
+            vec![transfer_content(), transfer_content(), transfer_content()],
+        );
+        let fee_refund_config = FeeRefundConfig {
+            da_fees: Mutez::ZERO,
+            base_fee_per_gas: Default::default(),
+            michelson_to_evm_gas_multiplier: 1,
+        };
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            batch,
+            &block_ctx!(),
+            false,
+            None,
+            Some(fee_refund_config),
+            &test_safe_roots(),
+        );
+
+        assert!(
+            matches!(
+                result,
+                Err(OperationError::Validation(
+                    ValidityError::AmountOutOfDomain(_)
+                ))
+            ),
+            "a batch whose fee sum exceeds u64 must be rejected as invalid, \
+             not abort the block: {result:?}"
         );
     }
 
@@ -12103,7 +12486,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::new(
@@ -12118,7 +12501,7 @@ mod tests {
             registry,
             &mut journal,
             &sender_account,
-            &Narith::from(1u64),
+            Mutez::try_from(1u64).unwrap(),
             dest,
             parameters,
             &parser,
@@ -12571,7 +12954,10 @@ mod tests {
             account_storage::TezosOriginatedAccount::from_kt1(&gateway_kt1)
                 .expect("Gateway account should exist");
         assert_eq!(
-            gateway_account.balance(rk.tez_accounts()).unwrap(),
+            gateway_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             0_u64.into(),
             "Gateway balance should be 0 after forwarding"
         );
@@ -12929,7 +13315,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -12941,7 +13327,7 @@ mod tests {
             &NotWiredRegistry,
             &mut journal,
             &sender_account,
-            &Narith::from(0u64),
+            Mutez::ZERO,
             &dest,
             &parameters,
             &parser,
@@ -13546,6 +13932,89 @@ mod tests {
         );
     }
 
+    /// A CRAC credit that would push the destination's balance past the
+    /// mutez domain fails the call (`CracError::Operation`), not the block
+    /// (`CracError::BlockAbort`): the destination already holds `Mutez::MAX`,
+    /// and the credit routed through `credit_destination_without_debiting_sender`
+    /// (the CRAC path — the sender was already debited by the calling
+    /// runtime) cannot add even one more mutez.
+    #[test]
+    fn cross_runtime_transfer_balance_overflow_is_operation_level() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
+
+        let dst = bootstrap2();
+        init_account(rk.tez_accounts_mut(), &dst.pkh, i64::MAX as u64);
+        let dest = Contract::Implicit(dst.pkh);
+
+        let parameters = Parameters {
+            entrypoint: mir::ast::Entrypoint::default(),
+            value: Micheline::from(())
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+        };
+
+        let parser = Parser::new();
+        let mut operation_gas = TezlinkOperationGas::start_milligas(10_000_000)
+            .expect("milligas within limit");
+        let mut tc_ctx = TcCtx {
+            rk: &mut rk,
+            operation_gas: &mut operation_gas,
+            big_map_diff: std::collections::BTreeMap::new(),
+            interpret_context: crate::mir_ctx::InterpretContext::new(),
+            temporary_big_map_id_allocator:
+                tezosx_journal::TemporaryBigMapIdAllocator::new(),
+        };
+        let mut counter = 0u128;
+        let level = BlockNumber { block_number: 0 };
+        let now = Timestamp::from(0);
+        let chain_id = tezos_crypto_rs::hash::ChainId::from([0, 0, 0, 0]);
+        let mut operation_ctx = crate::mir_ctx::OperationCtx {
+            source: &sender_account,
+            counter: &mut counter,
+            level: &level,
+            now: &now,
+            chain_id: &chain_id,
+            source_public_key: &[],
+            crac_chain_depth: 0,
+            crac_origin: None,
+            delegated_storage_cost: Mutez::ZERO,
+            applied_counters: std::collections::BTreeSet::new(),
+        };
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut nonce_counter: u16 = 0;
+
+        let result = cross_runtime_transfer(
+            &mut tc_ctx,
+            &mut operation_ctx,
+            &NotWiredRegistry,
+            &mut journal,
+            &sender_account,
+            Mutez::try_from(1u64).unwrap(),
+            &dest,
+            &parameters,
+            &parser,
+            &mut nonce_counter,
+        );
+
+        let err = match result {
+            Ok(_) => panic!("credit past the mutez domain must fail the call"),
+            Err(e) => e,
+        };
+        assert!(
+            matches!(
+                err.error,
+                CracError::Operation(TransferError::BalanceOverflow(_))
+            ),
+            "expected an operation-level BalanceOverflow, got: {:?}",
+            err.error
+        );
+    }
+
     /// When the gas budget is too tight to meter the FAILWITH body,
     /// `cross_runtime_transfer` returns `OutOfGas` AND still records the
     /// failed CRAC receipt (small — no bloated body), preserving the
@@ -13663,7 +14132,7 @@ mod tests {
             source_public_key: &[],
             crac_chain_depth: 0,
             crac_origin: None,
-            delegated_storage_cost: 0,
+            delegated_storage_cost: Mutez::ZERO,
             applied_counters: std::collections::BTreeSet::new(),
         };
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -13676,7 +14145,7 @@ mod tests {
             &NotWiredRegistry,
             &mut journal,
             &sender_account,
-            &Narith::from(0u64),
+            Mutez::ZERO,
             &dest,
             &parameters,
             &parser,
@@ -13865,11 +14334,13 @@ mod tests {
         /// Compute the expected refund: fee - da_fees - michelson_gas_to_mutez(consumed).
         fn expected_refund(&self, fee: u64, da_fees: u64) -> u64 {
             let consumed_gas = self.total_consumed_milligas.div_ceil(1000);
-            let consumed_gas_fees = (U256::from(TEST_BASE_FEE_PER_GAS)
-                * U256::from(TEST_GAS_MULTIPLIER)
-                * U256::from(consumed_gas)
-                / U256::exp10(12))
-            .low_u64();
+            let consumed_gas_fees = tezosx_types::michelson_gas_to_mutez(
+                U256::from(TEST_BASE_FEE_PER_GAS),
+                TEST_GAS_MULTIPLIER,
+                consumed_gas,
+            )
+            .unwrap()
+            .as_u64();
             fee.saturating_sub(da_fees.saturating_add(consumed_gas_fees))
         }
     }
@@ -13884,6 +14355,27 @@ mod tests {
         amount: u64,
         initial_src_balance: u64,
         da_fees: Option<u64>,
+    ) -> RefundTestCtx<'_> {
+        run_refund_transfer_with_base_fee(
+            host,
+            fee,
+            amount,
+            initial_src_balance,
+            da_fees,
+            U256::from(TEST_BASE_FEE_PER_GAS),
+        )
+    }
+
+    /// Like [`run_refund_transfer`], but with a caller-chosen
+    /// `base_fee_per_gas` — used to drive the execution-cost side of the
+    /// refund computation past the mutez domain.
+    fn run_refund_transfer_with_base_fee(
+        host: &mut MockKernelHost,
+        fee: u64,
+        amount: u64,
+        initial_src_balance: u64,
+        da_fees: Option<u64>,
+        base_fee_per_gas: U256,
     ) -> RefundTestCtx<'_> {
         let mut rk = RuntimeKeyspaces::init(host).unwrap();
 
@@ -13906,8 +14398,8 @@ mod tests {
         );
 
         let refund_config = da_fees.map(|da| FeeRefundConfig {
-            da_fees: da,
-            base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
+            da_fees: Mutez::try_from(da).unwrap(),
+            base_fee_per_gas,
             michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
         });
 
@@ -13970,12 +14462,18 @@ mod tests {
 
         // Verify final balances.
         assert_eq!(
-            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             (initial_balance - fee + expected_refund - amount).into(),
             "Source balance should reflect fee, refund, and transfer"
         );
         assert_eq!(
-            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.destination
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             (50 + amount).into(),
             "Destination balance should increase by transfer amount"
         );
@@ -14000,8 +14498,106 @@ mod tests {
 
         // Source balance = initial - fee - amount (no refund).
         assert_eq!(
-            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             (100 - fee - amount).into(),
+        );
+    }
+
+    #[test]
+    fn fee_refund_credit_past_mutez_domain_fails() {
+        let fee: u64 = 15;
+
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let dst = bootstrap2();
+
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        init_account(rk.tez_accounts_mut(), &dst.pkh, 50);
+
+        let operation = make_transfer_operation(
+            fee,
+            1,
+            21040,
+            5,
+            src.clone(),
+            1_u64.into(),
+            Contract::Implicit(dst.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let mut processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect("validate_and_apply_operation should succeed");
+
+        source
+            .set_balance(rk.tez_accounts_mut(), &Mutez::MAX)
+            .unwrap();
+
+        let result = crate::apply_fee_refund(
+            rk.tez_accounts_mut(),
+            &mut processed,
+            Mutez::try_from(1u64).unwrap(),
+        );
+
+        assert!(result.is_err());
+        assert_eq!(source.balance(rk.tez_accounts()).unwrap(), Mutez::MAX);
+        match &processed[0].operation_with_metadata.receipt {
+            OperationResultSum::Transfer(op_result) => assert_eq!(
+                op_result.balance_updates,
+                vec![bu_fee_debit(&src.pkh, fee), bu_fee_credit(fee)]
+            ),
+            other => panic!("Expected Transfer receipt, got {other:?}"),
+        }
+    }
+
+    // An execution cost past the mutez domain yields a zero refund.
+    // `base_fee_per_gas` is chosen so `base_fee * multiplier *
+    // consumed_gas` is a multiple of 2^64 mutez: past the mutez domain,
+    // which the checked conversion rejects outright, where a conversion
+    // wrapping mod 2^64 would read a zero cost and refund the whole fee.
+    #[test]
+    fn apply_transfer_refund_is_zero_when_execution_cost_overflows_mutez_domain() {
+        let fee: u64 = 1000;
+        let amount: u64 = 5;
+        let initial_balance: u64 = 2000;
+        let huge_base_fee_per_gas = (U256::one() << 64) * U256::exp10(12);
+
+        let mut host = test_host();
+        let ctx = run_refund_transfer_with_base_fee(
+            &mut host,
+            fee,
+            amount,
+            initial_balance,
+            Some(0),
+            huge_base_fee_per_gas,
+        );
+        let bus = ctx.balance_updates();
+
+        // Zero refund: only 2 entries (fee debit/credit), no refund entries.
+        assert_eq!(bus.len(), 2, "Expected 2 balance_updates, got {:?}", bus);
+
+        // Source balance = initial - fee - amount (no refund).
+        assert_eq!(
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            (initial_balance - fee - amount).into(),
         );
     }
 
@@ -14021,13 +14617,17 @@ mod tests {
 
         // Source balance = initial - fee - amount.
         assert_eq!(
-            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             (2000 - fee - amount).into(),
         );
     }
 
-    // A batch whose total declared fees overflow u64 must be rejected by
-    // validation instead of aborting the block when fee refund is enabled.
+    // A batch whose total declared fees overflow the mutez domain must be
+    // rejected by validation instead of aborting the block when fee refund
+    // is enabled.
     #[test]
     fn apply_batch_with_overflowing_total_fees_and_fee_refund() {
         let mut host = test_host();
@@ -14046,12 +14646,18 @@ mod tests {
                 parameters: Parameters::default(),
             })
         };
-        // Each fee fits in u64 but their sum does not.
-        let operation =
-            make_operation(u64::MAX, 1, 21040, 5, src, vec![transfer(), transfer()]);
+        // Each fee fits in the mutez domain but their sum does not.
+        let operation = make_operation(
+            i64::MAX as u64,
+            1,
+            21040,
+            5,
+            src,
+            vec![transfer(), transfer()],
+        );
 
         let refund_config = FeeRefundConfig {
-            da_fees: 50,
+            da_fees: Mutez::try_from(50_u64).unwrap(),
             base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
             michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
         };
@@ -14071,12 +14677,12 @@ mod tests {
         assert_eq!(
             result,
             Err(OperationError::Validation(ValidityError::CantPayFees(
-                u64::MAX.into()
+                Mutez::MAX
             )))
         );
         assert_eq!(
             source.balance(rk.tez_accounts()).unwrap(),
-            2000_u64.into(),
+            Mutez::try_from(2000_u64).unwrap(),
             "Source balance should be unchanged"
         );
     }
@@ -14137,13 +14743,19 @@ mod tests {
 
         // Source paid fees but got refund; transfer was reverted so amount not deducted.
         assert_eq!(
-            ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.source
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             (initial_balance - fee + expected_refund).into(),
             "Source should pay fee minus refund, transfer amount reverted"
         );
         // Destination unchanged: transfer was reverted.
         assert_eq!(
-            ctx.destination.balance(ctx.rk.tez_accounts()).unwrap(),
+            ctx.destination
+                .balance(ctx.rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
             50_u64.into(),
             "Destination should be unchanged after failed transfer"
         );
@@ -15086,7 +15698,7 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![TaggedInternalOp::own(internal, 0)],
+            vec![TaggedInternalOp::own(internal, Mutez::ZERO)],
         );
         assert_eq!(outcome, Err(ApplyOperationError::OperationQuotaExceeded));
 
@@ -15132,7 +15744,7 @@ mod tests {
                         },
                     )),
                 }),
-                0,
+                Mutez::ZERO,
             )
         };
         let mut content: ContentResult<TransferContent> = ContentResult::Applied(
@@ -15214,7 +15826,7 @@ mod tests {
             })),
         });
         let tagged = vec![
-            TaggedInternalOp::own(own_op, 0),
+            TaggedInternalOp::own(own_op, Mutez::ZERO),
             TaggedInternalOp::from_crac(crac_op),
         ];
         let mut content: ContentResult<TransferContent> = ContentResult::Applied(
@@ -15238,7 +15850,7 @@ mod tests {
         // pair, charging 4 × COST_PER_BYTES against the payer's balance.
         let own_burn = 4 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (100_000 - own_burn).into()
         );
 
@@ -15341,20 +15953,23 @@ mod tests {
             &payer,
             &mut storage_limit_remaining,
             &mut content,
-            vec![TaggedInternalOp::own(internal(), 0)],
+            vec![TaggedInternalOp::own(internal(), Mutez::ZERO)],
         );
 
         assert_eq!(
             outcome,
             Err(ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: c.clone(),
-                balance: 5_u64.into(),
-                amount: (10 * COST_PER_BYTES).into(),
+                balance: Mutez::try_from(5_u64).unwrap(),
+                amount: Mutez::try_from(10 * COST_PER_BYTES).unwrap(),
             }))
         );
         assert_eq!(content, ContentResult::Applied(transfer_target(10, vec![])));
         assert_eq!(internals, vec![internal()]);
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 5_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            Mutez::try_from(5_u64).unwrap()
+        );
         assert_eq!(storage_limit_remaining, num_bigint::BigUint::from(90_u64));
     }
 
@@ -15394,7 +16009,7 @@ mod tests {
             &mut content,
             internals_in()
                 .into_iter()
-                .map(|op| TaggedInternalOp::own(op, 0))
+                .map(|op| TaggedInternalOp::own(op, Mutez::ZERO))
                 .collect(),
         );
 
@@ -15406,7 +16021,7 @@ mod tests {
         assert_eq!(internals, internals_in());
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (1_000 - 4 * COST_PER_BYTES).into()
+            Mutez::try_from(1_000 - 4 * COST_PER_BYTES).unwrap()
         );
         assert_eq!(storage_limit_remaining, num_bigint::BigUint::from(4_u64));
     }
@@ -15469,9 +16084,9 @@ mod tests {
             &mut content,
             vec![
                 TaggedInternalOp::from_crac(crac()),
-                TaggedInternalOp::own(failed(), 5),
-                TaggedInternalOp::own(own(vec![]), 3),
-                TaggedInternalOp::own(event(), 2),
+                TaggedInternalOp::own(failed(), Mutez::try_from(5_u64).unwrap()),
+                TaggedInternalOp::own(own(vec![]), Mutez::try_from(3_u64).unwrap()),
+                TaggedInternalOp::own(event(), Mutez::try_from(2_u64).unwrap()),
             ],
         );
 
@@ -15488,7 +16103,7 @@ mod tests {
         );
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (1_000 - 4 * COST_PER_BYTES).into()
+            Mutez::try_from(1_000 - 4 * COST_PER_BYTES).unwrap()
         );
         assert_eq!(storage_limit_remaining, num_bigint::BigUint::ZERO);
     }

@@ -54,7 +54,7 @@ use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{AliasInfo, Registry};
-use tezosx_types::{canonicalize_native_address, RuntimeId};
+use tezosx_types::{canonicalize_native_address, Mutez, RuntimeId};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
@@ -745,19 +745,14 @@ fn run_code_params(
             return Err(format!("`self` must be a KT1, got {pkh}"))
         }
     };
-    let amount: u64 = input
-        .amount
-        .try_into()
+    let amount = Mutez::try_from(input.amount)
         .map_err(|_| "`amount` must not be negative".to_string())?;
     let sender = input.sender.map(tezos_execution::address_from_contract);
     let balance = input
         .balance
-        .map(|balance| {
-            balance
-                .try_into()
-                .map_err(|_| "`balance` must not be negative".to_string())
-        })
-        .transpose()?;
+        .map(Mutez::try_from)
+        .transpose()
+        .map_err(|_| "`balance` must not be negative".to_string())?;
     let milligas = match input.gas {
         None => TezlinkOperationGas::MAX_LIMIT,
         Some(gas) => u64::try_from(gas)

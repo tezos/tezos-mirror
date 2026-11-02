@@ -54,7 +54,8 @@ use tezos_evm_runtime::{
     },
 };
 use tezos_execution::{
-    get_required_da_fees, mir_ctx::BlockCtx, FeeRefundConfig, ProcessedOperation,
+    get_required_da_fees, mir_ctx::BlockCtx, DaFeesError, FeeRefundConfig,
+    ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
@@ -476,8 +477,7 @@ impl TezosXChainConfig {
         let level: BlockNumber = block_in_progress.number.try_into()?;
         let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
             .to_mutez_exact()
-            .map_err(|_| crate::Error::InvalidConversion)?
-            .as_u64();
+            .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(evm_world_state);
         let safe_roots = self.world_states(level.into());
@@ -922,7 +922,7 @@ pub struct TezlinkBlockConstants {
     pub level: BlockNumber,
     /// DA fee per byte in mutez, read once at block start from durable storage.
     /// When `disable_da_fees` is set, this is 0.
-    pub da_fee_per_byte_mutez: u64,
+    pub da_fee_per_byte_mutez: Mutez,
     /// Conversion factor from Michelson gas to EVM gas, read once at block
     /// start from durable storage (falls back to the compile-time constant).
     pub michelson_to_evm_gas_multiplier: u64,
@@ -942,10 +942,10 @@ enum CreditDaFees {
 }
 
 impl CreditDaFees {
-    fn da_fees(&self) -> u64 {
+    fn da_fees(&self) -> Mutez {
         match self {
-            CreditDaFees::Skip => 0,
-            CreditDaFees::Execute { da_fees_mutez, .. } => da_fees_mutez.as_u64(),
+            CreditDaFees::Skip => Mutez::ZERO,
+            CreditDaFees::Execute { da_fees_mutez, .. } => *da_fees_mutez,
         }
     }
 
@@ -971,7 +971,7 @@ impl CreditDaFees {
 struct FeesData {
     /// Total required fees (DA + gas) to check against declared fees,
     /// or `None` in simulation (skip_fees_check).
-    required_fees: Option<u64>,
+    required_fees: Option<Mutez>,
     /// Action to credit the sequencer pool with DA fees after execution.
     /// Also carries the DA fees amount (via `da_fees()`).
     credit_da_fees: CreditDaFees,
@@ -1048,7 +1048,7 @@ pub(crate) fn tezos_op_evm_gas_limit(
 fn get_fees_data(
     operation: &Operation,
     skip_fees_check: bool,
-    da_fee_per_byte_mutez: u64,
+    da_fee_per_byte_mutez: Mutez,
     base_fee_per_gas: U256,
     michelson_to_evm_gas_multiplier: u64,
     sequencer_pool_address: Option<H160>,
@@ -1060,15 +1060,16 @@ fn get_fees_data(
             credit_da_fees: CreditDaFees::Skip,
         }))
     } else {
-        let required_da_fees = if enable_da_fees {
-            get_required_da_fees(operation, da_fee_per_byte_mutez)?
-        } else {
-            0
-        };
         // Narrowed once, at construction: the DA fee is credited to the
         // sequencer pool later purely in mutez, never as a raw u64.
-        let Ok(da_fees_mutez) = Mutez::try_from(required_da_fees) else {
-            return Ok(FeesOutcome::Unpayable);
+        let da_fees_mutez = if enable_da_fees {
+            match get_required_da_fees(operation, da_fee_per_byte_mutez) {
+                Ok(da_fees) => da_fees,
+                Err(DaFeesError::OutOfDomain(_)) => return Ok(FeesOutcome::Unpayable),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            Mutez::ZERO
         };
 
         let total_gas_limit: u64 = operation
@@ -1095,7 +1096,7 @@ fn get_fees_data(
         };
 
         Ok(FeesOutcome::Payable(FeesData {
-            required_fees: Some(required_fees.as_u64()),
+            required_fees: Some(required_fees),
             credit_da_fees: CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez,
@@ -1388,7 +1389,7 @@ mod tests {
         // construction must flag the operation as unpayable rather than
         // truncate or saturate.
         let op = make_test_operation();
-        let result = get_fees_data(&op, false, u64::MAX, U256::one(), 1, None, true);
+        let result = get_fees_data(&op, false, Mutez::MAX, U256::one(), 1, None, true);
         assert!(matches!(result, Ok(FeesOutcome::Unpayable)));
     }
 
@@ -1402,7 +1403,8 @@ mod tests {
         // author's choice, so this must not surface as a kernel error.
         let op = make_test_operation();
         let huge_base_fee = U256::from(10u64).pow(U256::from(40u64));
-        let result = get_fees_data(&op, false, 0, huge_base_fee, 1, None, false);
+        let result =
+            get_fees_data(&op, false, Mutez::ZERO, huge_base_fee, 1, None, false);
         assert!(matches!(result, Ok(FeesOutcome::Unpayable)));
     }
 
@@ -1414,7 +1416,7 @@ mod tests {
         let op = make_test_operation();
         let op_size = op.to_bytes().unwrap().len() as u64;
         // The DA fee lands in (i64::MAX - op_size, i64::MAX].
-        let da_fee_per_byte = (i64::MAX as u64) / op_size;
+        let da_fee_per_byte = Mutez::try_from((i64::MAX as u64) / op_size).unwrap();
         // The gas fee is gas_limit * 10^6 mutez: positive, far above op_size,
         // and itself well within the domain.
         let base_fee = U256::exp10(18);

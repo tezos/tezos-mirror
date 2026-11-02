@@ -23,9 +23,9 @@ use typed_arena::Arena;
 /// [`CtxTrait::lookup_view_storage_balance`]. "View does not exist on
 /// this contract" is **not** an error variant — that case is signalled
 /// by `Ok(None)`. Any `Err` here means the lookup itself could not be
-/// fulfilled (corruption, I/O failure, serialization failure, balance
-/// overflow), and the caller should surface it as a hard runtime
-/// failure rather than collapsing it back to `V::Option(None)`.
+/// fulfilled (corruption, I/O failure, serialization failure), and the
+/// caller should surface it as a hard runtime failure rather than
+/// collapsing it back to `V::Option(None)`.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LookupViewError {
     /// Encoding the view's storage bytes failed. **Test-only in
@@ -54,9 +54,6 @@ pub enum LookupViewError {
     /// at the trait boundary because MIR is host-agnostic.
     #[error("host error during view lookup: {0}")]
     HostError(String),
-    /// The contract's balance does not fit in `i64`.
-    #[error("contract balance overflows i64")]
-    BalanceOverflow,
     /// Gas exhaustion.
     #[error("{0}")]
     OutOfGas(#[from] OutOfGas),

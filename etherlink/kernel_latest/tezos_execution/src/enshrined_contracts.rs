@@ -14,7 +14,9 @@ use mir::{
     gas::OutOfGas,
 };
 use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::ToPrimitive;
+#[cfg(test)]
+use num_traits::Zero;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -31,7 +33,7 @@ use tezos_tezlink::operation_result::{
 use tezosx_interfaces::TezosXRuntimeError;
 use tezosx_interfaces::{
     canonicalize_native_address,
-    headers::{format_tez_from_mutez, parse_u64_opt},
+    headers::{format_tez_from_mutez, parse_mutez_opt, MutezHeaderError},
     resolve_routing, translate_original_source, AliasInfo, Classification,
     CrossRuntimeContext, Gas, Milligas, Registry, RoutingDecision, RuntimeId,
     ALIAS_LOOKUP_COST, ERR_FORBIDDEN_TEZOS_HEADER, ERR_SAME_RUNTIME_NAC, X_TEZOS_AMOUNT,
@@ -40,6 +42,7 @@ use tezosx_interfaces::{
     X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Mutez;
 
 use crate::account_storage::TezosAccount;
 use crate::mir_ctx::{
@@ -85,17 +88,14 @@ impl From<TransferError> for CracError {
             //
             // KeySpace carries the failed account read or write. Context
             // carries an invalid key, or a deposit receiver of the wrong
-            // kind, which no CRAC transfer produces.
-            // FailedToComputeBalanceUpdate comes from a failed balance update
-            // conversion. None of these causes is recoverable user input.
+            // kind, which no CRAC transfer produces. None of these causes is
+            // recoverable user input.
             // A non-existent originated destination is caught upstream by the
             // `dest_account.exists(tez_accounts)` guard in `transfer` and
             // surfaces as the user-level TransferError::ContractDoesNotExist
             // instead, so a missing code here can only come from a
             // kernel-internal cause.
-            TransferError::KeySpace(_)
-            | TransferError::Context(_)
-            | TransferError::FailedToComputeBalanceUpdate(_) => {
+            TransferError::KeySpace(_) | TransferError::Context(_) => {
                 CracError::BlockAbort(format!("internal error during transfer: {e}"))
             }
             // Peer-runtime brokenness surfaced via MIR `VIEW
@@ -918,7 +918,8 @@ where
         return Ok(vec![]);
     };
     if let Some(v) = delegated_storage_cost {
-        ctx.add_delegated_storage_cost(v);
+        ctx.add_delegated_storage_cost(v)
+            .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
     }
 
     let kt1 = ContractKt1Hash::from_base58_check(&alias).map_err(|e| {
@@ -1216,7 +1217,7 @@ fn inject_context_headers_raw(
     sender_alias: &str,
     source_alias: &str,
     source_runtime: RuntimeId,
-    amount_mutez: u64,
+    amount_mutez: Mutez,
     gas_limit: Gas,
     timestamp: u64,
     block_number: u32,
@@ -1310,9 +1311,7 @@ where
         Some(Contract::Implicit(pkh)) => AddressHash::Implicit(pkh),
         None => AddressHash::from(ctx.source()),
     };
-    let amount_mutez: u64 = ctx
-        .amount()
-        .try_into()
+    let amount_mutez = Mutez::try_from(ctx.amount())
         .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
     let block_number = ctx.level();
     let timestamp = ctx.now();
@@ -1397,7 +1396,8 @@ where
                 })?
         };
         if let Some(v) = sender_resolution.delegated_storage_cost {
-            ctx.add_delegated_storage_cost(v);
+            ctx.add_delegated_storage_cost(v)
+                .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
         }
         ctx.operation_gas()
             .cast_and_consume_milligas(target_budget - sender_resolution.gas_remaining)
@@ -1451,7 +1451,8 @@ where
                     .map_err(|e| TransferError::GatewayError(e.to_string()))?
             };
             if let Some(v) = source_resolution.delegated_storage_cost {
-                ctx.add_delegated_storage_cost(v);
+                ctx.add_delegated_storage_cost(v)
+                    .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
             }
             ctx.operation_gas()
                 .cast_and_consume_milligas(
@@ -1644,12 +1645,12 @@ where
         let (rk, _, _) = ctx.cross_runtime_split();
         account.balance(rk.tez_accounts())?
     };
-    if !current.0.is_zero() {
+    if current != Mutez::ZERO {
         ctx.operation_gas()
             .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
             .map_err(TransferError::OutOfGas)?;
         let (rk, _, _) = ctx.cross_runtime_split();
-        account.set_balance(rk.tez_accounts_mut(), &0u64.into())?;
+        account.set_balance(rk.tez_accounts_mut(), &Mutez::ZERO)?;
     }
     Ok(response_body)
 }
@@ -2286,12 +2287,19 @@ fn classify_and_charge_crac_response(
             )
             .into());
         }
-        let storage_cost = parse_u64_opt(response.headers(), X_TEZOS_STORAGE_COST)
-            .map_err(|e| {
-                CracError::Operation(TransferError::GatewayError(e.to_string()))
+        let storage_cost = parse_mutez_opt(response.headers(), X_TEZOS_STORAGE_COST)
+            .map_err(|e| match e {
+                MutezHeaderError::OutOfDomain(e) => CracError::Operation(
+                    TransferError::StorageFeesConversion(e.to_string()),
+                ),
+                MutezHeaderError::Malformed(e) => {
+                    CracError::Operation(TransferError::GatewayError(e.to_string()))
+                }
             })?;
         if let Some(v) = storage_cost {
-            ctx.add_delegated_storage_cost(v);
+            ctx.add_delegated_storage_cost(v).map_err(|e| {
+                CracError::Operation(TransferError::StorageFeesConversion(e.to_string()))
+            })?;
         }
         Ok(response.into_body())
     } else if is_cross_runtime_oog(response.status()) {
@@ -2983,7 +2991,7 @@ pub(crate) mod tests {
             "sender_alias",
             "source_alias",
             RuntimeId::Tezos,
-            42u64, // 42 mutez = 0.000042 TEZ
+            Mutez::try_from(42u64).unwrap(), // 42 mutez = 0.000042 TEZ
             tezosx_interfaces::Gas::new(1000, RuntimeId::Tezos),
             1700000000u64,
             5,
@@ -3018,7 +3026,7 @@ pub(crate) mod tests {
             "sender_alias",
             "source_alias",
             RuntimeId::Tezos,
-            0u64,
+            Mutez::ZERO,
             tezosx_interfaces::Gas::new(0, RuntimeId::Tezos),
             0,
             0,
@@ -3045,7 +3053,7 @@ pub(crate) mod tests {
             "new_alias",
             "source_alias",
             RuntimeId::Tezos,
-            0u64,
+            Mutez::ZERO,
             tezosx_interfaces::Gas::new(0, RuntimeId::Tezos),
             0u64,
             0,
@@ -3568,8 +3576,8 @@ pub(crate) mod tests {
     fn test_dispatch_crac_call_accumulates_delegated_alias_storage_cost() {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let registry =
-            MockRegistry::new("KT1_mock_alias").with_alias_delegated_storage_cost(777);
+        let registry = MockRegistry::new("KT1_mock_alias")
+            .with_alias_delegated_storage_cost(Mutez::try_from(777u64).unwrap());
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
             0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
@@ -3586,12 +3594,12 @@ pub(crate) mod tests {
             tezosx_constants::MICHELSON_MAX_MILLIGAS_PER_OPERATION,
         )
         .unwrap();
-        assert_eq!(ctx.delegated_storage_cost(), 0);
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::ZERO);
         dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
             .expect("default MockRegistry serve must succeed");
         assert_eq!(
             ctx.delegated_storage_cost(),
-            2 * 777,
+            Mutez::try_from(2 * 777u64).unwrap(),
             "both sender and source alias materializations must accumulate"
         );
     }
@@ -3623,7 +3631,7 @@ pub(crate) mod tests {
         .unwrap();
         dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
             .expect("default MockRegistry serve must succeed");
-        assert_eq!(ctx.delegated_storage_cost(), 0);
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::ZERO);
     }
 
     // The body surcharge on the 4xx path can itself exhaust gas; that must
@@ -3966,7 +3974,7 @@ pub(crate) mod tests {
             "sender",
             "source",
             RuntimeId::Tezos,
-            0u64,
+            Mutez::ZERO,
             tezosx_interfaces::Gas::new(0, RuntimeId::Tezos),
             0u64,
             0,
@@ -3989,7 +3997,7 @@ pub(crate) mod tests {
             "sender",
             "source",
             RuntimeId::Tezos,
-            u64::MAX,
+            Mutez::MAX,
             tezosx_interfaces::Gas::new(u64::MAX, RuntimeId::Tezos),
             u64::MAX,
             u32::MAX,
@@ -3997,7 +4005,7 @@ pub(crate) mod tests {
             0,
         )
         .unwrap();
-        // u64::MAX mutez is a very large TEZ amount
+        // `Mutez::MAX` is a very large TEZ amount
         let amount = headers.get("X-Tezos-Amount").unwrap().to_str().unwrap();
         assert!(!amount.is_empty());
         assert_eq!(
@@ -5228,7 +5236,6 @@ pub(crate) mod tests {
             )),
             TransferError::Context(KeyError::KeyTooLarge.into()),
             TransferError::Context(OriginatedToImplicit(kt1).into()),
-            TransferError::FailedToComputeBalanceUpdate(String::new()),
         ];
         for variant in infra {
             let label = format!("{variant:?}");
@@ -5256,6 +5263,14 @@ pub(crate) mod tests {
             TransferError::NoSuchEntrypoint(mir::ast::Entrypoint::default()),
             TransferError::BadContractParameter(Contract::Originated(kt1.clone())),
             TransferError::MirAddressUnsupportedError,
+            TransferError::BalanceOverflow(
+                tezos_tezlink::operation_result::BalanceOverflow {
+                    contract: Contract::Originated(kt1.clone()),
+                    balance: Mutez::ZERO,
+                    amount: Mutez::ZERO,
+                },
+            ),
+            TransferError::StorageFeesConversion(String::new()),
             TransferError::ContractDoesNotExist(Contract::Originated(kt1)),
         ];
         for variant in user_facing {
@@ -6034,10 +6049,13 @@ pub(crate) mod tests {
         let mut journal = make_journal();
         let registry = MockRegistry::new("KT1_mock_alias");
         let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
-        assert_eq!(ctx.delegated_storage_cost(), 0);
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::ZERO);
         classify_and_charge_crac_response(response, &mut ctx)
             .expect("2xx response must not error");
-        assert_eq!(ctx.delegated_storage_cost(), 12345);
+        assert_eq!(
+            ctx.delegated_storage_cost(),
+            Mutez::try_from(12345u64).unwrap()
+        );
     }
 
     /// 2xx response with no `X-Tezos-Storage-Cost` header leaves the
@@ -6056,7 +6074,7 @@ pub(crate) mod tests {
         let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
         classify_and_charge_crac_response(response, &mut ctx)
             .expect("2xx response must not error");
-        assert_eq!(ctx.delegated_storage_cost(), 0);
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::ZERO);
     }
 
     /// Two successive 2xx responses on the same ctx sum their delegated
@@ -6083,7 +6101,10 @@ pub(crate) mod tests {
             .body(vec![])
             .unwrap();
         classify_and_charge_crac_response(second, &mut ctx).unwrap();
-        assert_eq!(ctx.delegated_storage_cost(), 350);
+        assert_eq!(
+            ctx.delegated_storage_cost(),
+            Mutez::try_from(350u64).unwrap()
+        );
     }
 
     /// On a non-2xx response the storage-cost header — present or
@@ -6105,8 +6126,77 @@ pub(crate) mod tests {
         assert!(result.is_err(), "4xx must surface an error");
         assert_eq!(
             ctx.delegated_storage_cost(),
-            0,
+            Mutez::ZERO,
             "header on non-2xx must not accumulate"
+        );
+    }
+
+    /// A `X-Tezos-Storage-Cost` header value past the mutez domain
+    /// (`> i64::MAX`) reverts the CRAC call — a catchable operation-level
+    /// error, never a block abort — and leaves the accumulator untouched.
+    #[test]
+    fn test_classify_and_charge_crac_response_storage_cost_out_of_domain_reverts() {
+        let response = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, u64::MAX.to_string())
+            .body(vec![])
+            .unwrap();
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
+        let result = classify_and_charge_crac_response(response, &mut ctx);
+        assert!(
+            matches!(
+                result,
+                Err(CracError::Operation(TransferError::StorageFeesConversion(_)))
+            ),
+            "an out-of-domain storage cost must revert the operation, not abort the block: {result:?}"
+        );
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::ZERO);
+    }
+
+    /// Two in-domain `X-Tezos-Storage-Cost` headers whose sum overflows
+    /// the mutez domain revert the CRAC call on the second response — a
+    /// catchable operation-level error, never a block abort.
+    #[test]
+    fn test_classify_and_charge_crac_response_storage_cost_sum_overflow_reverts() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = make_journal();
+        let registry = MockRegistry::new("KT1_mock_alias");
+        let mut ctx = classify_test_ctx(&mut rk, &mut journal, &registry);
+
+        let first = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, Mutez::MAX.as_u64().to_string())
+            .body(vec![])
+            .unwrap();
+        classify_and_charge_crac_response(first, &mut ctx)
+            .expect("a single in-domain header must not error");
+        assert_eq!(ctx.delegated_storage_cost(), Mutez::MAX);
+
+        let second = http::Response::builder()
+            .status(http::status::StatusCode::OK)
+            .header(X_TEZOS_GAS_CONSUMED, "1000")
+            .header(X_TEZOS_STORAGE_COST, "1")
+            .body(vec![])
+            .unwrap();
+        let result = classify_and_charge_crac_response(second, &mut ctx);
+        assert!(
+            matches!(
+                result,
+                Err(CracError::Operation(TransferError::StorageFeesConversion(_)))
+            ),
+            "an accumulator overflow must revert the operation, not abort the block: {result:?}"
+        );
+        assert_eq!(
+            ctx.delegated_storage_cost(),
+            Mutez::MAX,
+            "a reverted accumulation must not mutate the accumulator"
         );
     }
 
@@ -6469,8 +6559,8 @@ pub(crate) mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut journal = materialize_alias_journal();
-        let registry =
-            MockRegistry::new(MOCK_KT1_ALIAS).with_alias_delegated_storage_cost(42);
+        let registry = MockRegistry::new(MOCK_KT1_ALIAS)
+            .with_alias_delegated_storage_cost(Mutez::try_from(42u64).unwrap());
         let mut ctx = MockCtx::new(
             &mut rk,
             &mut journal,
@@ -6503,7 +6593,7 @@ pub(crate) mod tests {
                 RuntimeId::Tezos
             )]
         );
-        assert_eq!(delegated_storage_cost, 42);
+        assert_eq!(delegated_storage_cost, Mutez::try_from(42u64).unwrap());
         let [OperationInfo {
             operation: Operation::Emit(emit),
             ..

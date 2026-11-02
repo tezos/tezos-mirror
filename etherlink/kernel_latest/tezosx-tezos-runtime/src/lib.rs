@@ -5,6 +5,7 @@
 use http::StatusCode;
 use mir::ast::{AddressHash, ByteReprTrait};
 use mir::gas::{interpret_cost, Gas, OutOfGas};
+#[cfg(feature = "testing")]
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
@@ -64,9 +65,10 @@ use tezos_smart_rollup_host::path::OwnedPath;
 pub(crate) use tezos_execution::NULL_PKH;
 
 use tezos_execution::account_storage::{
-    get_tezos_account_info_or_init_at, key_to_tezos_account, narith_to_u256,
-    set_tezos_account_info_at, TezosOriginatedAccount,
+    get_tezos_account_info_or_init_at, key_to_tezos_account, set_tezos_account_info_at,
+    TezosOriginatedAccount,
 };
+use tezosx_types::Mutez;
 
 pub struct TezosRuntime(pub ChainId);
 
@@ -132,7 +134,7 @@ fn build_response(
         Ok(outcome) => {
             builder =
                 builder.header(http::header::CONTENT_TYPE, "application/octet-stream");
-            if outcome.delegated_storage_cost > 0 {
+            if outcome.delegated_storage_cost > Mutez::ZERO {
                 builder = builder.header(
                     X_TEZOS_STORAGE_COST,
                     outcome.delegated_storage_cost.to_string(),
@@ -296,7 +298,7 @@ fn build_crac_receipt(
     null_pkh: &PublicKeyHash,
     source_contract: &Contract,
     sender_contract: &Contract,
-    amount: &Narith,
+    amount: Mutez,
     destination: &Contract,
     parameters: &Parameters,
     target: TransferTarget,
@@ -339,7 +341,7 @@ fn build_crac_receipt(
         sender: sender_contract.clone(),
         nonce: transfer_nonce,
         content: TransferContent {
-            amount: amount.clone(),
+            amount: amount.to_narith(),
             destination: destination.clone(),
             parameters: parameters.clone(),
         },
@@ -442,7 +444,7 @@ fn build_failed_crac_receipt(
     null_pkh: &PublicKeyHash,
     source_contract: &Contract,
     sender_contract: &Contract,
-    amount: &Narith,
+    amount: Mutez,
     destination: &Contract,
     parameters: &Parameters,
     error: TransferError,
@@ -509,7 +511,7 @@ fn build_failed_crac_receipt(
             sender: sender_contract.clone(),
             nonce: transfer_nonce,
             content: TransferContent {
-                amount: amount.clone(),
+                amount: amount.to_narith(),
                 destination: destination.clone(),
                 parameters: parameters.clone(),
             },
@@ -594,7 +596,7 @@ fn build_alias_origination_internal(
 
 #[derive(Default)]
 pub(crate) struct ExecuteRequestOutcome {
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
     /// Milligas metered by this request, reported back to the caller.
     consumed_milligas: u64,
 }
@@ -811,7 +813,7 @@ where
         // (EVM alias) or `Implicit(pkh)` (native Michelson origin). `None`
         // only for a top-level Michelson tx (absent `X-Tezos-Source`).
         crac_origin: hdrs.crac_origin_contract.clone(),
-        delegated_storage_cost: 0,
+        delegated_storage_cost: Mutez::ZERO,
     };
     let parser = mir::parser::Parser::new();
 
@@ -869,7 +871,7 @@ where
                 registry,
                 journal,
                 &sender_account,
-                &hdrs.amount,
+                hdrs.amount,
                 &parsed.destination,
                 &parameters,
                 &parser,
@@ -884,7 +886,7 @@ where
                 registry,
                 journal,
                 &sender_account,
-                &hdrs.amount,
+                hdrs.amount,
                 &parsed.destination,
                 &parameters,
                 &parser,
@@ -960,7 +962,7 @@ where
                         &source_pkh,
                         source_contract,
                         &hdrs.sender,
-                        &hdrs.amount,
+                        hdrs.amount,
                         &parsed.destination,
                         &parameters,
                         te,
@@ -1007,7 +1009,7 @@ where
             &source_pkh,
             source_contract,
             &hdrs.sender,
-            &hdrs.amount,
+            hdrs.amount,
             &parsed.destination,
             &parameters,
             result.target,
@@ -1023,14 +1025,14 @@ where
     };
     let consumed_milligas = gas.total_milligas_consumed().into();
 
-    let delegated_storage_cost =
-        result.own_storage_cost + received_delegated_storage_cost;
-
-    let delegated_storage_cost = u64::try_from(delegated_storage_cost).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!(
-            "Delegated storage cost does not fit in u64: {e}"
-        ))
-    })?;
+    let delegated_storage_cost = result
+        .own_storage_cost
+        .checked_add(received_delegated_storage_cost)
+        .map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Delegated storage cost overflow: {e}"
+            ))
+        })?;
 
     Ok(ExecuteRequestOutcome {
         delegated_storage_cost,
@@ -1243,7 +1245,7 @@ impl RuntimeInterface for TezosRuntime {
                 &mut tc_ctx,
                 kt1,
                 &source_account,
-                &Narith(0u64.into()),
+                Mutez::ZERO,
                 None,
                 mir::ast::RcTypedValue::new(typed_storage),
                 &origin,
@@ -1277,12 +1279,6 @@ impl RuntimeInterface for TezosRuntime {
                     "Failed to compute storage fees for the alias forwarder origination: {e:?}"
                 ))
             })?;
-
-        let alias_storage_cost = u64::try_from(alias_storage_cost).map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Alias storage cost does not fit in u64: {e}"
-            ))
-        })?;
 
         journal
             .michelson
@@ -1515,14 +1511,14 @@ impl TezosRuntime {
     pub fn add_balance(
         tez_accounts: &mut impl KeySpace,
         pub_key_hash: &PublicKeyHash,
-        amount: U256,
+        amount: Mutez,
     ) -> Result<(), TezosXRuntimeError> {
         let key = key_to_tezos_account(pub_key_hash)?;
         let mut info = get_tezos_account_info_or_init_at(tez_accounts, &key)?;
         info.balance = info
             .balance
             .checked_add(amount)
-            .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
         Ok(set_tezos_account_info_at(tez_accounts, &key, info)?)
     }
 
@@ -1530,10 +1526,9 @@ impl TezosRuntime {
     pub fn get_originated_account_balance(
         tez_accounts: &impl KeySpace,
         kt1: &ContractKt1Hash,
-    ) -> Result<U256, TezosXRuntimeError> {
+    ) -> Result<Mutez, TezosXRuntimeError> {
         let originated_account = TezosOriginatedAccount::from_kt1(kt1)?;
-        let balance = originated_account.balance(tez_accounts)?;
-        narith_to_u256(&balance)
+        Ok(originated_account.balance(tez_accounts)?)
     }
 }
 
@@ -1560,6 +1555,32 @@ mod tests {
         fn is_failed(&self) -> bool {
             matches!(self, ContentResult::Failed(_))
         }
+    }
+
+    /// A credit that would push a Tezos-runtime account's balance past the
+    /// mutez domain (`Mutez::MAX`) is an error, not an unbounded add.
+    #[test]
+    fn tezos_runtime_add_balance_past_domain_errors() {
+        use tezos_evm_runtime::runtime::MockKernelHost;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let pkh = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash base58 conversion should succeed");
+
+        TezosRuntime::add_balance(rk.tez_accounts_mut(), &pkh, Mutez::MAX)
+            .expect("crediting up to Mutez::MAX should succeed");
+
+        let result = TezosRuntime::add_balance(
+            rk.tez_accounts_mut(),
+            &pkh,
+            Mutez::try_from(1u64).unwrap(),
+        );
+
+        assert!(
+            result.is_err(),
+            "crediting past Mutez::MAX must error instead of wrapping"
+        );
     }
 
     #[test]
@@ -1670,7 +1691,7 @@ mod tests {
         // 5000 milligas → reported as 5000
         let resp = build_response(
             Ok(ExecuteRequestOutcome {
-                delegated_storage_cost: 0,
+                delegated_storage_cost: Mutez::ZERO,
                 consumed_milligas: 5000,
             }),
             None,
@@ -1736,7 +1757,7 @@ mod tests {
     fn build_response_emits_storage_cost_header_on_2xx() {
         let resp = build_response(
             Ok(ExecuteRequestOutcome {
-                delegated_storage_cost: 12345,
+                delegated_storage_cost: Mutez::try_from(12345u64).unwrap(),
                 consumed_milligas: 0,
             }),
             None,
@@ -2082,7 +2103,7 @@ mod tests {
         let balance =
             TezosRuntime::get_originated_account_balance(rk.tez_accounts(), &kt1)
                 .expect("should read balance");
-        assert_eq!(balance, U256::zero());
+        assert_eq!(balance, Mutez::ZERO);
     }
 
     #[test]
@@ -2168,7 +2189,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(50_000_000u64.into()); // 50 tez in mutez
+        let amount = Mutez::try_from(50_000_000u64).unwrap(); // 50 tez in mutez
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
@@ -2183,7 +2204,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             target,
@@ -2261,7 +2282,8 @@ mod tests {
             "internal destination must be M_1"
         );
         assert_eq!(
-            internal.content.amount, amount,
+            internal.content.amount,
+            amount.to_narith(),
             "internal amount must match"
         );
 
@@ -2330,7 +2352,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(100_000_000u64.into());
+        let amount = Mutez::try_from(100_000_000u64).unwrap();
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::default(),
             value: mir::ast::micheline::Micheline::from(())
@@ -2344,7 +2366,7 @@ mod tests {
             &null_pkh,
             &alias, // source_contract = alias(E_0)
             &alias, // sender_contract = alias(E_1) = alias(E_0) when direct call
-            &amount,
+            amount,
             &destination,
             &parameters,
             target,
@@ -2410,7 +2432,8 @@ mod tests {
             "internal destination must be the target contract"
         );
         assert_eq!(
-            internal.content.amount, amount,
+            internal.content.amount,
+            amount.to_narith(),
             "internal amount must match"
         );
         assert!(
@@ -2458,7 +2481,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(50_000_000u64.into());
+        let amount = Mutez::try_from(50_000_000u64).unwrap();
         let parameters = Parameters {
             entrypoint: mir::ast::Entrypoint::from_string_unchecked("swap".into()),
             value: mir::ast::micheline::Micheline::from(())
@@ -2473,7 +2496,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             error,
@@ -2570,7 +2593,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(0u64.into());
+        let amount = Mutez::ZERO;
         let parameters = Parameters::default();
 
         // A distinctive, attacker-shaped payload that won't otherwise appear
@@ -2584,7 +2607,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             error,
@@ -2672,7 +2695,7 @@ mod tests {
             &null_pkh,
             &kt1("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"),
             &kt1("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2"),
-            &Narith(0u64.into()),
+            Mutez::ZERO,
             &kt1("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"),
             &Parameters::default(),
             TransferError::FailedToExecuteInternalOperation("test failure".into()),
@@ -2736,7 +2759,7 @@ mod tests {
             ContractKt1Hash::from_b58check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
                 .unwrap(),
         );
-        let amount = Narith(0u64.into());
+        let amount = Mutez::ZERO;
         let parameters = Parameters::default();
 
         // The wrapper error passed to the builder — present because the
@@ -2780,7 +2803,7 @@ mod tests {
             &null_pkh,
             &source_contract,
             &sender_contract,
-            &amount,
+            amount,
             &destination,
             &parameters,
             wrapper_error,

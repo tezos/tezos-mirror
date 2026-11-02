@@ -6,8 +6,10 @@
 //! allocated by a manager operation to its source and records
 //! the matching balance updates on the receipt.
 
-use num_bigint::{BigInt, BigUint, TryFromBigIntError};
-use num_traits::{ops::checked::CheckedSub, Zero};
+use num_bigint::{BigUint, TryFromBigIntError};
+use num_traits::ops::checked::CheckedSub;
+#[cfg(test)]
+use num_traits::Zero;
 use tezos_data_encoding::types::Zarith;
 use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_tezlink::operation::{OriginationContent, RevealContent, TransferContent};
@@ -16,6 +18,7 @@ use tezos_tezlink::operation_result::{
     InternalContentWithMetadata, InternalOperationSum, OperationKind, OriginationSuccess,
     TransferError, TransferTarget, UpdateOrigin,
 };
+use tezosx_types::Mutez;
 
 use crate::account_storage::TezosAccount;
 use crate::burn_tez;
@@ -29,13 +32,32 @@ pub const ORIGINATION_SIZE: u64 = 257;
 pub const HARD_STORAGE_LIMIT_PER_OPERATION: u64 = 60_000;
 
 /// A storage fee in mutez.
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
-pub struct StorageFee(BigUint);
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StorageFee(Mutez);
 
-impl From<StorageFee> for BigUint {
+impl From<StorageFee> for Mutez {
     fn from(val: StorageFee) -> Self {
         val.0
     }
+}
+
+/// Mutez cost of `bytes` bytes: `bytes × COST_PER_BYTES`, checked.
+/// `bytes` is a byte count, not a mutez amount — the multiplication
+/// happens in `u64` and only the resulting product is narrowed into
+/// the mutez domain. Errs if `bytes` does not fit `u64` (cannot happen
+/// for a byte count bounded by [`HARD_STORAGE_LIMIT_PER_OPERATION`]),
+/// if the product overflows `u64`, or if the product overflows the
+/// mutez domain.
+fn mutez_cost_for_bytes(bytes: &BigUint) -> Result<Mutez, TransferError> {
+    let bytes = u64::try_from(bytes).map_err(|e: TryFromBigIntError<()>| {
+        TransferError::StorageFeesConversion(e.to_string())
+    })?;
+    let cost = bytes.checked_mul(COST_PER_BYTES).ok_or_else(|| {
+        TransferError::StorageFeesConversion(
+            "storage byte cost overflowed u64".to_string(),
+        )
+    })?;
+    Mutez::try_from(cost).map_err(|e| TransferError::StorageFeesConversion(e.to_string()))
 }
 
 /// Burns the cost of `nb_consumed_bytes` bytes from the payer and
@@ -59,11 +81,12 @@ fn burn_storage_fee(
         .checked_sub(&nb_consumed_bytes)
         .ok_or(ApplyOperationError::OperationQuotaExceeded)?;
 
-    let to_burn = BigUint::from(COST_PER_BYTES) * nb_consumed_bytes;
-    if to_burn.is_zero() {
+    let to_burn = mutez_cost_for_bytes(&nb_consumed_bytes)
+        .map_err(ApplyOperationError::Transfer)?;
+    if to_burn == Mutez::ZERO {
         return Ok(StorageFee::default());
     }
-    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
+    burn_tez(tez_accounts, payer, to_burn).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -72,48 +95,30 @@ fn burn_storage_fee(
     Ok(StorageFee(to_burn))
 }
 
-/// Converts a signed balance delta into the `changes` field of a
-/// balance update. Fails with `FailedToComputeBalanceUpdate` when
-/// `delta` does not fit in an `i64`.
-fn balance_update_changes(delta: BigInt) -> Result<i64, ApplyOperationError> {
-    delta.try_into().map_err(|e: TryFromBigIntError<BigInt>| {
-        ApplyOperationError::Transfer(TransferError::FailedToComputeBalanceUpdate(
-            e.to_string(),
-        ))
-    })
-}
-
 /// Builds the two balance updates that record a storage fee of `fee`
 /// mutez in a Tezos receipt: a debit of `payer` and a credit of
 /// `StorageFees`.
 ///
-/// Returns an empty vector when `fee` is zero. Fails with
-/// `FailedToComputeBalanceUpdate` when `fee` does not fit in the
-/// `changes` field of a balance update.
+/// Returns an empty vector when `fee` is zero.
 fn compute_storage_balance_updates(
     payer: &impl TezosAccount,
-    fee: BigUint,
-) -> Result<Vec<BalanceUpdate>, ApplyOperationError> {
-    if fee.is_zero() {
-        return Ok(vec![]);
-    };
+    fee: Mutez,
+) -> Vec<BalanceUpdate> {
+    if fee == Mutez::ZERO {
+        return vec![];
+    }
+    let changes: i64 = fee.into();
     let source_update = BalanceUpdate {
         balance: Balance::Account(payer.contract()),
-        changes: balance_update_changes(BigInt::from_biguint(
-            num_bigint::Sign::Minus,
-            fee.clone(),
-        ))?,
+        changes: -changes,
         update_origin: UpdateOrigin::BlockApplication,
     };
     let block_fees = BalanceUpdate {
         balance: Balance::StorageFees,
-        changes: balance_update_changes(BigInt::from_biguint(
-            num_bigint::Sign::Plus,
-            fee,
-        ))?,
+        changes,
         update_origin: UpdateOrigin::BlockApplication,
     };
-    Ok(vec![source_update, block_fees])
+    vec![source_update, block_fees]
 }
 
 /// Append the `Debited(payer) / Credited(StorageFees)` pair for a
@@ -126,16 +131,15 @@ fn compute_storage_balance_updates(
 pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageFees>(
     payer: &impl TezosAccount,
     content: &mut ContentResult<M>,
-    mutez_cost: u64,
-) -> Result<(), ApplyOperationError> {
-    if mutez_cost == 0 {
-        return Ok(());
+    mutez_cost: Mutez,
+) {
+    if mutez_cost == Mutez::ZERO {
+        return;
     }
     if let ContentResult::Applied(success) = content {
-        let pair = compute_storage_balance_updates(payer, BigUint::from(mutez_cost))?;
+        let pair = compute_storage_balance_updates(payer, mutez_cost);
         M::extend_success_balance_updates(success, pair);
     }
-    Ok(())
 }
 
 /// Returns the mutez cost of allocating `nb_consumed_bytes`:
@@ -143,10 +147,10 @@ pub fn add_delegated_storage_fee_balance_updates_to_content<M: OperationStorageF
 /// `storage_limit` consumption, no host access. Errors on a
 /// negative-sign `Zarith` (cannot happen on a receipt's
 /// `paid_storage_size_diff`).
-fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<BigUint, TransferError> {
+fn storage_fee_for_bytes(nb_consumed_bytes: &Zarith) -> Result<Mutez, TransferError> {
     let bytes = BigUint::try_from(&nb_consumed_bytes.0)
         .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
-    Ok(BigUint::from(COST_PER_BYTES) * bytes)
+    mutez_cost_for_bytes(&bytes)
 }
 
 /// Charge `mutez_cost` against the payer.
@@ -161,20 +165,19 @@ pub fn burn_storage_cost(
     tez_accounts: &mut impl KeySpace,
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
-    mutez_cost: u64,
+    mutez_cost: Mutez,
 ) -> Result<(), ApplyOperationError> {
-    if mutez_cost == 0 {
+    if mutez_cost == Mutez::ZERO {
         return Ok(());
     }
 
-    let nb_consumed_bytes = BigUint::from(mutez_cost / COST_PER_BYTES);
+    let nb_consumed_bytes = BigUint::from(mutez_cost.as_u64() / COST_PER_BYTES);
 
     *storage_limit_remaining = storage_limit_remaining
         .checked_sub(&nb_consumed_bytes)
         .ok_or(ApplyOperationError::OperationQuotaExceeded)?;
 
-    let to_burn = BigUint::from(mutez_cost);
-    burn_tez(tez_accounts, payer, &to_burn).map_err(|err| match err {
+    burn_tez(tez_accounts, payer, mutez_cost).map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => {
             ApplyOperationError::CannotPayStorageFee(btl)
         }
@@ -202,7 +205,7 @@ where
         burn_storage_fee(tez_accounts, payer, storage_limit_remaining, bytes)
     })?;
     M::write_balance_updates(success, storage_fees, |fee| {
-        compute_storage_balance_updates(payer, fee.into())
+        Ok::<_, ApplyOperationError>(compute_storage_balance_updates(payer, fee.into()))
     })?;
     Ok(())
 }
@@ -248,7 +251,7 @@ fn charge_content_storage_fees<M: OperationStorageFees>(
         burn_storage_fee(tez_accounts, payer, storage_limit_remaining, bytes)
     })?;
     let updates = M::render_balance_updates(success, storage_fees, |fee| {
-        compute_storage_balance_updates(payer, fee.into())
+        Ok::<_, ApplyOperationError>(compute_storage_balance_updates(payer, fee.into()))
     })?;
     Ok(Some(updates))
 }
@@ -265,7 +268,7 @@ pub fn charge_internal_op_storage_fees(
     payer: &impl TezosAccount,
     storage_limit_remaining: &mut BigUint,
     op: &InternalOperationSum,
-    delegated_storage_cost: u64,
+    delegated_storage_cost: Mutez,
 ) -> Result<Option<Vec<BalanceUpdate>>, ApplyOperationError> {
     let charged = match op {
         InternalOperationSum::Transfer(meta) => charge_content_storage_fees(
@@ -287,18 +290,20 @@ pub fn charge_internal_op_storage_fees(
     };
     updates.extend(compute_storage_balance_updates(
         payer,
-        delegated_storage_cost.into(),
-    )?);
+        delegated_storage_cost,
+    ));
     Ok(Some(updates))
 }
 
 pub fn compute_storage_fees<M: OperationStorageFees>(
     success: &M::Success,
-) -> Result<BigUint, TransferError> {
-    let mut total = BigUint::ZERO;
+) -> Result<Mutez, TransferError> {
+    let mut total = Mutez::ZERO;
     let _: M::StorageFees = M::build_storage_fees(success, |bytes| {
         let fee = storage_fee_for_bytes(bytes)?;
-        total += &fee;
+        total = total
+            .checked_add(fee)
+            .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
         Ok::<StorageFee, TransferError>(StorageFee(fee))
     })?;
     Ok(total)
@@ -306,16 +311,16 @@ pub fn compute_storage_fees<M: OperationStorageFees>(
 
 fn compute_content_storage_fees<M: OperationStorageFees>(
     content: &ContentResult<M>,
-) -> Result<BigUint, TransferError> {
+) -> Result<Mutez, TransferError> {
     match content {
         ContentResult::Applied(success) => compute_storage_fees::<M>(success),
-        _ => Ok(BigUint::ZERO),
+        _ => Ok(Mutez::ZERO),
     }
 }
 
 fn compute_internal_meta_storage_fees<M: OperationStorageFees>(
     meta: &InternalContentWithMetadata<M>,
-) -> Result<BigUint, TransferError> {
+) -> Result<Mutez, TransferError> {
     compute_content_storage_fees(&meta.result)
 }
 
@@ -323,7 +328,7 @@ fn compute_internal_meta_storage_fees<M: OperationStorageFees>(
 /// operation, dispatching on its [`InternalOperationSum`] variant.
 pub fn compute_internal_op_storage_fees(
     op: &InternalOperationSum,
-) -> Result<BigUint, TransferError> {
+) -> Result<Mutez, TransferError> {
     match op {
         InternalOperationSum::Transfer(meta) => compute_internal_meta_storage_fees(meta),
         InternalOperationSum::Origination(meta) => {
@@ -596,7 +601,9 @@ mod tests {
         let pkh = PublicKeyHash::from_b58check(SOURCE_PKH).unwrap();
         let account = context::implicit_from_public_key_hash(&pkh).unwrap();
         account.allocate(tez_accounts).unwrap();
-        account.set_balance(tez_accounts, &balance.into()).unwrap();
+        account
+            .set_balance(tez_accounts, &Mutez::try_from(balance).unwrap())
+            .unwrap();
         account
     }
 
@@ -632,7 +639,7 @@ mod tests {
             storage_limit_remaining,
             nb_consumed_bytes,
         )?;
-        compute_storage_balance_updates(payer, fee.into())
+        Ok(compute_storage_balance_updates(payer, fee.into()))
     }
 
     /// Test wrapper around [`charge_internal_op_storage_fees`] that
@@ -651,7 +658,7 @@ mod tests {
             payer,
             &mut storage_limit_remaining,
             op,
-            0,
+            Mutez::ZERO,
         )?;
         if let Some(updates) = charged {
             op.set_balance_updates(updates);
@@ -678,7 +685,10 @@ mod tests {
 
         assert!(updates.is_empty(), "zero-byte burn must emit no updates");
         assert_eq!(
-            payer.balance(rk.tez_accounts()).expect("read balance"),
+            payer
+                .balance(rk.tez_accounts())
+                .expect("read balance")
+                .to_narith(),
             initial_balance.into(),
             "payer balance must be unchanged",
         );
@@ -710,7 +720,10 @@ mod tests {
         assert_eq!(updates[1].balance, Balance::StorageFees);
         assert_eq!(updates[1].changes, expected_to_burn as i64);
         assert_eq!(
-            payer.balance(rk.tez_accounts()).expect("read balance"),
+            payer
+                .balance(rk.tez_accounts())
+                .expect("read balance")
+                .to_narith(),
             (initial_balance - expected_to_burn).into(),
             "payer balance must drop by the burn amount",
         );
@@ -740,8 +753,11 @@ mod tests {
         match err {
             ApplyOperationError::CannotPayStorageFee(b) => {
                 assert_eq!(b.contract, payer.contract());
-                assert_eq!(b.balance, initial_balance.into());
-                assert_eq!(b.amount, (nb_consumed_bytes * COST_PER_BYTES).into());
+                assert_eq!(b.balance, Mutez::try_from(initial_balance).unwrap());
+                assert_eq!(
+                    b.amount,
+                    Mutez::try_from(nb_consumed_bytes * COST_PER_BYTES).unwrap()
+                );
             }
             other => panic!("expected CannotPayStorageFee(_), got {other:?}"),
         }
@@ -763,7 +779,10 @@ mod tests {
                 consumed_milligas: 0_u64.into(),
             });
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
     }
 
     /// A Transfer with `paid_storage_size_diff > 0` debits the payer
@@ -784,7 +803,7 @@ mod tests {
 
         let burn = 10 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (100_000 - burn).into(),
             "payer must drop by the burn amount"
         );
@@ -818,7 +837,10 @@ mod tests {
         let payer = init_payer(rk.tez_accounts_mut(), 1_000);
         let mut content = applied_transfer(TransferSuccess::default());
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
             panic!("expected Applied target");
         };
@@ -835,7 +857,10 @@ mod tests {
         let mut content: ContentResult<TransferContent> =
             ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            1_000_u64.into()
+        );
     }
 
     /// Insolvent payer for the top-level burn: returns a single
@@ -858,8 +883,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 5_u64.into(),
-                amount: (10 * COST_PER_BYTES).into(),
+                balance: Mutez::try_from(5_u64).unwrap(),
+                amount: Mutez::try_from(10 * COST_PER_BYTES).unwrap(),
             }),
         );
     }
@@ -890,7 +915,7 @@ mod tests {
 
         let burn = 4 * COST_PER_BYTES;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (100_000 - burn).into()
         );
 
@@ -934,7 +959,7 @@ mod tests {
         let variable = 38 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
         let ContentResult::Applied(success) = &content else {
@@ -981,7 +1006,7 @@ mod tests {
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(success) = &content else {
@@ -1027,8 +1052,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 62_u64.into(),
-                amount: SLOT_BURN.into(),
+                balance: Mutez::try_from(62_u64).unwrap(),
+                amount: Mutez::try_from(SLOT_BURN).unwrap(),
             }),
         );
 
@@ -1071,7 +1096,7 @@ mod tests {
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
 
@@ -1128,7 +1153,7 @@ mod tests {
         burn_content(rk.tez_accounts_mut(), &payer, u64::MAX, &mut content).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
@@ -1171,7 +1196,7 @@ mod tests {
         let variable = 10 * COST_PER_BYTES;
         let total = variable + SLOT_BURN;
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - total).into()
         );
         let ContentResult::Applied(TransferTarget::ToContract(success)) = &content else {
@@ -1231,8 +1256,8 @@ mod tests {
             err,
             ApplyOperationError::CannotPayStorageFee(BalanceTooLow {
                 contract: payer.contract(),
-                balance: 90_u64.into(),
-                amount: SLOT_BURN.into(),
+                balance: Mutez::try_from(90_u64).unwrap(),
+                amount: Mutez::try_from(SLOT_BURN).unwrap(),
             }),
         );
 
@@ -1274,7 +1299,7 @@ mod tests {
         burn_internal_op(rk.tez_accounts_mut(), &payer, u64::MAX, &mut op).unwrap();
 
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             (1_000_000 - SLOT_BURN).into()
         );
         let InternalOperationSum::Transfer(inner) = &op else {
@@ -1321,7 +1346,7 @@ mod tests {
 
         assert_eq!(trace, ApplyOperationError::OperationQuotaExceeded);
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into(),
             "payer balance must be untouched on quota failure",
         );
@@ -1399,7 +1424,8 @@ mod tests {
             allocated_destination_contract: true,
             ..Default::default()
         });
-        let expected = BigUint::from((10_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        let expected =
+            Mutez::try_from((10_u64 + ORIGINATION_SIZE) * COST_PER_BYTES).unwrap();
         assert_eq!(compute_content_storage_fees(&content).unwrap(), expected);
     }
 
@@ -1407,17 +1433,15 @@ mod tests {
     #[test]
     fn compute_transfer_no_growth_no_alloc_is_zero() {
         let content = applied_transfer(TransferSuccess::default());
-        assert_eq!(
-            compute_content_storage_fees(&content).unwrap(),
-            BigUint::ZERO
-        );
+        assert_eq!(compute_content_storage_fees(&content).unwrap(), Mutez::ZERO);
     }
 
     /// Origination always pays the slot, plus content when grown.
     #[test]
     fn compute_origination_content_plus_slot() {
         let content = applied_origination(origination_success(38));
-        let expected = BigUint::from((38_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        let expected =
+            Mutez::try_from((38_u64 + ORIGINATION_SIZE) * COST_PER_BYTES).unwrap();
         assert_eq!(compute_content_storage_fees(&content).unwrap(), expected);
     }
 
@@ -1428,10 +1452,7 @@ mod tests {
             ContentResult::Applied(RevealSuccess {
                 consumed_milligas: 0_u64.into(),
             });
-        assert_eq!(
-            compute_content_storage_fees(&content).unwrap(),
-            BigUint::ZERO
-        );
+        assert_eq!(compute_content_storage_fees(&content).unwrap(), Mutez::ZERO);
     }
 
     /// Non-Applied content (Failed, BackTracked, Skipped) yields
@@ -1440,10 +1461,7 @@ mod tests {
     fn compute_non_applied_is_zero() {
         let content: ContentResult<TransferContent> =
             ContentResult::Failed(ApplyOperationErrors { errors: vec![] });
-        assert_eq!(
-            compute_content_storage_fees(&content).unwrap(),
-            BigUint::ZERO
-        );
+        assert_eq!(compute_content_storage_fees(&content).unwrap(), Mutez::ZERO);
     }
 
     /// Internal-op dispatcher hits the per-kind summation through
@@ -1466,7 +1484,8 @@ mod tests {
             },
             result: ContentResult::Applied(origination_success(7)),
         });
-        let expected = BigUint::from((7_u64 + ORIGINATION_SIZE) * COST_PER_BYTES);
+        let expected =
+            Mutez::try_from((7_u64 + ORIGINATION_SIZE) * COST_PER_BYTES).unwrap();
         assert_eq!(compute_internal_op_storage_fees(&op).unwrap(), expected);
     }
 
@@ -1480,12 +1499,12 @@ mod tests {
             rk.tez_accounts_mut(),
             &payer,
             &mut storage_limit_remaining,
-            0,
+            Mutez::ZERO,
         )
         .unwrap();
         assert_eq!(storage_limit_remaining, BigUint::from(100u64));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into()
         );
     }
@@ -1496,7 +1515,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         // Pick V = 10 × COST_PER_BYTES to land exactly on 10 bytes.
-        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mutez_cost = Mutez::try_from(10 * COST_PER_BYTES).unwrap();
         let mut storage_limit_remaining = BigUint::from(100u64);
         burn_storage_cost(
             rk.tez_accounts_mut(),
@@ -1507,8 +1526,8 @@ mod tests {
         .expect("absorption must succeed when limit and balance suffice");
         assert_eq!(storage_limit_remaining, BigUint::from(90u64));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
-            (1_000_000_u64 - mutez_cost).into()
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
+            (1_000_000_u64 - mutez_cost.as_u64()).into()
         );
     }
 
@@ -1518,7 +1537,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let payer = init_payer(rk.tez_accounts_mut(), 1_000_000);
         // 10 bytes worth of cost, but the budget only allows 9.
-        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mutez_cost = Mutez::try_from(10 * COST_PER_BYTES).unwrap();
         let mut storage_limit_remaining = BigUint::from(9u64);
         let err = burn_storage_cost(
             rk.tez_accounts_mut(),
@@ -1529,7 +1548,7 @@ mod tests {
         .expect_err("overshoot must surface OperationQuotaExceeded");
         assert!(matches!(err, ApplyOperationError::OperationQuotaExceeded));
         assert_eq!(
-            payer.balance(rk.tez_accounts()).unwrap(),
+            payer.balance(rk.tez_accounts()).unwrap().to_narith(),
             1_000_000_u64.into(),
             "payer balance must be untouched when the limit check rejects the burn"
         );
@@ -1540,7 +1559,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let payer = init_payer(rk.tez_accounts_mut(), 5);
-        let mutez_cost: u64 = 10 * COST_PER_BYTES;
+        let mutez_cost = Mutez::try_from(10 * COST_PER_BYTES).unwrap();
         let mut storage_limit_remaining = BigUint::from(100u64);
         let err = burn_storage_cost(
             rk.tez_accounts_mut(),
@@ -1616,7 +1635,10 @@ mod tests {
             payer,
             storage_limit_remaining,
             &mut parent,
-            vec![crate::TaggedInternalOp::own(op, delegated_storage_cost)],
+            vec![crate::TaggedInternalOp::own(
+                op,
+                Mutez::try_from(delegated_storage_cost).unwrap(),
+            )],
         );
         assert_eq!(internals.len(), 1);
         (internals.pop().unwrap(), outcome)
@@ -1669,7 +1691,10 @@ mod tests {
             assert_eq!(op, internal_transfer(&payer.contract(), 0, status()));
         }
 
-        assert_eq!(payer.balance(rk.tez_accounts()).unwrap(), 1_000_u64.into());
+        assert_eq!(
+            payer.balance(rk.tez_accounts()).unwrap(),
+            Mutez::try_from(1_000_u64).unwrap()
+        );
         assert_eq!(storage_limit_remaining, BigUint::from(100_u64));
     }
 
@@ -1724,7 +1749,7 @@ mod tests {
         assert!(storage_limit_remaining.is_zero());
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (10_000 - 4 * COST_PER_BYTES - SLOT_BURN).into()
+            Mutez::try_from(10_000 - 4 * COST_PER_BYTES - SLOT_BURN).unwrap()
         );
 
         let mut storage_limit_remaining = BigUint::ZERO;
@@ -1823,7 +1848,7 @@ mod tests {
 
         assert_eq!(
             payer.balance(rk.tez_accounts()).unwrap(),
-            (10_000 - (4 + 10) * COST_PER_BYTES - 2 * SLOT_BURN).into()
+            Mutez::try_from(10_000 - (4 + 10) * COST_PER_BYTES - 2 * SLOT_BURN).unwrap()
         );
     }
 }

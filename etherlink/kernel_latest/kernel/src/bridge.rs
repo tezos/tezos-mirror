@@ -26,7 +26,7 @@ use tezos_ethereum::rlp_helpers::{
 use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_execution::account_storage::TezosAccount;
+use tezos_execution::account_storage::add_balance;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -545,38 +545,35 @@ where
 
             let depositor = Contract::Implicit(source.clone());
 
-            let (result, internal_operation_results) = match TezosRuntime::add_balance(
-                rk.tez_accounts_mut(),
-                pkh,
-                U256::from(amount.as_u64()),
-            ) {
-                Ok(()) => {
-                    let event = build_deposit_event(
-                        depositor.clone(),
-                        deposit.inbox_level,
-                        deposit.inbox_msg_id,
-                    )?;
-                    let success = TransferSuccess {
-                        balance_updates: BalanceUpdate::transfer(
-                            depositor,
-                            receiver,
-                            amount.as_u64(),
-                        ),
-                        ..TransferSuccess::default()
-                    };
-                    (
-                        ContentResult::Applied(TransferTarget::ToContract(success)),
-                        vec![event],
-                    )
-                }
-                Err(err) => {
-                    log!(Info, "Deposit failed because of {err}");
-                    (
-                        ContentResult::Failed(ApplyOperationErrors { errors: vec![] }),
-                        vec![],
-                    )
-                }
-            };
+            let (result, internal_operation_results) =
+                match TezosRuntime::add_balance(rk.tez_accounts_mut(), pkh, amount) {
+                    Ok(()) => {
+                        let event = build_deposit_event(
+                            depositor.clone(),
+                            deposit.inbox_level,
+                            deposit.inbox_msg_id,
+                        )?;
+                        let success = TransferSuccess {
+                            balance_updates: BalanceUpdate::transfer(
+                                depositor, receiver, amount,
+                            ),
+                            ..TransferSuccess::default()
+                        };
+                        (
+                            ContentResult::Applied(TransferTarget::ToContract(success)),
+                            vec![event],
+                        )
+                    }
+                    Err(err) => {
+                        log!(Info, "Deposit failed because of {err}");
+                        (
+                            ContentResult::Failed(ApplyOperationErrors {
+                                errors: vec![],
+                            }),
+                            vec![],
+                        )
+                    }
+                };
 
             let applied_operation = AppliedOperation {
                 hash: transaction_hash.into(),
@@ -623,14 +620,14 @@ pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
 fn tezlink_deposit(
     tez_accounts: &mut impl KeySpace,
-    amount: u64,
+    amount: Mutez,
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError> {
     let to_account = tezos_execution::context::implicit_from_contract(&receiver)?;
 
     let _was_allocated = to_account.allocate(tez_accounts)?;
 
-    match to_account.add_balance(tez_accounts, amount) {
+    match add_balance(&to_account, tez_accounts, amount) {
         Ok(()) => {
             let mut success = TransferSuccess::default();
             let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR).unwrap();
@@ -665,7 +662,7 @@ pub fn execute_tezlink_deposit(
         parameters: Parameters::default(),
     };
 
-    let result = match tezlink_deposit(tez_accounts, amount.as_u64(), receiver) {
+    let result = match tezlink_deposit(tez_accounts, amount, receiver) {
         Ok(success) => ContentResult::Applied(TransferTarget::ToContract(success)),
         Err(err) => ContentResult::Failed(ApplyOperationErrors {
             errors: vec![err.into()],
@@ -701,6 +698,7 @@ mod tests {
         ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair,
     };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
+    use tezos_smart_rollup_keyspace::KeySpace;
 
     use crate::{
         apply::{EthereumTransactionResult, ExecutionResult, RuntimeTransactionResult},
@@ -710,8 +708,16 @@ mod tests {
     use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
     use revm_etherlink::storage::world_state_handler::StorageAccount;
 
-    use super::{apply_tezosx_xtz_deposit, BridgeError, Deposit, Mutez};
+    use super::{
+        apply_tezosx_xtz_deposit, execute_tezlink_deposit, BridgeError, ContentResult,
+        Deposit, Mutez, OperationDataAndMetadata, OperationResult, OperationResultSum,
+        TezosRuntime, TransferError,
+    };
+    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_execution::account_storage::TezosAccount;
+    use tezos_tezlink::operation_result::ApplyOperationError;
+    use tezosx_types::ONE_MUTEZ_WEI;
 
     mod xtz_events {
         alloy_sol_types::sol! {
@@ -1118,6 +1124,97 @@ mod tests {
         let feed_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
         let feed_info = feed_account.info(rk.eth_accounts_mut()).unwrap();
         assert_eq!(feed_info.balance, alloy_primitives::U256::ZERO);
+    }
+
+    fn full_tezos_receiver(tez_accounts: &mut impl KeySpace) -> PublicKeyHash {
+        let pkh =
+            PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap();
+        TezosRuntime::add_balance(tez_accounts, &pkh, Mutez::MAX).unwrap();
+        pkh
+    }
+
+    fn tezos_balance(tez_accounts: &impl KeySpace, pkh: &PublicKeyHash) -> Mutez {
+        tezos_execution::context::implicit_from_public_key_hash(pkh)
+            .unwrap()
+            .balance(tez_accounts)
+            .unwrap()
+    }
+
+    #[test]
+    fn tezosx_deposit_to_full_tezos_balance_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let registry = &RegistryImpl::default();
+        init_precompile_bytecodes(rk.eth_accounts_mut(), true).unwrap();
+
+        let pkh = full_tezos_receiver(rk.tez_accounts_mut());
+        let deposit = Deposit {
+            amount: U256::from(ONE_MUTEZ_WEI),
+            receiver: DepositReceiver::Tezos(Contract::Implicit(pkh.clone())),
+            ..dummy_deposit()
+        };
+
+        let limits = EvmLimits::default();
+        let execution_result = apply_tezosx_xtz_deposit(
+            &mut rk,
+            registry,
+            &deposit,
+            &BlockConstants::first_block(
+                U256::zero(),
+                U256::zero(),
+                BlockFees::new(
+                    limits.minimum_base_fee_per_gas,
+                    U256::zero(),
+                    U256::zero(),
+                ),
+                limits.maximum_gas_limit,
+                H160::zero(),
+                &SpecId::default(),
+            ),
+            [0; TRANSACTION_HASH_SIZE],
+            None,
+            &limits,
+        )
+        .unwrap();
+        let ExecutionResult::Valid(RuntimeTransactionResult::Tezos { op, .. }) =
+            execution_result
+        else {
+            panic!("Deposit is invalid")
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(batch) = op.op_and_receipt;
+        assert!(matches!(
+            &batch.operations[0].receipt,
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::Failed(_),
+                ..
+            })
+        ));
+        assert_eq!(tezos_balance(rk.tez_accounts(), &pkh), Mutez::MAX);
+    }
+
+    #[test]
+    fn tezlink_deposit_to_full_balance_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let pkh = full_tezos_receiver(rk.tez_accounts_mut());
+        let deposit = Deposit {
+            amount: U256::from(ONE_MUTEZ_WEI),
+            receiver: DepositReceiver::Tezos(Contract::Implicit(pkh.clone())),
+            ..dummy_deposit()
+        };
+
+        let result = execute_tezlink_deposit(rk.tez_accounts_mut(), &deposit).unwrap();
+        let (ContentResult::Failed(errors), _) = result.outcome else {
+            panic!("Deposit to a full balance must fail")
+        };
+        assert!(matches!(
+            errors.errors.as_slice(),
+            [ApplyOperationError::Transfer(TransferError::DepositError(
+                _
+            ))]
+        ));
+        assert_eq!(tezos_balance(rk.tez_accounts(), &pkh), Mutez::MAX);
     }
 
     #[test]

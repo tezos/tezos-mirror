@@ -49,6 +49,7 @@ use tezosx_interfaces::{
     CrossRuntimeContext, Gas as TezosXGas, Registry, RoutingDecision, RuntimeId,
     TezosXRuntimeError, ALIAS_LOOKUP_COST,
 };
+use tezosx_types::Mutez;
 
 /// A journal of state changes internal to the EVM
 ///
@@ -686,7 +687,7 @@ pub enum MaterializedAlias {
         alias: String,
         /// Storage cost in mutez that the creation delegates to the caller,
         /// or `None` when it delegates none.
-        delegated_storage_cost: Option<u64>,
+        delegated_storage_cost: Option<Mutez>,
     },
 }
 
@@ -703,7 +704,7 @@ pub struct ResolvedAliasCost {
     /// Storage cost the target runtime delegates to the caller, in mutez
     /// (`None` when it makes no claim). Forwarded verbatim from
     /// `AliasResolution.delegated_storage_cost`.
-    pub delegated_storage_cost: Option<u64>,
+    pub delegated_storage_cost: Option<Mutez>,
 }
 
 /// Trait for cross-runtime call support on the journal.

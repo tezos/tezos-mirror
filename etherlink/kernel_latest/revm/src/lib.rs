@@ -1259,7 +1259,7 @@ mod test {
                     .get(tezosx_interfaces::X_TEZOS_AMOUNT)
                     .and_then(|v| v.to_str().ok())
                     .and_then(|s| tezosx_interfaces::headers::parse_tez_to_mutez(s).ok())
-                    .unwrap_or(0);
+                    .unwrap_or(tezosx_types::Mutez::ZERO);
 
                 // Store the balance keyed by the address string from the URL
                 let key = mock_tezos_balance_key(address_str.as_bytes()).unwrap();
@@ -1269,7 +1269,7 @@ mod test {
                     .get_u256_le_or(&key, primitive_types::U256::zero());
 
                 let new_balance = current_balance
-                    .checked_add(primitive_types::U256::from(amount))
+                    .checked_add(primitive_types::U256::from(amount.as_u64()))
                     .expect("Balance overflow");
                 rk.tez_accounts_mut()
                     .store_u256_le(&key, new_balance)

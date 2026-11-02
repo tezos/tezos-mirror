@@ -30,7 +30,8 @@ use tezos_smart_rollup_keyspace::{
 };
 use tezos_storage::error::StorageReadErrorKind;
 use tezos_storage::keyspace::KeySpaceExtBounded;
-use tezosx_interfaces::{Origin, TezosXRuntimeError};
+use tezosx_interfaces::Origin;
+use tezosx_types::{Mutez, MutezError};
 
 // Key of the RLP info record, under `key_to_implicit_account_prefix`. The
 // record holds the balance, the counter and, after a reveal, the public key.
@@ -82,14 +83,15 @@ pub trait TezosAccount {
     /// Get the **balance** of an account in Mutez held by the account.
     /// Each account kind reads it from its own storage layout (RLP `/info`
     /// for implicit accounts, the `/balance` key for originated ones), so
-    /// there is no shared default.
+    /// there is no shared default. A stored value outside the mutez domain
+    /// is a hard error: corruption to report, not a state to reach.
     ///
     /// Fails with a read error at the key that holds the balance when the stored value
     /// does not decode.
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>>;
+    ) -> Result<Mutez, KeySpaceError<StorageReadErrorKind>>;
 
     /// Set the **balance** of an account in Mutez held by the account.
     ///
@@ -98,29 +100,47 @@ pub trait TezosAccount {
     fn set_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
-        balance: &Narith,
+        balance: &Mutez,
     ) -> Result<(), KeySpaceError>;
+}
 
-    /// Add amount (in Mutez) to the **balance** held by the account.
-    ///
-    /// Delegates to `self.balance()` and `self.set_balance()`, so each account
-    /// kind's own implementation of those (e.g. the implicit account's RLP
-    /// `/info` storage) is used without needing to provide `add_balance` too.
-    ///
-    /// TODO: In TezosX, this causes two storage reads + two RLP decodes
-    /// (one in balance(), one in set_balance()). If add_balance becomes
-    /// a hot path, TezosX should override it with a single
-    /// read-modify-write on the RLP blob.
-    ///
-    /// Fails as [`Self::balance`] and [`Self::set_balance`] do.
-    fn add_balance(
-        &self,
-        tez_accounts: &mut impl KeySpace,
-        amount: u64,
-    ) -> Result<(), KeySpaceError<StorageReadErrorKind>> {
-        let current = self.balance(tez_accounts)?;
-        self.set_balance(tez_accounts, &Narith(current.0 + amount))?;
-        Ok(())
+/// Why [`add_balance`] failed.
+#[derive(Debug, thiserror::Error)]
+pub enum CreditError {
+    /// Reading or writing the balance failed.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
+    /// The credit would push the balance past the mutez domain.
+    #[error("the credit would push the balance past the mutez domain: {0}")]
+    BalanceOverflow(MutezError),
+}
+
+/// Adds `amount` to the balance of `account`.
+///
+/// TODO: In TezosX, this causes two storage reads + two RLP decodes
+/// (one in balance(), one in set_balance()). If add_balance becomes
+/// a hot path, TezosX should replace it with a single
+/// read-modify-write on the RLP blob.
+///
+/// Fails as [`TezosAccount::balance`] and [`TezosAccount::set_balance`] do,
+/// and with [`CreditError::BalanceOverflow`] when the credit would push the
+/// balance past the mutez domain.
+pub fn add_balance(
+    account: &impl TezosAccount,
+    tez_accounts: &mut impl KeySpace,
+    amount: Mutez,
+) -> Result<(), CreditError> {
+    let current = account.balance(tez_accounts)?;
+    let new_balance = current
+        .checked_add(amount)
+        .map_err(CreditError::BalanceOverflow)?;
+    account.set_balance(tez_accounts, &new_balance)?;
+    Ok(())
+}
+
+impl From<KeySpaceError> for CreditError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
     }
 }
 
@@ -153,16 +173,16 @@ impl TezosAccount for TezosOriginatedAccount {
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>> {
+    ) -> Result<Mutez, KeySpaceError<StorageReadErrorKind>> {
         Ok(tez_accounts
             .read_nom_bounded(&self.balance_key, NARITH_FIELD_MAX_BYTES)?
-            .unwrap_or(0_u64.into()))
+            .unwrap_or(Mutez::ZERO))
     }
 
     fn set_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
-        balance: &Narith,
+        balance: &Mutez,
     ) -> Result<(), KeySpaceError> {
         tez_accounts.store_bin(&self.balance_key, balance)
     }
@@ -875,29 +895,10 @@ impl TezosOriginatedAccount {
     }
 }
 
-pub fn narith_to_u256(
-    narith: &Narith,
-) -> Result<primitive_types::U256, TezosXRuntimeError> {
-    let bytes = narith.0.to_bytes_be();
-    if bytes.len() <= 32 {
-        Ok(primitive_types::U256::from_big_endian(&bytes))
-    } else {
-        Err(TezosXRuntimeError::ConversionError(
-            "Narith value too large to fit in U256".to_string(),
-        ))
-    }
-}
-
-pub fn u256_to_narith(value: &primitive_types::U256) -> Narith {
-    let mut bytes = [0u8; 32];
-    value.to_big_endian(&mut bytes);
-    Narith(num_bigint::BigUint::from_bytes_be(&bytes))
-}
-
 // Used as a value for the durable storage.
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TezosAccountInfo {
-    pub balance: U256,
+    pub balance: Mutez,
     pub nonce: u64,
     pub pub_key: Option<PublicKey>,
 }
@@ -905,7 +906,7 @@ pub struct TezosAccountInfo {
 impl Encodable for TezosAccountInfo {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(3);
-        append_u256_le(s, &self.balance);
+        append_u256_le(s, &U256::from(self.balance.as_u64()));
         append_u64_le(s, &self.nonce);
         match &self.pub_key {
             Some(pub_key) => s.append(&pub_key.to_b58check().as_bytes()),
@@ -924,7 +925,12 @@ impl Decodable for TezosAccountInfo {
         }
         let mut it = rlp.iter();
         let balance_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
-        let balance = decode_field_u256_le(&balance_decoder, "balance")?;
+        let balance = u64::try_from(decode_field_u256_le(&balance_decoder, "balance")?)
+            .ok()
+            .and_then(|balance| Mutez::try_from(balance).ok())
+            .ok_or(rlp::DecoderError::Custom(
+                "balance outside the mutez domain",
+            ))?;
         let nonce_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
         let nonce = decode_field_u64_le(&nonce_decoder, "nonce")?;
         let pub_key_decoder = it.next().ok_or(rlp::DecoderError::RlpExpectedToBeList)?;
@@ -1021,11 +1027,9 @@ impl TezosAccount for TezosImplicitAccount {
     fn balance(
         &self,
         tez_accounts: &impl KeySpace,
-    ) -> Result<Narith, KeySpaceError<StorageReadErrorKind>> {
-        match get_tezos_account_info_at(tez_accounts, &self.key)? {
-            Some(info) => Ok(u256_to_narith(&info.balance)),
-            None => Ok(Narith::from(0u64)),
-        }
+    ) -> Result<Mutez, KeySpaceError<StorageReadErrorKind>> {
+        Ok(get_tezos_account_info_at(tez_accounts, &self.key)?
+            .map_or(Mutez::ZERO, |info| info.balance))
     }
 
     /// Also fails with a read error when the record of the account does not decode, and
@@ -1033,16 +1037,10 @@ impl TezosAccount for TezosImplicitAccount {
     fn set_balance(
         &self,
         tez_accounts: &mut impl KeySpace,
-        balance: &Narith,
+        balance: &Mutez,
     ) -> Result<(), KeySpaceError> {
         let mut info = get_tezos_account_info_or_init_at(tez_accounts, &self.key)?;
-        info.balance = narith_to_u256(balance).map_err(|e| {
-            KeySpaceError::write(
-                tez_accounts.name(),
-                &self.key,
-                WriteKind::Encode(BinError::custom(e.to_string())),
-            )
-        })?;
+        info.balance = *balance;
         set_tezos_account_info_at(tez_accounts, &self.key, info)
     }
 }
@@ -1190,37 +1188,6 @@ impl TezosImplicitAccount {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use super::narith_to_u256;
-    use primitive_types::U256;
-    use tezos_data_encoding::types::Narith;
-
-    #[test]
-    fn convert_narith_u256() {
-        let narith = Narith::from(123456789u64);
-        let u256_value = narith_to_u256(&narith).unwrap();
-        assert_eq!(u256_value.low_u64(), 123456789u64);
-    }
-
-    #[test]
-    fn convert_u256_narith() {
-        let big_value = U256::from_dec_str("123456789012345678901234567890").unwrap();
-        let narith_value = super::u256_to_narith(&big_value);
-        let expected_narith = Narith(
-            num_bigint::BigUint::from_str("123456789012345678901234567890").unwrap(),
-        );
-        assert_eq!(narith_value, expected_narith);
-    }
-
-    #[test]
-    fn narith_u256_overflow() {
-        let u256_value = U256::MAX;
-        let narith_value = super::u256_to_narith(&u256_value);
-        let narith_value = Narith(narith_value.0 + num_bigint::BigUint::from(1u64));
-        let _ = narith_to_u256(&narith_value).expect_err("Should error on overflow");
-    }
-
     #[test]
     fn set_manager_public_key_reveals_manager() {
         use super::Manager;
@@ -1256,9 +1223,7 @@ mod test {
     #![allow(clippy::disallowed_methods)]
 
     use super::*;
-    use crate::account_storage::{
-        narith_to_u256, TezosAccountInfo, TezosImplicitAccount,
-    };
+    use crate::account_storage::{TezosAccountInfo, TezosImplicitAccount};
     use crate::context::{
         implicit_from_contract, implicit_from_public_key_hash, originated_from_contract,
     };
@@ -1266,6 +1231,7 @@ mod test {
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezosx_interfaces::TezosXRuntimeError;
 
     /// Build the live implicit account for `pkh` (RLP `/info` layout).
     fn implicit(pkh: &PublicKeyHash) -> TezosImplicitAccount {
@@ -1339,7 +1305,7 @@ mod test {
             rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
-                balance: narith_to_u256(&balance).unwrap(),
+                balance: Mutez::try_from(&balance).unwrap(),
                 nonce: 0,
                 pub_key: None,
             },
@@ -1351,7 +1317,7 @@ mod test {
             .balance(rk.tez_accounts())
             .expect("read_balance should have succeeded");
 
-        assert_eq!(balance, read_balance);
+        assert_eq!(balance, read_balance.to_narith());
     }
 
     #[test]
@@ -1368,7 +1334,7 @@ mod test {
             rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
-                balance: U256::zero(),
+                balance: Mutez::ZERO,
                 nonce: 3,
                 pub_key: None,
             },
@@ -1388,7 +1354,7 @@ mod test {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let balance = 4579_u64.into();
+        let balance = Mutez::try_from(4579_u64).unwrap();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
@@ -1404,6 +1370,93 @@ mod test {
             .expect("read_balance should have succeeded");
 
         assert_eq!(balance, read_balance);
+    }
+
+    /// A raw-stored balance past the mutez domain (`> i64::MAX`) is a
+    /// hard read error — corruption to report, not a state to reach.
+    #[test]
+    fn test_read_balance_out_of_domain_is_hard_error() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
+            .expect("PublicKeyHash base58 conversion should succeeded");
+
+        // i64::MAX + 1: outside the mutez domain.
+        let out_of_domain_balance = U256::from(i64::MAX as u128 + 1);
+
+        let mut record = rlp::RlpStream::new();
+        record.begin_list(3);
+        append_u256_le(&mut record, &out_of_domain_balance);
+        append_u64_le(&mut record, &0);
+        record.append_empty_data();
+        rk.tez_accounts_mut()
+            .write(&key_to_tezos_account(&pkh).unwrap(), 0, record.out())
+            .expect("seeding the raw account info should succeed");
+
+        let account = implicit(&pkh);
+
+        assert!(
+            account.balance(rk.tez_accounts()).is_err(),
+            "a stored balance past the mutez domain must be a read error"
+        );
+    }
+
+    /// Same as [`test_read_balance_out_of_domain_is_hard_error`] for the
+    /// originated (`KT1`) `/balance` layout: a raw-stored `Narith` past the
+    /// mutez domain is a hard read error.
+    #[test]
+    fn test_read_kt1_balance_out_of_domain_is_hard_error() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let contract = Contract::from_b58check(KT1)
+            .expect("Contract base58 conversion should succeeded");
+        let account = originated(&contract);
+
+        // i64::MAX + 1: outside the mutez domain.
+        let out_of_domain_balance: Narith = (i64::MAX as u64 + 1).into();
+
+        rk.tez_accounts_mut()
+            .store_bin(&account.balance_key, &out_of_domain_balance)
+            .expect("seeding the raw balance should have succeeded");
+
+        assert!(
+            account.balance(rk.tez_accounts()).is_err(),
+            "a stored balance past the mutez domain must be a read error"
+        );
+    }
+
+    /// A credit that would push the balance past the mutez domain
+    /// (`Mutez::MAX`) is an error, not an unbounded add.
+    #[test]
+    fn test_add_balance_past_domain_errors() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
+            .expect("Contract base58 conversion should succeeded");
+        let account = implicit_of(&contract);
+
+        account
+            .set_balance(rk.tez_accounts_mut(), &Mutez::MAX)
+            .expect("set_balance should have succeeded");
+
+        let result = add_balance(
+            &account,
+            rk.tez_accounts_mut(),
+            Mutez::try_from(1u64).unwrap(),
+        );
+
+        assert!(
+            result.is_err(),
+            "crediting past Mutez::MAX must error instead of wrapping"
+        );
+        assert_eq!(
+            account.balance(rk.tez_accounts()).unwrap(),
+            Mutez::MAX,
+            "a rejected credit must not mutate the stored balance"
+        );
     }
 
     #[test]
@@ -1442,7 +1495,7 @@ mod test {
             rk.tez_accounts_mut(),
             &pkh,
             TezosAccountInfo {
-                balance: U256::zero(),
+                balance: Mutez::ZERO,
                 nonce: 0,
                 pub_key: Some(public_key),
             },
@@ -1546,7 +1599,7 @@ mod test {
 
         assert!(exist);
 
-        let test_balance = 1999_u64.into();
+        let test_balance = Mutez::try_from(1999_u64).unwrap();
 
         account
             .set_balance(rk.tez_accounts_mut(), &test_balance)

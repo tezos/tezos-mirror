@@ -7,7 +7,7 @@
 //! Each runtime re-uses these low-level extractors when building its own
 //! typed `parse_request_headers` function.
 
-use crate::{Gas, TezosXRuntimeError, MAX_CRAC_DEPTH};
+use crate::{Gas, Mutez, MutezError, TezosXRuntimeError, MAX_CRAC_DEPTH};
 use primitive_types::U256;
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -108,19 +108,34 @@ pub fn parse_u32_default(
     }
 }
 
-/// Extract an optional `u64` header. Returns `None` when the header
-/// is absent, `Some(value)` when it is present and well-formed. Parse
-/// failure (header present but malformed) surfaces as `HeaderError`.
-pub fn parse_u64_opt(
+/// Failure to read a mutez header with [`parse_mutez_opt`].
+#[derive(Debug, thiserror::Error)]
+pub enum MutezHeaderError {
+    /// The value is not a `u64`, or the header cannot be read.
+    #[error(transparent)]
+    Malformed(TezosXRuntimeError),
+    /// The value is a `u64` outside the mutez domain.
+    #[error(transparent)]
+    OutOfDomain(MutezError),
+}
+
+/// Extract an optional mutez header. Returns `None` when the header is
+/// absent, `Some(amount)` when it holds an amount of the mutez domain.
+pub fn parse_mutez_opt(
     headers: &http::HeaderMap,
     name: &str,
-) -> Result<Option<u64>, TezosXRuntimeError> {
-    match parse_str(headers, name)? {
-        Some(s) => s.parse::<u64>().map(Some).map_err(|_| {
-            TezosXRuntimeError::HeaderError(format!(
-                "Invalid {name} header value: expected u64, got {s:?}"
-            ))
-        }),
+) -> Result<Option<Mutez>, MutezHeaderError> {
+    match parse_str(headers, name).map_err(MutezHeaderError::Malformed)? {
+        Some(s) => {
+            let value = s.parse::<u64>().map_err(|_| {
+                MutezHeaderError::Malformed(TezosXRuntimeError::HeaderError(format!(
+                    "Invalid {name} header value: expected u64, got {s:?}"
+                )))
+            })?;
+            Mutez::try_from(value)
+                .map(Some)
+                .map_err(MutezHeaderError::OutOfDomain)
+        }
         None => Ok(None),
     }
 }
@@ -148,9 +163,8 @@ pub fn check_crac_depth(depth: u32) -> Result<(), TezosXRuntimeError> {
 // TEZ decimal-string formatting and parsing
 // ---------------------------------------------------------------------------
 // TODO: https://linear.app/tezos/issue/L2-2021
-//   Retype this amount seam on the crate's `Mutez`/`Wei` (in the
-//   signatures instead of raw `u64`/`U256`) and tighten the inbound mutez
-//   cap to the mutez domain bound (`i64::MAX`).
+//   Retype the wei side of this amount seam on the crate's `Wei` (in the
+//   signatures instead of raw `U256`).
 
 /// Format a wei amount (`10^-18 TEZ`) as a canonical TEZ decimal string.
 ///
@@ -164,8 +178,8 @@ pub fn format_tez_from_wei(wei: U256) -> String {
 /// Format a mutez amount (`10^-6 TEZ`) as a canonical TEZ decimal string.
 ///
 /// Examples: `0` → `"0"`, `10^6` → `"1"`, `1` → `"0.000001"`.
-pub fn format_tez_from_mutez(mutez: u64) -> String {
-    format_tez_amount(U256::from(mutez), 6)
+pub fn format_tez_from_mutez(mutez: Mutez) -> String {
+    format_tez_amount(U256::from(mutez.as_u64()), 6)
 }
 
 /// Parse a TEZ decimal string into wei (`10^-18 TEZ`).
@@ -178,17 +192,19 @@ pub fn parse_tez_to_wei(s: &str) -> Result<U256, TezosXRuntimeError> {
 
 /// Parse a TEZ decimal string into mutez (`10^-6 TEZ`).
 ///
-/// Truncates excess decimal places beyond 6 (ADR L2-1004).
-pub fn parse_tez_to_mutez(s: &str) -> Result<u64, TezosXRuntimeError> {
+/// Truncates excess decimal places beyond 6 (ADR L2-1004). A malformed
+/// string is a `HeaderError`; an amount outside the mutez domain is a
+/// `BadRequest`.
+pub fn parse_tez_to_mutez(s: &str) -> Result<Mutez, TezosXRuntimeError> {
     let amount = parse_tez_amount(s, 6).map_err(|e| {
         TezosXRuntimeError::HeaderError(format!("Invalid TEZ amount: {e}"))
     })?;
-    if amount > U256::from(u64::MAX) {
-        return Err(TezosXRuntimeError::HeaderError(
-            "TEZ amount too large for mutez".to_string(),
-        ));
-    }
-    Ok(amount.as_u64())
+    let amount = u64::try_from(amount).map_err(|_| {
+        TezosXRuntimeError::BadRequest(format!(
+            "TEZ amount {s} does not fit in the mutez domain"
+        ))
+    })?;
+    Mutez::try_from(amount).map_err(|e| TezosXRuntimeError::BadRequest(e.to_string()))
 }
 
 fn format_tez_amount(amount: U256, decimals: usize) -> String {
@@ -297,6 +313,48 @@ mod tests {
     use super::*;
     use crate::{X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_TIMESTAMP};
 
+    fn mutez(value: u64) -> Mutez {
+        Mutez::try_from(value).unwrap()
+    }
+
+    #[test]
+    fn parse_mutez_opt_returns_none_for_absent_header() {
+        let map = http::HeaderMap::new();
+        assert_eq!(parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap(), None);
+    }
+
+    #[test]
+    fn parse_mutez_opt_parses_domain_amount() {
+        let mut map = http::HeaderMap::new();
+        map.insert(X_TEZOS_AMOUNT, http::HeaderValue::from_static("1500000"));
+        assert_eq!(
+            parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap(),
+            Some(mutez(1_500_000))
+        );
+    }
+
+    #[test]
+    fn parse_mutez_opt_rejects_malformed_as_malformed() {
+        let mut map = http::HeaderMap::new();
+        map.insert(X_TEZOS_AMOUNT, http::HeaderValue::from_static("1.5"));
+        let err = parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap_err();
+        assert!(matches!(
+            err,
+            MutezHeaderError::Malformed(TezosXRuntimeError::HeaderError(_))
+        ));
+    }
+
+    #[test]
+    fn parse_mutez_opt_rejects_out_of_domain_as_out_of_domain() {
+        let mut map = http::HeaderMap::new();
+        map.insert(
+            X_TEZOS_AMOUNT,
+            http::HeaderValue::from_static("9223372036854775808"),
+        );
+        let err = parse_mutez_opt(&map, X_TEZOS_AMOUNT).unwrap_err();
+        assert!(matches!(err, MutezHeaderError::OutOfDomain(_)));
+    }
+
     #[test]
     fn parse_str_returns_none_for_absent_header() {
         let map = http::HeaderMap::new();
@@ -395,24 +453,24 @@ mod tests {
 
     #[test]
     fn format_mutez_zero() {
-        assert_eq!(format_tez_from_mutez(0), "0");
+        assert_eq!(format_tez_from_mutez(Mutez::ZERO), "0");
     }
 
     #[test]
     fn format_mutez_one_tez() {
-        assert_eq!(format_tez_from_mutez(1_000_000), "1");
+        assert_eq!(format_tez_from_mutez(mutez(1_000_000)), "1");
     }
 
     #[test]
     fn format_mutez_fractional() {
         // 1.5 TEZ = 1_500_000 mutez
-        assert_eq!(format_tez_from_mutez(1_500_000), "1.5");
+        assert_eq!(format_tez_from_mutez(mutez(1_500_000)), "1.5");
     }
 
     #[test]
     fn format_mutez_smallest() {
         // 0.000001 TEZ = 1 mutez
-        assert_eq!(format_tez_from_mutez(1), "0.000001");
+        assert_eq!(format_tez_from_mutez(mutez(1)), "0.000001");
     }
 
     // --- TEZ parsing tests ---
@@ -455,31 +513,31 @@ mod tests {
 
     #[test]
     fn parse_mutez_zero() {
-        assert_eq!(parse_tez_to_mutez("0").unwrap(), 0);
+        assert_eq!(parse_tez_to_mutez("0").unwrap(), Mutez::ZERO);
     }
 
     #[test]
     fn parse_mutez_one_tez() {
-        assert_eq!(parse_tez_to_mutez("1").unwrap(), 1_000_000);
+        assert_eq!(parse_tez_to_mutez("1").unwrap(), mutez(1_000_000));
     }
 
     #[test]
     fn parse_mutez_fractional() {
-        assert_eq!(parse_tez_to_mutez("1.5").unwrap(), 1_500_000);
+        assert_eq!(parse_tez_to_mutez("1.5").unwrap(), mutez(1_500_000));
     }
 
     #[test]
     fn parse_mutez_smallest() {
-        assert_eq!(parse_tez_to_mutez("0.000001").unwrap(), 1);
+        assert_eq!(parse_tez_to_mutez("0.000001").unwrap(), mutez(1));
     }
 
     #[test]
     fn parse_mutez_truncates_excess_decimals() {
         // "0.0000001" has 7 decimals; mutez precision is 6.
         // ADR L2-1004: truncate to "0.000000" = 0 mutez.
-        assert_eq!(parse_tez_to_mutez("0.0000001").unwrap(), 0);
+        assert_eq!(parse_tez_to_mutez("0.0000001").unwrap(), Mutez::ZERO);
         // "1.1234567" truncates to "1.123456" = 1_123_456 mutez.
-        assert_eq!(parse_tez_to_mutez("1.1234567").unwrap(), 1_123_456);
+        assert_eq!(parse_tez_to_mutez("1.1234567").unwrap(), mutez(1_123_456));
     }
 
     // --- Round-trip tests ---
@@ -505,14 +563,35 @@ mod tests {
 
     #[test]
     fn roundtrip_mutez() {
-        for mutez in [0, 1, 1_000_000, 1_500_000, 123_456, u64::MAX] {
-            let s = format_tez_from_mutez(mutez);
+        for value in [0, 1, 1_000_000, 1_500_000, 123_456, i64::MAX as u64] {
+            let amount = mutez(value);
+            let s = format_tez_from_mutez(amount);
             assert_eq!(
                 parse_tez_to_mutez(&s).unwrap(),
-                mutez,
+                amount,
                 "round-trip failed for {s}"
             );
         }
+    }
+
+    #[test]
+    fn parse_mutez_accepts_domain_max() {
+        assert_eq!(
+            parse_tez_to_mutez("9223372036854.775807").unwrap(),
+            Mutez::MAX
+        );
+    }
+
+    #[test]
+    fn parse_mutez_above_domain_is_bad_request() {
+        let err = parse_tez_to_mutez("9223372036854.775808").unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::BadRequest(_)));
+    }
+
+    #[test]
+    fn parse_mutez_above_u64_is_bad_request() {
+        let err = parse_tez_to_mutez("18446744073709.551616").unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::BadRequest(_)));
     }
 
     // --- Error cases ---

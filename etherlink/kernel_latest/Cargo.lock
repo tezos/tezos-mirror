@@ -3404,6 +3404,7 @@ dependencies = [
  "tezosx-constants",
  "tezosx-interfaces",
  "tezosx-journal",
+ "tezosx-types",
  "thiserror 1.0.69",
  "typed-arena",
 ]

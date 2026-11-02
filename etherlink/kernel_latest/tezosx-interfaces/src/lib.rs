@@ -25,6 +25,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 #[cfg(feature = "testing")]
 use tezos_smart_rollup_keyspace::KeySpace;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezosx_types::Mutez;
 
 /// Result of an alias-resolution call.
 ///
@@ -35,11 +36,10 @@ pub struct AliasResolution {
     /// Gas remaining after the resolution work has been deducted, in the
     /// target runtime's unit.
     pub gas_remaining: Gas,
-    /// Storage cost the target runtime asks the caller to bill, in
-    /// mutez, for bytes allocated during this resolution. `None` when
-    /// the target runtime makes no claim on the caller for this
-    /// materialization.
-    pub delegated_storage_cost: Option<u64>,
+    /// Storage cost the target runtime asks the caller to bill, for
+    /// bytes allocated during this resolution. `None` when the target
+    /// runtime makes no claim on the caller for this materialization.
+    pub delegated_storage_cost: Option<Mutez>,
 }
 
 impl AliasResolution {
@@ -52,7 +52,7 @@ impl AliasResolution {
 
     pub fn build_with_delegated_storage_cost(
         gas_remaining: Gas,
-        delegated_storage_cost: u64,
+        delegated_storage_cost: Mutez,
     ) -> Self {
         Self {
             gas_remaining,

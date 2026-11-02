@@ -9,6 +9,10 @@
 
 use std::fmt;
 
+use tezos_data_encoding::enc::{BinResult, BinWriter};
+use tezos_data_encoding::encoding::{Encoding, HasEncoding};
+use tezos_data_encoding::nom::error::{BoundedEncodingKind, DecodeError};
+use tezos_data_encoding::nom::{NomReader, NomResult};
 use tezos_data_encoding::types::Narith;
 use thiserror::Error;
 
@@ -23,6 +27,9 @@ pub enum MutezError {
     /// `u64::MAX` mutez.
     #[error("Narith amount {} does not fit in u64", .0.0)]
     NarithTooLarge(Narith),
+    /// A signed amount (e.g. a MIR `Mutez(i64)`) is negative.
+    #[error("amount {0} is negative")]
+    Negative(i64),
     /// Checked addition/subtraction over- or under-flowed the domain.
     #[error("mutez arithmetic overflow")]
     Overflow,
@@ -47,6 +54,16 @@ impl Mutez {
         self.0
             .checked_add(other.0)
             .filter(|&sum| sum <= Self::MAX.0)
+            .map(Mutez)
+            .ok_or(MutezError::Overflow)
+    }
+
+    /// Checked multiplication by a count; errs on overflow past
+    /// [`Mutez::MAX`].
+    pub fn checked_mul(self, factor: u64) -> Result<Mutez, MutezError> {
+        self.0
+            .checked_mul(factor)
+            .filter(|&product| product <= Self::MAX.0)
             .map(Mutez)
             .ok_or(MutezError::Overflow)
     }
@@ -97,6 +114,55 @@ impl TryFrom<&Narith> for Mutez {
     }
 }
 
+impl TryFrom<i64> for Mutez {
+    type Error = MutezError;
+
+    /// Narrows a signed amount (e.g. a MIR `Mutez(i64)`) to the mutez
+    /// domain: a negative value is a hard error, never a panic or a
+    /// silent absolute value.
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        u64::try_from(value)
+            .map_err(|_| MutezError::Negative(value))
+            .and_then(Mutez::try_from)
+    }
+}
+
+impl From<Mutez> for i64 {
+    /// Exact embedding into `i64`: every `Mutez` is representable, since
+    /// the domain is bounded at `i64::MAX`.
+    fn from(value: Mutez) -> Self {
+        value.0 as i64
+    }
+}
+
+/// Encoded as a `Narith`, the encoding of a mutez amount on L1.
+impl HasEncoding for Mutez {
+    fn encoding() -> Encoding {
+        Encoding::N
+    }
+}
+
+/// Decodes a `Narith`, and fails on a value outside the mutez domain.
+impl NomReader<'_> for Mutez {
+    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
+        let (rest, narith) = Narith::nom_read(bytes)?;
+        match Mutez::try_from(&narith) {
+            Ok(mutez) => Ok((rest, mutez)),
+            Err(_) => Err(nom::Err::Error(DecodeError::limit(
+                bytes,
+                BoundedEncodingKind::Bounded,
+            ))),
+        }
+    }
+}
+
+/// Encodes as a `Narith`.
+impl BinWriter for Mutez {
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        self.to_narith().bin_write(output)
+    }
+}
+
 impl fmt::Display for Mutez {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -106,6 +172,31 @@ impl fmt::Display for Mutez {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binary_encoding_roundtrip() {
+        for value in [0u64, 1, 127, 128, 1_000_000, i64::MAX as u64] {
+            let mutez = Mutez::try_from(value).unwrap();
+            let bytes = mutez.to_bytes().unwrap();
+            assert_eq!(
+                Mutez::nom_read_exact(&bytes),
+                Ok(mutez),
+                "round-trip failed for {value}"
+            );
+            assert_eq!(
+                bytes,
+                Narith::from(value).to_bytes().unwrap(),
+                "not the Narith encoding of {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn binary_decoding_rejects_above_max() {
+        let bytes = Narith::from(i64::MAX as u64 + 1).to_bytes().unwrap();
+        let error = Mutez::nom_read_exact(&bytes).unwrap_err();
+        assert!(error.to_string().contains("boundary violation"));
+    }
 
     #[test]
     fn try_from_u64_accepts_max() {
@@ -141,6 +232,23 @@ mod tests {
         let a = Mutez(u64::MAX);
         let b = Mutez::try_from(1u64).unwrap();
         assert_eq!(a.checked_add(b), Err(MutezError::Overflow));
+    }
+
+    #[test]
+    fn checked_mul_within_domain() {
+        let a = Mutez::try_from(4u64).unwrap();
+        assert_eq!(a.checked_mul(250), Ok(Mutez::try_from(1_000u64).unwrap()));
+    }
+
+    #[test]
+    fn checked_mul_rejects_overflow_past_max() {
+        assert_eq!(Mutez::MAX.checked_mul(2), Err(MutezError::Overflow));
+    }
+
+    #[test]
+    fn checked_mul_rejects_u64_overflow() {
+        let a = Mutez::try_from(1u64 << 62).unwrap();
+        assert_eq!(a.checked_mul(8), Err(MutezError::Overflow));
     }
 
     #[test]
@@ -188,5 +296,31 @@ mod tests {
     fn display_matches_raw_digits() {
         let m = Mutez::try_from(12345u64).unwrap();
         assert_eq!(m.to_string(), "12345");
+    }
+
+    #[test]
+    fn try_from_i64_accepts_non_negative() {
+        assert_eq!(Mutez::try_from(42i64), Ok(Mutez::try_from(42u64).unwrap()));
+    }
+
+    #[test]
+    fn try_from_i64_rejects_negative() {
+        assert_eq!(Mutez::try_from(-1i64), Err(MutezError::Negative(-1)));
+    }
+
+    #[test]
+    fn try_from_i64_accepts_max() {
+        assert_eq!(Mutez::try_from(i64::MAX), Ok(Mutez::MAX));
+    }
+
+    #[test]
+    fn i64_round_trip_from_mutez() {
+        let m = Mutez::try_from(42u64).unwrap();
+        assert_eq!(i64::from(m), 42i64);
+    }
+
+    #[test]
+    fn i64_from_mutez_max_matches_i64_max() {
+        assert_eq!(i64::from(Mutez::MAX), i64::MAX);
     }
 }
