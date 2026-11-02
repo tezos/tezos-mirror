@@ -14,4 +14,10 @@ disallowed-methods = [
     # sanctioned sites, each saying why, may call them.
     { path = "revm_etherlink::storage::world_state_handler::StorageAccount::set_info", reason = "balance-carrying info write — use the balance-preserving writer" },
     { path = "revm_etherlink::storage::world_state_handler::StorageAccount::set_info_without_code", reason = "balance-carrying info write — use the balance-preserving writer" },
+    # Accessors that read a durable blob without charging for it. They are correct
+    # only where no operation gas counter exists (the RPC inspection paths) and in
+    # tests; anywhere else they are an unbounded read no operation pays for. Reach
+    # for `code_metered` / `storage_metered` instead, or opt out explicitly.
+    { path = "tezos_execution_latest::account_storage::TezosOriginatedAccount::code", reason = "unmetered durable read; use `code_metered` under an operation" },
+    { path = "tezos_execution_latest::account_storage::TezosOriginatedAccount::storage", reason = "unmetered durable read; use `storage_metered` under an operation" },
 ]

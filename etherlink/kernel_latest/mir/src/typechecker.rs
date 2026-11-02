@@ -4832,7 +4832,7 @@ pub(crate) fn typecheck_contract_address<'a>(
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
             let contract_entrypoints = _ctx
-                .lookup_entrypoints(&address.hash)
+                .lookup_entrypoints(&address.hash)?
                 .ok_or(TcError::NoSuchContract)?;
 
             // Flat entrypoint-resolution charge, as for `SELF` (see

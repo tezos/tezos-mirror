@@ -1539,6 +1539,9 @@ impl TezosRuntime {
 
 #[cfg(all(test, feature = "testing"))]
 mod tests {
+    // Tests read blobs directly; there is no operation to charge.
+    #![allow(clippy::disallowed_methods)]
+
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_data_encoding::types::Zarith;
     use tezos_ethereum::block::BlockConstants;

@@ -5,10 +5,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::account_storage::{
-    Code, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    Code, MeteredReadError, TezosAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::context::{address_registry, big_maps::*};
-use crate::get_contract_entrypoint;
+use crate::get_contract_entrypoint_metered;
 use crate::{
     consume_storage_read_milligas, consume_storage_write_milligas, contract_from_address,
     COUNTER_SIZE,
@@ -257,11 +257,15 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> TypecheckingCtx<'a>
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(
+    ) -> Result<
+        Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>>,
+        mir::gas::OutOfGas,
+    > {
+        // Charged, unlike the RPC variant: this runs inside an operation.
+        get_contract_entrypoint_metered(
             self.rk.tez_accounts(),
             address,
-            &mut self.operation_gas.remaining,
+            self.operation_gas,
         )
     }
 
@@ -308,7 +312,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> TypecheckingCtx<'a>
     fn lookup_entrypoints(
         &mut self,
         address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    ) -> Result<
+        Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>>,
+        mir::gas::OutOfGas,
+    > {
         self.tc_ctx.lookup_entrypoints(address)
     }
 
@@ -488,9 +495,10 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // failure (read, decode, balance overflow) means corruption or
         // I/O on a known contract and must surface as an error rather
         // than impersonate "view not found".
+        // Read both blobs through their gas charge; they used to be free.
         let serialized_script = account
-            .code(self.tc_ctx.rk.tez_accounts())
-            .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+            .code_metered(self.tc_ctx.rk.tez_accounts(), self.tc_ctx.operation_gas)
+            .map_err(metered_read_to_lookup_view)?;
         match serialized_script {
             Code::Code(serialized_script) => {
                 let decoded = Micheline::decode_raw(
@@ -513,8 +521,11 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     code: view.code.clone(),
                 };
                 let storage = account
-                    .storage(self.tc_ctx.rk.tez_accounts())
-                    .map_err(|e| LookupViewError::HostError(e.to_string()))?;
+                    .storage_metered(
+                        self.tc_ctx.rk.tez_accounts(),
+                        self.tc_ctx.operation_gas,
+                    )
+                    .map_err(metered_read_to_lookup_view)?;
                 let balance = account
                     .balance(self.tc_ctx.rk.tez_accounts())
                     .map_err(|e| LookupViewError::HostError(e.to_string()))?;
@@ -1220,6 +1231,17 @@ fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStora
     LazyStorageError::BinWriteError(std::rc::Rc::new(
         tezos_data_encoding::enc::BinError::custom(e.into().to_string()),
     ))
+}
+
+/// Route a metered read's failure to the view-lookup error it means. Keeping
+/// out-of-gas apart from a store failure is what lets the runtime answer an
+/// over-budget view with a catchable 429 instead of a kernel fault.
+fn metered_read_to_lookup_view(err: MeteredReadError) -> mir::context::LookupViewError {
+    use mir::context::LookupViewError;
+    match err {
+        MeteredReadError::OutOfGas(err) => LookupViewError::OutOfGas(err),
+        MeteredReadError::Storage(err) => LookupViewError::HostError(err.to_string()),
+    }
 }
 
 /// Charge for and read a big_map entry value, returning `None` when absent.
@@ -3653,8 +3675,8 @@ pub(crate) mod mock {
         fn lookup_entrypoints(
             &mut self,
             _address: &AddressHash,
-        ) -> Option<HashMap<Entrypoint, Type>> {
-            None
+        ) -> Result<Option<HashMap<Entrypoint, Type>>, mir::gas::OutOfGas> {
+            Ok(None)
         }
 
         fn big_map_get_type(

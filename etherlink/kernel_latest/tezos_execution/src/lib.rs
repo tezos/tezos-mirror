@@ -3,6 +3,7 @@
 
 use account_storage::Code;
 use account_storage::Manager;
+use account_storage::MeteredReadError;
 use account_storage::TezosAccount;
 use enshrined_contracts::charge_internal_receipt_bodies;
 use enshrined_contracts::charge_persisted_error;
@@ -178,6 +179,8 @@ pub mod account_storage;
 #[cfg(test)]
 mod address;
 pub mod context;
+#[cfg(test)]
+pub(crate) mod counting_host;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
@@ -1543,20 +1546,20 @@ where
                     &dest_account,
                 )?
             };
-            let code = dest_account.code(tc_ctx.rk.tez_accounts())?;
-            let (code_read_count, code_size) = match &code {
-                Code::Code(code_bytes) => (1, code_bytes.len() as u64),
-                Code::Enshrined(_) => (0, 0),
-            };
-            consume_storage_read_milligas(
-                tc_ctx.operation_gas,
-                code_read_count,
-                code_size,
-            )
-            .map_err(TransferError::OutOfGas)?;
-            let storage = dest_account.storage(tc_ctx.rk.tez_accounts())?;
-            consume_storage_read_milligas(tc_ctx.operation_gas, 1, storage.len() as u64)
-                .map_err(TransferError::OutOfGas)?;
+            // Read both blobs through their gas charge: charging afterwards
+            // cannot un-read a multi-megabyte storage.
+            let code = dest_account
+                .code_metered(tc_ctx.rk.tez_accounts(), tc_ctx.operation_gas)
+                .map_err(|err| match err {
+                    MeteredReadError::OutOfGas(err) => TransferError::OutOfGas(err),
+                    MeteredReadError::Storage(err) => err.into(),
+                })?;
+            let storage = dest_account
+                .storage_metered(tc_ctx.rk.tez_accounts(), tc_ctx.operation_gas)
+                .map_err(|err| match err {
+                    MeteredReadError::OutOfGas(err) => TransferError::OutOfGas(err),
+                    MeteredReadError::Storage(err) => err.into(),
+                })?;
             let exec_ctx = ExecCtx::create(
                 tc_ctx.rk.tez_accounts_mut(),
                 sender_account,
@@ -1755,6 +1758,19 @@ fn get_originated_contract_entrypoint(
     typecheck_originated_script(&code, gas).map(|(entrypoints, _)| entrypoints)
 }
 
+fn entrypoints_of_code(
+    code: Code,
+    gas: &mut Gas,
+) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    match code {
+        Code::Code(code) => get_originated_contract_entrypoint(code, gas),
+        Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
+    }
+}
+
+/// Entrypoints of the contract at `address`, reading its code **without
+/// charging**. Only for the RPC path, which bills no operation; anything
+/// reachable from one must use [`get_contract_entrypoint_metered`].
 pub fn get_contract_entrypoint(
     tez_accounts: &impl KeySpace,
     address: &AddressHash,
@@ -1762,11 +1778,33 @@ pub fn get_contract_entrypoint(
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
+    // Unmetered by design: the RPC bills no operation, so there is no counter.
+    #[allow(clippy::disallowed_methods)]
     let code = contract_account.code(tez_accounts).ok()?;
-    match code {
-        Code::Code(code) => get_originated_contract_entrypoint(code, gas),
-        Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
-    }
+    entrypoints_of_code(code, gas)
+}
+
+/// [`get_contract_entrypoint`], with the code read charged before it happens.
+/// `Ok(None)` keeps `None`'s meaning: no contract, or a script that does not
+/// typecheck. A read the operation cannot pay for is `Err(OutOfGas)`, so gas
+/// exhaustion does not surface as a missing contract.
+pub fn get_contract_entrypoint_metered(
+    tez_accounts: &impl KeySpace,
+    address: &AddressHash,
+    operation_gas: &mut TezlinkOperationGas,
+) -> Result<Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>>, mir::gas::OutOfGas> {
+    let Ok(contract) = contract_from_address(address.clone()) else {
+        return Ok(None);
+    };
+    let Ok(contract_account) = context::originated_from_contract(&contract) else {
+        return Ok(None);
+    };
+    let code = match contract_account.code_metered(tez_accounts, operation_gas) {
+        Ok(code) => code,
+        Err(MeteredReadError::OutOfGas(err)) => return Err(err),
+        Err(MeteredReadError::Storage(_)) => return Ok(None),
+    };
+    Ok(entrypoints_of_code(code, &mut operation_gas.remaining))
 }
 
 /// Errors returned by [`upgrade_alias_implementation`].
@@ -1892,6 +1930,8 @@ pub fn get_enshrined_contract_views(
 ) -> Option<Vec<(&'static str, mir::ast::Type, mir::ast::Type)>> {
     let contract = contract_from_address(address.clone()).ok()?;
     let contract_account = context::originated_from_contract(&contract).ok()?;
+    // Unmetered by design: same RPC inspection path as above.
+    #[allow(clippy::disallowed_methods)]
     let code = contract_account.code(tez_accounts).ok()?;
     match code {
         Code::Code(_) => None,
@@ -3344,6 +3384,9 @@ pub(crate) mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    // Tests read blobs directly; there is no operation to charge.
+    #![allow(clippy::disallowed_methods)]
+
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_journal::TezosXHashes;
 
@@ -3353,6 +3396,7 @@ mod tests {
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
     use crate::context;
+    use crate::counting_host::CountingHost;
     use crate::{
         account_storage::TezosOriginatedAccount, address::OriginationNonce,
         mir_ctx::clear_temporary_big_maps, mir_ctx::BlockCtx,
@@ -3796,6 +3840,78 @@ mod tests {
             PAIR
         }"#;
 
+    /// Resolving a contract's entrypoints reads its code, and under an
+    /// operation that read must be charged: a counter one milligas short of
+    /// its cost is refused, as `OutOfGas` and not as an absent contract.
+    #[test]
+    fn metered_entrypoint_lookup_charges_the_code_read_upfront() {
+        use crate::get_contract_entrypoint_metered;
+        use mir::ast::{AddressHash, Entrypoint, Type};
+
+        let mut host = CountingHost::default();
+        let bytes_read = host.bytes_read_handle();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let kt1 = ContractKt1Hash::from_b58check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &kt1,
+            UNIT_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+        let code_len = TezosOriginatedAccount::from_kt1(&kt1)
+            .unwrap()
+            .code(rk.tez_accounts())
+            .map(|code| match code {
+                Code::Code(bytes) => bytes.len(),
+                Code::Enshrined(_) => panic!("the fixture is an ordinary contract"),
+            })
+            .unwrap();
+        let read_cost = storage_read_cost_milligas(1, code_len as u64);
+
+        // One milligas short: refused before the bytes move.
+        let mut too_poor = TezlinkOperationGas::start_milligas(read_cost - 1).unwrap();
+        rk.host().reset_bytes_read();
+        assert_eq!(
+            get_contract_entrypoint_metered(
+                rk.tez_accounts(),
+                &AddressHash::Kt1(kt1.clone()),
+                &mut too_poor
+            ),
+            Err(mir::gas::OutOfGas),
+            "a counter that cannot pay for the code read must report out of gas, \
+             not a missing contract"
+        );
+        assert_eq!(
+            bytes_read.get(),
+            0,
+            "the refused lookup must not have read the code"
+        );
+
+        // Enough to pay for the read, and for the typechecking that follows.
+        let mut rich = TezlinkOperationGas::default();
+        rk.host().reset_bytes_read();
+        let entrypoints = get_contract_entrypoint_metered(
+            rk.tez_accounts(),
+            &AddressHash::Kt1(kt1),
+            &mut rich,
+        )
+        .expect("an ample counter must not run out of gas")
+        .expect("the fixture's entrypoints must resolve");
+        assert_eq!(entrypoints.get(&Entrypoint::default()), Some(&Type::Unit));
+        assert_eq!(
+            bytes_read.get(),
+            code_len as u64,
+            "the successful lookup reads the code blob exactly once"
+        );
+        assert!(
+            u64::from(rich.total_milligas_consumed()) >= read_cost,
+            "the lookup must charge at least the code read ({read_cost} milligas), \
+             consumed {}",
+            rich.total_milligas_consumed()
+        );
+    }
     /// The entrypoints RPC (`get_contract_entrypoint`) goes through
     /// `code()`, so a code-less alias transparently exposes the entrypoints of
     /// the shared implementation — here the `default : unit` of `UNIT_SCRIPT`.
@@ -12840,6 +12956,500 @@ mod tests {
         (err, consumed)
     }
 
+    /// A transfer must charge a destination's durable reads before performing
+    /// them. Consumed gas cannot witness that — it is the same either way — so
+    /// the assertion is on the payload bytes the host handed back, which must
+    /// not grow with the destination's storage.
+    #[test]
+    fn transfer_charges_storage_read_before_reading() {
+        const BYTES_STORAGE_SCRIPT: &str = "
+            parameter unit;
+            storage bytes;
+            code {
+                CDR;
+                NIL operation;
+                PAIR
+            }
+        ";
+        // Both are past what the calibrated limit can pay to read (asserted
+        // below), so a correct charge order reads neither.
+        const FAT: usize = 1_000_000;
+        const FOUR_TIMES_FAT: usize = 4_000_000;
+        const TINY: usize = 8;
+
+        // One amount-0 call; reports the receipt and the bytes the host read.
+        let run = |storage_len: usize, gas_limit: u64| -> (OperationResultSum, u64) {
+            let mut host = CountingHost::default();
+            let bytes_read = host.bytes_read_handle();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let src = bootstrap1();
+            let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+            init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+            reveal_account(rk.tez_accounts_mut(), &src);
+            init_contract(
+                &mut rk,
+                &dest,
+                BYTES_STORAGE_SCRIPT,
+                &Micheline::Bytes(vec![0u8; storage_len]),
+                &0_u64.into(),
+            );
+
+            let operation = make_transfer_operation(
+                15,
+                1,
+                gas_limit,
+                100,
+                src.clone(),
+                0_u64.into(),
+                Contract::Originated(dest),
+                Parameters {
+                    entrypoint: Entrypoint::default(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                },
+            );
+
+            // Measure the operation, not the state setup that precedes it.
+            rk.host().reset_bytes_read();
+            let processed = validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel \
+                 error",
+            );
+            let mut receipts = ProcessedOperation::into_receipts(processed);
+            assert_eq!(receipts.len(), 1, "expected a single top-level receipt");
+            (receipts.remove(0).receipt, bytes_read.get())
+        };
+
+        let is_applied = |receipt: &OperationResultSum| {
+            matches!(
+                receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Calibrated rather than hardcoded, so the test survives a gas-model
+        // change. The floor covers validation (~165 gas) but no interpretation.
+        const VALIDATES_BUT_TOO_LOW: u64 = 200;
+        const AMPLE: u64 = 100_000;
+        let mut too_low = VALIDATES_BUT_TOO_LOW;
+        let mut enough = AMPLE;
+        assert!(
+            is_applied(&run(TINY, enough).0),
+            "the tiny-storage call must apply at the calibration ceiling"
+        );
+        assert!(
+            !is_applied(&run(TINY, too_low).0),
+            "the tiny-storage call must not apply at the calibration floor"
+        );
+        while enough - too_low > 1 {
+            let probe = too_low + (enough - too_low) / 2;
+            if is_applied(&run(TINY, probe).0) {
+                enough = probe;
+            } else {
+                too_low = probe;
+            }
+        }
+        let minimal_gas_limit = enough;
+
+        // Negative control: the same call over a tiny storage is applied.
+        let (tiny, _) = run(TINY, minimal_gas_limit);
+        assert!(
+            is_applied(&tiny),
+            "the tiny-storage call must apply at its calibrated limit, got {tiny:?}"
+        );
+
+        // An operation that can afford a read is entitled to it.
+        for size in [FAT, FOUR_TIMES_FAT] {
+            assert!(
+                storage_read_cost_milligas(1, size as u64) > minimal_gas_limit * 1000,
+                "a {size} B storage read must not fit in {minimal_gas_limit} gas, or \
+                 the test is measuring an affordable read"
+            );
+        }
+
+        let (fat, fat_bytes) = run(FAT, minimal_gas_limit);
+        let (four_times_fat, four_times_fat_bytes) =
+            run(FOUR_TIMES_FAT, minimal_gas_limit);
+
+        for (label, receipt) in [("1 MB", &fat), ("4 MB", &four_times_fat)] {
+            match receipt {
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                    ..
+                }) => assert!(
+                    errors.iter().any(|e| matches!(
+                        e,
+                        ApplyOperationError::Transfer(TransferError::OutOfGas(_))
+                    )),
+                    "expected the {label} call to fail out of gas, got {errors:?}"
+                ),
+                other => panic!(
+                    "expected the {label} call to have failed out of gas, got {other:?}"
+                ),
+            }
+        }
+
+        // The out-of-gas is reached without reading the storage.
+        assert_eq!(
+            fat_bytes, four_times_fat_bytes,
+            "bytes read must not depend on the destination's storage size: \
+             {FAT} B storage read {fat_bytes} B, {FOUR_TIMES_FAT} B storage read \
+             {four_times_fat_bytes} B"
+        );
+        assert!(
+            fat_bytes < FAT as u64,
+            "the out-of-gas call must not read the {FAT} B storage, but the host \
+             returned {fat_bytes} B"
+        );
+    }
+
+    /// The symmetric guarantee for the destination's **code**: a transfer must
+    /// charge the code read before performing it, so a fat script cannot be
+    /// read for free. Same witness as the storage test — the bytes the host
+    /// hands back must not grow with the code size. The code is read before the
+    /// storage, so inflating the code and keeping storage tiny isolates it.
+    #[test]
+    fn transfer_charges_code_read_before_reading() {
+        // A valid, runnable contract whose code blob is inflated to ~`code_len`
+        // bytes by an unused `PUSH bytes` literal; storage stays unit (tiny).
+        let script = |code_len: usize| -> String {
+            format!(
+                "parameter unit; storage unit; \
+                 code {{ DROP; PUSH bytes 0x{}; DROP; UNIT; NIL operation; PAIR }}",
+                "00".repeat(code_len)
+            )
+        };
+        const FAT: usize = 1_000_000;
+        const FOUR_TIMES_FAT: usize = 4_000_000;
+        const TINY: usize = 8;
+
+        // One amount-0 call; reports the receipt and the bytes the host read.
+        let run = |code_len: usize, gas_limit: u64| -> (OperationResultSum, u64) {
+            let mut host = CountingHost::default();
+            let bytes_read = host.bytes_read_handle();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            let src = bootstrap1();
+            let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+            init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+            reveal_account(rk.tez_accounts_mut(), &src);
+            init_contract(
+                &mut rk,
+                &dest,
+                &script(code_len),
+                &Micheline::from(()),
+                &0_u64.into(),
+            );
+
+            let operation = make_transfer_operation(
+                15,
+                1,
+                gas_limit,
+                100,
+                src.clone(),
+                0_u64.into(),
+                Contract::Originated(dest),
+                Parameters {
+                    entrypoint: Entrypoint::default(),
+                    value: Micheline::from(())
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                },
+            );
+
+            // Measure the operation, not the state setup that precedes it.
+            rk.host().reset_bytes_read();
+            let processed = validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel \
+                 error",
+            );
+            let mut receipts = ProcessedOperation::into_receipts(processed);
+            assert_eq!(receipts.len(), 1, "expected a single top-level receipt");
+            (receipts.remove(0).receipt, bytes_read.get())
+        };
+
+        let is_applied = |receipt: &OperationResultSum| {
+            matches!(
+                receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Calibrated rather than hardcoded, so the test survives a gas-model
+        // change. The tiny-code call reads a minimal script and its unit storage.
+        const VALIDATES_BUT_TOO_LOW: u64 = 200;
+        const AMPLE: u64 = 100_000;
+        let mut too_low = VALIDATES_BUT_TOO_LOW;
+        let mut enough = AMPLE;
+        assert!(
+            is_applied(&run(TINY, enough).0),
+            "the tiny-code call must apply at the calibration ceiling"
+        );
+        assert!(
+            !is_applied(&run(TINY, too_low).0),
+            "the tiny-code call must not apply at the calibration floor"
+        );
+        while enough - too_low > 1 {
+            let probe = too_low + (enough - too_low) / 2;
+            if is_applied(&run(TINY, probe).0) {
+                enough = probe;
+            } else {
+                too_low = probe;
+            }
+        }
+        let minimal_gas_limit = enough;
+
+        // Negative control: the same call over a tiny code is applied.
+        let (tiny, _) = run(TINY, minimal_gas_limit);
+        assert!(
+            is_applied(&tiny),
+            "the tiny-code call must apply at its calibrated limit, got {tiny:?}"
+        );
+
+        // An operation that cannot afford the read must not get it.
+        for size in [FAT, FOUR_TIMES_FAT] {
+            assert!(
+                storage_read_cost_milligas(1, size as u64) > minimal_gas_limit * 1000,
+                "a {size} B code read must not fit in {minimal_gas_limit} gas, or \
+                 the test is measuring an affordable read"
+            );
+        }
+
+        let (fat, fat_bytes) = run(FAT, minimal_gas_limit);
+        let (four_times_fat, four_times_fat_bytes) =
+            run(FOUR_TIMES_FAT, minimal_gas_limit);
+
+        for (label, receipt) in [("1 MB", &fat), ("4 MB", &four_times_fat)] {
+            match receipt {
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                    ..
+                }) => assert!(
+                    errors.iter().any(|e| matches!(
+                        e,
+                        ApplyOperationError::Transfer(TransferError::OutOfGas(_))
+                    )),
+                    "expected the {label} call to fail out of gas, got {errors:?}"
+                ),
+                other => panic!(
+                    "expected the {label} call to have failed out of gas, got {other:?}"
+                ),
+            }
+        }
+
+        // The out-of-gas is reached without reading the code.
+        assert_eq!(
+            fat_bytes, four_times_fat_bytes,
+            "bytes read must not depend on the destination's code size: \
+             {FAT} B code read {fat_bytes} B, {FOUR_TIMES_FAT} B code read \
+             {four_times_fat_bytes} B"
+        );
+        assert!(
+            fat_bytes < FAT as u64,
+            "the out-of-gas call must not read the {FAT} B code, but the host \
+             returned {fat_bytes} B"
+        );
+    }
+    /// Same for a `VIEW`, whose script and storage reads were charged nothing
+    /// at all. Same witness: the bytes the host hands back must not grow with
+    /// the viewed contract's storage.
+    #[test]
+    fn view_charges_storage_read_before_reading() {
+        const VIEWED_SCRIPT: &str = r#"
+            parameter unit ;
+            storage bytes ;
+            code { CDR ; NIL operation ; PAIR } ;
+            view "get_size" unit nat { CDR ; SIZE }
+        "#;
+        const CALLER_SCRIPT: &str = r#"
+            parameter unit ;
+            storage address ;
+            code { CDR ;
+                DUP ;
+                UNIT ;
+                VIEW "get_size" nat ;
+                IF_NONE { PUSH string "View failed" ; FAILWITH }
+                        { DROP ; NIL operation ; PAIR } }
+        "#;
+        const FAT: usize = 1_000_000;
+        const FOUR_TIMES_FAT: usize = 4_000_000;
+        const TINY: usize = 8;
+
+        // Views a contract holding `storage_len` bytes; reports bytes read.
+        let run = |storage_len: usize, gas_limit: u64| -> (OperationResultSum, u64) {
+            let mut host = CountingHost::default();
+            let bytes_read = host.bytes_read_handle();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut gas = Gas::default();
+            let arena = Arena::new();
+
+            let src = bootstrap1();
+            let mut origination_nonce =
+                OriginationNonce::initial(OperationHash::default());
+            let viewed_addr = origination_nonce.generate_kt1();
+            let caller_addr = origination_nonce.generate_kt1();
+
+            init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
+            reveal_account(rk.tez_accounts_mut(), &src);
+            init_contract(
+                &mut rk,
+                &viewed_addr,
+                VIEWED_SCRIPT,
+                &Micheline::Bytes(vec![0u8; storage_len]),
+                &0.into(),
+            );
+            let viewed_micheline = TypedValue::Address(Address {
+                hash: mir::ast::AddressHash::Kt1(viewed_addr),
+                entrypoint: Entrypoint::default(),
+            })
+            .into_micheline_optimized_legacy(&arena, &mut gas)
+            .unwrap();
+            init_contract(
+                &mut rk,
+                &caller_addr,
+                CALLER_SCRIPT,
+                &viewed_micheline,
+                &0.into(),
+            );
+
+            let operation = make_transfer_operation(
+                15,
+                1,
+                gas_limit,
+                100,
+                src.clone(),
+                0.into(),
+                Contract::Originated(caller_addr),
+                Parameters::default(),
+            );
+
+            // Measure the operation, not the state setup that precedes it.
+            rk.host().reset_bytes_read();
+            let processed = validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel \
+                 error",
+            );
+            let mut receipts = ProcessedOperation::into_receipts(processed);
+            assert_eq!(receipts.len(), 1, "expected a single top-level receipt");
+            (receipts.remove(0).receipt, bytes_read.get())
+        };
+
+        let is_applied = |receipt: &OperationResultSum| {
+            matches!(
+                receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            )
+        };
+
+        // Calibrated, so the test survives a gas-model change.
+        const VALIDATES_BUT_TOO_LOW: u64 = 200;
+        const AMPLE: u64 = 100_000;
+        let mut too_low = VALIDATES_BUT_TOO_LOW;
+        let mut enough = AMPLE;
+        assert!(
+            is_applied(&run(TINY, enough).0),
+            "the tiny-storage view must apply at the calibration ceiling"
+        );
+        assert!(
+            !is_applied(&run(TINY, too_low).0),
+            "the tiny-storage view must not apply at the calibration floor"
+        );
+        while enough - too_low > 1 {
+            let probe = too_low + (enough - too_low) / 2;
+            if is_applied(&run(TINY, probe).0) {
+                enough = probe;
+            } else {
+                too_low = probe;
+            }
+        }
+        let minimal_gas_limit = enough;
+
+        // Negative control: the same call over a tiny storage is applied.
+        let (tiny, _) = run(TINY, minimal_gas_limit);
+        assert!(
+            is_applied(&tiny),
+            "the tiny-storage view must apply at its calibrated limit, got {tiny:?}"
+        );
+
+        // Unaffordable at this limit, so a correct charge order reads neither.
+        for size in [FAT, FOUR_TIMES_FAT] {
+            assert!(
+                storage_read_cost_milligas(1, size as u64) > minimal_gas_limit * 1000,
+                "a {size} B storage read must not fit in {minimal_gas_limit} gas, or \
+                 the test is measuring an affordable read"
+            );
+        }
+
+        let (fat, fat_bytes) = run(FAT, minimal_gas_limit);
+        let (four_times_fat, four_times_fat_bytes) =
+            run(FOUR_TIMES_FAT, minimal_gas_limit);
+
+        for (label, receipt) in [("1 MB", &fat), ("4 MB", &four_times_fat)] {
+            assert!(
+                !is_applied(receipt),
+                "expected the {label} view to fail, got {receipt:?}"
+            );
+        }
+        assert_eq!(
+            fat_bytes, four_times_fat_bytes,
+            "bytes read must not depend on the viewed contract's storage size: \
+             {FAT} B storage read {fat_bytes} B, {FOUR_TIMES_FAT} B storage read \
+             {four_times_fat_bytes} B"
+        );
+        assert!(
+            fat_bytes < FAT as u64,
+            "the failing view must not read the {FAT} B storage, but the host \
+             returned {fat_bytes} B"
+        );
+    }
     /// Gas consumed by `cross_runtime_transfer` scales with the FAILWITH
     /// payload length.  The exact delta matches the sum of three
     /// contributions that grow with `n`:
