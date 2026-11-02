@@ -403,7 +403,8 @@ impl Evaluation {
         let minimum_base_fee_per_gas =
             crate::retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
         let da_fee = crate::retrieve_da_fee(rk.evm_world_state_mut())?;
-        let coinbase = read_sequencer_pool_address(rk.host()).unwrap_or_default();
+        let coinbase =
+            read_sequencer_pool_address(rk.evm_world_state()).unwrap_or_default();
         let experimental_features = ExperimentalFeatures::read_from_storage(base);
         let debug_features = DebugFeatures::read_from_storage(base);
 
