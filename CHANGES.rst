@@ -45,6 +45,10 @@ General
   NAT or load balancer that drops idle flows) are eventually closed and
   their resources released, instead of being retained until restart.
 
+- RPC servers now normalize absolute-form request targets
+  (``http://host/path``) to their origin-form equivalent (``/path``)
+  before handling them.
+
 - ``data-encoding``: the binary decoder now bounds its recursion depth,
   rejecting deeply-nested input with a new ``Too_many_recursive_calls`` decode
   error instead of recursing on the native OCaml stack. The bound is above the
