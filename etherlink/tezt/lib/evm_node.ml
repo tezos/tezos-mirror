@@ -170,7 +170,7 @@ type kernel_setup = {
 }
 
 let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
-    ?kernel_compat ?remove_whitelist ?kernel_root_hash ?chain_id
+    ?kernel_compat ?remove_whitelist ?kernel_root_hash ?(chain_id = 1337)
     ?eth_bootstrap_balance
     ?(eth_bootstrap_accounts = eth_default_bootstrap_accounts)
     ?tez_bootstrap_balance ?tez_bootstrap_accounts ?tez_bootstrap_contracts
@@ -200,7 +200,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     kernel_compat;
     remove_whitelist;
     kernel_root_hash;
-    chain_id;
+    chain_id = Some chain_id;
     eth_bootstrap_balance;
     eth_bootstrap_accounts = Some eth_bootstrap_accounts;
     tez_bootstrap_balance;
