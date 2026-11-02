@@ -74,7 +74,7 @@ create_kernel_config() {
   add_kernel_config_contract "$file" /base/admin "${EVM_ADMIN_ALIAS}_contract" "ADMIN"
 
   # sequencer admin config
-  add_kernel_config_contract "$file" /evm/sequencer_governance "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "SEQUENCER_GOVERNANCE"
+  add_kernel_config_contract "$file" /evm/world_state/sequencer_governance "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "SEQUENCER_GOVERNANCE"
 
   # delayed bridge config
   add_kernel_config_contract "$file" /evm/delayed_bridge "${DELAYED_BRIDGE_ALIAS}" "DELAYED_BRIDGE"
