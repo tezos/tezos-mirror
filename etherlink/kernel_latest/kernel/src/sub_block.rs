@@ -158,7 +158,8 @@ where
     let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
     let da_fee_per_byte = retrieve_da_fee(evm_world_state)?;
     let minimum_base_fee_per_gas = config.get_limits().minimum_base_fee_per_gas;
-    let base_fee_per_gas = base_fee_per_gas(host, timestamp, minimum_base_fee_per_gas);
+    let base_fee_per_gas =
+        base_fee_per_gas(evm_world_state, timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
     let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
@@ -382,14 +383,14 @@ where
     let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
+    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     crate::gas_price::register_block(
-        &mut safe_host,
+        rk.evm_world_state_mut(),
         block_in_progress.cumulative_execution_gas,
         block_in_progress.timestamp,
         block_in_progress.queue_length(),
     )?;
     let number = block_in_progress.number;
-    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     let block = block_in_progress.finalize_and_store(
         &mut rk,
         &block_constants,
