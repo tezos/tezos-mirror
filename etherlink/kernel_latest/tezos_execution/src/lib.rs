@@ -2901,6 +2901,10 @@ where
 {
     // Sum declared fees (mutez) from all operation contents before
     // `operation` is moved into validation.
+    // Saturating is safe: validation debits every fee from the source
+    // balance with exact arithmetic, so a batch whose total does not fit in
+    // u64 is rejected as invalid and the saturated value is never used.
+    // Failing here instead would abort the block on an unvalidated operation.
     let fee_refund_config = if let Some(config) = fee_refund_config {
         let total_fees: u64 = operation
             .content
@@ -2908,9 +2912,7 @@ where
             .map(|c| &c.fee().0)
             .sum::<BigUint>()
             .to_u64()
-            .ok_or_else(|| {
-                OperationError::BlockAbort("total fees do not fit in u64".into())
-            })?;
+            .unwrap_or(u64::MAX);
         Some((config, total_fees))
     } else {
         None
@@ -13411,6 +13413,61 @@ mod tests {
         assert_eq!(
             ctx.source.balance(ctx.rk.tez_accounts()).unwrap(),
             (2000 - fee - amount).into(),
+        );
+    }
+
+    // A batch whose total declared fees overflow u64 must be rejected by
+    // validation instead of aborting the block when fee refund is enabled.
+    #[test]
+    fn apply_batch_with_overflowing_total_fees_and_fee_refund() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let dst = bootstrap2();
+
+        let source = init_account(rk.tez_accounts_mut(), &src.pkh, 2000);
+        reveal_account(rk.tez_accounts_mut(), &src);
+
+        let transfer = || {
+            OperationContent::Transfer(TransferContent {
+                amount: 1_u64.into(),
+                destination: Contract::Implicit(dst.pkh.clone()),
+                parameters: Parameters::default(),
+            })
+        };
+        // Each fee fits in u64 but their sum does not.
+        let operation =
+            make_operation(u64::MAX, 1, 21040, 5, src, vec![transfer(), transfer()]);
+
+        let refund_config = FeeRefundConfig {
+            da_fees: 50,
+            base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
+            michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
+        };
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            Some(refund_config),
+            &test_safe_roots(),
+        );
+
+        assert_eq!(
+            result,
+            Err(OperationError::Validation(ValidityError::CantPayFees(
+                u64::MAX.into()
+            )))
+        );
+        assert_eq!(
+            source.balance(rk.tez_accounts()).unwrap(),
+            2000_u64.into(),
+            "Source balance should be unchanged"
         );
     }
 
