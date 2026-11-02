@@ -948,9 +948,10 @@ where
     // whole NAC transaction. A subsequent `revert_frame` on the
     // enclosing EVM frame keeps it, since the receipt of a reverted frame
     // stays in the block.
-    journal
-        .michelson
-        .set_internal_operation_counter(final_internal_operation_counter);
+    let journal_counter = journal.michelson.internal_operation_counter();
+    journal.michelson.set_internal_operation_counter(
+        journal_counter.max(final_internal_operation_counter),
+    );
     let result = match transfer_result {
         Ok(r) => r,
         Err(CracTransferError {

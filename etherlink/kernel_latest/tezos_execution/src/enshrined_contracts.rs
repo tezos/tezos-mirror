@@ -1614,10 +1614,23 @@ where
 
     let request = inject_context_headers(request, ctx)?;
 
-    let response = {
+    // Hand the frame's internal-operation counter to the journal, so that a
+    // nested Michelson frame resumes from it rather than from a stale value,
+    // then take back the value the nested frames reached. Otherwise the
+    // nested frames reuse the counters of this frame and miss its entries
+    // when checking the per-block internal-operation cap. The journal
+    // counter never goes back, hence the `max`.
+    let counter = *ctx.internal_operation_counter_mut();
+    let (response, counter_after) = {
         let (rk, journal, registry) = ctx.cross_runtime_split();
-        registry.serve(rk, journal, request)
+        let journal_counter = journal.michelson.internal_operation_counter();
+        journal
+            .michelson
+            .set_internal_operation_counter(journal_counter.max(counter));
+        let response = registry.serve(rk, journal, request);
+        (response, journal.michelson.internal_operation_counter())
     };
+    *ctx.internal_operation_counter_mut() = counter.max(counter_after);
     let response_body = classify_and_charge_crac_response(response, ctx)?;
 
     // Debit the gateway: after a successful call, the gateway
@@ -5020,6 +5033,38 @@ pub(crate) mod tests {
             ops[0].counter, 2,
             "counter should follow previously consumed values"
         );
+    }
+
+    /// A gateway call hands the frame's internal-operation counter to the
+    /// journal, so that a nested Michelson frame resumes from it, and takes
+    /// back what the nested frame reached.
+    #[test]
+    fn test_dispatch_crac_call_syncs_internal_operation_counter() {
+        let mut host = MockKernelHost::default();
+        let mut registry = MockRegistry::new("KT1_mock_alias".to_string());
+        registry.nested_internal_operations = 8;
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.set_internal_operation_counter(3);
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
+        ctx.operation_counter = 10;
+        let request =
+            build_ethereum_request("0x1234567890123456789012345678901234567890", &[])
+                .unwrap();
+        dispatch_crac_call(&mut ctx, request).unwrap();
+        // The nested frame resumed from 10, not 3, and its 8 operations are
+        // taken back by the calling frame and kept in the journal.
+        assert_eq!(ctx.operation_counter, 18);
+        assert_eq!(journal.michelson.internal_operation_counter(), 18);
     }
 
     #[test]
