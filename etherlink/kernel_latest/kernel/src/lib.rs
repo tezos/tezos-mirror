@@ -343,9 +343,10 @@ where
 
     // 1. Fetch the smart rollup address via the host function, it cannot fail.
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
-    // 2. Fetch the per mode configuration of the kernel. Returns the default
-    //    configuration if it fails.
+    // 2. Fetch the chain configuration. Fails when the EVM chain id is not set.
     let chain_configuration = fetch_tezosx_configuration(&mut bk)?;
+    // 3. Fetch the per mode configuration of the kernel. Returns the default
+    //    configuration if it fails.
     let mut configuration = fetch_configuration(&bk);
     let sequencer_pool_address = read_sequencer_pool_address(bk.evm_world_state());
 
@@ -479,10 +480,12 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use crate::block_storage::internal_for_tests::read_transaction_receipt_status;
+    use crate::configuration::EVM_CHAIN_ID;
     use crate::fees;
     use crate::parsing::RollupType;
     use crate::run;
-    use crate::storage::{store_evm_chain_id, ENABLE_FA_BRIDGE};
+    use crate::storage::tests::store_evm_chain_id;
+    use crate::storage::ENABLE_FA_BRIDGE;
     use alloy_primitives::keccak256;
     use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;
@@ -739,6 +742,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            store_evm_chain_id(rk.evm_world_state_mut(), &U256::from(EVM_CHAIN_ID))
+                .unwrap();
 
             // enable FA bridge feature
             if enable_fa_bridge {
@@ -845,6 +850,8 @@ mod tests {
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            store_evm_chain_id(rk.evm_world_state_mut(), &U256::from(EVM_CHAIN_ID))
+                .unwrap();
 
             // enable FA bridge feature
             if enable_fa_bridge {

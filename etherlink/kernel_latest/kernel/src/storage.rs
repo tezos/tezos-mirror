@@ -598,19 +598,21 @@ pub fn create_chunked_transaction(
     Ok(())
 }
 
-/// Writes the EVM chain id to the `/evm/world_state` keyspace.
-/// Errors when the write fails.
-pub fn store_evm_chain_id(
-    evm_world_state: &mut impl KeySpace,
-    evm_chain_id: &U256,
-) -> Result<(), KeySpaceError> {
-    evm_world_state.store_u256_le(&EVM_CHAIN_ID_KEY, evm_chain_id)
-}
-
 /// Reads the EVM chain id from the `/evm/world_state` keyspace.
-/// Returns `None` when it is absent or shorter than 32 bytes.
-pub fn read_evm_chain_id(evm_world_state: &impl KeySpace) -> Option<U256> {
-    evm_world_state.get_u256_le(&EVM_CHAIN_ID_KEY)
+/// Errors with [`StorageReadErrorKind::NotFound`] when it is absent or shorter
+/// than 32 bytes.
+pub fn read_evm_chain_id(
+    evm_world_state: &impl KeySpace,
+) -> Result<U256, KeySpaceError<StorageReadErrorKind>> {
+    evm_world_state
+        .get_u256_le(&EVM_CHAIN_ID_KEY)
+        .ok_or_else(|| {
+            KeySpaceError::read(
+                evm_world_state.name(),
+                &EVM_CHAIN_ID_KEY,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+        })
 }
 
 pub fn store_michelson_runtime_chain_id(
@@ -1153,9 +1155,10 @@ pub fn read_delayed_transaction_bridge(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use crate::load_base;
     use tezos_data_encoding::enc::BinWriter;
+    use tezos_ethereum::keyspace::KeySpaceExtU256;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -1163,7 +1166,7 @@ mod tests {
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
-    use tezos_smart_rollup_keyspace::KeySpace;
+    use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceError};
     use tezosx_journal::TezosXHashes;
     use tezosx_journal::{CracId, TezosXJournal};
     use tezosx_types::Wei;
@@ -1176,6 +1179,15 @@ mod tests {
     // through the `/base` keyspace via [`super::STORAGE_VERSION_KEY`]; tests
     // assert against this resolved absolute form.
     const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
+
+    /// Writes the EVM chain id to the `/evm/world_state` keyspace.
+    /// Errors when the write fails.
+    pub(crate) fn store_evm_chain_id(
+        evm_world_state: &mut impl KeySpace,
+        evm_chain_id: &primitive_types::U256,
+    ) -> Result<(), KeySpaceError> {
+        evm_world_state.store_u256_le(&super::EVM_CHAIN_ID_KEY, evm_chain_id)
+    }
 
     fn tweak_dal_activation(
         base: &mut impl KeySpace,
@@ -2123,7 +2135,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let evm_chain_id = primitive_types::U256::from(42793);
 
-        super::store_evm_chain_id(rk.evm_world_state_mut(), &evm_chain_id).unwrap();
+        store_evm_chain_id(rk.evm_world_state_mut(), &evm_chain_id).unwrap();
 
         let mut bytes = [0u8; 32];
         evm_chain_id.to_little_endian(&mut bytes);
@@ -2135,7 +2147,7 @@ mod tests {
         );
         assert_eq!(
             super::read_evm_chain_id(rk.evm_world_state()),
-            Some(evm_chain_id)
+            Ok(evm_chain_id)
         );
     }
 

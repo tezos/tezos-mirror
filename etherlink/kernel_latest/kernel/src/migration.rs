@@ -33,7 +33,7 @@ const MAINNET_CHAIN_ID: u64 = 42793;
 
 #[allow(dead_code)]
 fn is_etherlink_network(evm_world_state: &impl KeySpace, expected_chain_id: u64) -> bool {
-    read_evm_chain_id(evm_world_state) == Some(expected_chain_id.into())
+    matches!(read_evm_chain_id(evm_world_state), Ok(id) if id == expected_chain_id.into())
 }
 
 #[allow(dead_code)]
