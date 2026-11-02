@@ -991,6 +991,21 @@ where
         // is rejected (matching L1 `Internal_operation_replay`) instead
         // of being applied a second time under a fresh display nonce.
         let is_replay = !operation_ctx.applied_counters.insert(counter);
+        // A replayed copy still adds an entry to the receipt but did not
+        // advance the MIR counter, which is also the position checked
+        // against the per-block internal-operation cap. Reserve one for it,
+        // failing the operation at the cap like MIR does, so that the cap is
+        // reached here rather than at block finalization.
+        if is_replay {
+            if *operation_ctx.counter >= mir::interpreter::MAX_INTERNAL_OPERATIONS {
+                return Err(ApplyOperationError::from(TransferError::from(
+                    ContractInterpretError::InterpretError(
+                        InterpretError::TooManyInternalOperations,
+                    ),
+                )));
+            }
+            *operation_ctx.counter += 1;
+        }
         // Resolve the disposition once: a prior failure short-circuits
         // every kind to `Skip`, a replayed counter to `Replay`, and a
         // replay also fails the enclosing operation. Only `Apply` needs
@@ -8452,6 +8467,63 @@ mod tests {
                 panic!("Second copy should be a Failed origination but is {other:?}")
             }
         }
+    }
+
+    /// A replayed copy adds a receipt entry without a MIR counter of its
+    /// own. Near the per-block cap, it must fail the operation instead of
+    /// adding an entry over the limit.
+    #[test]
+    fn test_internal_emit_replay_counts_towards_cap() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &parent_hash,
+            "parameter unit; storage unit; code { CDR; PUSH nat 42; EMIT %foo nat; \
+             DUP; NIL operation; SWAP; CONS; SWAP; CONS; PAIR }",
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+        let operation = make_transfer_operation(
+            10,
+            1,
+            30000,
+            0,
+            src,
+            0.into(),
+            Contract::Originated(parent_hash),
+            Parameters::default(),
+        );
+        // Room for the event itself, not for its replayed copy.
+        let base = mir::interpreter::MAX_INTERNAL_OPERATIONS - 1;
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &BlockCtx {
+                    level: &0u32.into(),
+                    now: &0i64.into(),
+                    chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                    internal_operations_base: base,
+                    tracing_enabled: false,
+                    http_trace_enabled: false,
+                },
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .unwrap(),
+        );
+        assert!(!receipts[0].receipt.is_applied());
+        let entries = get_internal_receipts(&receipts[0].receipt).len() as u128;
+        assert!(base + entries <= mir::interpreter::MAX_INTERNAL_OPERATIONS);
     }
 
     /// L2-1637, event variant: a contract `DUP`s an internal `EMIT`
