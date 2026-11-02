@@ -2669,6 +2669,64 @@ mod review_verification {
         }
     }
 
+    /// ENG-119: extracting lazy storage rebuilds every `map` whose values hold
+    /// a big map, re-inserting each entry (see [`Frame::BuildMap`]). Each
+    /// re-insert descends the tree comparing the key, so it is charged
+    /// [`crate::gas::interpret_cost::map_update`], like a `MAP UPDATE`.
+    ///
+    /// Two maps that differ only in their key size are rebuilt. The per-node
+    /// charge is identical and cancels, so the gas difference is exactly the
+    /// key-comparison cost: `map_update` summed over the entries.
+    #[test]
+    fn rebuild_charges_the_key_comparison() {
+        use crate::gas::interpret_cost::map_update;
+
+        const ENTRIES: usize = 20;
+        const SMALL_KEY: usize = 32;
+        const LARGE_KEY: usize = 4096;
+
+        // `map bytes (big_map int int)` with `ENTRIES` distinct `keylen`-byte
+        // keys, each mapped to a big map so every entry is rebuilt.
+        fn rebuild_gas(keylen: usize) -> u32 {
+            let key = |i: usize| {
+                let mut k = vec![0x41u8; keylen];
+                k[keylen - 8..].copy_from_slice(&(i as u64).to_be_bytes());
+                k
+            };
+            let map = RedBlackTreeMap::from_iter((0..ENTRIES).map(|i| {
+                (
+                    Rc::new(TypedValue::Bytes(key(i))),
+                    Rc::new(leaf_big_map(i as i64)),
+                )
+            }));
+            let mut root = TypedValue::Map(map);
+            let mut storage = MeteredStorage {
+                inner: InMemoryLazyStorage::new(),
+                gas: crate::gas::Gas::new(u32::MAX),
+            };
+            let before = storage.gas.milligas().unwrap();
+            root.for_each_big_map_mut(&mut storage, &mut |_, _| Ok(()))
+                .unwrap();
+            before - storage.gas.milligas().unwrap()
+        }
+
+        // Every insert overwrites an existing key, so the map keeps `ENTRIES`
+        // entries and each insert is charged `map_update(key, ENTRIES)`. The
+        // keys all have the same length, so one representative key gives the
+        // per-insert cost.
+        let per_insert = |keylen: usize| {
+            map_update(&TypedValue::Bytes(vec![0x41u8; keylen]), ENTRIES).unwrap()
+        };
+        let expected_delta =
+            ENTRIES as u32 * (per_insert(LARGE_KEY) - per_insert(SMALL_KEY));
+
+        assert_eq!(
+            rebuild_gas(LARGE_KEY) - rebuild_gas(SMALL_KEY),
+            expected_delta,
+            "the rebuild must charge map_update per re-inserted key (ENG-119)"
+        );
+    }
+
     /// Only one entry is rebuilt; the others stay shared with the original
     /// map, which is what makes the rebuild copy-on-write rather than a copy.
     #[test]
