@@ -88,7 +88,7 @@ create_kernel_config() {
   if [[ -n $SEQUENCER_ALIAS ]]; then
     pubkey=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ALIAS}" | grep Public | grep -oE "edpk.*")
     pubkey_hex=$(printf '%s' "${pubkey}" | xxd -p -c 54)
-    add_kernel_config_set "$file" "/evm/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
+    add_kernel_config_set "$file" "/evm/world_state/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
   fi
 }
 
