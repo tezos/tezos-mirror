@@ -603,7 +603,11 @@ fn dispatch_callback<'a>(
     ctx.operation_gas()
         .cast_and_consume_milligas(CALLBACK_DISPATCH_MILLIGAS)
         .map_err(TransferError::OutOfGas)?;
-    let counter = ctx.operation_counter();
+    // The callback is an internal operation like any other: allocate its
+    // counter through the same per-block cap check.
+    let counter = mir::interpreter::fresh_operation_counter(ctx).map_err(|e| {
+        TransferError::from(mir::interpreter::ContractInterpretError::InterpretError(e))
+    })?;
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
             param: RcTypedValue::new(TypedValue::Bytes(response_body)),
@@ -5032,6 +5036,15 @@ pub(crate) mod tests {
         assert_eq!(
             ops[0].counter, 2,
             "counter should follow previously consumed values"
+        );
+        // At the per-block cap, the callback fails like any other internal
+        // operation instead of adding an entry over the limit.
+        ctx.operation_counter = mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        let result = dispatch_callback(&mut ctx, Some(make_test_address()), vec![]);
+        assert!(
+            matches!(&result, Err(TransferError::MichelsonContractInterpretError(msg))
+                if msg.contains("too many internal operations")),
+            "got {result:?}"
         );
     }
 

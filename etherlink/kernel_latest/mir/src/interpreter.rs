@@ -1760,7 +1760,11 @@ fn interpret_step<'a, 'b>(
 /// exactly the same boundary instead of redefining the literal.
 pub const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
 
-fn fresh_operation_counter<'a>(
+/// Allocate the counter of a new internal operation, failing with
+/// [`InterpretError::TooManyInternalOperations`] at
+/// [`MAX_INTERNAL_OPERATIONS`]. Every producer of internal operations must go
+/// through it, including those outside the interpreter.
+pub fn fresh_operation_counter<'a>(
     ctx: &mut impl CtxTrait<'a>,
 ) -> Result<u128, InterpretError<'a>> {
     let counter = ctx.operation_counter();
