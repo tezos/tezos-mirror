@@ -782,6 +782,122 @@ let test_init_config_network network =
   Regression.capture config ;
   unit
 
+(* The kernel configurations of [etherlink/config], written by hand. *)
+let kernel_config name =
+  Uses.make ~tag:"kernel_config" ~path:(sf "etherlink/config/%s.yaml" name) ()
+
+let dev_kernel_config = kernel_config "dev"
+
+let sequencer_kernel_config = kernel_config "sequencer"
+
+let benchmarking_kernel_config = kernel_config "benchmarking"
+
+let benchmarking_sequencer_kernel_config =
+  kernel_config "benchmarking_sequencer"
+
+let dailynet_kernel_config = kernel_config "dailynet"
+
+let ghostnet_kernel_config = kernel_config "ghostnet"
+
+(* Captures the configuration that the node generates for the values of each
+   hand-written kernel configuration, and fails when that configuration misses
+   one of the generated paths. *)
+let test_kernel_configs_use_node_paths () =
+  Regression.register
+    ~__FILE__
+    ~title:"Kernel configurations use the paths of the node"
+    ~tags:["evm"; "installer"; "config"]
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        dev_kernel_config;
+        sequencer_kernel_config;
+        benchmarking_kernel_config;
+        benchmarking_sequencer_kernel_config;
+        dailynet_kernel_config;
+        ghostnet_kernel_config;
+      ]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let paths contents =
+    String.split_on_char '\n' contents
+    |> List.filter_map (fun line ->
+           let line = String.trim line in
+           if String.starts_with ~prefix:"to: " line then
+             Some (String.sub line 4 (String.length line - 4))
+           else None)
+  in
+  let check config args =
+    let file = Uses.path config in
+    let output = Temp.file (Filename.basename file) in
+    let* () =
+      Process.run
+        (Uses.path Constant.octez_evm_node)
+        (["make"; "kernel"; "installer"; "config"; output] @ args)
+    in
+    let generated = read_file output in
+    Regression.capture (sf "%s:" file) ;
+    Regression.capture generated ;
+    let file_paths = paths (read_file file) in
+    List.iter
+      (fun path ->
+        if not (List.mem path file_paths) then
+          Test.fail
+            "%s does not set %s, which the node writes for the same values"
+            file
+            path)
+      (paths generated) ;
+    unit
+  in
+  let ticketer = ["--ticketer"; "KT1DXADSWXucAJ6PujZeUSK9brpToFtC9fz6"] in
+  let sequencer =
+    ["--sequencer"; "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"]
+  in
+  let accounts addresses =
+    List.concat_map (fun a -> ["--eth-bootstrap-account"; a]) addresses
+  in
+  let dev_accounts =
+    [
+      "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c";
+      "0xb53dc01974176e5dff2298c5a94343c2585e3c54";
+      "0x9b49c988b5817be31dfb00f7a5a4671772dcce2b";
+    ]
+  in
+  let benchmarking =
+    accounts ["0xd9e5c94a12f78a96640757ac97ba0c257e8aa262"]
+    @ ticketer @ ["--enable-fa-bridge"]
+  in
+  let* () = check dev_kernel_config (ticketer @ accounts dev_accounts) in
+  let* () = check sequencer_kernel_config (accounts dev_accounts @ sequencer) in
+  let* () = check benchmarking_kernel_config benchmarking in
+  let* () =
+    check benchmarking_sequencer_kernel_config (benchmarking @ sequencer)
+  in
+  let* () =
+    check
+      dailynet_kernel_config
+      (["--ticketer"; "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW"]
+      @ accounts
+          (dev_accounts
+          @ [
+              "0xb2f428baf0916d30af9fb9801e2a648667a0a3da";
+              "0x021df5394494cd3485b7b12646448a0dc923dd4a";
+              "0xcdac74220da1399a78c3c850d2ca4b24ac4051e1";
+            ]))
+  in
+  check
+    ghostnet_kernel_config
+    [
+      "--ticketer";
+      "KT1Bp9YUvUBJgXxf5UrYTM2CGRUPixURqx4m";
+      "--admin";
+      "KT1Ewy8Thvqt6nFCWdGPAkCpN2tXmCXadwdF";
+      "--chain-id";
+      "128123";
+    ]
+
 let protocols = [Protocol.Alpha]
 
 let () =
@@ -791,6 +907,7 @@ let () =
   test_evm_node_flag [Alpha] ;
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;
+  test_kernel_configs_use_node_paths () ;
   test_sequencer_sandbox () ;
   test_debug_print_store_schemas () ;
   test_man () ;
