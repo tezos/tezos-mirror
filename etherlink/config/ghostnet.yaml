@@ -10,4 +10,4 @@ instructions:
   - set:
       # Chain ID: 128123
       value: 7BF4010000000000000000000000000000000000000000000000000000000000
-      to: /evm/chain_id
+      to: /evm/world_state/chain_id

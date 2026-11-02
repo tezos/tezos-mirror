@@ -65,7 +65,7 @@ create_kernel_config() {
 
   # chain ID config
   evm_chain_id=$(create_chain_id "${EVM_CHAIN_ID}")
-  add_kernel_config_set "$file" /evm/chain_id "${evm_chain_id}" "Chain ID: ${EVM_CHAIN_ID}"
+  add_kernel_config_set "$file" /evm/world_state/chain_id "${evm_chain_id}" "Chain ID: ${EVM_CHAIN_ID}"
 
   # ticketer config
   add_kernel_config_contract "$file" /evm/world_state/ticketer "${BRIDGE_ALIAS}" "BRIDGE"
