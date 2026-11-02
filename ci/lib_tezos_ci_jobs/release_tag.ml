@@ -444,7 +444,7 @@ let job_update_gitlab_release =
        packaging revision"
     ~needs:[(Job, job_create_gitlab_package)]
     ~id_tokens:Tezos_ci.id_tokens
-    ~script:["./scripts/releases/update_gitlab_release.sh"]
+    ~script:["./scripts/releases/create_gitlab_release.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
