@@ -437,12 +437,14 @@ pub struct TezosXBlockConstants {
     pub michelson_runtime_block_constants: TezlinkBlockConstants,
 }
 
-fn read_or_init_michelson_to_evm_gas_multiplier(host: &mut impl StorageV1) -> u64 {
-    match read_michelson_to_evm_gas_multiplier(host) {
-        Ok(value) => value,
-        Err(_) => {
+fn read_or_init_michelson_to_evm_gas_multiplier(
+    evm_world_state: &mut impl KeySpace,
+) -> u64 {
+    match read_michelson_to_evm_gas_multiplier(evm_world_state) {
+        Some(value) => value,
+        None => {
             let _ = store_michelson_to_evm_gas_multiplier(
-                host,
+                evm_world_state,
                 DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
             );
             DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER
@@ -466,7 +468,7 @@ impl TezosXChainConfig {
 
     pub fn constants(
         &self,
-        host: &mut impl StorageV1,
+        evm_world_state: &mut impl KeySpace,
         block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
@@ -477,7 +479,7 @@ impl TezosXChainConfig {
             .map_err(|_| crate::Error::InvalidConversion)?
             .as_u64();
         let michelson_to_evm_gas_multiplier =
-            read_or_init_michelson_to_evm_gas_multiplier(host);
+            read_or_init_michelson_to_evm_gas_multiplier(evm_world_state);
         let safe_roots = self.world_states(level.into());
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
