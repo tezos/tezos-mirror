@@ -28,6 +28,7 @@ pub use pricing::{michelson_gas_to_mutez, mutez_to_evm_gas};
 pub use wei::{Wei, WeiToMutezError, ONE_MUTEZ_WEI};
 
 use primitive_types::U256;
+use tezos_crypto_rs::base58::FromBase58CheckError;
 use tezos_data_encoding::{enc::BinWriter, encoding::HasEncoding, nom::NomReader};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -136,6 +137,10 @@ pub enum StorageReadErrorKind {
     /// it. This error is a kernel bug, not a user error.
     #[error("no value at a key that the kernel writes before any read")]
     NotSeeded,
+
+    /// The value is not a base58check encoding of the requested hash.
+    #[error("value is not valid base58check: {0}")]
+    InvalidBase58(#[from] FromBase58CheckError),
 }
 
 impl tezos_smart_rollup_keyspace::ExtensionError for StorageReadErrorKind {}

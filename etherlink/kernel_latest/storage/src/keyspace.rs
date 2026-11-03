@@ -6,10 +6,13 @@
 //! This crate implements each trait for every keyspace. The traits report
 //! their own failures as a [`StorageReadErrorKind`].
 
+use tezos_crypto_rs::base58::FromBase58CheckError;
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, ReadKind};
 
 use crate::error::StorageReadErrorKind;
+use crate::KT1_B58_SIZE;
 
 /// Binary reads over a [`KeySpace`] that read at most a given number of
 /// bytes.
@@ -71,6 +74,45 @@ pub trait KeySpaceExtBounded: KeySpace + Sized {
 }
 
 impl<KS: KeySpace> KeySpaceExtBounded for KS {}
+
+/// Base58 contract-address reads over a [`KeySpace`].
+///
+/// The bytes are read from the keyspace in the same format as
+/// [`crate::read_b58_kt1`] reads them from a raw storage path. Invalid values
+/// are reported as [`StorageReadErrorKind::InvalidBase58`] instead of being
+/// silently treated as missing.
+pub trait KeySpaceExtB58: KeySpace {
+    /// Returns the base58 contract address stored at `key`.
+    ///
+    /// The first [`crate::KT1_B58_SIZE`] bytes of the value are decoded as a
+    /// [`ContractKt1Hash`]. A missing key or a value shorter than that size
+    /// returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// - [`StorageReadErrorKind::InvalidBase58`] when the bytes are not a
+    ///   valid base58 contract address.
+    fn get_b58_kt1(
+        &self,
+        key: &Key,
+    ) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+        let result = self.get_prefix_exact::<KT1_B58_SIZE>(key);
+        if let Some(buffer) = result {
+            std::str::from_utf8(&buffer)
+                // Base58 is ASCII, so bytes that are not UTF-8 are not base58 either.
+                .map_err(|_| FromBase58CheckError::InvalidBase58)
+                .and_then(ContractKt1Hash::from_b58check)
+                .map_err(|err| {
+                    KeySpaceError::read(self.name(), key, ReadKind::Ext(err.into()))
+                })
+                .map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl<KS: KeySpace> KeySpaceExtB58 for KS {}
 
 #[cfg(test)]
 mod tests {
