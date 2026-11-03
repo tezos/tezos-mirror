@@ -5,7 +5,6 @@
 //! Gas accounting and costs.
 
 use num_bigint::{BigInt, BigUint};
-use tezos_data_encoding::enc::{BinError, BinWriter};
 
 /// Structure carrying the remaining gas amount.
 #[derive(Debug)]
@@ -20,12 +19,6 @@ pub struct Gas {
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 #[error("Gas_exhaustion")]
 pub struct OutOfGas;
-
-impl BinWriter for OutOfGas {
-    fn bin_write(&self, _: &mut Vec<u8>) -> Result<(), BinError> {
-        Ok(())
-    }
-}
 
 /// Arithmetic overflow during cost computation. Produced by
 /// [`AsGasCost::as_gas_cost`] and [`Log2i::log2i`] when a cost-formula
