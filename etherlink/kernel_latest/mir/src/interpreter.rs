@@ -41,7 +41,7 @@ use crate::typechecker::{
 };
 
 /// Errors possible during interpretation.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum InterpretError<'a> {
     /// Interpreter ran out of gas.
     #[error("Gas_exhaustion")]

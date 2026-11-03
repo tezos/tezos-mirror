@@ -31,7 +31,7 @@ use crate::tzt::expectation::*;
 pub type TestStack<'a> = Vec<(Type, TypedValue<'a>)>;
 
 /// The TZT execution didn't succeed, the expectation is not fulfilled.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum TztTestError<'a> {
     /// Expected and actual output stacks don't match.
     StackMismatch(
@@ -698,7 +698,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 
 /// This represents possibilities in which the execution of
 /// the code in a test can fail.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TestError<'a> {
     /// Error happened during typechecking.
     #[error(transparent)]

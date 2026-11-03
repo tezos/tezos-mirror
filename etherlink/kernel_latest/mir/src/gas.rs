@@ -5,7 +5,6 @@
 //! Gas accounting and costs.
 
 use num_bigint::{BigInt, BigUint};
-use tezos_data_encoding::enc::{BinError, BinWriter};
 
 /// Structure carrying the remaining gas amount.
 #[derive(Debug)]
@@ -17,15 +16,9 @@ pub struct Gas {
 /// caller's remaining budget is insufficient. Arithmetic-overflow failures
 /// during cost computation use [`CostOverflow`] instead — `OutOfGas` is not
 /// an arithmetic error.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("Gas_exhaustion")]
 pub struct OutOfGas;
-
-impl BinWriter for OutOfGas {
-    fn bin_write(&self, _: &mut Vec<u8>) -> Result<(), BinError> {
-        Ok(())
-    }
-}
 
 /// Arithmetic overflow during cost computation. Produced by
 /// [`AsGasCost::as_gas_cost`] and [`Log2i::log2i`] when a cost-formula
@@ -33,12 +26,12 @@ impl BinWriter for OutOfGas {
 /// domain (e.g. `log2i(0)`, `log2i(usize::MAX)`). Distinct from
 /// [`OutOfGas`]: the caller's budget was not exhausted; the cost itself
 /// is unrepresentable.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("arithmetic overflow in cost computation")]
 pub struct CostOverflow;
 
 /// Error when computing comparison cost.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum CompareError {
     /// Cost arithmetic overflowed while sizing the comparison. Most
     /// cost-helper functions in [`tc_cost`] / [`interpret_cost`] do not

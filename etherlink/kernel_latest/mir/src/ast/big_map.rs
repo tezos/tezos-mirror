@@ -266,7 +266,7 @@ impl<'a> BigMap<'a> {
 }
 
 /// Errors that can happen when working with lazy storage.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum LazyStorageError {
     /// Error when computing path in storage
     #[error("Error generating path: {0}")]
@@ -284,12 +284,8 @@ pub enum LazyStorageError {
     #[error("Error nom_reading stored value: {0}")]
     NomReadError(String),
     /// Error when using bin_write to interact with the storage
-    ///
-    /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
-    /// does not implement [`Clone`] (its `IOError` variant carries a
-    /// non-Clone `std::io::Error`), and this enum derives `Clone`.
     #[error("Error bin_writing value to store: {0}")]
-    BinWriteError(std::rc::Rc<tezos_data_encoding::enc::BinError>),
+    BinWriteError(#[from] tezos_data_encoding::enc::BinError),
     /// The requested big_map id was not found in the lazy storage.
     #[error("big map with ID {0} not found in the lazy storage")]
     BigMapNotFound(BigMapId),
@@ -325,12 +321,6 @@ impl From<BorrowedUnparseError> for LazyStorageError {
                 LazyStorageError::NonStorableValue
             }
         }
-    }
-}
-
-impl From<tezos_data_encoding::enc::BinError> for LazyStorageError {
-    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
-        LazyStorageError::BinWriteError(std::rc::Rc::new(err))
     }
 }
 
