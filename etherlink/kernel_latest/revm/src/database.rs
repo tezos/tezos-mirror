@@ -10,8 +10,8 @@ use crate::storage::{
     code::CodeStorage,
     sequencer_key_change::{store_sequencer_key_change, write_sequencer_change_counter},
     world_state_handler::{
-        AccountInfo, AccountOrigin, StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_KEY,
-        KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_COUNTER_PATH,
+        read_ticketer, AccountInfo, AccountOrigin, StorageAccount,
+        GOVERNANCE_SEQUENCER_UPGRADE_KEY, SEQUENCER_KEY_CHANGE_COUNTER_PATH,
         SEQUENCER_KEY_PATH,
     },
 };
@@ -30,10 +30,7 @@ use revm::{
     },
     Database as RevmDatabase, DatabaseCommit,
 };
-use tezos_crypto_rs::{
-    hash::{ContractKt1Hash, HashTrait},
-    public_key::PublicKey,
-};
+use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
@@ -361,12 +358,7 @@ where
     }
 
     fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
-        let ticketer =
-            self.rk
-                .host()
-                .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
-        let kt1_b58 = std::str::from_utf8(&ticketer)?;
-        Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
+        read_ticketer(self.rk.host())
     }
 
     fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {

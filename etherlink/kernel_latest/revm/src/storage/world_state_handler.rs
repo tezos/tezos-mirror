@@ -9,9 +9,10 @@ use revm::{
     state::{AccountInfo as RevmAccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::keyspace::KeySpaceExtU256;
-use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
+use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, storage::StorageV1};
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
 use tezosx_interfaces::{AliasInfo, Origin};
@@ -26,6 +27,16 @@ pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
 
 /// Size of contract hash encoded in base58.
 pub const KT1_B58_SIZE: usize = 36;
+
+/// Reads the withdrawal ticketer. Errors when it is absent or is not a base58
+/// KT1 address.
+pub fn read_ticketer(
+    host: &impl StorageV1,
+) -> Result<ContractKt1Hash, PrecompileStateError> {
+    let ticketer = host.store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
+    let kt1_b58 = std::str::from_utf8(&ticketer)?;
+    Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
+}
 
 /// Path where a possible waiting sequencer upgrade triggered by a precompile
 /// is store.

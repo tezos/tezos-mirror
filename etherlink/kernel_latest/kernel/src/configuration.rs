@@ -20,7 +20,8 @@ use crate::{
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
 use primitive_types::U256;
-use revm_etherlink::storage::{read_ticketer, version::read_or_set_evm_version};
+use revm_etherlink::storage::version::read_or_set_evm_version;
+use revm_etherlink::storage::world_state_handler::read_ticketer;
 use tezos_crypto_rs::{
     blake2b,
     hash::{ChainId, ContractKt1Hash},
@@ -196,7 +197,7 @@ fn read_and_log_b58<T, E: std::fmt::Display>(
 fn fetch_tezos_contracts(host: &impl StorageV1, base: &impl KeySpace) -> TezosContracts {
     // 1. Fetch the kernel's ticketer, returns `None` if it is badly
     //    encoded or absent.
-    let ticketer = read_ticketer(host);
+    let ticketer = read_ticketer(host).ok();
     // 2. Fetch the kernel's administrator, returns `None` if it is badly
     //    encoded or absent.
     let admin = read_and_log_b58(read_admin(base), &ADMIN_KEY);
