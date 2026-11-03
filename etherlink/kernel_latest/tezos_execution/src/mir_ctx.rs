@@ -1224,8 +1224,8 @@ fn hash_micheline_expr(
 /// [`LazyStorageError`] has no `From` impl for this conversion, because it
 /// belongs to `mir`, and `mir` does not depend on `tezos-storage-latest`.
 fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStorageError {
-    LazyStorageError::BinWriteError(std::rc::Rc::new(
-        tezos_data_encoding::enc::BinError::custom(e.into().to_string()),
+    LazyStorageError::BinWriteError(tezos_data_encoding::enc::BinError::custom(
+        e.into().to_string(),
     ))
 }
 
