@@ -2696,6 +2696,7 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-keyspace",
+ "tezos-storage-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
