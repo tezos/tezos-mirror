@@ -299,6 +299,14 @@ type job = {
   retry : retry option;
   parallel : parallel option;
   environment : environment option;
+  resource_group : string option;
+      (** Jobs with the same [resource_group] never run concurrently,
+          even across pipelines of the same project: GitLab starts one
+          and makes the others wait until it finishes.
+
+          See
+          {{:https://docs.gitlab.com/ee/ci/yaml/#resource_group}resource_group}
+          for more info. *)
 }
 
 (** Represents a trigger rule.

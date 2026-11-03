@@ -143,6 +143,26 @@ let%expect_test _ =
       environment:
         name: documentation
         action: access |}] ;
+  (* resource_group *)
+  p
+    [
+      Types.(
+        Generic_job
+          (Job
+             (Util.job
+                ~stage:"publish"
+                ~name:"publish_docs"
+                ~resource_group:"documentation"
+                ~script:["./publish.sh"]
+                ())));
+    ] ;
+  [%expect
+    {|
+    publish_docs:
+      stage: publish
+      script:
+      - ./publish.sh
+      resource_group: documentation |}] ;
   ()
 
 (** {2 Test {!If}-expressions} *)

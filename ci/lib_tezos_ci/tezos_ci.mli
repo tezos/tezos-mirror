@@ -296,7 +296,11 @@ type git_strategy =
       access to variables scoped to that environment. Use [action:Access]
       to avoid registering a deployment.
       If omitted, only variables with the wildcard scope are available.
-      See {{:https://docs.gitlab.com/ci/environments/} GitLab environments}. *)
+      See {{:https://docs.gitlab.com/ci/environments/} GitLab environments}.
+
+    - [resource_group] prevents the job from running concurrently with any
+      other job of the same resource group, including jobs of other pipelines.
+      See {{:https://docs.gitlab.com/ci/resource_groups/} resource groups}. *)
 val job :
   ?arch:Runner.Arch.t ->
   ?after_script:string list ->
@@ -319,6 +323,7 @@ val job :
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?environment:Gitlab_ci.Types.environment ->
+  ?resource_group:string ->
   ?description:string ->
   ?dev_infra:bool ->
   __POS__:string * int * int * int ->
