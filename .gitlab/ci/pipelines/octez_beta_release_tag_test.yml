@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:container_scanning:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -60,7 +60,7 @@ docker:container_scanning:
   retry: 0
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -88,7 +88,7 @@ docker:merge_manifests:
   retry: 0
 
 docker:mirror_to_gitlab_registry:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -115,7 +115,7 @@ docker:mirror_to_gitlab_registry:
   retry: 0
 
 gitlab:release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -144,7 +144,7 @@ gitlab:release:
   retry: 0
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -174,7 +174,7 @@ grafazos.build:
     when: on_success
 
 grafazos.release-page-deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -206,7 +206,7 @@ grafazos.release-page-deploy-assets:
   retry: 0
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -252,7 +252,7 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -298,7 +298,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -313,8 +313,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -332,7 +332,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -347,8 +347,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -366,7 +366,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 release_page.deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -400,7 +400,7 @@ release_page.deploy-assets:
   retry: 0
 
 release_site.render:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -434,7 +434,7 @@ release_site.render:
   retry: 0
 
 teztale.build-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -485,7 +485,7 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -536,7 +536,7 @@ teztale.build-x86_64:
     when: on_success
 
 teztale.release-page-deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: publish
   tags:
   - gcp_not_interruptible

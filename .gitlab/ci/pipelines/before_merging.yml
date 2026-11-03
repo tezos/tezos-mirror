@@ -8,7 +8,7 @@ stages:
 - test
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -57,7 +57,7 @@ audit_riscv_deps:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 build-layer1-profiling:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -142,7 +142,7 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 build_octez_source:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -192,7 +192,7 @@ build_octez_source:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 cargo_audit:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -219,7 +219,7 @@ cargo_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -246,7 +246,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -293,7 +293,7 @@ check_riscv_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -316,7 +316,7 @@ check_rust_fmt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 commit_titles:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -337,7 +337,7 @@ commit_titles:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp_arm64
@@ -362,7 +362,7 @@ de.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -412,7 +412,7 @@ docker:hadolint:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.build_all:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -466,7 +466,7 @@ documentation.build_all:
     expose_as: Documentation - excluding old protocols
 
 documentation.docgen:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -532,7 +532,7 @@ documentation.docgen:
     - docs/shell/p2p_api.rst
 
 documentation.install_python_trixie:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -561,7 +561,7 @@ documentation.install_python_trixie:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.linkcheck:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -613,7 +613,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.manuals:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -666,7 +666,7 @@ documentation.manuals:
     - docs/user/node-config.json
 
 documentation.odoc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -730,7 +730,7 @@ documentation.odoc:
     when: always
 
 documentation.rst-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -754,7 +754,7 @@ documentation.rst-check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.build_evm_node_static_arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_arm64
@@ -807,7 +807,7 @@ etherlink.build_evm_node_static_arm64:
     when: on_success
 
 etherlink.build_evm_node_static_x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -860,7 +860,7 @@ etherlink.build_evm_node_static_x86_64:
     when: on_success
 
 etherlink.build_tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -939,7 +939,7 @@ etherlink.build_tezt:
     when: on_success
 
 etherlink.check_node_changelog:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -965,7 +965,7 @@ etherlink.check_node_changelog:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.check_tezosx_changelog:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -991,7 +991,7 @@ etherlink.check_tezosx_changelog:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.lint_solidity_artifacts:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1021,7 +1021,7 @@ etherlink.lint_solidity_artifacts:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.lint_wasm_runtime:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1065,7 +1065,7 @@ etherlink.lint_wasm_runtime:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_no_tickets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1114,7 +1114,7 @@ etherlink.mir_no_tickets:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.mir_tzt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1153,7 +1153,7 @@ etherlink.mir_tzt:
     CARGO_NET_OFFLINE: "false"
 
 etherlink.preview_node_changelog:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1179,7 +1179,7 @@ etherlink.preview_node_changelog:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.preview_tezosx_changelog:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1205,7 +1205,7 @@ etherlink.preview_tezosx_changelog:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.test_evm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1255,7 +1255,7 @@ etherlink.test_evm_compatibility:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_kernel:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1313,7 +1313,7 @@ etherlink.test_kernel:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.test_revm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1364,7 +1364,7 @@ etherlink.test_revm_compatibility:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 etherlink.tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -1450,7 +1450,7 @@ etherlink.tezt:
   parallel: 36
 
 etherlink.tezt-extra:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -1536,7 +1536,7 @@ etherlink.tezt-extra:
   parallel: 12
 
 etherlink.tezt-flaky:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -1623,7 +1623,7 @@ etherlink.tezt-flaky:
   parallel: 2
 
 etherlink.tezt-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -1709,7 +1709,7 @@ etherlink.tezt-slow:
   parallel: 3
 
 etherlink.unit_tests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1773,7 +1773,7 @@ etherlink.unit_tests:
   retry: 2
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -1805,7 +1805,7 @@ grafazos.build:
     when: on_success
 
 images.alpine-ci-all.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -1880,7 +1880,7 @@ images.alpine-ci-all.merge:
     - runner_system_failure
 
 images.alpine-ci-all:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1930,7 +1930,7 @@ images.alpine-ci-all:amd64:
     - runner_system_failure
 
 images.alpine-ci-all:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -2029,7 +2029,7 @@ images.alpine-docker-ci:
     - runner_system_failure
 
 images.ci-release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2077,7 +2077,7 @@ images.ci-release:
       - trixie
 
 images.debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2147,7 +2147,7 @@ images.debian:
       - trixie
 
 images.debian-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - $TAGS
@@ -2208,7 +2208,7 @@ images.debian-build:
       - gcp_arm64
 
 images.debian-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -2264,7 +2264,7 @@ images.debian-build.merge:
       - trixie
 
 images.debian-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2312,7 +2312,7 @@ images.debian-homebrew:
       - trixie
 
 images.debian-jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2359,7 +2359,7 @@ images.debian-jsonnet:
       - trixie
 
 images.debian-rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - $TAGS
@@ -2411,7 +2411,7 @@ images.debian-rust:
       - gcp_arm64
 
 images.debian-rust-sdk-bindings:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2459,7 +2459,7 @@ images.debian-rust-sdk-bindings:
       - trixie
 
 images.debian-rust.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -2503,7 +2503,7 @@ images.debian-rust.merge:
     - runner_system_failure
 
 images.debian-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2555,7 +2555,7 @@ images.debian-systemd:
       - trixie
 
 images.ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2620,7 +2620,7 @@ images.ubuntu:
       - "26.04"
 
 images.ubuntu-build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - $TAGS
@@ -2683,7 +2683,7 @@ images.ubuntu-build:
       - gcp_arm64
 
 images.ubuntu-build.merge:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -2741,7 +2741,7 @@ images.ubuntu-build.merge:
       - "26.04"
 
 images.ubuntu-systemd:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -2859,7 +2859,7 @@ npm_audit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build:static-arm64-linux-experimental-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -2929,7 +2929,7 @@ oc.build:static-arm64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -2998,7 +2998,7 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-experimental-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3068,7 +3068,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3137,7 +3137,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build_arm64-exp:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -3216,7 +3216,7 @@ oc.build_arm64-exp:
     when: on_success
 
 oc.build_arm64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -3295,7 +3295,7 @@ oc.build_arm64-extra-dev:
     when: on_success
 
 oc.build_arm64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -3377,7 +3377,7 @@ oc.build_arm64-released:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3458,7 +3458,7 @@ oc.build_kernels:
     when: on_success
 
 oc.build_x86_64-exp:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3546,7 +3546,7 @@ oc.build_x86_64-exp:
     when: on_success
 
 oc.build_x86_64-extra-dev:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3641,7 +3641,7 @@ oc.build_x86_64-extra-dev:
     when: on_success
 
 oc.build_x86_64-released:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -3729,7 +3729,7 @@ oc.build_x86_64-released:
     when: on_success
 
 oc.check_lift_limits_patch:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -3776,7 +3776,7 @@ oc.check_lift_limits_patch:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-build:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -3812,7 +3812,7 @@ oc.compile_sources_doc:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -3849,8 +3849,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -3868,7 +3868,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: build
   tags:
   - gcp_arm64
@@ -3905,8 +3905,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-18884dda
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -3924,7 +3924,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 oc.integration:compiler-rejections:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -3987,7 +3987,7 @@ oc.integration:compiler-rejections:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.misc_checks:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -4025,7 +4025,7 @@ oc.misc_checks:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.ocaml_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -4065,7 +4065,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 oc.python_check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4094,7 +4094,7 @@ oc.python_check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script.docker_verify_image_amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4145,7 +4145,7 @@ oc.script.docker_verify_image_amd64:
     - runner_system_failure
 
 oc.script.docker_verify_image_arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4196,7 +4196,7 @@ oc.script.docker_verify_image_arm64:
     - runner_system_failure
 
 oc.script:b58_prefix:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4225,7 +4225,7 @@ oc.script:b58_prefix:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.script:snapshot_alpha_and_link:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -4273,7 +4273,7 @@ oc.script:snapshot_alpha_and_link:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:test-gen-genesis:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4327,7 +4327,7 @@ oc.script:test-gen-genesis:
     CARGO_NET_OFFLINE: "false"
 
 oc.script:test_octez_release_versions:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4383,7 +4383,7 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.test-liquidity-baking-scripts:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4417,7 +4417,7 @@ oc.test-liquidity-baking-scripts:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.unit:non-proto-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp_arm64
@@ -4494,7 +4494,7 @@ oc.unit:non-proto-arm64:
   parallel: 2
 
 oc.unit:non-proto-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4578,7 +4578,7 @@ oc.unit:non-proto-x86_64:
   retry: 2
 
 oc.unit:other-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_high_cpu
@@ -4660,7 +4660,7 @@ oc.unit:other-x86_64:
   retry: 2
 
 oc.unit:proto-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -4742,7 +4742,7 @@ oc.unit:proto-x86_64:
   retry: 2
 
 oc.unit:protocol_compiles:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -4805,7 +4805,7 @@ oc.unit:protocol_compiles:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.unit:webassembly-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4860,7 +4860,7 @@ oc.unit:webassembly-x86_64:
     CARGO_NET_OFFLINE: "false"
 
 oc:scripts:release_script_values:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -4886,7 +4886,7 @@ oc:scripts:release_script_values:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 ocaml-check:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -4929,7 +4929,7 @@ ocaml-check:
     DUNE_CACHE_STORAGE_MODE: hardlink
 
 release_site.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -4961,7 +4961,7 @@ release_site.build:
     when: on_success
 
 release_site.build_tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -5001,7 +5001,7 @@ release_site.build_tezt:
     when: on_success
 
 release_site.tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5057,7 +5057,7 @@ release_site.tezt:
     when: always
 
 resto.unit:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp_arm64
@@ -5082,7 +5082,7 @@ resto.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 resto.unit:x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-test:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -5107,7 +5107,7 @@ resto.unit:x86_64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sanity_ci:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: sanity
   tags:
   - gcp
@@ -5139,7 +5139,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 sdk_bindings.test:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust-sdk-bindings:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -5185,7 +5185,7 @@ sdk_bindings.test:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 select_tezts:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-prebuild:master-d74b3dc3
   stage: build
   tags:
   - gcp
@@ -5238,7 +5238,7 @@ select_tezts:
     when: always
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -5285,7 +5285,7 @@ test_kernels:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -5334,7 +5334,7 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 tezt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5418,7 +5418,7 @@ tezt:
   parallel: 34
 
 tezt-extra:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5501,7 +5501,7 @@ tezt-extra:
   retry: 2
 
 tezt-flaky:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5586,7 +5586,7 @@ tezt-flaky:
   parallel: 2
 
 tezt-riscv-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5667,7 +5667,7 @@ tezt-riscv-slow:
   retry: 2
 
 tezt-slow:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5751,7 +5751,7 @@ tezt-slow:
   parallel: 12
 
 tezt-static-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp
@@ -5835,7 +5835,7 @@ tezt-static-binaries:
     when: always
 
 tezt-time-sensitive:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-e2etest:master-d74b3dc3
   stage: test
   tags:
   - gcp_tezt
@@ -5919,7 +5919,7 @@ tezt-time-sensitive:
   parallel: 2
 
 teztale.build-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_arm64
@@ -5972,7 +5972,7 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-18884dda
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
   stage: test
   tags:
   - gcp_very_high_cpu
