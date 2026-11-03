@@ -51,7 +51,7 @@ pub trait DatabasePrecompileStateChanges {
         owner: &Address,
     ) -> Result<U256, PrecompileStateError>;
     fn sequencer(&self) -> Result<PublicKey, PrecompileStateError>;
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError>;
+    fn governance_sequencer_upgrade_exists(&self) -> bool;
     /// Counter the next sequencer key change must be signed against, used to
     /// make a captured change calldata non-replayable once the key rotates again.
     fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError>;

@@ -10,7 +10,7 @@ use crate::storage::{
     code::CodeStorage,
     sequencer_key_change::{store_sequencer_key_change, write_sequencer_change_counter},
     world_state_handler::{
-        AccountInfo, AccountOrigin, StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
+        AccountInfo, AccountOrigin, StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_KEY,
         KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_COUNTER_PATH,
         SEQUENCER_KEY_PATH,
     },
@@ -37,7 +37,7 @@ use tezos_crypto_rs::{
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::{AliasInfo, Origin, Registry};
 
@@ -375,16 +375,10 @@ where
         Ok(PublicKey::from_b58check(s)?)
     }
 
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError> {
-        match self
-            .rk
-            .host()
-            .store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
-        {
-            Ok(_) => Ok(true),
-            Err(RuntimeError::PathNotFound) => Ok(false),
-            Err(e) => Err(e.into()),
-        }
+    fn governance_sequencer_upgrade_exists(&self) -> bool {
+        self.rk
+            .evm_world_state()
+            .contains(&GOVERNANCE_SEQUENCER_UPGRADE_KEY)
     }
 
     fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {

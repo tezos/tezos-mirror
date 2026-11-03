@@ -35,13 +35,13 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
 pub const KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/kernel_root_hash");
 use revm_etherlink::storage::sequencer_key_change::increment_sequencer_change_counter;
-use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_PATH;
+use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_KEY;
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -188,15 +188,13 @@ impl Encodable for SequencerUpgrade {
     }
 }
 
-pub fn store_sequencer_upgrade<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
+/// Stores the sequencer upgrade event in `/base` and the upgrade itself in
+/// the `/evm/world_state` keyspace. Errors when either write fails.
+pub fn store_sequencer_upgrade(
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     sequencer_upgrade: SequencerUpgrade,
     common: &CommonConfig,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-{
+) -> anyhow::Result<()> {
     log!(
         Info,
         "A sequencer upgrade to {} is planned for {}",
@@ -204,22 +202,22 @@ where
         sequencer_upgrade.activation_timestamp
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
-    Event::SequencerUpgrade(sequencer_upgrade).store(base, common)?;
-    let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
-    host.store_write_all(&path, bytes)
+    Event::SequencerUpgrade(sequencer_upgrade).store(bk.base_mut(), common)?;
+    bk.evm_world_state_mut()
+        .set(&GOVERNANCE_SEQUENCER_UPGRADE_KEY, bytes)
         .context("Failed to store sequencer upgrade")
 }
 
+/// Reads the waiting sequencer upgrade from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent, and errors when it does not decode.
 pub fn read_sequencer_upgrade(
-    host: &impl StorageV1,
-) -> anyhow::Result<Option<SequencerUpgrade>> {
-    let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
-    read_optional_rlp(host, &path).context("Failed to decode sequencer upgrade")
+    evm_world_state: &impl KeySpace,
+) -> Result<Option<SequencerUpgrade>, KeySpaceError> {
+    evm_world_state.read_rlp(&GOVERNANCE_SEQUENCER_UPGRADE_KEY)
 }
 
-fn delete_sequencer_upgrade(host: &mut impl StorageV1) -> anyhow::Result<()> {
-    host.store_delete(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
-        .context("Failed to delete sequencer upgrade")
+fn delete_sequencer_upgrade(evm_world_state: &mut impl KeySpace) {
+    evm_world_state.delete(&GOVERNANCE_SEQUENCER_UPGRADE_KEY);
 }
 
 fn sequencer_upgrade<Host>(
@@ -242,7 +240,7 @@ where
     // the counter at exactly +1 per applied governance change.
     increment_sequencer_change_counter(host)?;
     store_sequencer_pool_address(evm_world_state, pool_address)?;
-    delete_sequencer_upgrade(host)?;
+    delete_sequencer_upgrade(evm_world_state);
     delete_sequencer_key_change(host)?;
     log!(Info, "Sequencer has been updated.");
     Ok(())
@@ -252,7 +250,7 @@ pub fn possible_sequencer_upgrade(
     host: &mut impl StorageV1,
     bk: &mut BlueprintKeyspaces<impl KeySpace>,
 ) -> anyhow::Result<()> {
-    let upgrade = read_sequencer_upgrade(host)?;
+    let upgrade = read_sequencer_upgrade(bk.evm_world_state())?;
     if let Some(upgrade) = upgrade {
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(bk.base())?;
         if ipl_timestamp >= upgrade.activation_timestamp {
@@ -340,20 +338,16 @@ mod tests {
 
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
 
-        {
-            let host = &mut host;
-            store_sequencer_upgrade(
-                host,
-                bk.base_mut(),
-                SequencerUpgrade {
-                    sequencer: test_public_key(),
-                    pool_address: H160::zero(),
-                    activation_timestamp: Timestamp::from(100i64),
-                },
-                &CommonConfig::default(),
-            )
-            .unwrap();
-        }
+        store_sequencer_upgrade(
+            &mut bk,
+            SequencerUpgrade {
+                sequencer: test_public_key(),
+                pool_address: H160::zero(),
+                activation_timestamp: Timestamp::from(100i64),
+            },
+            &CommonConfig::default(),
+        )
+        .unwrap();
 
         // Merely scheduling the upgrade must not move the counter.
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
@@ -373,6 +367,13 @@ mod tests {
             Timestamp::from(100i64),
         )
         .unwrap();
+        possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
+        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+
+        // The applied upgrade is deleted, so a later call applies nothing.
+        assert!(read_sequencer_upgrade(bk.evm_world_state())
+            .unwrap()
+            .is_none());
         possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
         assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
     }
