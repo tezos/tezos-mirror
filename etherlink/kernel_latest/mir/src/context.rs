@@ -26,7 +26,7 @@ use typed_arena::Arena;
 /// fulfilled (corruption, I/O failure, serialization failure), and the
 /// caller should surface it as a hard runtime failure rather than
 /// collapsing it back to `V::Option(None)`.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum LookupViewError {
     /// Encoding the view's storage bytes failed. **Test-only in
     /// practice**: only reachable from the in-memory [`Ctx`] (which
@@ -66,7 +66,7 @@ impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
 }
 
 /// Errors from address registry I/O. The in-memory [Ctx] never produces them.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AddressRegistryError {
     /// Non-recoverable host storage failure, stringified (MIR is
     /// host-agnostic). Aborts execution.

@@ -16,7 +16,7 @@ pub struct Gas {
 /// caller's remaining budget is insufficient. Arithmetic-overflow failures
 /// during cost computation use [`CostOverflow`] instead — `OutOfGas` is not
 /// an arithmetic error.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("Gas_exhaustion")]
 pub struct OutOfGas;
 
@@ -26,12 +26,12 @@ pub struct OutOfGas;
 /// domain (e.g. `log2i(0)`, `log2i(usize::MAX)`). Distinct from
 /// [`OutOfGas`]: the caller's budget was not exhausted; the cost itself
 /// is unrepresentable.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("arithmetic overflow in cost computation")]
 pub struct CostOverflow;
 
 /// Error when computing comparison cost.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum CompareError {
     /// Cost arithmetic overflowed while sizing the comparison. Most
     /// cost-helper functions in [`tc_cost`] / [`interpret_cost`] do not

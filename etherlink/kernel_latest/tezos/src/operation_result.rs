@@ -274,7 +274,7 @@ impl From<KeyError> for TransferError {
     }
 }
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum OriginationError {
     #[error("Failed to fetch source account")]
     FailedToFetchSourceAccount,

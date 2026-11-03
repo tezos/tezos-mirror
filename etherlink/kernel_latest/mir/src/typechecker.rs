@@ -38,7 +38,7 @@ use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TcError {
     /// Two stacks didn't compare equal when they should have.
     #[error("type stacks not equal: {0:?} != {1:?}")]

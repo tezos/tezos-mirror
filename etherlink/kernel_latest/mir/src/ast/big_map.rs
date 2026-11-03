@@ -266,7 +266,7 @@ impl<'a> BigMap<'a> {
 }
 
 /// Errors that can happen when working with lazy storage.
-#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum LazyStorageError {
     /// Error when computing path in storage
     #[error("Error generating path: {0}")]
