@@ -228,19 +228,24 @@ fn fetch_dal_configuration(
     }
 }
 
-pub fn fetch_evm_chain_id(host: &mut impl StorageV1) -> U256 {
-    read_evm_chain_id(host).unwrap_or_else(|err| {
-        // Chain id not in storage yet: fall back to the default and persist.
-        log!(
-            Info,
-            "Failed to read the EVM chain id ({err:?}), falling back to the default."
-        );
-        let evm_chain_id = U256::from(EVM_CHAIN_ID);
-        if let Err(err) = store_evm_chain_id(host, evm_chain_id) {
-            log!(Error, "Failed to persist the default EVM chain id: {err:?}");
+/// Reads the EVM chain id from `evm_world_state`, the `/evm/world_state`
+/// keyspace. When it is absent, writes the default there and returns it.
+/// Errors when that write fails.
+pub fn fetch_evm_chain_id(
+    evm_world_state: &mut impl KeySpace,
+) -> Result<U256, KeySpaceError> {
+    match read_evm_chain_id(evm_world_state) {
+        Some(evm_chain_id) => Ok(evm_chain_id),
+        None => {
+            log!(
+                Info,
+                "No EVM chain id in storage, falling back to the default."
+            );
+            let evm_chain_id = U256::from(EVM_CHAIN_ID);
+            store_evm_chain_id(evm_world_state, evm_chain_id)?;
+            Ok(evm_chain_id)
         }
-        evm_chain_id
-    })
+    }
 }
 
 /// Derive the Michelson runtime chain ID from the EVM chain ID by
@@ -270,6 +275,10 @@ fn fetch_michelson_runtime_chain_id(
 
 /// Reads the chain configuration of the TezosX kernel.
 ///
+/// The EVM chain id is read from the `/evm/world_state` keyspace of `bk`.
+/// When it is absent, the default is written there. Errors when that write
+/// fails.
+///
 /// The Michelson chain id is read from the `/tez/world_state` keyspace of
 /// `bk`. When it is absent, the id is derived from the EVM chain id and
 /// written there. Errors when that read or write fails.
@@ -288,7 +297,7 @@ pub fn fetch_tezosx_configuration(
     // Read both runtime chain ids from storage. The EVM chain id falls back to
     // the default and is persisted on first use; the Michelson runtime chain id
     // is derived from it and persisted if absent.
-    let evm_chain_id = fetch_evm_chain_id(host);
+    let evm_chain_id = fetch_evm_chain_id(bk.evm_world_state_mut())?;
     let limits = fetch_evm_limits(bk.evm_world_state_mut());
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());

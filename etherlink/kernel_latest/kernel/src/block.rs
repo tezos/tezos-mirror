@@ -1002,7 +1002,7 @@ mod tests {
         store_block_fees(&mut evm_world_state, &dummy_block_fees()).unwrap();
         // The run reads its chain configuration from storage: the dummy
         // transactions are signed for `DUMMY_CHAIN_ID`.
-        crate::storage::store_evm_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
+        crate::storage::store_evm_chain_id(&mut evm_world_state, DUMMY_CHAIN_ID).unwrap();
         let mut eth_accounts = host
             .load_or_create(
                 tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_KEYSPACE_NAME,
@@ -2896,7 +2896,7 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = fetch_evm_chain_id(rk.host_mut());
+        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut()).unwrap();
         let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block fees should be defined");
         TezosXBlockConstants {

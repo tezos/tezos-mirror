@@ -32,9 +32,7 @@ use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtNum};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
-use tezos_storage::{
-    get_b58_kt1, read_b58_kt1, read_u256_le, store_read_slice, write_u256_le,
-};
+use tezos_storage::{get_b58_kt1, read_b58_kt1, store_read_slice};
 
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
@@ -133,7 +131,8 @@ pub const EVM_BLOCK_IN_PROGRESS: RefPath =
 /// push-only counter (`length`) and indexed values are stored.
 const EVENTS_KEY: Key = Key::from_static(b"/rollup_events");
 
-const EVM_CHAIN_ID_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/chain_id");
+// Key to the EVM chain id, inside the `/evm/world_state` keyspace.
+const EVM_CHAIN_ID_KEY: Key = Key::from_static(b"/chain_id");
 
 // The Michelson runtime chain id is read and written through the
 // `/tez/world_state` keyspace at this relative key.
@@ -627,15 +626,19 @@ where
     Ok(())
 }
 
+/// Writes the EVM chain id to the `/evm/world_state` keyspace.
+/// Errors when the write fails.
 pub fn store_evm_chain_id(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     evm_chain_id: U256,
-) -> Result<(), Error> {
-    write_u256_le(host, &EVM_CHAIN_ID_PATH, evm_chain_id).map_err(Error::from)
+) -> Result<(), KeySpaceError> {
+    evm_world_state.store_u256_le(&EVM_CHAIN_ID_KEY, evm_chain_id)
 }
 
-pub fn read_evm_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
-    read_u256_le(host, &EVM_CHAIN_ID_PATH).map_err(Error::from)
+/// Reads the EVM chain id from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than 32 bytes.
+pub fn read_evm_chain_id(evm_world_state: &impl KeySpace) -> Option<U256> {
+    evm_world_state.get_u256_le(&EVM_CHAIN_ID_KEY)
 }
 
 pub fn store_michelson_runtime_chain_id(
@@ -2050,6 +2053,29 @@ mod tests {
             rk.evm_world_state()
                 .get(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY),
             Some(short_value.to_vec())
+        );
+    }
+
+    /// The EVM chain id resolves to `/evm/world_state/chain_id`.
+    #[test]
+    fn evm_chain_id_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let evm_chain_id = primitive_types::U256::from(42793);
+
+        super::store_evm_chain_id(rk.evm_world_state_mut(), evm_chain_id).unwrap();
+
+        let mut bytes = [0u8; 32];
+        evm_chain_id.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(b"/evm/world_state/chain_id"))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(
+            super::read_evm_chain_id(rk.evm_world_state()),
+            Some(evm_chain_id)
         );
     }
 }

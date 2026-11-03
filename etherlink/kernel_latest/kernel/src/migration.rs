@@ -6,7 +6,6 @@
 
 use crate::block_storage::read_current_number;
 use crate::error::Error;
-use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{read_evm_chain_id, StorageVersion};
 use revm_etherlink::storage::block::BLOCKS_STORED;
@@ -16,6 +15,7 @@ use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -33,17 +33,8 @@ const TESTNET_CHAIN_ID: u64 = 128123;
 const MAINNET_CHAIN_ID: u64 = 42793;
 
 #[allow(dead_code)]
-fn is_etherlink_network(
-    host: &impl StorageV1,
-    expected_chain_id: u64,
-) -> Result<bool, Error> {
-    match read_evm_chain_id(host) {
-        Ok(chain_id) => Ok(chain_id == expected_chain_id.into()),
-        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
-            Ok(false)
-        }
-        Err(err) => Err(err),
-    }
+fn is_etherlink_network(evm_world_state: &impl KeySpace, expected_chain_id: u64) -> bool {
+    read_evm_chain_id(evm_world_state) == Some(expected_chain_id.into())
 }
 
 #[allow(dead_code)]
