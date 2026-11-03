@@ -73,12 +73,8 @@ pub enum InterpretError<'a> {
     #[error("view lookup error: {0}")]
     ViewLookupError(#[from] crate::context::LookupViewError),
     /// Error when encoding serialized data
-    ///
-    /// Wrapped in `Rc` because [`tezos_data_encoding::enc::BinError`]
-    /// does not implement [`Clone`] (its `IOError` variant carries a
-    /// non-Clone `std::io::Error`), and this enum derives `Clone`.
     #[error("encoding error: {0}")]
-    EncodeError(Rc<tezos_data_encoding::enc::BinError>),
+    EncodeError(#[from] tezos_data_encoding::enc::BinError),
     /// Error when decoding serialized data
     #[error(transparent)]
     DecodeError(#[from] DecodeError),
@@ -116,8 +112,8 @@ pub enum InterpretError<'a> {
     InternalError(InterpretInvariant),
     /// Non-recoverable kernel storage failure from the address registry;
     /// aborts contract execution. Carries the abort-worthy variants
-    /// (`HostError`, `AlreadySeeded`) — the `From` impl below routes
-    /// `OutOfGas` to [`InterpretError::OutOfGas`].
+    /// (`KeySpace`, `Key`, `MissingCounter`, `AlreadySeeded`). The `From`
+    /// impl below routes `OutOfGas` to [`InterpretError::OutOfGas`].
     #[error("address registry error: {0}")]
     AddressRegistryError(crate::context::AddressRegistryError),
 }
@@ -127,7 +123,9 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
         use crate::context::AddressRegistryError;
         match e {
             AddressRegistryError::OutOfGas(_) => InterpretError::OutOfGas,
-            e @ (AddressRegistryError::HostError(_)
+            e @ (AddressRegistryError::KeySpace(_)
+            | AddressRegistryError::Key(_)
+            | AddressRegistryError::MissingCounter
             | AddressRegistryError::AlreadySeeded(_)) => {
                 InterpretError::AddressRegistryError(e)
             }
@@ -258,12 +256,6 @@ impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
                 )
             }
         }
-    }
-}
-
-impl<'a> From<tezos_data_encoding::enc::BinError> for InterpretError<'a> {
-    fn from(err: tezos_data_encoding::enc::BinError) -> Self {
-        InterpretError::EncodeError(Rc::new(err))
     }
 }
 
@@ -11573,7 +11565,7 @@ mod interpreter_tests {
                 InterpretError::OutOfGas
             ));
             assert!(matches!(
-                InterpretError::from(AddressRegistryError::HostError("io".into())),
+                InterpretError::from(AddressRegistryError::MissingCounter),
                 InterpretError::AddressRegistryError(_)
             ));
         }

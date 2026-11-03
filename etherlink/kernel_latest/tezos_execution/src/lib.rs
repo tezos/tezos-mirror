@@ -2034,9 +2034,10 @@ const GAS_EXHAUSTED: &str = "Gas exhausted";
 fn is_host_fault(err: &LazyStorageError) -> bool {
     matches!(
         err,
-        LazyStorageError::PathError(_)
+        LazyStorageError::KeySpace(_)
+            | LazyStorageError::Key(_)
+            | LazyStorageError::PathError(_)
             | LazyStorageError::RuntimeError(_)
-            | LazyStorageError::NomReadError(_)
             | LazyStorageError::BinWriteError(_)
     )
 }

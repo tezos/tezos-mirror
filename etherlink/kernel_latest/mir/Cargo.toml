@@ -16,6 +16,7 @@ tezos_data_encoding = { path = "../../../sdk/rust/encoding" }
 tezos_crypto_rs = { path = "../../../sdk/rust/crypto", default-features = false}
 tezos-protocol = { path = "../../../sdk/rust/protocol" }
 tezos-smart-rollup-host = { path = "../../../src/kernel_sdk/host" }
+tezos-smart-rollup-keyspace.workspace = true
 typed-arena = "2"
 base58 = "0.2"
 cryptoxide = "0.4"

@@ -628,9 +628,7 @@ mod tests {
         use mir::context::AddressRegistryError;
         assert!(matches!(
             classify_interpret_error(InterpretError::AddressRegistryError(
-                AddressRegistryError::HostError(
-                    "host I/O on /address_registry".to_owned()
-                )
+                AddressRegistryError::MissingCounter
             )),
             TezosXRuntimeError::Custom(_)
         ));

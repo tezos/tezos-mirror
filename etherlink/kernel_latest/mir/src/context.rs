@@ -17,6 +17,7 @@ use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use typed_arena::Arena;
 
 /// Errors that can surface from
@@ -68,10 +69,15 @@ impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
 /// Errors from address registry I/O. The in-memory [Ctx] never produces them.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AddressRegistryError {
-    /// Non-recoverable host storage failure, stringified (MIR is
-    /// host-agnostic). Aborts execution.
-    #[error("address registry error: {0}")]
-    HostError(String),
+    /// A read or a write of the registry failed. Aborts execution.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
+    /// The key of a registry entry is not a valid key. Aborts execution.
+    #[error(transparent)]
+    Key(#[from] KeyError),
+    /// The registry holds no counter, so it is not set up. Aborts execution.
+    #[error("address registry has no counter")]
+    MissingCounter,
     /// Gas exhausted charging a registry access; routed to `OutOfGas`.
     #[error(transparent)]
     OutOfGas(#[from] crate::gas::OutOfGas),

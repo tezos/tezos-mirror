@@ -38,10 +38,7 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WASM_CHUNK_SIZE;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
-use tezos_smart_rollup_keyspace::{
-    Key, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
-};
-use tezos_storage::error::StorageReadErrorKind;
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
@@ -320,12 +317,6 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> TypecheckingCtx<'a>
     }
 }
 
-/// Collapse path and storage errors into the non-recoverable
-/// [`AddressRegistryError::HostError`].
-fn registry_error(e: impl std::fmt::Display) -> AddressRegistryError {
-    AddressRegistryError::HostError(e.to_string())
-}
-
 /// Seed the address registry: the null address takes index 0 and the counter
 /// (next free index) starts at 1, as on L1. Seeds exactly once — the counter's
 /// presence marks the registry as seeded, so a second call errors with
@@ -334,47 +325,36 @@ fn registry_error(e: impl std::fmt::Display) -> AddressRegistryError {
 ///
 /// `tez_accounts` must be the keyspace rooted at `/tez/tez_accounts`: the
 /// registry keys are relative to it. Errors with
-/// [`AddressRegistryError::HostError`] if a keyspace write fails, or if a
+/// [`AddressRegistryError::KeySpace`] if a keyspace write fails, or if a
 /// stored counter does not decode.
 pub fn init_address_registry(
     tez_accounts: &mut impl KeySpace,
 ) -> Result<(), AddressRegistryError> {
-    if let Some(counter) = tez_accounts
-        .read_nom::<Narith>(&address_registry::COUNTER_KEY)
-        .map_err(registry_error)?
+    if let Some(counter) =
+        tez_accounts.read_nom::<Narith>(&address_registry::COUNTER_KEY)?
     {
         return Err(AddressRegistryError::AlreadySeeded(counter.0));
     }
-    let zero_entry =
-        address_registry::entry_key(&AddressHash::default()).map_err(registry_error)?;
+    let zero_entry = address_registry::entry_key(&AddressHash::default())?;
+    tez_accounts.store_bin(&zero_entry, &Narith(BigUint::from(0u32)))?;
     tez_accounts
-        .store_bin(&zero_entry, &Narith(BigUint::from(0u32)))
-        .map_err(registry_error)?;
-    tez_accounts
-        .store_bin(&address_registry::COUNTER_KEY, &Narith(BigUint::from(1u32)))
-        .map_err(registry_error)?;
+        .store_bin(&address_registry::COUNTER_KEY, &Narith(BigUint::from(1u32)))?;
     Ok(())
 }
 
 /// Returns the address registry counter, the next free index.
 ///
 /// `tez_accounts` must be the `/tez/tez_accounts` keyspace. Errors with
-/// [`AddressRegistryError::HostError`] when the counter is absent or does
-/// not decode. The counter is absent in a registry that is not set up yet
-/// (see [`init_address_registry`]).
+/// [`AddressRegistryError::MissingCounter`] when the counter is absent, and
+/// with [`AddressRegistryError::KeySpace`] when it does not decode. The
+/// counter is absent in a registry that is not set up yet (see
+/// [`init_address_registry`]).
 pub fn read_address_counter(
     tez_accounts: &impl KeySpace,
 ) -> Result<BigUint, AddressRegistryError> {
     Ok(tez_accounts
-        .read_nom::<Narith>(&address_registry::COUNTER_KEY)
-        .map_err(registry_error)?
-        .ok_or_else(|| {
-            registry_error(KeySpaceError::<StorageReadErrorKind>::read(
-                tez_accounts.name(),
-                &address_registry::COUNTER_KEY,
-                ReadKind::Ext(StorageReadErrorKind::NotFound),
-            ))
-        })?
+        .read_nom::<Narith>(&address_registry::COUNTER_KEY)?
+        .ok_or(AddressRegistryError::MissingCounter)?
         .0)
 }
 
@@ -626,20 +606,18 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
             WASM_CHUNK_SIZE as u64,
         )?;
 
-        let entry = address_registry::entry_key(address).map_err(registry_error)?;
+        let entry = address_registry::entry_key(address)?;
         let counter = read_address_counter(self.tc_ctx.rk.tez_accounts())?;
         let current = Narith(counter);
         self.tc_ctx
             .rk
             .tez_accounts_mut()
-            .store_bin(&entry, &current)
-            .map_err(registry_error)?;
+            .store_bin(&entry, &current)?;
 
         self.tc_ctx
             .rk
             .tez_accounts_mut()
-            .store_bin(&address_registry::COUNTER_KEY, &Narith(&current.0 + 1u32))
-            .map_err(registry_error)?;
+            .store_bin(&address_registry::COUNTER_KEY, &Narith(&current.0 + 1u32))?;
         // Emit the (address, index) pair on the frame's receipt, like L1's
         // address_registry_diff.
         // Sr1 addresses consume an index but are skipped here: the receipt's
@@ -661,14 +639,13 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         &mut self,
         address: &AddressHash,
     ) -> Result<Option<BigUint>, AddressRegistryError> {
-        let entry = address_registry::entry_key(address).map_err(registry_error)?;
+        let entry = address_registry::entry_key(address)?;
         consume_storage_read_milligas(self.tc_ctx.operation_gas, 1, COUNTER_SIZE)?;
         Ok(self
             .tc_ctx
             .rk
             .tez_accounts()
-            .read_nom::<Narith>(&entry)
-            .map_err(registry_error)?
+            .read_nom::<Narith>(&entry)?
             .map(|n| n.0))
     }
 }
@@ -1154,15 +1131,11 @@ impl<Host: KeySpaceLoader + StorageV1> TcCtx<'_, '_, Host> {
         if temporary {
             Ok(self.temporary_big_map_id_allocator.allocate().into())
         } else {
-            let id: BigMapId = self
-                .rk
-                .tez_accounts()
-                .read_nom_or(&NEXT_ID_KEY, 0.into())
-                .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+            let id: BigMapId =
+                self.rk.tez_accounts().read_nom_or(&NEXT_ID_KEY, 0.into())?;
             self.rk
                 .tez_accounts_mut()
-                .store_bin(&NEXT_ID_KEY, &id.succ())
-                .map_err(storage_error_to_lazy)?;
+                .store_bin(&NEXT_ID_KEY, &id.succ())?;
             Ok(id)
         }
     }
@@ -1216,17 +1189,6 @@ fn hash_micheline_expr(
         .map_err(|_| LazyStorageError::OutOfGasError(OutOfGas))?;
     gas.consume(cost)?;
     Ok(digest_256(&bytes).into())
-}
-
-/// Converts a storage failure into a [`LazyStorageError::BinWriteError`]
-/// that holds its message.
-///
-/// [`LazyStorageError`] has no `From` impl for this conversion, because it
-/// belongs to `mir`, and `mir` does not depend on `tezos-storage-latest`.
-fn storage_error_to_lazy(e: impl Into<tezos_storage::error::Error>) -> LazyStorageError {
-    LazyStorageError::BinWriteError(tezos_data_encoding::enc::BinError::custom(
-        e.into().to_string(),
-    ))
 }
 
 /// Route a metered read's failure to the view-lookup error it means. Keeping
@@ -1340,11 +1302,9 @@ fn total_bytes(
     id: &BigMapId,
 ) -> Result<Zarith, LazyStorageError> {
     let key = total_bytes_key(id)?;
-    match tez_accounts.read_nom::<Zarith>(&key) {
-        Ok(Some(total)) => Ok(total),
-        Ok(None) => Err(LazyStorageError::MissingTotalBytes(id.clone())),
-        Err(e) => Err(LazyStorageError::NomReadError(e.to_string())),
-    }
+    tez_accounts
+        .read_nom::<Zarith>(&key)?
+        .ok_or_else(|| LazyStorageError::MissingTotalBytes(id.clone()))
 }
 
 /// Write the `total_bytes` counter persisted for a big-map.
@@ -1354,9 +1314,7 @@ fn set_total_bytes(
     value: &Zarith,
 ) -> Result<(), LazyStorageError> {
     let key = total_bytes_key(id)?;
-    tez_accounts
-        .store_bin(&key, value)
-        .map_err(storage_error_to_lazy)?;
+    tez_accounts.store_bin(&key, value)?;
     Ok(())
 }
 
@@ -1480,10 +1438,7 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
                     1,
                     encoded.len() as u64,
                 )?;
-                self.rk
-                    .tez_accounts_mut()
-                    .set(&value_key, &encoded)
-                    .map_err(storage_error_to_lazy)?;
+                self.rk.tez_accounts_mut().set(&value_key, &encoded)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -1534,12 +1489,10 @@ impl<'a, 'host, Host: KeySpaceLoader + StorageV1> LazyStorage<'a>
             .encode(&mut self.operation_gas.remaining)??;
         self.rk
             .tez_accounts_mut()
-            .set(&value_type_key, &value_type_encoded)
-            .map_err(storage_error_to_lazy)?;
+            .set(&value_type_key, &value_type_encoded)?;
         self.rk
             .tez_accounts_mut()
-            .set(&key_type_key, &key_type_encoded)
-            .map_err(storage_error_to_lazy)?;
+            .set(&key_type_key, &key_type_encoded)?;
         set_total_bytes(self.rk.tez_accounts_mut(), &id, &Zarith(BigInt::from(0)))?;
 
         self.interpret_context.record_lazy_storage_size_diff(
@@ -2531,7 +2484,7 @@ pub mod tests {
 
         assert!(matches!(
             ctx.big_map_new(&Type::Int, &Type::String, false),
-            Err(LazyStorageError::NomReadError(_))
+            Err(LazyStorageError::KeySpace(_))
         ));
         assert_eq!(ctx.rk.tez_accounts().get(&NEXT_ID_KEY), Some(vec![0xff]));
     }
@@ -3440,7 +3393,10 @@ pub mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // An unseeded registry has no counter: the read errors rather than
         // seeding on demand.
-        assert!(super::read_address_counter(rk.tez_accounts()).is_err());
+        assert_eq!(
+            super::read_address_counter(rk.tez_accounts()),
+            Err(AddressRegistryError::MissingCounter)
+        );
 
         // Seeding installs null@0 and the next-free counter at 1.
         super::init_address_registry(rk.tez_accounts_mut()).unwrap();
