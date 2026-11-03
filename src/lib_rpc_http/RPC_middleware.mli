@@ -64,9 +64,25 @@ val default_max_body_size : int64
 (** A Resto middleware that rejects (413 Request Entity Too Large) any
     request whose body exceeds [max_body_size], before the wrapped
     [callback] runs. Bounds memory even when the client lies about or
-    omits [Content-Length] (chunked / unknown-length transfer). *)
+    omits [Content-Length] (chunked / unknown-length transfer).
+
+    Rejecting is followed by a bounded lingering close: what is left of the
+    body is discarded for a short while, bounded in time and in bytes, so that
+    a client which is done sending can read the response on a connection that
+    stays reusable. Past those bounds the read side of the socket is shut down,
+    best effort, so that an oversized request stops holding its connection --
+    and hence one of the server's active connection slots. Best effort because
+    the shutdown needs a file descriptor: on a connection that does not expose
+    one, cohttp's own unbounded drain is left to run and nothing bounds it.
+
+    [cors] (default: {!Resto_cohttp.Cors.default}, which allows no origin)
+    should be the server's own CORS policy, so that the 413 and 408 responses
+    are allowed cross-origin exactly as resto's responses are. *)
 val limit_body_size :
-  max_body_size:int64 -> RPC_server.callback -> RPC_server.callback
+  ?cors:Resto_cohttp.Cors.t ->
+  max_body_size:int64 ->
+  RPC_server.callback ->
+  RPC_server.callback
 
 (** A Resto middleware that transforms any server callback to an other
     that handles RPC metrics *)

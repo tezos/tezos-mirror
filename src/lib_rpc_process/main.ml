@@ -171,6 +171,7 @@ let launch_rpc_server dynamic_store (params : Parameters.t) (addr, port)
   (* Outermost layer: caps the request body size before anything else runs. *)
   let callback =
     RPC_middleware.limit_body_size
+      ~cors
       ~max_body_size:params.config.rpc.max_request_body_size
       callback
   in

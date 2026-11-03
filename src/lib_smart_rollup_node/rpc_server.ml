@@ -86,6 +86,7 @@ let start ~rpc_addr ~rpc_port ~acl ~rpc_max_request_body_size ~cors dir =
       server
       ~callback:
         (RPC_middleware.limit_body_size
+           ~cors
            ~max_body_size:rpc_max_request_body_size
            (Octez_telemetry.HTTP_server.resto_callback ~port:rpc_port server))
       node

@@ -55,6 +55,25 @@ General
   your system package manager: ``libclang-dev`` on Debian and Ubuntu.
   (MR :gl:`!22818`, MR :gl:`!22827`)
 
+- Bounded the read that follows the rejection of an oversized RPC request
+  body: the remainder is discarded within a bounded time and number of
+  bytes, after which the connection is released rather than held for as
+  long as the client keeps sending. Without this bound, one endless upload
+  per connection slot would suffice to exhaust the server's active
+  connection slots. As a consequence, a client still uploading more than
+  twice the cap when its request is rejected may see its connection reset
+  instead of reading the 413 response. (MR :gl:`!22629`)
+
+- An RPC request body within the cap must now arrive within 60 seconds, with
+  no pause over 10 seconds, or the server answers with HTTP 408 and closes the
+  connection. Sending a body at the default cap thus takes an upload rate of at
+  least about 273 KiB/s on the node and the DAL node (16 MiB cap), and 546 KiB/s
+  on the smart rollup node (32 MiB cap). (MR :gl:`!22629`)
+
+- An RPC request whose body ends before the length declared in its
+  ``Content-Length`` is now answered with HTTP 400, where the truncated body
+  used to be handed to the RPC as if complete. (MR :gl:`!22629`)
+
 Node
 ----
 

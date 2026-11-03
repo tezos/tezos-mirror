@@ -481,6 +481,7 @@ let launch_rpc_server ?middleware (config : Config_file.t) dir rpc_server_kind
      (events, metrics, forwarding, routing, ACL). *)
   let callback =
     RPC_middleware.limit_body_size
+      ~cors
       ~max_body_size:rpc_config.max_request_body_size
       callback
   in
