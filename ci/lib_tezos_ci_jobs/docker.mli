@@ -15,24 +15,24 @@ val version : string
 
 (** The [CI_DOCKER_HUB] variable for jobs that handle Docker images
     built in a given mode (see {!job_docker}). *)
-val docker_hub_variable : [`real | `test | `release] -> string * string
+val docker_hub_variable : [`docker_hub | `test | `release] -> string * string
 
 (** The environment for jobs that handle Docker images
     built in a given mode (see {!job_docker}). *)
 val docker_publish_environment :
-  [`real | `test | `release] -> Gitlab_ci.Types.environment option
+  [`docker_hub | `test | `release] -> Gitlab_ci.Types.environment option
 
 (** Jobs [oc.docker:$ARCH].
 
     The mode specifies where images are pushed:
-    - [`real]: to Docker Hub on protected refs of tezos/tezos,
+    - [`docker_hub]: to Docker Hub on protected refs of tezos/tezos,
       to the GCP registry otherwise;
     - [`test]: to the GCP registry, signed with the dev-only signer;
     - [`release]: to the GCP registry, signed with the production signer
       on protected refs, so that they can be copied to Docker Hub. *)
 val job_docker :
   [`released | `experimental] ->
-  [`real | `test | `release] ->
+  [`docker_hub | `test | `release] ->
   Tezos_ci.Runner.Arch.t ->
   Cacio.job
 
@@ -40,10 +40,10 @@ val job_docker :
 
     See {!job_docker} for the meaning of the mode. *)
 val job_docker_merge_manifests :
-  [`released | `experimental] -> [`real | `test | `release] -> Cacio.job
+  [`released | `experimental] -> [`docker_hub | `test | `release] -> Cacio.job
 
 (** Job [docker:mirror_to_gitlab_registry]: copies the tags published by
     [docker:merge_manifests] into the project's GitLab container registry.
     Should be set to [Manual], and must run after that job. *)
 val job_docker_mirror_to_gitlab_registry :
-  [`released | `experimental] -> [`real | `test | `release] -> Cacio.job
+  [`released | `experimental] -> [`docker_hub | `test | `release] -> Cacio.job

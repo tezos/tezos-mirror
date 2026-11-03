@@ -266,7 +266,7 @@ let job_dispatch_call =
        tez-capital/tezos-macos-pipeline"
     ~needs:
       [
-        (Job, job_gitlab_release `real);
+        (Job, job_gitlab_release `docker_hub);
         (Job, job_deploy_release_page_assets `real);
       ]
     ~environment:
@@ -283,9 +283,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_major_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -305,9 +305,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_minor_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
@@ -327,9 +327,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_beta_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -348,8 +348,8 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   Cacio.register_jobs
@@ -443,11 +443,11 @@ let () =
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
-      (Manual, job_docker `real Amd64);
-      (Manual, job_docker `real Arm64);
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Manual, job_docker_promote_to_version `real);
+      (Manual, job_docker `docker_hub Amd64);
+      (Manual, job_docker `docker_hub Arm64);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Manual, job_docker_promote_to_version `docker_hub);
       (Manual, job_deploy_release_page_assets_packaging_revision `real);
       ( Auto,
         Release_site_ci.job_render

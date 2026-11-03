@@ -16,7 +16,8 @@ let version = Tezos_ci.Images.Base_images.docker_version
 
 (* Variables and environment of jobs that build or merge Docker images,
    depending on where they push the images:
-   - [`real]: Docker Hub on protected refs of tezos/tezos, GCP otherwise;
+   - [`docker_hub]: Docker Hub on protected refs of tezos/tezos,
+     GCP otherwise;
    - [`test]: GCP, signed with the dev-only signer;
    - [`release]: GCP, signed with the production signer on protected refs
      (see [docker_sign.sh]), so that the images can then be copied
@@ -25,10 +26,10 @@ let version = Tezos_ci.Images.Base_images.docker_version
    scoped to the [docker-publish] environment. *)
 let docker_hub_variable mode =
   ( "CI_DOCKER_HUB",
-    match mode with `real -> "true" | `test | `release -> "false" )
+    match mode with `docker_hub -> "true" | `test | `release -> "false" )
 
 let docker_publish_environment = function
-  | `real | `release ->
+  | `docker_hub | `release ->
       Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
   | `test -> None
 
@@ -90,7 +91,7 @@ let job_docker_snapshot =
         Tezos_ci.docker_release_script;
       ]
     contents
-    `real
+    `docker_hub
     arch
 
 let job_docker =
@@ -149,7 +150,7 @@ let job_docker_merge_manifests_snapshot =
         "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
         "./scripts/ci/docker_merge_manifests.sh";
       ]
-    `real
+    `docker_hub
 
 let job_docker_merge_manifests =
   Cacio.parameterize @@ fun contents ->
@@ -285,10 +286,10 @@ let () =
     ] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.master_branch
-    [(Auto, job_docker_merge_manifests `experimental `real)] ;
+    [(Auto, job_docker_merge_manifests `experimental `docker_hub)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_docker_build_pipeline
-    [(Auto, job_docker_merge_manifests `experimental `real)] ;
+    [(Auto, job_docker_merge_manifests `experimental `docker_hub)] ;
   Cacio.register_jobs
     Tezos_ci_pipelines.schedule_docker_master_snapshot
     [
