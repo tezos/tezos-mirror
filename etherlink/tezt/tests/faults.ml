@@ -11,19 +11,20 @@
                  make octez-node octez-client octez-smart-rollup-node octez-evm-node
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file faults.ml
    Subject:      Exercise the kernel's behaviour when an operation
-                 deliberately triggers an unrecoverable WASM trap, submitted
-                 directly or through the delayed inbox, and the operator's
-                 recovery from a delayed one.
+                 deliberately fails -- an unrecoverable WASM trap, or a
+                 recoverable block abort -- submitted directly or through the
+                 delayed inbox, and the operator's recovery from a delayed one.
  *)
 
 open Test_helpers
 open Rpc.Syntax
 
-type fault = Panic | Stack_overflow
+type fault = Panic | Stack_overflow | Block_abort
 
 let string_of_fault = function
   | Panic -> "panic"
   | Stack_overflow -> "stack_overflow"
+  | Block_abort -> "block_abort"
 
 (** [craft_tx ~fault ~sequencer ~nonce] builds a signed transaction from the
     first bootstrap account that calls the [fault] method of the debug
@@ -125,11 +126,17 @@ let send_raw_tx_to_delayed_inbox ~sc_rollup_node ~client ~l1_contracts
   unit
 
 (* A faulty transaction reaching the block producer through the delayed inbox
-   takes the sequencer down, exactly like one submitted directly. This
-   exercises the operator's recovery path: manually flushing the delayed inbox
-   with [--force] publishes a blueprint the kernel drops on the trap,
-   unblocking the rollup node so the sequencer can be restarted and able to
-   produce blocks again.
+   stops block production, exactly like one submitted directly. This exercises
+   the operator's recovery path: manually flushing the delayed inbox with
+   [--force] publishes a blueprint the kernel drops when applying it fails,
+   unblocking the rollup node so the sequencer can produce blocks again.
+
+   How production stops depends on the fault. [Panic] and [Stack_overflow] trap
+   the PVM, which takes the whole sequencer process down -- hence the restart
+   below. [Block_abort] is recoverable: [produce_block] merely returns an error
+   and the sequencer stays up, so the terminate/run cycle is an ordinary
+   restart for that variant. Either way the delayed transaction must not
+   survive the flush.
 
    The [Stack_overflow] variant additionally pins the call-depth guard injected
    by [smart-rollup-instrument]: its recursion spills only a scalar per frame,
@@ -180,8 +187,10 @@ let test_recover_crashing_delayed_transaction fault =
   in
   (* This should fail *)
   let*@? _ = Rpc.produce_block ~with_delayed_transactions:true sequencer in
-  (* While the sequencer is down, flush the delayed inbox with [--force]: the
-     blueprint is published even though applying it traps. *)
+  (* Flush the delayed inbox with [--force]: the blueprint is published even
+     though applying it fails. Terminating first is what the operator does
+     after a trap; for [Block_abort] the sequencer is still alive and this is
+     an ordinary shutdown. *)
   let* () = Evm_node.terminate sequencer in
   let*! () =
     Evm_node.flush_delayed_inbox
@@ -227,4 +236,4 @@ let () =
   Self_tests.register () ;
   List.iter
     (fun fault -> test_recover_crashing_delayed_transaction fault [Alpha])
-    [Panic; Stack_overflow]
+    [Panic; Stack_overflow; Block_abort]

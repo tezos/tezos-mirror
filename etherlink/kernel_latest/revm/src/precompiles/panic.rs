@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! A precompile whose sole purpose is to deliberately trigger WASM traps,
-//! used to exercise the kernel's behaviour in the face of unrecoverable
-//! failures. It exposes three methods:
+//! A precompile whose sole purpose is to deliberately trigger kernel-level
+//! failures, used to exercise the kernel's behaviour when a transaction cannot
+//! complete normally. It exposes four methods. The first three raise
+//! unrecoverable WASM traps (PVM-level):
 //!
 //! - `panic()` aborts execution (via `panic!`), which compiles down to an
 //!   `unreachable` instruction on `wasm32-unknown-unknown`.
@@ -15,9 +16,19 @@
 //!   `unreachable` on its own: without the instrumentation it exhausts a real
 //!   stack instead. See [`stack_overflow`] for why that distinction decides
 //!   what the test proves.
+//!
+//! The fourth is a *recoverable* failure, not a trap:
+//!
+//! - `block_abort()` returns a cross-runtime block abort
+//!   ([`CustomPrecompileAbort::Crac`]) -- the same error the runtime gateway
+//!   raises on a 5xx cross-runtime response. It propagates out of
+//!   `run_transaction` and fails the whole block computation (the `Err` arm of
+//!   block production), delayed transaction or not. A delayed one is not
+//!   replayed after a forced flush: dropping the failed single-transaction
+//!   blueprint also removes its transaction from the delayed inbox.
 
 use alloy_sol_types::{sol, SolInterface};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use revm::interpreter::{CallInputs, Gas, InterpreterResult};
 
 sol! {
@@ -25,6 +36,7 @@ sol! {
         function panic() external;
         function oom() external;
         function stack_overflow() external;
+        function block_abort() external;
     }
 }
 
@@ -90,6 +102,16 @@ pub(crate) fn panic_precompile(
                 "stack_overflow precompile returned without trapping".to_string(),
                 gas,
             ))
+        }
+        Panic::PanicCalls::block_abort(Panic::block_abortCall {}) => {
+            // A *recoverable* cross-runtime block abort -- not a WASM trap.
+            // This is the same error the runtime gateway raises on a 5xx
+            // cross-runtime response: it propagates out of `run_transaction`
+            // and fails the whole block computation (the `Err` arm of block
+            // production), whether the transaction is delayed or not.
+            Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(
+                "block_abort precompile invoked".to_string(),
+            )))
         }
     }
 }
