@@ -56,15 +56,15 @@ let evm_alias_of_tezos_address address =
     match Public_key_hash.of_b58check_opt address with
     | Some (Ed25519 pkh) ->
         Some
-          ( "d532c0971e9c85e2468c8cc6c3949eae285cd513",
+          ( "fee60e905d91905df9cd6bf8153976e9d77d5051",
             Ed25519.Public_key_hash.to_string pkh )
     | Some (Secp256k1 pkh) ->
         Some
-          ( "b47274809a09e0e0d565f1b50feba2a1cddc8199",
+          ( "47c81e55f51344d80a8e85c2add86257b51ea3d2",
             Secp256k1.Public_key_hash.to_string pkh )
     | Some (P256 pkh) ->
         Some
-          ( "924f65272e0b3531084b1539b96ed0522541f7d7",
+          ( "894b62c61b208184b80fd72803811ba35d818112",
             P256.Public_key_hash.to_string pkh )
     | Some _ | None -> None
   in

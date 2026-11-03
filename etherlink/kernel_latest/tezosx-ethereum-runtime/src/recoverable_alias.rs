@@ -79,63 +79,63 @@ mod tests {
     use super::*;
 
     /// Alias vectors of `artifacts/frozen.json` in
-    /// trilitech/tz-alias-recovery (commit b410859).
+    /// trilitech/tz-alias-recovery (commit b42336e).
     const VECTORS: [(&str, &str); 14] = [
         (
             "tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh",
-            "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae",
+            "0x0ea7865238580e0d8f0d2ca196d3b672dea705ad",
         ),
         (
             "tz1WDRuEornRTSHFTgnwC5LPRQThxbZqofiF",
-            "0xfc997539476b344a3e6fff32aedfe7f70b944079",
+            "0x1975f732fea2a37de36e40017b907d6562ffce7d",
         ),
         (
             "tz1cgbBXC99Tkv26pxXDcFExd5agYtJKp6Ko",
-            "0xd493383ef3e54f84e21f25c610a5abc2137074db",
+            "0xcd9737deee8444f5c277bee986586de00b5b5d2b",
         ),
         (
             "tz1cEFKy9mT7yfTZX9yAGn4ZiFC77wxf5WC3",
-            "0x0be2acc9919c7b9b7bff50bbd0621ba819c49f4c",
+            "0xf45fb97fc5d9785f1075bf86e050c608b601faaf",
         ),
         (
             "tz2BCeQSi5ETyKJsob61pWCoQvoGtsrJBEt2",
-            "0x87823d019d057c7645ce9b403c2149ae512d78e0",
+            "0x29dd12971b4b7f5741334ab0cd72fe9706e2e2cd",
         ),
         (
             "tz2DQNNCg1zbmNEMbYFK9sn1JakSkdkGy525",
-            "0xc774d8d2245c77dc9598bd739d8ceca40ee8c982",
+            "0x3915cb0424fa0a7f08cf4f78aa9a6910177272b1",
         ),
         (
             "tz2RteZE6H6r4YSX7PwHDiEodx1j365BS6Zw",
-            "0x8fefd6010c630095f25ba704e5429d7dcf68d196",
+            "0x78cd291942fdd47a55cea942adbdc35782f1a254",
         ),
         (
             "tz2Cv1duW3gb9j6yV4u3CzqkbrH2XYQuacu3",
-            "0xb844a4a05735a13fb7d6d9a9641d1e28c043a9a2",
+            "0x3fdbb367414d2426d2549fa4f5429623d3c19c52",
         ),
         (
             "tz3bqAfFRnSA6dfPRG8XR6MBMmo6HZTTG44V",
-            "0x76842c0a2a079aed35ccfc7d1fdda15596094a96",
+            "0xc75658fcee30564ffda5e61c48cdebd47eb0633e",
         ),
         (
             "tz3UddKLx4bhUxev77uHWuy9UqDk1VHeDpfQ",
-            "0x87fa76396789e17722f48fe735001591a0ae7a54",
+            "0x3ea387c764b0d48b8416e19a5d68d0219b9c13dd",
         ),
         (
             "tz3bxdqRaqmfQ8V8aNPtJC3sg29GKMtAxSo4",
-            "0x1fc77b46644ce33b3bb95f962358bd88582a4b4f",
+            "0xbc46edf18e7c5d62ae88c8796a490c491cccdda2",
         ),
         (
             "tz3N5sNfWMwWLiUC65vH43rpHKDNYLGyrEnc",
-            "0xe680afa7dca95810a3f1f0b90faa412e5c1146af",
+            "0xee9440608815f399d8fd197cd5ead96dbcef288b",
         ),
         (
             "tz1aAdmy1MiGhnRkw8RWS6xbUpTuSRh3ZB4y",
-            "0xf20dc8cfe3ab395547d9d702e2d1efb6378e38a6",
+            "0xcdb4d002582717fa10060665ec598ac68590072a",
         ),
         (
             "tz2K1exM7pLKyUtVTKqtDo6zFwv98trFxqBc",
-            "0xa01485dafd78651e8b73e5f202669d0270e918df",
+            "0x40f2c21437e12669dbf98d5035b21c6141c7bb69",
         ),
     ];
 

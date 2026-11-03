@@ -1857,14 +1857,14 @@ mod compute_alias_tests {
 
     const TZ1: &str = "tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh";
     /// Recoverable alias of [`TZ1`], from tz-alias-recovery's `frozen.json`.
-    const TZ1_ALIAS: &str = "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae";
+    const TZ1_ALIAS: &str = "0x0ea7865238580e0d8f0d2ca196d3b672dea705ad";
 
     /// `target_runtime = Ethereum`, `native_address = TZ1`.
     const INPUT: &str =
         "0100000024747a3161796756706f636f65454d55383976586b3932734d48715059464e5a5667767268";
     /// `Success(TZ1_ALIAS)`.
     const SUCCESS_RESULT: &str =
-        "000000002a307830346539626139383862613837626264376237356535616138313363353263613363333165396165";
+        "000000002a307830656137383635323338353830653064386630643263613139366433623637326465613730356164";
     /// `Error("bad input")`.
     const ERROR_RESULT: &str = "010000000962616420696e707574";
 
@@ -1927,7 +1927,7 @@ mod compute_alias_tests {
     fn michelson_alias_ignores_the_evm_address_case() {
         let lower = compute(
             RuntimeId::Tezos,
-            "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae",
+            "0x0ea7865238580e0d8f0d2ca196d3b672dea705ad",
         );
         let ComputeAliasResult::Success(alias) = &lower else {
             panic!("expected an alias, got {lower:?}")
@@ -1936,7 +1936,7 @@ mod compute_alias_tests {
         assert_eq!(
             compute(
                 RuntimeId::Tezos,
-                "0x04E9BA988BA87BBD7B75E5AA813C52CA3C31E9AE"
+                "0x0EA7865238580E0D8F0D2CA196D3B672DEA705AD"
             ),
             lower
         );
