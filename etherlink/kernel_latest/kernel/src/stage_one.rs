@@ -200,7 +200,6 @@ mod tests {
     };
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
@@ -1187,9 +1186,8 @@ mod tests {
         use crate::configuration::fetch_configuration;
 
         let mut host = MockKernelHost::default();
-        let base = load_base(&mut host).unwrap();
-        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let conf = fetch_configuration(rk.host(), &base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        let conf = fetch_configuration(&host, &bk);
         assert!(
             matches!(conf.mode, ConfigurationMode::Proxy),
             "fetch_configuration should return Proxy when no sequencer key is stored"

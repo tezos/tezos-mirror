@@ -10,7 +10,8 @@ use tezos_crypto_rs::{
 };
 use tezos_evm_logging::Level;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
-use tezos_smart_rollup_keyspace::KeyError;
+use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
+use tezosx_types::StorageReadErrorKind;
 use thiserror::Error;
 
 use crate::{
@@ -59,7 +60,7 @@ pub trait DatabasePrecompileStateChanges {
         &self,
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, PrecompileStateError>;
-    fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError>;
+    fn ticketer(&self) -> Result<ContractKt1Hash, KeySpaceError<StorageReadErrorKind>>;
 }
 
 pub trait DatabaseCommitPrecompileStateChanges {

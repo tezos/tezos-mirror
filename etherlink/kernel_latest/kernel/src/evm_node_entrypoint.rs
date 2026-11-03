@@ -94,17 +94,17 @@ where
     Host: StorageV1 + CoreStorage,
 {
     let mut kernel_host: KernelHost<Host, &mut Host> = KernelHost::init(host);
-    let Some(mut base) = load_base_or_log(&mut kernel_host) else {
+    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
-    let payload = base.get(&DELAYED_INPUT_KEY).unwrap();
+    let payload = bk.base().get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
-    let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
-    let common = fetch_common_config(&kernel_host, &base);
+    let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
+    let common = fetch_common_config(&kernel_host, &bk);
     delayed_inbox
         .save_transaction(
             &kernel_host,
-            &mut base,
+            bk.base_mut(),
             transaction,
             0.into(),
             0u32,

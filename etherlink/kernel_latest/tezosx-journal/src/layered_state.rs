@@ -314,6 +314,8 @@ mod tests {
     use revm::primitives::{Address, U256};
     use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_keyspace::KeySpaceError;
+    use tezosx_types::StorageReadErrorKind;
 
     use super::LayeredState;
 
@@ -341,10 +343,15 @@ mod tests {
             Ok(FaDepositWithProxy::default())
         }
 
-        fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
-            Ok(ContractKt1Hash::from_base58_check(
-                "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
-            )?)
+        fn ticketer(
+            &self,
+        ) -> Result<ContractKt1Hash, KeySpaceError<StorageReadErrorKind>> {
+            Ok(
+                ContractKt1Hash::from_base58_check(
+                    "KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+                )
+                .unwrap(),
+            )
         }
 
         fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {

@@ -2130,4 +2130,38 @@ mod tests {
             Some(upgrade)
         );
     }
+
+    /// The ticketer resolves to `/evm/world_state/ticketer`.
+    #[test]
+    fn native_token_ticketer_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let ticketer = b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT";
+
+        rk.evm_world_state_mut()
+            .set(
+                &revm_etherlink::storage::world_state_handler::NATIVE_TOKEN_TICKETER_KEY,
+                ticketer,
+            )
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(b"/evm/world_state/ticketer"))
+                .unwrap(),
+            ticketer
+        );
+        assert_eq!(
+            revm_etherlink::storage::world_state_handler::read_ticketer(
+                rk.evm_world_state()
+            )
+            .unwrap(),
+            Some(
+                super::ContractKt1Hash::from_base58_check(
+                    "KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT"
+                )
+                .unwrap()
+            )
+        );
+    }
 }
