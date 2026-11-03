@@ -7,12 +7,9 @@ use std::str::FromStr;
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use revm::context::result::ExecutionResult;
 use revm::primitives::Address;
-use revm_etherlink::{EvmKernelError, EvmRunError, ExecutionOutcome};
+use revm_etherlink::{EvmKernelError, EvmRunError, ExecutionOutcome, JournalCloseError};
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{
-    log,
-    Level::{Debug, Error},
-};
+use tezos_evm_logging::{log, Level::Debug};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::host::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -74,28 +71,43 @@ fn close_tezosx_journal<Host>(
     host: &mut Host,
     mut journal: TezosXJournal,
     result: Option<&ExecutionResult>,
-) -> Result<(), EvmRunError>
+) -> Result<(), JournalCloseError>
 where
     Host: StorageV1,
 {
-    let open_frames = journal.michelson.open_frame_count();
-    if open_frames > 0 {
-        return Err(EvmKernelError::UnbalancedMichelsonJournal { open_frames }.into());
+    // A collection of fallible clean-up routines.
+    let errors: Vec<EvmRunError> = [
+        // Temporary big maps are scoped to the transaction.
+        tezos_execution::mir_ctx::clear_temporary_big_maps(
+            host,
+            &journal.michelson.temporary_big_map_id_allocator(),
+        )
+        .map_err(|err| EvmKernelError::TemporaryBigMapCleanup(err.to_string()).into()),
+        // Reject a Michelson journal with frames still open.
+        {
+            let open_frames = journal.michelson.open_frame_count();
+            if open_frames > 0 {
+                Err(EvmKernelError::UnbalancedMichelsonJournal { open_frames }.into())
+            } else {
+                Ok(())
+            }
+        },
+        // Finalize the EVM tracer with the transaction's execution result.
+        if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
+            tracer.finalize(host, result).map_err(EvmRunError::from)
+        } else {
+            Ok(())
+        },
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    .collect();
+
+    if !errors.is_empty() {
+        return Err(errors.into());
     }
-    // Michelson temporary big maps are scoped to the transaction, not just to
-    // the frame that allocated them. Failing to clear them leaves dead entries
-    // in the durable store, which is not worth losing the transaction over.
-    if let Err(err) = tezos_execution::mir_ctx::clear_temporary_big_maps(
-        host,
-        &journal.michelson.temporary_big_map_id_allocator(),
-    ) {
-        log!(Error, "Failed to clear the temporary big maps: {err}");
-    }
-    if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
-        Ok(tracer.finalize(host, result)?)
-    } else {
-        Ok(())
-    }
+
+    Ok(())
 }
 
 pub trait HasExecutionResult {
@@ -167,7 +179,7 @@ where
     let close_outcome = close_tezosx_journal(rk.host_mut(), journal, outcome.result());
 
     let res = outcome?;
-    close_outcome?;
+    close_outcome.map_err(EvmRunError::from)?;
     Ok(res)
 }
 
