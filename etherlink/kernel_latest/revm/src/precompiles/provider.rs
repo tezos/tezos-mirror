@@ -139,7 +139,7 @@ impl EtherlinkPrecompiles {
                 verify_tezos_signature_precompile(&calldata, inputs)
             }
             PANIC_PRECOMPILE_ADDRESS if self.enable_debug_precompiles => {
-                panic_precompile(&calldata, inputs)
+                panic_precompile(&calldata, context, inputs)
             }
             _ => return Ok(None),
         };

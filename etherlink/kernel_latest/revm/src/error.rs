@@ -98,11 +98,30 @@ pub enum EvmKernelError {
     TxEnvBuild(#[from] TxEnvBuildError),
     #[error("Indexable storage push failed: {0}")]
     IndexableStorage(#[from] IndexableStorageError),
+    #[error("Failed to clear temporary big maps: {0}")]
+    TemporaryBigMapCleanup(String),
+    #[error("Michelson journal closed with {open_frames} frame(s) still open")]
+    UnbalancedMichelsonJournal { open_frames: usize },
+}
+
+/// Failures collected while closing a transaction journal.
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("Journal close failed: {errors:?}")]
+pub struct JournalCloseError {
+    pub errors: Vec<EvmRunError>,
+}
+
+impl From<Vec<EvmRunError>> for JournalCloseError {
+    fn from(errors: Vec<EvmRunError>) -> Self {
+        Self { errors }
+    }
 }
 
 /// Top-level error from an EVM transaction run
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum EvmRunError {
+    #[error(transparent)]
+    JournalClose(#[from] JournalCloseError),
     #[error(transparent)]
     Kernel(#[from] EvmKernelError),
     /// Error originated by a DB call made from revm during execution

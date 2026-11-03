@@ -7,12 +7,9 @@ use std::str::FromStr;
 use evm_inspectors::{get_tracer_configuration, TracerInput};
 use revm::context::result::ExecutionResult;
 use revm::primitives::Address;
-use revm_etherlink::{EvmRunError, ExecutionOutcome};
+use revm_etherlink::{EvmKernelError, EvmRunError, ExecutionOutcome, JournalCloseError};
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{
-    log,
-    Level::{Debug, Error, Fatal},
-};
+use tezos_evm_logging::{log, Level::Debug};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::host::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -69,40 +66,48 @@ fn prepare_tezosx_journal(
 /// prevents use after close.
 ///
 /// Also reports a leaked EVM frame checkpoint, which mis-points the CRAC receipt
-/// watermarks. A log and not an assertion: `run_transaction` leaks one until
-/// !22693 lands.
+/// watermarks, by returning an error that aborts the block.
 fn close_tezosx_journal<Host>(
     host: &mut Host,
     mut journal: TezosXJournal,
     result: Option<&ExecutionResult>,
-) -> Result<(), EvmRunError>
+) -> Result<(), JournalCloseError>
 where
     Host: StorageV1,
 {
-    let open_frames = journal.michelson.open_frame_count();
-    if open_frames > 0 {
-        log!(
-            Fatal,
-            "closing the journal with {} EVM frame checkpoint(s) still open: a \
-             frame was neither committed nor reverted, so the cross-runtime call \
-             receipt watermarks no longer match the receipts they index.",
-            open_frames
-        );
+    // A collection of fallible clean-up routines.
+    let errors: Vec<EvmRunError> = [
+        // Temporary big maps are scoped to the transaction.
+        tezos_execution::mir_ctx::clear_temporary_big_maps(
+            host,
+            &journal.michelson.temporary_big_map_id_allocator(),
+        )
+        .map_err(|err| EvmKernelError::TemporaryBigMapCleanup(err.to_string()).into()),
+        // Reject a Michelson journal with frames still open.
+        {
+            let open_frames = journal.michelson.open_frame_count();
+            if open_frames > 0 {
+                Err(EvmKernelError::UnbalancedMichelsonJournal { open_frames }.into())
+            } else {
+                Ok(())
+            }
+        },
+        // Finalize the EVM tracer with the transaction's execution result.
+        if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
+            tracer.finalize(host, result).map_err(EvmRunError::from)
+        } else {
+            Ok(())
+        },
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    .collect();
+
+    if !errors.is_empty() {
+        return Err(errors.into());
     }
-    // Michelson temporary big maps are scoped to the transaction, not just to
-    // the frame that allocated them. Failing to clear them leaves dead entries
-    // in the durable store, which is not worth losing the transaction over.
-    if let Err(err) = tezos_execution::mir_ctx::clear_temporary_big_maps(
-        host,
-        &journal.michelson.temporary_big_map_id_allocator(),
-    ) {
-        log!(Error, "Failed to clear the temporary big maps: {err}");
-    }
-    if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
-        Ok(tracer.finalize(host, result)?)
-    } else {
-        Ok(())
-    }
+
+    Ok(())
 }
 
 pub trait HasExecutionResult {
@@ -143,8 +148,8 @@ impl<T: HasExecutionResult, U> HasExecutionResult for (T, U) {
 ///
 /// The continuation supplies the EVM result used to finalize the tracer, or
 /// `None` for invalid operations. Errors close without finalizing the tracer.
-/// A close error takes precedence over the continuation's error, as at the
-/// explicit prepare/close call sites. Panics do not run the close step.
+/// The continuation's error takes precedence over a close error.
+/// Panics do not run the close step.
 #[allow(clippy::too_many_arguments)]
 pub fn with_tezosx_journal<'host, Host: StorageV1 + KeySpaceLoader, T, E>(
     rk: &mut RuntimeKeyspaces<'host, Host>,
@@ -171,8 +176,11 @@ where
         tracer_input,
     );
     let outcome = apply(rk, &mut journal);
-    close_tezosx_journal(rk.host_mut(), journal, outcome.result())?;
-    outcome
+    let close_outcome = close_tezosx_journal(rk.host_mut(), journal, outcome.result());
+
+    let res = outcome?;
+    close_outcome.map_err(EvmRunError::from)?;
+    Ok(res)
 }
 
 /// Run a Tezos operation inside the tracer frame of its fake EVM transaction.

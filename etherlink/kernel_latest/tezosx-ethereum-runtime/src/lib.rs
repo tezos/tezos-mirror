@@ -373,6 +373,8 @@ where
 fn classify_evm_run_error(context: &str, e: EvmRunError) -> TezosXRuntimeError {
     let message = format!("{context}: {e:?}");
     match e {
+        // Cleanup failures are infrastructure faults → block-aborting `5xx`.
+        EvmRunError::JournalClose(_) => TezosXRuntimeError::Custom(message),
         // User-shaped pre-execution validation failure → catchable `400`.
         EvmRunError::RevmDB(EVMError::Transaction(_)) => {
             TezosXRuntimeError::BadRequest(message)

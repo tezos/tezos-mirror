@@ -5,7 +5,7 @@
 
 use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
-pub use error::{EvmDbError, EvmKernelError, EvmRunError};
+pub use error::{EvmDbError, EvmKernelError, EvmRunError, JournalCloseError};
 use evm_inspectors::TracerInspector;
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
