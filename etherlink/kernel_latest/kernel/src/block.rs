@@ -494,8 +494,6 @@ where
         storage::delete_block_in_progress(host)?;
     }
     host.promote()?;
-    host.promote_trace()?;
-    host.promote_http_trace()?;
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
 

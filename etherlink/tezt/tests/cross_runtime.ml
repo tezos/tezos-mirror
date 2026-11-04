@@ -5941,18 +5941,15 @@ let test_crac_debug_trace_normal_tx_in_crac_block () =
 (** L2-1212 — [debug_traceBlockByNumber] on a block with 1 normal tx + 2
     incoming Michelson-originated CRAC operations.
 
-    Each applied Michelson operation runs in its own SafeStorage staging cycle;
-    without the [/base/trace] straight-through passthrough, operation k+1's
-    trace promotion ([store_move]) wholesale-overwrites operation k's already
-    promoted [/base/trace] subtree, so block-mode tracing recovers fewer traces
-    than the block has transactions and [trace_block]'s positional
-    [List.combine] raises [Inconsistent_traces] ("Trace not available"). This
-    test drives two CRAC operations into one block and asserts (a) the RPC
-    succeeds, (b) it returns exactly one entry per transaction, and (c) each
-    entry's [result] is JSON-deep-equal to that transaction's
-    [debug_traceTransaction] — pinning content, not just arity. It is the
-    regression test for the SafeStorage trace-accumulation fix and closes
-    L2-1212. *)
+    Each applied Michelson operation runs in its own SafeStorage cycle over
+    [/evm/world_state]. The cycle copies the traces of the earlier operations
+    in and promotes them back. The call tracer flushes the operation's own
+    traces afterwards, on the block mirror. Block-mode tracing therefore
+    recovers one trace per transaction, and [trace_block]'s positional
+    [List.combine] does not raise [Inconsistent_traces]. The test drives two
+    CRAC operations into one block and checks that the RPC succeeds, that it
+    returns one entry per transaction, and that each entry's [result] equals
+    that transaction's [debug_traceTransaction] output. *)
 let test_crac_l2_1212_multi_michelson_block () =
   register_crac_runner_test
     ~title:"CRAC: debug_traceBlockByNumber on 1 normal + 2 CRAC block (L2-1212)"
