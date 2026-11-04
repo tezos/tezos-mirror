@@ -14150,7 +14150,7 @@ code { DROP ;
                     &mut Gas::default(),
                     stk
                 ),
-                Ok(Push(Rc::new(TypedValue::Timestamp(
+                Ok(Push(RcTypedValue::new(TypedValue::Timestamp(
                     BigInt::parse_bytes(s.as_bytes(), 10).unwrap()
                 ))))
             );
@@ -14170,7 +14170,7 @@ code { DROP ;
                     stk
                 ),
                 Err(TcError::InvalidValueForType(
-                    Micheline::String(s),
+                    format!("{:?}", Micheline::String(s)),
                     Type::Timestamp
                 ))
             );
