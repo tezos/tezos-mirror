@@ -146,6 +146,47 @@ module type COMPONENT = sig
   val paths : string list
 end
 
+(** Conditions for jobs to be included in pipelines (see [only_if] in
+    {!COMPONENT_API.job}).
+
+    Conditions are boolean formulas. Not all of them can be encoded into
+    GitLab rules: in a conjunction, at most one subformula can test changesets,
+    and changesets cannot be negated. Defining a pipeline in which a job has
+    a condition that cannot be encoded fails. *)
+module Condition : sig
+  (** Conditions for a job to be included. *)
+  type t
+
+  (** Condition that never holds (never include the job). *)
+  val false_ : t
+
+  (** Condition that always holds (always include the job). *)
+  val true_ : t
+
+  (** Include the job if the merge request modifies
+      at least one of the files that match given paths.
+
+      Paths can include glob patterns such as [dir/**/*.ml]. *)
+  val changes : string list -> t
+
+  (** Include the job if the merge request modifies
+      at least one of the files of the component of the job
+      (see {!COMPONENT.paths}). *)
+  val component_changes : t
+
+  (** Include the job if the merge request has a given label. *)
+  val mr_has_label : string -> t
+
+  (** Negation: include the job if a condition does not hold. *)
+  val not_ : t -> t
+
+  (** Conjunction: include the job if both conditions hold. *)
+  val ( && ) : t -> t -> t
+
+  (** Disjunction: include the job if at least one condition holds. *)
+  val ( || ) : t -> t -> t
+end
+
 module type COMPONENT_API = sig
   (** Functions that components can use to define their CI (result of the {!Make} functor). *)
 
@@ -173,12 +214,17 @@ module type COMPONENT_API = sig
       Instead, each pipeline can decide to add jobs with a different trigger.
 
       When added to the [before_merging] or [merge_train] pipeline,
-      jobs are only included to the pipeline if
-      any file listed in [only_if_changed] has been modified,
-      or if the merge request has any label listed in [force_if_label],
-      or if [force] is set to [true].
+      jobs are only included to the pipeline if [only_if] holds.
+      Its default value is {!Condition.component_changes}.
+
+      [only_if_changed], [force_if_label] and [force] are deprecated,
+      and cannot be used together with [only_if]. They are equivalent to
+      [only_if] being:
+      - [Condition.true_] if [force] is [true];
+      - otherwise, [Condition.changes only_if_changed], or
+        [Condition.component_changes] if [only_if_changed] is not specified,
+        or [Condition.mr_has_label label] for any [label] in [force_if_label].
       [only_if_changed] can include glob patterns such as [dir/**/*.ml].
-      Its default value is the [paths] of the current component.
 
       The job will not start before all [needs] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
@@ -212,6 +258,7 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?image:Tezos_ci.Image.t ->
+    ?only_if:Condition.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
     ?force_if_label:string list ->
@@ -302,6 +349,7 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
+    ?only_if:Condition.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?disable_datadog:bool ->
