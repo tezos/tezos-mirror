@@ -55,7 +55,7 @@ let job_rst_check =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~description:"Check ReStructured Text files."
-    ~only_if_changed:Files.rst
+    ~only_if:(Cacio.Condition.changes Files.rst)
     ~script:[". $HOME/.venv/bin/activate"; "make --silent -C docs sphinx-check"]
 
 let job_install_python =
@@ -83,8 +83,9 @@ let job_install_python =
     ~description:
       "Check that the Python installation script from the documentation \
        actually work."
-    ~only_if_changed:Files.python_install_script
-    ~force_if_label:["ci--docs"]
+    ~only_if:
+      Cacio.Condition.(
+        changes Files.python_install_script || mr_has_label "ci--docs")
     ~script:
       [
         sf
@@ -105,8 +106,7 @@ let job_odoc =
       ("Build the documentation of our OCaml libraries (make -C docs " ^ target
      ^ ").")
     ~cpu:Tezos_ci.Runner.CPU.Very_high
-    ~only_if_changed:Files.odoc
-    ~force_if_label:["ci--docs"]
+    ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~when_:Always
@@ -131,8 +131,7 @@ let job_manuals =
         (Artifacts, Tezos_ci_jobs.Build.job_build_released Amd64);
         (Artifacts, Tezos_ci_jobs.Build.job_build_extra_dev Amd64);
       ]
-    ~only_if_changed:Files.odoc
-    ~force_if_label:["ci--docs"]
+    ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Weeks 1))
@@ -155,8 +154,7 @@ let job_docgen =
       "Build various generated reference material. This includes the RPC, P2P \
        and error reference."
     ~cpu:Tezos_ci.Runner.CPU.Very_high
-    ~only_if_changed:Files.odoc
-    ~force_if_label:["ci--docs"]
+    ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Weeks 1))
@@ -179,8 +177,7 @@ let job_build_all =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Build
     ~description:"Build the RSTs. Include material from previous build jobs."
-    ~only_if_changed:Files.odoc
-    ~force_if_label:["ci--docs"]
+    ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~needs:
       [
         (Artifacts, job_odoc mode);
@@ -209,8 +206,7 @@ let job_linkcheck =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~description:"Check links in the documentation."
-    ~only_if_changed:Files.odoc
-    ~force_if_label:["ci--docs"]
+    ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~needs:
       [
         (Artifacts, job_manuals);
