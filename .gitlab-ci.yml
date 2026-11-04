@@ -92,8 +92,9 @@ workflow:
     variables:
       PIPELINE_TYPE: before_merging
     when: always
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+  - if: ($CI_PROJECT_NAMESPACE == "tezos" || $CI_PROJECT_NAMESPACE == "nomadic-labs/private")
+      && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train"
     variables:
       PIPELINE_TYPE: merge_train
     when: always
@@ -369,8 +370,9 @@ include:
     when: always
 - local: .gitlab/ci/pipelines/merge_train.yml
   rules:
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+  - if: ($CI_PROJECT_NAMESPACE == "tezos" || $CI_PROJECT_NAMESPACE == "nomadic-labs/private")
+      && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      == "merge_train"
     when: always
 - local: .gitlab/ci/pipelines/master_branch.yml
   rules:

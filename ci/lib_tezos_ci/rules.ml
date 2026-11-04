@@ -102,6 +102,13 @@ let on_tezos_namespace = Predefined_vars.ci_project_namespace == str "tezos"
 
 let not_on_tezos_namespace = Predefined_vars.ci_project_namespace != str "tezos"
 
+let on_security_namespace =
+  Predefined_vars.ci_project_namespace == str "nomadic-labs/private"
+
+(* Merge trains run on [tezos/tezos] and on the security repository
+   [nomadic-labs/private/tezos-security-issues]. *)
+let on_merge_train_namespace = on_tezos_namespace || on_security_namespace
+
 let has_tag_match tag = Predefined_vars.ci_commit_tag =~ tag
 
 let assigned_to_marge_bot =

@@ -171,6 +171,14 @@ val on_tezos_namespace : If.t
 (** A rule that is true if [CI_PROJECT_NAMESPACE] is not [tezos]. *)
 val not_on_tezos_namespace : If.t
 
+(** A rule that is true if [CI_PROJECT_NAMESPACE] is [nomadic-labs/private],
+    the namespace of the security repository. *)
+val on_security_namespace : If.t
+
+(** A rule that is true on the namespaces where merge trains are used:
+    [tezos] and [nomadic-labs/private]. *)
+val on_merge_train_namespace : If.t
+
 (** A rule that is true if [CI_COMMIT_TAG] matches the given regexp. *)
 val has_tag_match : string -> If.t
 
