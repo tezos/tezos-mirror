@@ -2695,8 +2695,8 @@ mod review_verification {
             };
             let map = RedBlackTreeMap::from_iter((0..ENTRIES).map(|i| {
                 (
-                    Rc::new(TypedValue::Bytes(key(i))),
-                    Rc::new(leaf_big_map(i as i64)),
+                    RcTypedValue::new(TypedValue::Bytes(key(i))),
+                    RcTypedValue::new(leaf_big_map(i as i64)),
                 )
             }));
             let mut root = TypedValue::Map(map);
