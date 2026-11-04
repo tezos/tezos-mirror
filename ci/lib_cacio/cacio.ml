@@ -1793,7 +1793,7 @@ let () =
          ~stage:Start
          ~timeout:(Minutes 10)
          ~allow_failure:No
-         ~force:true
+         ~only_if:Condition.true_
          ~script:
            [
              "echo 'Trigger pipeline!'";
@@ -1814,7 +1814,7 @@ let () =
          ~allow_failure:Yes
          ~image:Tezos_ci.Images.datadog_ci
          ~stage:Start
-         ~force:true
+         ~only_if:Condition.true_
          ~script:
            [
              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";

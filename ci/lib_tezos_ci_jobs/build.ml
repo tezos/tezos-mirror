@@ -10,9 +10,10 @@
 
 module CI = Cacio.Shared
 
-(* This job is [~forced] to appear in all pipelines because there does not appear
-   to be an obvious changeset that would work. Looking at the history,
-   this job was triggered in some MRs that didn't modify [changeset_octez].
+(* This job is included in all pipelines ([~only_if:Condition.true_])
+   because there does not appear to be an obvious changeset that would work.
+   Looking at the history, this job was triggered in some MRs that didn't
+   modify [changeset_octez].
    TODO: it could be a good idea to require a label to be added to the MR instead. *)
 let build_octez_source =
   CI.job
@@ -20,7 +21,7 @@ let build_octez_source =
     ~__POS__
     ~description:"Check compilation of the Octez tarball."
     ~stage:Test
-    ~force:true
+    ~only_if:Cacio.Condition.true_
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
