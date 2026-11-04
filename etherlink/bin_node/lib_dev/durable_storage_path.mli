@@ -370,27 +370,29 @@ end
 module Http_trace : sig
   (** Durable storage flag that enables per-transaction HTTP trace capture
       during a block replay. Written by the EVM node through
-      [alter_evm_state] before invoking [Exe.replay] for the
-      [http_traceTransaction] / [http_traceBlockByNumber] /
-      [http_traceBlockByHash] RPCs, and read by the kernel on every applied
-      transaction. *)
+      [alter_evm_state] before the replay, read once per block by the
+      kernel. *)
   val enabled_flag : path
 
-  (** Path at which the kernel persists the RLP-encoded list of HTTP traces
+  (** Path at which the kernel writes the RLP-encoded list of HTTP traces
       for the transaction [transaction_hash] (a hex string, without [0x]
-      prefix). A missing key means the transaction performed no cross-runtime
-      HTTP call. *)
+      prefix). On V70+ kernels it is under
+      [/evm/world_state/__http_trace/traces],
+      and exists only on replay states. A missing key means the transaction
+      performed no cross-runtime HTTP call. *)
   val for_tx : storage_version:int -> transaction_hash:path -> path
 end
 
 module Trace : sig
-  (** Path under which all traces are stored when the
-      given [hash] parameter is provided, otherwise it
-      will just provide the path to the root. *)
+  (** Path under which the traces of [transaction_hash] are stored, or the
+      root when [transaction_hash] is [None]. On V70+ kernels the root is
+      [/evm/world_state/trace], and exists only on replay and simulation
+      states. *)
   val root_indexed_by_hash :
     storage_version:int -> transaction_hash:path option -> path
 
-  (** Path where is stored the input of the tracer. *)
+  (** Path where is stored the input of the tracer: [/base/trace/input] on
+      V60+ kernels, [/evm/trace/input] before. *)
   val input : storage_version:int -> path
 
   (** Path where is stored the gas consumed by the call. *)

@@ -13,6 +13,7 @@
   test_entrypoints_decoder
   test_run_code_codec
   test_compute_alias_codec
+  test_durable_storage_path
   test_tezlink_prevalidation
   test_transaction_object)
  (libraries
@@ -141,6 +142,15 @@
   invalidRLPTest.json
   ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_compute_alias_codec.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
+ (action (run %{dep:./test_durable_storage_path.exe})))
 
 (rule
  (alias runtest)
