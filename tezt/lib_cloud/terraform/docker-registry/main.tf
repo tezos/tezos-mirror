@@ -19,7 +19,9 @@ variable "project_id" {
 locals {
   repository_id = "${terraform.workspace}-docker-registry"
   labels = {
-    terraform = "true"
+    terraform  = "true"
+    created_by = "tezt-cloud"
+    workspace  = terraform.workspace
   }
 }
 
