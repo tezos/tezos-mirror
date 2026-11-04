@@ -3373,6 +3373,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-keyspace",
  "tezos-smart-rollup-mock",
+ "thiserror 1.0.69",
  "tracing",
 ]
 
