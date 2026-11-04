@@ -77,9 +77,8 @@ impl<KS: KeySpace> KeySpaceExtBounded for KS {}
 
 /// Base58 contract-address reads over a [`KeySpace`].
 ///
-/// The bytes are read from the keyspace in the same format as
-/// [`crate::read_b58_kt1`] reads them from a raw storage path. Invalid values
-/// are reported as [`StorageReadErrorKind::InvalidBase58`] instead of being
+/// The value holds the base58 text of the address. Invalid values are
+/// reported as [`StorageReadErrorKind::InvalidBase58`] instead of being
 /// silently treated as missing.
 pub trait KeySpaceExtB58: KeySpace {
     /// Returns the base58 contract address stored at `key`.

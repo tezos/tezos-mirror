@@ -16,6 +16,7 @@ use crate::{
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
         store_evm_chain_id, store_michelson_runtime_chain_id, ADMIN_KEY,
         DELAYED_BRIDGE_KEY, KERNEL_GOVERNANCE_KEY, KERNEL_SECURITY_GOVERNANCE_KEY,
+        SEQUENCER_GOVERNANCE_KEY,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -194,12 +195,8 @@ fn read_and_log_b58<T, E: std::fmt::Display>(
     }
 }
 
-// The sequencer governance is read through the raw host; the other contracts
-// go through the keyspace handles.
-fn fetch_tezos_contracts(
-    host: &impl StorageV1,
-    bk: &BlueprintKeyspaces<impl KeySpace>,
-) -> TezosContracts {
+// The Tezos contracts are read through their respective keyspace handles.
+fn fetch_tezos_contracts(bk: &BlueprintKeyspaces<impl KeySpace>) -> TezosContracts {
     // 1. Fetch the kernel's ticketer.
     let ticketer = read_and_log_b58(
         read_ticketer(bk.evm_world_state()),
@@ -208,9 +205,11 @@ fn fetch_tezos_contracts(
     // 2. Fetch the kernel's administrator, returns `None` if it is badly
     //    encoded or absent.
     let admin = read_and_log_b58(read_admin(bk.base()), &ADMIN_KEY);
-    // 3. Fetch the sequencer governance, returns `None` if it is badly
-    //    encoded or absent.
-    let sequencer_governance = read_sequencer_governance(host);
+    // 3. Fetch the sequencer governance.
+    let sequencer_governance = read_and_log_b58(
+        read_sequencer_governance(bk.evm_world_state()),
+        &SEQUENCER_GOVERNANCE_KEY,
+    );
     // 4. Fetch the kernel_governance contract, returns `None` if it is badly
     //    encoded or absent.
     let kernel_governance =
@@ -348,11 +347,8 @@ pub fn fetch_tezosx_configuration(
     ))
 }
 
-pub fn fetch_common_config(
-    host: &impl StorageV1,
-    bk: &BlueprintKeyspaces<impl KeySpace>,
-) -> CommonConfig {
-    let tezos_contracts = fetch_tezos_contracts(host, bk);
+pub fn fetch_common_config(bk: &BlueprintKeyspaces<impl KeySpace>) -> CommonConfig {
+    let tezos_contracts = fetch_tezos_contracts(bk);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(bk.base()).unwrap_or(MAX_ALLOWED_TICKS);
     let enable_fa_bridge = is_enable_fa_bridge(bk.base());
@@ -370,7 +366,7 @@ pub fn fetch_configuration(
     bk: &BlueprintKeyspaces<impl KeySpace>,
 ) -> Configuration {
     let sequencer = sequencer(host).unwrap_or_default();
-    let common = fetch_common_config(host, bk);
+    let common = fetch_common_config(bk);
     let dal: Option<DalConfiguration> =
         fetch_dal_configuration(bk.base(), common.evm_node_flag);
     match sequencer {

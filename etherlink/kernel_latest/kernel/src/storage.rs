@@ -33,7 +33,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtNum};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::keyspace::KeySpaceExtB58;
-use tezos_storage::{read_b58_kt1, store_read_slice};
+use tezos_storage::store_read_slice;
 use tezosx_types::StorageReadErrorKind;
 
 use crate::error::{Error, StorageError};
@@ -109,8 +109,11 @@ const KERNEL_VERSION_KEY: Key = Key::from_static(b"/kernel_version");
 // `/base/admin`. Both the reveal-storage bootstrap writer and the readers go
 // through the `/base` keyspace.
 pub(crate) const ADMIN_KEY: Key = Key::from_static(b"/admin");
-pub const SEQUENCER_GOVERNANCE: RefPath =
-    RefPath::assert_from(b"/evm/world_state/sequencer_governance");
+// The sequencer-governance contract is written by the installer at its
+// absolute path; the kernel reads it through the `/evm/world_state` keyspace
+// at this relative key.
+pub(crate) const SEQUENCER_GOVERNANCE_KEY: Key =
+    Key::from_static(b"/sequencer_governance");
 pub(crate) const KERNEL_GOVERNANCE_KEY: Key = Key::from_static(b"/kernel_governance");
 pub(crate) const KERNEL_SECURITY_GOVERNANCE_KEY: Key =
     Key::from_static(b"/kernel_security_governance");
@@ -816,8 +819,10 @@ pub fn read_admin(
     base.get_b58_kt1(&ADMIN_KEY)
 }
 
-pub fn read_sequencer_governance(host: &impl StorageV1) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
+pub fn read_sequencer_governance(
+    evm_world_state: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    evm_world_state.get_b58_kt1(&SEQUENCER_GOVERNANCE_KEY)
 }
 
 pub fn read_kernel_governance(
@@ -2159,6 +2164,37 @@ mod tests {
             Some(
                 super::ContractKt1Hash::from_base58_check(
                     "KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT"
+                )
+                .unwrap()
+            )
+        );
+    }
+
+    /// The sequencer governance resolves to
+    /// `/evm/world_state/sequencer_governance`.
+    #[test]
+    fn sequencer_governance_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let sequencer_governance = b"KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
+
+        rk.evm_world_state_mut()
+            .set(&super::SEQUENCER_GOVERNANCE_KEY, sequencer_governance)
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/sequencer_governance"
+                ))
+                .unwrap(),
+            sequencer_governance
+        );
+        assert_eq!(
+            super::read_sequencer_governance(rk.evm_world_state()).unwrap(),
+            Some(
+                super::ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"
                 )
                 .unwrap()
             )
