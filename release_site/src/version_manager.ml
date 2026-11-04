@@ -13,26 +13,32 @@ open Base.Version
    versions with that specific prerelease. [None] (absent) means no filter. *)
 type version_qualifier = Stable | Prerelease of Version.prerelease
 
-let create_version_from_args ?major ?minor ?(active = false) ?announcement
-    ?prerelease ?(publication_date = 0.) () =
-  match (major, minor) with
-  | None, _ -> failwith "Missing argument for [--major]"
-  | _, None -> failwith "Missing argument for [--minor]"
-  | Some major, Some minor ->
-      make
-        ?announcement
-        ~major
-        ~minor
-        ?prerelease
-        ~latest:false
-        ~active
-        ~publication_date
-        ()
+let number_of_args ?major ?minor ?date ?counter () =
+  match (major, minor, date, counter) with
+  | Some major, Some minor, None, None -> Semver {major; minor}
+  | None, None, Some date, counter -> Dated {date; counter}
+  | _ -> failwith "Use [--major] and [--minor], or [--date] and [--counter]"
 
-let predicate_from_args ?major ?minor ?version_qualifier () =
+let create_version_from_args ?major ?minor ?date ?counter ?(active = false)
+    ?announcement ?prerelease ?(publication_date = 0.) () =
+  make
+    ?announcement
+    ~number:(number_of_args ?major ?minor ?date ?counter ())
+    ?prerelease
+    ~latest:false
+    ~active
+    ~publication_date
+    ()
+
+let predicate_from_args ?major ?minor ?date ?counter ?version_qualifier () =
  fun version ->
   let check x = function None -> true | Some y -> x = y in
-  check version.major major && check version.minor minor
+  (match version.number with
+  | Semver {major = ma; minor = mi} ->
+      date = None && counter = None && check ma major && check mi minor
+  | Dated {date = d; counter = c} -> (
+      major = None && minor = None && check d date
+      && match counter with None -> true | Some n -> c = Some n))
   &&
   match version_qualifier with
   | None -> true
@@ -61,10 +67,9 @@ let version_to_rss_items ~component version =
     let pubdate = version.publication_date |> Ptime.of_float_s in
     let desc =
       sf
-        "%s version %d.%d%s"
+        "%s version %s%s"
         (String.capitalize_ascii component.name)
-        version.major
-        version.minor
+        (number_to_string version.number)
         rc_suffix
     in
     Rss.item ~title ~desc ~guid ~link ?pubdate ()
@@ -86,10 +91,9 @@ let version_to_rss_items ~component version =
         let pubdate = Ptime.of_float_s rev.revision_date in
         let desc =
           sf
-            "%s version %d.%d%s - packaging revision %d"
+            "%s version %s%s - packaging revision %d"
             (String.capitalize_ascii component.name)
-            version.major
-            version.minor
+            (number_to_string version.number)
             rc_suffix
             rev.build_number
         in
@@ -124,6 +128,20 @@ let () =
       ~short:'m'
       ~placeholder:"MINOR"
       ~description:"Minor version number"
+      ()
+  in
+  let date =
+    Clap.optional_int
+      ~long:"date"
+      ~placeholder:"YYYYMMDD"
+      ~description:"Release date of a dated version, instead of major and minor"
+      ()
+  in
+  let counter =
+    Clap.optional_int
+      ~long:"counter"
+      ~placeholder:"N"
+      ~description:"Same-day counter of a dated version"
       ()
   in
   let stable =
@@ -291,6 +309,8 @@ let () =
           ?prerelease
           ?major
           ?minor
+          ?date
+          ?counter
           ~publication_date
           ()
       in
@@ -299,7 +319,14 @@ let () =
       Format.printf "Added %s@." (to_string new_version)
   | `set_latest -> (
       let target_version =
-        create_version_from_args ?announcement ?prerelease ?major ?minor ()
+        create_version_from_args
+          ?announcement
+          ?prerelease
+          ?major
+          ?minor
+          ?date
+          ?counter
+          ()
       in
       let updated =
         Base.Version.set_latest target_version (load_from_file file)
@@ -309,7 +336,9 @@ let () =
       | Some latest -> Format.printf "Set %s as latest@." (to_string latest)
       | None -> Format.printf "Warning: No version marked as latest@.")
   | `set_active ->
-      let predicate = predicate_from_args ?major ?minor ?version_qualifier () in
+      let predicate =
+        predicate_from_args ?major ?minor ?date ?counter ?version_qualifier ()
+      in
       let updated = Base.Version.set_active predicate (load_from_file file) in
       save_to_file updated file ;
       let active_versions = find_active updated in
@@ -321,7 +350,9 @@ let () =
           (fun v -> Format.printf "  - %s@." (to_string v))
           active_versions)
   | `set_inactive ->
-      let predicate = predicate_from_args ?major ?minor ?version_qualifier () in
+      let predicate =
+        predicate_from_args ?major ?minor ?date ?counter ?version_qualifier ()
+      in
       let updated = Base.Version.set_inactive predicate (load_from_file file) in
       save_to_file updated file ;
       let still_active = find_active updated in
@@ -342,12 +373,7 @@ let () =
         Format.printf "The following version(s) remain active:@." ;
         List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
   | `update_build_number ->
-      let major =
-        match major with Some m -> m | None -> failwith "--major is required"
-      in
-      let minor =
-        match minor with Some m -> m | None -> failwith "--minor is required"
-      in
+      let number = number_of_args ?major ?minor ?date ?counter () in
       let bn =
         match build_number with
         | Some bn -> bn
@@ -356,15 +382,17 @@ let () =
       let revision_date = Unix.time () in
       let updated =
         Base.Version.add_build_number
-          ~major
-          ~minor
+          ~number
           ?prerelease
           ~build_number:bn
           ~revision_date
         @@ load_from_file file
       in
       save_to_file updated file ;
-      Format.printf "Updated build number of v%d.%d to %d@." major minor bn
+      Format.printf
+        "Updated build number of %s to %d@."
+        (Base.Version.tag ~number ?prerelease ())
+        bn
   | `generate_rss -> (
       let component_name = "octez" in
       let path = require_path () in

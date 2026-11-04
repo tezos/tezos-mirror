@@ -41,6 +41,13 @@ let test_generate_release_page =
       version_manager
       ["--file"; file; "add"; "--major"; "123"; "--minor"; "4"]
   in
+  (* A dated rollup node version. *)
+  let* () =
+    Process.run
+      ~name:"version_manager"
+      version_manager
+      ["--file"; file; "add"; "--date"; "20260724"]
+  in
   let* () =
     Process.run
       ~name:"generate_release_page"
@@ -50,12 +57,18 @@ let test_generate_release_page =
   let index = read_file (dir // "index.html") in
   let older = read_file (dir // "older_releases.html") in
   let feed = read_file (project_root // "feed.xml") in
+  let html = index ^ older in
+  Check.((html =~ rex "122\\.0") ~error_msg:"Expected v122.0 in generated HTML") ;
+  Check.((html =~ rex "123\\.4") ~error_msg:"Expected v123.4 in generated HTML") ;
   Check.(
-    (index ^ older =~ rex "122\\.0")
-      ~error_msg:"Expected v122.0 in generated HTML") ;
+    (html =~ rex "20260724") ~error_msg:"Expected v20260724 in generated HTML") ;
   Check.(
-    (index ^ older =~ rex "123\\.4")
-      ~error_msg:"Expected v123.4 in generated HTML") ;
+    (html =~! rex "20260724\\.0")
+      ~error_msg:"Expected no counter after v20260724 in generated HTML") ;
   Check.((feed =~ rex "122\\.0") ~error_msg:"Expected v122.0 in feed.xml") ;
   Check.((feed =~ rex "123\\.4") ~error_msg:"Expected v123.4 in feed.xml") ;
+  Check.((feed =~ rex "20260724") ~error_msg:"Expected v20260724 in feed.xml") ;
+  Check.(
+    (feed =~! rex "20260724\\.0")
+      ~error_msg:"Expected no counter after v20260724 in feed.xml") ;
   unit

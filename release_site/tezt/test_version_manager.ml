@@ -49,6 +49,92 @@ let test_add =
   Check.((output =~ rex "v123\\.4") ~error_msg:"Expected v123.4 in list output") ;
   unit
 
+let test_add_dated =
+  Test.register
+    ~__FILE__
+    ~title:"add dated version"
+    ~tags:["version_manager"; "add"; "dated"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () = run ~file ["add"; "--date"; "20260724"] in
+  let* output = list file in
+  Check.(
+    (output =~ rex "v20260724\n") ~error_msg:"Expected v20260724 in list output") ;
+  Check.(
+    (output =~! rex "v20260724\\.")
+      ~error_msg:"Expected no counter after v20260724") ;
+  let raw = read_file file in
+  Check.((raw =~ rex "\"date\": 20260724") ~error_msg:"Expected a date key") ;
+  Check.(
+    (raw =~! rex "major|minor") ~error_msg:"Expected no major or minor key") ;
+  unit
+
+let test_add_dated_with_counter =
+  Test.register
+    ~__FILE__
+    ~title:"dated versions with and without a counter are distinct"
+    ~tags:["version_manager"; "add"; "dated"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () = run ~file ["add"; "--date"; "20260724"] in
+  let* () = run ~file ["add"; "--date"; "20260724"; "--counter"; "1"] in
+  let* output = list file in
+  Check.(
+    (output =~ rex "v20260724\n") ~error_msg:"Expected v20260724 in list output") ;
+  Check.(
+    (output =~ rex "v20260724\\.1")
+      ~error_msg:"Expected v20260724.1 in list output") ;
+  unit
+
+let test_add_rejects_mixed_schemes =
+  Test.register
+    ~__FILE__
+    ~title:"add rejects a missing minor and mixed version schemes"
+    ~tags:["version_manager"; "add"; "dated"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () = run ~expect_failure:true ~file ["add"; "--major"; "25"] in
+  let* () =
+    run
+      ~expect_failure:true
+      ~file
+      ["add"; "--major"; "25"; "--minor"; "0"; "--date"; "20260724"]
+  in
+  let* () = run ~expect_failure:true ~file ["add"; "--counter"; "1"] in
+  unit
+
+let test_read_entry_without_minor_fails =
+  Test.register
+    ~__FILE__
+    ~title:"an entry with a major and no minor does not decode"
+    ~tags:["version_manager"; "compat"]
+  @@ fun () ->
+  let file = Temp.file "versions.json" in
+  write_file file ~contents:{|[{"major":25,"latest":true,"pubDate":0}]|} ;
+  let* () = run ~expect_failure:true ~file ["list"] in
+  unit
+
+let test_read_legacy_minor =
+  Test.register
+    ~__FILE__
+    ~title:"a version written with a minor still decodes"
+    ~tags:["version_manager"; "add"; "compat"]
+  @@ fun () ->
+  let file = Temp.file "versions.json" in
+  (* The Octez and Etherlink pages always write a minor. *)
+  write_file
+    file
+    ~contents:
+      {|[{"major":25,"minor":0,"latest":true,"active":false,"pubDate":0}]|} ;
+  let* output = list file in
+  Check.((output =~ rex "v25\\.0") ~error_msg:"Expected v25.0 in list output") ;
+  (* Re-encoding must keep the minor field. *)
+  let* () = run ~file ["set-latest"; "--major"; "25"; "--minor"; "0"] in
+  Check.(
+    (read_file file =~ rex "\"minor\": 0")
+      ~error_msg:"Expected re-encoded JSON to keep the minor field") ;
+  unit
+
 let test_add_rc =
   Test.register
     ~__FILE__

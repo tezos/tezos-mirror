@@ -96,21 +96,19 @@ let get_assets ?arch ~component ~version ~asset () =
     match arch with
     | None ->
         Format.printf
-          "Getting %s list from %s for version %i.%i@."
+          "Getting %s list from %s for version %s@."
           (string_of_asset_type asset)
           component.path
-          version.major
-          version.minor ;
+          (Version.to_string version) ;
         Format.printf "%s@." (component.asset_path version asset) ;
         component.asset_path version asset
     | Some arch ->
         let arch = string_of_arch arch in
         Format.printf
-          "Getting %s list from %s for version %i.%i and architecture %s@."
+          "Getting %s list from %s for version %s and architecture %s@."
           (string_of_asset_type asset)
           component.path
-          version.major
-          version.minor
+          (Version.to_string version)
           arch ;
         Filename.concat (component.asset_path version asset) arch
   in
@@ -206,32 +204,16 @@ let asset_content ~component ~version = function
    the [version] of [component] in the release page,
    containing the assets of [asset_types]. *)
 let version_section ~component ~asset_types ~version =
-  let {major; minor; prerelease; latest; _} = version in
+  let {number; prerelease; latest; _} = version in
+  let number = Version.number_to_string number in
+  let name = String.capitalize_ascii component.name in
   let title =
     match prerelease with
-    | Some (RC rcn) ->
-        sf
-          "%s Release Candidate %i.%i~rc%i\n"
-          (String.capitalize_ascii component.name)
-          major
-          minor
-          rcn
-    | Some (Beta bn) ->
-        sf
-          "%s Beta %i.%i~beta%i\n"
-          (String.capitalize_ascii component.name)
-          major
-          minor
-          bn
+    | Some (RC rcn) -> sf "%s Release Candidate %s~rc%i\n" name number rcn
+    | Some (Beta bn) -> sf "%s Beta %s~beta%i\n" name number bn
     | None ->
-        if latest then
-          sf
-            "%s %i.%i (latest)\n"
-            (String.capitalize_ascii component.name)
-            major
-            minor
-        else
-          sf "%s %i.%i\n" (String.capitalize_ascii component.name) major minor
+        if latest then sf "%s %s (latest)\n" name number
+        else sf "%s %s\n" name number
   in
   {
     Content.title;
@@ -324,33 +306,11 @@ let make_component ~name ~bucket ~path ~url =
        else sf "%s%s/%s" bucket path name);
     asset_path =
       (fun version asset_type ->
-        let variant_suffix =
-          match version.prerelease with
-          | Some (RC n) -> sf "-rc%d" n
-          | Some (Beta n) -> sf "-beta%d" n
-          | None -> ""
-        in
+        let version_tag = Version.to_string version in
+        let asset = string_of_asset_type asset_type |> String.lowercase_ascii in
         if name = "octez" then
-          sf
-            "%s%s/%s-v%i.%i%s/%s"
-            bucket
-            path
-            name
-            version.major
-            version.minor
-            variant_suffix
-            (string_of_asset_type asset_type |> String.lowercase_ascii)
-        else
-          sf
-            "%s%s/%s/%s-v%i.%i%s/%s"
-            bucket
-            path
-            name
-            name
-            version.major
-            version.minor
-            variant_suffix
-            (string_of_asset_type asset_type |> String.lowercase_ascii));
+          sf "%s%s/%s-%s/%s" bucket path name version_tag asset
+        else sf "%s%s/%s/%s-%s/%s" bucket path name name version_tag asset);
     url;
   }
 
