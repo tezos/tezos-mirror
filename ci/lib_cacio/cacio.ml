@@ -950,9 +950,6 @@ module type COMPONENT_API = sig
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?image:Tezos_ci.Image.t ->
     ?only_if:Condition.t ->
-    ?only_if_changed:string list ->
-    ?force:bool ->
-    ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
@@ -985,7 +982,6 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if:Condition.t ->
-    ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
@@ -1209,7 +1205,7 @@ let output_tezt_job_list path =
    but in practice this would be less convenient since all functions need at least
    one of them. *)
 module Make (Component : COMPONENT) : COMPONENT_API = struct
-  let default_only_if_changed = Tezos_ci.Changeset.make Component.paths
+  let component_changeset = Tezos_ci.Changeset.make Component.paths
 
   let is_a_valid_name =
     String.for_all (function
@@ -1244,12 +1240,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ?tag ?image ?only_if ?only_if_changed ?(force = false)
-      ?(force_if_label = []) ?(needs = []) ?parallel ?environment
-      ?resource_group ?(variables = []) ?artifacts ?(cache = [])
-      ?(cargo_cache = false) ?sccache ?(dune_cache = false)
-      ?(disable_datadog = false) ?allow_failure ?retry ?timeout ?services
-      ?id_tokens ?(script = []) name =
+      ?storage ?tag ?image ?(only_if = Condition.component_changes)
+      ?(needs = []) ?parallel ?environment ?resource_group ?(variables = [])
+      ?artifacts ?(cache = []) ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     let before_script = [] in
@@ -1374,27 +1369,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       parallel;
-      only_if =
-        (Condition.resolve_component_changes default_only_if_changed
-        @@
-        match only_if with
-        | Some only_if ->
-            if only_if_changed <> None || force || force_if_label <> [] then
-              error
-                source_location
-                "job %s: ~only_if cannot be used together with \
-                 ~only_if_changed, ~force or ~force_if_label"
-                name ;
-            only_if
-        | None ->
-            if force then Condition.true_
-            else
-              List.fold_left
-                (fun acc label -> Condition.(acc || mr_has_label label))
-                (match only_if_changed with
-                | None -> Condition.component_changes
-                | Some list -> Condition.changes list)
-                force_if_label);
+      only_if = Condition.resolve_component_changes component_changeset only_if;
       variables;
       before_script;
       script;
@@ -1436,12 +1411,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if ?only_if_changed
-      ?(needs = []) ?disable_datadog ?allow_failure ?tezt_exe
-      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
-      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = [])
-      ?(select_tezts = true) variant =
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if ?(needs = [])
+      ?disable_datadog ?allow_failure ?tezt_exe ?(global_timeout = Minutes 30)
+      ?(test_timeout = Minutes 9) ?(parallel_jobs = 1) ?(parallel_tests = 1)
+      ?retry_jobs ?(retry_tests = 0) ?(test_selection = Tezt_core.TSL_AST.True)
+      ?(before_script = []) ?(select_tezts = true) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
@@ -1616,7 +1590,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?tag
       ~image:Tezos_ci.Images.Base_images.alpine_e2etest
       ?only_if
-      ?only_if_changed
       ~needs
       ?parallel:
         (if parallel_jobs > 1 then Some (Vector parallel_jobs) else None)

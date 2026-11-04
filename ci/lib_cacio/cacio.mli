@@ -141,8 +141,8 @@ module type COMPONENT = sig
 
   (** Files that belong to the component.
 
-      This is added as [changes] clauses for jobs of this component
-      in the [before_merging] pipeline. *)
+      This is the changeset of {!Condition.component_changes},
+      which is the default condition of jobs. *)
   val paths : string list
 end
 
@@ -217,15 +217,6 @@ module type COMPONENT_API = sig
       jobs are only included to the pipeline if [only_if] holds.
       Its default value is {!Condition.component_changes}.
 
-      [only_if_changed], [force_if_label] and [force] are deprecated,
-      and cannot be used together with [only_if]. They are equivalent to
-      [only_if] being:
-      - [Condition.true_] if [force] is [true];
-      - otherwise, [Condition.changes only_if_changed], or
-        [Condition.component_changes] if [only_if_changed] is not specified,
-        or [Condition.mr_has_label label] for any [label] in [force_if_label].
-      [only_if_changed] can include glob patterns such as [dir/**/*.ml].
-
       The job will not start before all [needs] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
       is present if they are not already present.
@@ -259,9 +250,6 @@ module type COMPONENT_API = sig
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?image:Tezos_ci.Image.t ->
     ?only_if:Condition.t ->
-    ?only_if_changed:string list ->
-    ?force:bool ->
-    ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
@@ -350,7 +338,6 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if:Condition.t ->
-    ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
@@ -576,8 +563,9 @@ val output_tezt_job_list : string -> unit
       not test release pipelines (those can use the GitLab registry instead for instance);
     - ... *)
 
-(** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
-    Or to automatically add this label to the list. *)
+(** Another idea would be to give components a label, e.g. ["ci--" ^ component_name],
+    and to make {!Condition.component_changes} also hold if the merge request
+    has this label. *)
 
 (** Pipelines that are declared by components, with the
     [register_*_pipeline] functions of {!COMPONENT_API}, are registered with
