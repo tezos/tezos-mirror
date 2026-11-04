@@ -116,3 +116,4 @@ Additionally, you can list the jobs of a given pipeline and their description
 with the following command (replace `before_merging` with the pipeline of your choice):
 
     make -s -C ci before_merging.describe-pipeline
+dummy
