@@ -253,6 +253,56 @@ let decode_micheline_storage hex_str =
            |> to_string
            |> JSON.parse ~origin:"decode_micheline_storage"))
 
+(** [encode_transfer ~source ~fee ~counter ~gas_limit ~storage_limit ~dest
+    ~amount] is the binary encoding of a transfer of [amount] mutez from
+    [source] to [dest], without parameters. *)
+let encode_transfer ~(source : Account.key) ~fee ~counter ~gas_limit
+    ~storage_limit ~(dest : Account.key) ~amount =
+  let bin encoding value = Data_encoding.Binary.to_string_exn encoding value in
+  let source =
+    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+      source.public_key_hash
+  in
+  let dest =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         dest.public_key_hash
+  in
+  String.concat
+    ""
+    [
+      (* Transaction tag *)
+      "\x6c";
+      bin Tezos_crypto.Signature.Public_key_hash.encoding source;
+      bin Data_encoding.n fee;
+      bin Data_encoding.n counter;
+      bin Data_encoding.n gas_limit;
+      bin Data_encoding.n storage_limit;
+      bin Data_encoding.n amount;
+      bin Tezos_protocol_alpha.Protocol.Contract_repr.encoding dest;
+      (* No parameters *)
+      "\x00";
+    ]
+
+(** [encode_unsigned_operation ~branch contents] is the binary encoding of the
+    unsigned operation on [branch] made of the encoded manager operations
+    [contents], in order. *)
+let encode_unsigned_operation ~branch contents =
+  Tezos_crypto.Hashed.Block_hash.(to_string (of_b58check_exn branch))
+  ^ String.concat "" contents
+
+(** [sign_encoded_operation ~signer unsigned] is the encoded unsigned operation
+    [unsigned] followed by its signature by [signer]. [signer] must not be a
+    BLS key, whose signature is encoded differently. *)
+let sign_encoded_operation ~signer unsigned =
+  let signature =
+    Account.sign_bytes
+      ~watermark:Tezos_crypto.Signature.Generic_operation
+      ~signer
+      (Bytes.of_string unsigned)
+  in
+  unsigned ^ Tezos_crypto.Signature.to_string signature
+
 (** [send_tezos_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
     delayed inbox and waits until it is included and the delayed inbox is
     empty. *)
