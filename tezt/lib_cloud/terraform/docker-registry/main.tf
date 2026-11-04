@@ -48,6 +48,29 @@ resource "google_artifact_registry_repository" "docker-registry" {
   location      = var.region
   labels        = local.labels
 
+  # Each workspace gets its own registry, created from the developer's
+  # machine, so nothing else ever removes its images.
+  cleanup_policy_dry_run = false
+
+  cleanup_policies {
+    id     = "delete-old"
+    action = "DELETE"
+    condition {
+      tag_state  = "ANY"
+      older_than = "2592000s" # 30 days
+    }
+  }
+
+  # KEEP takes precedence over DELETE: the image of a workspace in use is
+  # never removed under it.
+  cleanup_policies {
+    id     = "keep-recent"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 3
+    }
+  }
+
   lifecycle {
     prevent_destroy = true
   }
