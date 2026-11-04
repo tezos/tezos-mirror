@@ -798,7 +798,7 @@ where
             // observable through the [http_trace*] RPCs. Matches the behavior of the
             // other two journal sites (Tezos / TezosDelayed).
             crate::storage::maybe_store_http_traces_for_tx(
-                rk.host_mut(),
+                rk.evm_world_state_mut(),
                 http_trace_enabled,
                 &transaction_hash,
                 journal,
