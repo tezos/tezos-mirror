@@ -234,8 +234,7 @@ end = struct
           else
             failwith
               (sf
-                 "Cacio.Condition.encode: cannot encode a conjunction of \
-                  changesets: [%s] and [%s]"
+                 "cannot encode a conjunction of changesets: [%s] and [%s]"
                  (String.concat ", " (Tezos_ci.Changeset.encode a))
                  (String.concat ", " (Tezos_ci.Changeset.encode b)))
     in
@@ -256,8 +255,7 @@ end = struct
         else
           failwith
             (sf
-               "Cacio.Condition.encode: cannot encode the negation of a \
-                changeset: [%s]"
+               "cannot encode the negation of a changeset: [%s]"
                (String.concat ", " (Tezos_ci.Changeset.encode set)))
     | Not condition -> terms ~positive:(not positive) condition
     | Or (a, b) when positive -> terms ~positive a @ terms ~positive b
@@ -818,7 +816,14 @@ let convert_graph ?(interruptible_pipeline = true)
                 let condition =
                   if with_condition then only_if else Condition.true_
                 in
-                Condition.encode ?when_ ?allow_failure condition
+                try Condition.encode ?when_ ?allow_failure condition
+                with Failure message ->
+                  error
+                    source_location
+                    "job %s: %s, either in its ~only_if or in the ~only_if of \
+                     a job that needs it"
+                    name
+                    message
               in
               let interruptible, interruptible_runner =
                 match stage with
