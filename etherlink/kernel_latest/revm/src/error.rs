@@ -15,6 +15,7 @@ use revm::{
     interpreter::Gas,
     primitives::{B256, U256},
 };
+use tezos_evm_runtime::snapshot::SnapshotError;
 use tezos_indexable_storage::IndexableStorageError;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
@@ -103,6 +104,10 @@ pub enum EvmKernelError {
     TxEnvBuild(#[from] TxEnvBuildError),
     #[error("Indexable storage push failed: {0}")]
     IndexableStorage(#[from] IndexableStorageError),
+    /// A frame commit or revert failed on a snapshot of the
+    /// Michelson accounts.
+    #[error("Snapshot error: {0}")]
+    Snapshot(#[from] SnapshotError),
     #[error("Failed to clear temporary big maps: {0}")]
     TemporaryBigMapCleanup(String),
     #[error("Michelson journal closed with {open_frames} frame(s) still open")]
@@ -189,6 +194,9 @@ impl From<EvmKernelError> for TezosXRuntimeError {
     fn from(value: EvmKernelError) -> Self {
         match value {
             EvmKernelError::Runtime(err) => TezosXRuntimeError::Runtime(err),
+            EvmKernelError::Snapshot(err) => {
+                TezosXRuntimeError::Snapshot(err.to_string())
+            }
             other => TezosXRuntimeError::Custom(other.to_string()),
         }
     }

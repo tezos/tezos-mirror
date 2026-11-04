@@ -1743,7 +1743,8 @@ where
             | TezosXRuntimeError::HeaderError(_)
             | TezosXRuntimeError::CheckNativeAddressError(_)
             | TezosXRuntimeError::Key(_)
-            | TezosXRuntimeError::KeySpace(_) => {
+            | TezosXRuntimeError::KeySpace(_)
+            | TezosXRuntimeError::Snapshot(_) => {
                 mir::interpreter::EnshrinedViewDispatchError::AliasResolution.into()
             }
         })?;
