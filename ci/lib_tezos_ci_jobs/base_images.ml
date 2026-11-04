@@ -240,7 +240,7 @@ let job_debian_based_images =
     (dockerfile Debian)
     ~__POS__
     ~description:"Build debian base images"
-    ~only_if_changed:Files.debian_base
+    ~only_if:(Cacio.Condition.changes Files.debian_base)
     "images.debian"
 
 (* ── Cacio: ubuntu ───────────────────────────────────────────────────────── *)
@@ -253,7 +253,7 @@ let job_ubuntu_based_images =
     (dockerfile Ubuntu)
     ~__POS__
     ~description:"Build ubuntu base images"
-    ~only_if_changed:Files.debian_base
+    ~only_if:(Cacio.Condition.changes Files.debian_base)
     "images.ubuntu"
 
 (* ── Standalone jobs (no job dependencies within this file) ─────────────── *)
@@ -269,7 +269,7 @@ let job_ci_release_based_images =
     "images/base-images/Dockerfile.debian-release"
     ~__POS__
     ~description:"Build ci-release base images"
-    ~only_if_changed:Files.(ci_releases @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(ci_releases @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.ci-release"
 
@@ -289,7 +289,7 @@ let job_docker_ci_based_images =
     ~services:[{name = Images.Base_images.dind_service}]
     ~retry:Tezos_ci.dind_retry
     ~tag:Gcp_very_high_cpu
-    ~only_if_changed:Files.alpine_docker_ci
+    ~only_if:(Cacio.Condition.changes Files.alpine_docker_ci)
     ~variables:
       [
         ("RELEASE", docker_version);
@@ -325,7 +325,7 @@ let job_rust_based_images =
     "images/base-images/Dockerfile.rust"
     ~__POS__
     ~description:"Build debian-rust base images"
-    ~only_if_changed:Files.(debian_rust_build @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_rust_build @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-rust"
 
@@ -344,7 +344,9 @@ let job_rust_based_images_merge =
     ~script:["scripts/ci/docker-merge-base-images.sh"]
     ~__POS__
     ~description:"Merge debian-rust base image manifests"
-    ~only_if_changed:Files.(merge_script @ debian_rust_build @ debian_base)
+    ~only_if:
+      (Cacio.Condition.changes
+         Files.(merge_script @ debian_rust_build @ debian_base))
     ~needs:[(Job, job_rust_based_images)]
     "images.debian-rust.merge"
 
@@ -364,7 +366,7 @@ let job_debian_homebrew_based_images =
     "images/base-images/Dockerfile.debian-homebrew"
     ~__POS__
     ~description:"Build debian-homebrew base images"
-    ~only_if_changed:Files.(debian_homebrew @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_homebrew @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-homebrew"
 
@@ -381,7 +383,7 @@ let job_debian_build_based_images =
     "images/base-images/Dockerfile.debian-build"
     ~__POS__
     ~description:"Build debian-build base images"
-    ~only_if_changed:Files.(debian_build @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_build @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-build"
 
@@ -395,7 +397,9 @@ let job_debian_build_based_images_merge =
     ~__POS__
     ~description:"Merge debian-build base image manifests"
     ~parallel:(Matrix [release_matrix Debian])
-    ~only_if_changed:Files.(merge_script @ debian_build @ debian_base)
+    ~only_if:
+      (Cacio.Condition.changes
+         Files.(merge_script @ debian_build @ debian_base))
     ~needs:[(Job, job_debian_build_based_images)]
     "images.debian-build.merge"
 
@@ -410,7 +414,7 @@ let job_ubuntu_build_based_images =
     "images/base-images/Dockerfile.debian-build"
     ~__POS__
     ~description:"Build ubuntu-build base images"
-    ~only_if_changed:Files.(debian_build @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_build @ debian_base))
     ~needs:[(Job, job_ubuntu_based_images)]
     "images.ubuntu-build"
 
@@ -424,7 +428,9 @@ let job_ubuntu_build_based_images_merge =
     ~__POS__
     ~description:"Merge ubuntu-build base image manifests"
     ~parallel:(Matrix [release_matrix Ubuntu])
-    ~only_if_changed:Files.(merge_script @ debian_build @ debian_base)
+    ~only_if:
+      (Cacio.Condition.changes
+         Files.(merge_script @ debian_build @ debian_base))
     ~needs:[(Job, job_ubuntu_build_based_images)]
     "images.ubuntu-build.merge"
 
@@ -441,7 +447,7 @@ let job_debian_systemd_based_images =
     "images/base-images/Dockerfile.debian-systemd"
     ~__POS__
     ~description:"Build debian-systemd base images"
-    ~only_if_changed:Files.(debian_systemd @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_systemd @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-systemd"
 
@@ -456,7 +462,7 @@ let job_ubuntu_systemd_based_images =
     "images/base-images/Dockerfile.debian-systemd"
     ~__POS__
     ~description:"Build ubuntu-systemd base images"
-    ~only_if_changed:Files.(debian_systemd @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_systemd @ debian_base))
     ~needs:[(Job, job_ubuntu_based_images)]
     "images.ubuntu-systemd"
 
@@ -473,7 +479,7 @@ let job_jsonnet_based_images =
     "images/base-images/Dockerfile.debian-jsonnet"
     ~__POS__
     ~description:"Build debian-jsonnet base images"
-    ~only_if_changed:Files.(debian_jsonnet @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(debian_jsonnet @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-jsonnet"
 
@@ -490,7 +496,7 @@ let job_rust_sdk_bindings_based_images =
     "images/base-images/Dockerfile.rust-sdk-bindings"
     ~__POS__
     ~description:"Build debian-rust-sdk-bindings base images"
-    ~only_if_changed:Files.(rust_sdk_bindings @ debian_base)
+    ~only_if:(Cacio.Condition.changes Files.(rust_sdk_bindings @ debian_base))
     ~needs:[(Job, job_debian_based_images)]
     "images.debian-rust-sdk-bindings"
 
@@ -542,7 +548,7 @@ let job_alpine_ci =
     ?storage:(match arch with Arm64 -> Some Runner.Storage.Ramfs | _ -> None)
       (* Inherits [dind_retry] from [docker_job], which retries on both
          [Script_failure] and [Runner_system_failure] to recover preemptions. *)
-    ~only_if_changed:Files.ci_images
+    ~only_if:(Cacio.Condition.changes Files.ci_images)
     ("images.alpine-ci-all:" ^ arch_str)
 
 let job_alpine_ci_merge =
@@ -581,7 +587,7 @@ let job_alpine_ci_merge =
     ~description:
       "Merge the per-arch static alpine-* CI images into multi-arch manifests, \
        tagged both <ref-slug>-<short-sha> and <ref-slug>"
-    ~only_if_changed:Files.ci_images
+    ~only_if:(Cacio.Condition.changes Files.ci_images)
     ~needs:[(Job, job_alpine_ci Amd64); (Job, job_alpine_ci Arm64)]
     "images.alpine-ci-all.merge"
 

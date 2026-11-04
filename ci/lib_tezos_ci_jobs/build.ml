@@ -52,7 +52,9 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = [])
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
     ?storage
     ~image:Tezos_ci.Images.Base_images.alpine_build
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~variables:
       (("EXECUTABLE_FILES", executable_files)
       ::
@@ -161,7 +163,9 @@ let job_build_layer1_profiling =
     ~stage:Test
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~artifacts:
       (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) binaries)
     ~variables:[("PROFILE", "static")]
@@ -196,7 +200,9 @@ let job_build_static_linux_released_binaries =
       ("Build the static Octez released binaries for " ^ arch_string ^ ".")
     ~stage:Build
     ?allow_failure:(match mode with `test -> None | `release -> Some No)
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
     ~image:Tezos_ci.Images.Base_images.alpine_build
@@ -231,7 +237,9 @@ let job_build_static_linux_experimental_binaries =
     ~description:
       ("Build the static Octez experimental binaries for " ^ arch_string ^ ".")
     ~stage:Build
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
     ~image:Tezos_ci.Images.Base_images.alpine_build

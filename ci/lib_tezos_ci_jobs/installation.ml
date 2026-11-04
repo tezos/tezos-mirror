@@ -24,7 +24,8 @@ let compile_sources_doc_deps_job ~name_suffix ~image =
     ~cpu:Very_high
     ~image
     ~variables:[("CARGO_NET_OFFLINE", "false")]
-    ~only_if_changed:["docs/introduction/compile-sources-setup.sh"]
+    ~only_if:
+      (Cacio.Condition.changes ["docs/introduction/compile-sources-setup.sh"])
     ~script:[sf "./docs/introduction/compile-sources-setup.sh"]
 
 let job_compile_sources_doc_deps_debian =
@@ -51,7 +52,7 @@ let compile_sources_doc_job ~name_suffix ~project ~branch ~image =
          image)
     ~stage:Test
     ~cpu:Very_high
-    ~only_if_changed:["docs/introduction/compile-sources.sh"]
+    ~only_if:(Cacio.Condition.changes ["docs/introduction/compile-sources.sh"])
     ~image
     ~variables:[("DUNE_BUILD_JOBS", "-j 12"); ("CARGO_NET_OFFLINE", "false")]
     ~sccache:(Cacio.sccache ())

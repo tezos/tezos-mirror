@@ -34,7 +34,7 @@ let job_check_riscv_kernels =
     ~__POS__
     ~stage:Test
     ~description:"Run 'make check' in 'src/riscv' and 'src/lib_riscv/kernels'."
-    ~only_if_changed:Files.kernels
+    ~only_if:(Cacio.Condition.changes Files.kernels)
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~script:
       [
@@ -50,7 +50,7 @@ let job_audit_riscv_deps =
     ~__POS__
     ~stage:Test
     ~description:"Run 'make audit' in 'src/riscv' and 'src/lib_riscv/kernels'."
-    ~only_if_changed:Files.kernels
+    ~only_if:(Cacio.Condition.changes Files.kernels)
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~cache:
       [
@@ -72,7 +72,7 @@ let job_test_kernels =
     ~__POS__
     ~stage:Test
     ~description:"Run 'make check' and 'make test' for kernels."
-    ~only_if_changed:Files.test_kernels
+    ~only_if:(Cacio.Condition.changes Files.test_kernels)
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~script:["make -f kernels.mk check"; "make -f kernels.mk test"]
 
@@ -84,17 +84,18 @@ let job_build_kernels =
     ~description:"Build the kernels, including the Etherlink kernel."
     ~cpu:Very_high
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
-    ~only_if_changed:
-      [
-        (* This job is used by other jobs such as [etherlink.test_kernels]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           (* This job is used by other jobs such as [etherlink.test_kernels]
            and is thus automatically added to pipelines that modify the changeset
            of those other jobs. But we also want to check that kernels compile
            if the makefiles are modified, and [kernels.mk] does not trigger those other jobs.
            So we explicitly add the makefiles to the changeset and we explicitly
            register [job_build_kernels] in the pipelines. *)
-        "kernels.mk";
-        "etherlink.mk";
-      ]
+           "kernels.mk";
+           "etherlink.mk";
+         ])
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"build-kernels-$CI_COMMIT_REF_SLUG"

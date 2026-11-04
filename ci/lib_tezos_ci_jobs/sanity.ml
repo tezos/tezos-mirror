@@ -24,16 +24,17 @@ let job_sanity_ci =
       "Check that generated dune, .opam and .yml files are up-to-date."
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
-    ~only_if_changed:
-      [
-        "**/manifest/**/*";
-        "**/dune";
-        "opam/**/*";
-        "**/ci/**/*";
-        ".gitlab-ci.yml";
-        ".gitlab/ci/pipelines/*.yml";
-        "script-inputs/**/*";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "**/manifest/**/*";
+           "**/dune";
+           "opam/**/*";
+           "**/ci/**/*";
+           ".gitlab-ci.yml";
+           ".gitlab/ci/pipelines/*.yml";
+           "script-inputs/**/*";
+         ])
     ~script:
       [
         "./scripts/ci/take_ownership.sh";
@@ -50,7 +51,7 @@ let job_docker_hadolint =
     ~description:"Run hadolint on some Docker files."
     ~image:Tezos_ci.Images.hadolint
     ~stage:Test
-    ~only_if_changed:files_to_lint
+    ~only_if:(Cacio.Condition.changes files_to_lint)
     ~script:(List.map (( ^ ) "hadolint ") files_to_lint)
 
 let job_oc_ocaml_fmt =
@@ -62,7 +63,8 @@ let job_oc_ocaml_fmt =
        source files are correctly formatted using ocamlformat."
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
-    ~only_if_changed:["**/.ocamlformat"; "**/*.ml"; "**/*.mli"]
+    ~only_if:
+      (Cacio.Condition.changes ["**/.ocamlformat"; "**/*.ml"; "**/*.mli"])
     ~dune_cache:true
     ~script:
       [
@@ -82,8 +84,9 @@ let job_semgrep =
     ~description:"Run a linter on OCaml code."
     ~image:Tezos_ci.Images.semgrep_agent
     ~stage:Test
-    ~only_if_changed:
-      ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"]
+    ~only_if:
+      (Cacio.Condition.changes
+         ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"])
     ~script:
       [
         "echo \"OCaml code linting. For information on how to reproduce \
@@ -102,16 +105,17 @@ let job_oc_misc_checks =
        migrations, check licences."
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
-    ~only_if_changed:
-      [
-        "src/**/*";
-        "tezt/**/*";
-        "devtools/**/*";
-        "scripts/**/*";
-        "docs/**/*";
-        "contrib/**/*";
-        "etherlink/**/*";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "src/**/*";
+           "tezt/**/*";
+           "devtools/**/*";
+           "scripts/**/*";
+           "docs/**/*";
+           "contrib/**/*";
+           "etherlink/**/*";
+         ])
     ~script:
       (List.flatten
          [
@@ -145,7 +149,7 @@ let job_check_jsonnet =
     ~image:Tezos_ci.Images.Base_images.debian_jsonnet_trixie
     ~description:"Check jsonnet format and lint."
     ~stage:Test
-    ~only_if_changed:["**/*.jsonnet"]
+    ~only_if:(Cacio.Condition.changes ["**/*.jsonnet"])
     ~script:
       [
         "cd grafazos/";
@@ -164,7 +168,7 @@ let job_check_rust_fmt =
     ~description:"Check formatting on Rust source files."
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
-    ~only_if_changed:["**/*.rs"]
+    ~only_if:(Cacio.Condition.changes ["**/*.rs"])
     ~script:["scripts/check-format-rust.sh"]
 
 (* Necromantic nix-related rites. *)
@@ -176,7 +180,8 @@ let job_nix =
     ~image:Tezos_ci.Images.nix
     ~stage:Test
     ~artifacts:(Gitlab_ci.Util.artifacts ~when_:On_failure ["flake.lock"])
-    ~only_if_changed:["**/*.nix"; "flake.lock"; "scripts/version.sh"]
+    ~only_if:
+      (Cacio.Condition.changes ["**/*.nix"; "flake.lock"; "scripts/version.sh"])
     ~cache:[Gitlab_ci.Util.cache ~key:"nix-store" ["/nix/store"]]
     ~script:
       [
@@ -233,7 +238,8 @@ let job_npm_audit =
     ~image:Tezos_ci.Images.node_alpine
     ~stage:Test
     ~allow_failure:(With_exit_codes [2])
-    ~only_if_changed:["**/package-lock.json"; "**/package.json"]
+    ~only_if:
+      (Cacio.Condition.changes ["**/package-lock.json"; "**/package.json"])
     ~script:
       (* [|| exit $?] preserves the script's exit code;
          GitLab otherwise masks any failure as 1,
@@ -271,7 +277,9 @@ let job_cargo_audit =
          exit 1 (a critical/high advisory) blocks. See
          scripts/ci/cargo_audit.sh for the tiering. *)
     ~allow_failure:(With_exit_codes [2])
-    ~only_if_changed:["**/Cargo.lock"; "**/Cargo.toml"; "**/.cargo/audit.toml"]
+    ~only_if:
+      (Cacio.Condition.changes
+         ["**/Cargo.lock"; "**/Cargo.toml"; "**/.cargo/audit.toml"])
     ~script:
       (* [|| exit $?] preserves the script's exit code (1 = critical/high,
          2 = warnings only); GitLab otherwise masks any failure as 1, which
