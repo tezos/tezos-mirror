@@ -2115,11 +2115,9 @@ mod test {
     fn test_credit_checkpoint_keeps_call_tracer_depths() {
         use evm_inspectors::{
             call_tracer::{CallTracer, CallTracerConfig},
-            storage::trace_tx_path,
+            storage::call_trace_storage,
             Tracer,
         };
-        use tezos_indexable_storage::IndexableStorage;
-        use tezos_smart_rollup_host::path::RefPath;
 
         // Same shape as `test_revm_call_depth_caps_inner_revm_chain`: the
         // contract CALLs into 0x3333... and returns the CALL result.
@@ -2215,17 +2213,15 @@ mod test {
                 .evm
                 .take_tracer()
                 .expect("tracer should still be attached")
-                .finalize(rk.host_mut(), &outcome.result)
+                .finalize(rk.evm_world_state_mut(), &outcome.result)
                 .expect("tracer finalization should succeed");
 
-            // With no tx hash on the tracer the traces land under the base
-            // trace path.
-            let path =
-                trace_tx_path(&None, &RefPath::assert_from(b"/call_trace")).unwrap();
-            let store = IndexableStorage::new_owned_path(path);
-            let len = store.length(rk.host()).unwrap();
+            // With no tx hash on the tracer the traces land under the
+            // hash-less trace root.
+            let store = call_trace_storage(&None).unwrap();
+            let len = store.length(rk.evm_world_state()).unwrap();
             (0..len)
-                .map(|i| store.get_value(rk.host(), i).unwrap())
+                .map(|i| store.get_value(rk.evm_world_state(), i).unwrap())
                 .collect()
         };
 
@@ -5397,7 +5393,7 @@ mod test {
         use alloy_sol_types::{sol, SolCall};
         use evm_inspectors::{
             call_tracer::{CallTracer, CallTracerConfig},
-            storage::trace_tx_path,
+            storage::call_trace_storage,
             Tracer,
         };
         use revm::{
@@ -5413,8 +5409,7 @@ mod test {
         use tezos_evm_runtime::runtime_keyspaces::{
             MockRuntimeKeyspaces, RuntimeKeyspaces,
         };
-        use tezos_indexable_storage::IndexableStorage;
-        use tezos_smart_rollup_host::path::RefPath;
+        use tezos_smart_rollup_keyspace::KeySpace;
         use tezosx_interfaces::RuntimeId;
         use tezosx_journal::TezosXJournal;
 
@@ -5470,7 +5465,7 @@ mod test {
 
             if let Some(mut tracer) = journal.evm.take_tracer() {
                 tracer
-                    .finalize(rk.host_mut(), &outcome.result)
+                    .finalize(rk.evm_world_state_mut(), &outcome.result)
                     .expect("tracer finalization should succeed");
             }
             outcome
@@ -5515,17 +5510,14 @@ mod test {
         }
 
         // The `CallTracer` flushes its buffered traces, RLP-encoded, into
-        // an `IndexableStorage` keyed on the transaction hash. There is no
+        // a `KeyspaceIndexableStorage` keyed on the transaction hash. There is no
         // Rust decoder for `CallTrace` (the node side decodes the RLP), so
         // we read the raw encodings back and inspect them positionally.
-        fn read_traces(host: &MockKernelHost, tx_hash: B256) -> Vec<Vec<u8>> {
-            let path =
-                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
-                    .unwrap();
-            let storage = IndexableStorage::new_owned_path(path);
-            let length = storage.length(host).unwrap();
+        fn read_traces(evm_world_state: &impl KeySpace, tx_hash: B256) -> Vec<Vec<u8>> {
+            let storage = call_trace_storage(&Some(tx_hash)).unwrap();
+            let length = storage.length(evm_world_state).unwrap();
             (0..length)
-                .map(|index| storage.get_value(host, index).unwrap())
+                .map(|index| storage.get_value(evm_world_state, index).unwrap())
                 .collect()
         }
 
@@ -5578,7 +5570,7 @@ mod test {
                 "static call to the identity precompile should succeed"
             );
 
-            let traces = read_traces(rk.host(), tx_hash);
+            let traces = read_traces(rk.evm_world_state(), tx_hash);
             assert_eq!(
                 traces.len(),
                 2,
@@ -5620,7 +5612,7 @@ mod test {
                 "call to the identity precompile should succeed"
             );
 
-            let traces = read_traces(rk.host(), tx_hash);
+            let traces = read_traces(rk.evm_world_state(), tx_hash);
             assert_eq!(traces.len(), 1, "expected a single top-level frame");
 
             let frame = Rlp::new(&traces[0]);
@@ -5653,7 +5645,7 @@ mod test {
     mod call_tracer_frame_intrinsic_gas {
         use evm_inspectors::{
             call_tracer::{CallTracer, CallTracerConfig},
-            storage::trace_tx_path,
+            storage::call_trace_storage,
         };
         use revm::{
             context::{
@@ -5674,8 +5666,6 @@ mod test {
         use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-        use tezos_indexable_storage::IndexableStorage;
-        use tezos_smart_rollup_host::path::RefPath;
         use tezosx_interfaces::RuntimeId;
         use tezosx_journal::TezosXJournal;
 
@@ -5856,17 +5846,14 @@ mod test {
                 output: Output::Call(Bytes::new()),
             };
             tracer
-                .finalize(rk.host_mut(), &result)
+                .finalize(rk.evm_world_state_mut(), &result)
                 .expect("tracer finalization should succeed");
 
             // Read the flushed traces back and locate the top frame.
-            let path =
-                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
-                    .unwrap();
-            let storage = IndexableStorage::new_owned_path(path);
-            let length = storage.length(rk.host()).unwrap();
+            let storage = call_trace_storage(&Some(tx_hash)).unwrap();
+            let length = storage.length(rk.evm_world_state()).unwrap();
             let traces: Vec<Vec<u8>> = (0..length)
-                .map(|index| storage.get_value(rk.host(), index).unwrap())
+                .map(|index| storage.get_value(rk.evm_world_state(), index).unwrap())
                 .collect();
             assert_eq!(traces.len(), 2, "expected the outer and inner frames");
 
@@ -5985,16 +5972,13 @@ mod test {
                 output: Output::Call(Bytes::new()),
             };
             tracer
-                .finalize(rk.host_mut(), &result)
+                .finalize(rk.evm_world_state_mut(), &result)
                 .expect("tracer finalization should succeed");
 
-            let path =
-                trace_tx_path(&Some(tx_hash), &RefPath::assert_from(b"/call_trace"))
-                    .unwrap();
-            let storage = IndexableStorage::new_owned_path(path);
-            let length = storage.length(rk.host()).unwrap();
+            let storage = call_trace_storage(&Some(tx_hash)).unwrap();
+            let length = storage.length(rk.evm_world_state()).unwrap();
             let traces: Vec<Vec<u8>> = (0..length)
-                .map(|index| storage.get_value(rk.host(), index).unwrap())
+                .map(|index| storage.get_value(rk.evm_world_state(), index).unwrap())
                 .collect();
             assert_eq!(traces.len(), 2, "expected the outer and nested frames");
 

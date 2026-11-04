@@ -23,13 +23,13 @@ use revm::{
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 use super::{
     storage::{
         store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
     },
-    HasHost,
+    HasEvmWorldState,
 };
 
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
@@ -137,11 +137,11 @@ impl StructLog {
         }
     }
 
-    pub fn store<Host>(&self, host: &mut Host, transaction_hash: &Option<B256>)
+    pub fn store<KS>(&self, evm_world_state: &mut KS, transaction_hash: &Option<B256>)
     where
-        Host: StorageV1,
+        KS: KeySpace,
     {
-        store_struct_log(host, self, transaction_hash)
+        store_struct_log(evm_world_state, self, transaction_hash)
             .inspect_err(|err| log!(Debug, "Storing call trace failed with: {err:?}"))
             .ok();
     }
@@ -189,34 +189,34 @@ impl StructLogger {
     }
 
     #[instrument(skip_all)]
-    pub fn store_outcome<Host>(
-        host: &mut Host,
+    pub fn store_outcome<KS>(
+        evm_world_state: &mut KS,
         is_success: bool,
         output: Option<&Bytes>,
         gas_used: u64,
         transaction_hash: Option<B256>,
     ) -> Result<(), InspectorError>
     where
-        Host: StorageV1,
+        KS: KeySpace,
     {
-        store_trace_failed(host, is_success, &transaction_hash)?;
-        store_trace_gas(host, gas_used, &transaction_hash)?;
+        store_trace_failed(evm_world_state, is_success, &transaction_hash)?;
+        store_trace_gas(evm_world_state, gas_used, &transaction_hash)?;
         if let Some(return_value) = output {
-            store_return_value(host, return_value, &transaction_hash)?;
+            store_return_value(evm_world_state, return_value, &transaction_hash)?;
         };
         Ok(())
     }
 
-    pub fn finalize<Host>(
+    pub fn finalize<KS>(
         &mut self,
-        host: &mut Host,
+        evm_world_state: &mut KS,
         result: &ExecutionResult,
     ) -> Result<(), InspectorError>
     where
-        Host: StorageV1,
+        KS: KeySpace,
     {
         Self::store_outcome(
-            host,
+            evm_world_state,
             result.is_success(),
             result.output(),
             result.tx_gas_used(),
@@ -244,7 +244,7 @@ fn to_structured_stack(st: &Stack) -> Vec<B256> {
 
 impl<CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
-    CTX: ContextTr<Db: HasHost<H: StorageV1>>,
+    CTX: ContextTr<Db: HasEvmWorldState>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, _: &mut CTX) {
@@ -326,7 +326,10 @@ where
 
             let struct_log =
                 struct_log.complete(depth, self.gas_inspector.last_gas_cost(), error);
-            struct_log.store(context.db_mut().as_host_mut(), &self.transaction_hash);
+            struct_log.store(
+                context.db_mut().evm_world_state_mut(),
+                &self.transaction_hash,
+            );
         }
     }
 

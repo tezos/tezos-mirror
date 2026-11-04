@@ -75,8 +75,10 @@ impl IntoWithRemainder for EvmDbError {
 pub enum EvmKernelError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
-    #[error("Path error: {0}")]
-    Path(#[from] PathError),
+    #[error(transparent)]
+    Key(#[from] KeyError),
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
     #[error("Base fee per gas does not fit in u64")]
     BaseFeePerGasOverflow,
     #[error("Gas for fees does not fit in u64")]
@@ -195,8 +197,8 @@ impl From<EvmKernelError> for TezosXRuntimeError {
 impl From<InspectorError> for EvmKernelError {
     fn from(value: InspectorError) -> Self {
         match value {
-            InspectorError::Runtime(err) => EvmKernelError::Runtime(err),
-            InspectorError::Path(err) => EvmKernelError::Path(err),
+            InspectorError::KeySpace(err) => EvmKernelError::KeySpace(err),
+            InspectorError::Key(err) => EvmKernelError::Key(err),
             InspectorError::IndexableStorage(err) => {
                 EvmKernelError::IndexableStorage(err)
             }
