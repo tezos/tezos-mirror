@@ -587,6 +587,12 @@ where
             ))?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V70 => {
+            // The `debug_trace*` and `http_trace*` output lives in the
+            // `/evm/world_state` keyspace and only exists on the throwaway
+            // states of replays and simulations: nothing to move.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
