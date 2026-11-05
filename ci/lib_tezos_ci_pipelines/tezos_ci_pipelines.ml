@@ -55,7 +55,7 @@ let before_merging =
 let merge_train =
   Cacio.new_global_pipeline
     "merge_train"
-    (lazy Rules.(If.(on_tezos_namespace && merge_request && merge_train)))
+    (lazy Rules.(If.(on_merge_train_namespace && merge_request && merge_train)))
     ~with_condition:true
     ~allow_manual_jobs:false
     ~auto_cancel:Types.{on_job_failure = true; on_new_commit = false}
