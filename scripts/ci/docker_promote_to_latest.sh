@@ -8,7 +8,10 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-ci_commit_tag=$(git tag --points-at HEAD)
+# A tag pipeline already sets CI_COMMIT_TAG. Fall back to the tag at HEAD only
+# for the suite's latest-release branch flow, where CI_COMMIT_TAG is unset. This
+# avoids a multi-line value when several tags point at HEAD.
+ci_commit_tag="${CI_COMMIT_TAG:-$(git tag --points-at HEAD)}"
 export CI_COMMIT_TAG="${ci_commit_tag}"
 
 target_tag="${1:-latest}"

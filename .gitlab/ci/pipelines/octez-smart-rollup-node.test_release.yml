@@ -202,6 +202,33 @@ octez-smart-rollup-node.docker:merge_manifests:
     DOCKER_VERSION: 28.5.1
   retry: 0
 
+octez-smart-rollup-node.docker:promote_to_latest:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - octez-smart-rollup-node.docker:merge_manifests
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh --image-names
+  - ./scripts/ci/docker_promote_to_latest.sh octez-smart-rollup-node-latest ./scripts/rollup_node/releases/release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:28.5.1-dind@sha256:ea9d20492ca1caaaba78e68453433895d256173c79281756e88b745647fcbcfd
+  variables:
+    CI_DOCKER_HUB: "false"
+    DOCKER_VERSION: 28.5.1
+  retry: 0
+
 octez-smart-rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d74b3dc3
   stage: publish

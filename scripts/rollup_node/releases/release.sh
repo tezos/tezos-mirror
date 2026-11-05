@@ -9,6 +9,10 @@ architectures='x86_64 arm64'
 # optional ".N" (N has no leading zero) and an optional "-rcN" or "-betaN".
 release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-smart-rollup-node-v[0-9]{8}(\.[1-9][0-9]*)?(-(rc|beta)[0-9]+)?$' || :)
 
+# [docker_promote_to_latest.sh] reads this name.
+# shellcheck disable=SC2034
+gitlab_release="${release}"
+
 # Strips the leading 'octez-smart-rollup-node-v'
 # YYYYMMDD, YYYYMMDD.N, YYYYMMDD-rcZ or YYYYMMDD.N-rcZ
 release_no_v=$(echo "${release}" | sed -E 's/^octez-smart-rollup-node-v//g')
