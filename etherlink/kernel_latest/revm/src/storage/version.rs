@@ -54,7 +54,7 @@ pub fn store_evm_version(
     host.store_write(&EVM_VERSION, &evm_version.to_le_bytes(), 0)
 }
 
-pub fn read_evm_version(host: &mut impl StorageV1) -> EVMVersion {
+pub fn read_or_set_evm_version(host: &mut impl StorageV1) -> EVMVersion {
     let evm_version = host.store_read_all(&EVM_VERSION);
     match evm_version {
         Ok(evm_version) => match evm_version.as_slice().try_into().ok() {

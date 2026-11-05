@@ -20,7 +20,7 @@ use crate::{
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
 use primitive_types::U256;
-use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
+use revm_etherlink::storage::{read_ticketer, version::read_or_set_evm_version};
 use tezos_crypto_rs::{
     blake2b,
     hash::{ChainId, ContractKt1Hash},
@@ -326,7 +326,7 @@ pub fn fetch_tezosx_configuration(
     // is derived from it and persisted if absent.
     let evm_chain_id = fetch_evm_chain_id(bk.evm_world_state_mut())?;
     let limits = fetch_evm_limits(bk.evm_world_state_mut());
-    let spec_id = read_evm_version(host).into();
+    let spec_id = read_or_set_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());
     let debug_features = DebugFeatures::read_from_storage(bk.base());
     let michelson_chain_id =
