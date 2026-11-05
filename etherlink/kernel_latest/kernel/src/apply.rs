@@ -10,7 +10,9 @@ use alloy_sol_types::{sol, SolCall};
 use evm_inspectors::TracerInput;
 use primitive_types::{H160, U256};
 use revm::primitives::{Address, Bytes, B256};
-use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
+use revm_etherlink::helpers::legacy::{
+    access_list_to_revm, alloy_to_h160, FaDeposit, FaDepositWithProxy,
+};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -19,11 +21,11 @@ use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
+use revm_etherlink::{GasData, RevmTxRefusal, TxValidation};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
@@ -149,6 +151,8 @@ pub enum Validity {
     InvalidCode,
     InvalidMaxBaseFee,
     InvalidNotEnoughGasForFees,
+    /// REVM would refuse the transaction before executing it.
+    InvalidRevm(RevmTxRefusal),
 }
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
@@ -228,7 +232,70 @@ pub fn is_valid_ethereum_transaction_common(
         return Ok(Validity::InvalidNotEnoughGasForFees);
     };
     let capped_gas_limit = u64::min(gas_limit, limits.maximum_gas_limit);
+
+    // Replay REVM's own validation with the exact inputs the run will
+    // get, so a transaction REVM refuses is dropped here, before the DA
+    // fee is charged and the journal is opened, instead of aborting the
+    // block. The run validates again; the duplication is accepted to
+    // keep the refusal path free of any state to undo.
+    let balance_for_execution = if is_delayed {
+        info.balance
+    } else {
+        // The DA fee is debited before the run (see
+        // `apply_ethereum_transaction_common`). `InvalidPrePay` above
+        // ensures it does not exceed the balance.
+        info.balance
+            .saturating_sub(u256_to_alloy(&transaction_da_fee(
+                transaction,
+                block_constant,
+            )))
+    };
+    let gas_data = revm_gas_data(
+        capped_gas_limit,
+        effective_gas_price,
+        limits.maximum_gas_limit,
+    )?;
+    if let TxValidation::Refused(refusal) = revm_etherlink::validate_user_transaction(
+        block_constant,
+        h160_to_alloy(&caller),
+        transaction.to.as_ref().map(h160_to_alloy),
+        Bytes::from(transaction.data.clone()),
+        &gas_data,
+        u256_to_alloy(&transaction.value),
+        info.nonce,
+        balance_for_execution,
+        access_list_to_revm(transaction.access_list.clone()),
+        transaction
+            .authorization_list
+            .clone()
+            .map(signed_authorization),
+    )
+    .map_err(Error::InvalidRunTransaction)?
+    {
+        log!(
+            Benchmarking,
+            "Transaction status: ERROR_REVM_VALIDATION ({refusal})."
+        );
+        return Ok(Validity::InvalidRevm(refusal));
+    }
+
     Ok(Validity::Valid(caller, capped_gas_limit))
+}
+
+/// DA fee charged to a non-delayed transaction before its execution.
+fn transaction_da_fee(
+    transaction: &EthereumTransactionCommon,
+    block_constants: &BlockConstants,
+) -> U256 {
+    fees::da_fee(
+        block_constants.block_fees.da_fee_per_byte(),
+        &transaction.data,
+        &transaction.access_list,
+        transaction
+            .authorization_list
+            .as_ref()
+            .map_or(0, |al| al.len()),
+    )
 }
 
 /// Result of executing an Ethereum transaction.
@@ -538,6 +605,25 @@ fn log_transaction_type(to: Option<H160>, data: &[u8]) {
     }
 }
 
+fn revm_gas_data(
+    gas_limit: u64,
+    effective_gas_price: U256,
+    maximum_gas_per_transaction: u64,
+) -> Result<GasData, Error> {
+    let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
+        effective_gas_price.low_u128().to_le_bytes()
+    } else {
+        return Err(Error::Overflow(
+            "Given amount does not fit in a u128".to_string(),
+        ));
+    });
+    Ok(GasData::new(
+        gas_limit,
+        effective_gas_price,
+        maximum_gas_per_transaction,
+    ))
+}
+
 #[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
@@ -577,15 +663,8 @@ where
     // once we fully make the switch to REVM.
     let mut bytes = vec![0u8; 32];
     value.to_little_endian(&mut bytes);
-    let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
-        effective_gas_price.low_u128().to_le_bytes()
-    } else {
-        return Err(Error::Overflow(
-            "Given amount does not fit in a u128".to_string(),
-        ));
-    });
     let gas_data =
-        GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
+        revm_gas_data(gas_limit, effective_gas_price, maximum_gas_per_transaction)?;
     revm_etherlink::run_transaction(
         rk,
         registry,
@@ -655,16 +734,10 @@ where
         //           >= gas_for_fees * minimum_base_fee_per_gas
         //           >= da_fee
         // Nothing modifies the caller's balance between the validation check
-        // and this point, so `sub_balance` cannot fail.
-        let cost = fees::da_fee(
-            block_constants.block_fees.da_fee_per_byte(),
-            &transaction.data,
-            &transaction.access_list,
-            transaction
-                .authorization_list
-                .as_ref()
-                .map_or(0, |al| al.len()),
-        );
+        // and this point, so `sub_balance` cannot fail. The validation also
+        // replayed REVM's balance check against the balance left after
+        // this debit.
+        let cost = transaction_da_fee(transaction, block_constants);
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
@@ -716,9 +789,7 @@ where
                 transaction.authorization_list.clone(),
                 false,
                 TransactionOrigin::UserInput {
-                    access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
-                        transaction.access_list.clone(),
-                    ),
+                    access_list: access_list_to_revm(transaction.access_list.clone()),
                 },
             );
 
@@ -1660,11 +1731,11 @@ pub(crate) mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let balance = U256::from(21000) * gas_price;
+        let balance = U256::from(21040) * gas_price;
         // fund account
         set_balance(eth_accounts, &address, balance);
 
-        let gas_limit = 21000; // gas limit is not enough to cover fees
+        let gas_limit = 21040; // gas limit is not enough to cover fees
         let mut transaction = valid_tx(gas_limit);
         transaction.data = vec![1u8];
         transaction = resign(transaction);
