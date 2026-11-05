@@ -95,7 +95,7 @@ let register_merge_request_jobs jobs =
 let master_branch =
   Cacio.new_global_pipeline
     "master_branch"
-    (lazy Rules.(If.(on_tezos_namespace && push && on_branch "master")))
+    (lazy Rules.(If.(on_tezos_namespace && push && on_default_branch)))
     ~interruptible_publish:true
     ~description:
       "Publishes artifacts (Docker images, static binaries) from master on \

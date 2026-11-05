@@ -94,8 +94,6 @@ let schedule_docker_build =
 let schedule_docker_master_snapshot =
   scheduled && var "TZ_SCHEDULE_KIND" == str "schedule_docker_master_snapshot"
 
-let on_master = Predefined_vars.ci_commit_branch == str "master"
-
 let on_default_branch =
   Predefined_vars.ci_commit_branch == var_term Predefined_vars.ci_default_branch
 
