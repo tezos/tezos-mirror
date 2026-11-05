@@ -105,6 +105,10 @@ let on_tezos_namespace = Predefined_vars.ci_project_namespace == str "tezos"
 
 let not_on_tezos_namespace = Predefined_vars.ci_project_namespace != str "tezos"
 
+let merge_request_targets_default_branch =
+  Predefined_vars.ci_merge_request_target_branch_name
+  == var_term Predefined_vars.ci_default_branch
+
 let has_tag_match tag = Predefined_vars.ci_commit_tag =~ tag
 
 let assigned_to_marge_bot =

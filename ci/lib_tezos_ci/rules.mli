@@ -175,6 +175,10 @@ val on_tezos_namespace : If.t
 (** A rule that is true if [CI_PROJECT_NAMESPACE] is not [tezos]. *)
 val not_on_tezos_namespace : If.t
 
+(** A rule that is true if [CI_MERGE_REQUEST_TARGET_BRANCH_NAME] is the
+    project's default branch ([CI_DEFAULT_BRANCH]). *)
+val merge_request_targets_default_branch : If.t
+
 (** A rule that is true if [CI_COMMIT_TAG] matches the given regexp. *)
 val has_tag_match : string -> If.t
 
