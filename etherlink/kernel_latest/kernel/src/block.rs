@@ -745,7 +745,7 @@ mod tests {
     use crate::transaction::TransactionContent::EthereumDelayed;
     use crate::{load_base, load_keyspaces};
     use primitive_types::{H160, U256};
-    use revm::primitives::hardfork::SpecId;
+    use revm::primitives::{eip3860::MAX_INITCODE_SIZE, hardfork::SpecId};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use sha3::{Digest, Keccak256};
@@ -1205,6 +1205,35 @@ mod tests {
         sign_transaction(tx)
     }
 
+    fn dummy_eip7702_creation_tx() -> EthereumTransactionCommon {
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let mut authorization = rlp::RlpStream::new_list(6);
+        authorization
+            .append(&DUMMY_CHAIN_ID)
+            .append(&H160::zero())
+            .append(&0u64)
+            .append(&0u8)
+            .append(&U256::one())
+            .append(&U256::one());
+        let authorization = rlp::decode(&authorization.out()).unwrap();
+        let tx = EthereumTransactionCommon::new(
+            TransactionType::Eip7702,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            100_000u64,
+            // The poison shape: an EIP-7702 transaction without destination.
+            None,
+            U256::zero(),
+            vec![],
+            vec![],
+            Some(vec![authorization]),
+            None,
+        );
+        sign_transaction(tx)
+    }
+
     fn dummy_eth_transaction_zero() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
@@ -1217,6 +1246,13 @@ mod tests {
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
         let nonce = 1;
         make_dummy_transaction(nonce, TransactionType::Legacy)
+    }
+
+    fn dummy_eth_transaction_value_above_balance() -> EthereumTransactionCommon {
+        let mut tx = dummy_eth_gen_transaction(0, TransactionType::Legacy);
+        // The poison shape: a value no balance can cover.
+        tx.value = U256::from(2).pow(U256::from(200));
+        sign_transaction(tx)
     }
 
     fn dummy_eth_transaction_deploy_from_nonce_and_pk(
@@ -2810,6 +2846,277 @@ mod tests {
         assert_eq!(TransactionStatus::Success, status);
     }
 
+    /// A delayed transaction whose gas limit is below its intrinsic gas is
+    /// dropped without a receipt, and the next transactions of the blueprint
+    /// are applied.
+    #[test]
+    fn test_delayed_tx_below_intrinsic_gas_dropped() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let mut below_intrinsic_gas =
+            dummy_eth_gen_transaction(0, TransactionType::Eip1559);
+        below_intrinsic_gas.gas_limit = 0;
+        let below_hash = [1; TRANSACTION_HASH_SIZE];
+        let below_tx = Transaction {
+            tx_hash: below_hash,
+            content: EthereumDelayed(sign_transaction(below_intrinsic_gas)),
+        };
+        // Same nonce as the dropped transaction, which must not consume it.
+        let valid_hash = [2; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_hash,
+            content: Ethereum(make_dummy_transaction(0, TransactionType::Eip1559)),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![below_tx, valid_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert!(
+            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            "The transaction below its intrinsic gas must be dropped without a receipt"
+        );
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+            .expect("The valid transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
+    }
+
+    /// A delayed transaction whose gas limit covers its intrinsic gas but not
+    /// its calldata floor is dropped without a receipt, and the next
+    /// transactions of the blueprint are applied.
+    #[test]
+    fn test_delayed_tx_below_calldata_floor_dropped() {
+        use revm::interpreter::gas::calculate_initial_tx_gas;
+
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let mut below_floor = dummy_eth_gen_transaction(0, TransactionType::Eip1559);
+        // Non-zero calldata costs more in the floor than in the intrinsic gas, so
+        // that initial_gas < floor_gas.
+        below_floor.data = vec![1u8; 1000];
+        let gas = calculate_initial_tx_gas(
+            SpecId::default(),
+            &below_floor.data,
+            false,
+            0,
+            0,
+            0,
+            None,
+        );
+        below_floor.gas_limit = gas.floor_gas - 1;
+        assert!(gas.initial_regular_gas <= below_floor.gas_limit);
+        let below_hash = [1; TRANSACTION_HASH_SIZE];
+        let below_tx = Transaction {
+            tx_hash: below_hash,
+            content: EthereumDelayed(sign_transaction(below_floor)),
+        };
+        // Same nonce as the dropped transaction, which must not consume it.
+        let valid_hash = [2; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_hash,
+            content: Ethereum(make_dummy_transaction(0, TransactionType::Eip1559)),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![below_tx, valid_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert!(
+            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            "The transaction below its calldata floor must be dropped without a receipt"
+        );
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+            .expect("The valid transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
+    }
+
+    /// Before Prague there is no calldata floor: a delayed transaction below
+    /// the floor Prague would set is applied.
+    #[test]
+    fn test_delayed_tx_below_calldata_floor_applied_before_prague() {
+        use revm::interpreter::gas::calculate_initial_tx_gas;
+
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let mut below_floor = dummy_eth_gen_transaction(0, TransactionType::Eip1559);
+        below_floor.data = vec![1u8; 1000];
+        // The floor as Prague defines it, while the block runs Cancun.
+        let gas = calculate_initial_tx_gas(
+            SpecId::PRAGUE,
+            &below_floor.data,
+            false,
+            0,
+            0,
+            0,
+            None,
+        );
+        below_floor.gas_limit = gas.floor_gas - 1;
+        let tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(sign_transaction(below_floor)),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::CANCUN),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+            .expect("The transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
+    }
+
+    /// A delayed transaction whose gas limit covers its intrinsic gas but not
+    /// its execution runs out of gas: it is included with a failed receipt.
+    #[test]
+    fn test_delayed_tx_at_intrinsic_gas_runs_out_of_gas() {
+        use revm::interpreter::gas::calculate_initial_tx_gas;
+
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        // PUSH1 0, PUSH1 0, RETURN: an initcode that needs gas to run.
+        let initcode = vec![0x60, 0x00, 0x60, 0x00, 0xf3];
+        let intrinsic_gas =
+            calculate_initial_tx_gas(SpecId::default(), &initcode, true, 0, 0, 0, None)
+                .initial_regular_gas;
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let creation = EthereumTransactionCommon::new(
+            TransactionType::Eip1559,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            intrinsic_gas,
+            None,
+            U256::zero(),
+            initcode,
+            vec![],
+            None,
+            None,
+        );
+        let tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let creation_tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(sign_transaction(creation)),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![creation_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+            .expect("The transaction should have a receipt");
+        assert_eq!(TransactionStatus::Failure, status);
+    }
+
     #[test]
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
@@ -3120,6 +3427,68 @@ mod tests {
                 safe_roots: vec![],
             },
         }
+    }
+
+    #[test]
+    fn test_delayed_creation_above_initcode_limit_does_not_abort_block() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let mut creation = dummy_eth_gen_transaction(0, TransactionType::Legacy);
+        creation.to = None;
+        creation.value = U256::zero();
+        creation.gas_limit = 10_000_000;
+        creation.data = vec![0; MAX_INITCODE_SIZE + 1];
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let poison_tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(sign_transaction(creation)),
+        };
+        // Same nonce as the poison transaction, which must not consume it.
+        let valid_tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![poison_tx, valid_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert!(
+            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            "The poison delayed transaction must be skipped without a receipt"
+        );
+        // The block is produced: the next transaction is applied.
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
+            .expect("The next transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
     }
 
     #[test]
@@ -3754,6 +4123,63 @@ mod tests {
     }
 
     #[test]
+    fn test_delayed_value_above_balance_does_not_abort_block() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let poison_tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(dummy_eth_transaction_value_above_balance()),
+        };
+        // Same nonce as the poison transaction, which must not consume it.
+        let valid_tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![poison_tx, valid_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert!(
+            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            "The poison delayed transaction must be skipped without a receipt"
+        );
+        // The block is produced: the next transaction is applied.
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
+            .expect("The next transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
+    }
+
+    #[test]
     fn test_transaction_pre_eip155() {
         // This test injects a presigned transaction defined by
         // https://github.com/mds1/multicall#new-deployments, which is a well
@@ -3832,12 +4258,10 @@ mod tests {
     #[test]
     // Regression test for L2-1407 / F-1357: a forced-inclusion (delayed) type-4
     // transaction whose authorization list is present but empty must NOT abort
-    // block production. REVM rejects the shape with "Authorization list cannot
-    // be empty per EIP-7702"; because the transaction is delayed and cannot be
-    // dropped by the sequencer, that error is demoted to an invalid transaction
-    // and skipped, keeping the forced blueprint valid. Before this was
-    // hardened, the error propagated as a block-level failure and the whole
-    // forced blueprint was reverted, halting the chain.
+    // block production. Validation rejects the shape as an invalid
+    // transaction (`Validity::InvalidRevm`), which is skipped without a
+    // receipt and does not consume the nonce, so the forced blueprint stays
+    // valid.
     fn test_delayed_empty_eip7702_authorization_list_does_not_abort_block() {
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
@@ -3857,8 +4281,14 @@ mod tests {
             tx_hash,
             content: EthereumDelayed(dummy_eip7702_empty_authorization_list_tx()),
         };
+        // Same nonce as the poison transaction, which must not consume it.
+        let valid_tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
 
-        store_blueprints(&mut base, vec![blueprint(vec![poison_tx])]);
+        store_blueprints(&mut base, vec![blueprint(vec![poison_tx, valid_tx])]);
 
         let sender = dummy_eth_caller();
         set_balance(
@@ -3888,6 +4318,11 @@ mod tests {
             read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
+
+        // The block is produced: the next transaction is applied.
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
+            .expect("The next transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
     }
 
     // Comment out `ignore` when resigning the dummy transactions
@@ -4154,5 +4589,62 @@ mod tests {
             &key_to_tezos_account(pub_key_hash)?,
             info,
         )?)
+    }
+
+    #[test]
+    fn test_delayed_eip7702_creation_does_not_abort_block() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        crate::storage::store_minimum_base_fee_per_gas(
+            rk.evm_world_state_mut(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let poison_tx = Transaction {
+            tx_hash,
+            content: EthereumDelayed(dummy_eip7702_creation_tx()),
+        };
+        // Same nonce as the poison transaction, which must not consume it.
+        let valid_tx_hash = [1; TRANSACTION_HASH_SIZE];
+        let valid_tx = Transaction {
+            tx_hash: valid_tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
+
+        store_blueprints(&mut base, vec![blueprint(vec![poison_tx, valid_tx])]);
+
+        let sender = dummy_eth_caller();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(1_000_000_000_000_000_000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        assert!(
+            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            "The poison delayed transaction must be skipped without a receipt"
+        );
+        // The block is produced: the next transaction is applied.
+        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
+            .expect("The next transaction should have a receipt");
+        assert_eq!(TransactionStatus::Success, status);
     }
 }
