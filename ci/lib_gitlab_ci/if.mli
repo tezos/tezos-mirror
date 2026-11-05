@@ -46,6 +46,10 @@ val str : string -> term
 (** The [if:]-expression [null]. *)
 val null : term
 
+(** [var_term v] is the term [$v], to compare a variable to another
+    variable, as in [If.(var "foo" == var_term (var "bar"))]. *)
+val var_term : Var.t -> term
+
 (** Equality in [if:]-expressions.
 
     Example: [var "foo" == str "bar"] translates to [$foo == "bar"]. *)
