@@ -19,7 +19,10 @@ end)
    release on the same day adds a ".N" suffix, where N has no leading zero. A
    prerelease adds "-rcN" or "-betaN". *)
 let octez_smart_rollup_node_release_tag_re =
-  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?(-(rc|beta)\\d+)?$/"
+  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?$/"
+
+let octez_smart_rollup_node_prerelease_tag_re =
+  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?-(rc|beta)\\d+$/"
 
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =
@@ -183,32 +186,30 @@ let job_gitlab_release =
     ~description:"Create the gitlab release for the Octez Smart Rollup."
     ~script:["./scripts/rollup_node/releases/create_gitlab_release.sh"]
 
+let release_jobs pipeline_type =
+  [
+    (Cacio.Auto, job_build_static_binaries Arm64);
+    (Cacio.Auto, job_build_static_binaries Amd64);
+    (Cacio.Auto, job_docker_merge_manifests pipeline_type);
+    (Cacio.Auto, job_gitlab_release);
+    (Cacio.Manual, job_deploy_release_page_assets pipeline_type);
+    (* Re-render the whole site once the Rollup node's assets are deployed. *)
+    ( Cacio.Auto,
+      Release_site_ci.job_render
+        pipeline_type
+        ~needs:[(Job, job_deploy_release_page_assets pipeline_type)] );
+  ]
+
 let () =
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `test);
-      (Auto, job_gitlab_release);
-      (Manual, job_deploy_release_page_assets `test);
-      (* Re-render the whole site once the Rollup node's assets are deployed. *)
-      ( Auto,
-        Release_site_ci.job_render
-          `test
-          ~needs:[(Job, job_deploy_release_page_assets `test)] );
-    ] ;
+    (release_jobs `test) ;
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `real);
-      (Auto, job_gitlab_release);
-      (Manual, job_deploy_release_page_assets `real);
-      (* Re-render the whole site once the Rollup node's assets are deployed. *)
-      ( Auto,
-        Release_site_ci.job_render
-          `real
-          ~needs:[(Job, job_deploy_release_page_assets `real)] );
-    ]
+    (release_jobs `real) ;
+  CI.register_dedicated_test_prerelease_pipeline
+    ~tag_rex:octez_smart_rollup_node_prerelease_tag_re
+    (release_jobs `test) ;
+  CI.register_dedicated_prerelease_pipeline
+    ~tag_rex:octez_smart_rollup_node_prerelease_tag_re
+    (release_jobs `real)
