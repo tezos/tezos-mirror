@@ -26,7 +26,7 @@ let unhex s = Hex.to_bytes_exn (`Hex s)
 
 let tz1 = "tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh"
 
-let tz1_alias = "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae"
+let tz1_alias = "0x0ea7865238580e0d8f0d2ca196d3b672dea705ad"
 
 (* Target runtime tag (`01` = Ethereum), then the address as a dynamic
    string. *)
@@ -35,7 +35,7 @@ let input_hex =
 
 (* Variant tag, then a dynamic string. *)
 let success_result_hex =
-  "000000002a307830346539626139383862613837626264376237356535616138313363353263613363333165396165"
+  "000000002a307830656137383635323338353830653064386630643263613139366433623637326465613730356164"
 
 let error_result_hex = "010000000962616420696e707574"
 

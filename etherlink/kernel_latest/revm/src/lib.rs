@@ -5967,7 +5967,7 @@ mod test {
         // A rescue clone deployed at the alias before the guard: it holds
         // the only reference to its code, and the commit tagged it Native.
         let clone_code = hex::decode(
-            "363d3d373d3d3d363d73d532c0971e9c85e2468c8cc6c3949eae285cd5135af43d82803e903d91602b57fd5bf3",
+            "363d3d373d3d3d363d73fee60e905d91905df9cd6bf8153976e9d77d50515af43d82803e903d91602b57fd5bf3",
         )
         .unwrap();
         let clone_code_hash =

@@ -1383,7 +1383,7 @@ mod tests {
         // Vector from tz-alias-recovery's `artifacts/frozen.json`.
         assert_eq!(
             alias("tz1aygVpocoeEMU89vXk92sMHqPYFNZVgvrh").to_lowercase(),
-            "0x04e9ba988ba87bbd7b75e5aa813c52ca3c31e9ae"
+            "0x0ea7865238580e0d8f0d2ca196d3b672dea705ad"
         );
 
         let kt1 = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
@@ -3354,7 +3354,7 @@ mod tests {
 
             // Runtime code of the rescue clone, as left by its deployment.
             let clone_code = Bytes::from_hex(
-                "0x363d3d373d3d3d363d73d532c0971e9c85e2468c8cc6c3949eae285cd5135af43d82803e903d91602b57fd5bf3",
+                "0x363d3d373d3d3d363d73fee60e905d91905df9cd6bf8153976e9d77d50515af43d82803e903d91602b57fd5bf3",
             )
             .unwrap();
             deploy_at(rk.eth_accounts_mut(), &alias, clone_code);

@@ -76,7 +76,7 @@ pub const RESCUE_GUARD_CONTRACT: PredeployedContract = PredeployedContract {
 /// [`RESCUE_SAFE_FACTORY`] with [`RESCUE_SALT`], of a minimal clone of the
 /// account type's implementation carrying the account's key hash. Every
 /// value below is part of every such alias: they are taken verbatim from
-/// `artifacts/frozen.json` of trilitech/tz-alias-recovery (commit b410859)
+/// `artifacts/frozen.json` of trilitech/tz-alias-recovery (commit b42336e)
 /// and must never change once released.
 ///
 /// Safe singleton factory, at the same address on every chain Safe supports.
@@ -88,13 +88,13 @@ pub const RESCUE_SALT: B256 =
     b256!("9b8bb449a3d23b110d8c46424ba9b40748ac28bc7b99b7422a272950e17bb1d8");
 
 /// `TezosAccountTz1` implementation (ed25519).
-pub const RESCUE_IMPL_TZ1: Address = address!("d532c0971e9c85e2468c8cc6c3949eae285cd513");
+pub const RESCUE_IMPL_TZ1: Address = address!("fee60e905d91905df9cd6bf8153976e9d77d5051");
 
 /// `TezosAccountTz2` implementation (secp256k1).
-pub const RESCUE_IMPL_TZ2: Address = address!("b47274809a09e0e0d565f1b50feba2a1cddc8199");
+pub const RESCUE_IMPL_TZ2: Address = address!("47c81e55f51344d80a8e85c2add86257b51ea3d2");
 
 /// `TezosAccountTz3` implementation (P-256).
-pub const RESCUE_IMPL_TZ3: Address = address!("924f65272e0b3531084b1539b96ed0522541f7d7");
+pub const RESCUE_IMPL_TZ3: Address = address!("894b62c61b208184b80fd72803811ba35d818112");
 
 pub const SYSTEM_SOL_ADDR: Address = Address::ZERO;
 
