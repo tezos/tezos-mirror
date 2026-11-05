@@ -860,7 +860,17 @@ pub mod interpret_cost {
         mul_cost(i1.byte_size(), i2.byte_size())
     }
 
-    // corresponds to cost_N_IEdiv_int in the Tezos protocol
+    // Bytes EDIV allocates for its result: the quotient is at most as large
+    // as the dividend, and the remainder at most as large as the divisor. The
+    // remainder can reach the divisor's size even for a tiny dividend: with a
+    // negative dividend it is `|divisor| - r`, so `-1 / n` allocates a copy of
+    // `n`.
+    fn ediv_alloc(size_1: Checked<u64>, size_2: Checked<u64>) -> Checked<u64> {
+        size_1 + size_2
+    }
+
+    // corresponds to cost_N_IEdiv_int in the Tezos protocol, floored by the
+    // allocation gas
     pub fn ediv_int(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -872,16 +882,18 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 3)
+        let time = ((w1 * 3)
             + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
             + (size_1 >> 2)
             + (size_1 >> 3)
             + (size_1 >> 7)
             + 70)
-            .as_gas_cost()
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(ediv_alloc(size_1, size_2))?))
     }
 
-    // corresponds to cost_N_IEdiv_nat in the Tezos protocol
+    // corresponds to cost_N_IEdiv_nat in the Tezos protocol, floored by the
+    // allocation gas
     pub fn ediv_nat(
         i1: &impl BigIntByteSize,
         i2: &impl BigIntByteSize,
@@ -893,7 +905,7 @@ pub mod interpret_cost {
         } else {
             Checked::from(0u64)
         };
-        ((w1 * 3)
+        let time = ((w1 * 3)
             + (((w1 >> 6) + (w1 >> 8) + (w1 >> 10)) * size_2)
             + (w1 >> 3)
             + (size_1 >> 3)
@@ -901,7 +913,8 @@ pub mod interpret_cost {
             + (size_1 >> 5)
             + (size_1 >> 7)
             + 70)
-            .as_gas_cost()
+            .as_gas_cost()?;
+        Ok(time.max(alloc_cost(ediv_alloc(size_1, size_2))?))
     }
 
     pub fn compare(

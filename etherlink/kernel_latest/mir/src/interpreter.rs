@@ -2173,9 +2173,13 @@ fn interpret_one<'a>(
                 if x2.sign() == Sign::NoSign {
                     stack.push(V::Option(None));
                 } else {
+                    // Take the divisor's magnitude by value so a negative
+                    // dividend's remainder `|x2| - r` reuses its buffer
+                    // instead of allocating a fresh copy, as `IntNat` does.
+                    let (sign2, magnitude2) = x2.into_parts();
                     let (quotient, remainder) =
-                        BigUint::div_rem(x1.magnitude(), x2.magnitude());
-                    match (x1.sign(), x2.sign()) {
+                        BigUint::div_rem(x1.magnitude(), &magnitude2);
+                    match (x1.sign(), sign2) {
                         (Sign::Minus, Sign::Minus) => {
                             stack.push(V::new_option(Some(
                                 if remainder > BigUint::zero() {
@@ -2184,7 +2188,7 @@ fn interpret_one<'a>(
                                             BigInt::from_biguint(Sign::Plus, quotient)
                                                 + 1,
                                         ),
-                                        V::Nat(x2.magnitude() - remainder),
+                                        V::Nat(magnitude2 - remainder),
                                     )
                                 } else {
                                     V::new_pair(
@@ -2205,7 +2209,7 @@ fn interpret_one<'a>(
                                             BigInt::from_biguint(Sign::Minus, quotient)
                                                 - 1,
                                         ),
-                                        V::Nat(x2.magnitude() - remainder),
+                                        V::Nat(magnitude2 - remainder),
                                     )
                                 } else {
                                     V::new_pair(
@@ -5758,6 +5762,53 @@ mod interpreter_tests {
                 allocated < SIZE as u64,
                 "SLICE (strings) allocated its {SIZE}-byte result ({allocated} \
                  bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+    }
+
+    /// ENG-153: `-1 EDIV n` has remainder `n - 1`, a buffer as large as the
+    /// divisor, built from a 1-byte dividend. Run on a shared divisor, as in
+    /// `DUP; PUSH int -1; EDIV`, the remainder is a fresh copy of `n` that
+    /// stays live next to it, so a loop grows memory by `n` per iteration. The
+    /// gas charged must cover what the run allocates, at `alloc_cost`'s rate
+    /// of 5/32 milligas per byte. Before the floor, EDIV charged about 70
+    /// milligas whatever the divisor's size.
+    #[test]
+    fn ediv_charges_for_the_remainder_it_allocates() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Per-run allocations that do not scale with SIZE (stack cells, the
+        // pair and option boxes, the quotient), left uncharged by the bound.
+        const OVERHEAD_BYTES: u64 = 4096;
+        let divisor = BigUint::from_bytes_le(&[0xffu8; SIZE]);
+        for (overload, divisor) in [
+            (overloads::EDiv::IntNat, V::Nat(divisor.clone())),
+            (overloads::EDiv::IntInt, V::Int(BigInt::from(divisor))),
+        ] {
+            let mut stack = stk![divisor];
+            let mut ctx = Ctx::default();
+            // Built before measuring, so only the interpretation is counted.
+            let prog = [
+                Dup(None),
+                Push(RcTypedValue::new(V::int(-1))),
+                EDiv(overload),
+            ];
+            let gas_before = ctx.gas().milligas().unwrap();
+            let bytes_before = thread_allocated_bytes();
+            interpret(&prog, &mut ctx, &mut stack).unwrap();
+            let bytes = thread_allocated_bytes() - bytes_before;
+            let gas = u64::from(gas_before - ctx.gas().milligas().unwrap());
+            assert!(
+                bytes >= SIZE as u64,
+                "EDIV ({overload:?}) allocated {bytes} bytes, less than the \
+                 {SIZE}-byte remainder: the test no longer exercises the copy.",
+            );
+            let charged_bytes = bytes - OVERHEAD_BYTES;
+            let min_gas = (charged_bytes >> 3) + (charged_bytes >> 5);
+            assert!(
+                gas >= min_gas,
+                "DUP; PUSH int -1; EDIV ({overload:?}) allocated {bytes} bytes \
+                 but charged {gas} milligas, below the {min_gas} milligas \
+                 alloc_cost requires; floor EDIV's cost by alloc_cost.",
             );
         }
     }
