@@ -523,7 +523,7 @@ where
         Input::SequencerUpgrade(sequencer_upgrade) => {
             store_sequencer_upgrade(bk, sequencer_upgrade, common)?
         }
-        Input::RemoveSequencer => remove_sequencer(host)?,
+        Input::RemoveSequencer => remove_sequencer(bk.evm_world_state_mut()),
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
             clear_events(base)?;

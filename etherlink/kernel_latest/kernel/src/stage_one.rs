@@ -1187,7 +1187,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         let bk = load_keyspaces(&mut host).unwrap();
-        let conf = fetch_configuration(&host, &bk);
+        let conf = fetch_configuration(&bk);
         assert!(
             matches!(conf.mode, ConfigurationMode::Proxy),
             "fetch_configuration should return Proxy when no sequencer key is stored"

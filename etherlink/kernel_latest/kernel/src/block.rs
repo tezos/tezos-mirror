@@ -668,11 +668,8 @@ where
             // `promote_block` moves to `/evm/world_state`. Its error is
             // returned after the promotion: a rejected block fails again on
             // each retry.
-            let key_change = upgrade::possible_sequencer_key_change(
-                rk.host_mut(),
-                &mut base,
-                timestamp,
-            );
+            let key_change =
+                upgrade::possible_sequencer_key_change(&mut rk, &mut base, timestamp);
             promote_block(
                 rk.host_mut(),
                 &mut base,

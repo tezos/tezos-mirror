@@ -367,7 +367,7 @@ where
         input_data.block_number,
     )?;
 
-    let mut configuration = fetch_configuration(host, &bk);
+    let mut configuration = fetch_configuration(&bk);
     let mut base = bk.into_base();
     let mut safe_host = SafeStorage {
         host,
@@ -396,7 +396,7 @@ where
     // to `/evm/world_state`. Its error is returned after the promotion: a
     // rejected block fails again on each retry.
     let key_change =
-        upgrade::possible_sequencer_key_change(rk.host_mut(), &mut base, timestamp);
+        upgrade::possible_sequencer_key_change(&mut rk, &mut base, timestamp);
     promote_block(
         rk.host_mut(),
         &mut base,

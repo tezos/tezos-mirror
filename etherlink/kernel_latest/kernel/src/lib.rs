@@ -317,7 +317,7 @@ where
             // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(bk.base_mut())?;
-            let configuration = fetch_configuration(host, &bk);
+            let configuration = fetch_configuration(&bk);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
@@ -346,7 +346,7 @@ where
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
     let chain_configuration = fetch_tezosx_configuration(&mut bk)?;
-    let mut configuration = fetch_configuration(host, &bk);
+    let mut configuration = fetch_configuration(&bk);
     let sequencer_pool_address = read_sequencer_pool_address(bk.evm_world_state());
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it

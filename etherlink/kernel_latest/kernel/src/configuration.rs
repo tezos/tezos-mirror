@@ -13,7 +13,7 @@ use crate::{
         read_admin, read_delayed_transaction_bridge, read_evm_chain_id,
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
-        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
+        read_or_set_maximum_gas_per_transaction, read_sequencer_governance,
         store_evm_chain_id, store_michelson_runtime_chain_id, ADMIN_KEY,
         DELAYED_BRIDGE_KEY, KERNEL_GOVERNANCE_KEY, KERNEL_SECURITY_GOVERNANCE_KEY,
         SEQUENCER_GOVERNANCE_KEY,
@@ -23,7 +23,7 @@ use crate::{
 use primitive_types::U256;
 use revm_etherlink::storage::version::read_or_set_evm_version;
 use revm_etherlink::storage::world_state_handler::{
-    read_ticketer, NATIVE_TOKEN_TICKETER_KEY,
+    read_sequencer, read_ticketer, NATIVE_TOKEN_TICKETER_KEY, SEQUENCER_KEY_KEY,
 };
 use tezos_crypto_rs::{
     blake2b,
@@ -33,7 +33,6 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
@@ -178,15 +177,15 @@ fn read_and_log_b58<T, E: std::fmt::Display>(
     key: &Key,
 ) -> Option<T> {
     match result {
-        Ok(Some(contract)) => Some(contract),
+        Ok(Some(value)) => Some(value),
         Ok(None) => {
-            log!(Info, "No contract provided at key {}", key);
+            log!(Info, "No value provided at key {}", key);
             None
         }
         Err(err) => {
             log!(
                 Error,
-                "Failed to read contract from storage at key {}: {}",
+                "Failed to read the value from storage at key {}: {}",
                 key,
                 err
             );
@@ -361,11 +360,11 @@ pub fn fetch_common_config(bk: &BlueprintKeyspaces<impl KeySpace>) -> CommonConf
     }
 }
 
-pub fn fetch_configuration(
-    host: &impl StorageV1,
-    bk: &BlueprintKeyspaces<impl KeySpace>,
-) -> Configuration {
-    let sequencer = sequencer(host).unwrap_or_default();
+pub fn fetch_configuration(bk: &BlueprintKeyspaces<impl KeySpace>) -> Configuration {
+    // A sequencer key that is missing or does not decode leaves the kernel in
+    // proxy mode.
+    let sequencer =
+        read_and_log_b58(read_sequencer(bk.evm_world_state()), &SEQUENCER_KEY_KEY);
     let common = fetch_common_config(bk);
     let dal: Option<DalConfiguration> =
         fetch_dal_configuration(bk.base(), common.evm_node_flag);

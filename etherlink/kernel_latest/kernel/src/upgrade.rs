@@ -25,7 +25,7 @@ use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
+use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -35,7 +35,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, KeySpaceLoader};
 use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
@@ -231,7 +231,7 @@ where
 {
     log!(Info, "sequencer upgrade initialisation.");
 
-    store_sequencer(host, sequencer)?;
+    store_sequencer(evm_world_state, sequencer)?;
     // Governance changes bump the counter at apply-time. Unlike the precompile
     // path -- whose signed calldata could otherwise be replayed and so must be
     // invalidated as soon as a change is *stored* -- a governance upgrade carries
@@ -281,30 +281,30 @@ fn delete_sequencer_key_change(host: &mut impl StorageV1) -> anyhow::Result<()> 
 }
 
 fn sequencer_key_change<Host>(
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     key_change: EVMBasedSequencerKeyChange,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(Info, "EVM based sequencer key change initialisation.");
 
-    store_sequencer(host, key_change.sequencer_key())?;
-    delete_sequencer_key_change(host)?;
+    store_sequencer(rk.evm_world_state_mut(), key_change.sequencer_key())?;
+    delete_sequencer_key_change(rk.host_mut())?;
 
     log!(Info, "Sequencer key has been updated.");
     Ok(())
 }
 
-fn apply_active_sequencer_key_change(
-    host: &mut impl StorageV1,
+fn apply_active_sequencer_key_change<Host: StorageV1 + KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()> {
-    let upgrade = read_sequencer_key_change(host)?;
+    let upgrade = read_sequencer_key_change(rk.host())?;
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {
-            sequencer_key_change(host, upgrade)?;
+            sequencer_key_change(rk, upgrade)?;
             blueprint_storage::clear_all_blueprints(base)?;
         }
     }
@@ -315,16 +315,17 @@ fn apply_active_sequencer_key_change(
 /// activation timestamp.
 ///
 /// Does nothing when no change is pending or when it is not active yet.
-/// The pending change is read from and deleted through `host`, the new key is
-/// written through `host`, and the blueprints of `base` are cleared.
+/// The pending change is read from and deleted through the host of `rk`, the
+/// new key is written in its `/evm/world_state` keyspace, and the blueprints
+/// of `base` are cleared.
 /// Errors when the pending change does not decode or when a write fails, and
 /// logs the error.
-pub fn possible_sequencer_key_change(
-    host: &mut impl StorageV1,
+pub fn possible_sequencer_key_change<Host: StorageV1 + KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()> {
-    apply_active_sequencer_key_change(host, base, evm_timestamp).inspect_err(|err| {
+    apply_active_sequencer_key_change(rk, base, evm_timestamp).inspect_err(|err| {
         log!(Error, "Failed to apply the sequencer key change: {err:?}")
     })
 }
@@ -340,7 +341,6 @@ mod tests {
     use revm_etherlink::storage::sequencer_key_change::store_sequencer_key_change;
     use tezos_ethereum::keyspace::KeySpaceExtU256;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 
     fn test_public_key() -> PublicKey {
@@ -466,7 +466,7 @@ mod tests {
         );
 
         // Before activation nothing applies.
-        possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(50i64))
+        possible_sequencer_key_change(&mut rk, &mut base, Timestamp::from(50i64))
             .unwrap();
         assert_eq!(
             read_sequencer_change_counter(rk.evm_world_state()),
@@ -474,7 +474,7 @@ mod tests {
         );
 
         // At/after activation the change applies but the counter is unchanged.
-        possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(100i64))
+        possible_sequencer_key_change(&mut rk, &mut base, Timestamp::from(100i64))
             .unwrap();
         assert_eq!(
             read_sequencer_change_counter(rk.evm_world_state()),

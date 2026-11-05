@@ -10,6 +10,7 @@ use revm::{
 };
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_crypto_rs::public_key::PublicKey;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
@@ -41,13 +42,22 @@ pub fn read_ticketer(
 pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
 
+/// Reads the sequencer public key from the `/evm/world_state` keyspace.
+///
+/// Returns `None` when the key is absent. Invalid UTF-8 and invalid base58check
+/// values are reported as keyspace read errors.
+pub fn read_sequencer(
+    evm_world_state: &impl KeySpace,
+) -> Result<Option<PublicKey>, KeySpaceError<StorageReadErrorKind>> {
+    evm_world_state.get_b58_public_key(&SEQUENCER_KEY_KEY)
+}
+
 /// Key of the waiting governance sequencer upgrade, inside the
 /// `/evm/world_state` keyspace.
 pub const GOVERNANCE_SEQUENCER_UPGRADE_KEY: Key = Key::from_static(b"/sequencer_upgrade");
 
-/// Path where the sequencer key is stored.
-pub const SEQUENCER_KEY_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/sequencer");
+/// Key of the sequencer public key in the `/evm/world_state` keyspace.
+pub const SEQUENCER_KEY_KEY: Key = Key::from_static(b"/sequencer");
 
 /// Monotonic counter incremented on every sequencer key change (whether it
 /// went through the [`change_sequencer_key`] precompile or a governance
