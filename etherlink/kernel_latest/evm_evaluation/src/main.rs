@@ -365,6 +365,38 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "RevertInCreateInInitCreate2Paris.json"
         | "create2collisionStorageParis.json"
         | "InitCollisionParis.json"
+
+        // TEMPORARY (L2-1859): ecrecover (0x01) and ecPairing (0x08) are
+        // repriced above their upstream EVM gas (ecrecover 3000 -> 9000,
+        // ecPairing per-point 34000 -> 68000) — a deliberate, documented
+        // divergence. Every state test that pins those precompiles' gas or
+        // gas boundary therefore diverges on gas / post-state. Skipped until
+        // the divergence is adopted upstream or the reprice is reverted.
+        // (Only the gas-boundary cases break; the ample-gas ones still pass.)
+        | "CALLCODEEcrecover0_completeReturnValue.json"
+        | "CALLCODEEcrecover0_gas3000.json"
+        | "CallEcrecover0_completeReturnValue.json"
+        | "CallEcrecover0_gas3000.json"
+        | "CallEcrecover_Overflow.json"
+        | "ecrecoverShortBuff.json"
+        | "ecrecoverWeirdV.json"
+        | "static_CallEcrecover0_gas3000.json"
+        | "RevertPrecompiledTouchExactOOG_Paris.json"
+        | "pairingTest.json"
+        | "ecpairing_one_point_fail.json"
+        | "ecpairing_one_point_with_g1_zero.json"
+        | "ecpairing_one_point_with_g2_zero.json"
+        | "ecpairing_three_point_fail_1.json"
+        | "ecpairing_three_point_match_1.json"
+        | "ecpairing_two_point_fail_1.json"
+        | "ecpairing_two_point_fail_2.json"
+        | "ecpairing_two_point_match_1.json"
+        | "ecpairing_two_point_match_2.json"
+        | "ecpairing_two_point_match_3.json"
+        | "ecpairing_two_point_match_4.json"
+        | "ecpairing_two_point_match_5.json"
+        | "ecpairing_two_point_oog.json"
+        | "ecpairing_two_points_with_one_g2_zero.json"
     )
 }
 

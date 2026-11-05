@@ -55,6 +55,10 @@ impl Default for EtherlinkPrecompiles {
 
 impl EtherlinkPrecompiles {
     pub fn new(enable_debug_precompiles: bool) -> Self {
+        // Route revm's crypto primitives (currently ecrecover) through
+        // `EtherlinkCrypto`. Idempotent. It changes how the result is
+        // computed, never the result or the gas. See `precompiles::crypto`.
+        let _ = crate::precompiles::crypto::ensure_etherlink_crypto_installed();
         let builtins = EthPrecompiles::new(EVMVersion::default().into());
         let warm_addresses =
             Self::compute_warm_addresses(&builtins, enable_debug_precompiles);
@@ -184,6 +188,13 @@ where
         let changed = <EthPrecompiles as PrecompileProvider<CTX>>::set_spec(
             &mut self.builtins,
             spec,
+        );
+        // L2-1859: override 0x01/0x08 with the repriced gas by swapping in a
+        // Precompiles map that differs from upstream only in those two entries.
+        // All of `EthPrecompiles::run`'s behaviour is inherited. `set_spec` above
+        // already resolved the SpecId into `builtins.spec`.
+        self.builtins.precompiles = crate::precompiles::reprice::repriced_precompiles(
+            revm::precompile::PrecompileSpecId::from_spec_id(self.builtins.spec),
         );
         if changed {
             self.warm_addresses = Self::compute_warm_addresses(

@@ -87,6 +87,12 @@ fn skip_test(test_name: &str) -> bool {
         // max priority fee per gas, but we do not need to make this check
         // as our effective gas price is always the current base fee.
         | "fork_Prague-state_test-priority_greater_than_max_fee_per_gas"
+        // TEMPORARY (L2-1859): ecrecover (0x01) is repriced above its upstream
+        // EVM gas (3000 -> 9000), a deliberate divergence. This EIP-7702 test
+        // delegates an EOA to the ecrecover precompile and pins its gas, so it
+        // diverges on gas / post-state. Skip until the divergence is adopted
+        // upstream or the reprice is reverted.
+        | "fork_Prague-precompile_0x0000000000000000000000000000000000000001-state_test"
     )
 }
 
