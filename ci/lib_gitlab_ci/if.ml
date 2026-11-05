@@ -7,7 +7,7 @@
 
 open Base
 
-type term = Str of string | Null
+type term = Str of string | Null | Var of Var.t
 
 type t =
   | And of t * t
@@ -39,6 +39,7 @@ let rec encode expr =
   in
   let encode_term = function
     | Null -> "null"
+    | Var v -> Var.encode v
     | Str s ->
         (* Strings can be enclosed by single or double quotes, see
            https://docs.gitlab.com/ee/ci/jobs/job_control.html#compare-a-variable-to-a-string.
@@ -63,6 +64,8 @@ let rec encode expr =
   | Neq (a, b) -> sf "%s != %s" (Var.encode a) (encode_term b)
   | Match (a, b) -> sf "%s =~ %s" (Var.encode a) b
   | Unmatch (a, b) -> sf "%s !~ %s" (Var.encode a) b
+
+let var_term v = Var v
 
 let eq a b = Eq (a, b)
 
