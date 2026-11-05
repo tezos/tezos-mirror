@@ -162,8 +162,9 @@ val schedule_docker_master_snapshot : If.t
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 
-(** A rule that is true if [CI_COMMIT_BRANCH] is [master]. *)
-val on_master : If.t
+(** A rule that is true if [CI_COMMIT_BRANCH] is the project's default
+    branch ([CI_DEFAULT_BRANCH]). *)
+val on_default_branch : If.t
 
 (** A rule that is true if [CI_PROJECT_NAMESPACE] is [tezos]. *)
 val on_tezos_namespace : If.t
