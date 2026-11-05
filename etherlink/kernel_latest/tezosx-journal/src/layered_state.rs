@@ -188,7 +188,7 @@ impl LayeredState {
     pub fn sequencer_change_counter<DB: DatabasePrecompileStateChanges>(
         &self,
         db: &DB,
-    ) -> Result<U256, LayeredStateError> {
+    ) -> U256 {
         match self.etherlink_data.sequencer_change_counter {
             // `pending == base + 1`, and `base == durable` within a
             // transaction, so this recovers the durable base without an
@@ -200,14 +200,14 @@ impl LayeredState {
                 {
                     debug_assert_eq!(
                         base,
-                        db.sequencer_change_counter()?,
+                        db.sequencer_change_counter(),
                         "layered sequencer change counter must equal the durable \
                          base within a transaction",
                     );
                 }
-                Ok(base)
+                base
             }
-            None => Ok(db.sequencer_change_counter()?),
+            None => db.sequencer_change_counter(),
         }
     }
 
@@ -364,8 +364,8 @@ mod tests {
             false
         }
 
-        fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {
-            Ok(U256::ZERO)
+        fn sequencer_change_counter(&self) -> U256 {
+            U256::ZERO
         }
     }
 
@@ -435,7 +435,7 @@ mod tests {
 
         // With no pending change the read falls back to durable storage.
         assert_eq!(
-            layered_state.sequencer_change_counter(&dummy_db).unwrap(),
+            layered_state.sequencer_change_counter(&dummy_db),
             U256::ZERO
         );
 
@@ -446,7 +446,7 @@ mod tests {
             .store_sequencer_key_change(dummy_key_change(), U256::ZERO)
             .unwrap();
         assert_eq!(
-            layered_state.sequencer_change_counter(&dummy_db).unwrap(),
+            layered_state.sequencer_change_counter(&dummy_db),
             U256::ZERO
         );
     }

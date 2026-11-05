@@ -55,7 +55,7 @@ pub trait DatabasePrecompileStateChanges {
     fn governance_sequencer_upgrade_exists(&self) -> bool;
     /// Counter the next sequencer key change must be signed against, used to
     /// make a captured change calldata non-replayable once the key rotates again.
-    fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError>;
+    fn sequencer_change_counter(&self) -> U256;
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
