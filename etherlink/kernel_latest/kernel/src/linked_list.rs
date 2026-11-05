@@ -779,8 +779,10 @@ mod tests {
         // The element data is readable, as raw rlp, at the historical path.
         let data_path =
             RefPath::assert_from(b"/base/delayed-inbox/abababababababab/data");
-        let raw: u8 = tezos_storage::read_rlp(&host, &data_path)
+        let bytes = host
+            .store_read_all(&data_path)
             .expect("data should be readable at the historical path");
+        let raw: u8 = rlp::decode(&bytes).expect("data should be valid rlp");
         assert_eq!(raw, elt);
 
         // The pointer and metadata nodes exist at their historical paths.

@@ -921,7 +921,6 @@ mod test {
         primitives::{hex::FromHex, Address, Bytes, U256},
         state::Bytecode,
     };
-    use rlp::Decodable;
     use tezos_crypto_rs::{
         hash::{HashTrait, SecretKeyEd25519},
         public_key::PublicKey,
@@ -929,7 +928,6 @@ mod test {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
-    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
@@ -968,10 +966,12 @@ mod test {
             initializer::init_precompile_bytecodes,
         },
         storage::{
-            sequencer_key_change::{read_sequencer_change_counter, SequencerKeyChange},
+            sequencer_key_change::{
+                read_sequencer_change_counter, read_sequencer_key_change,
+            },
             world_state_handler::{
                 AccountInfo, AccountOrigin, StorageAccount, NATIVE_TOKEN_TICKETER_KEY,
-                SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_KEY,
+                SEQUENCER_KEY_CHANGE_KEY, SEQUENCER_KEY_KEY,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
@@ -2509,11 +2509,9 @@ mod test {
                 .unwrap()
                 == &ChangeSequencerKeyEvent::SIGNATURE_HASH
         );
-        let value = rk
-            .host()
-            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
+        let stored_change = read_sequencer_key_change(rk.evm_world_state())
+            .unwrap()
             .unwrap();
-        let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
         assert_eq!(stored_change.sequencer_key(), &public_key);
 
         // Storing the pending change bumps the change counter immediately,
@@ -2543,11 +2541,9 @@ mod test {
             read_sequencer_change_counter(rk.evm_world_state()),
             U256::from(2)
         );
-        let value = rk
-            .host()
-            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
+        let stored_change = read_sequencer_key_change(rk.evm_world_state())
+            .unwrap()
             .unwrap();
-        let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
         assert_eq!(stored_change.sequencer_key(), &public_key);
     }
 
@@ -2627,9 +2623,9 @@ mod test {
         // is stored.
         assert!(result.logs().is_empty());
         assert!(rk
-            .host()
-            .store_read_all(&SEQUENCER_KEY_CHANGE_PATH)
-            .is_err());
+            .evm_world_state()
+            .get(&SEQUENCER_KEY_CHANGE_KEY)
+            .is_none());
     }
 
     #[test]

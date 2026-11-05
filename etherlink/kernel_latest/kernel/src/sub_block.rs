@@ -395,8 +395,11 @@ where
     // The key change writes into the block mirror, which `promote_block` moves
     // to `/evm/world_state`. Its error is returned after the promotion: a
     // rejected block fails again on each retry.
-    let key_change =
-        upgrade::possible_sequencer_key_change(&mut rk, &mut base, timestamp);
+    let key_change = upgrade::possible_sequencer_key_change(
+        rk.evm_world_state_mut(),
+        &mut base,
+        timestamp,
+    );
     promote_block(
         rk.host_mut(),
         &mut base,
