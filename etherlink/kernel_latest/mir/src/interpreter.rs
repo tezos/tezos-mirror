@@ -2319,16 +2319,18 @@ fn interpret_one<'a>(
                     return Err(InterpretError::Overflow);
                 }
 
-                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
+                let o2 = o2.to_u64().ok_or(InterpretError::Overflow)?;
+                let byte_shifts = o2 / 8;
+                let bit_shifts = o2 % 8;
                 ctx.gas()
-                    .consume(interpret_cost::lsl_bytes(o1, &o2_usize)?)?;
-
-                let byte_shifts = o2_usize / 8;
-                let bit_shifts = o2_usize % 8;
+                    .consume(interpret_cost::lsl_bytes(o1, &o2, &byte_shifts)?)?;
 
                 let left_pad = bit_shifts > 0;
                 let mut result: Vec<u8> =
-                    vec![0; o1.len() + byte_shifts + if left_pad { 1 } else { 0 }];
+                    vec![
+                        0;
+                        o1.len() + byte_shifts as usize + if left_pad { 1 } else { 0 }
+                    ];
                 let mut carry = 0u8;
 
                 for (i, &byte) in o1.iter().enumerate().rev() {
@@ -2837,12 +2839,15 @@ fn interpret_one<'a>(
                             ))
                         }
                     };
-                    total_len += s.len()
+                    total_len += s.len() as u64
                 }
                 ctx.gas()
                     .consume(interpret_cost::concat_string_list(total_len)?)?;
 
-                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let total_len: usize = total_len
+                    .ok_or(InterpretError::Overflow)?
+                    .try_into()
+                    .map_err(|_| InterpretError::Overflow)?;
                 let mut result = String::new();
                 result
                     .try_reserve_exact(total_len)
@@ -2879,12 +2884,15 @@ fn interpret_one<'a>(
                             ))
                         }
                     };
-                    total_len += bs.len()
+                    total_len += bs.len() as u64
                 }
                 ctx.gas()
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
-                let total_len = total_len.ok_or(InterpretError::Overflow)?;
+                let total_len: usize = total_len
+                    .ok_or(InterpretError::Overflow)?
+                    .try_into()
+                    .map_err(|_| InterpretError::Overflow)?;
                 let mut result = Vec::new();
                 result
                     .try_reserve_exact(total_len)
@@ -5233,6 +5241,50 @@ mod interpreter_tests {
                 "{name}: amplification {amp_a:.1} (64 KiB) / {amp_b:.1} (256 KiB) \
                  bytes-per-milligas exceeds the {MAX_BYTES_PER_MILLIGAS} bound; per-gas \
                  clone work is unbounded (L2-1794)",
+            );
+        }
+    }
+
+    // Checks `UPDATE` on a shared map charges at least `alloc_cost`'s per-byte
+    // rate, below which an operation's gas budget could fund more than the 4 GiB
+    // WASM heap. Part of the path it copies is allocated outside the tree, so the
+    // charge can fall behind without the data structure changing.
+    #[test]
+    fn map_update_gas_covers_the_path_it_copies() {
+        fn marginal_bytes(entries: i64) -> u64 {
+            let run = |k: usize| {
+                let map = V::Map(rc_map((1..=entries).map(|i| (V::int(i), V::int(i)))));
+                let prog: Vec<Instruction> = (0..k)
+                    .flat_map(|_| {
+                        [
+                            Dup(None),
+                            Push(RcTypedValue::new(V::new_option(Some(V::int(7))))),
+                            Push(RcTypedValue::new(V::int(0))),
+                            Update(overloads::Update::Map),
+                        ]
+                    })
+                    .collect();
+                let mut stack = stk![map];
+                let mut ctx = Ctx::default();
+                let before = thread_allocated_bytes();
+                interpret(&prog, &mut ctx, &mut stack).unwrap();
+                thread_allocated_bytes() - before
+            };
+            (run(100) - run(10)) / 90
+        }
+
+        for exp in [10u32, 16] {
+            let entries = 1i64 << exp;
+            let bytes = marginal_bytes(entries);
+            let gas =
+                interpret_cost::map_update(&V::int(0), entries as usize).unwrap() as u64;
+            // 0.15625 milligas per byte, as 5/32, to stay in integers
+            assert!(
+                bytes * 5 <= gas * 32,
+                "map_update charges {gas} milligas for {bytes} bytes copied at \
+                 2^{exp} entries, above the {} bytes per milligas the \
+                 allocation floor allows",
+                bytes as f64 / gas as f64
             );
         }
     }
