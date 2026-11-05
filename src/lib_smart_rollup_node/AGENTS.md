@@ -377,7 +377,7 @@ Integration tests: `tezt/tests/sc_rollup.ml`
 
 ## Changelog
 
-User-facing changes go in `CHANGES.rst` at repo root, under the "Smart Rollup node" section.
+User-facing changes go in `docs/releases/smart_rollup_node_changelog.rst`, under the "Unreleased" section, not in `CHANGES.rst`.
 
 ## User documentation
 

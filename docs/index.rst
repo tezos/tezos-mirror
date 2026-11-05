@@ -217,6 +217,8 @@ You may also access this whole documentation (for the stable release) as a singl
 
    releases/releases
    releases/packaging_revisions
+   releases/smart_rollup_node
+   releases/smart_rollup_node_changelog
    releases/version-25
    releases/history
 

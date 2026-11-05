@@ -15,8 +15,14 @@ module CI = Cacio.Make (struct
   let paths = ["src/**/*"]
 end)
 
+(* We release from a dated tag "octez-smart-rollup-node-vYYYYMMDD". A second
+   release on the same day adds a ".N" suffix, where N has no leading zero. A
+   prerelease adds "-rcN" or "-betaN". *)
 let octez_smart_rollup_node_release_tag_re =
-  "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
+  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?$/"
+
+let octez_smart_rollup_node_prerelease_tag_re =
+  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?-(rc|beta)\\d+$/"
 
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =
@@ -123,6 +129,41 @@ let job_docker_merge_manifests =
         "./scripts/ci/docker_merge_manifests.sh";
       ]
 
+(* Move the [octez-smart-rollup-node-latest] Docker tag to this release. This
+   runs on a release pipeline only. A prerelease or a test must not move the
+   tag. *)
+let job_docker_promote_to_latest =
+  Cacio.parameterize @@ fun test ->
+  CI.job
+    "docker:promote_to_latest"
+    ~__POS__
+    ~needs:[(Job, job_docker_merge_manifests test)]
+    ~stage:Publish
+    ~image:Images.Base_images.alpine_docker_ci
+    ~services:[{name = Images.Base_images.dind_service}]
+    ~variables:
+      [
+        ("DOCKER_VERSION", Images.Base_images.docker_version);
+        ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
+      ]
+      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
+       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
+       authenticate and thus need access. *)
+    ?environment:
+      (match test with
+      | `real ->
+          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
+      | `test -> None)
+    ~retry:no_retry
+    ~description:"Promote the docker images to octez-smart-rollup-node-latest."
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh --image-names";
+        "./scripts/ci/docker_promote_to_latest.sh \
+         octez-smart-rollup-node-latest \
+         ./scripts/rollup_node/releases/release.sh";
+      ]
+
 let release_page_variables = function
   | `test ->
       (* The S3_BUCKET and DISTRIBUTION_ID depend on the release type (tests
@@ -180,32 +221,34 @@ let job_gitlab_release =
     ~description:"Create the gitlab release for the Octez Smart Rollup."
     ~script:["./scripts/rollup_node/releases/create_gitlab_release.sh"]
 
+(* A prerelease does not move the [octez-smart-rollup-node-latest] tag. *)
+let release_jobs ~promote pipeline_type =
+  [
+    (Cacio.Auto, job_build_static_binaries Arm64);
+    (Cacio.Auto, job_build_static_binaries Amd64);
+    (Cacio.Auto, job_docker_merge_manifests pipeline_type);
+    (Cacio.Auto, job_gitlab_release);
+    (Cacio.Manual, job_deploy_release_page_assets pipeline_type);
+    (* Re-render the whole site once the Rollup node's assets are deployed. *)
+    ( Cacio.Auto,
+      Release_site_ci.job_render
+        pipeline_type
+        ~needs:[(Job, job_deploy_release_page_assets pipeline_type)] );
+  ]
+  @
+  if promote then [(Cacio.Auto, job_docker_promote_to_latest pipeline_type)]
+  else []
+
 let () =
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `test);
-      (Auto, job_gitlab_release);
-      (Manual, job_deploy_release_page_assets `test);
-      (* Re-render the whole site once the Rollup node's assets are deployed. *)
-      ( Auto,
-        Release_site_ci.job_render
-          `test
-          ~needs:[(Job, job_deploy_release_page_assets `test)] );
-    ] ;
+    (release_jobs ~promote:true `test) ;
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
-    [
-      (Auto, job_build_static_binaries Arm64);
-      (Auto, job_build_static_binaries Amd64);
-      (Auto, job_docker_merge_manifests `real);
-      (Auto, job_gitlab_release);
-      (Manual, job_deploy_release_page_assets `real);
-      (* Re-render the whole site once the Rollup node's assets are deployed. *)
-      ( Auto,
-        Release_site_ci.job_render
-          `real
-          ~needs:[(Job, job_deploy_release_page_assets `real)] );
-    ]
+    (release_jobs ~promote:true `real) ;
+  CI.register_dedicated_test_prerelease_pipeline
+    ~tag_rex:octez_smart_rollup_node_prerelease_tag_re
+    (release_jobs ~promote:false `test) ;
+  CI.register_dedicated_prerelease_pipeline
+    ~tag_rex:octez_smart_rollup_node_prerelease_tag_re
+    (release_jobs ~promote:false `real)

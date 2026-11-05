@@ -616,6 +616,9 @@ For user-facing changes, add an entry to `CHANGES.rst`:
 - Breaking changes
 - Deprecations
 
+The Smart Rollup node has its own changelog:
+`docs/releases/smart_rollup_node_changelog.rst`.
+
 ### Required Approvals
 
 - 2 approvals from Octez Merge Team members

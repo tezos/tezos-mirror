@@ -420,7 +420,7 @@ let site_catalog =
     {
       component_name = "octez-smart-rollup-node";
       subpath = "octez-smart-rollup-node";
-      asset_types = [Binaries];
+      asset_types = [Changelog; Binaries];
       pages =
         [
           {

@@ -1,7 +1,43 @@
-:orphan:
-
-Changelog Smart Rollup Node
+Smart Rollup node changelog
 '''''''''''''''''''''''''''
+
+This page lists the changes in each Octez Smart Rollup node release, the most
+recent first. A version with a date, such as 20260724, is a standalone release.
+A version such as 24.0 is a release of the Octez suite. Each change is under the
+first release that contains it.
+
+See :doc:`smart_rollup_node` for the release procedure.
+
+Unreleased
+==========
+
+- The vendored Wasmer runtime used for fast execution was upgraded from 3.3.0
+  to 7.2.1. This fixes a misaligned ``ucontext_t`` dereference that made the
+  previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set
+  of WebAssembly proposals accepted by fast execution is unchanged.
+
+- Fixed the WASM PVM fast execution engine (Wasmer) answering a different
+  error code than the interpreter when a kernel reads an empty, or a
+  negative, number of bytes from an address outside its memory. A kernel
+  making such a call computed a different state under the fast engine than
+  under the interpreter. (MR :gl:`!22837`)
+
+- The WASM PVM fast execution engine (Wasmer) now implements the new durable
+  storage (NDS) host functions of PVM version V6 and above, with the same
+  results as the interpreter. A kernel importing them no longer panics the
+  fast engine, so it runs at full speed without ``--slow-vm-fallback``.
+  (MR :gl:`!22822`)
+
+- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
+  set by the new ``--rpc-max-request-body`` option (in bytes, 32 MiB by
+  default).
+
+Version 25.3 (2026-10-20)
+=========================
+
+- **Security**: For protocol Ushuaia (025), refutation moves are now injected
+  together with an additional ``smart_rollup_add_messages`` operation, required
+  by the new validation of refutation proofs. (MR :gl:`!23032`)
 
 Version 20260724 (2026-07-24)
 =============================
@@ -275,7 +311,7 @@ Version 20250911 (2025-09-11)
 - Improved Opentelemetry traces for Etherlink block evaluation (MR :gl:`!18592`)
 
 - The rollup node now exports its logs to Opentelemetry when enabled in the
-  configuration file or with `--profiling true`. (MR :gl:`!18910`)
+  configuration file or with ``--profiling true``. (MR :gl:`!18910`)
 
 - The rollup node now ensures pending telemetry data is exported on exit (MR
   :gl:`!19157`)
@@ -369,7 +405,7 @@ Version 22.0 (2025-04-07)
     inferior to it.
 
   + ``drop_no_order``: a boolean that if true remove all messages that
-    has no order specified. ``false` by default. If no ``order_below``
+    has no order specified. ``false`` by default. If no ``order_below``
     is specified it completely clear the queue.
 
   (MR :gl:`!15929`)
@@ -499,7 +535,7 @@ Version 21.0 (2024-11-14)
 - The rollup node can be configured to execute outbox message automatically with
   filters. (MRs :gl:`!14498`, :gl:`!14499`)
 
-Version 20.2 (2024-07-16)
+Version 20.1 (2024-06-18)
 =========================
 
 - New command ``repair commitments`` which allows the rollup node to recompute
@@ -538,7 +574,7 @@ Version 20.0 (2024-05-28)
   to gas variations. (MR :gl:`!11761`)
 
 - **Breaking change** Removed RPC ``/helpers/proofs/outbox?message_index=<index>&outbox_level=<level>&serialized_outbox_message=<bytes>``.
-  Use ``helpers/proofs/outbox/<level>/messages?index=<index>`` to avoid generating the ```serialized_outbox_message`` yourself.
+  Use ``helpers/proofs/outbox/<level>/messages?index=<index>`` to avoid generating the ``serialized_outbox_message`` yourself.
   (MR :gl:`!12140`)
 
 - Compact snapshots with context reconstruction. (MR :gl:`!11651`)

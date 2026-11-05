@@ -76,6 +76,11 @@ However, each component has its own minor release cycle, meaning that components
 can be released independently with minor releases, following their own
 incrementation schedule.
 
+.. seealso::
+
+   The Smart Rollup node has its own release, described in
+   :doc:`smart_rollup_node`.
+
 Distribution
 ------------
 
