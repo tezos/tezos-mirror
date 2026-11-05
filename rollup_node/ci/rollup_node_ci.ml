@@ -15,8 +15,11 @@ module CI = Cacio.Make (struct
   let paths = ["src/**/*"]
 end)
 
+(* We release from a dated tag "octez-smart-rollup-node-vYYYYMMDD". A second
+   release on the same day adds a ".N" suffix, where N has no leading zero. A
+   prerelease adds "-rcN" or "-betaN". *)
 let octez_smart_rollup_node_release_tag_re =
-  "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
+  "/^octez-smart-rollup-node-v\\d{8}(\\.[1-9]\\d*)?(-(rc|beta)\\d+)?$/"
 
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =

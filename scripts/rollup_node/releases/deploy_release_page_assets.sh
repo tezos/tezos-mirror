@@ -30,7 +30,7 @@ if [ -z "${CI_COMMIT_TAG:-}" ]; then
 fi
 
 # Initialize rollup-node release variables needed later to determine relevant version information:
-# - major and minor version numbers (resp. [release_major_version], [release_minor_version])
+# - the date and the optional same-day counter ([release_date], [release_counter])
 # - and, optionally, release candidate or beta version number ([release_rc_version], [release_beta_version]).
 # shellcheck source=./scripts/rollup_node/releases/release.sh
 . ./scripts/rollup_node/releases/release.sh
@@ -48,11 +48,12 @@ S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}/octez-smart-rollup-node"
 echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
 
+# Pass --counter only when the tag carries one.
 echo "Adding version ${release} to release page..."
 $VM \
   add \
-  --major "${release_major_version}" \
-  --minor "${release_minor_version}" \
+  --date "${release_date}" \
+  ${release_counter:+--counter "${release_counter}"} \
   ${release_rc_version:+--rc "${release_rc_version}"} \
   ${release_beta_version:+--beta "${release_beta_version}"}
 
@@ -60,8 +61,8 @@ if [ -z "${release_rc_version}" ] && [ -z "${release_beta_version}" ]; then
   echo "Setting version as latest..."
   $VM \
     set-latest \
-    --major "${release_major_version}" \
-    --minor "${release_minor_version}"
+    --date "${release_date}" \
+    ${release_counter:+--counter "${release_counter}"}
 fi
 
 # Upload binaries to S3 bucket
