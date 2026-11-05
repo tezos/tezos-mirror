@@ -101,7 +101,7 @@ workflow:
     auto_cancel:
       on_job_failure: all
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
-      == "master"
+      == $CI_DEFAULT_BRANCH
     variables:
       PIPELINE_TYPE: master_branch
     when: always
@@ -377,7 +377,7 @@ include:
 - local: .gitlab/ci/pipelines/master_branch.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
-      == "master"
+      == $CI_DEFAULT_BRANCH
     when: always
 - local: .gitlab/ci/pipelines/octez_latest_release.yml
   rules:
