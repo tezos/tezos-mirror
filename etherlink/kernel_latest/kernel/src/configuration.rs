@@ -318,7 +318,6 @@ fn fetch_michelson_runtime_chain_id(
 /// keyspace of `bk`. When it is absent, the default is written there, and a
 /// failed write is ignored.
 pub fn fetch_tezosx_configuration(
-    host: &mut impl StorageV1,
     bk: &mut BlueprintKeyspaces<impl KeySpace>,
 ) -> Result<TezosXChainConfig, KeySpaceError> {
     // Read both runtime chain ids from storage. The EVM chain id falls back to
@@ -326,7 +325,7 @@ pub fn fetch_tezosx_configuration(
     // is derived from it and persisted if absent.
     let evm_chain_id = fetch_evm_chain_id(bk.evm_world_state_mut())?;
     let limits = fetch_evm_limits(bk.evm_world_state_mut());
-    let spec_id = read_or_set_evm_version(host).into();
+    let spec_id = read_or_set_evm_version(bk.evm_world_state_mut())?.into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());
     let debug_features = DebugFeatures::read_from_storage(bk.base());
     let michelson_chain_id =

@@ -4,13 +4,12 @@
 // SPDX-License-Identifier: MIT
 
 use revm::primitives::hardfork::SpecId;
-use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, storage::StorageV1};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
-// Path to the EVM version.
-const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/world_state/evm_version");
+const EVM_VERSION_KEY: Key = Key::from_static(b"/evm_version");
 
 // Note: Glamsterdam: there is no Amsterdam variant yet.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]
 pub enum EVMVersion {
     Shanghai = 0,
@@ -47,23 +46,106 @@ impl From<EVMVersion> for SpecId {
     }
 }
 
+/// Writes `evm_version` in `evm_world_state`.
+///
+/// Fails when the key space rejects the write.
 pub fn store_evm_version(
-    host: &mut impl StorageV1,
-    evm_version: &EVMVersion,
-) -> Result<(), RuntimeError> {
-    host.store_write(&EVM_VERSION, &evm_version.to_le_bytes(), 0)
+    evm_world_state: &mut impl KeySpace,
+    evm_version: EVMVersion,
+) -> Result<(), KeySpaceError> {
+    evm_world_state.set(&EVM_VERSION_KEY, evm_version.to_le_bytes())
 }
 
-pub fn read_or_set_evm_version(host: &mut impl StorageV1) -> EVMVersion {
-    let evm_version = host.store_read_all(&EVM_VERSION);
-    match evm_version {
-        Ok(evm_version) => match evm_version.as_slice().try_into().ok() {
-            Some(evm_version) => EVMVersion::from_le_bytes(evm_version),
-            None => EVMVersion::default(),
-        },
-        Err(_) => {
-            let _ = store_evm_version(host, &EVMVersion::default());
-            EVMVersion::default()
+/// Returns the EVM version stored in `evm_world_state`.
+///
+/// When the key is absent, writes [`EVMVersion::default`] there and returns
+/// it. When the stored bytes are not a known version, returns the default and
+/// leaves them in place. Fails only when the write of the default fails.
+pub fn read_or_set_evm_version(
+    evm_world_state: &mut impl KeySpace,
+) -> Result<EVMVersion, KeySpaceError> {
+    match evm_world_state.get(&EVM_VERSION_KEY) {
+        Some(bytes) => Ok(bytes
+            .try_into()
+            .map(EVMVersion::from_le_bytes)
+            .unwrap_or_default()),
+        None => {
+            let evm_version = EVMVersion::default();
+            store_evm_version(evm_world_state, evm_version)?;
+            Ok(evm_version)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+
+    const LEGACY_EVM_VERSION: RefPath =
+        RefPath::assert_from(b"/evm/world_state/evm_version");
+
+    #[test]
+    fn evm_version_uses_the_world_state_keyspace() {
+        let mut host = MockKernelHost::default();
+        let mut keyspaces = RuntimeKeyspaces::init(&mut host).unwrap();
+        let version = EVMVersion::Cancun;
+
+        store_evm_version(keyspaces.evm_world_state_mut(), version).unwrap();
+
+        assert_eq!(
+            keyspaces
+                .host()
+                .store_read_all(&LEGACY_EVM_VERSION)
+                .unwrap(),
+            version.to_le_bytes()
+        );
+        assert_eq!(
+            read_or_set_evm_version(keyspaces.evm_world_state_mut()).unwrap(),
+            version
+        );
+    }
+
+    #[test]
+    fn missing_evm_version_is_defaulted_in_the_world_state_keyspace() {
+        let mut host = MockKernelHost::default();
+        let mut keyspaces = RuntimeKeyspaces::init(&mut host).unwrap();
+        let default = EVMVersion::default();
+
+        assert_eq!(
+            read_or_set_evm_version(keyspaces.evm_world_state_mut()).unwrap(),
+            default
+        );
+        assert_eq!(
+            keyspaces
+                .host()
+                .store_read_all(&LEGACY_EVM_VERSION)
+                .unwrap(),
+            default.to_le_bytes()
+        );
+    }
+
+    #[test]
+    fn malformed_evm_version_defaults_without_overwriting_storage() {
+        let mut host = MockKernelHost::default();
+        let mut keyspaces = RuntimeKeyspaces::init(&mut host).unwrap();
+        keyspaces
+            .host_mut()
+            .store_write_all(&LEGACY_EVM_VERSION, &[1, 2, 3])
+            .unwrap();
+
+        assert_eq!(
+            read_or_set_evm_version(keyspaces.evm_world_state_mut()).unwrap(),
+            EVMVersion::default()
+        );
+        assert_eq!(
+            keyspaces
+                .host()
+                .store_read_all(&LEGACY_EVM_VERSION)
+                .unwrap(),
+            [1, 2, 3]
+        );
     }
 }

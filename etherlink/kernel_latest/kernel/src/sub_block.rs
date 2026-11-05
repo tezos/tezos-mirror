@@ -217,7 +217,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &mut bk)?;
+    let config = fetch_tezosx_configuration(&mut bk)?;
     let block_constants = block_constants(
         bk.evm_world_state_mut(),
         &config,
@@ -359,7 +359,7 @@ where
     ];
     __trace_kernel_add_attrs!(__attrs);
 
-    let config = fetch_tezosx_configuration(host, &mut bk)?;
+    let config = fetch_tezosx_configuration(&mut bk)?;
     let block_constants = block_constants(
         bk.evm_world_state_mut(),
         &config,

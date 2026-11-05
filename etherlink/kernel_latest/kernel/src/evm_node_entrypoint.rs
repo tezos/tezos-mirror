@@ -285,7 +285,7 @@ where
         transaction_bytes.len()
     );
 
-    let chain_config = match fetch_tezosx_configuration(&mut kernel_host, &mut bk) {
+    let chain_config = match fetch_tezosx_configuration(&mut bk) {
         Ok(chain_config) => chain_config,
         Err(err) => {
             log!(Error, "Failed to read the chain configuration: {:?}", err);
@@ -806,7 +806,7 @@ where
     let input = RunCodeInput::nom_read_exact(payload)
         .map_err(|e| RunCodeError::Execution(format!("cannot decode the input: {e}")))?;
 
-    let chain_config = fetch_tezosx_configuration(host, bk).map_err(|err| {
+    let chain_config = fetch_tezosx_configuration(bk).map_err(|err| {
         RunCodeError::Host(format!("cannot read the chain configuration: {err}"))
     })?;
 
@@ -1107,7 +1107,7 @@ where
     };
     let result = match bk.base().get(&TEZOSX_COMPUTE_ALIAS_INPUT_KEY) {
         None => ComputeAliasResult::Error("compute_alias input not found".to_string()),
-        Some(payload) => match fetch_tezosx_configuration(&mut kernel_host, &mut bk) {
+        Some(payload) => match fetch_tezosx_configuration(&mut bk) {
             Ok(chain_config) => {
                 compute_alias_from_input(&chain_config.init_registry(), &payload)
             }
