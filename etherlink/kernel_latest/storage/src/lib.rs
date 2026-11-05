@@ -26,7 +26,6 @@ use tezos_nom::error::DecodeError;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
 /// The size of one 256 bit word. Size in bytes.
 pub const WORD_SIZE: usize = 32usize;
@@ -201,14 +200,6 @@ pub fn read_b58_kt1(host: &impl StorageV1, path: &impl Path) -> Option<ContractK
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
 }
 
-/// Returns the base58 contract address at the given `key`, over the same
-/// bytes as [`read_b58_kt1`] reads at the path the key resolves to.
-pub fn get_b58_kt1(ks: &impl KeySpace, key: &Key) -> Option<ContractKt1Hash> {
-    let buffer: [u8; KT1_B58_SIZE] = ks.get_prefix_exact(key)?;
-    let kt1_b58 = std::str::from_utf8(&buffer).ok()?;
-    ContractKt1Hash::from_b58check(kt1_b58).ok()
-}
-
 /// Store the `value` into the storage at the given `path`
 ///
 /// The stored value must implement BinWriter
@@ -311,11 +302,13 @@ pub fn read_optional_nom_value_bounded_with_len<T: for<'a> NomReader<'a>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keyspace::KeySpaceExtB58;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
-    use tezos_smart_rollup_keyspace::KeySpaceLoader;
+    use tezos_smart_rollup_keyspace::{ErrorKind, Key, KeySpaceLoader, ReadKind};
+    use tezosx_types::StorageReadErrorKind;
 
     const PATH: RefPath = RefPath::assert_from(b"/some/value");
 
@@ -459,20 +452,39 @@ mod tests {
         );
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
         assert_eq!(
-            get_b58_kt1(&ks, &key(b"/contract")),
+            ks.get_b58_kt1(&key(b"/contract")).unwrap(),
             ContractKt1Hash::from_b58check(KT1).ok()
         );
     }
 
     #[test]
-    fn b58_kt1_missing_or_garbage_is_none() {
+    fn b58_kt1_missing_is_not_found() {
         let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/ks/garbage");
-        host.store_write_all(&path, b"not a contract").unwrap();
+        let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        assert_eq!(ks.get_b58_kt1(&key(b"/missing")).unwrap(), None);
+    }
+
+    #[test]
+    fn b58_kt1_garbage_is_invalid_base58() {
+        let mut host = MockKernelHost::default();
+        // 36 bytes, the size of a KT1 address: one is not base58, the other
+        // is not UTF-8.
+        host.store_write_all(
+            &RefPath::assert_from(b"/ks/not_base58"),
+            b"KT1-this-is-not-a-base58-contract-00",
+        )
+        .unwrap();
+        host.store_write_all(&RefPath::assert_from(b"/ks/not_utf8"), &[0xffu8; 36])
+            .unwrap();
 
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-        assert_eq!(get_b58_kt1(&ks, &key(b"/garbage")), None);
-        assert_eq!(get_b58_kt1(&ks, &key(b"/missing")), None);
+        for garbage in [b"/not_base58".as_slice(), b"/not_utf8"] {
+            let err = ks.get_b58_kt1(&key(garbage)).unwrap_err();
+            assert!(matches!(
+                err.kind(),
+                ErrorKind::Read(ReadKind::Ext(StorageReadErrorKind::InvalidBase58(_)))
+            ));
+        }
     }
 
     // An integer written through the keyspace must land at the absolute path

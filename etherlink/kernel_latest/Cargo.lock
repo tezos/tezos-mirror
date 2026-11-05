@@ -3832,6 +3832,7 @@ dependencies = [
  "primitive-types",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-keyspace",
+ "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezosx-constants",
  "thiserror 1.0.69",

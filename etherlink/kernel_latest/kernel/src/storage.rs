@@ -32,7 +32,9 @@ use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtNum};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
-use tezos_storage::{get_b58_kt1, read_b58_kt1, store_read_slice};
+use tezos_storage::keyspace::KeySpaceExtB58;
+use tezos_storage::{read_b58_kt1, store_read_slice};
+use tezosx_types::StorageReadErrorKind;
 
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
@@ -109,10 +111,10 @@ const KERNEL_VERSION_KEY: Key = Key::from_static(b"/kernel_version");
 pub(crate) const ADMIN_KEY: Key = Key::from_static(b"/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_governance");
-const KERNEL_GOVERNANCE_KEY: Key = Key::from_static(b"/kernel_governance");
-const KERNEL_SECURITY_GOVERNANCE_KEY: Key =
+pub(crate) const KERNEL_GOVERNANCE_KEY: Key = Key::from_static(b"/kernel_governance");
+pub(crate) const KERNEL_SECURITY_GOVERNANCE_KEY: Key =
     Key::from_static(b"/kernel_security_governance");
-const DELAYED_BRIDGE_KEY: Key = Key::from_static(b"/delayed_bridge");
+pub(crate) const DELAYED_BRIDGE_KEY: Key = Key::from_static(b"/delayed_bridge");
 
 const MAXIMUM_ALLOWED_TICKS_KEY: Key = Key::from_static(b"/maximum_allowed_ticks");
 
@@ -808,20 +810,26 @@ pub fn read_last_info_per_level_timestamp(
     Ok(timestamp.into())
 }
 
-pub fn read_admin(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    get_b58_kt1(base, &ADMIN_KEY)
+pub fn read_admin(
+    base: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    base.get_b58_kt1(&ADMIN_KEY)
 }
 
 pub fn read_sequencer_governance(host: &impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
 }
 
-pub fn read_kernel_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    get_b58_kt1(base, &KERNEL_GOVERNANCE_KEY)
+pub fn read_kernel_governance(
+    base: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    base.get_b58_kt1(&KERNEL_GOVERNANCE_KEY)
 }
 
-pub fn read_kernel_security_governance(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    get_b58_kt1(base, &KERNEL_SECURITY_GOVERNANCE_KEY)
+pub fn read_kernel_security_governance(
+    base: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    base.get_b58_kt1(&KERNEL_SECURITY_GOVERNANCE_KEY)
 }
 
 pub fn read_maximum_allowed_ticks(base: &impl KeySpace) -> Option<u64> {
@@ -1156,8 +1164,10 @@ pub fn max_blueprint_lookahead_in_seconds(base: &impl KeySpace) -> anyhow::Resul
 ///
 /// This smart contract is used to submit transactions to the rollup
 /// when in sequencer mode
-pub fn read_delayed_transaction_bridge(base: &impl KeySpace) -> Option<ContractKt1Hash> {
-    get_b58_kt1(base, &DELAYED_BRIDGE_KEY)
+pub fn read_delayed_transaction_bridge(
+    base: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    base.get_b58_kt1(&DELAYED_BRIDGE_KEY)
 }
 
 #[cfg(test)]
@@ -1281,13 +1291,19 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(super::read_admin(&base), Some(kt1.clone()));
-        assert_eq!(super::read_kernel_governance(&base), Some(kt1.clone()));
+        assert_eq!(super::read_admin(&base).unwrap(), Some(kt1.clone()));
         assert_eq!(
-            super::read_kernel_security_governance(&base),
+            super::read_kernel_governance(&base).unwrap(),
             Some(kt1.clone())
         );
-        assert_eq!(super::read_delayed_transaction_bridge(&base), Some(kt1));
+        assert_eq!(
+            super::read_kernel_security_governance(&base).unwrap(),
+            Some(kt1.clone())
+        );
+        assert_eq!(
+            super::read_delayed_transaction_bridge(&base).unwrap(),
+            Some(kt1)
+        );
         assert_eq!(super::read_maximum_allowed_ticks(&base), Some(42));
         assert_eq!(
             super::max_blueprint_lookahead_in_seconds(&base).unwrap(),
@@ -1315,10 +1331,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let base = load_base(&mut host).unwrap();
 
-        assert_eq!(super::read_admin(&base), None);
-        assert_eq!(super::read_kernel_governance(&base), None);
-        assert_eq!(super::read_kernel_security_governance(&base), None);
-        assert_eq!(super::read_delayed_transaction_bridge(&base), None);
+        assert_eq!(super::read_delayed_transaction_bridge(&base).unwrap(), None);
         assert_eq!(super::read_maximum_allowed_ticks(&base), None);
         assert!(super::max_blueprint_lookahead_in_seconds(&base).is_err());
         assert!(!super::is_enable_fa_bridge(&base));

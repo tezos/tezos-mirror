@@ -10,7 +10,7 @@ use thiserror::Error;
 pub const B58CHECK_ENCODED_MAX_SIZE: usize = 150;
 
 /// Possible errors for base58checked
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum FromBase58CheckError {
     /// Base58 error.
     #[error("invalid base58")]

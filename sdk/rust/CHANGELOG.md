@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `OriginationContent` defining operation content for origination.
 - Implement trait `BinWriter` for `&T` whenever `T` implements `BinWriter`.
 - `HashType::b58check_to_sized_hash` method has been added to `HashType`. Conversion chains like `.as_ref().try_into().unwrap()` can be replaced by `.into()`.
+- Derive `PartialEq` and `Eq` for `FromBase58CheckError`.
 
 ### Changed
 
