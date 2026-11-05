@@ -48,12 +48,18 @@ S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}/octez-smart-rollup-node"
 echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
 
+# Link to the changelog section of this release, with the anchor that Sphinx makes from its heading.
+heading=$(awk -v h="Version ${release_no_v} " 'index($0, h) == 1 { print; exit }' docs/releases/smart_rollup_node_changelog.rst)
+anchor=$(printf '%s' "${heading}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-//; s/-$//')
+ANNOUNCEMENT="https://octez.tezos.com/docs/releases/smart_rollup_node_changelog.html${anchor:+#${anchor}}"
+
 # Pass --counter only when the tag carries one.
 echo "Adding version ${release} to release page..."
 $VM \
   add \
   --date "${release_date}" \
   ${release_counter:+--counter "${release_counter}"} \
+  --announcement "${ANNOUNCEMENT}" \
   ${release_rc_version:+--rc "${release_rc_version}"} \
   ${release_beta_version:+--beta "${release_beta_version}"}
 
