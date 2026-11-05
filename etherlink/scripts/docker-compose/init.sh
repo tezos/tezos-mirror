@@ -65,30 +65,30 @@ create_kernel_config() {
 
   # chain ID config
   evm_chain_id=$(create_chain_id "${EVM_CHAIN_ID}")
-  add_kernel_config_set "$file" /evm/chain_id "${evm_chain_id}" "Chain ID: ${EVM_CHAIN_ID}"
+  add_kernel_config_set "$file" /evm/world_state/chain_id "${evm_chain_id}" "Chain ID: ${EVM_CHAIN_ID}"
 
   # ticketer config
   add_kernel_config_contract "$file" /evm/world_state/ticketer "${BRIDGE_ALIAS}" "BRIDGE"
 
   # evm admin config
-  add_kernel_config_contract "$file" /evm/admin "${EVM_ADMIN_ALIAS}_contract" "ADMIN"
+  add_kernel_config_contract "$file" /base/admin "${EVM_ADMIN_ALIAS}_contract" "ADMIN"
 
   # sequencer admin config
-  add_kernel_config_contract "$file" /evm/sequencer_governance "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "SEQUENCER_GOVERNANCE"
+  add_kernel_config_contract "$file" /evm/world_state/sequencer_governance "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "SEQUENCER_GOVERNANCE"
 
   # delayed bridge config
-  add_kernel_config_contract "$file" /evm/delayed_bridge "${DELAYED_BRIDGE_ALIAS}" "DELAYED_BRIDGE"
+  add_kernel_config_contract "$file" /base/delayed_bridge "${DELAYED_BRIDGE_ALIAS}" "DELAYED_BRIDGE"
 
   # evm accounts config
   for account in "${EVM_ACCOUNTS[@]}"; do
-    add_kernel_config_set "$file" "/evm/world_state/eth_accounts/${account}/balance" 0000dc0a0713000c1e0200000000000000000000000000000000000000000000 ""
+    add_kernel_config_set "$file" "/evm/eth_accounts/${account}/balance" 0000dc0a0713000c1e0200000000000000000000000000000000000000000000 ""
   done
 
   # sequencer_config
   if [[ -n $SEQUENCER_ALIAS ]]; then
     pubkey=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ALIAS}" | grep Public | grep -oE "edpk.*")
     pubkey_hex=$(printf '%s' "${pubkey}" | xxd -p -c 54)
-    add_kernel_config_set "$file" "/evm/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
+    add_kernel_config_set "$file" "/evm/world_state/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
   fi
 }
 
