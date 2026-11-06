@@ -632,17 +632,13 @@ impl MichelsonJournal {
         // value rather than re-using already-burned indices.
         let _ = checkpoint.origination_index;
         let _ = checkpoint.alias_internals_count;
-        // Clamp both branches. The `+ 1` overshoots on purpose: the snapshot
-        // at the watermark is left for the parent.
-        let drain_from = if self.external_checkpoints.is_empty() {
-            checkpoint.snapshot_watermark.min(self.snapshots.len())
+        // The snapshot at the watermark is left for the parent frame, if any.
+        let height = if self.external_checkpoints.is_empty() {
+            checkpoint.snapshot_watermark
         } else {
-            (checkpoint.snapshot_watermark + 1).min(self.snapshots.len())
+            checkpoint.snapshot_watermark + 1
         };
-        for snapshot in self.snapshots.drain(drain_from..) {
-            host.store_delete(&snapshot.snapshot_path)?;
-        }
-        Ok(())
+        self.release_to(host, height)
     }
 
     // Called by EVM journal on checkpoint revert.
@@ -667,13 +663,8 @@ impl MichelsonJournal {
         if checkpoint.snapshot_watermark >= self.snapshots.len() {
             return Ok(());
         }
-        for snapshot in self.snapshots.drain(checkpoint.snapshot_watermark + 1..) {
-            host.store_delete(&snapshot.snapshot_path)?;
-        }
-        if let Some(snapshot) = self.snapshots.pop() {
-            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
-        }
-        Ok(())
+        self.release_to(host, checkpoint.snapshot_watermark + 1)?;
+        self.rollback(host)
     }
 
     // Called by Michelson CRAC logic.
@@ -710,11 +701,7 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let start = (checkpoint_index + 1).min(self.snapshots.len());
-        for snapshot in self.snapshots.drain(start..) {
-            host.store_delete(&snapshot.snapshot_path)?;
-        }
-        Ok(())
+        self.release_to(host, checkpoint_index + 1)
     }
 
     /// Number of snapshots currently held, to be passed to
@@ -748,16 +735,12 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let start = if self.is_frame_revert_point(watermark) {
+        let height = if self.is_frame_revert_point(watermark) {
             watermark.saturating_add(1)
         } else {
             watermark
-        }
-        .min(self.snapshots.len());
-        for snapshot in self.snapshots.drain(start..) {
-            host.store_delete(&snapshot.snapshot_path)?;
-        }
-        Ok(())
+        };
+        self.release_to(host, height)
     }
 
     /// Undo work that failed after taking snapshots since `watermark` (a
@@ -777,17 +760,15 @@ impl MichelsonJournal {
         if self.snapshots.len() <= watermark {
             return Ok(());
         }
-        for snapshot in self.snapshots.drain(watermark.saturating_add(1)..) {
-            host.store_delete(&snapshot.snapshot_path)?;
-        }
+        self.release_to(host, watermark.saturating_add(1))?;
         if self.is_frame_revert_point(watermark) {
             if let Some(snapshot) = self.snapshots.last() {
                 host.store_copy(&snapshot.snapshot_path, &snapshot.from_path)?;
             }
-        } else if let Some(snapshot) = self.snapshots.pop() {
-            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
+            Ok(())
+        } else {
+            self.rollback(host)
         }
-        Ok(())
     }
 
     // Called by Michelson CRAC logic.
@@ -803,10 +784,27 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let start = (checkpoint_index + 1).min(self.snapshots.len());
-        for snapshot in self.snapshots.drain(start..) {
+        self.release_to(host, checkpoint_index + 1)?;
+        self.rollback(host)
+    }
+
+    /// Release the snapshots above the `height` oldest, keeping the writes
+    /// made since. Releases nothing if at most `height` snapshots are held.
+    fn release_to<Host: StorageV1>(
+        &mut self,
+        host: &mut Host,
+        height: usize,
+    ) -> Result<(), RuntimeError> {
+        let height = height.min(self.snapshots.len());
+        for snapshot in self.snapshots.drain(height..) {
             host.store_delete(&snapshot.snapshot_path)?;
         }
+        Ok(())
+    }
+
+    /// Restore durable storage from the top snapshot, and release it.
+    /// Restores nothing if no snapshot is held.
+    fn rollback<Host: StorageV1>(&mut self, host: &mut Host) -> Result<(), RuntimeError> {
         if let Some(snapshot) = self.snapshots.pop() {
             host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
         }
