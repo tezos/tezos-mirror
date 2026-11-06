@@ -8,6 +8,7 @@
 
 use tezos_crypto_rs::base58::FromBase58CheckError;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_crypto_rs::public_key::PublicKey;
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, Name, ReadKind};
 
@@ -95,11 +96,11 @@ fn decode_b58<T>(
         .map_err(|err| KeySpaceError::read(keyspace_name, key, ReadKind::Ext(err.into())))
 }
 
-/// Base58 contract-address reads over a [`KeySpace`].
+/// Base58 reads of contract addresses and public keys over a [`KeySpace`].
 ///
-/// The value holds the base58 text of the address. Invalid values are
-/// reported as [`StorageReadErrorKind::InvalidBase58`] instead of being
-/// silently treated as missing.
+/// The value holds the base58 text. Invalid values are reported as
+/// [`StorageReadErrorKind::InvalidBase58`] instead of being silently treated
+/// as missing.
 pub trait KeySpaceExtB58: KeySpace {
     /// Returns the base58 contract address stored at `key`.
     ///
@@ -122,6 +123,26 @@ pub trait KeySpaceExtB58: KeySpace {
         } else {
             Ok(None)
         }
+    }
+
+    /// Returns the base58check public key stored at `key`.
+    ///
+    /// The whole value is read and decoded as a [`PublicKey`], in the format
+    /// that [`PublicKey::to_b58check`] writes. A missing key returns
+    /// `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// - [`StorageReadErrorKind::InvalidBase58`] when the bytes are not a
+    ///   valid base58check public key.
+    fn get_b58_public_key(
+        &self,
+        key: &Key,
+    ) -> Result<Option<PublicKey>, KeySpaceError<StorageReadErrorKind>> {
+        let Some(bytes) = self.get(key) else {
+            return Ok(None);
+        };
+        decode_b58(self.name(), key, &bytes, PublicKey::from_b58check).map(Some)
     }
 }
 
@@ -209,5 +230,41 @@ mod tests {
         let read_with_len: Result<Option<(Narith, usize)>, _> =
             ks.read_nom_bounded_with_len(&key(b"/value"), 1);
         assert!(read_with_len.is_err());
+    }
+
+    /// Makes sure that a public key reads back, that an absent key reads as
+    /// `Ok(None)`, and that a value that is not a base58check public key
+    /// fails with `InvalidBase58`.
+    #[test]
+    fn public_key_base58_read() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/some".parse().unwrap()).unwrap();
+        let key = key(b"/public_key");
+        let public_key_b58 = "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw";
+        let public_key = PublicKey::from_b58check(public_key_b58).unwrap();
+
+        assert_eq!(ks.get_b58_public_key(&key).unwrap(), None);
+
+        ks.set(&key, public_key_b58.as_bytes()).unwrap();
+        assert_eq!(ks.get_b58_public_key(&key).unwrap(), Some(public_key));
+
+        let name = ks.name().clone();
+        let invalid_base58 = |err| {
+            Err(KeySpaceError::read(
+                &name,
+                &key,
+                ReadKind::Ext(StorageReadErrorKind::InvalidBase58(err)),
+            ))
+        };
+
+        ks.set(&key, b"not a public key").unwrap();
+        let err = PublicKey::from_b58check("not a public key").unwrap_err();
+        assert_eq!(ks.get_b58_public_key(&key), invalid_base58(err));
+
+        ks.set(&key, [0xff, 0xfe]).unwrap();
+        assert_eq!(
+            ks.get_b58_public_key(&key),
+            invalid_base58(FromBase58CheckError::InvalidBase58)
+        );
     }
 }
