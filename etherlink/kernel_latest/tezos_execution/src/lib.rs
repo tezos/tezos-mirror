@@ -2648,8 +2648,7 @@ where
     let lazy_storage_size_diff = ctx.interpret_context.take_lazy_storage_size_diff();
 
     // Set the storage of the contract
-    let smart_contract = account_storage::TezosOriginatedAccount::from_kt1(&contract)
-        .map_err(|_| OriginationError::FailedToFetchOriginated)?;
+    let smart_contract = account_storage::TezosOriginatedAccount::from_kt1(&contract)?;
 
     // Charge gas for the durable writes `smart_contract.init` performs: the
     // code and storage blobs (their own size), plus a single write of the
@@ -2683,14 +2682,12 @@ where
     let StorageSpace {
         used_bytes: total_size,
         allocated_bytes: paid_storage_size_diff,
-    } = smart_contract
-        .init(
-            ctx.rk.tez_accounts_mut(),
-            script_code,
-            &new_storage,
-            lazy_storage_size_diff,
-        )
-        .map_err(|_| OriginationError::CantInitContract)?;
+    } = smart_contract.init(
+        ctx.rk.tez_accounts_mut(),
+        script_code,
+        &new_storage,
+        lazy_storage_size_diff,
+    )?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
     //
@@ -2726,15 +2723,15 @@ where
     )
     .map_err(|err| match err {
         TransferError::BalanceTooLow(btl) => OriginationError::BalanceTooLow(btl),
+        TransferError::KeySpace(error) => OriginationError::KeySpace(error),
+        TransferError::Context(error) => OriginationError::Context(error),
         _ => OriginationError::FailedToApplyBalanceUpdate,
     })?;
 
     // Record the classification of the new contract. Origination is the only
     // writer of the origin path for a freshly created KT1, so write it
     // unconditionally.
-    smart_contract
-        .set_origin(ctx.rk.tez_accounts_mut(), origin)
-        .map_err(|_| OriginationError::CantInitContract)?;
+    smart_contract.set_origin(ctx.rk.tez_accounts_mut(), origin)?;
 
     let origination_success = OriginationSuccess {
         balance_updates,
