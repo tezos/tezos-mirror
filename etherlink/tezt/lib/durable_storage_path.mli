@@ -109,9 +109,6 @@ val delayed_inbox_timeout : Kernel.t -> path
     needed to have passed to consider a timeout. *)
 val delayed_inbox_min_levels : Kernel.t -> path
 
-(** [reveal_config] is the path to the storage configuration. *)
-val reveal_config : Kernel.t -> path
-
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
 val enable_fa_bridge : Kernel.t -> path
 

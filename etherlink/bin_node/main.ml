@@ -681,13 +681,6 @@ let omit_delayed_tx_events_arg =
        sequencer."
     ()
 
-let keep_everything_arg =
-  Tezos_clic.switch
-    ~short:'k'
-    ~long:"keep-everything"
-    ~doc:"Do not filter out files outside of the `/evm` directory."
-    ()
-
 let fail_on_divergence_arg =
   Tezos_clic.switch
     ~long:"fail-on-divergence"
@@ -2116,53 +2109,6 @@ let init_from_rollup_node_command =
         ~omit_delayed_tx_events
         ~rollup_node_data_dir
         ())
-
-let dump_to_rlp_command =
-  let open Tezos_clic in
-  let open Lwt_result_syntax in
-  command
-    ~group:Groups.debug
-    ~desc:"Transforms the JSON list of instructions to a RLP list."
-    (args1 keep_everything_arg)
-    (prefixes ["transform"; "dump"]
-    @@ param ~name:"dump.json" ~desc:"Description." Params.string
-    @@ prefixes ["to"; "rlp"]
-    @@ param ~name:"dump.rlp" ~desc:"Description." Params.string
-    @@ stop)
-    (fun keep_everything dump_json dump_rlp () ->
-      let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
-      let config =
-        Data_encoding.Json.destruct
-          Octez_smart_rollup.Installer_config.encoding
-          dump_json
-      in
-
-      let bytes =
-        let aux =
-          let open Evm_node_lib_dev_encoding.Rlp in
-          if keep_everything then
-            fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-            List [Value (String.to_bytes to_); Value (String.to_bytes value)]
-            :: acc
-          else fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-            if String.starts_with ~prefix:"/evm" to_ then
-              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
-              :: acc
-            else acc
-        in
-        let open Evm_node_lib_dev_encoding.Rlp in
-        List.fold_left aux [] config |> fun l -> encode (List l)
-      in
-
-      let write_bytes_to_file filename bytes =
-        let oc = open_out filename in
-        output_bytes oc bytes ;
-        close_out oc
-      in
-
-      write_bytes_to_file dump_rlp bytes ;
-
-      return_unit)
 
 let flush_delayed_inbox_command =
   let open Tezos_clic in
@@ -4292,7 +4238,6 @@ let commands =
     make_kernel_config_command;
     make_l2_kernel_config_command;
     preemptive_kernel_download_command;
-    dump_to_rlp_command;
     patch_state_command;
     debug_print_store_schemas_command;
     list_metrics_command;

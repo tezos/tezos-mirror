@@ -1103,12 +1103,6 @@ Debug commands:
     -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
     --tracer <tracer>: Tracer to use (callTracer or structLogger). Default: callTracer.
   
-  transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
-    Transforms the JSON list of instructions to a RLP list.
-    <dump.json>: Description.
-    <dump.rlp>: Description.
-    -k --keep-everything: Do not filter out files outside of the `/evm` directory.
-  
   patch state at <path> with <value> [--data-dir <data-dir>] [--config-file <path>]
       [--block-number <N>] [-f --force]
     Patches the state with an arbitrary value. This is an unsafe command, it should be used

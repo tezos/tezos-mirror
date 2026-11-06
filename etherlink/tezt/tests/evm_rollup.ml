@@ -329,10 +329,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ?max_number_of_chunks ?(setup_mode = Setup_proxy)
-    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
-    ?dal_slots ?websockets ?(enable_fa_bridge = false)
+    ?max_number_of_chunks ?(setup_mode = Setup_proxy) ?whitelist
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
+    ?(enable_dal = false) ?dal_slots ?websockets ?(enable_fa_bridge = false)
     ?(enable_fast_withdrawal = false) ?with_runtimes
     ?tezosx_target_sunrise_levels protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
@@ -455,16 +454,11 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   (* EVM Kernel installation level. *)
-  let* () =
-    if force_install_kernel then
-      let* () = Client.bake_for_and_wait ~keys:[] client in
-      let* level = Node.get_level node in
-      let* _ =
-        (* Time to install the kernel depends on size, adjust if necessary. *)
-        Sc_rollup_node.wait_for_level ~timeout:300. sc_rollup_node level
-      in
-      unit
-    else unit
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* level = Node.get_level node in
+  let* _ =
+    (* Time to install the kernel depends on size, adjust if necessary. *)
+    Sc_rollup_node.wait_for_level ~timeout:300. sc_rollup_node level
   in
   let patch_config = Evm_node.patch_config_with_experimental_feature () in
   let evm_version = Kernel.select_evm_version kernel ?evm_version in
@@ -522,40 +516,20 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           }
       in
       let* sequencer =
-        if force_install_kernel then
-          Evm_node.init
-            ~patch_config
-            ~node_setup:
-              (Evm_node.make_setup
-                 ?restricted_rpcs
-                 ?websockets
-                 ~initial_kernel:output
-                 ~preimages_dir
-                 ?tx_queue_max_lifespan
-                 ?tx_queue_max_size
-                 ?tx_queue_tx_per_addr_limit
-                 ())
-            ~mode:sequencer_mode
-            ()
-        else
-          let evm_node =
-            Evm_node.create
-              ~node_setup:
-                (Evm_node.make_setup
-                   ?restricted_rpcs
-                   ?websockets
-                   ~initial_kernel:output
-                   ~preimages_dir
-                   ?tx_queue_max_lifespan
-                   ?tx_queue_max_size
-                   ?tx_queue_tx_per_addr_limit
-                   ())
-              ~mode:sequencer_mode
-              ()
-          in
-          let* () = Process.check @@ Evm_node.spawn_init_config evm_node in
-          let* () = Evm_node.Config_file.update evm_node patch_config in
-          return evm_node
+        Evm_node.init
+          ~patch_config
+          ~node_setup:
+            (Evm_node.make_setup
+               ?restricted_rpcs
+               ?websockets
+               ~initial_kernel:output
+               ~preimages_dir
+               ?tx_queue_max_lifespan
+               ?tx_queue_max_size
+               ?tx_queue_tx_per_addr_limit
+               ())
+          ~mode:sequencer_mode
+          ()
       in
       let produce_block () = Rpc.produce_block sequencer in
       let common_setup = {common_setup with produce_block} in
@@ -5852,144 +5826,6 @@ let test_check_estimateGas_enforces_limits =
          available") ;
   unit
 
-let test_reveal_storage =
-  register_sequencer
-    ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "reveal_storage"]
-    ~title:"Reveal storage"
-    ~dal:false
-    ~additional_uses:[Constant.WASM.evm_kernel]
-  @@ fun ~protocol ~evm_setup ->
-  let* () =
-    repeat 5 (fun _ ->
-        let*@ _ = evm_setup.produce_block () in
-        unit)
-  in
-  let sender, receiver =
-    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
-  in
-  let* transfer_result =
-    make_transfer
-      ~value:Wei.(default_bootstrap_account_balance - one_eth)
-      ~sender
-      ~receiver
-      evm_setup
-  in
-  let* () =
-    bake_until_sync
-      ~sc_rollup_node:evm_setup.sc_rollup_node
-      ~sequencer:evm_setup.evm_node
-      ~client:evm_setup.client
-      ()
-  in
-  (* Dump the storage of the smart rollup node and convert it into a RLP file
-     the kernel can read. *)
-  let dump_json = Temp.file "dump.json" in
-  let dump_rlp = Temp.file "dump.rlp" in
-  let* () =
-    Sc_rollup_node.dump_durable_storage
-      ~sc_rollup_node:evm_setup.sc_rollup_node
-      ~dump:dump_json
-      ()
-  in
-  let* () = Evm_node.transform_dump ~dump_json ~dump_rlp in
-
-  (* Get root hash of the storage configuration *)
-  let config_preimages_dir = Temp.dir "config_preimages" in
-  let* {root_hash = configuration_root_hash; _} =
-    prepare_installer_kernel_with_arbitrary_file
-      ~preimages_dir:config_preimages_dir
-      dump_rlp
-  in
-
-  (* Start a new EVM rollup chain, but this time, with a ad-hoc config that
-     allows to duplicate the state of the previous one.
-
-     The only way for this new rollup to see initialized balances is for the
-     duplication process to work. *)
-  let new_kernel = Kernel.Latest in
-  let additional_config =
-    Sc_rollup_helpers.Installer_kernel_config.
-      [
-        Reveal
-          {
-            hash = configuration_root_hash;
-            to_ = Durable_storage_path.reveal_config new_kernel;
-          };
-      ]
-  in
-
-  (* Setup the new rollup, but do not force the installation of the kernel as
-     we need to setup the preimage directory first. *)
-  let* evm_setup, _mode =
-    setup_evm_kernel
-      ~admin:None
-      ~additional_config
-      ~force_install_kernel:false
-      ~eth_bootstrap_accounts:[]
-      ~kernel:new_kernel
-      protocol
-  in
-
-  (* Copy the config preimages directory contents into the preimages directory
-       of the new rollup node. *)
-  let* _ =
-    Lwt_unix.system
-      Format.(
-        sprintf
-          "cp %s/* %s"
-          config_preimages_dir
-          (Sc_rollup_node.data_dir evm_setup.sc_rollup_node // "wasm_2_0_0"))
-  in
-
-  (* Force the installation of the kernel of the new chain. *)
-  let* _ =
-    Rollup.next_rollup_node_level
-      ~sc_rollup_node:evm_setup.sc_rollup_node
-      ~client:evm_setup.client
-  in
-
-  let open Evm_node_lib_dev_encoding in
-  let rollup_node_account_info ~address =
-    let* info_opt =
-      Sc_rollup_node.RPC.call
-        evm_setup.sc_rollup_node
-        ~rpc_hooks:Tezos_regression.rpc_hooks
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind
-           ~operation:Sc_rollup_rpc.Value
-           ~key:(Durable_storage_path.account_info evm_setup.kernel address)
-           ()
-    in
-    match info_opt with
-    | None -> Test.fail "missing account infos"
-    | Some hex_str -> (
-        let bytes = Hex.to_bytes (`Hex hex_str) in
-        match Rlp.decode bytes with
-        (* The kernel may append a fourth field (origin-classification
-           tag) to the account info record; tolerate both shapes. *)
-        | Ok
-            (List
-               (Value balance
-               :: Value nonce
-               :: Value _code_hash
-               :: ([] | [Value _]))) ->
-            let balance = Wei.to_wei_z (Helpers.decode_z_le balance) in
-            let nonce = Helpers.decode_z_le nonce |> Z.to_int64 in
-            return (balance, nonce)
-        | _ -> Test.fail ~__LOC__ "invalid account info RLP for %s" address)
-  in
-  let* sender_balance, sender_nonce =
-    rollup_node_account_info ~address:sender.Eth_account.address
-  in
-  assert (sender_balance = transfer_result.sender_balance_after) ;
-  let* receiver_balance, _ =
-    rollup_node_account_info ~address:receiver.Eth_account.address
-  in
-  assert (receiver_balance = transfer_result.receiver_balance_after) ;
-  assert (sender_nonce = transfer_result.sender_nonce_after) ;
-  unit
-
 let call_get_hash ~address ~block_number endpoint =
   Cast.call
     ~args:[string_of_int block_number]
@@ -6726,7 +6562,6 @@ let register_evm_node ~protocols =
     protocols ;
   test_mcopy_opcode protocols ;
   test_transient_storage protocols ;
-  test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_check_estimateGas_enforces_limits protocols ;
   test_blockhash_opcode protocols ;

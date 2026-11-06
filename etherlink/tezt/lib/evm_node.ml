@@ -1575,11 +1575,6 @@ let upgrade_payload ~root_hash ~activation_timestamp =
   in
   return (String.trim payload)
 
-let transform_dump ~dump_json ~dump_rlp =
-  let args = ["transform"; "dump"; dump_json; "to"; "rlp"; dump_rlp] in
-  let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
-  Process.check process
-
 let reset evm_node ~l2_level =
   let args =
     ["reset"; "at"; string_of_int l2_level; "--force"] @ data_dir_arg evm_node

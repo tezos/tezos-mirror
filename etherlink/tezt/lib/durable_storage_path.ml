@@ -113,10 +113,6 @@ let delayed_inbox_min_levels = function
   | Kernel.Latest | Kernel.Previewnet | Kernel.Mainnet ->
       base "/delayed_inbox_min_levels"
 
-let reveal_config = function
-  | Kernel.Latest | Kernel.Previewnet | Kernel.Mainnet ->
-      base "/__tmp/reveal_config"
-
 let enable_fa_bridge = function
   | Kernel.Latest | Kernel.Previewnet | Kernel.Mainnet ->
       base "/feature_flags/enable_fa_bridge"
