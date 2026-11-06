@@ -9,7 +9,7 @@
 use tezos_crypto_rs::base58::FromBase58CheckError;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::nom::NomReader;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, ReadKind};
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, Name, ReadKind};
 
 use crate::error::StorageReadErrorKind;
 use crate::KT1_B58_SIZE;
@@ -75,6 +75,26 @@ pub trait KeySpaceExtBounded: KeySpace + Sized {
 
 impl<KS: KeySpace> KeySpaceExtBounded for KS {}
 
+/// Decodes the base58check text in `bytes` into a `T` with `from_b58check`.
+///
+/// # Errors
+///
+/// - [`StorageReadErrorKind::InvalidBase58`], as a read error of `key` in the
+///   keyspace `keyspace_name`. It holds the error of `from_b58check`, or
+///   [`FromBase58CheckError::InvalidBase58`] when `bytes` is not UTF-8.
+fn decode_b58<T>(
+    keyspace_name: &Name,
+    key: &Key,
+    bytes: &[u8],
+    from_b58check: impl FnOnce(&str) -> Result<T, FromBase58CheckError>,
+) -> Result<T, KeySpaceError<StorageReadErrorKind>> {
+    std::str::from_utf8(bytes)
+        // Base58 is ASCII, so bytes that are not UTF-8 are not base58 either.
+        .map_err(|_| FromBase58CheckError::InvalidBase58)
+        .and_then(from_b58check)
+        .map_err(|err| KeySpaceError::read(keyspace_name, key, ReadKind::Ext(err.into())))
+}
+
 /// Base58 contract-address reads over a [`KeySpace`].
 ///
 /// The value holds the base58 text of the address. Invalid values are
@@ -97,13 +117,7 @@ pub trait KeySpaceExtB58: KeySpace {
     ) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
         let result = self.get_prefix_exact::<KT1_B58_SIZE>(key);
         if let Some(buffer) = result {
-            std::str::from_utf8(&buffer)
-                // Base58 is ASCII, so bytes that are not UTF-8 are not base58 either.
-                .map_err(|_| FromBase58CheckError::InvalidBase58)
-                .and_then(ContractKt1Hash::from_b58check)
-                .map_err(|err| {
-                    KeySpaceError::read(self.name(), key, ReadKind::Ext(err.into()))
-                })
+            decode_b58(self.name(), key, &buffer, ContractKt1Hash::from_b58check)
                 .map(Some)
         } else {
             Ok(None)
