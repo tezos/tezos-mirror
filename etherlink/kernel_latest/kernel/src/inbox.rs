@@ -1300,6 +1300,74 @@ mod tests {
     }
 
     #[test]
+    // A reassembly started at the legacy root completes after the V69 move.
+    fn chunked_transaction_survives_the_v69_migration() {
+        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+
+        let mut host = MockKernelHost::default();
+
+        let (data, tx) = large_transaction();
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
+        let inputs = make_chunked_transactions(tx_hash, data);
+        assert_eq!(inputs.len(), 3);
+
+        let Input::ModeSpecific(ProxyInput::NewChunkedTransaction {
+            num_chunks,
+            chunk_hashes,
+            ..
+        }) = &inputs[0]
+        else {
+            panic!("Expected a new chunked transaction")
+        };
+        let Input::ModeSpecific(ProxyInput::TransactionChunk { data: chunk0, .. }) =
+            &inputs[1]
+        else {
+            panic!("Expected a transaction chunk")
+        };
+        let mut rlp = rlp::RlpStream::new_list(chunk_hashes.len());
+        for chunk_hash in chunk_hashes {
+            rlp.append(&chunk_hash.as_slice());
+        }
+        let legacy = |suffix: &str| {
+            OwnedPath::try_from(format!(
+                "/chunked_transactions/{}{suffix}",
+                hex::encode(tx_hash)
+            ))
+            .unwrap()
+        };
+        host.store_write_all(&legacy("/num_chunks"), &num_chunks.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&legacy("/chunk_hashes"), &rlp.out())
+            .unwrap();
+        host.store_write_all(&legacy("/0"), chunk0).unwrap();
+
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/storage_version"),
+            &68u64.to_le_bytes(),
+        )
+        .unwrap();
+        crate::migration::storage_migration(&mut host).unwrap();
+
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        host.host.add_external(Bytes::from(input_to_bytes(
+            SMART_ROLLUP_ADDRESS,
+            inputs[2].clone(),
+        )));
+        let (host, bk) = (&mut host, &mut bk);
+        let inbox_content =
+            read_proxy_inbox(host, bk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
+
+        let expected_transactions = vec![Transaction {
+            tx_hash,
+            content: Ethereum(tx),
+        }
+        .into()];
+        assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
     fn parse_valid_simple_transaction_framed() {
         // Don't use zero-hash for rollup here - as the long string of zeros is still valid under the previous
         // parsing. This won't happen in practice, though

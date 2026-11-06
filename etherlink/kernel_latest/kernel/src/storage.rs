@@ -77,6 +77,7 @@ pub enum StorageVersion {
     V66,
     V67,
     V68,
+    V69,
 }
 
 impl From<StorageVersion> for u64 {
@@ -91,7 +92,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V68;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V69;
 
 // Legacy storage version path, outside the `/base` keyspace. Only read once,
 // by `init_storage_versioning` at stage zero, which promotes the recorded

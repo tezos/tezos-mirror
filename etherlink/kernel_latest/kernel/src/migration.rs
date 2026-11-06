@@ -58,6 +58,12 @@ mod legacy {
     const ENABLE_TEZOS_RUNTIME_PATH: RefPath =
         RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
 
+    pub const CHUNKED_TRANSACTIONS_PATH: RefPath =
+        RefPath::assert_from(b"/chunked_transactions");
+
+    pub const BASE_CHUNKED_TRANSACTIONS_PATH: RefPath =
+        RefPath::assert_from(b"/base/chunked_transactions");
+
     pub fn migration_read_storage_version(
         host: &impl StorageV1,
     ) -> Result<StorageVersion, Error> {
@@ -573,6 +579,14 @@ where
             host.store_write(&ENABLE_MICHELSON_GAS_REFUND_V68, &[], 0)?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V69 => {
+            // The proxy inbox reassembles chunked transactions in the `/base` keyspace.
+            allow_path_not_found(host.store_move(
+                &legacy::CHUNKED_TRANSACTIONS_PATH,
+                &legacy::BASE_CHUNKED_TRANSACTIONS_PATH,
+            ))?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
@@ -1082,5 +1096,62 @@ mod tests {
 
         let base = crate::load_base(&mut host).unwrap();
         assert!(crate::storage::enable_michelson_gas_refund(&base));
+    }
+
+    /// V69 moves the chunked transactions under `/base`, bytes unchanged.
+    #[test]
+    fn v69_migration_moves_the_chunked_transactions_under_base() {
+        let mut host = MockKernelHost::default();
+        let tx = "11".repeat(32);
+        let legacy = |suffix: &str| {
+            OwnedPath::try_from(format!("/chunked_transactions/{tx}{suffix}")).unwrap()
+        };
+        let moved = |suffix: &str| {
+            OwnedPath::try_from(format!("/base/chunked_transactions/{tx}{suffix}"))
+                .unwrap()
+        };
+        let num_chunks = 2u16.to_le_bytes();
+        let mut rlp = rlp::RlpStream::new_list(2);
+        rlp.append(&[1u8; 32].as_slice());
+        rlp.append(&[2u8; 32].as_slice());
+        let chunk_hashes = rlp.out().to_vec();
+        let chunk0 = vec![0xABu8; 3000];
+        let entries: [(&str, &[u8]); 3] = [
+            ("/num_chunks", &num_chunks),
+            ("/chunk_hashes", &chunk_hashes),
+            ("/0", &chunk0),
+        ];
+        for (suffix, bytes) in entries {
+            host.store_write_all(&legacy(suffix), bytes).unwrap();
+        }
+
+        let status = migrate_to(&mut host, StorageVersion::V69).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        for (suffix, bytes) in entries {
+            assert!(matches!(
+                host.store_read_all(&legacy(suffix)),
+                Err(RuntimeError::PathNotFound)
+            ));
+            assert_eq!(host.store_read_all(&moved(suffix)).unwrap(), bytes);
+        }
+
+        let status = migrate_to(&mut host, StorageVersion::V69).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        for (suffix, bytes) in entries {
+            assert_eq!(host.store_read_all(&moved(suffix)).unwrap(), bytes);
+        }
+    }
+
+    /// V69 is a no-op when no chunked transaction is pending.
+    #[test]
+    fn v69_migration_is_safe_when_absent() {
+        let mut host = MockKernelHost::default();
+
+        let status = migrate_to(&mut host, StorageVersion::V69).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        assert!(host
+            .store_has(&legacy::BASE_CHUNKED_TRANSACTIONS_PATH)
+            .unwrap()
+            .is_none());
     }
 }
