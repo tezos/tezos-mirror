@@ -115,7 +115,7 @@ more information.
 
 An Etherlink instance supports receiving sequencer upgrade payload from
 one smart contract, as specified by the content (b58-checked encoded) of
-the `/evm/sequencer_governance` file.
+the `/evm/world_state/sequencer_governance` file.
 
 The payload expected from this contract is a RLP-encoded structure containing
 three fields: the public key of the sequencer, the L2 address to be used to
