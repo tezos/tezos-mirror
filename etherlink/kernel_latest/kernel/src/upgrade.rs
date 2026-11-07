@@ -296,7 +296,7 @@ where
     Ok(())
 }
 
-pub fn possible_sequencer_key_change(
+fn apply_active_sequencer_key_change(
     host: &mut impl StorageV1,
     base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
@@ -309,6 +309,24 @@ pub fn possible_sequencer_key_change(
         }
     }
     Ok(())
+}
+
+/// Applies the pending sequencer key change once `evm_timestamp` reaches its
+/// activation timestamp.
+///
+/// Does nothing when no change is pending or when it is not active yet.
+/// The pending change is read from and deleted through `host`, the new key is
+/// written through `host`, and the blueprints of `base` are cleared.
+/// Errors when the pending change does not decode or when a write fails, and
+/// logs the error.
+pub fn possible_sequencer_key_change(
+    host: &mut impl StorageV1,
+    base: &mut impl KeySpace,
+    evm_timestamp: Timestamp,
+) -> anyhow::Result<()> {
+    apply_active_sequencer_key_change(host, base, evm_timestamp).inspect_err(|err| {
+        log!(Error, "Failed to apply the sequencer key change: {err:?}")
+    })
 }
 
 #[cfg(test)]
