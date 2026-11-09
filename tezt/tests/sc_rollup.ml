@@ -1698,7 +1698,18 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   (* We want to produce snapshots for rollup node which have cemented
      commitments *)
   let* level = Node.get_level node in
-  let level_snapshot = level + (commitment_period + 4) in
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let genesis_level = JSON.(genesis_info |-> "level" |> as_int) in
+  (* 4 levels after a commitment level, so [commitment_period] must be > 4. *)
+  let level_snapshot =
+    genesis_level
+    + ((((level - genesis_level) / commitment_period) + 2) * commitment_period)
+    + 4
+  in
   (* We want to build an L2 chain that goes beyond the snapshots (and has
      additional commitments). *)
   let total_blocks = level_snapshot + (2 * commitment_period) in
@@ -1818,6 +1829,121 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
       rollup_node_3
       ~snapshot_file
   in
+  Log.info "Check that the import stopped at the last commitment." ;
+  (* Generated snapshot names are "snapshot-<address>-<head level>.<mode>". *)
+  let snapshot_head_level file =
+    match Filename.basename file =~* rex "-(\\d+)\\." with
+    | Some l -> int_of_string l
+    | None -> Test.fail ~__LOC__ "No level in snapshot name %s" file
+  in
+  let head_level_of_node node =
+    let* out =
+      Process.run_and_read_stdout
+        "sqlite3"
+        [
+          Filename.concat (Sc_rollup_node.data_dir node) "store.sqlite";
+          "SELECT MAX(level) FROM l2_levels";
+        ]
+    in
+    return (int_of_string (String.trim out))
+  in
+  let* imported_head = head_level_of_node rollup_node_3 in
+  let exported_head = snapshot_head_level snapshot_file in
+  (* Commitment levels are [genesis_level] plus a multiple of the period. *)
+  Check.(((imported_head - genesis_level) mod commitment_period = 0) int)
+    ~error_msg:
+      "Imported head %L is not on a commitment boundary (period %R from \
+       genesis)" ;
+  (* Strict, as [level_snapshot] is not a commitment level. *)
+  Check.((imported_head < exported_head) int)
+    ~error_msg:"Imported head %L is not below the snapshot head %R" ;
+  Check.((exported_head - imported_head < commitment_period) int)
+    ~error_msg:"Import dropped %L levels, a whole commitment period (%R)" ;
+  Log.info "Importing with --level head keeps the uncommitted blocks." ;
+  (* In a new node, as [rollup_node_3] can refuse a second import. *)
+  let* head_level_node = create_observer_node None in
+  let*? head_import =
+    Sc_rollup_node.import_snapshot
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      ~level:"head"
+      head_level_node
+      ~snapshot_file
+  in
+  let* stderr = Process.check_and_read_stderr head_import in
+  (* Separate matches, as the log wraps the message across lines. *)
+  if not (stderr =~ rex "carries no commitment") then
+    Test.fail
+      ~__LOC__
+      "Importing at the snapshot head did not warn about the unchecked state, \
+       stderr was: %s"
+      stderr ;
+  (* A riscv snapshot has no context for the head, so no state hash. *)
+  if String.equal kind "wasm_2_0_0" && not (stderr =~ rex "srs1") then
+    Test.fail
+      ~__LOC__
+      "The unchecked head warning did not name the state hash being trusted, \
+       stderr was: %s"
+      stderr ;
+  let* kept_head = head_level_of_node head_level_node in
+  Check.((kept_head = exported_head) int)
+    ~error_msg:"Import at --level head stopped at %L instead of %R" ;
+  Log.info "A snapshot without any commitment is rejected by default." ;
+  let* stripped_node = create_observer_node None in
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      stripped_node
+      ~snapshot_file
+  in
+  (* Removes every commitment, so the import has no level to stop at. *)
+  let* () =
+    Process.check
+    @@ Process.spawn
+         "sqlite3"
+         [
+           Filename.concat (Sc_rollup_node.data_dir stripped_node) "store.sqlite";
+           "UPDATE l2_blocks SET commitment_hash = NULL";
+         ]
+  in
+  let* stripped_snapshot =
+    Sc_rollup_node.export_snapshot
+      ~no_check:true
+      ~level:"head"
+      stripped_node
+      (Tezt.Temp.dir "snapshot_stripped")
+    |> Runnable.run
+  in
+  let* rejecting_node = create_observer_node None in
+  (* The rejection does not depend on the checks that --no-check skips. *)
+  let*? rejected =
+    Sc_rollup_node.import_snapshot
+      ~no_check:true
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      rejecting_node
+      ~snapshot_file:stripped_snapshot
+  in
+  let* () =
+    (* The level name tells this error from the one of 'cemented'. *)
+    Process.check_error ~msg:(rex "cannot use 'commitment'") rejected
+  in
+  Log.info "The same snapshot is imported at --level head, with a warning." ;
+  (* In a new node, as the rejected import left the extracted data in place. *)
+  let* opt_out_node = create_observer_node None in
+  let*? accepted =
+    Sc_rollup_node.import_snapshot
+      ~no_check:true
+      ~level:"head"
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      opt_out_node
+      ~snapshot_file:stripped_snapshot
+  in
+  let* stderr = Process.check_and_read_stderr accepted in
+  if not (stderr =~ rex "carries no commitment") then
+    Test.fail
+      ~__LOC__
+      "Importing a snapshot without commitments at --level head did not warn \
+       that its state is unchecked, stderr was: %s"
+      stderr ;
   (* rollup_node_2 was stopped before so it has data but is late with respect to
      sc_rollup_node. *)
   Log.info "Try importing snapshot in already populated rollup node." ;
