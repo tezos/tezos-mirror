@@ -2851,7 +2851,7 @@ module Sc_rollup = struct
     in
     Process.check process
 
-  let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
+  let publish_commitment ?hooks ?(wait = "none") ?burn_cap ?fee ~src ~sc_rollup
       ~compressed_state ~inbox_level ~predecessor ~number_of_ticks client =
     let process =
       spawn_command
@@ -2884,6 +2884,7 @@ module Sc_rollup = struct
             "ticks";
             string_of_int number_of_ticks;
           ]
+        @ optional_arg "fee" Tez.to_string fee
         @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
     let parse process = Process.check process in
