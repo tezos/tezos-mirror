@@ -190,25 +190,71 @@ let first_available_block ~data_dir:_ store =
   | None -> failwith "No blocks with context committed to disk"
   | Some b -> return b
 
+(* The level of the last cemented commitment, as Layer 1 reports it. *)
+let get_l1_lcc_level cctxt (store : _ Store.t) (metadata : Metadata.t)
+    ~head_level () =
+  let open Lwt_result_syntax in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store head_level
+  in
+  let+ lcc =
+    Plugin.Layer1_helpers.get_last_cemented_commitment
+      cctxt
+      metadata.rollup_address
+  in
+  lcc.level
+
+(* Only 'cemented' calls [get_l1_lcc_level]. *)
 let resolve_snapshot_level (store : _ Store.t) ~(head : Sc_rollup_block.t)
-    ~first_available_level (level : Cli.snapshot_level) =
+    ~first_available_level ~get_l1_lcc_level (level : Cli.snapshot_level) =
   let open Lwt_result_syntax in
   let head_level = head.header.level in
+  (* Rejects, rather than clamps, a level outside the range the store holds. *)
+  let in_range what l =
+    if Compare.Int32.(l > head_level) then
+      failwith
+        "Level %ld of the %s is higher than the head level %ld."
+        l
+        what
+        head_level
+    else if Compare.Int32.(l < first_available_level) then
+      failwith
+        "Level %ld of the %s is below the first available level %ld."
+        l
+        what
+        first_available_level
+    else return l
+  in
   match level with
   | Head -> return head_level
-  | Finalized -> (
-      let* finalized = Store.L2_blocks.find_finalized store in
-      match finalized with
-      | Some b -> return b.header.level
-      | None ->
-          failwith "No finalized block in the store, cannot use 'finalized'.")
+  | Finalized ->
+      (* Derived from the head, not from the finalized pointer of the store. *)
+      in_range "finalized block" (Int32.sub head_level 2l)
   | Cemented -> (
-      let* lcc = Store.State.LCC.get store in
-      match lcc with
-      | Some (_, lcc_level) -> return lcc_level
+      (* LCC level from Layer 1, capped by the last commitment of the store. *)
+      let* lcc_level = get_l1_lcc_level () in
+      let* last =
+        Store.L2_blocks.find_last_with_commitment store ~level:head_level
+      in
+      match last with
+      | Some b ->
+          in_range "cemented commitment" (Int32.min lcc_level b.header.level)
       | None ->
-          failwith "No cemented commitment in the store, cannot use 'cemented'."
-      )
+          failwith
+            "No block with a commitment in the store, cannot use 'cemented'.")
+  | Commitment -> (
+      (* Uses [commitment_hash] only, never [previous_commitment_hash]. *)
+      let* last =
+        Store.L2_blocks.find_last_with_commitment store ~level:head_level
+      in
+      match last with
+      | Some b -> in_range "last block with a commitment" b.header.level
+      | None ->
+          (* No fallback to the head, whose state no commitment covers. *)
+          failwith
+            "No block with a commitment in the store, cannot use 'commitment'. \
+             Use --level head to import the snapshot without checking its \
+             state against Layer 1.")
   | Level l ->
       if l > head_level then
         failwith
@@ -246,6 +292,7 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
       store
       ~head
       ~first_available_level:first_avail.header.level
+      ~get_l1_lcc_level:(get_l1_lcc_level cctxt store metadata ~head_level)
       level
   in
   (* Get the block at the target level to use for the snapshot header *)

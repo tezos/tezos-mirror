@@ -371,6 +371,17 @@ module L2_blocks : sig
   val find_last_committed :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
+  (** [find_last_with_commitment s ~level] retrieves the last block at or below
+      [level] whose header carries a commitment hash. Whether that commitment
+      is published on Layer 1 is not checked here. Unlike
+      {!find_last_committed}, this does not look at whether the context of the
+      block is on disk. *)
+  val find_last_with_commitment :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    level:int32 ->
+    Sc_rollup_block.t option tzresult Lwt.t
+
   (** Retrieve the first block whose context is committed on disk. *)
   val find_first_committed :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
