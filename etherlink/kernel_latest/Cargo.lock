@@ -3418,13 +3418,9 @@ dependencies = [
 name = "tezos-indexable-storage-latest"
 version = "0.1.0"
 dependencies = [
- "num-bigint",
- "rlp",
- "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-keyspace",
- "tezos-smart-rollup-storage",
  "tezos-storage-latest",
  "thiserror 1.0.69",
 ]

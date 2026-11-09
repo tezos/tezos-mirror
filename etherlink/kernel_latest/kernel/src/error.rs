@@ -254,25 +254,9 @@ impl From<BinError> for Error {
 impl From<IndexableStorageError> for Error {
     fn from(e: IndexableStorageError) -> Self {
         match e {
-            IndexableStorageError::Path(e) => Error::Storage(StorageError::Path(e)),
-            IndexableStorageError::Runtime(e) => Error::Storage(StorageError::Runtime(e)),
-            IndexableStorageError::Storage(e) => Error::Storage(StorageError::Storage(e)),
             IndexableStorageError::IndexOutOfBounds => {
                 Error::Storage(StorageError::IndexOutOfBounds)
             }
-            IndexableStorageError::RlpDecoderError(e) => Error::RlpDecoderError(e),
-            IndexableStorageError::InvalidLoadValue { expected, actual } => {
-                Error::Storage(StorageError::InvalidLoadValue { expected, actual })
-            }
-            IndexableStorageError::BinWriteError(msg) => {
-                Error::Encoding(EncodingError::BinWriterError(msg))
-            }
-            IndexableStorageError::NomReadError(msg) => Error::NomReadError(msg),
-            IndexableStorageError::TcError(msg) => Error::TcError(msg),
-            IndexableStorageError::TryFromBigIntError(msg) => {
-                Error::TryFromBigIntError(msg)
-            }
-            IndexableStorageError::Internal(msg) => Error::Internal(msg),
             IndexableStorageError::KeySpace(e) => {
                 Error::Storage(StorageError::KeySpace(e))
             }
