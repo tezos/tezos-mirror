@@ -805,6 +805,32 @@ let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches
     ?dal_node_endpoint
     reconstruct_context_from_first_available_level
 
+(* Warns with the state hash of a head whose state no commitment covers. *)
+let check_imported_head_state (head : Sc_rollup_block.t) context
+    (module Plugin : Protocol_plugin_sig.S) kind =
+  let open Lwt_result_syntax in
+  match (head.header.commitment_hash, head.header.context_hash) with
+  | Some _, Some _ -> return_unit
+  | Some _, None ->
+      failwith
+        "The head at level %ld has a commitment but no context, its state \
+         cannot be checked against Layer 1."
+        head.header.level
+  | None, None ->
+      let*! () = Event.unchecked_imported_head ~level:head.header.level () in
+      return_unit
+  | None, Some context_hash ->
+      let*! head_ctxt = Context.checkout context context_hash in
+      let*? head_ctxt = check_some head.header.block_hash "context" head_ctxt in
+      let* pvm_state =
+        get_pvm_state_from_store head_ctxt head.header.block_hash
+      in
+      let*! state_hash = Plugin.Pvm.state_hash kind pvm_state in
+      let*! () =
+        Event.unchecked_imported_head ~level:head.header.level ~state_hash ()
+      in
+      return_unit
+
 let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     ~dest =
   let open Lwt_result_syntax in
@@ -828,6 +854,12 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     Context.load (module C) ~cache_size:100 Read_only context_dir
   in
   let* head = check_head head context in
+  let* () =
+    match action with
+    | `Import _ ->
+        check_imported_head_state head context (module Plugin) metadata.kind
+    | `Export -> return_unit
+  in
   let*? () =
     match action with
     | `Import _ when head.header.level < snapshot_header.Header.head_level ->
@@ -1283,7 +1315,7 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
       Store.State.History_mode.set store Full
 
 (* Resets the store to [level]; warns if below [existing_head_level]. *)
-let reset_imported_store cctxt ~data_dir ~existing_head_level
+let reset_imported_store cctxt ~data_dir ~no_checks ~existing_head_level
     ~(level : Cli.snapshot_level) =
   let open Lwt_result_syntax in
   let* store = Store.init Read_write ~data_dir in
@@ -1336,6 +1368,12 @@ let reset_imported_store cctxt ~data_dir ~existing_head_level
              new_head.header.level
     | Head | Finalized | Level _ -> return_unit
   in
+  let*! () =
+    (* [post_checks] emits this warning, but --no-checks skips it. *)
+    if no_checks && Option.is_none new_head.header.commitment_hash then
+      Event.unchecked_imported_head ~level:new_head.header.level ()
+    else Lwt.return_unit
+  in
   let*! () = Store.close store in
   return_unit
 
@@ -1371,7 +1409,9 @@ let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ~level
   List.iter rm Store.extra_sqlite_files ;
   let* () = check_store_version (Configuration.default_storage_dir data_dir) in
   (* Reset first, so that only the kept levels are reconstructed. *)
-  let* () = reset_imported_store cctxt ~data_dir ~existing_head_level ~level in
+  let* () =
+    reset_imported_store cctxt ~data_dir ~no_checks ~existing_head_level ~level
+  in
   let* () =
     maybe_reconstruct_context
       cctxt
