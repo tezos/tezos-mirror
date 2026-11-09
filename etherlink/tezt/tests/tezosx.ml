@@ -6815,6 +6815,85 @@ let test_delayed_origination_balance_out_of_domain_dropped =
       "The invalid operation must not pay its fee: expected balance %R, got %L" ;
   unit
 
+(* A delayed native operation whose gas limits each fit in u64 but sum past it
+   is invalid: the block that includes it is produced, the operation leaves the
+   delayed inbox, and it is not applied. *)
+let test_delayed_gas_limit_sum_overflow_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native operation whose gas limits overflow u64 is dropped"
+    ~tags:["gas"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let* tez_client = tezlink_client sequencer in
+  let get_counter () =
+    let* counter =
+      Client.RPC.call tez_client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source.public_key_hash
+           ()
+    in
+    return (JSON.as_int counter)
+  in
+  let get_balance () =
+    let* balance =
+      Client.get_balance_for ~account:source.public_key_hash tez_client
+    in
+    return (Tez.to_mutez balance)
+  in
+  let* counter_before = get_counter () in
+  let* balance_before = get_balance () in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
+  (* Two gas limits of 2^63 each fit in u64; their sum does not. *)
+  let transfer i =
+    encode_transfer
+      ~source
+      ~fee:(Z.of_int branch_transfer_fee)
+      ~counter:(Z.of_int (counter_before + i))
+      ~gas_limit:(Z.shift_left Z.one 63)
+      ~storage_limit:Z.zero
+      ~dest:Constant.bootstrap2
+      ~amount:Z.one
+  in
+  let (`Hex operation) =
+    encode_unsigned_operation ~branch [transfer 1; transfer 2]
+    |> sign_encoded_operation ~signer:source
+    |> Hex.of_string
+  in
+  let* _hash =
+    Delayed_inbox.send_raw_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      operation
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* counter_after = get_counter () in
+  Check.((counter_after = counter_before) int)
+    ~error_msg:
+      "The invalid operation must not be applied: expected counter %R, got %L" ;
+  let* balance_after = get_balance () in
+  Check.((balance_after = balance_before) int)
+    ~error_msg:
+      "The invalid operation must not pay its fee: expected balance %R, got %L" ;
+  unit
+
 (* Test 3: a transfer with a foreign branch is rejected by the prevalidator at
    injection (so it never gets included and pays no inclusion fees). *)
 let test_native_branch_foreign_rejected () =
@@ -8177,6 +8256,7 @@ let () =
   test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
   test_delayed_amount_out_of_domain_dropped [Alpha] ;
   test_delayed_origination_balance_out_of_domain_dropped [Alpha] ;
+  test_delayed_gas_limit_sum_overflow_dropped [Alpha] ;
   test_delayed_crac_abort_promotes_unbacked_credit [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
