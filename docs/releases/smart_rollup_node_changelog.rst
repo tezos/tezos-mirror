@@ -46,6 +46,16 @@ Unreleased
 - The public ``secure`` RPC ACL now denies ``POST
   /global/block/<id>/simulate``. (MR :gl:`!22890`)
 
+- **Breaking change** ``snapshot import`` now stops at the last block that
+  carries a commitment, not at the snapshot head. The node checks the state of
+  this block against the commitment on L1, and gets the next blocks from L1 when
+  it starts. ``--level`` accepts ``head``, ``finalized``, ``cemented``,
+  ``commitment`` (default) or a block level. The default import fails if the
+  snapshot has no commitment. With ``--level head``, the node does not check the
+  state of the imported head and logs a warning. (MR :gl:`!23128`)
+
+- ``snapshot export`` accepts ``--level commitment``. (MR :gl:`!23128`)
+
 Version 25.3 (2026-10-20)
 =========================
 
