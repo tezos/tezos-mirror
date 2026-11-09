@@ -384,10 +384,12 @@ val change_operators : t -> (purpose * string) list -> unit
 val dump_durable_storage :
   sc_rollup_node:t -> dump:string -> ?block:string -> unit -> unit Lwt.t
 
-(** [export_snapshot ?compress_on_the_fly ?compact ?no_check rollup_node dir]
-    creates a snapshot of the rollup node in directory [dir]. *)
+(** [export_snapshot ?compress_on_the_fly ?uncompressed ?compact ?no_check
+    rollup_node dir] creates a snapshot of the rollup node in directory [dir].
+    With [uncompressed], the snapshot is not compressed. *)
 val export_snapshot :
   ?compress_on_the_fly:bool ->
+  ?uncompressed:bool ->
   ?compact:bool ->
   ?no_check:bool ->
   ?level:string ->

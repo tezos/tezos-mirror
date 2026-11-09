@@ -795,8 +795,8 @@ let patch_durable_storage sc_rollup_node ~key ~value =
       Process.check process
   | Running _ -> Test.fail "Cannot patch the state of a running node"
 
-let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
-    ?(no_check = false) ?level sc_rollup_node dir =
+let export_snapshot ?(compress_on_the_fly = false) ?(uncompressed = false)
+    ?(compact = false) ?(no_check = false) ?level sc_rollup_node dir =
   let process =
     spawn_command
       sc_rollup_node
@@ -809,6 +809,7 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
          data_dir sc_rollup_node;
        ]
       @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
+      @ Cli_arg.optional_switch "uncompressed" uncompressed
       @ Cli_arg.optional_switch "compact" compact
       @ Cli_arg.optional_switch "no-check" no_check
       @ Cli_arg.optional_arg "level" Fun.id level)
