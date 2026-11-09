@@ -100,7 +100,7 @@ where
     let payload = bk.base().get(&DELAYED_INPUT_KEY).unwrap();
     let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
     let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
-    let common = fetch_common_config(&kernel_host, &bk);
+    let common = fetch_common_config(&bk);
     delayed_inbox
         .save_transaction(
             &kernel_host,

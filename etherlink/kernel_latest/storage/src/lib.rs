@@ -17,7 +17,6 @@ use nom::Finish;
 use primitive_types::{H256, U256};
 use rlp::Decodable;
 
-use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::NomReader;
@@ -193,13 +192,6 @@ pub fn read_optional_rlp<T: Decodable>(
     }
 }
 
-/// Return a base58 contract address from storage at the given `path`.
-pub fn read_b58_kt1(host: &impl StorageV1, path: &impl Path) -> Option<ContractKt1Hash> {
-    let bytes = host.store_read(path, 0, KT1_B58_SIZE).ok()?;
-    let kt1_b58 = String::from_utf8(bytes).ok()?;
-    ContractKt1Hash::from_b58check(&kt1_b58).ok()
-}
-
 /// Store the `value` into the storage at the given `path`
 ///
 /// The stored value must implement BinWriter
@@ -303,6 +295,7 @@ pub fn read_optional_nom_value_bounded_with_len<T: for<'a> NomReader<'a>>(
 mod tests {
     use super::*;
     use crate::keyspace::KeySpaceExtB58;
+    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::path::RefPath;
@@ -441,15 +434,11 @@ mod tests {
     }
 
     #[test]
-    fn b58_kt1_byte_compatible_with_absolute_helper() {
+    fn b58_kt1_reads_the_raw_base58_bytes() {
         let mut host = MockKernelHost::default();
         let path = RefPath::assert_from(b"/ks/contract");
         host.store_write_all(&path, KT1.as_bytes()).unwrap();
 
-        assert_eq!(
-            crate::read_b58_kt1(&host, &path),
-            ContractKt1Hash::from_b58check(KT1).ok()
-        );
         let ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
         assert_eq!(
             ks.get_b58_kt1(&key(b"/contract")).unwrap(),
