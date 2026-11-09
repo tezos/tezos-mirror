@@ -378,7 +378,7 @@ release_page.deploy-assets-packaging-revision:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - ./scripts/releases/deploy-release-page-assets-packaging-revision.sh
+  - ./scripts/releases/deploy-release-page-assets.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

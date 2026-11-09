@@ -3,6 +3,9 @@
 # Deploys the Octez release assets: updates versions.json (the source of truth)
 # and uploads the binaries, checksums and archives to S3.
 #
+# For packaging revisions (octez-vX.Y-N), the version X.Y already exists:
+# only its build number is updated, and its binaries are replaced.
+#
 # It does NOT render the release site itself: that is done by the site-wide
 # [render_release_site.sh], which re-renders every component's page from the
 # versions.json published here.
@@ -31,13 +34,23 @@ fi
 
 # Initialize octez release variables needed later to determine relevant version information:
 # - major and minor version numbers (resp. [gitlab_release_major_version], [gitlab_release_minor_version])
-# - and, optionally, release candidate version number ([gitlab_release_rc_version]).
+# - and, optionally, release candidate version number ([gitlab_release_rc_version]),
+#   beta version number ([gitlab_release_beta_version])
+#   or packaging revision number ([gitlab_packaging_revision_version]).
 # shellcheck source=./scripts/releases/octez-release.sh
 . ./scripts/releases/octez-release.sh
 
 if [ -z "${gitlab_release}" ]; then
   echo "This is not an Octez release. No assets will be added to the release page."
   exit 0
+fi
+
+# The S3 directory name for this version, e.g. "octez-v20.0" or "octez-v20.0-rc1".
+# Packaging revisions replace the assets of the version they revise.
+if [ -n "${gitlab_packaging_revision_version}" ]; then
+  version_dir="octez-v${gitlab_release_major_version}.${gitlab_release_minor_version}"
+else
+  version_dir="${gitlab_release}"
 fi
 
 dune build release_site/src/
@@ -49,58 +62,68 @@ S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 echo "Downloading versions.json..."
 $VM download --path "${S3_PATH}"
 
-announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
-
-# Add the new version using version_manager
-# [gitlab_release_rc_version], [gitlab_release_beta_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
-echo "Adding version ${gitlab_release} to release page..."
-$VM \
-  add \
-  --major "${gitlab_release_major_version}" \
-  --minor "${gitlab_release_minor_version}" \
-  ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
-  ${gitlab_release_beta_version:+--beta "${gitlab_release_beta_version}"} \
-  --announcement "${announcement}"
-
-# Set as latest only if not an RC or beta
-if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ]; then
-  echo "Setting version as latest..."
+if [ -n "${gitlab_packaging_revision_version}" ]; then
+  # Update the build number of the existing version.
+  echo "Updating build number of ${version_dir} to ${gitlab_packaging_revision_version}..."
   $VM \
-    set-latest \
+    update-build-number \
     --major "${gitlab_release_major_version}" \
-    --minor "${gitlab_release_minor_version}"
-fi
+    --minor "${gitlab_release_minor_version}" \
+    --build-number "${gitlab_packaging_revision_version}"
+else
+  announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
 
-# Active versions logic: only for stable major releases (not RC, not beta)
-if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
+  # Add the new version using version_manager
+  # [gitlab_release_rc_version], [gitlab_release_beta_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
+  echo "Adding version ${gitlab_release} to release page..."
+  $VM \
+    add \
+    --major "${gitlab_release_major_version}" \
+    --minor "${gitlab_release_minor_version}" \
+    ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
+    ${gitlab_release_beta_version:+--beta "${gitlab_release_beta_version}"} \
+    --announcement "${announcement}"
 
-  echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
-
-  prev_major=$((gitlab_release_major_version - 1))
-  if [ "$prev_major" -ge 0 ]; then
+  # Set as latest only if not an RC or beta
+  if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ]; then
+    echo "Setting version as latest..."
     $VM \
-      set-inactive \
-      --major "${prev_major}" || true
+      set-latest \
+      --major "${gitlab_release_major_version}" \
+      --minor "${gitlab_release_minor_version}"
   fi
-fi
 
-echo "Set versions ${gitlab_release_major_version} as active..."
-$VM \
-  set-active \
-  --major "${gitlab_release_major_version}"
+  # Active versions logic: only for stable major releases (not RC, not beta)
+  if [ -z "${gitlab_release_rc_version}" ] && [ -z "${gitlab_release_beta_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
+
+    echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
+
+    prev_major=$((gitlab_release_major_version - 1))
+    if [ "$prev_major" -ge 0 ]; then
+      $VM \
+        set-inactive \
+        --major "${prev_major}" || true
+    fi
+  fi
+
+  echo "Set versions ${gitlab_release_major_version} as active..."
+  $VM \
+    set-active \
+    --major "${gitlab_release_major_version}"
+fi
 
 # Upload binaries to S3 bucket
 echo "Uploading binaries..."
-aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/x86_64/" --region "${REGION}"
+aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/arm64/" --region "${REGION}"
 
 # Create and push archives
-tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
-aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-sha256sum "${gitlab_release}.tar.gz" >> "./x86_64_sha256sums.txt"
-tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
-sha256sum "${gitlab_release}.tar.gz" >> "./arm64_sha256sums.txt"
-aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+tar -czf "${version_dir}.tar.gz" --transform 's|^octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
+aws s3 cp "./${version_dir}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/x86_64/" --region "${REGION}"
+sha256sum "${version_dir}.tar.gz" >> "./x86_64_sha256sums.txt"
+tar -czf "${version_dir}.tar.gz" --transform 's|^octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
+sha256sum "${version_dir}.tar.gz" >> "./arm64_sha256sums.txt"
+aws s3 cp "./${version_dir}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/arm64/" --region "${REGION}"
 
 # Push checksums for x86_64 binaries
 echo "Generating checksums for x86_64 binaries"
@@ -108,7 +131,7 @@ for binary in ./octez-binaries/x86_64/*; do
   filename=$(basename "$binary")
   [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
 done
-aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
+aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/x86_64/sha256sums.txt"
 
 # Push checksums for arm64 binaries
 echo "Generating checksums for arm64 binaries"
@@ -116,7 +139,7 @@ for binary in ./octez-binaries/arm64/*; do
   filename=$(basename "$binary")
   [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
 done
-aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/sha256sums.txt"
+aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${version_dir}/binaries/arm64/sha256sums.txt"
 
 # Upload versions.json back to remote storage. Only done here, since this is
 # the only branch that modifies it; otherwise we would re-upload an unchanged
