@@ -5,6 +5,8 @@
 
 use revm_interpreter::Gas;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_keyspace::KeySpaceError;
+use tezosx_types::StorageReadErrorKind;
 use thiserror::Error;
 
 /// Actual errors that propagate up past the precompile boundary,
@@ -13,6 +15,9 @@ use thiserror::Error;
 pub enum CustomPrecompileAbort {
     #[error("Runtime error: {0}")]
     Runtime(RuntimeError),
+    /// A keyspace read failed.
+    #[error(transparent)]
+    KeySpaceRead(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error("cross-runtime call block abort: {0}")]
     Crac(String),
 }

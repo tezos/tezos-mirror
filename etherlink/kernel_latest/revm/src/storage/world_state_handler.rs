@@ -9,23 +9,32 @@ use revm::{
     state::{AccountInfo as RevmAccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace};
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
+use tezos_storage::keyspace::KeySpaceExtB58;
 use tezosx_interfaces::{AliasInfo, Origin};
+use tezosx_types::StorageReadErrorKind;
 
 use evm_types::{FaDepositWithProxy, PrecompileStateError};
 
 use crate::{error::EvmDbError, storage::code::CodeStorage};
 
-/// Path where the L1 address of our withdrawals ticketer is stored.
-pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/ticketer");
+/// Key to the L1 address of the withdrawal ticketer, inside the
+/// `/evm/world_state` keyspace.
+pub const NATIVE_TOKEN_TICKETER_KEY: Key = Key::from_static(b"/ticketer");
 
-/// Size of contract hash encoded in base58.
-pub const KT1_B58_SIZE: usize = 36;
+/// Reads the withdrawal ticketer from the `/evm/world_state` keyspace.
+/// Returns `None` when it is absent or shorter than a base58 KT1 address, and
+/// errors when it is not a base58 KT1 address.
+pub fn read_ticketer(
+    evm_world_state: &impl KeySpace,
+) -> Result<Option<ContractKt1Hash>, KeySpaceError<StorageReadErrorKind>> {
+    evm_world_state.get_b58_kt1(&NATIVE_TOKEN_TICKETER_KEY)
+}
 
 /// Path where a possible waiting sequencer upgrade triggered by a precompile
 /// is store.

@@ -43,11 +43,12 @@ use crate::{
     },
 };
 use evm_types::{
-    CustomPrecompileError, DatabasePrecompileStateChanges, IntoWithRemainder,
-    PrecompileStateError,
+    CustomPrecompileAbort, CustomPrecompileError, DatabasePrecompileStateChanges,
+    IntoWithRemainder,
 };
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezos_smart_rollup_keyspace::{KeySpaceError, KeySpaceLoader};
+use tezosx_types::StorageReadErrorKind;
 
 sol! {
     contract SendOutboxMessage {
@@ -113,8 +114,8 @@ pub(crate) enum SendOutboxRevertReason {
     #[error("Fixed byte array conversion error: {0}")]
     IntoFixedInvalidSize(usize),
 
-    #[error("Database access error: {0}")]
-    DatabaseAccess(#[from] PrecompileStateError),
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
 
     #[error("Outbox message too large: {size} bytes exceeds the {max} bytes limit")]
     OutboxMessageTooLarge { size: usize, max: usize },
@@ -123,7 +124,9 @@ pub(crate) enum SendOutboxRevertReason {
 impl IntoWithRemainder for SendOutboxRevertReason {
     fn into_with_remainder(self, gas: revm::interpreter::Gas) -> CustomPrecompileError {
         match self {
-            SendOutboxRevertReason::DatabaseAccess(e) => e.into_with_remainder(gas),
+            SendOutboxRevertReason::KeySpace(e) => {
+                CustomPrecompileError::Abort(CustomPrecompileAbort::KeySpaceRead(e))
+            }
             other => CustomPrecompileError::Revert(other.to_string(), gas),
         }
     }
@@ -527,6 +530,25 @@ mod tests {
             entrypoint,
             ticketer,
         )
+    }
+
+    /// A failed keyspace read, such as a missing ticketer, aborts the
+    /// precompile instead of reverting it.
+    #[test]
+    fn keyspace_read_error_aborts() {
+        use crate::storage::world_state_handler::NATIVE_TOKEN_TICKETER_KEY;
+        use tezos_smart_rollup_keyspace::ReadKind;
+
+        let error = KeySpaceError::read(
+            &"/evm/world_state".parse().unwrap(),
+            &NATIVE_TOKEN_TICKETER_KEY,
+            ReadKind::Ext(StorageReadErrorKind::NotFound),
+        );
+        assert!(matches!(
+            SendOutboxRevertReason::KeySpace(error)
+                .into_with_remainder(revm::interpreter::Gas::new(0)),
+            CustomPrecompileError::Abort(CustomPrecompileAbort::KeySpaceRead(_))
+        ));
     }
 
     #[test]

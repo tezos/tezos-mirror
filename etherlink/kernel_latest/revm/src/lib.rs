@@ -828,7 +828,7 @@ mod test {
         storage::{
             sequencer_key_change::{read_sequencer_change_counter, SequencerKeyChange},
             world_state_handler::{
-                AccountInfo, AccountOrigin, StorageAccount, NATIVE_TOKEN_TICKETER_PATH,
+                AccountInfo, AccountOrigin, StorageAccount, NATIVE_TOKEN_TICKETER_KEY,
                 SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
             },
         },
@@ -2213,11 +2213,10 @@ mod test {
             .unwrap();
 
         // Store the ticketer address required to build the outbox message
-        rk.host_mut()
-            .store_write(
-                &NATIVE_TOKEN_TICKETER_PATH,
+        rk.evm_world_state_mut()
+            .set(
+                &NATIVE_TOKEN_TICKETER_KEY,
                 "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
-                0,
             )
             .unwrap();
 

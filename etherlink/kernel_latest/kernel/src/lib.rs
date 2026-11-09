@@ -321,7 +321,7 @@ where
             // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(bk.base_mut())?;
-            let configuration = fetch_configuration(host, bk.base());
+            let configuration = fetch_configuration(host, &bk);
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
@@ -350,7 +350,7 @@ where
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
     let chain_configuration = fetch_tezosx_configuration(&mut bk)?;
-    let mut configuration = fetch_configuration(host, bk.base());
+    let mut configuration = fetch_configuration(host, &bk);
     let sequencer_pool_address = read_sequencer_pool_address(bk.evm_world_state());
 
     // Performing health check to recover from a potentially corrupted durable storage. We do it
@@ -577,7 +577,7 @@ mod tests {
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
     use revm_etherlink::storage::world_state_handler::{
-        StorageAccount, NATIVE_TOKEN_TICKETER_PATH,
+        StorageAccount, NATIVE_TOKEN_TICKETER_KEY,
     };
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::enc::BinWriter;
@@ -691,9 +691,9 @@ mod tests {
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-            rk.host_mut()
-                .store_write_all(
-                    &NATIVE_TOKEN_TICKETER_PATH,
+            rk.evm_world_state_mut()
+                .set(
+                    &NATIVE_TOKEN_TICKETER_KEY,
                     b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
                 )
                 .unwrap();

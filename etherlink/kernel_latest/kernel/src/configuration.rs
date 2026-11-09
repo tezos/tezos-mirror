@@ -20,7 +20,10 @@ use crate::{
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
 use primitive_types::U256;
-use revm_etherlink::storage::{read_ticketer, version::read_or_set_evm_version};
+use revm_etherlink::storage::version::read_or_set_evm_version;
+use revm_etherlink::storage::world_state_handler::{
+    read_ticketer, NATIVE_TOKEN_TICKETER_KEY,
+};
 use tezos_crypto_rs::{
     blake2b,
     hash::{ChainId, ContractKt1Hash},
@@ -169,8 +172,6 @@ impl TezosContracts {
     }
 }
 
-// The `/evm` contracts are read through the raw host; the `/base` ones go
-// through the keyspace handle.
 fn read_and_log_b58<T, E: std::fmt::Display>(
     result: Result<Option<T>, E>,
     key: &Key,
@@ -193,24 +194,31 @@ fn read_and_log_b58<T, E: std::fmt::Display>(
     }
 }
 
-fn fetch_tezos_contracts(host: &impl StorageV1, base: &impl KeySpace) -> TezosContracts {
-    // 1. Fetch the kernel's ticketer, returns `None` if it is badly
-    //    encoded or absent.
-    let ticketer = read_ticketer(host);
+// The sequencer governance is read through the raw host; the other contracts
+// go through the keyspace handles.
+fn fetch_tezos_contracts(
+    host: &impl StorageV1,
+    bk: &BlueprintKeyspaces<impl KeySpace>,
+) -> TezosContracts {
+    // 1. Fetch the kernel's ticketer.
+    let ticketer = read_and_log_b58(
+        read_ticketer(bk.evm_world_state()),
+        &NATIVE_TOKEN_TICKETER_KEY,
+    );
     // 2. Fetch the kernel's administrator, returns `None` if it is badly
     //    encoded or absent.
-    let admin = read_and_log_b58(read_admin(base), &ADMIN_KEY);
+    let admin = read_and_log_b58(read_admin(bk.base()), &ADMIN_KEY);
     // 3. Fetch the sequencer governance, returns `None` if it is badly
     //    encoded or absent.
     let sequencer_governance = read_sequencer_governance(host);
     // 4. Fetch the kernel_governance contract, returns `None` if it is badly
     //    encoded or absent.
     let kernel_governance =
-        read_and_log_b58(read_kernel_governance(base), &KERNEL_GOVERNANCE_KEY);
+        read_and_log_b58(read_kernel_governance(bk.base()), &KERNEL_GOVERNANCE_KEY);
     // 5. Fetch the kernel_security_governance contract, returns `None` if it is badly
     //    encoded or absent.
     let kernel_security_governance = read_and_log_b58(
-        read_kernel_security_governance(base),
+        read_kernel_security_governance(bk.base()),
         &KERNEL_SECURITY_GOVERNANCE_KEY,
     );
 
@@ -340,12 +348,15 @@ pub fn fetch_tezosx_configuration(
     ))
 }
 
-pub fn fetch_common_config(host: &impl StorageV1, base: &impl KeySpace) -> CommonConfig {
-    let tezos_contracts = fetch_tezos_contracts(host, base);
+pub fn fetch_common_config(
+    host: &impl StorageV1,
+    bk: &BlueprintKeyspaces<impl KeySpace>,
+) -> CommonConfig {
+    let tezos_contracts = fetch_tezos_contracts(host, bk);
     let maximum_allowed_ticks =
-        read_maximum_allowed_ticks(base).unwrap_or(MAX_ALLOWED_TICKS);
-    let enable_fa_bridge = is_enable_fa_bridge(base);
-    let evm_node_flag = evm_node_flag(base);
+        read_maximum_allowed_ticks(bk.base()).unwrap_or(MAX_ALLOWED_TICKS);
+    let enable_fa_bridge = is_enable_fa_bridge(bk.base());
+    let evm_node_flag = evm_node_flag(bk.base());
     CommonConfig {
         tezos_contracts,
         maximum_allowed_ticks,
@@ -354,15 +365,18 @@ pub fn fetch_common_config(host: &impl StorageV1, base: &impl KeySpace) -> Commo
     }
 }
 
-pub fn fetch_configuration(host: &impl StorageV1, base: &impl KeySpace) -> Configuration {
+pub fn fetch_configuration(
+    host: &impl StorageV1,
+    bk: &BlueprintKeyspaces<impl KeySpace>,
+) -> Configuration {
     let sequencer = sequencer(host).unwrap_or_default();
-    let common = fetch_common_config(host, base);
+    let common = fetch_common_config(host, bk);
     let dal: Option<DalConfiguration> =
-        fetch_dal_configuration(base, common.evm_node_flag);
+        fetch_dal_configuration(bk.base(), common.evm_node_flag);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_and_log_b58(
-                read_delayed_transaction_bridge(base),
+                read_delayed_transaction_bridge(bk.base()),
                 &DELAYED_BRIDGE_KEY,
             )
             // The sequencer must declare a delayed transaction bridge. This
@@ -373,9 +387,9 @@ pub fn fetch_configuration(host: &impl StorageV1, base: &impl KeySpace) -> Confi
             });
             // Default to 5 minutes.
             let max_blueprint_lookahead_in_seconds =
-                max_blueprint_lookahead_in_seconds(base)
+                max_blueprint_lookahead_in_seconds(bk.base())
                     .unwrap_or(DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS);
-            match DelayedInbox::from_base(base) {
+            match DelayedInbox::from_base(bk.base()) {
                 Ok(delayed_inbox) => Configuration {
                     common,
                     mode: ConfigurationMode::Sequencer(SequencerConfig {

@@ -86,10 +86,6 @@ let kernel_security_governance = function
   | Kernel.Latest | Kernel.Previewnet | Kernel.Mainnet ->
       base "/kernel_security_governance"
 
-let sequencer_governance = evm "/sequencer_governance"
-
-let ticketer = evm "/ticketer"
-
 let sequencer = function
   | Kernel.Latest | Kernel.Previewnet | Kernel.Mainnet ->
       world_state "/sequencer"

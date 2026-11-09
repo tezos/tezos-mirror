@@ -45,3 +45,4 @@ tezos_data_encoding.workspace = true
 tezos-protocol.workspace = true
 mir.workspace = true
 tezos-smart-rollup.workspace = true
+tezos-smart-rollup-keyspace.workspace = true

@@ -111,6 +111,6 @@ pub fn reveal_storage(
         Ok(chain_config) => log!(Info, "Chain Configuration {chain_config:?}"),
         Err(err) => log!(Error, "Failed to read the chain configuration: {err:?}"),
     }
-    let configuration = fetch_configuration(host, bk.base());
+    let configuration = fetch_configuration(host, bk);
     log!(Info, "Configuration {}", configuration);
 }

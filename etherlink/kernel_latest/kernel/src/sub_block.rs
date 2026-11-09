@@ -367,7 +367,7 @@ where
         input_data.block_number,
     )?;
 
-    let mut configuration = fetch_configuration(host, bk.base());
+    let mut configuration = fetch_configuration(host, &bk);
     let mut base = bk.into_base();
     let mut safe_host = SafeStorage {
         host,

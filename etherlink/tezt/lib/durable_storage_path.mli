@@ -78,13 +78,6 @@ val kernel_governance : Kernel.t -> path
 (** [kernel_security_governance] is the path to the security governance contract. *)
 val kernel_security_governance : Kernel.t -> path
 
-(** [sequencer_governance] is the path to the governance contract
-    administrating the sequencer. *)
-val sequencer_governance : path
-
-(** [ticketer] is the path to the ticketer contract. *)
-val ticketer : path
-
 (** [sequencer kernel] is the path to the sequencer key. It lives in the
     world state for every kernel in the table: the move happened in V51
     ([Storage_version.sequencer_key_storage_migrated_to_world_state]). *)
