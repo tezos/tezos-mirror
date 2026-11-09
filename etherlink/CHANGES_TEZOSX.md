@@ -7,6 +7,272 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.11 (Etherlink 8.0) (c81d9f519b7b2031a564082c3cdb1411eba22b8c)
+
+### EVM Runtime
+
+- A delayed EVM transaction that the EVM refuses before executing it (gas
+  limit below the intrinsic gas or the EIP-7623 floor, initcode too large,
+  value above the balance, malformed EIP-7702 transaction, ...) is now
+  dropped as invalid instead of aborting the block. (!23139)
+- The `ecrecover` precompile (`0x01`) now costs 9000 gas instead of 3000, and
+  the `ecPairing` precompile (`0x08`) costs 68000 gas per point instead of
+  34000. Its base cost is unchanged. (!23094)
+- `ecrecover` is computed with `libsecp256k1`, which is faster. Its results
+  are unchanged. (!23094)
+- A `SWAP1` to `SWAP16` that finds too few items on the stack now halts with
+  a stack underflow instead of a stack overflow. Transaction traces show the
+  new halt reason. (!23041)
+- In callTracer traces, a failed call to a standard precompile now reports
+  all the gas it received as used, instead of 0. (!23041)
+- The error message of an `eth_call` or `eth_estimateGas` that halts now
+  shows the gas fields of revm 43. (!23041)
+- When a frame that materializes a legacy alias forwarder again reverts, the
+  forwarder keeps its code instead of losing it. (!23041)
+- **Breaking change:** The EVM alias of a tz1, tz2 or tz3 account now
+  coincides with the address of a rescue smart wallet that can be deployed on
+  other EVM chains. Users who bridge assets to their alias by mistake can
+  recover them safely with their Tezos key. See
+  [EVM alias of a Tezos account](https://docs.etherlink.com/overview/accounts-and-aliases#evm-alias-of-a-tezos-account). (!23037)
+- Add a new method to the EVM gateway to materialize the EVM alias
+  of an account of another runtime, following rules in [RFC-26049](https://github.com/trilitech/engineering-rfcs/blob/main/rfcs/26049-alias-materialization-rules.md). (!22919)
+- The `callTracer` now records geth's `position` on every log it captures
+  with `withLog: true`: the number of the enclosing frame's sub-calls that
+  had completed when the log fired. Recording it at emission time is what
+  makes it exact — the transaction's log order alone cannot place a
+  sub-call that emitted nothing. As on geth, `onlyTopCall` reports `0`,
+  no sub-call being appended to the reported frame. (!22573)
+
+### Michelson Runtime
+
+- The message of a typechecking error, in the `error_message` field of a
+  receipt or in the revert of a cross-runtime view, is a short description
+  such as "unexpected syntax". It no longer shows the rejected value, type or
+  stack. (!23153)
+- A failed typechecking encodes the rejected value in binary Micheline at the
+  expense of the operation gas. It can consume more gas than before. This
+  includes a failed `UNPACK`, which then consumes more gas than on L1. (!23153)
+- A `VIEW` that runs out of gas while it loads the code of its target
+  contract is reported as running out of gas, not as a failure of the script. (!23153)
+- **Breaking change:** a cross-runtime view that reaches `FAILWITH` reverts
+  with "script reached FAILWITH instruction". The revert no longer carries the
+  failed value and its type, so an EVM caller cannot decode them. More
+  generally, the revert of a cross-runtime view shows the short message of an
+  interpretation error, not its debug text. (!23153)
+- A FAILWITH is reported as the error `tezosx.failwith`, which the EVM node
+  serves as L1's `michelson_v1.script_rejected`, with the failed value as a
+  Micheline expression in the `with` field. It was reported as
+  `tezosx_internal.transfer.michelson_contract_interpret_error` carrying a debug
+  string. The location of the failure is not tracked yet and is always -1. The
+  failed value is unparsed at the expense of the operation gas, as on L1, so a
+  FAILWITH on a value too large to unparse runs out of gas. (!23142)
+- When the binary Micheline of the failed value and of its type takes more
+  than 64 KiB, the `with` field is the string "FAILWITH value too large". (!23142)
+- A CRAC to a Michelson contract that reaches FAILWITH reverts with "script
+  reached FAILWITH instruction". The revert no longer shows the failed value
+  and its type, which the failed CRAC receipt carries. (!23142)
+- A Michelson operation whose declared gas limits sum past `u64` is invalid,
+  instead of aborting the block that includes it. (!23138)
+- `EDIV` is now charged at least for the memory its quotient and remainder
+  allocate. Divisions of large numbers can consume more gas than before. (!23138)
+- Charge the whole gas budget when the creation of a sender or source alias
+  runs out of gas in a Michelson call to the EVM through the runtime gateway
+  (`%call`, `%call_evm`). (!23138)
+- A timestamp given as a string that is not RFC3339 and is longer than 32
+  bytes is rejected, while L1 accepts it. Such a string was parsed in time
+  quadratic in its length, for a gas cost that grows as its length to the
+  power 1.5. (!23138)
+- `MAP` on a map charges the update of the result map for each element, as
+  L1 does. It consumes more gas than before, more so on maps with large keys. (!23138)
+- Numeric instructions, `AND` on int and nat, `SELF`, `PAIR n` and the map and
+  set updates are now charged at least for the memory they allocate. Some of
+  these instructions consume more gas than before. (!23092)
+- Charge gas before reading contract code and storage during transfers, views,
+  and entrypoint lookups in the Michelson runtime. (!23059)
+- When gas refund is enabled, an operation whose total declared fees overflow
+  64 bits is rejected as invalid instead of aborting the block. (!23055)
+- An origination that fails to read or write the contract state reports the
+  keyspace error, with the keyspace and the key it failed on, under
+  `tezosx_internal.origination.read` or `tezosx_internal.origination.write`,
+  instead of a fixed message under `origination.failed_to_fetch_originated`.
+  An invalid contract key reports a permanent error under
+  `tezosx_internal.origination.key`. The id
+  `tezosx_internal.origination.failed_to_fetch_source_account` is gone, nothing
+  produced it. (!22995)
+- A transfer that fails to read or write an account reports the keyspace
+  error, with the keyspace and the key it failed on, under
+  `tezosx_internal.transfer.read` or `tezosx_internal.transfer.write`, instead
+  of a fixed message under one id per failing step
+  (`transfer.failed_to_fetch_destination_account`,
+  `transfer.failed_to_fetch_contract_code`,
+  `transfer.failed_to_update_contract_storage` and the others). An invalid
+  account key reports a permanent error under `tezosx_internal.transfer.key`,
+  and a deposit to an originated contract under
+  `tezosx_internal.transfer.context`. (!22994)
+- Failed operations report their errors with the ids and fields of the L1
+  protocol, e.g. `proto.025-PsUshuai.contract.balance_too_low` with `contract`,
+  `balance` and `amount`, instead of a single `tezlink_error` id carrying a
+  debug string, so wallets and indexers recognise them. This covers balance too
+  low, storage fees that cannot be paid, gas and storage exhaustion, already
+  revealed keys, inconsistent public keys, empty transactions, non-existing
+  contracts, bad parameters and unknown entrypoints of accounts without code.
+  The other errors get one id per error under
+  `proto.025-PsUshuai.tezosx_internal.`, which is not a stable API, and a
+  readable `error_message`. (!22946)
+- A cross-runtime call whose Michelson target runs out of gas answers the EVM
+  caller with a 429 and the `OOG` body instead of a 400 carrying the
+  interpreter message. The revert stays catchable, but its revert data changes. (!22946)
+- The gas charged on the error persisted by a failed cross-runtime call is
+  based on the encoded size of the error instead of the length of its debug
+  rendering, which is about 100 bytes more for a small error. (!22946)
+- A reveal that fails to read or write the account record reports the keyspace error, with the keyspace and the key it failed on, under
+  `tezosx_internal.reveal.read` or `tezosx_internal.reveal.write`, instead of
+  a fixed message under `tezosx_internal.reveal.unretrievable_manager` or
+  `tezosx_internal.reveal.failed_to_write_manager`. (!22941)
+- Add a `%materialize_alias` entrypoint to the Michelson runtime gateway.
+  It creates the Michelson (KT1) alias of an account from another runtime
+  (for now, an EVM address), without waiting for a NAC. (!22932)
+- The error for a Michelson `key_hash` or `address` value given as bytes that
+  do not decode displays the decoder error in user-facing form, instead of a
+  debug form. (!22918)
+- The error for a Michelson `key` value given as bytes that do not decode
+  displays the failing byte range and the decoder error in user-facing form,
+  instead of a debug form. The error of `run_code` for an input that does not
+  decode uses the same text. (!22918)
+- A Michelson operation whose fee, amount, or origination balance exceeds
+  the mutez domain (`i64::MAX`) is now rejected as invalid at validation. (!22836)
+- With the fee refund enabled, a batch whose declared fees sum past the mutez
+  domain is now rejected as invalid at validation. (!22836)
+- A cross-runtime `X-Tezos-Amount` header above the mutez domain is now
+  rejected as a bad request. (!22836)
+- A credit that would push a balance past the mutez domain now fails the
+  operation, or the deposit; it was previously unbounded. (!22836)
+- A delegated storage cost that would leave the mutez domain now fails the
+  cross-runtime call that bills it, rather than the storage burn at the end
+  of the operation. (!22836)
+- Optimize batched updates of big maps by updating its new size only once. (!22710)
+- The Michelson runtime no longer supports Tezos protocol S023 (Seoul): the
+  kernel drops the S023 protocol variant and no longer decodes RLP protocol tag
+  23. The oldest supported protocol is now T024 (Tallinn), and headers
+  predating the `next_protocol` field are back-filled with T024. (!22606)
+
+### Native Atomic Composability
+
+- Runtime gateway: **gas change.** The per-word charge on the calldata of every
+  gateway entrypoint is now charged before the calldata is decoded, and the base
+  cost of `callMichelson`, `callMichelsonView` and `call` with it. A call
+  forwarding too little gas runs out of gas without decoding anything, where it
+  used to decode its whole input first. The total charged for a `callMichelson`,
+  `callMichelsonView` or `call` that succeeds is unchanged. `originOf`,
+  `resolveAddress` and `materializeAlias` now also pay the per-word charge on
+  their calldata, a few gas for a normal call, and a call with a malformed
+  encoding pays these charges before it reverts. (!23138)
+- Runtime gateway: `call(string,(string,string)[],bytes,uint8)` no longer
+  accepts user-supplied headers. The selector and signature are unchanged and
+  calls passing an empty `headers` array behave as before; a non-empty array
+  now reverts with `invalid input encoding`. The headers were never read by
+  either runtime. (!23138)
+- Michelson runtime: the gateway `%call` entrypoint no longer accepts
+  user-supplied headers either. A non-empty `headers` list now fails the call;
+  an empty list behaves as before. (!23138)
+- Fix `debug_traceBlockByNumber` with `callTracer` failing on a block holding a
+  Tezos operation whose cross-runtime call is rejected by the EVM runtime after
+  materializing the sender's EVM alias. Such an operation produces no synthetic
+  EVM transaction and now leaves no trace either. (!22981)
+- Fix a Michelson runtime failure caught by the EVM runtime still failing its
+  parent when nested: the cross-runtime call into the Michelson runtime was
+  reverted, or the enclosing Michelson operation was labelled as backtracked. (!22979)
+- Fix partial reverts tampering with Tezos operation status. Before, a
+  successful Tezos operation whose execution leads to a reverting Michelson
+  runtime cross-runtime call could wrongfully be labelled as backtracked. (!22931)
+- Fixes Michelson receipts being emitted out of depth-first execution order when the
+  gateway is called directly by an implicit account or by a cross-runtime call. (!22924)
+- Always produce a synthetic EVM transaction when a Tezos operation performs a
+  cross-runtime call, even if every such call is a static call. In the latter
+  case, the kernel was not producing a synthetic EVM transaction before. (!22923)
+- Tezos operations performing at least one cross-runtime call now always
+  produce a synthetic EVM transaction. Before, the synthetic transaction was
+  omitted when the operation reverted. (!22913)
+- Fix `OutOfGas` errors within a NAC frame aborting the whole block. (!22839)
+- The `originOf` and `resolveAddress` gateway entrypoints now charge the same
+  alias-lookup gas whether the origin was read from durable storage or from an
+  alias staged earlier in the same transaction. A source on the Michelson
+  runtime taking the staged path was billed 96 EVM gas instead of 2100. (!22779)
+- Cap the number of HTTP headers accepted by the EVM gateway's `call()`
+  entrypoint, mirroring the Michelson `%call` gateway. (!22735)
+
+### L1/L2 Bridge
+
+- Apply a two-week minimum delayed-inbox timeout until 2026-11-27T00:00:00Z.
+  Longer configured timeouts remain effective, and forced flushes are
+  unaffected. After the sunset, the configured timeout applies again. (!23054)
+
+### Storage versions
+
+- The storage version is now 69. The migration moves `/chunked_transactions`
+  under `/base/chunked_transactions`, where the proxy inbox reassembles chunked
+  transactions through the keyspace. (!23123)
+- The storage version is now 70. It carries no data migration: the version is
+  the signal on which the node gates where it reads the `debug_trace*` output
+  (`/evm/world_state/trace/`) and the per-transaction `http_trace*` output
+  (`/evm/world_state/__http_trace/traces/`). Both only exist on throwaway
+  states: the `debug_trace*` output on replays and simulations, the
+  `http_trace*` output on replays. The tracer input `/base/trace/input` and the
+  flag `/base/__http_trace_enabled` do not move. (!23115)
+- The storage version is now 68. The migration writes
+  `/base/feature_flags/enable_michelson_gas_refund`, which enables the gas
+  refund of the Michelson runtime. (!23056)
+- The storage version is now 67. It carries no data migration: the version is
+  the signal on which the node gates the new `tezosx_compute_alias`
+  entrypoint, which derives an alias exactly as the kernel does. (!23037)
+- The storage version is now 66. The target sunrise level of the Michelson
+  runtime moves from `/tez/world_state/michelson_runtime/target_sunrise_level`
+  to `/base/michelson_runtime_target_sunrise_level`. (!22887)
+
+### Internals
+
+- Remove the reveal storage testing device, which replicated a dumped durable
+  storage into a new rollup before stage one. (!23124)
+- The EVM tracers and the per-transaction HTTP trace capture write into the
+  `/evm/world_state` keyspace instead of raw `/base/trace` and
+  `/base/__http_trace` paths on the `SafeStorage` host. The keyspace is a
+  mirror root, so the block mirror and the per-operation mirror of the
+  Michelson runtime carry the traces with the rest of the state, and
+  `SafeStorage::promote_trace` and `promote_http_trace` are removed. The
+  traces are never committed and are not part of the state hash. (!23115)
+- Hash Keccak-256 with `tiny-keccak` again. With revm 43, Keccak-256 cost
+  about 5 times more ticks. (!23063)
+- Bump revm from 36.0.0 to 43.0.3. Amsterdam stays disabled. (!23041)
+- Bump ruint from 1.17.2 to 1.20.1, which fixes RUSTSEC-2026-0220 (wrong
+  overflow flag on shifts). (!23034)
+- EVM account metadata writes (predeployed contract code, alias
+  classification) go through a writer that cannot change the balance, and
+  the whole-record account writers are sealed by clippy. (!22948)
+- Add method to determine if an address is native to a runtime or not in runtime interfaces. (!22915)
+- The Michelson side of the kernel (`tezos_execution`, `tezosx-tezos-runtime`,
+  the Tezos-side deposits, the MIR boundary, the alias-resolution seam, the
+  cross-runtime amount headers, the DA fee per byte) now carries native amounts
+  as `Mutez` end to end; `Narith → Mutez` is validated once, at operation entry. (!22836)
+- The legacy `tezos_ethereum::wei::michelson_gas_to_mutez` is removed. (!22836)
+- Native-token amounts are now typed (`Mutez`, `Wei`): wei/mutez
+  conversions at kernel call sites go through explicit, checked policies,
+  and amounts outside the mutez domain (bridge deposits, DA and gas fees,
+  delegated storage cost) are rejected with an error instead of flowing
+  unchecked. (!22801)
+- Clamp the cross-runtime call watermarks to the length of the list they index
+  before draining it, so a watermark that outlives its list no longer traps the
+  kernel. (!22696)
+- Report a leaked cross-runtime frame checkpoint when closing the journal,
+  instead of letting it pass unnoticed. (!22696)
+- Guard the Michelson runtime interpreter DIP against a stack underflow: use a
+  checked split so a broken stack-length invariant surfaces as an error instead
+  of trapping the kernel. (!22696)
+- Add a `text-parser` Cargo feature (default-on) to the Michelson in Rust
+  (MIR) crate. The parser, lexer, `Tok` enum, and LALRPOP-generated grammar
+  are gated behind this feature. Kernel builds now declare
+  `default-features = false` for the MIR dependency, statically excluding
+  the parser and lexer from the kernel binary. (!21858)
+
 ## Version 0.10 (6d47b6a1268f623c80c493b0c321ccd222aaf1b8)
 
 ### EVM Runtime
