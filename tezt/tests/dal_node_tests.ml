@@ -1730,6 +1730,7 @@ let test_compact_snapshot_with_dal_node protocol parameters dal_node
   let*! () =
     Sc_rollup_node.import_snapshot
       ~no_check:true
+      ~level:"head"
       ~dal_node
       new_rollup_node
       ~snapshot_file

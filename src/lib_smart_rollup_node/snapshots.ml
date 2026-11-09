@@ -805,8 +805,7 @@ let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches
     ?dal_node_endpoint
     reconstruct_context_from_first_available_level
 
-let post_checks ?(apply_unsafe_patches = false)
-    ?(check_commitment_publication = false) ~action ~message snapshot_header
+let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
@@ -837,10 +836,9 @@ let post_checks ?(apply_unsafe_patches = false)
   in
   let* () =
     match action with
-    | `Import cctxt when check_commitment_publication ->
-        let last_commitment_hash =
-          Sc_rollup_block.most_recent_commitment head.header
-        in
+    | `Import cctxt ->
+        (* The commitment of the head, or of an ancestor if it has none. *)
+        let commitment = Sc_rollup_block.most_recent_commitment head.header in
         (* Use the recorded publication level from the imported store when
            available — it gives a one-RPC direct lookup. Fall back to the
            commitment's inbox level, which is a guaranteed lower bound on
@@ -848,26 +846,29 @@ let post_checks ?(apply_unsafe_patches = false)
         let* recorded_publication =
           Store.Commitments_published_at_levels.get_first_published_level
             store
-            last_commitment_hash
+            commitment
         in
         let* hint_level =
           match recorded_publication with
           | Some level -> return level
-          | None ->
-              let* last_commitment =
-                Store.Commitments.find store last_commitment_hash
-              in
-              let last_commitment =
-                WithExceptions.Option.get ~loc:__LOC__ last_commitment
-              in
-              return last_commitment.inbox_level
+          | None -> (
+              let* stored = Store.Commitments.find store commitment in
+              match stored with
+              | Some stored -> return stored.inbox_level
+              | None ->
+                  failwith
+                    "Missing commitment %a of the head at level %ld in the \
+                     imported store."
+                    Commitment.Hash.pp
+                    commitment
+                    head.header.level)
         in
         check_commitment_published
           ~hint_level
           cctxt
           metadata.rollup_address
-          last_commitment_hash
-    | _ -> return_unit
+          commitment
+    | `Export -> return_unit
   in
   let* check_block_data =
     match action with
@@ -1155,7 +1156,7 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename
     ~filename
     ()
 
-let pre_import_checks cctxt ~no_checks ~data_dir ?level
+let pre_import_checks cctxt ~no_checks ~data_dir ~(level : Cli.snapshot_level)
     (snapshot_header : Header.t) =
   let open Lwt_result_syntax in
   (* Load stores in read-only to make simple checks. *)
@@ -1198,13 +1199,15 @@ let pre_import_checks cctxt ~no_checks ~data_dir ?level
   let*? () =
     let open Result_syntax in
     match level with
-    | None -> return_unit
-    | Some level ->
+    | Cli.Level level ->
         error_when (level > snapshot_header.head_level)
         @@ error_of_fmt
              "Cannot import a snapshot for level %ld at level %ld."
              snapshot_header.head_level
              level
+    | Head | Finalized | Cemented | Commitment ->
+        (* Resolved from the imported store, at or below the snapshot head. *)
+        return_unit
   in
 
   let*? () =
@@ -1221,16 +1224,17 @@ let pre_import_checks cctxt ~no_checks ~data_dir ?level
              head.header.level
              snapshot_header.head_level
   in
-  (* Skip the commitment publication check if an import level before the
-     snapshot head is provided, as the last commitment will change after
-     reset. It will be checked in post_checks instead. *)
-  let skip_commitment_check =
+  (* Checks the header commitment before extraction; [post_checks] checks the
+     commitment of the imported head. *)
+  let check_header_commitment =
     match level with
-    | Some level -> level < snapshot_header.head_level
-    | None -> false
+    | Cli.Head | Cli.Commitment -> true
+    | Finalized | Cemented | Level _ ->
+        (* Resolved from data which is unrelated to the header's commitment. *)
+        false
   in
   let* () =
-    unless (no_checks || skip_commitment_check) @@ fun () ->
+    unless (no_checks || not check_header_commitment) @@ fun () ->
     let* savepoint_level = get_l1_savepoint_level cctxt in
     let*? () =
       error_when (snapshot_header.head_level <= savepoint_level)
@@ -1247,7 +1251,10 @@ let pre_import_checks cctxt ~no_checks ~data_dir ?level
       snapshot_header.address
       snapshot_header.last_commitment
   in
-  return (metadata, history_mode, skip_commitment_check)
+  let existing_head_level =
+    Option.map (fun (b : Sc_rollup_block.t) -> b.header.level) head
+  in
+  return (metadata, history_mode, existing_head_level)
 
 let check_data_dir_unpopulated data_dir () =
   let open Lwt_result_syntax in
@@ -1275,7 +1282,64 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
       let* store = Store.init Read_write ~data_dir in
       Store.State.History_mode.set store Full
 
-let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
+(* Resets the store to [level]; warns if below [existing_head_level]. *)
+let reset_imported_store cctxt ~data_dir ~existing_head_level
+    ~(level : Cli.snapshot_level) =
+  let open Lwt_result_syntax in
+  let* store = Store.init Read_write ~data_dir in
+  let* head = get_head store in
+  let* first_available = first_available_block ~data_dir store in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." data_dir
+    | Some m -> Ok m
+  in
+  let* target_level =
+    resolve_snapshot_level
+      store
+      ~head
+      ~first_available_level:first_available.header.level
+      ~get_l1_lcc_level:
+        (get_l1_lcc_level cctxt store metadata ~head_level:head.header.level)
+      level
+  in
+  let* () =
+    unless no_checks @@ fun () ->
+    let* savepoint_level = get_l1_savepoint_level cctxt in
+    fail_when Compare.Int32.(target_level <= savepoint_level)
+    @@ error_of_fmt
+         "The imported head at level %ld is at or below the savepoint %ld of \
+          the L1 node, which cannot give the next blocks to the rollup node. \
+          Use an archive L1 node, or --level head."
+         target_level
+         savepoint_level
+  in
+  let*! () =
+    match existing_head_level with
+    | Some current_level when Compare.Int32.(target_level < current_level) ->
+        Event.import_below_current_head ~level:target_level ~current_level
+    | Some _ | None -> Lwt.return_unit
+  in
+  (* Always reset: an equal level does not mean the head is the target block. *)
+  let* () = Store.reset_to_level store ~level:target_level in
+  let* new_head = get_head store in
+  (* Here and not in [post_checks], so that --no-checks does not skip it. *)
+  let* () =
+    match level with
+    | Cli.Commitment | Cli.Cemented ->
+        fail_when (Option.is_none new_head.header.commitment_hash)
+        @@ error_of_fmt
+             "The head of the imported store, at level %ld, carries no \
+              commitment, so its state cannot be checked against Layer 1. Use \
+              --level head to import the snapshot as is."
+             new_head.header.level
+    | Head | Finalized | Level _ -> return_unit
+  in
+  let*! () = Store.close store in
+  return_unit
+
+let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ~level
     cctxt ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let* () = unless force (check_data_dir_unpopulated data_dir) in
@@ -1286,11 +1350,11 @@ let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
     ~when_locked:(`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile))
     ~filename:lockfile
   @@ fun () ->
-  let* snapshot_header, original_history_mode, check_commitment_publication =
+  let* snapshot_header, original_history_mode, existing_head_level =
     with_open_snapshot ~progress:true snapshot_file
     @@ fun header snapshot_input ->
-    let* _original_metadata, original_history_mode, skipped_commitment_check =
-      (pre_import_checks cctxt ~no_checks ~data_dir ?level) header
+    let* _original_metadata, original_history_mode, existing_head_level =
+      pre_import_checks cctxt ~no_checks ~data_dir ~level header
     in
     let*! () =
       extract
@@ -1299,13 +1363,15 @@ let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
         ~cancellable:false
         ~dest:data_dir
     in
-    return (header, original_history_mode, skipped_commitment_check)
+    return (header, original_history_mode, existing_head_level)
   in
   let rm f =
     try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   in
   List.iter rm Store.extra_sqlite_files ;
   let* () = check_store_version (Configuration.default_storage_dir data_dir) in
+  (* Reset first, so that only the kept levels are reconstructed. *)
+  let* () = reset_imported_store cctxt ~data_dir ~existing_head_level ~level in
   let* () =
     maybe_reconstruct_context
       cctxt
@@ -1317,28 +1383,9 @@ let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
   in
-  let* () =
-    match level with
-    | Some level ->
-        let* store = Store.init Read_write ~data_dir in
-        let* first_avail = first_available_block ~data_dir store in
-        let first_avail = first_avail.header.level in
-        let* () =
-          if level < first_avail then
-            failwith
-              "Requested level %ld is below the first available level %ld."
-              level
-              first_avail
-          else Store.reset_to_level store ~level
-        in
-        let*! () = Store.close store in
-        return_unit
-    | None -> return_unit
-  in
   unless no_checks @@ fun () ->
   post_checks
     ~apply_unsafe_patches
-    ~check_commitment_publication
     ~action:(`Import cctxt)
     ~message:"Checking imported data"
     snapshot_header

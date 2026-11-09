@@ -606,19 +606,18 @@ let snapshot_level_arg =
     snapshot_level_parameter
 
 let import_level_arg =
-  Tezos_clic.arg
+  Tezos_clic.default_arg
     ~long:"level"
-    ~placeholder:"<level>"
+    ~placeholder:snapshot_level_placeholder
+    ~default:"commitment"
     ~doc:
-      "Reset the imported snapshot to this level. Data after this level will \
-       be removed from the imported store."
-    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
-         match Int32.of_string_opt s with
-         | Some l when Compare.Int32.(l > 0l) -> Lwt_result.return l
-         | _ ->
-             cctxt#error
-               "Invalid import level %S. Expected a positive integer."
-               s))
+      "The last level to keep in the imported store. Accepts 'head', \
+       'finalized', 'cemented', 'commitment' (default) or a block level \
+       number. Data after this level is removed on import. With 'commitment', \
+       the head of the imported store is the last block of the snapshot that \
+       carries a commitment, so that its state can be checked against the \
+       commitment published on Layer 1."
+    snapshot_level_parameter
 
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
