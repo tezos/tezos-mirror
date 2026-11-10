@@ -7,6 +7,60 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.68 (2026-11-10)
+
+This is a new quality-of-life improvement release, which notably harden the
+RPC server of the node with additional protections that were fully delegated to
+a reverse proxy before. This release is also necessary for providers running
+node for the Tezos X Previewnet test network.
+
+This release will apply one migration to the node’s store (version 25), meaning
+it is not possible downgrade to a previous version.
+
+### RPCs changes
+
+- Prepare `tez_getTezosEthereumAddress` and `tez_getEthereumTezosAddress` for
+  the [new alias derivation introduced in Etherlink 8.0][ann]. Results computed
+  by these RPC will match the derivation used in the most recent block of the
+  chain. (!23037)
+- In the preconfirmation stream of the instant confirmations feature, the
+  receipts of the synthetic EVM transactions corresponding to calls from the
+  Michelson runtime are now streamed alongside the receipts of the native EVM
+  transactions. (!22926)
+- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
+  set by the new `--rpc-max-request-body` option (in bytes, 32 MiB by default). (!22532)
+- An RPC request body within the size cap must now arrive within 60 seconds,
+  with no pause over 10 seconds, or the node answers with HTTP 408 and closes
+  the connection. (!22629)
+- After rejecting an oversized request body with HTTP 413, the node discards
+  what is left of the body within a bounded time and number of bytes, then
+  releases the connection instead of holding it for as long as the client keeps
+  sending. A client still uploading more than twice the cap may see its
+  connection reset instead of reading the 413 response. The 413 response now
+  carries the node's CORS headers. (!22629)
+- An RPC request whose body ends before the length declared in its
+  `Content-Length` is now answered with HTTP 400, where the truncated body used
+  to be handed to the RPC as if complete. (!22629)
+- Speed-up Tezos block retrievals by hash (`GET /chains/main/blocks/<block_hash>`),
+  from several seconds to a few hundred of milliseconds. (!22922)
+
+[ann]: https://forum.tezosagora.org/t/etherlink-8-0-preview-new-evm-alias-derivation-for-tz1-tz2-tz3-accounts/7222
+
+### Execution changes
+
+- Fixes the `--disable-da-fees` CLI flag of the `replay` command. The inclusion
+  fees were wrongfully set to 48 wei instead of being properly disabled
+  before. (!23038)
+
+### Storage changes
+
+- For kernels at storage version 66 or higher, write the target sunrise level
+  of the Michelson runtime, set by `--with-runtime tezos:LEVEL`, at
+  `/base/michelson_runtime_target_sunrise_level` instead of
+  `/tez/world_state/michelson_runtime/target_sunrise_level`. This applies to
+  `run sandbox`, and to `make kernel installer config` for the `latest` kernel,
+  the default of `--kernel-compat`. (!22887)
+
 ## Version 0.67 (2026-09-29)
 
 This new release notably speeds up kernel downloads and improves their
