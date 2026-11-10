@@ -50,10 +50,67 @@ let simulate_info_per_level (node_ctxt : Node_context.ro) predecessor =
   let predecessor_timestamp = pred_header.timestamp in
   return {predecessor_timestamp; predecessor}
 
+type error += Invalid_simulation_kernel_log_file of string
+
+let () =
+  register_error_kind
+    ~id:"simulation.invalid_kernel_log_file"
+    ~title:"Invalid simulation kernel log file"
+    ~description:
+      "The simulation kernel log file must be a relative path naming a file \
+       inside the simulation log directory."
+    ~pp:(fun ppf file ->
+      Format.fprintf
+        ppf
+        "Invalid simulation kernel log file %S: it must be a relative path \
+         naming a file inside the simulation log directory."
+        file)
+    `Permanent
+    Data_encoding.(obj1 (req "file" string))
+    (function
+      | Invalid_simulation_kernel_log_file file -> Some file | _ -> None)
+    (fun file -> Invalid_simulation_kernel_log_file file)
+
+let stays_inside_directory file =
+  let does_not_escape file =
+    String.split_on_char '/' file
+    |> List.fold_left
+         (fun depth segment ->
+           match (depth, segment) with
+           (* Already escaped, short-circuit *)
+           | None, _ -> None
+           (* Double slash: no-op *)
+           | Some d, "" -> Some d
+           | Some d, "." -> Some d
+           (* Would go above the root *)
+           | Some 0, ".." -> None
+           | Some d, ".." -> Some (d - 1)
+           | Some d, _ -> Some (d + 1))
+         (Some 0)
+    |> Option.is_some
+  in
+  let names_a_file file =
+    match List.rev (String.split_on_char '/' file) with
+    | last :: _ ->
+        last <> ""
+        && last <> Filename.current_dir_name
+        && last <> Filename.parent_dir_name
+    | [] -> false
+  in
+  Filename.is_relative file && does_not_escape file && names_a_file file
+
 let set_simulation_kernel_log ?log_kernel_debug_file
     (node_ctxt : Node_context.ro) =
-  let open Lwt_syntax in
-  let* kernel_debug_logger, finaliser =
+  let open Lwt_result_syntax in
+  let*? () =
+    match log_kernel_debug_file with
+    | Some file ->
+        error_unless
+          (stays_inside_directory file)
+          (Invalid_simulation_kernel_log_file file)
+    | None -> Ok ()
+  in
+  let*! kernel_debug_logger, finaliser =
     match (node_ctxt.config.log_kernel_debug, log_kernel_debug_file) with
     | true, Some file ->
         let logs_dir =
@@ -66,16 +123,14 @@ let set_simulation_kernel_log ?log_kernel_debug_file
           ~logs_dir
           node_ctxt.config
           Event.simulation_kernel_debug
-    | _ -> return (Event.simulation_kernel_debug, fun () -> return_unit)
+    | _ -> Lwt.return (Event.simulation_kernel_debug, fun () -> Lwt.return_unit)
   in
   return {node_ctxt with kernel_debug_logger; finaliser}
 
 let start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file
     (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
-  let*! node_ctxt =
-    set_simulation_kernel_log ?log_kernel_debug_file node_ctxt
-  in
+  let* node_ctxt = set_simulation_kernel_log ?log_kernel_debug_file node_ctxt in
   let inbox_level = Int32.succ level in
   let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt inbox_level in
   let*? () =

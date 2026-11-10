@@ -11,6 +11,10 @@ See :doc:`smart_rollup_node` for the release procedure.
 Unreleased
 ==========
 
+- The ``simulate`` RPC now refuses a ``log_kernel_debug_file`` that could leave
+  ``<data_dir>/simulation_kernel_logs``: it must be a relative path naming a
+  file inside that directory. (MR :gl:`!22889`)
+
 - The injector now adds a gas safety guard of 750 instead of 300 to the
   simulated gas of commitment publications. A conflicting commitment for the
   same inbox level that is included between the simulation and the inclusion

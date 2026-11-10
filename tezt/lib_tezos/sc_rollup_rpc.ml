@@ -113,7 +113,7 @@ type simulation_result = {
 }
 
 let post_global_block_simulate ?(block = "head") ?(reveal_pages = [])
-    ?(insight_requests = []) messages =
+    ?(insight_requests = []) ?log_kernel_debug_file messages =
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
   in
@@ -138,9 +138,16 @@ let post_global_block_simulate ?(block = "head") ?(reveal_pages = [])
     in
     [("insight_requests", `A (List.map insight_request_json insight_requests))]
   in
+  let log_kernel_debug_file_json =
+    match log_kernel_debug_file with
+    | None -> []
+    | Some file -> [("log_kernel_debug_file", `String file)]
+  in
   let data =
     Data
-      (`O ((("messages", messages_json) :: reveal_json) @ insight_requests_json))
+      (`O
+         ((("messages", messages_json) :: reveal_json)
+         @ insight_requests_json @ log_kernel_debug_file_json))
   in
   make POST ["global"; "block"; block; "simulate"] ~data (fun obj ->
       JSON.

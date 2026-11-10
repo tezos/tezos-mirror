@@ -102,6 +102,7 @@ val post_global_block_simulate :
   ?reveal_pages:string list ->
   ?insight_requests:
     [< `Durable_storage_key of string list | `Pvm_state_key of string list] list ->
+  ?log_kernel_debug_file:string ->
   string list ->
   simulation_result RPC_core.t
 
