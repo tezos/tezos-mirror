@@ -30,12 +30,20 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
+usage() {
+  echo "Usage: $0 --to gitlab-registry|docker-hub [--dry-run]" >&2
+  exit 1
+}
+
 destination=''
 dry_run=false
 while [ $# -gt 0 ]; do
   case "$1" in
   --to)
-    destination="${2:-}"
+    if [ $# -lt 2 ]; then
+      usage
+    fi
+    destination="$2"
     shift 2
     ;;
   --dry-run)
@@ -90,8 +98,7 @@ docker-hub)
   destination_prefix="docker.io/${CI_PROJECT_PATH}"
   ;;
 *)
-  echo "Usage: $0 --to gitlab-registry|docker-hub [--dry-run]" >&2
-  exit 1
+  usage
   ;;
 esac
 
