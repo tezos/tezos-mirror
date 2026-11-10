@@ -621,6 +621,8 @@ List of checks performed for import
 - For each L2 block:
 
   - The commitment, if any, must be for the PVM state of this block
+  - The most recent commitment of the block is the previous commitment of its
+    successor
   - Hashes are for the correct content (for state hash, commitment hash, inbox
     hash)
 

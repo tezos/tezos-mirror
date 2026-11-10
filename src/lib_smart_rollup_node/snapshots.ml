@@ -591,14 +591,32 @@ let check_l2_chain ~message ~data_dir (store : _ Store.t) context
       blocks_to_check
   in
   Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
-  let rec check_chain hash next_commitment =
+  (* Links each block to the [previous_commitment_hash] of its successor. *)
+  let rec check_chain hash next_commitment ~expected_commitment =
     let* header, commitment = check_block store context hash next_commitment in
+    let most_recent = Sc_rollup_block.most_recent_commitment header in
+    let*? () =
+      error_unless Commitment.Hash.(most_recent = expected_commitment)
+      @@ error_of_fmt
+           "Most recent commitment %a for level %ld was expected to be %a."
+           Commitment.Hash.pp
+           most_recent
+           header.level
+           Commitment.Hash.pp
+           expected_commitment
+    in
     let*! () = count_progress 1 in
     if header.Sc_rollup_block.level <= first_available_level then return_unit
     else
-      check_chain header.predecessor (Option.either commitment next_commitment)
+      check_chain
+        header.predecessor
+        (Option.either commitment next_commitment)
+        ~expected_commitment:header.previous_commitment_hash
   in
-  check_chain head.header.block_hash None
+  check_chain
+    head.header.block_hash
+    None
+    ~expected_commitment:(Sc_rollup_block.most_recent_commitment head.header)
 
 let check_last_commitment head (snapshot_header : Header.t) =
   let last_snapshot_commitment =
