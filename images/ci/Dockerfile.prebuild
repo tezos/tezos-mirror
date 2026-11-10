@@ -55,6 +55,7 @@ RUN apk update \
     eudev-dev \
     git \
     gmp-dev \
+    gmp-static \
     libev-dev \
     libffi-dev \
     libtool \
@@ -65,7 +66,7 @@ RUN apk update \
     openssl-dev \
     patch \
     perl \
-    postgresql14-dev \
+    postgresql17-dev \
     rsync \
     tar \
     unzip \

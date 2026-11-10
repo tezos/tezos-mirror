@@ -26,7 +26,7 @@ variable "REGISTRY" { default = "octez-local-ci" }
 variable "TAG" { default = "latest" }
 
 # Versions (defaults kept in sync with scripts/version.sh).
-variable "ALPINE_VERSION" { default = "3.20" }
+variable "ALPINE_VERSION" { default = "3.22" }
 variable "OPAM_VERSION" { default = "2.3.0" }
 variable "OCAML_VERSION" { default = "5.3.0" }
 variable "GCLOUD_VERSION" { default = "543.0.0" }
