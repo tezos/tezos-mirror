@@ -13,9 +13,10 @@ set -eu
 ###       ($CI_REGISTRY_IMAGE);
 ###     - docker-hub: the Docker Hub repositories of this project
 ###       (docker.io/$CI_PROJECT_PATH). Requires CI_DOCKER_AUTH.
+###       All images must be signed: this is checked before copying anything.
 ###
 ### With --dry-run, only print what would be copied, without logging into
-### the destination nor copying anything.
+### the destination nor copying anything. Signatures are still checked.
 ###
 ### This script only reads from the source; it never pushes there. It copies
 ### what is already present, so it must run after docker_merge_manifests.sh has
@@ -157,6 +158,44 @@ for docker_architecture in ${docker_architectures}; do
   docker_tags="${docker_tags} ${docker_architecture}_${short_tag}"
 done
 
+# Print the tag of the cosign signature of an image.
+# cosign stores the signature under a tag derived from the image digest.
+# The digest survives the copy, so the same tag name applies on both sides.
+# Args: $1=image with its tag
+signature_tag() {
+  digest=$(regctl image digest "${1}")
+  echo "$(echo "${digest}" | tr ':' '-').sig"
+}
+
+# Whether an image tag exists.
+# [manifest digest] doubles as an existence probe: regctl v0.4.3 has no
+# [manifest head], and this fails when the tag is absent.
+# Args: $1=image with its tag
+tag_exists() {
+  regctl manifest digest "${1}" > /dev/null 2>&1
+}
+
+# Images published on Docker Hub must be signed. Check that they all are
+# before copying any of them, otherwise the copy could publish some images
+# before failing. This is also done in dry-run mode, so that dry runs fail
+# if the actual copy would fail.
+if [ "${destination}" = docker-hub ]; then
+  echo "### Checking that all images to copy are signed"
+  unsigned=""
+  for src_image in ${docker_images}; do
+    for docker_tag in ${docker_tags}; do
+      if ! tag_exists "${src_image}:$(signature_tag "${src_image}:${docker_tag}")"; then
+        unsigned="${unsigned} ${src_image}:${docker_tag}"
+      fi
+    done
+  done
+  if [ -n "${unsigned}" ]; then
+    echo "### No cosign signature for:${unsigned}" >&2
+    echo "### Images published on Docker Hub must be signed, aborting" >&2
+    exit 1
+  fi
+fi
+
 # Copy one image's tags, plus the cosign signature of each.
 # Args: $1=source image (no tag), $2=destination image (no tag)
 copy_image() {
@@ -164,31 +203,33 @@ copy_image() {
   dst_image="${2}"
 
   for docker_tag in ${docker_tags}; do
-    # cosign stores the signature under a tag derived from the image digest.
-    # The digest survives the copy, so the same tag name applies on both sides.
-    digest=$(regctl image digest "${src_image}:${docker_tag}")
-    sig_tag="$(echo "${digest}" | tr ':' '-').sig"
+    sig_tag=$(signature_tag "${src_image}:${docker_tag}")
+    if tag_exists "${src_image}:${sig_tag}"; then
+      signed=true
+    else
+      # A missing signature is not an error here: it was checked above
+      # for Docker Hub, and this may run against tags that were not signed
+      # for the GitLab registry.
+      signed=false
+    fi
 
     if [ "${dry_run}" = true ]; then
-      echo "### Would copy ${src_image}:${docker_tag} (${digest}) -> ${dst_image}:${docker_tag}"
+      echo "### Would copy ${src_image}:${docker_tag} -> ${dst_image}:${docker_tag}"
+      if [ "${signed}" = true ]; then
+        echo "### Would copy ${src_image}:${sig_tag} -> ${dst_image}:${sig_tag}"
+      else
+        echo "### No cosign signature for ${src_image}:${docker_tag}, would skip it"
+      fi
       continue
     fi
 
     echo "### Copying ${src_image}:${docker_tag} -> ${dst_image}:${docker_tag}"
     regctl image copy "${src_image}:${docker_tag}" "${dst_image}:${docker_tag}"
 
-    # [manifest digest] doubles as an existence probe: regctl v0.4.3 has no
-    # [manifest head], and this fails when the tag is absent.
-    if regctl manifest digest "${src_image}:${sig_tag}" > /dev/null 2>&1; then
+    if [ "${signed}" = true ]; then
       echo "### Copying ${src_image}:${sig_tag} -> ${dst_image}:${sig_tag}"
       regctl image copy "${src_image}:${sig_tag}" "${dst_image}:${sig_tag}"
-    elif [ "${destination}" = docker-hub ]; then
-      # Images published on Docker Hub must be signed.
-      echo "### No cosign signature for ${src_image}:${docker_tag}" >&2
-      return 1
     else
-      # A missing signature is not an error: this may run against tags that
-      # were not signed.
       echo "### No cosign signature for ${src_image}:${docker_tag}, skipping"
     fi
   done
