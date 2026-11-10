@@ -3551,6 +3551,68 @@ let test_consecutive_commitments _protocol _rollup_node sc_rollup _tezos_node
   in
   unit
 
+(* Our publication survives a conflicting commitment applied before it. *)
+let test_publication_after_conflicting_commitment ~kind =
+  let operator = Constant.bootstrap1 in
+  test_full_scenario
+    ~kind
+    ~commitment_period:3
+    ~operator:operator.alias
+    {
+      variant = None;
+      tags = ["commitment"; "conflict"; "gas"];
+      description =
+        "rollup node publication is applied after a conflicting commitment";
+    }
+  @@ fun _protocol rollup_node sc_rollup tezos_node client ->
+  let* predecessor, lcc_level =
+    last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
+  let inbox_level = lcc_level + 3 in
+  let injected =
+    Sc_rollup_node.wait_for ~timeout:60. rollup_node "injected_ops.v0"
+    @@ fun json ->
+    let kind op = JSON.(op |-> "kind" |> as_string) in
+    let ops = JSON.(json |-> "operations" |> as_list) in
+    if List.exists (fun op -> kind op = "publish") ops then Some () else None
+  in
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  let* level = Client.level client in
+  let* () = bake_levels (inbox_level + 1 - level) client in
+  let conflicting_staker = Constant.bootstrap2.public_key_hash in
+  (* The high fee puts the conflicting commitment first in the block. *)
+  let* () =
+    Runnable.run
+    @@ Client.Sc_rollup.publish_commitment
+         ~fee:(Tez.of_mutez_int 100_000)
+         ~src:conflicting_staker
+         ~sc_rollup
+         ~compressed_state:Constant.sc_rollup_compressed_state
+         ~inbox_level
+         ~predecessor
+         ~number_of_ticks:1
+         client
+  in
+  (* Empty blocks until injection, so the simulation sees no commitment. *)
+  let rec bake_until_injected () =
+    if not (Lwt.is_sleeping injected) then injected
+    else
+      let* () = Client.bake_for_and_wait ~ignore_node_mempool:true client in
+      let* _ = wait_for_current_level tezos_node rollup_node in
+      bake_until_injected ()
+  in
+  let* () = bake_until_injected () in
+  let* () = Client.bake_for_and_wait client in
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
+  let sources =
+    check_l1_block_contains ~kind:"smart_rollup_publish" ~what:"publish" block
+    |> List.map (fun content -> JSON.(content |-> "source" |> as_string))
+  in
+  Check.(
+    (sources = [conflicting_staker; operator.public_key_hash]) (list string))
+    ~error_msg:"The block publications are from %L instead of %R" ;
+  unit
+
 let test_can_stake ~kind =
   test_l1_scenario
     ~kind
@@ -10243,6 +10305,7 @@ let register ~protocols =
     (List.filter (fun p -> Protocol.number p = 025) protocols) ;
   test_recover_bond_of_stakers protocols ;
   test_patch_durable_storage_on_commitment protocols ;
+  test_publication_after_conflicting_commitment ~kind:"arith" protocols ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
     ~boot_sector:(fun () -> "10 10 10 + +")

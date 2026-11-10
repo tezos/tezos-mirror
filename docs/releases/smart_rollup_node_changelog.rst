@@ -11,6 +11,13 @@ See :doc:`smart_rollup_node` for the release procedure.
 Unreleased
 ==========
 
+- The injector now adds a gas safety guard of 750 instead of 300 to the
+  simulated gas of commitment publications. A conflicting commitment for the
+  same inbox level that is included between the simulation and the inclusion
+  of a publication adds about 698 gas to it on a level with no commitment, and
+  about 468 gas on a level with commitments. Such a publication no longer fails
+  with gas exhaustion and no longer loses its fees. (MR :gl:`!23126`)
+
 - The vendored Wasmer runtime used for fast execution was upgraded from 3.3.0
   to 7.2.1. This fixes a misaligned ``ucontext_t`` dereference that made the
   previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set

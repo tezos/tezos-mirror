@@ -2157,6 +2157,7 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
+    ?fee:Tez.t ->
     src:string ->
     sc_rollup:string ->
     compressed_state:string ->

@@ -99,12 +99,8 @@ module Parameters :
 
   let safety_guard = function
     | Operation.Publish _ ->
-        (* Gas consumption of commitment publication can increase if there are
-           already commitments for the same level in the context. The value 300
-           was inferred empirically by looking at gas consumption on a running
-           rollup, and is sufficient to cover the difference in the case where a
-           commitment for the same level already exists. *)
-        Some 300
+        (* Covers one conflicting commitment included first (up to 698 gas). *)
+        Some 750
     | Timeout _ | Refute _ ->
         (* We increase safety of refutation game operations by precaution. *)
         Some 300
