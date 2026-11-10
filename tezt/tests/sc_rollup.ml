@@ -683,6 +683,67 @@ let test_simulate_kernel_log_file ~kind =
          got %L)") ;
   unit
 
+(* Security: [POST /global/block/<id>/simulate] is the one route whose cost the
+   caller dictates, so the public "secure" ACL must reject anonymous callers on
+   it. *)
+let test_simulate_protected_by_secure_acl ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["acl"; "security"; "rpc"; "simulate"];
+      description = "secure RPC ACL must block the simulate endpoint";
+    }
+    ~kind
+  @@ fun _protocol rollup_node sc_rollup _tezos_node _tezos_client ->
+  let* () =
+    Sc_rollup_node.run rollup_node sc_rollup [Sc_rollup_node.Acl_secure]
+  in
+  let* level = Sc_rollup_node.wait_sync rollup_node ~timeout:30. in
+  let unauthorized_code = 401 in
+  let call_code rpc =
+    let* {RPC_core.code; body; _} =
+      Sc_rollup_node.RPC.call_raw rollup_node rpc
+    in
+    let uri =
+      RPC_core.make_uri (Sc_rollup_node.as_rpc_endpoint rollup_node) rpc
+    in
+    Log.info
+      "%s %s -> HTTP %d: %s"
+      (RPC_core.show_verb rpc.verb)
+      (Uri.path_and_query uri)
+      code
+      body ;
+    return code
+  in
+  let* simulate_code =
+    call_code @@ Sc_rollup_rpc.post_global_block_simulate []
+  in
+  let level_block = string_of_int level in
+  let* simulate_level_code =
+    call_code @@ Sc_rollup_rpc.post_global_block_simulate ~block:level_block []
+  in
+  let* hash_code = call_code @@ Sc_rollup_rpc.get_global_block_hash () in
+  Check.(
+    (simulate_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /global/block/<id>/simulate: the secure ACL must reject \
+         anonymous callers (expected HTTP %R, got HTTP %L).") ;
+  Check.(
+    (simulate_level_code = unauthorized_code)
+      int
+      ~error_msg:
+        "POST /global/block/<level>/simulate: the secure ACL must reject \
+         anonymous callers whichever block the request addresses (expected \
+         HTTP %R, got HTTP %L)") ;
+  Check.(
+    (hash_code = 200)
+      int
+      ~error_msg:
+        "GET /global/block/<id>/hash: the secure ACL must keep serving the \
+         read-only routes under /global/block (expected HTTP %R, got HTTP %L)") ;
+  unit
+
 (** Genesis information and last cemented commitment at origination are correct
 ----------------------------------------------------------
 
@@ -10404,6 +10465,7 @@ let register ~protocols =
      the tezt will not test for PVM kind specific features. *)
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_signals_empty protocols ;
+  test_simulate_protected_by_secure_acl ~kind:"wasm_2_0_0" [Protocol.Alpha] ;
   test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_simulate_kernel_log_file ~kind:"wasm_2_0_0" [Protocol.Alpha] ;
