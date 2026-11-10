@@ -201,9 +201,16 @@ fi
 copy_image() {
   src_image="${1}"
   dst_image="${2}"
+  # Tags with the same digest, such as the short and the long tag, share their
+  # signature: copy it only once.
+  copied_sig_tags=""
 
   for docker_tag in ${docker_tags}; do
     sig_tag=$(signature_tag "${src_image}:${docker_tag}")
+    case " ${copied_sig_tags} " in
+    *" ${sig_tag} "*) copy_sig=false ;;
+    *) copy_sig=true ;;
+    esac
     if tag_exists "${src_image}:${sig_tag}"; then
       signed=true
     else
@@ -215,8 +222,11 @@ copy_image() {
 
     if [ "${dry_run}" = true ]; then
       echo "### Would copy ${src_image}:${docker_tag} -> ${dst_image}:${docker_tag}"
-      if [ "${signed}" = true ]; then
+      if [ "${signed}" = true ] && [ "${copy_sig}" = true ]; then
         echo "### Would copy ${src_image}:${sig_tag} -> ${dst_image}:${sig_tag}"
+        copied_sig_tags="${copied_sig_tags} ${sig_tag}"
+      elif [ "${signed}" = true ]; then
+        echo "### Signature ${sig_tag} already copied"
       else
         echo "### No cosign signature for ${src_image}:${docker_tag}, would skip it"
       fi
@@ -226,9 +236,12 @@ copy_image() {
     echo "### Copying ${src_image}:${docker_tag} -> ${dst_image}:${docker_tag}"
     regctl image copy "${src_image}:${docker_tag}" "${dst_image}:${docker_tag}"
 
-    if [ "${signed}" = true ]; then
+    if [ "${signed}" = true ] && [ "${copy_sig}" = true ]; then
       echo "### Copying ${src_image}:${sig_tag} -> ${dst_image}:${sig_tag}"
       regctl image copy "${src_image}:${sig_tag}" "${dst_image}:${sig_tag}"
+      copied_sig_tags="${copied_sig_tags} ${sig_tag}"
+    elif [ "${signed}" = true ]; then
+      echo "### Signature ${sig_tag} already copied"
     else
       echo "### No cosign signature for ${src_image}:${docker_tag}, skipping"
     fi
