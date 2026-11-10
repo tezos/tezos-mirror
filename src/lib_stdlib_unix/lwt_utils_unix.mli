@@ -85,6 +85,11 @@ val is_directory : string -> bool Lwt.t
     directory. *)
 val dir_exists : string -> bool Lwt.t
 
+(** [remove_dir dir] removes the directory [dir] and its content recursively.
+    It does not follow symbolic links: a symbolic link below [dir] is removed,
+    and its target is not modified. If [dir] is a symbolic link to a
+    directory, only the link is removed. It does nothing if [dir] does not
+    exist or is not a directory or a symbolic link to a directory. *)
 val remove_dir : string -> unit Lwt.t
 
 (** [create_dir ?perm dir] creates the directory at the path [dir] and

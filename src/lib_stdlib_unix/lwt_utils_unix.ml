@@ -139,13 +139,28 @@ let remove_dir dir =
           if file = "." || file = ".." then Lwt.return_unit
           else
             let file = Filename.concat dir file in
-            if Sys.is_directory file then remove file else Lwt_unix.unlink file)
+            (* [lstat] does not follow a symbolic link, so it is unlinked. *)
+            let* {st_kind; _} = Lwt_unix.lstat file in
+            match st_kind with
+            | S_DIR -> remove file
+            | _ -> Lwt_unix.unlink file)
         files
     in
     Lwt_unix.rmdir dir
   in
-  let* dir_exists = dir_exists dir in
-  if dir_exists then remove dir else Lwt.return_unit
+  let* kind =
+    Lwt.catch
+      (fun () ->
+        let+ {st_kind; _} = Lwt_unix.lstat dir in
+        Some st_kind)
+      (function Unix.Unix_error _ -> return_none | e -> Lwt.reraise e)
+  in
+  match kind with
+  | Some S_DIR -> remove dir
+  | Some S_LNK ->
+      let* target_is_dir = dir_exists dir in
+      if target_is_dir then Lwt_unix.unlink dir else Lwt.return_unit
+  | Some _ | None -> Lwt.return_unit
 
 let rec create_dir ?(perm = 0o755) dir =
   let open Lwt_syntax in
