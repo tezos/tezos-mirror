@@ -1887,6 +1887,43 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   let* kept_head = head_level_of_node head_level_node in
   Check.((kept_head = exported_head) int)
     ~error_msg:"Import at --level head stopped at %L instead of %R" ;
+  Log.info "A snapshot whose head points to an older commitment is rejected." ;
+  (* Sets the head's previous commitment to the predecessor of the real one. *)
+  let* () =
+    Process.check
+    @@ Process.spawn
+         "sqlite3"
+         [
+           Filename.concat
+             (Sc_rollup_node.data_dir head_level_node)
+             "store.sqlite";
+           "UPDATE l2_blocks SET previous_commitment_hash = (SELECT \
+            predecessor FROM commitments WHERE hash = \
+            l2_blocks.previous_commitment_hash) WHERE block_hash = (SELECT \
+            block_hash FROM l2_levels ORDER BY level DESC LIMIT 1)";
+         ]
+  in
+  let* older_commitment_snapshot =
+    Sc_rollup_node.export_snapshot
+      ~no_check:true
+      ~level:"head"
+      head_level_node
+      (Tezt.Temp.dir "snapshot_older_commitment")
+    |> Runnable.run
+  in
+  let* older_commitment_node = create_observer_node None in
+  let*? older_commitment_import =
+    Sc_rollup_node.import_snapshot
+      ~apply_unsafe_patches:unsafe_pvm_patches
+      ~level:"head"
+      older_commitment_node
+      ~snapshot_file:older_commitment_snapshot
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Most recent commitment")
+      older_commitment_import
+  in
   Log.info "A snapshot without any commitment is rejected by default." ;
   let* stripped_node = create_observer_node None in
   let*! () =
