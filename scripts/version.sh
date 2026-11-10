@@ -40,12 +40,6 @@ export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb
 
 # The builds of these image also rely on variables set above.
 
-# The Alpine minor version used to build the images/ci images
-# and used to run the `trigger` job in the CI. This value SHOULD
-# correspond to the Alpine minor version given by the `trigger` job's
-# `image:`.
-export alpine_version='3.20'
-
 # Installed via apk rust
 export rust_version='1.94.0'
 
