@@ -2822,9 +2822,15 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     produce block activate the upgrade on the sequencer, and we bake (sync) so that
     the rollup node also upgrades itself this way the boot.wasm is replaced for
     both. *)
+    (* In proxy mode, the rollup node applies the upgrade on one of these
+       levels: it compiles the new kernel and runs its migrations, which can
+       take more than the 30s of [Rollup.next_rollup_node_level]. *)
     let* () =
       repeat 3 (fun () ->
-          let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+          let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
+          let* _ =
+            Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node l1_level
+          in
           unit)
     in
     let* _ = produce_block () in
