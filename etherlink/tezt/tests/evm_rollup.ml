@@ -2831,7 +2831,15 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     let* () =
       match mode with
       | Sequencer {evm_node} ->
-          bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node ()
+          (* The rollup node applies the upgrade with the blueprint of
+             [produce_block]: it compiles the new kernel and runs its
+             migrations, which can take more than 30s. *)
+          bake_until_sync
+            ~timeout:120.
+            ~sc_rollup_node
+            ~client
+            ~sequencer:evm_node
+            ()
       | Proxy -> unit
     in
     unit
