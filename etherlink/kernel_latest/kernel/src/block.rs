@@ -112,7 +112,6 @@ pub fn compute<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut BlockInProgress,
     block_constants: &TezosXBlockConstants,
     sequencer_pool_address: Option<H160>,
@@ -160,7 +159,6 @@ where
                 block_in_progress,
                 rk,
                 registry,
-                outbox_queue,
                 block_constants,
                 transaction,
                 block_in_progress.index,
@@ -297,7 +295,6 @@ pub fn compute_bip<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -319,7 +316,6 @@ where
         rk,
         registry,
         chain_config,
-        outbox_queue,
         &mut block_in_progress,
         &constants,
         sequencer_pool_address,
@@ -619,7 +615,6 @@ where
         &mut safe_rk,
         &registry,
         chain_config,
-        &outbox_queue,
         block_in_progress,
         sequencer_pool_address,
         tracer_input,
@@ -2751,13 +2746,11 @@ mod tests {
             U256::from(MINIMUM_BASE_FEE_PER_GAS),
         );
         let registry = RegistryImpl::default();
-        let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
         let result = chain_config
             .apply_transaction(
                 &block_in_progress,
                 &mut rk,
                 &registry,
-                &outbox_queue,
                 &block_constants,
                 transaction,
                 0,
@@ -2998,8 +2991,6 @@ mod tests {
                 };
 
             let registry = RegistryImpl::default();
-            let outbox_queue =
-                OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
 
             // skip_fees_check keeps the assertion focused on the internal-op
             // cap; fee payment on the delayed path is covered elsewhere.
@@ -3008,7 +2999,6 @@ mod tests {
                     &block_in_progress,
                     &mut rk,
                     &registry,
-                    &outbox_queue,
                     &block_constants,
                     transaction,
                     0,
@@ -3128,7 +3118,6 @@ mod tests {
                 &bip,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash: hash_from_nonce(0),
@@ -3208,7 +3197,6 @@ mod tests {
                 &block_in_progress,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash,
@@ -3299,7 +3287,6 @@ mod tests {
                 &block_in_progress,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash,
@@ -4212,7 +4199,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
@@ -4343,7 +4329,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
@@ -5408,7 +5393,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,

@@ -48,8 +48,7 @@ use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, DaFeesError, FeeRefundConfig,
     ProcessedOperation,
 };
-use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::Path;
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
@@ -561,7 +560,6 @@ impl TezosXChainConfig {
         block_in_progress: &BlockInProgress,
         rk: &mut RuntimeKeyspaces<'_, Host>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
-        outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &TezosXBlockConstants,
         transaction: TezosXTransaction,
         index: u32,
@@ -595,7 +593,6 @@ impl TezosXChainConfig {
                             block_in_progress,
                             rk,
                             registry,
-                            outbox_queue,
                             operation,
                             block_constants,
                             sequencer_pool_address,
@@ -616,7 +613,6 @@ impl TezosXChainConfig {
                 crate::apply::apply_transaction(
                     rk,
                     registry,
-                    outbox_queue,
                     &block_constants.evm_runtime_block_constants,
                     *transaction,
                     crac_id,
@@ -633,7 +629,6 @@ impl TezosXChainConfig {
                 block_in_progress,
                 rk,
                 registry,
-                outbox_queue,
                 operation,
                 block_constants,
                 sequencer_pool_address,
@@ -685,7 +680,6 @@ impl TezosXChainConfig {
         block_in_progress: &BlockInProgress,
         rk: &mut RuntimeKeyspaces<'_, Host>,
         registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
-        outbox_queue: &OutboxQueue<'_, impl Path>,
         operation: TezlinkOperation,
         block_constants: &TezosXBlockConstants,
         sequencer_pool_address: Option<H160>,
@@ -750,7 +744,6 @@ impl TezosXChainConfig {
                             skip_signature_check,
                             skip_fees_check,
                             skip_branch_check,
-                            Some(outbox_queue),
                             Some(&block_constants.evm_runtime_block_constants),
                             journal,
                             self.experimental_features.is_michelson_gas_refund_enabled(),
@@ -1041,7 +1034,6 @@ pub fn apply_tezos_operation<Host>(
     // Delayed-origin ops are branch-checked once at delayed-inbox entry; skip the
     // check here so a branch aging out before forced inclusion cannot drop them.
     skip_branch_check: bool,
-    outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
     enable_gas_refund: bool,
@@ -1173,9 +1165,7 @@ where
                 block_constants,
             );
 
-            if let (Some(outbox_queue), Some(evm_block_constants)) =
-                (outbox_queue, evm_block_constants)
-            {
+            if let Some(evm_block_constants) = evm_block_constants {
                 let etherlink_withdrawals = commit_evm_journal_from_external(
                     rk,
                     registry,
@@ -1183,11 +1173,7 @@ where
                     journal,
                     credit_da_fees.to_credit(),
                 )?;
-                push_withdrawals_to_outbox(
-                    rk.host_mut(),
-                    outbox_queue,
-                    etherlink_withdrawals,
-                )?;
+                push_withdrawals_to_outbox(rk, etherlink_withdrawals)?;
             }
 
             Ok(crate::apply::ExecutionResult::Valid(TezosExecutionInfo {

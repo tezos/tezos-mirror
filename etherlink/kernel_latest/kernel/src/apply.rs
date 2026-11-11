@@ -35,8 +35,8 @@ use tezos_ethereum::tx_common::{
 };
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
-use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup::outbox::OutboxMessage;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
@@ -55,6 +55,7 @@ use crate::chains::{
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::journal;
+use crate::outbox_queue::{queue_outbox_message, OutboxQueueError};
 use crate::transaction::{Transaction, TransactionContent};
 
 pub struct TransactionReceiptInfo {
@@ -1201,24 +1202,24 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
     }
 }
 
-pub fn push_withdrawals_to_outbox<Host>(
-    host: &mut Host,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
+/// Appends `withdrawals`, in order, to the withdrawal outbox queue of `rk`.
+///
+/// Fails with the first error of [`queue_outbox_message`], after the
+/// withdrawals before it are appended.
+pub fn push_withdrawals_to_outbox<Host: KeySpaceLoader>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     withdrawals: Vec<Withdrawal>,
-) -> Result<(), anyhow::Error>
-where
-    Host: StorageV1,
-{
+) -> Result<(), OutboxQueueError> {
     for message in withdrawals {
         match message {
             Withdrawal::Standard(message) => {
                 let outbox_message: OutboxMessage<RouterInterface> = message;
-                let len = outbox_queue.queue_message(host, outbox_message)?;
+                let len = queue_outbox_message(rk, outbox_message)?;
                 log!(Debug, "Length of the outbox queue: {}", len);
             }
             Withdrawal::Fast(message) => {
                 let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
-                let len = outbox_queue.queue_message(host, outbox_message)?;
+                let len = queue_outbox_message(rk, outbox_message)?;
                 log!(Debug, "Length of the outbox queue: {}", len);
             }
         }
@@ -1226,11 +1227,9 @@ where
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn handle_transaction_result<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,
     index: u32,
@@ -1268,7 +1267,7 @@ where
             log!(Benchmarking, "reason: {:?}", execution_outcome.result);
 
             let withdrawals = std::mem::take(&mut execution_outcome.withdrawals);
-            push_withdrawals_to_outbox(rk.host_mut(), outbox_queue, withdrawals)?;
+            push_withdrawals_to_outbox(rk, withdrawals)?;
 
             if pay_fees {
                 fee_updates.apply(rk, caller, sequencer_pool_address)?;
@@ -1305,11 +1304,7 @@ where
             cross_runtime_effects,
             consumed_milligas,
         } => {
-            push_withdrawals_to_outbox(
-                rk.host_mut(),
-                outbox_queue,
-                etherlink_withdrawals,
-            )?;
+            push_withdrawals_to_outbox(rk, etherlink_withdrawals)?;
             Ok(RuntimeExecutionInfo::Tezos(TezosExecutionInfo {
                 op,
                 cross_runtime_effects,
@@ -1324,7 +1319,6 @@ where
 pub fn apply_transaction<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,
     crac_id: CracId,
@@ -1409,7 +1403,6 @@ where
         ExecutionResult::Valid(tx_result) => {
             let execution_result = handle_transaction_result(
                 rk,
-                outbox_queue,
                 block_constants,
                 transaction,
                 index,

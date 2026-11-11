@@ -236,7 +236,6 @@ where
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
     let registry = config.init_registry();
-    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let stored_block_in_progress = storage::read_block_in_progress_in_safe_copy(host)?;
     let (block_in_progress_provenance, mut block_in_progress) =
@@ -299,7 +298,6 @@ where
         &mut safe_rk,
         &registry,
         &config,
-        &outbox_queue,
         &mut block_in_progress,
         &block_constants,
         sequencer_pool_address,

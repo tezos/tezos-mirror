@@ -10,10 +10,7 @@
 //! using the inbox and a specific message.
 
 use crate::{
-    apply::{
-        ExecutionResult, RuntimeExecutionInfo, TezosExecutionInfo,
-        WITHDRAWAL_OUTBOX_QUEUE,
-    },
+    apply::{ExecutionResult, RuntimeExecutionInfo, TezosExecutionInfo},
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
@@ -49,7 +46,6 @@ use tezos_evm_runtime::runtime_keyspaces::{
 };
 use tezos_execution::{RunCodeError, RunCodeOutput, RunCodeParams};
 use tezos_protocol::contract::Contract;
-use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
@@ -350,9 +346,6 @@ where
         }
     };
 
-    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
-        .expect("WITHDRAWAL_OUTBOX_QUEUE is a valid path");
-
     // This "tezosx_simulate_fn" function is actually called in two
     // cases: actual simulation (the user has not signed the operation
     // yet, and does not yet know what gas limit and fees are
@@ -433,7 +426,6 @@ where
                         // Simulation / pre-application: do not enforce branch liveness
                         // (lenient, like skip_signature_check; matches L1 run_operation).
                         true,
-                        Some(&outbox_queue),
                         Some(&block_constants.evm_runtime_block_constants),
                         trace_journal,
                         enable_gas_refund,
@@ -461,7 +453,6 @@ where
                 &block_in_progress,
                 &mut rk,
                 &registry,
-                &outbox_queue,
                 &block_constants,
                 transaction,
                 0,
