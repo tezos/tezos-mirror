@@ -36,7 +36,6 @@ use tezos_ethereum::tx_common::{
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::outbox::OutboxMessage;
-use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_tezlink::block::AppliedOperation;
@@ -1096,9 +1095,6 @@ where
 
     Ok(ExecutionResult::Valid(transaction_result))
 }
-
-pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
-    RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
 /// Execution info for an Ethereum transaction.
 pub struct EthereumExecutionInfo {

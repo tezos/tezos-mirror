@@ -17,7 +17,10 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup::outbox::{AtomicBatch, OutboxMessageFull};
 use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, KeySpaceLoader};
+use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_smart_rollup_keyspace::{
+    Key, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
+};
 use tezosx_types::StorageReadErrorKind;
 use thiserror::Error;
 
@@ -89,6 +92,65 @@ where
     Ok(new_len)
 }
 
+/// Writes the messages of the withdrawal outbox queue, in the
+/// [EVM world-state keyspace](RuntimeKeyspaces::evm_world_state) of `rk`, to
+/// the outbox of the host of `rk`, oldest first. Removes them from the queue,
+/// and returns how many it wrote.
+///
+/// Stops at the first message that the outbox refuses, which stays at the
+/// head of the queue. Two flushes from the same durable state write the same
+/// messages twice.
+///
+/// # Errors
+///
+/// [`OutboxQueueError::KeySpace`] when a message that the metadata counts is
+/// absent. The messages before it are then in the outbox and out of the
+/// queue.
+pub fn flush_outbox_queue<Host>(
+    rk: &mut RuntimeKeyspaces<'_, Host>,
+) -> Result<u32, OutboxQueueError>
+where
+    Host: KeySpaceLoader + WasmHost,
+{
+    let (mut start, mut len) = meta(rk.evm_world_state());
+    let mut flushed = 0;
+    while len > 0 {
+        let key = message_key(start);
+        let message = message(rk.evm_world_state(), &key)?;
+        if rk.host_mut().write_output(&message).is_err() {
+            // The outbox is full for this level, or the message is larger than
+            // an output. A full outbox takes the message at the next level. A
+            // message too large blocks the queue until a kernel upgrade, but
+            // `queue_outbox_message` never queues one.
+            break;
+        }
+        let ks = rk.evm_world_state_mut();
+        ks.delete(&key);
+        start = start.wrapping_add(1);
+        len -= 1;
+        flushed += 1;
+        // Cannot leave the deleted message counted: `set` refuses only a
+        // value too large for the keyspace, and the metadata is 8 bytes.
+        set_meta(ks, start, len)?;
+    }
+    Ok(flushed)
+}
+
+/// Returns the message at `key`, which the metadata counts, or a `NotFound`
+/// read error when the keyspace has no value there.
+fn message(
+    ks: &impl KeySpace,
+    key: &Key,
+) -> Result<Vec<u8>, KeySpaceError<StorageReadErrorKind>> {
+    ks.get(key).ok_or_else(|| {
+        KeySpaceError::read(
+            ks.name(),
+            key,
+            ReadKind::Ext(StorageReadErrorKind::NotFound),
+        )
+    })
+}
+
 fn message_key(index: u32) -> Key {
     // The root key, `/` and 8 hex digits always form a valid key.
     ROOT_SEGMENT
@@ -126,6 +188,9 @@ fn set_meta(ks: &mut impl KeySpace, start: u32, len: u32) -> Result<(), KeySpace
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+    use std::collections::BTreeSet;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::michelson::MichelsonBytes;
     use tezos_smart_rollup::outbox::{
@@ -186,6 +251,102 @@ pub(crate) mod tests {
         );
     }
 
+    /// Makes sure that a flush writes the oldest messages first, stops at the
+    /// 100 messages that the outbox takes per level, and keeps the others
+    /// for the next level.
+    #[test]
+    fn flush_stops_at_the_outbox_limit() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        for payload in 0..150 {
+            assert_eq!(
+                queue_outbox_message(&mut rk, message(vec![payload])).unwrap(),
+                u32::from(payload) + 1
+            );
+        }
+
+        let level = rk.host_mut().unprefixed_mut().unwrap().host.level();
+        assert_eq!(flush_outbox_queue(&mut rk).unwrap(), 100);
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
+            (0..100).map(output).collect::<Vec<_>>()
+        );
+
+        rk.host_mut()
+            .unprefixed_mut()
+            .unwrap()
+            .host
+            .run_level(|_| ());
+        let level = rk.host_mut().unprefixed_mut().unwrap().host.level();
+        assert_eq!(flush_outbox_queue(&mut rk).unwrap(), 50);
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
+            (100..150).map(output).collect::<Vec<_>>()
+        );
+        assert!(!rk.evm_world_state().contains(&META_KEY));
+    }
+
+    /// Returns the durable values of the queue: the metadata, then the
+    /// message at each of `indices`. `None` stands for an absent value.
+    fn durable_queue(
+        host: &impl StorageV1,
+        indices: &BTreeSet<u32>,
+    ) -> Vec<Option<Vec<u8>>> {
+        let read = |suffix: String| host.store_read_all(&durable_path(&suffix)).ok();
+        let mut values = vec![read("meta".to_string())];
+        values.extend(
+            indices
+                .iter()
+                .map(|index| read(hex::encode(index.to_le_bytes()))),
+        );
+        values
+    }
+
+    /// Returns the index of the next queued message, from the durable
+    /// metadata of the queue.
+    fn next_index(host: &impl StorageV1) -> u32 {
+        let Ok(meta) = host.store_read_all(&durable_path("meta")) else {
+            return 0;
+        };
+        let start = u32::from_le_bytes(meta[..4].try_into().unwrap());
+        let len = u32::from_le_bytes(meta[4..8].try_into().unwrap());
+        start.wrapping_add(len)
+    }
+
+    /// Makes sure that the queue reads and extends a queue that the SDK
+    /// queue wrote at the same durable path.
+    #[test]
+    fn extends_the_queue_of_the_sdk() {
+        let mut host = MockKernelHost::default();
+        let sdk_queue = SdkOutboxQueue::new(&DURABLE_ROOT, u32::MAX).unwrap();
+        for payload in 0..2 {
+            sdk_queue
+                .queue_message(&mut host, message(vec![payload]))
+                .unwrap();
+        }
+
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(queue_outbox_message(&mut rk, message(vec![2])).unwrap(), 3);
+        let level = rk.host_mut().unprefixed_mut().unwrap().host.level();
+        assert_eq!(flush_outbox_queue(&mut rk).unwrap(), 3);
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
+            vec![output(0), output(1), output(2)]
+        );
+    }
+
     /// Makes sure that the SDK queue reads and extends a queue that the queue
     /// wrote at the same durable path.
     #[test]
@@ -208,6 +369,136 @@ pub(crate) mod tests {
         assert_eq!(sdk_queue.flush_queue(&mut host), 3);
         assert_eq!(
             host.host.outbox_at(level),
+            vec![output(0), output(1), output(2)]
+        );
+    }
+
+    /// One step of `behaves_as_the_sdk`.
+    #[derive(Clone, Debug)]
+    enum Step {
+        /// Queues one message for each payload.
+        Queue(Vec<Vec<u8>>),
+        /// Flushes the queue.
+        Flush,
+        /// Ends the level. The outbox of the next level is empty.
+        NextLevel,
+    }
+
+    /// Returns any step. A step queues up to 149 messages, so that a flush
+    /// can meet the limit of 100 outputs per level.
+    fn step() -> impl Strategy<Value = Step> {
+        prop_oneof![
+            vec(vec(any::<u8>(), 0..4), 0..150).prop_map(Step::Queue),
+            Just(Step::Flush),
+            Just(Step::NextLevel),
+        ]
+    }
+
+    proptest! {
+        // Each case queues up to a few thousand messages on two hosts.
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// Makes sure that, from a queue of `len` messages at index `start`,
+        /// each step gives the same result through the SDK queue and through
+        /// the queue, on two hosts, with the same outbox and the same durable
+        /// values. `start` is often close to `u32::MAX`, so that the indices
+        /// wrap.
+        #[test]
+        fn behaves_as_the_sdk(
+            start in prop_oneof![any::<u32>(), u32::MAX - 300..=u32::MAX],
+            len in 0u32..150,
+            steps in vec(step(), 0..24),
+        ) {
+            let mut sdk_host = MockKernelHost::default();
+            let mut host = MockKernelHost::default();
+            let mut indices: BTreeSet<u32> =
+                (0..len).map(|offset| start.wrapping_add(offset)).collect();
+            if len > 0 {
+                for host in [&mut sdk_host, &mut host] {
+                    for index in &indices {
+                        host.store_write_all(
+                            &durable_path(&hex::encode(index.to_le_bytes())),
+                            &output(0),
+                        )
+                        .unwrap();
+                    }
+                    let mut meta = start.to_le_bytes().to_vec();
+                    meta.extend(len.to_le_bytes());
+                    host.store_write_all(&durable_path("meta"), &meta).unwrap();
+                }
+            }
+            let sdk_queue = SdkOutboxQueue::new(&DURABLE_ROOT, u32::MAX).unwrap();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+            for step in steps {
+                match step {
+                    Step::Queue(payloads) => {
+                        for payload in payloads {
+                            indices.insert(next_index(&sdk_host));
+                            let sdk_len = sdk_queue
+                                .queue_message(&mut sdk_host, message(payload.clone()))
+                                .unwrap();
+                            let len =
+                                queue_outbox_message(&mut rk, message(payload)).unwrap();
+                            prop_assert_eq!(sdk_len, len as usize);
+                        }
+                    }
+                    Step::Flush => {
+                        let level = sdk_host.host.level();
+                        prop_assert_eq!(
+                            level,
+                            rk.host_mut().unprefixed_mut().unwrap().host.level()
+                        );
+                        let flushed = flush_outbox_queue(&mut rk).unwrap();
+                        prop_assert_eq!(sdk_queue.flush_queue(&mut sdk_host), flushed as usize);
+                        prop_assert_eq!(
+                            sdk_host.host.outbox_at(level),
+                            rk.host_mut()
+                                .unprefixed_mut()
+                                .unwrap()
+                                .host
+                                .outbox_at(level)
+                        );
+                    }
+                    Step::NextLevel => {
+                        sdk_host.host.run_level(|_| ());
+                        rk.host_mut()
+                            .unprefixed_mut()
+                            .unwrap()
+                            .host
+                            .run_level(|_| ());
+                    }
+                }
+                prop_assert_eq!(
+                    durable_queue(&sdk_host, &indices),
+                    durable_queue(rk.host(), &indices)
+                );
+            }
+        }
+    }
+
+    /// Makes sure that the indices wrap around `u32::MAX` and keep the order.
+    #[test]
+    fn queue_outbox_message_wraps_around_the_last_index() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let ks = rk.evm_world_state_mut();
+        ks.set(&message_key(u32::MAX), output(0)).unwrap();
+        set_meta(ks, u32::MAX, 1).unwrap();
+
+        for payload in 1..3 {
+            queue_outbox_message(&mut rk, message(vec![payload])).unwrap();
+        }
+        assert!(rk.evm_world_state().contains(&message_key(1)));
+
+        let level = rk.host_mut().unprefixed_mut().unwrap().host.level();
+        assert_eq!(flush_outbox_queue(&mut rk).unwrap(), 3);
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
             vec![output(0), output(1), output(2)]
         );
     }
@@ -251,5 +542,39 @@ pub(crate) mod tests {
 
         assert!(matches!(pushed, Err(OutboxQueueError::Full)));
         assert_eq!(meta(rk.evm_world_state()), (0, u32::MAX));
+    }
+
+    /// Makes sure that a flush fails at a message that the metadata counts
+    /// but the keyspace does not hold, after it writes the messages before it
+    /// to the outbox and removes them from the queue.
+    #[test]
+    fn flush_outbox_queue_rejects_a_missing_message() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let ks = rk.evm_world_state_mut();
+        ks.set(&message_key(0), output(0)).unwrap();
+        set_meta(ks, 0, 2).unwrap();
+
+        let level = rk.host_mut().unprefixed_mut().unwrap().host.level();
+        let flushed = flush_outbox_queue(&mut rk);
+
+        let missing = KeySpaceError::read(
+            rk.evm_world_state().name(),
+            &message_key(1),
+            ReadKind::Ext(StorageReadErrorKind::NotFound),
+        );
+        assert!(
+            matches!(flushed, Err(OutboxQueueError::KeySpace(err)) if err == missing)
+        );
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
+            vec![output(0)]
+        );
+        assert!(!rk.evm_world_state().contains(&message_key(0)));
+        assert_eq!(meta(rk.evm_world_state()), (1, 1));
     }
 }
