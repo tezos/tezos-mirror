@@ -195,7 +195,13 @@ launch_accuser_test() {
 }
 
 launch_smart_rollup_node() {
-  configure_client
+  if [ ! -x "$smart_rollup_node" ]; then
+    echo "This image has no octez-smart-rollup-node." \
+      "Use the image tezos/tezos:octez-smart-rollup-node-latest." >&2
+    exit 1
+  fi
+  # The node takes --endpoint and --base-dir as arguments, not from the client.
+  mkdir -p "$client_dir"
 
   if [ ! -f "$smart_rollup_node_data_dir/config.json" ]; then
     echo "Configuring the smart rollup node..."
