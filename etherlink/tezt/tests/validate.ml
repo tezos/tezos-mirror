@@ -636,7 +636,7 @@ let test_validate_gas_limit =
   let*@? err =
     Rpc.send_raw_transaction ~raw_tx:not_enough_access_list_tx sequencer
   in
-  Check.(err.message =~ rex "Not enough gas for inclusion fees")
+  Check.(err.message =~ rex " is insufficient to cover the transaction cost")
     ~error_msg:
       "The transaction has not enough gas to pay da_fees for access_list, it \
        should fail" ;
@@ -725,6 +725,119 @@ let test_base_gas_cost =
   let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
   Check.(err.message =~ rex "The provided gas limit")
     ~error_msg:"The error message should be %R but got %L" ;
+  unit
+
+let test_validate_empty_contract_creation =
+  register
+    ~kernels:[Kernel.Latest]
+    ~da_fee_per_byte:Wei.zero
+    ~title:"Validate intrinsic gas for empty contract creation"
+    ~tags:["empty_contract_creation"; "gas_limit"]
+  @@ fun _kernel sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_tx gas =
+    Cast.craft_deploy_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy:(tx_type = Legacy)
+      ~gas
+      ~value:Wei.zero
+      ~data:"0x"
+      ()
+  in
+  (* Empty init code still costs 21,000 + 32,000 intrinsic gas.
+     Before the fix, the node admitted this transaction as a 21,000-gas call. *)
+  let* raw_tx = make_tx 52_999 in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex "transaction cost of 53000 gas")
+    ~error_msg:"Expected the empty creation minimum in %R, got %L" ;
+  let* raw_tx = make_tx 53_000 in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  unit
+
+let test_validate_access_list_da_minimum =
+  register
+    ~kernels:[Kernel.Latest]
+    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
+    ~minimum_base_fee_per_gas:(Wei.of_string "1_000_000_000")
+    ~title:"Validate minimum gas includes access-list DA overhead"
+    ~tags:["access_list_da_minimum"; "da_fee"; "gas_limit"]
+  @@ fun _kernel sequencer _tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344" in
+  let storage_key = "0x" ^ String.make 64 '0' in
+  let make_tx gas =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy:false
+      ~access_list:[(address, [storage_key])]
+      ~gas
+      ~address
+      ~value:Wei.zero
+      ()
+  in
+  (* DA: (150 + 20 + 32) bytes * 4,000 gas/byte = 808,000.
+     Intrinsic: 21,000 + 2,400 + 1,900 = 25,300.
+     Before the fix, the minimum omitted 208,000 DA gas. The later
+     inclusion-fee check still passes since 25,299 execution gas remains. *)
+  let minimum_gas = 808_000 + 25_300 in
+  let* raw_tx = make_tx (minimum_gas - 1) in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex "transaction cost of 833300 gas")
+    ~error_msg:"Expected the access-list minimum in %R, got %L" ;
+  let* raw_tx = make_tx minimum_gas in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  unit
+
+let test_validate_initcode_size =
+  register
+    ~kernels:[Kernel.Latest]
+    ~da_fee_per_byte:Wei.zero
+    ~title:"Validate contract creation initcode size limit"
+    ~tags:["initcode_size"; "gas_limit"]
+  @@ fun _kernel sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_data size = "0x" ^ String.make (2 * size) '0' in
+  let make_creation size =
+    Cast.craft_deploy_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy:(tx_type = Legacy)
+      ~gas:2_000_000
+      ~value:Wei.zero
+      ~data:(make_data size)
+      ()
+  in
+  (* Both sizes fit the blueprint and have ample intrinsic gas. Only
+     creation initcode above the EIP-3860 boundary should be rejected. *)
+  let* raw_tx = make_creation 49_153 in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex "Contract initcode exceeded the allowed size")
+    ~error_msg:"Expected the initcode size error %R, got %L" ;
+  let* raw_tx = make_creation 49_152 in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  (* The same oversized input is allowed as calldata of an ordinary call. *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~legacy:(tx_type = Legacy)
+      ~gas:2_000_000
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~arguments:[make_data 49_153]
+      ~value:Wei.zero
+      ()
+  in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sequencer in
   unit
 
 let test_validate_calldata_cost =
@@ -876,5 +989,8 @@ let () =
   test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction [Legacy] ;
   test_sender_is_not_contract all_types ;
   test_base_gas_cost all_types ;
+  test_validate_empty_contract_creation [Legacy; Eip1559] ;
+  test_validate_access_list_da_minimum [Eip1559] ;
+  test_validate_initcode_size [Legacy; Eip1559] ;
   test_validate_calldata_cost all_types ;
   test_eip7702_da_fee_includes_authorization_list [Eip1559]

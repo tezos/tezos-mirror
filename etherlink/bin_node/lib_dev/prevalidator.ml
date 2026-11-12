@@ -71,6 +71,8 @@ module K = struct
 
   let initcode_word_cost = 2
 
+  let max_initcode_size = 49_152
+
   let word_size = 32
 
   let access_list_address = 2_400
@@ -418,10 +420,8 @@ let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
          be contained within one of the chunks. *)
       (max_number_of_chunks - 1)
 
-let is_contract_creation calldata to_ authorization_list =
-  Bytes.length calldata != 0
-  && Option.is_none to_
-  && List.is_empty authorization_list
+let is_contract_creation to_ authorization_list =
+  Option.is_none to_ && List.is_empty authorization_list
 
 let validate_tx_data_size ~max_number_of_chunks
     (transaction : Transaction_object.t) =
@@ -431,6 +431,16 @@ let validate_tx_data_size ~max_number_of_chunks
   in
   if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
     return @@ Error "Transaction data exceeded the allowed size."
+  else if
+    is_contract_creation
+      (Transaction_object.to_ transaction)
+      (Transaction_object.authorization_list transaction)
+    && Bytes.length
+         (Transaction_object.input transaction
+         |> Ethereum_types.hex_to_real_bytes)
+       > K.max_initcode_size
+  then
+    return (Error "Contract initcode exceeded the allowed size of 49152 bytes.")
   else return (Ok ())
 
 let initial_tx_gas_computation ~(transaction : Transaction_object.t)
@@ -467,7 +477,6 @@ let initial_tx_gas_computation ~(transaction : Transaction_object.t)
   let creation_cost =
     if
       is_contract_creation
-        data
         (Transaction_object.to_ transaction)
         authorization_list
     then
@@ -520,6 +529,7 @@ let validate_minimum_gas_requirement ~session
       ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
       ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~authorization_list_len
+      ~access_list:(Transaction_object.access_list transaction)
       data
   in
   let (Qty gas_limit) = Transaction_object.gas transaction in
