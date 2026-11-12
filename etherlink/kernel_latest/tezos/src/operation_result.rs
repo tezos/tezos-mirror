@@ -577,8 +577,9 @@ pub enum ErrorId {
 pub struct L1Error {
     pub kind: ErrorKind,
     pub id: ErrorId,
-    /// The fields, in the order L1 encodes them.
-    pub fields: Vec<(&'static str, String)>,
+    /// The fields, in the order L1 encodes them. Each value is a bson string,
+    /// given by its bytes, which do not need to be valid UTF-8.
+    pub fields: Vec<(&'static str, Vec<u8>)>,
 }
 
 impl L1Error {
@@ -590,7 +591,10 @@ impl L1Error {
         Self {
             kind,
             id: ErrorId::L1(id),
-            fields,
+            fields: fields
+                .into_iter()
+                .map(|(key, value)| (key, value.into_bytes()))
+                .collect(),
         }
     }
 
@@ -604,7 +608,7 @@ impl L1Error {
         Self {
             kind,
             id: ErrorId::TezosxInternal(id.into()),
-            fields: vec![("error_message", error.to_string())],
+            fields: vec![("error_message", error.to_string().into_bytes())],
         }
     }
 
@@ -662,7 +666,7 @@ impl L1Error {
         elements.push((b"kind", self.kind.as_str().as_bytes()));
         elements.push((b"id", id.as_bytes()));
         for (key, value) in &self.fields {
-            elements.push((key.as_bytes(), value.as_bytes()));
+            elements.push((key.as_bytes(), value.as_slice()));
         }
         elements_to_bson(&elements)
     }
