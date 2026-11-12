@@ -541,9 +541,17 @@ fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
 //    "error_message": <message> }`, where the kind is temporary unless
 // retrying cannot help.
 //
+// A `FAILWITH` is encoded as `{ "kind": "temporary", "id":
+// "proto.<protocol>.tezosx.failwith", "with": <failed value> }`,
+// where the failed value is a bson string that holds its binary
+// Micheline. L1's `michelson_v1.script_rejected` holds the failed
+// value as a Micheline object, which a flat bson object cannot hold.
+// The node registers the id `tezosx.failwith` and decodes such an
+// error as L1's `michelson_v1.script_rejected`.
+//
 // TODO: https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
-// Encode the Michelson script failures (`michelson_v1.script_rejected`, ...)
-// as L1 does, which needs non-string bson fields.
+// Encode the other Michelson script failures (`michelson_v1.script_overflow`,
+// ...) as L1 does.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorKind {
@@ -567,6 +575,9 @@ impl ErrorKind {
 pub enum ErrorId {
     /// The id of an L1 error.
     L1(&'static str),
+    /// The id of an error under `tezosx.`, which the node translates
+    /// to some L1 error.
+    Tezosx(&'static str),
     /// The id of an error without L1 counterpart, under `tezosx_internal.`,
     /// which is not a stable API.
     TezosxInternal(Cow<'static, str>),
@@ -658,6 +669,7 @@ impl L1Error {
         let prefix = TARGET_TEZOS_PROTOCOL.error_prefix();
         let id = match &self.id {
             ErrorId::L1(id) => format!("proto.{prefix}.{id}"),
+            ErrorId::Tezosx(id) => format!("proto.{prefix}.tezosx.{id}"),
             ErrorId::TezosxInternal(id) => {
                 format!("proto.{prefix}.tezosx_internal.{id}")
             }
@@ -747,10 +759,19 @@ impl TransferError {
                 ErrorKind::Permanent,
                 "transfer.micheline_serialization_error",
             ),
-            TransferError::MichelsonContractInterpretError(_) => fallback(
-                ErrorKind::Temporary,
-                "transfer.michelson_contract_interpret_error",
-            ),
+            TransferError::MichelsonContractInterpretError(err) => match err {
+                mir::interpreter::ContractInterpretError::InterpretError(
+                    mir::interpreter::InterpretError::FailedWith { ty, with },
+                ) => L1Error {
+                    kind: Temporary,
+                    id: ErrorId::Tezosx("failwith"),
+                    fields: vec![("ty", ty.0.clone()), ("with", with.0.clone())],
+                },
+                _ => fallback(
+                    ErrorKind::Temporary,
+                    "transfer.michelson_contract_interpret_error",
+                ),
+            },
             TransferError::MirTypecheckingError(_) => {
                 fallback(ErrorKind::Permanent, "transfer.mir_typechecking_error")
             }
@@ -2416,6 +2437,45 @@ mod tests {
         );
     }
 
+    #[test]
+    fn failwith_carries_the_micheline_bytes() {
+        use mir::interpreter::{ContractInterpretError, InterpretError, MichelineBytes};
+        // `Pair 1 "oops"`: `Pair` with two arguments and no annotation, the
+        // integer 1, then the string "oops".
+        let with = hex::decode("070700010100000004")
+            .unwrap()
+            .into_iter()
+            .chain(b"oops".iter().copied())
+            .collect::<Vec<u8>>();
+        // `pair int string`: `pair` with two arguments and no annotation,
+        // then `int` and `string`, each a primitive without arguments.
+        let ty = hex::decode("0765035b0368").unwrap();
+        let rejected = || {
+            TransferError::MichelsonContractInterpretError(
+                ContractInterpretError::InterpretError(InterpretError::FailedWith {
+                    ty: MichelineBytes(ty.clone()),
+                    with: MichelineBytes(with.clone()),
+                }),
+            )
+        };
+        let rejected_len = rejected().persisted_len();
+        let error = ApplyOperationError::Transfer(rejected());
+        let encoded = encode_error(&error);
+        // `ty` and `with` are not valid UTF-8, so [expected_object] cannot
+        // build them.
+        let elements: [(&[u8], &[u8]); 4] = [
+            (b"kind", b"temporary"),
+            (b"id", b"proto.025-PsUshuai.tezosx.failwith"),
+            (b"ty", &ty),
+            (b"with", &with),
+        ];
+        let bson = elements_to_bson(&elements);
+        let mut expected = (bson.len() as u32).to_be_bytes().to_vec();
+        expected.extend_from_slice(&bson);
+        assert_eq!(encoded, expected);
+        assert_eq!(error.persisted_len(), encoded.len());
+        assert_eq!(rejected_len, encoded.len());
+    }
     fn key_space_read_error() -> KeySpaceError<StorageReadErrorKind> {
         KeySpaceError::read(
             &Name::from_static("/tez/tez_accounts"),
