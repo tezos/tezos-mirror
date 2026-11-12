@@ -1105,7 +1105,7 @@ where
                             }
                             Err(CracError::Operation(err)) => {
                                 frame.failed = true;
-                                log!(Error, "Internal transfer failed: {err:?}");
+                                log!(Debug, "Internal transfer failed: {err:?}");
                                 (
                                     ContentResult::Failed(
                                         ApplyOperationError::from(err).into(),
@@ -3300,7 +3300,7 @@ where
                     return Err(msg);
                 }
                 Err(CracError::Operation(e)) => {
-                    log!(Error, "Transfer failed because of: {e:?}");
+                    log!(Debug, "Transfer failed because of: {e:?}");
                     Err(e)
                 }
             };
