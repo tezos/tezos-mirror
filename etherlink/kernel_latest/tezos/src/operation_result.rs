@@ -369,7 +369,7 @@ impl From<mir::ast::BorrowedUnparseError> for OriginationError {
     }
 }
 
-impl From<mir::interpreter::ContractInterpretError<'_>> for TransferError {
+impl From<mir::interpreter::ContractInterpretError> for TransferError {
     fn from(err: mir::interpreter::ContractInterpretError) -> Self {
         use mir::interpreter::{
             ContractInterpretError, EnshrinedViewDispatchError, InterpretError,

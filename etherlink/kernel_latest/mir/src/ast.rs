@@ -1419,6 +1419,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     // representation of the reference implementation, because
                     // reference implementation optimizes the size of combs and uses
                     // an untyped representation that is the shortest.
+                    // FAILWITH values are thus not L1-compatible for combs of 4
+                    // or more elements, see https://linear.app/tezos/issue/L2-2260.
                     TV::Pair(l, r) => {
                         frames.push(TvImFrame::BuildPrim2(Prim::Pair));
                         frames

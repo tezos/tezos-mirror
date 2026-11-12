@@ -2057,7 +2057,7 @@ fn is_host_fault(err: &LazyStorageError) -> bool {
     )
 }
 
-impl From<ScriptError<'_>> for RunCodeError {
+impl From<ScriptError> for RunCodeError {
     fn from(err: ScriptError) -> Self {
         match err {
             ScriptError::OutOfGas(_) => Self::Execution(GAS_EXHAUSTED.to_string()),
@@ -2814,7 +2814,7 @@ fn apply_balance_changes(
 /// TODO: https://gitlab.com/tezos/tezos/-/issues/8003
 /// migrate [TransferError]'s remaining stringly sinks onto this type.
 #[derive(Debug, thiserror::Error)]
-enum ScriptError<'a> {
+enum ScriptError {
     /// Gas ran out outside interpretation and unparsing, which report
     /// their own exhaustion through [ScriptError::Interpret] and the
     /// unparse fold in [interpret_encoded_script].
@@ -2829,7 +2829,7 @@ enum ScriptError<'a> {
     /// Execution failed: `FAILWITH`, an ill-typed parameter or storage,
     /// gas, or a lazy-storage fault.
     #[error("script execution failed")]
-    Interpret(ContractInterpretError<'a>),
+    Interpret(#[from] ContractInterpretError),
     /// The resulting storage cannot be unparsed.
     #[error("resulting storage cannot be unparsed")]
     Unparse(BorrowedUnparseError),
@@ -2838,15 +2838,7 @@ enum ScriptError<'a> {
     Encode(#[from] tezos_data_encoding::enc::BinError),
 }
 
-/// Hand-written: `#[from]` refuses a non-`'static` source
-/// ([Error::source] must be `dyn Error + 'static`).
-impl<'a> From<ContractInterpretError<'a>> for ScriptError<'a> {
-    fn from(e: ContractInterpretError<'a>) -> Self {
-        Self::Interpret(e)
-    }
-}
-
-impl From<ScriptError<'_>> for TransferError {
+impl From<ScriptError> for TransferError {
     fn from(err: ScriptError) -> Self {
         match err {
             ScriptError::OutOfGas(e) => Self::OutOfGas(e),
@@ -2870,7 +2862,7 @@ fn interpret_encoded_script<'a>(
     parser: &'a Parser<'a>,
     ctx: &mut impl CtxTrait<'a>,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
-) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError<'a>> {
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, code, ctx.gas())??;
     let contract_typechecked =
@@ -3754,7 +3746,7 @@ mod tests {
                 "a FAILWITH is not a host failure: {err:?}"
             );
             assert!(
-                err.to_string().contains("boom"),
+                err.to_string().contains(&hex::encode("boom")),
                 "the failure value should survive into the message: {err}"
             );
         }
@@ -6368,7 +6360,16 @@ mod tests {
             result:  ContentResult::Failed(vec![
                 ApplyOperationError::Transfer(
             TransferError::MichelsonContractInterpretError(
-                "runtime failure while running the script: failed with: String(\"This contract always fails\") of type String".into()
+                // The type `string` in binary Micheline is 0x0368.
+                format!(
+                    "runtime failure while running the script: failed with: 0x{} of type 0x0368",
+                    hex::encode(
+                        Micheline::from("This contract always fails")
+                            .encode(&mut Gas::default())
+                            .unwrap()
+                            .unwrap()
+                    )
+                )
             )
         )].into()),
             internal_operation_results: vec![],
@@ -14103,13 +14104,33 @@ mod tests {
         let check_printable_delta = mir::gas::tc_cost::check_printable(N_LONG).unwrap()
             as u64
             - mir::gas::tc_cost::check_printable(N_SHORT).unwrap() as u64;
+        // Unparsing and encoding the FAILWITH value, charged on the operation
+        // as on L1.
+        let rejection_cost = |n: usize| {
+            let arena = Arena::new();
+            let mut gas = Gas::default();
+            let before = gas.milligas().unwrap();
+            TypedValue::String("x".repeat(n))
+                .clone_into_micheline_optimized_legacy(&arena, &mut gas, None)
+                .unwrap()
+                .encode(&mut gas)
+                .unwrap()
+                .unwrap();
+            u64::from(before - gas.milligas().unwrap())
+        };
+        let rejection_delta = rejection_cost(N_LONG) - rejection_cost(N_SHORT);
 
         assert_eq!(
             gas_long - gas_short,
-            storage_read_delta + decode_delta + metering_delta + check_printable_delta,
+            storage_read_delta
+                + decode_delta
+                + metering_delta
+                + check_printable_delta
+                + rejection_delta,
             "exact per-byte delta: storage_read({storage_read_delta}) \
              + decode({decode_delta}) + metering({metering_delta}) \
-             + check_printable({check_printable_delta})"
+             + check_printable({check_printable_delta}) \
+             + rejection({rejection_delta})"
         );
     }
 

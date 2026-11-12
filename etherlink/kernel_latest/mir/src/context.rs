@@ -229,8 +229,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
         _input: &TypedValue<'a>,
         _return_type: &Type,
         _arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<Result<Option<TypedValue<'a>>, crate::interpreter::InterpretError<'a>>>
-    {
+    ) -> Option<Result<Option<TypedValue<'a>>, crate::interpreter::InterpretError>> {
         None
     }
 

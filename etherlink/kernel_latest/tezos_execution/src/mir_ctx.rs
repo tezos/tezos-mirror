@@ -550,8 +550,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
         // materialize Micheline values; the EVM bridge's output is
         // a plain byte vector so the arena is unused here.
         _arena: &'a typed_arena::Arena<Micheline<'a>>,
-    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
-    {
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError>> {
         let contract = crate::enshrined_contracts::from_kt1(kt1)?;
         // Gate on [`enshrined_synthetic_views`] so the off-chain
         // `/script` synthesizer (which mirrors that enumeration) and
@@ -712,15 +711,15 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R>
     /// see [`crate::enshrined_contracts::charge_gateway_base_cost`].
     ///
     /// On an invalid `source_runtime` nat, returns
-    /// `Err(InterpretError::FailedWith(...))` with the Michelson payload
-    /// `(Pair "INVALID_RUNTIME_ID" received_nat)` — standard Michelson
-    /// FAILWITH semantics, causing the operation to revert with that value.
+    /// `Err(InterpretError::FailedWith { .. })` carrying the binary Micheline
+    /// of `(Pair "INVALID_RUNTIME_ID" received_nat)` and of its type
+    /// `pair string nat` — standard Michelson FAILWITH semantics, causing the
+    /// operation to revert with that value.
     fn dispatch_origin_of_view(
         &mut self,
         input: &TypedValue<'a>,
         return_type: &Type,
-    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
-    {
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError>> {
         // Return-type guard: `or unit (or nat (pair nat string))`.
         if !matches!(
             return_type,
@@ -767,8 +766,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R>
         &mut self,
         input: &TypedValue<'a>,
         return_type: &Type,
-    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
-    {
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError>> {
         // Return-type guard: `option (pair nat string)`.
         if !matches!(
             return_type,
@@ -817,8 +815,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R>
         &mut self,
         input: &TypedValue<'a>,
         return_type: &Type,
-    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError<'a>>>
-    {
+    ) -> Option<Result<Option<TypedValue<'a>>, mir::interpreter::InterpretError>> {
         if !matches!(return_type, Type::Bytes) {
             return Some(Ok(None));
         }
