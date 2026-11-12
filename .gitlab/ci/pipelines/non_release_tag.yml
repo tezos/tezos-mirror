@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:merge_manifests:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -60,7 +60,7 @@ docker:merge_manifests:
   retry: 0
 
 docker:mirror_to_gitlab_registry:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -90,7 +90,7 @@ docker:mirror_to_gitlab_registry:
   retry: 0
 
 gitlab:publish:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -117,7 +117,7 @@ gitlab:publish:
   retry: 0
 
 grafazos.build:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-a416870e
   stage: build
   tags:
   - gcp
@@ -144,7 +144,7 @@ grafazos.build:
     when: on_success
 
 oc.build:static-arm64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_arm64
@@ -190,7 +190,7 @@ oc.build:static-arm64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.build:static-x86_64-linux-released-binaries:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -236,7 +236,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-a416870e
   stage: build
   tags:
   - gcp
@@ -251,8 +251,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-a416870e
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -273,7 +273,7 @@ oc.docker:amd64:
     - runner_system_failure
 
 oc.docker:arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-a416870e
   stage: build
   tags:
   - gcp_arm64
@@ -288,8 +288,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_initialize.sh --image-names
-  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-d74b3dc3
-    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  - ./scripts/ci/docker_release.sh --runtime-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-runtime:master-a416870e
+    --build-deps-image ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -310,7 +310,7 @@ oc.docker:arm64:
     - runner_system_failure
 
 teztale.build-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_arm64
@@ -358,7 +358,7 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_very_high_cpu
