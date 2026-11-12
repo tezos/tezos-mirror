@@ -408,14 +408,12 @@ fn force_top_level_failed(receipt: &mut AppliedOperation) {
 ///
 /// It counts *every* `internal_operation_results` entry, matching exactly what
 /// [`renumber_nonces`] numbers. That includes CRAC synthetic markers (begin/end
-/// events, synthetic transfers, alias originations) stamped via `nonce_counter`
-/// that never advance the op-level MIR counter. So on CRAC blocks this
-/// population exceeds the op-level counter by the marker count, and the
-/// apply-time cap (fail the op in isolation) coincides with the finalization
-/// backstop (fail the block) exactly only on the native/delayed paths; on the
-/// CRAC path the backstop can lead. Both sit at
-/// [`mir::interpreter::MAX_INTERNAL_OPERATIONS`] and are gas-bounded, so the
-/// divergence is latent (see L2-1727).
+/// events, synthetic transfers, alias originations), which the Michelson
+/// runtime reserves on the journal counter before running an inbound CRAC, and
+/// the entries of failed or backtracked CRAC receipts, which the journal
+/// counter keeps on revert. So the apply-time cap (fail the op in isolation)
+/// is reached no later than the finalization backstop (fail the block), on
+/// every path.
 pub fn count_internal_operations(operations: &[AppliedOperation]) -> u128 {
     let mut count: u128 = 0;
     for op in operations {

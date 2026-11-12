@@ -5,6 +5,7 @@
 use http::StatusCode;
 use mir::ast::{AddressHash, ByteReprTrait};
 use mir::gas::{interpret_cost, Gas, OutOfGas};
+use mir::interpreter::{ContractInterpretError, InterpretError, MAX_INTERNAL_OPERATIONS};
 #[cfg(feature = "testing")]
 use primitive_types::U256;
 use std::collections::BTreeMap;
@@ -269,6 +270,12 @@ fn build_synthetic_crac_marker(
         result,
     }))
 }
+
+/// Number of internal-operation entries a CRAC receipt adds besides the
+/// MIR operations and the alias originations: the begin marker, the
+/// synthetic `alias(E_1)→target` transfer and the end marker. Both
+/// [`build_crac_receipt`] and [`build_failed_crac_receipt`] emit them.
+const CRAC_RECEIPT_SYNTHETIC_ENTRIES: u128 = 3;
 
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
 ///
@@ -792,8 +799,36 @@ where
     // namespace for the manager operation's internal-op tree. The
     // post-execution value is written back below
     // (`set_internal_operation_counter`), and a subsequent
-    // `revert_frame` rolls it back to the value captured at frame entry.
+    // `revert_frame` keeps it.
+    //
+    // The counter is also the position checked against the per-block
+    // internal-operation cap, which `renumber_nonces` enforces on every
+    // receipt entry. A CRAC receipt adds entries that are not MIR
+    // operations: the begin and end markers, the synthetic transfer and
+    // the alias originations. Reserve them before running Michelson so
+    // that the cap is reached at apply time, failing this call only,
+    // rather than at block finalization, which aborts the block.
     let mut counter = journal.michelson.internal_operation_counter();
+    if is_crac {
+        counter = counter
+            .saturating_add(CRAC_RECEIPT_SYNTHETIC_ENTRIES)
+            .saturating_add(alias_origination_internals.len() as u128);
+        if counter > MAX_INTERNAL_OPERATIONS {
+            // No receipt is built: its entries would not fit in the block.
+            // Report the same error as when MIR itself hits the cap.
+            let error = TransferError::from(ContractInterpretError::InterpretError(
+                InterpretError::TooManyInternalOperations,
+            ));
+            // Metering has started: charge what was consumed, as when MIR
+            // rejects, rather than the whole op limit.
+            return Err(RequestFailure {
+                error: TezosXRuntimeError::BadRequest(error.to_string()),
+                consumed_milligas: Some(
+                    tc_ctx.operation_gas.total_milligas_consumed().into(),
+                ),
+            });
+        }
+    }
     let mut operation_ctx = OperationCtx {
         source: &source_account,
         counter: &mut counter,
@@ -910,12 +945,13 @@ where
     // the journal on every path (success, failure, OOG): the next
     // reentrant inbound Michelson frame resumes from this value so
     // internal-operation replay identities stay monotonic across the
-    // whole NAC transaction, and a subsequent `revert_frame` on the
-    // enclosing EVM frame rolls it back to the frame-entry value
-    // (L2-1676).
-    journal
-        .michelson
-        .set_internal_operation_counter(final_internal_operation_counter);
+    // whole NAC transaction. A subsequent `revert_frame` on the
+    // enclosing EVM frame keeps it, since the receipt of a reverted frame
+    // stays in the block.
+    let journal_counter = journal.michelson.internal_operation_counter();
+    journal.michelson.set_internal_operation_counter(
+        journal_counter.max(final_internal_operation_counter),
+    );
     let result = match transfer_result {
         Ok(r) => r,
         Err(CracTransferError {
@@ -2250,7 +2286,7 @@ mod tests {
         // Internal op #0 = CRAC begin event, #1 = transfer, #2 = CRAC end event
         assert_eq!(
             result.internal_operation_results.len(),
-            3,
+            CRAC_RECEIPT_SYNTHETIC_ENTRIES as usize,
             "three internal operations (CRAC begin + transfer + CRAC end)"
         );
 
@@ -2527,7 +2563,7 @@ mod tests {
 
         assert_eq!(
             result.internal_operation_results.len(),
-            3,
+            CRAC_RECEIPT_SYNTHETIC_ENTRIES as usize,
             "three internal operations (CRAC begin + failed transfer + CRAC end)"
         );
 
@@ -2835,7 +2871,7 @@ mod tests {
         // Receipt layout: [begin_event, alias→destination, deeper_failed_iop, end_event]
         assert_eq!(
             result.internal_operation_results.len(),
-            4,
+            CRAC_RECEIPT_SYNTHETIC_ENTRIES as usize + 1,
             "expected 4 internal ops: begin + alias→target + deeper failed + end"
         );
 
@@ -3509,18 +3545,19 @@ mod tests {
             String::from_utf8_lossy(resp.body())
         );
 
-        // The parent emitted one internal operation, which must have
-        // taken the identity SEEDED_COUNTER + 1 (resumed, not reset),
-        // and that value must be persisted back to the journal for the
-        // next reentrant frame.
+        // The frame resumed from SEEDED_COUNTER (not reset), reserved
+        // the CRAC receipt's synthetic entries, then its parent
+        // emitted one internal operation. That value must be persisted
+        // back to the journal for the next reentrant frame.
+        let expected = SEEDED_COUNTER + CRAC_RECEIPT_SYNTHETIC_ENTRIES + 1;
         assert_eq!(
             journal.michelson.internal_operation_counter(),
-            SEEDED_COUNTER + 1,
+            expected,
             "the frame must resume the MIR counter from the journal \
-             (got {}, expected {}); a value of 1 means the counter \
-             reset to 0 instead of resuming",
+             (got {}, expected {expected}); a value of {} means the \
+             counter reset to 0 instead of resuming",
             journal.michelson.internal_operation_counter(),
-            SEEDED_COUNTER + 1
+            CRAC_RECEIPT_SYNTHETIC_ENTRIES + 1
         );
     }
 
@@ -3539,7 +3576,6 @@ mod tests {
             X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
         };
         use mir::ast::micheline::Micheline;
-        use mir::interpreter::MAX_INTERNAL_OPERATIONS;
         use tezos_crypto_rs::blake2b::digest_160;
         use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezosx_journal::CracId;
@@ -3642,25 +3678,51 @@ mod tests {
                 .body(body)
                 .unwrap();
 
-            runtime
-                .serve(&registry, &mut rk, &mut journal, request)
-                .status()
+            let response = runtime.serve(&registry, &mut rk, &mut journal, request);
+            let consumed_milligas: u64 = response
+                .headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .expect("the consumed gas must be reported")
+                .to_str()
+                .unwrap()
+                .parse()
+                .unwrap();
+            (response.status(), consumed_milligas)
         };
 
-        // Just below the cap: the parent's internal transfer takes a counter
-        // under the limit and the CRAC succeeds.
+        // The CRAC receipt holds the parent's internal transfer plus its
+        // synthetic entries (begin/end markers, synthetic transfer), all of
+        // which count towards the cap.
+        let receipt_entries = CRAC_RECEIPT_SYNTHETIC_ENTRIES + 1;
+        // The receipt fits exactly under the cap: the CRAC succeeds.
         assert_eq!(
-            run(MAX_INTERNAL_OPERATIONS - 1),
+            run(MAX_INTERNAL_OPERATIONS - receipt_entries).0,
             StatusCode::OK,
             "below the cap the inbound CRAC must succeed"
         );
-        // At the cap: allocating the counter fails L1's
-        // Too_many_internal_operations, so the CRAC fails op-level (400 — a
-        // catchable revert), not a 500 block abort.
+        // One more: allocating the counter of the internal transfer fails
+        // L1's Too_many_internal_operations, so the CRAC fails op-level
+        // (400 — a catchable revert), not a 500 block abort.
         assert_eq!(
-            run(MAX_INTERNAL_OPERATIONS),
+            run(MAX_INTERNAL_OPERATIONS - receipt_entries + 1).0,
             StatusCode::BAD_REQUEST,
             "at the cap the inbound CRAC must fail in isolation (op-level)"
+        );
+        // Not even room for the synthetic entries: the CRAC is rejected
+        // before running Michelson, also op-level, and only charged for the
+        // gas it consumed, not the whole op limit.
+        let (status, consumed_milligas) =
+            run(MAX_INTERNAL_OPERATIONS - CRAC_RECEIPT_SYNTHETIC_ENTRIES + 1);
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "without room for its synthetic entries the inbound CRAC must \
+             fail in isolation (op-level)"
+        );
+        assert!(
+            consumed_milligas < 600_000_000,
+            "the rejection must not charge the whole op limit, got \
+             {consumed_milligas}"
         );
     }
 

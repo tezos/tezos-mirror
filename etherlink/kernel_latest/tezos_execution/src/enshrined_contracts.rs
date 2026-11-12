@@ -603,7 +603,11 @@ fn dispatch_callback<'a>(
     ctx.operation_gas()
         .cast_and_consume_milligas(CALLBACK_DISPATCH_MILLIGAS)
         .map_err(TransferError::OutOfGas)?;
-    let counter = ctx.operation_counter();
+    // The callback is an internal operation like any other: allocate its
+    // counter through the same per-block cap check.
+    let counter = mir::interpreter::fresh_operation_counter(ctx).map_err(|e| {
+        TransferError::from(mir::interpreter::ContractInterpretError::InterpretError(e))
+    })?;
     Ok(vec![OperationInfo {
         operation: Operation::TransferTokens(TransferTokens {
             param: RcTypedValue::new(TypedValue::Bytes(response_body)),
@@ -1112,33 +1116,17 @@ fn extract_http_call_request(
             "http_call: expected list for headers".into(),
         ))
     );
-    let headers: Vec<(String, String)> = headers_list
-        .into_iter()
-        .map(|item| {
-            let (name_rc, val_rc) = take_payload!(
-                item.unwrap_or_clone(),
-                TypedValue::Pair(name_rc, val_rc),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected pair (name, value) in headers list".into(),
-                ))
-            );
-            let name = take_payload!(
-                name_rc.unwrap_or_clone(),
-                TypedValue::String(name),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected string for header name".into(),
-                ))
-            );
-            let val = take_payload!(
-                val_rc.unwrap_or_clone(),
-                TypedValue::String(val),
-                return Err(TransferError::GatewayError(
-                    "http_call: expected string for header value".into(),
-                ))
-            );
-            Ok((name, val))
-        })
-        .collect::<Result<_, _>>()?;
+    // User-supplied headers are not supported: the runtimes never read them.
+    //
+    // TODO: L2-2216
+    // Re-opening headers requires a bounded decode first, and the EVM gateway
+    // must stay in step.
+    if headers_list.len() != 0 {
+        return Err(TransferError::GatewayError(
+            "http_call: user-supplied headers are not supported".into(),
+        ));
+    }
+    let headers: Vec<(String, String)> = Vec::new();
     let (body_rc, method_callback_rc) = take_payload!(
         body_method_rc.unwrap_or_clone(),
         TypedValue::Pair(body_rc, method_callback_rc),
@@ -1253,6 +1241,27 @@ fn inject_context_headers_raw(
         parse_value(&format!("{crac_depth}"))?,
     );
     Ok(())
+}
+
+/// Map a failed alias creation to the error of the gateway call.
+///
+/// An alias creation that runs out of gas used the whole budget it was given:
+/// the call is charged for it, not only for the lookups done before, so that
+/// the failed attempt can't be repeated for cheap.
+fn alias_creation_error(
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+    budget: Gas,
+    error: TezosXRuntimeError,
+) -> TransferError {
+    match error {
+        TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(
+            operation_gas
+                .cast_and_consume_milligas(budget)
+                .err()
+                .unwrap_or(OutOfGas),
+        ),
+        _ => TransferError::GatewayError(error.to_string()),
+    }
 }
 
 /// Inject trusted X-Tezos-* context headers derived from `ctx` into `request`.
@@ -1378,23 +1387,20 @@ where
         } else {
             None
         };
-        let (sender_alias, sender_resolution) = {
+        let sender_resolution = {
             let (rk, journal, registry) = ctx.cross_runtime_split();
-            registry
-                .ensure_alias(
-                    rk,
-                    journal,
-                    alias_info,
-                    sender_pubkey,
-                    target_runtime,
-                    context.clone(),
-                    target_budget,
-                )
-                .map_err(|e| match e {
-                    TezosXRuntimeError::OutOfGas => TransferError::OutOfGas(OutOfGas),
-                    _ => TransferError::GatewayError(e.to_string()),
-                })?
+            registry.ensure_alias(
+                rk,
+                journal,
+                alias_info,
+                sender_pubkey,
+                target_runtime,
+                context.clone(),
+                target_budget,
+            )
         };
+        let (sender_alias, sender_resolution) = sender_resolution
+            .map_err(|e| alias_creation_error(ctx.operation_gas(), target_budget, e))?;
         if let Some(v) = sender_resolution.delegated_storage_cost {
             ctx.add_delegated_storage_cost(v)
                 .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
@@ -1436,20 +1442,21 @@ where
             let source_runtime = alias_info.runtime;
             let remaining_milligas = ctx.gas().milligas().ok_or(OutOfGas)? as u64;
             let target_budget = Gas::new(remaining_milligas, RuntimeId::Tezos);
-            let (source_alias, source_resolution) = {
+            let source_resolution = {
                 let (rk, journal, registry) = ctx.cross_runtime_split();
-                registry
-                    .ensure_alias(
-                        rk,
-                        journal,
-                        alias_info,
-                        Some(&source_public_key),
-                        target_runtime,
-                        context,
-                        target_budget,
-                    )
-                    .map_err(|e| TransferError::GatewayError(e.to_string()))?
+                registry.ensure_alias(
+                    rk,
+                    journal,
+                    alias_info,
+                    Some(&source_public_key),
+                    target_runtime,
+                    context,
+                    target_budget,
+                )
             };
+            let (source_alias, source_resolution) = source_resolution.map_err(|e| {
+                alias_creation_error(ctx.operation_gas(), target_budget, e)
+            })?;
             if let Some(v) = source_resolution.delegated_storage_cost {
                 ctx.add_delegated_storage_cost(v)
                     .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))?;
@@ -1630,10 +1637,23 @@ where
 
     let request = inject_context_headers(request, ctx)?;
 
-    let response = {
+    // Hand the frame's internal-operation counter to the journal, so that a
+    // nested Michelson frame resumes from it rather than from a stale value,
+    // then take back the value the nested frames reached. Otherwise the
+    // nested frames reuse the counters of this frame and miss its entries
+    // when checking the per-block internal-operation cap. The journal
+    // counter never goes back, hence the `max`.
+    let counter = *ctx.internal_operation_counter_mut();
+    let (response, counter_after) = {
         let (rk, journal, registry) = ctx.cross_runtime_split();
-        registry.serve(rk, journal, request)
+        let journal_counter = journal.michelson.internal_operation_counter();
+        journal
+            .michelson
+            .set_internal_operation_counter(journal_counter.max(counter));
+        let response = registry.serve(rk, journal, request);
+        (response, journal.michelson.internal_operation_counter())
     };
+    *ctx.internal_operation_counter_mut() = counter.max(counter_after);
     let response_body = classify_and_charge_crac_response(response, ctx)?;
 
     // Debit the gateway: after a successful call, the gateway
@@ -2780,6 +2800,51 @@ pub(crate) mod tests {
         );
     }
 
+    // An alias creation that runs out of gas used the whole budget it was
+    // given: the call is charged for it, not only for the lookups done
+    // before, so that the failed attempt can't be repeated for cheap.
+    // `calls_before_out_of_gas` picks the sender alias (0) or the source
+    // alias (1), which resolve one after the other.
+    fn dispatch_with_alias_creation_out_of_gas(calls_before_out_of_gas: usize) {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string())
+            .with_alias_creation_out_of_gas_after(calls_before_out_of_gas);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 500);
+
+        let err =
+            dispatch_crac_call(&mut ctx, build_ethereum_request(dest, &[]).unwrap())
+                .unwrap_err();
+        assert!(
+            matches!(err, CracError::Operation(TransferError::OutOfGas(_))),
+            "{err}"
+        );
+        assert_eq!(ctx.operation_gas().remaining.milligas(), Some(0));
+        assert_eq!(
+            registry.ensure_alias_calls.borrow().len(),
+            calls_before_out_of_gas
+        );
+    }
+
+    #[test]
+    fn test_sender_alias_out_of_gas_is_charged_the_whole_budget() {
+        dispatch_with_alias_creation_out_of_gas(0)
+    }
+
+    #[test]
+    fn test_source_alias_out_of_gas_is_charged_the_whole_budget() {
+        dispatch_with_alias_creation_out_of_gas(1)
+    }
+
     #[test]
     fn test_alias_lookup_cost_caps_per_transfer() {
         let mut host = MockKernelHost::default();
@@ -2912,7 +2977,7 @@ pub(crate) mod tests {
         let value = build_http_call_micheline(
             &arena,
             "http://michelson/KT1abc/transfer",
-            &[("Content-Type", "application/micheline")],
+            &[],
             &[0x01, 0x02],
             1,
         );
@@ -2922,10 +2987,7 @@ pub(crate) mod tests {
         let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
-        assert_eq!(
-            request.headers().get("Content-Type").unwrap(),
-            "application/micheline"
-        );
+        assert!(request.headers().is_empty());
         assert_eq!(request.body(), &vec![0x01, 0x02]);
     }
 
@@ -2945,30 +3007,23 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_multiple_headers() {
+    fn test_http_call_rejects_user_supplied_headers() {
         let arena = typed_arena::Arena::new();
         let value = build_http_call_micheline(
             &arena,
             "http://michelson/KT1abc",
-            &[
-                ("Content-Type", "application/micheline"),
-                ("X-Custom", "some-value"),
-            ],
+            &[("Content-Type", "application/micheline")],
             &[0xDE, 0xAD],
-            42,
+            1,
         );
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let typed = typecheck_call(&value, &mut rk).unwrap();
-        let (request, _) = extract_http_call_request(typed).unwrap();
-        // Unknown method defaults to POST
-        assert_eq!(request.method(), http::Method::POST);
-        assert_eq!(
-            request.headers().get("Content-Type").unwrap(),
-            "application/micheline"
+        let err = extract_http_call_request(typed).unwrap_err();
+        assert!(
+            err.to_string().contains("headers are not supported"),
+            "unexpected error: {err}"
         );
-        assert_eq!(request.headers().get("X-Custom").unwrap(), "some-value");
-        assert_eq!(request.body(), &vec![0xDE, 0xAD]);
     }
 
     #[test]
@@ -3065,21 +3120,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_rejects_x_tezos_headers() {
-        let arena = typed_arena::Arena::new();
-        let value = build_http_call_micheline(
-            &arena,
-            "http://michelson/KT1abc",
-            &[("X-Tezos-Sender", "attacker")],
-            &[],
-            0,
-        );
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let typed = typecheck_call(&value, &mut rk).unwrap();
-        let result = extract_http_call_request(typed);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
+    fn test_build_http_request_rejects_x_tezos_headers() {
+        let headers = vec![("X-Tezos-Sender".to_string(), "attacker".to_string())];
+        let err =
+            build_http_request("http://michelson/KT1abc", &headers, &[], 0u32.into())
+                .unwrap_err();
         assert!(
             err.to_string().contains("X-Tezos-"),
             "error should mention the header name: {err}"
@@ -3087,20 +3132,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_http_call_rejects_x_tezos_headers_case_insensitive() {
-        let arena = typed_arena::Arena::new();
-        let value = build_http_call_micheline(
-            &arena,
+    fn test_build_http_request_rejects_x_tezos_headers_case_insensitive() {
+        let headers = vec![("x-tezos-amount".to_string(), "999".to_string())];
+        assert!(build_http_request(
             "http://michelson/KT1abc",
-            &[("x-tezos-amount", "999")],
+            &headers,
             &[],
-            0,
-        );
-        let mut host = MockKernelHost::default();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let typed = typecheck_call(&value, &mut rk).unwrap();
-        let result = extract_http_call_request(typed);
-        assert!(result.is_err());
+            0u32.into()
+        )
+        .is_err());
     }
 
     // --- Cross-runtime call: amount edge cases ---
@@ -5061,6 +5101,47 @@ pub(crate) mod tests {
             ops[0].counter, 2,
             "counter should follow previously consumed values"
         );
+        // At the per-block cap, the callback fails like any other internal
+        // operation instead of adding an entry over the limit.
+        ctx.operation_counter = mir::interpreter::MAX_INTERNAL_OPERATIONS;
+        let result = dispatch_callback(&mut ctx, Some(make_test_address()), vec![]);
+        assert!(
+            matches!(&result, Err(TransferError::MichelsonContractInterpretError(msg))
+                if msg.contains("too many internal operations")),
+            "got {result:?}"
+        );
+    }
+
+    /// A gateway call hands the frame's internal-operation counter to the
+    /// journal, so that a nested Michelson frame resumes from it, and takes
+    /// back what the nested frame reached.
+    #[test]
+    fn test_dispatch_crac_call_syncs_internal_operation_counter() {
+        let mut host = MockKernelHost::default();
+        let mut registry = MockRegistry::new("KT1_mock_alias".to_string());
+        registry.nested_internal_operations = 8;
+        let mut journal = TezosXJournal::new(
+            CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.set_internal_operation_counter(3);
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut ctx = MockCtx::new(&mut rk, &mut journal, &registry, source, 0);
+        ctx.operation_counter = 10;
+        let request =
+            build_ethereum_request("0x1234567890123456789012345678901234567890", &[])
+                .unwrap();
+        dispatch_crac_call(&mut ctx, request).unwrap();
+        // The nested frame resumed from 10, not 3, and its 8 operations are
+        // taken back by the calling frame and kept in the journal.
+        assert_eq!(ctx.operation_counter, 18);
+        assert_eq!(journal.michelson.internal_operation_counter(), 18);
     }
 
     #[test]

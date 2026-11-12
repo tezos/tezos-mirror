@@ -253,6 +253,97 @@ let decode_micheline_storage hex_str =
            |> to_string
            |> JSON.parse ~origin:"decode_micheline_storage"))
 
+(** [encode_transfer ~source ~fee ~counter ~gas_limit ~storage_limit ~dest
+    ~amount] is the binary encoding of a transfer of [amount] mutez from
+    [source] to [dest], without parameters. *)
+let encode_transfer ~(source : Account.key) ~fee ~counter ~gas_limit
+    ~storage_limit ~(dest : Account.key) ~amount =
+  let bin encoding value = Data_encoding.Binary.to_string_exn encoding value in
+  let source =
+    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+      source.public_key_hash
+  in
+  let dest =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         dest.public_key_hash
+  in
+  String.concat
+    ""
+    [
+      (* Transaction tag *)
+      "\x6c";
+      bin Tezos_crypto.Signature.Public_key_hash.encoding source;
+      bin Data_encoding.n fee;
+      bin Data_encoding.n counter;
+      bin Data_encoding.n gas_limit;
+      bin Data_encoding.n storage_limit;
+      bin Data_encoding.n amount;
+      bin Tezos_protocol_alpha.Protocol.Contract_repr.encoding dest;
+      (* No parameters *)
+      "\x00";
+    ]
+
+(** [encode_origination ~source ~fee ~counter ~gas_limit ~storage_limit
+    ~balance] is the binary encoding of an origination by [source], without
+    delegate, of a contract holding [balance] mutez whose script ignores its
+    parameter and keeps its storage. *)
+let encode_origination ~(source : Account.key) ~fee ~counter ~gas_limit
+    ~storage_limit ~balance =
+  let bin encoding value = Data_encoding.Binary.to_string_exn encoding value in
+  let source =
+    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+      source.public_key_hash
+  in
+  let script =
+    Data_encoding.Json.destruct
+      Tezos_protocol_alpha.Protocol.Script_repr.encoding
+      (Result.get_ok
+      @@ Data_encoding.Json.from_string
+           {|{"code": [{"prim": "parameter", "args": [{"prim": "unit"}]},
+                       {"prim": "storage", "args": [{"prim": "unit"}]},
+                       {"prim": "code",
+                        "args": [[{"prim": "CDR"},
+                                  {"prim": "NIL", "args": [{"prim": "operation"}]},
+                                  {"prim": "PAIR"}]]}],
+              "storage": {"prim": "Unit"}}|}
+      )
+  in
+  String.concat
+    ""
+    [
+      (* Origination tag *)
+      "\x6d";
+      bin Tezos_crypto.Signature.Public_key_hash.encoding source;
+      bin Data_encoding.n fee;
+      bin Data_encoding.n counter;
+      bin Data_encoding.n gas_limit;
+      bin Data_encoding.n storage_limit;
+      bin Data_encoding.n balance;
+      (* No delegate *)
+      "\x00";
+      bin Tezos_protocol_alpha.Protocol.Script_repr.encoding script;
+    ]
+
+(** [encode_unsigned_operation ~branch contents] is the binary encoding of the
+    unsigned operation on [branch] made of the encoded manager operations
+    [contents], in order. *)
+let encode_unsigned_operation ~branch contents =
+  Tezos_crypto.Hashed.Block_hash.(to_string (of_b58check_exn branch))
+  ^ String.concat "" contents
+
+(** [sign_encoded_operation ~signer unsigned] is the encoded unsigned operation
+    [unsigned] followed by its signature by [signer]. [signer] must not be a
+    BLS key, whose signature is encoded differently. *)
+let sign_encoded_operation ~signer unsigned =
+  let signature =
+    Account.sign_bytes
+      ~watermark:Tezos_crypto.Signature.Generic_operation
+      ~signer
+      (Bytes.of_string unsigned)
+  in
+  unsigned ^ Tezos_crypto.Signature.to_string signature
+
 (** [send_tezos_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
     delayed inbox and waits until it is included and the delayed inbox is
     empty. *)
@@ -3588,6 +3679,147 @@ let test_michelson_gateway_evm_revert () =
       ~error_msg:"Expected reverter balance 0 but got %L") ;
   unit
 
+(** Net fee (in mutez) the sender of the last operation paid, i.e. the
+    declared fee minus the refund of the unused gas, given the balances
+    before and after. The transfers measured with it carry no amount. *)
+let net_fee_paid ~balance_before ~balance_after =
+  Tez.to_mutez balance_before - Tez.to_mutez balance_after
+
+(** Sum of the [consumed_milligas] of the single manager operation of the
+    head block, over its main result and its internal results. *)
+let head_operation_consumed_milligas client =
+  let* ops = Client.RPC.call client (Node.RPC.get_chain_block_operations ()) in
+  let milligas result =
+    match JSON.(result |-> "consumed_milligas" |> as_string_opt) with
+    | Some s -> int_of_string s
+    | None -> 0
+  in
+  match JSON.as_list ops |> List.concat_map JSON.as_list with
+  | [op] ->
+      let metadata = JSON.(op |-> "contents" |=> 0 |-> "metadata") in
+      let main = milligas JSON.(metadata |-> "operation_result") in
+      let internals =
+        JSON.(metadata |-> "internal_operation_results" |> as_list_opt)
+        |> Option.value ~default:[]
+        |> List.fold_left
+             (fun acc internal -> acc + milligas JSON.(internal |-> "result"))
+             0
+      in
+      return (main + internals)
+  | _ -> Test.fail "Expected exactly one operation in the head block"
+
+(** BB-178: a Michelson->EVM gateway call from an account without an alias
+    first creates the alias. When the budget runs out during that creation,
+    the work done must be billed, as the [%materialize_alias] and EVM
+    gateway sites do, otherwise it can be repeated for the price of the
+    lookups.
+
+    1. A cold call (fresh source) and a warm call (alias now present) both
+       succeed: they give the full cost, and the cost without creation.
+    2. A cold call from another fresh source is given a budget between the
+       two, so the creation runs out of gas. The operation fails and its
+       sender must be charged at least what the warm call costs, since the
+       whole budget exceeds it. *)
+let test_michelson_gateway_alias_creation_oog_is_charged () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"Michelson gateway: alias creation out of gas is charged"
+    ~tags:["cross_runtime"; "gateway"; "alias"; "out_of_gas"; "bb178"]
+    ~with_runtimes:[Tezos]
+    ~enable_michelson_gas_refund:true
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* evm_contract =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~init_code:evm_storer_init_code
+      ()
+  in
+  let* tez_client = tezlink_client sandbox in
+  let fee = Tez.of_int 1 in
+  let arg_data =
+    sf
+      {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
+      evm_contract
+      abi_encoded_uint256_42
+  in
+  (* Call the gateway from [source] with [gas_limit] (in gas units), and
+     return the net fee paid and the milligas reported by the receipt. The
+     fee and the gas limit are always given, so that every operation has the
+     same size, hence the same data-availability fee. *)
+  let call ~source ~gas_limit ~expected_status =
+    let account = source.Account.public_key_hash in
+    let* balance_before = Client.get_balance_for ~account tez_client in
+    let* () =
+      sandbox_call_michelson_contract
+        ~source
+        ~dest:gateway_address
+        ~entrypoint:"call_evm"
+        ~arg_data
+        ~force:true
+        ~gas_limit
+        ~storage_limit:1000
+        ~fee
+        sandbox
+    in
+    let* () = check_block_op_status ~index:0 ~expected_status tez_client in
+    let* balance_after = Client.get_balance_for ~account tez_client in
+    let* milligas = head_operation_consumed_milligas tez_client in
+    return (net_fee_paid ~balance_before ~balance_after, milligas)
+  in
+  let max_gas_limit = 500_000 in
+  let* cold_fee, cold_milligas =
+    call
+      ~source:Constant.bootstrap1
+      ~gas_limit:max_gas_limit
+      ~expected_status:"applied"
+  in
+  let* warm_fee, warm_milligas =
+    call
+      ~source:Constant.bootstrap1
+      ~gas_limit:max_gas_limit
+      ~expected_status:"applied"
+  in
+  Log.info
+    "cold: %d mutez, %d milligas; warm: %d mutez, %d milligas"
+    cold_fee
+    cold_milligas
+    warm_fee
+    warm_milligas ;
+  Check.(
+    (cold_milligas > warm_milligas)
+      int
+      ~error_msg:
+        "Expected the cold call (%L milligas) to cost more than the warm call \
+         (%R milligas)") ;
+  (* A budget, in gas units, that covers the warm call and a part of the
+     alias creation. *)
+  let budget_gas = (warm_milligas + cold_milligas) / 2 / 1000 in
+  Log.info "Out-of-gas budget: %d gas" budget_gas ;
+  let attempt source =
+    let* fee_paid, _ =
+      call ~source ~gas_limit:budget_gas ~expected_status:"failed"
+    in
+    Log.info
+      "Out-of-gas attempt from %s: %d mutez"
+      source.Account.alias
+      fee_paid ;
+    Check.(
+      (fee_paid >= warm_fee)
+        int
+        ~error_msg:
+          "Alias creation ran out of gas on a budget larger than the whole \
+           warm call, but the sender was charged %L mutez, less than the %R \
+           mutez of the warm call: the work done is not billed") ;
+    unit
+  in
+  let* () = attempt Constant.bootstrap2 in
+  (* Repeatable from another fresh address. *)
+  attempt Constant.bootstrap3
+
 let test_tx_queue_mixed_transaction_types ~runtime () =
   Setup.register_sandbox_with_oberver_test
     ~title:
@@ -6562,6 +6794,247 @@ let test_native_branch_valid_delayed_applied =
     ~error_msg:"Recipient balance: expected %R, got %L" ;
   unit
 
+(* A delayed native transfer whose amount exceeds the mutez domain is invalid:
+   the block that includes it is produced, the operation leaves the delayed
+   inbox, and it is not applied. *)
+let test_delayed_amount_out_of_domain_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native transfer above the mutez domain is dropped"
+    ~tags:["mutez"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let* tez_client = tezlink_client sequencer in
+  let get_counter () =
+    let* counter =
+      Client.RPC.call tez_client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source.public_key_hash
+           ()
+    in
+    return (JSON.as_int counter)
+  in
+  let get_balance () =
+    let* balance =
+      Client.get_balance_for ~account:source.public_key_hash tez_client
+    in
+    return (Tez.to_mutez balance)
+  in
+  let* counter_before = get_counter () in
+  let* balance_before = get_balance () in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
+  (* 2^63 mutez is one above the mutez domain. *)
+  let (`Hex operation) =
+    encode_unsigned_operation
+      ~branch
+      [
+        encode_transfer
+          ~source
+          ~fee:(Z.of_int branch_transfer_fee)
+          ~counter:(Z.of_int (counter_before + 1))
+          ~gas_limit:(Z.of_int branch_transfer_gas_limit)
+          ~storage_limit:Z.zero
+          ~dest:Constant.bootstrap2
+          ~amount:(Z.shift_left Z.one 63);
+      ]
+    |> sign_encoded_operation ~signer:source
+    |> Hex.of_string
+  in
+  let* _hash =
+    Delayed_inbox.send_raw_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      operation
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* counter_after = get_counter () in
+  Check.((counter_after = counter_before) int)
+    ~error_msg:
+      "The invalid operation must not be applied: expected counter %R, got %L" ;
+  let* balance_after = get_balance () in
+  Check.((balance_after = balance_before) int)
+    ~error_msg:
+      "The invalid operation must not pay its fee: expected balance %R, got %L" ;
+  unit
+
+(* A delayed native origination whose balance exceeds the mutez domain is
+   invalid: the block that includes it is produced and stored by the
+   sequencer, the operation leaves the delayed inbox, and it is not applied. *)
+let test_delayed_origination_balance_out_of_domain_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native origination above the mutez domain is dropped"
+    ~tags:["mutez"; "liveness"; "delayed_inbox"; "origination"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let* tez_client = tezlink_client sequencer in
+  let get_counter () =
+    let* counter =
+      Client.RPC.call tez_client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source.public_key_hash
+           ()
+    in
+    return (JSON.as_int counter)
+  in
+  let get_balance () =
+    let* balance =
+      Client.get_balance_for ~account:source.public_key_hash tez_client
+    in
+    return (Tez.to_mutez balance)
+  in
+  let* counter_before = get_counter () in
+  let* balance_before = get_balance () in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
+  (* 2^63 mutez is one above the mutez domain. *)
+  let (`Hex operation) =
+    encode_unsigned_operation
+      ~branch
+      [
+        encode_origination
+          ~source
+          ~fee:(Z.of_int branch_transfer_fee)
+          ~counter:(Z.of_int (counter_before + 1))
+          ~gas_limit:(Z.of_int 20_000)
+          ~storage_limit:(Z.of_int 1_000)
+          ~balance:(Z.shift_left Z.one 63);
+      ]
+    |> sign_encoded_operation ~signer:source
+    |> Hex.of_string
+  in
+  let* _hash =
+    Delayed_inbox.send_raw_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      operation
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  (* The sequencer keeps producing blocks after the one including the
+     operation. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  let* counter_after = get_counter () in
+  Check.((counter_after = counter_before) int)
+    ~error_msg:
+      "The invalid operation must not be applied: expected counter %R, got %L" ;
+  let* balance_after = get_balance () in
+  Check.((balance_after = balance_before) int)
+    ~error_msg:
+      "The invalid operation must not pay its fee: expected balance %R, got %L" ;
+  unit
+
+(* A delayed native operation whose gas limits each fit in u64 but sum past it
+   is invalid: the block that includes it is produced, the operation leaves the
+   delayed inbox, and it is not applied. *)
+let test_delayed_gas_limit_sum_overflow_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed native operation whose gas limits overflow u64 is dropped"
+    ~tags:["gas"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap1 in
+  let* tez_client = tezlink_client sequencer in
+  let get_counter () =
+    let* counter =
+      Client.RPC.call tez_client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source.public_key_hash
+           ()
+    in
+    return (JSON.as_int counter)
+  in
+  let get_balance () =
+    let* balance =
+      Client.get_balance_for ~account:source.public_key_hash tez_client
+    in
+    return (Tez.to_mutez balance)
+  in
+  let* counter_before = get_counter () in
+  let* balance_before = get_balance () in
+  let* branch = tezlink_branch ~sc_rollup_node ~client ~sequencer in
+  (* Two gas limits of 2^63 each fit in u64; their sum does not. *)
+  let transfer i =
+    encode_transfer
+      ~source
+      ~fee:(Z.of_int branch_transfer_fee)
+      ~counter:(Z.of_int (counter_before + i))
+      ~gas_limit:(Z.shift_left Z.one 63)
+      ~storage_limit:Z.zero
+      ~dest:Constant.bootstrap2
+      ~amount:Z.one
+  in
+  let (`Hex operation) =
+    encode_unsigned_operation ~branch [transfer 1; transfer 2]
+    |> sign_encoded_operation ~signer:source
+    |> Hex.of_string
+  in
+  let* _hash =
+    Delayed_inbox.send_raw_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      operation
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* counter_after = get_counter () in
+  Check.((counter_after = counter_before) int)
+    ~error_msg:
+      "The invalid operation must not be applied: expected counter %R, got %L" ;
+  let* balance_after = get_balance () in
+  Check.((balance_after = balance_before) int)
+    ~error_msg:
+      "The invalid operation must not pay its fee: expected balance %R, got %L" ;
+  unit
+
 (* Test 3: a transfer with a foreign branch is rejected by the prevalidator at
    injection (so it never gets included and pays no inclusion fees). *)
 let test_native_branch_foreign_rejected () =
@@ -7922,6 +8395,9 @@ let () =
   test_native_branch_foreign_rejected () ;
   test_bootstrap_kernel_config () ;
   test_low_fee_op_refused_by_sequencer_accepted_via_delayed_inbox [Alpha] ;
+  test_delayed_amount_out_of_domain_dropped [Alpha] ;
+  test_delayed_origination_balance_out_of_domain_dropped [Alpha] ;
+  test_delayed_gas_limit_sum_overflow_dropped [Alpha] ;
   test_delayed_crac_abort_promotes_unbacked_credit [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
@@ -7945,6 +8421,7 @@ let () =
   test_cross_runtime_view_call_negative () ;
   test_cross_runtime_call_from_michelson_to_evm () ;
   test_michelson_gateway_evm_revert () ;
+  test_michelson_gateway_alias_creation_oog_is_charged () ;
   test_cross_runtime_call_from_michelson_contract_to_evm () ;
   test_cross_runtime_call_from_michelson_contract_to_evm_revert () ;
   test_cross_runtime_transfer_from_michelson_contract_to_evm () ;

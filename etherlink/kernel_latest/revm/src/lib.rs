@@ -4117,10 +4117,12 @@ mod test {
         use alloy_sol_types::{sol, SolCall, SolEvent, SolInterface};
         use revm::{
             context::{
-                result::{ExecutionResult, Output},
+                result::{ExecutionResult, HaltReason, Output},
                 transaction::AccessList,
+                TxEnv,
             },
-            primitives::{hex::FromHex, Address, Bytes, U256},
+            interpreter::gas::calculate_initial_tx_gas_for_tx,
+            primitives::{hex::FromHex, Address, Bytes, TxKind, U256},
         };
         use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
@@ -4131,7 +4133,9 @@ mod test {
 
         use crate::{
             precompiles::{
-                constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                constants::{
+                    RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                },
                 runtime_gateway::{
                     CrossRuntimeCallSent,
                     RuntimeGateway::{
@@ -4144,7 +4148,7 @@ mod test {
             test::{
                 utilities::{
                     fund, last_recorded_sender, last_recorded_source, Registry,
-                    STATIC_CALLER_BYTECODE,
+                    DEFAULT_SPEC_ID, STATIC_CALLER_BYTECODE,
                 },
                 GAS_LIMIT,
             },
@@ -4208,6 +4212,16 @@ mod test {
             destination: Address,
             calldata: Bytes,
         ) -> ExecutionOutcome {
+            call_into_with_gas(rk, caller, destination, calldata, GAS_LIMIT)
+        }
+
+        fn call_into_with_gas(
+            rk: &mut MockRuntimeKeyspaces<'_>,
+            caller: Address,
+            destination: Address,
+            calldata: Bytes,
+            gas_limit: u64,
+        ) -> ExecutionOutcome {
             let registry = Registry::new();
             let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
             run_transaction(
@@ -4219,7 +4233,7 @@ mod test {
                 caller,
                 Some(destination),
                 calldata,
-                GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+                GasData::new(gas_limit, 1, GAS_LIMIT),
                 U256::ZERO,
                 None,
                 false,
@@ -4260,6 +4274,81 @@ mod test {
             })
             .abi_encode()
             .into()
+        }
+
+        // --- Calldata is charged before it is decoded -------------------------
+
+        /// The `call` selector followed by bytes that are not a valid
+        /// encoding: decoding it fails.
+        fn invalid_call_payload() -> Bytes {
+            let mut calldata = callCall::SELECTOR.to_vec();
+            calldata.extend([0xFFu8; 64]);
+            calldata.into()
+        }
+
+        /// An invalid calldata sent with just enough gas to pay for the
+        /// transaction itself runs out of gas in the gateway, before the decode
+        /// can reject it. Were the calldata charged after the decode, the call
+        /// would revert with `invalid input encoding` without paying anything.
+        #[test]
+        fn runtime_gateway_charges_calldata_before_decoding_it() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let caller = Address::from([1u8; 20]);
+            fund(rk.eth_accounts_mut(), caller);
+            let calldata = invalid_call_payload();
+
+            let tx = TxEnv {
+                kind: TxKind::Call(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+                data: calldata.clone(),
+                ..Default::default()
+            };
+            let gas = calculate_initial_tx_gas_for_tx(&tx, DEFAULT_SPEC_ID, None);
+            // What is left for the gateway after the transaction's own cost
+            // is a little, well below the gateway's base cost.
+            let initial_gas = gas.initial_total_gas();
+            let gas_limit = initial_gas.max(gas.floor_gas) + 1_000;
+            assert!(gas_limit - initial_gas < u64::from(RUNTIME_GATEWAY_BASE_COST));
+
+            let res = call_into_with_gas(
+                &mut rk,
+                caller,
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                calldata,
+                gas_limit,
+            );
+            match res.result {
+                ExecutionResult::Halt {
+                    reason: HaltReason::OutOfGas(_),
+                    ..
+                } => { /* expected */ }
+                other => panic!(
+                    "expected the gateway to run out of gas before decoding, got {other:?}"
+                ),
+            }
+        }
+
+        /// With enough gas to pay for it, the same calldata is decoded and
+        /// rejected as invalid.
+        #[test]
+        fn runtime_gateway_rejects_invalid_calldata_once_paid_for() {
+            let mut host = MockKernelHost::default();
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let caller = Address::from([1u8; 20]);
+            fund(rk.eth_accounts_mut(), caller);
+
+            let res = call_into(
+                &mut rk,
+                caller,
+                RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                invalid_call_payload(),
+            );
+            match res.result {
+                ExecutionResult::Revert { output, .. } => {
+                    assert_eq!(output, Bytes::from("invalid input encoding"))
+                }
+                other => panic!("expected an invalid-encoding revert, got {other:?}"),
+            }
         }
 
         // --- DELEGATECALL guard ----------------------------------------------

@@ -254,6 +254,13 @@ pub struct MockRegistry {
     /// When `true`, `ensure_alias` runs out of gas, as an alias creation
     /// given too small a budget does. Default `false`.
     pub alias_creation_out_of_gas: bool,
+    /// Internal operations a nested Michelson frame adds to the journal
+    /// counter during `serve`, to model a re-entrant call.
+    pub nested_internal_operations: u128,
+    /// When `Some(n)`, `ensure_alias` runs out of gas, as an alias creation
+    /// given too small a budget does, from its `n`-th call on: the previous
+    /// ones succeed. Default `None`.
+    pub alias_creation_out_of_gas_after: Option<usize>,
     pub ensure_alias_calls: RefCell<Vec<(AliasInfo, RuntimeId)>>,
     pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
     /// When `Some`, `serve` runs it on the journal before answering, so
@@ -271,6 +278,8 @@ impl MockRegistry {
             alias_delegated_storage_cost: None,
             native_address_rejection_cost: None,
             alias_creation_out_of_gas: false,
+            nested_internal_operations: 0,
+            alias_creation_out_of_gas_after: None,
             ensure_alias_calls: RefCell::new(Vec::new()),
             serve_calls: RefCell::new(Vec::new()),
             serve_journal_hook: None,
@@ -285,8 +294,14 @@ impl MockRegistry {
     }
 
     /// Have `ensure_alias` run out of gas.
-    pub fn with_alias_creation_out_of_gas(mut self) -> Self {
-        self.alias_creation_out_of_gas = true;
+    pub fn with_alias_creation_out_of_gas(self) -> Self {
+        self.with_alias_creation_out_of_gas_after(0)
+    }
+
+    /// Have `ensure_alias` run out of gas from its `calls`-th call on, the
+    /// previous ones succeeding.
+    pub fn with_alias_creation_out_of_gas_after(mut self, calls: usize) -> Self {
+        self.alias_creation_out_of_gas_after = Some(calls);
         self
     }
 
@@ -344,7 +359,10 @@ impl Registry for MockRegistry {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        if self.alias_creation_out_of_gas {
+        if self
+            .alias_creation_out_of_gas_after
+            .is_some_and(|calls| self.ensure_alias_calls.borrow().len() >= calls)
+        {
             return Err(TezosXRuntimeError::OutOfGas);
         }
         self.ensure_alias_calls
@@ -448,6 +466,10 @@ impl Registry for MockRegistry {
         Host: StorageV1 + KeySpaceLoader,
     {
         self.serve_calls.borrow_mut().push(request);
+        let counter = journal.michelson.internal_operation_counter();
+        journal
+            .michelson
+            .set_internal_operation_counter(counter + self.nested_internal_operations);
         if let Some(hook) = &self.serve_journal_hook {
             hook(journal);
         }

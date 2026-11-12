@@ -330,6 +330,13 @@ const MAX_TYPECHECK_RECURSION_DEPTH: u16 = 10_000;
 /// bounded by it.
 pub(crate) const MICHELSON_MAXIMUM_TYPE_SIZE: usize = 2001;
 
+/// Maximum length, in bytes, of a timestamp string that is not RFC3339 and is
+/// parsed as an integer. The integer parser takes quadratic time in the length
+/// of the string, while the gas charged for the string grows as `n^1.5`, so a
+/// longer string is rejected before it is parsed. L1 has no such bound. 32
+/// bytes hold every `i64` with its sign.
+const MAX_DECIMAL_TIMESTAMP_LENGTH: usize = 32;
+
 std::thread_local! {
     static TYPECHECK_RECURSION_DEPTH: std::cell::Cell<u16> = const { std::cell::Cell::new(0) };
 }
@@ -5932,7 +5939,9 @@ fn visit_value<'a, 'b>(
             // (src/proto_alpha/lib_protocol/script_timestamp.ml): try RFC3339
             // first, then fall back to arbitrary-precision integer parsing via
             // Zarith's `Z.of_string` grammar (`tezos_data_encoding`'s `Zarith`
-            // `FromStr`, which mirrors `Z.of_string` byte-for-byte).
+            // `FromStr`, which mirrors `Z.of_string` byte-for-byte). Unlike
+            // L1, the fallback rejects a string longer than
+            // `MAX_DECIMAL_TIMESTAMP_LENGTH`.
             if let Ok(dt) = DateTime::parse_from_rfc3339(n) {
                 // Chrono represents a leap second (e.g. `:60`) by keeping the
                 // POSIX timestamp at `:59` and storing nanoseconds in the
@@ -5942,6 +5951,8 @@ fn visit_value<'a, 'b>(
                 // decodes to the same epoch second on both sides.
                 let leap_offset = i64::from(dt.timestamp_subsec_nanos() >= 1_000_000_000);
                 results.push(TV::Timestamp(BigInt::from(dt.timestamp() + leap_offset)));
+            } else if n.len() > MAX_DECIMAL_TIMESTAMP_LENGTH {
+                return Err(invalid());
             } else if let Ok(z) = n.parse::<tezos_data_encoding::types::Zarith>() {
                 results.push(TV::Timestamp(z.0));
             } else {
@@ -14121,6 +14132,49 @@ code { DROP ;
             ),
             Ok(Push(RcTypedValue::new(TypedValue::Timestamp(neg_expected))))
         );
+    }
+
+    /// A non-RFC3339 timestamp string is parsed as an integer only up to
+    /// `MAX_DECIMAL_TIMESTAMP_LENGTH` bytes.
+    #[test]
+    fn timestamp_value_string_length_bound() {
+        let accepted = [
+            "9".repeat(MAX_DECIMAL_TIMESTAMP_LENGTH),
+            format!("-{}", "9".repeat(MAX_DECIMAL_TIMESTAMP_LENGTH - 1)),
+        ];
+        for s in accepted {
+            let stk = &mut tc_stk![];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("PUSH timestamp \"{s}\"")).unwrap(),
+                    &mut Gas::default(),
+                    stk
+                ),
+                Ok(Push(RcTypedValue::new(TypedValue::Timestamp(
+                    BigInt::parse_bytes(s.as_bytes(), 10).unwrap()
+                ))))
+            );
+        }
+
+        // The bound counts bytes, not significant digits.
+        let rejected = [
+            "9".repeat(MAX_DECIMAL_TIMESTAMP_LENGTH + 1),
+            format!("{}1", "0".repeat(MAX_DECIMAL_TIMESTAMP_LENGTH)),
+        ];
+        for s in rejected {
+            let stk = &mut tc_stk![];
+            assert_eq!(
+                typecheck_instruction(
+                    &parse(&format!("PUSH timestamp \"{s}\"")).unwrap(),
+                    &mut Gas::default(),
+                    stk
+                ),
+                Err(TcError::InvalidValueForType(
+                    format!("{:?}", Micheline::String(s)),
+                    Type::Timestamp
+                ))
+            );
+        }
     }
 
     /// L2-1375: an RFC3339 leap-second string (`...T00:00:60Z`) must decode to

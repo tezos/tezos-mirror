@@ -1144,6 +1144,8 @@ fn run_interp_driver<'a, 'b>(
                 let prev_key = current_key.ok_or(InterpretError::InternalError(
                     InterpretInvariant::UnreachableState,
                 ))?;
+                ctx.gas()
+                    .consume(interpret_cost::map_update(&prev_key, acc.size())?)?;
                 acc.insert_mut(prev_key, new_val);
                 if let Some((k, v)) = remaining.next() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
@@ -1758,7 +1760,11 @@ fn interpret_step<'a, 'b>(
 /// exactly the same boundary instead of redefining the literal.
 pub const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
 
-fn fresh_operation_counter<'a>(
+/// Allocate the counter of a new internal operation, failing with
+/// [`InterpretError::TooManyInternalOperations`] at
+/// [`MAX_INTERNAL_OPERATIONS`]. Every producer of internal operations must go
+/// through it, including those outside the interpreter.
+pub fn fresh_operation_counter<'a>(
     ctx: &mut impl CtxTrait<'a>,
 ) -> Result<u128, InterpretError<'a>> {
     let counter = ctx.operation_counter();
@@ -2167,9 +2173,13 @@ fn interpret_one<'a>(
                 if x2.sign() == Sign::NoSign {
                     stack.push(V::Option(None));
                 } else {
+                    // Take the divisor's magnitude by value so a negative
+                    // dividend's remainder `|x2| - r` reuses its buffer
+                    // instead of allocating a fresh copy, as `IntNat` does.
+                    let (sign2, magnitude2) = x2.into_parts();
                     let (quotient, remainder) =
-                        BigUint::div_rem(x1.magnitude(), x2.magnitude());
-                    match (x1.sign(), x2.sign()) {
+                        BigUint::div_rem(x1.magnitude(), &magnitude2);
+                    match (x1.sign(), sign2) {
                         (Sign::Minus, Sign::Minus) => {
                             stack.push(V::new_option(Some(
                                 if remainder > BigUint::zero() {
@@ -2178,7 +2188,7 @@ fn interpret_one<'a>(
                                             BigInt::from_biguint(Sign::Plus, quotient)
                                                 + 1,
                                         ),
-                                        V::Nat(x2.magnitude() - remainder),
+                                        V::Nat(magnitude2 - remainder),
                                     )
                                 } else {
                                     V::new_pair(
@@ -2199,7 +2209,7 @@ fn interpret_one<'a>(
                                             BigInt::from_biguint(Sign::Minus, quotient)
                                                 - 1,
                                         ),
-                                        V::Nat(x2.magnitude() - remainder),
+                                        V::Nat(magnitude2 - remainder),
                                     )
                                 } else {
                                     V::new_pair(
@@ -5289,6 +5299,147 @@ mod interpreter_tests {
         }
     }
 
+    // ENG-100: MAP over a `map` re-inserts every key into a fresh
+    // accumulator, and each insertion compares the key with the keys on
+    // its path in the tree. The keys below share all their bytes but the
+    // last two, so every comparison scans the whole key and the work is
+    // the number of comparisons times the key length.
+
+    /// Number of key comparisons done by MAP on a map of `n` keys: the
+    /// accumulator is a `RedBlackTreeMap` filled in key order, and the
+    /// comparisons it does only depend on that order, so they are counted
+    /// on the same insertions with keys that count their comparisons.
+    fn map_on_map_comparisons(n: u16) -> u64 {
+        struct Counted<'c>(u16, &'c Cell<u64>);
+        impl PartialEq for Counted<'_> {
+            fn eq(&self, other: &Self) -> bool {
+                self.cmp(other).is_eq()
+            }
+        }
+        impl std::cmp::Eq for Counted<'_> {}
+        impl PartialOrd for Counted<'_> {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl Ord for Counted<'_> {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.1.set(self.1.get() + 1);
+                self.0.cmp(&other.0)
+            }
+        }
+        let count = Cell::new(0);
+        let mut acc = RedBlackTreeMap::new();
+        for i in 0..n {
+            acc.insert_mut(Counted(i, &count), ());
+        }
+        count.get()
+    }
+
+    /// Key `i` of `len` bytes: a common prefix then `i` in big endian, so
+    /// the keys sort like their indices.
+    fn map_on_map_key(len: usize, i: u16) -> V<'static> {
+        let mut b = vec![0x41u8; len];
+        b[len - 2..].copy_from_slice(&i.to_be_bytes());
+        V::Bytes(b)
+    }
+
+    /// Milligas consumed by MAP on a map of `n` keys of `len` bytes.
+    fn map_on_map_gas(n: u16, len: usize) -> u64 {
+        let map = V::Map(rc_map((0..n).map(|i| (map_on_map_key(len, i), V::int(0)))));
+        let mut stack = stk![map];
+        let mut ctx = Ctx::default();
+        interpret(
+            &[Map(overloads::Map::Map, vec![ISome])],
+            &mut ctx,
+            &mut stack,
+        )
+        .unwrap();
+        u64::from(Gas::default().milligas().unwrap() - ctx.gas().milligas().unwrap())
+    }
+
+    /// Milligas charged by COMPARE on two keys of `len` bytes, the
+    /// protocol's price for one comparison of such keys.
+    fn compare_gas(len: usize) -> u64 {
+        let mut gas = Gas::default();
+        interpret_cost::compare(
+            &mut gas,
+            &map_on_map_key(len, 0),
+            &map_on_map_key(len, 1),
+        )
+        .unwrap();
+        u64::from(Gas::default().milligas().unwrap() - gas.milligas().unwrap())
+    }
+
+    /// Checks that, from keys of `len` to keys of `2 * len` bytes, the gas
+    /// of MAP on `n` keys grows at least as much as the price of the
+    /// comparisons it does, and returns that growth.
+    fn assert_map_on_map_gas_covers_comparisons(n: u16, len: usize) -> u64 {
+        let charged = map_on_map_gas(n, 2 * len) - map_on_map_gas(n, len);
+        let comparisons = map_on_map_comparisons(n);
+        let work = comparisons * (compare_gas(2 * len) - compare_gas(len));
+        assert!(
+            charged >= work,
+            "MAP on {n} keys charges {charged} milligas for {len} more bytes per \
+             key, below the {work} milligas of its {comparisons} comparisons"
+        );
+        charged
+    }
+
+    // The gas must grow linearly with the size of the keys: the extra gas
+    // per extra key byte must not decrease as the keys grow.
+    #[test]
+    fn map_on_map_gas_grows_linearly_with_key_length() {
+        let n = 64;
+        let mut previous_per_byte = 0;
+        for len in [256, 1024, 4096] {
+            let per_byte = assert_map_on_map_gas_covers_comparisons(n, len) / len as u64;
+            assert!(
+                per_byte >= previous_per_byte,
+                "MAP on {n} keys charges {per_byte} milligas per key byte at \
+                 {len} bytes, less than {previous_per_byte} for shorter keys"
+            );
+            previous_per_byte = per_byte;
+        }
+    }
+
+    // The gas must grow with the number of comparisons, which grows like
+    // `n log n` with the number `n` of keys: inserting the `i`-th key costs
+    // about `log i` comparisons.
+    //
+    // To check this, the test divides the gas by the number of comparisons
+    // and checks that this gas per comparison does not drop much as `n` grows.
+    // - `map_update` charges each insertion for the key size times
+    //   `log(size + 1) + 2`, so its gas also grows like `n log n` and its gas
+    //   per comparison tends to a constant. It still drops a little because
+    //   of the `+ 2`: from 128 to 4096 keys it keeps about 86% of its value.
+    // - A charge per key that ignores the depth of the tree grows like `n`,
+    //   so its gas per comparison drops like `1 / log n`: from 128 to 4096
+    //   keys it keeps about 50% of its value.
+    // - A single charge per MAP keeps almost nothing.
+    // The 3/4 threshold sits between 86% and 50%: it accepts the current
+    // model with some margin and rejects a charge that ignores the depth.
+    #[test]
+    fn map_on_map_gas_grows_with_the_number_of_comparisons() {
+        let len = 256;
+        let per_comparison = |n| {
+            assert_map_on_map_gas_covers_comparisons(n, len) / map_on_map_comparisons(n)
+        };
+        for n in [2, 16] {
+            assert_map_on_map_gas_covers_comparisons(n, len);
+        }
+        // The larger maps are compared to the gas per comparison on 128 keys.
+        let reference = per_comparison(128);
+        for n in [1024, 4096] {
+            let current = per_comparison(n);
+            assert!(
+                4 * current >= 3 * reference,
+                "MAP on {n} keys charges {current} milligas per comparison, \
+                 less than 3/4 of the {reference} it charges on 128 keys"
+            );
+        }
+    }
+
     // A large operand kept live by extra copies on the stack must not be
     // copied by the op. A reintroduced operand copy shows up as one extra buffer.
     #[test]
@@ -5611,6 +5762,53 @@ mod interpreter_tests {
                 allocated < SIZE as u64,
                 "SLICE (strings) allocated its {SIZE}-byte result ({allocated} \
                  bytes) before running out of gas; floor its cost by alloc_cost.",
+            );
+        }
+    }
+
+    /// ENG-153: `-1 EDIV n` has remainder `n - 1`, a buffer as large as the
+    /// divisor, built from a 1-byte dividend. Run on a shared divisor, as in
+    /// `DUP; PUSH int -1; EDIV`, the remainder is a fresh copy of `n` that
+    /// stays live next to it, so a loop grows memory by `n` per iteration. The
+    /// gas charged must cover what the run allocates, at `alloc_cost`'s rate
+    /// of 5/32 milligas per byte. Before the floor, EDIV charged about 70
+    /// milligas whatever the divisor's size.
+    #[test]
+    fn ediv_charges_for_the_remainder_it_allocates() {
+        const SIZE: usize = 16 * 1024 * 1024;
+        // Per-run allocations that do not scale with SIZE (stack cells, the
+        // pair and option boxes, the quotient), left uncharged by the bound.
+        const OVERHEAD_BYTES: u64 = 4096;
+        let divisor = BigUint::from_bytes_le(&[0xffu8; SIZE]);
+        for (overload, divisor) in [
+            (overloads::EDiv::IntNat, V::Nat(divisor.clone())),
+            (overloads::EDiv::IntInt, V::Int(BigInt::from(divisor))),
+        ] {
+            let mut stack = stk![divisor];
+            let mut ctx = Ctx::default();
+            // Built before measuring, so only the interpretation is counted.
+            let prog = [
+                Dup(None),
+                Push(RcTypedValue::new(V::int(-1))),
+                EDiv(overload),
+            ];
+            let gas_before = ctx.gas().milligas().unwrap();
+            let bytes_before = thread_allocated_bytes();
+            interpret(&prog, &mut ctx, &mut stack).unwrap();
+            let bytes = thread_allocated_bytes() - bytes_before;
+            let gas = u64::from(gas_before - ctx.gas().milligas().unwrap());
+            assert!(
+                bytes >= SIZE as u64,
+                "EDIV ({overload:?}) allocated {bytes} bytes, less than the \
+                 {SIZE}-byte remainder: the test no longer exercises the copy.",
+            );
+            let charged_bytes = bytes - OVERHEAD_BYTES;
+            let min_gas = (charged_bytes >> 3) + (charged_bytes >> 5);
+            assert!(
+                gas >= min_gas,
+                "DUP; PUSH int -1; EDIV ({overload:?}) allocated {bytes} bytes \
+                 but charged {gas} milligas, below the {min_gas} milligas \
+                 alloc_cost requires; floor EDIV's cost by alloc_cost.",
             );
         }
     }
@@ -6071,7 +6269,9 @@ mod interpreter_tests {
                     V::new_option(Some(V::new_pair(V::int(2), V::String("b".into()))))
                 )
             ]))],
-            interpret_cost::MAP_MAP,
+            interpret_cost::MAP_MAP
+                + interpret_cost::map_update(&V::int(1), 0).unwrap()
+                + interpret_cost::map_update(&V::int(2), 1).unwrap(),
         );
     }
 

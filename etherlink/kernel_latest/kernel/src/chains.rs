@@ -985,7 +985,8 @@ enum FeesOutcome {
     /// account can cover it. The operation is invalid, like one whose
     /// declared fees are insufficient; it is not a kernel error, since
     /// the gas limit the fee derives from is chosen by the operation's
-    /// author.
+    /// author. An operation whose declared gas limits do not sum in u64
+    /// is unpayable for the same reason.
     Unpayable,
 }
 
@@ -1044,7 +1045,8 @@ pub(crate) fn tezos_op_evm_gas_limit(
 
 /// Returns the required fees if any and the function to execute
 /// regarding DA fees, either skipped if operation is a simulation
-/// or credit sequencer pool address accordingly.
+/// or credit sequencer pool address accordingly. The outcome is
+/// [`FeesOutcome::Unpayable`] when the required fees are out of range.
 fn get_fees_data(
     operation: &Operation,
     skip_fees_check: bool,
@@ -1072,13 +1074,15 @@ fn get_fees_data(
             Mutez::ZERO
         };
 
-        let total_gas_limit: u64 = operation
+        let Some(total_gas_limit) = operation
             .content
             .iter()
             .filter_map(|c| c.gas_limit().ok())
             .filter_map(|gl| gl.0.to_u64())
             .try_fold(0u64, |acc, x| acc.checked_add(x))
-            .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+        else {
+            return Ok(FeesOutcome::Unpayable);
+        };
 
         let Ok(required_execution_gas_fees) = michelson_gas_to_mutez(
             base_fee_per_gas,
@@ -1167,7 +1171,7 @@ where
                 FeesOutcome::Unpayable => {
                     log!(
                         Error,
-                        "Dropping Tezos operation {}: its required fees exceed the mutez domain",
+                        "Dropping Tezos operation {}: its gas limits or required fees are out of range",
                         hex::encode(*hash)
                     );
                     return Ok(crate::apply::ExecutionResult::Invalid);
@@ -1380,6 +1384,22 @@ mod tests {
         let encoded = rlp::encode(&content);
         let decoded: TezlinkContent = rlp::decode(&encoded).unwrap();
         assert_eq!(decoded, content);
+    }
+
+    #[test]
+    fn get_fees_data_rejects_gas_limit_sum_past_u64() {
+        // Each gas limit fits in u64; their sum does not.
+        let mut op = make_test_operation();
+        let ManagerOperationContent::Reveal(mut reveal) = op.content.remove(0) else {
+            panic!("The test operation should be a reveal");
+        };
+        reveal.gas_limit = tezos_data_encoding::types::Narith((1u64 << 63).into());
+        op.content = vec![
+            ManagerOperationContent::Reveal(reveal.clone()),
+            ManagerOperationContent::Reveal(reveal),
+        ];
+        let result = get_fees_data(&op, false, Mutez::ZERO, U256::one(), 1, None, false);
+        assert!(matches!(result, Ok(FeesOutcome::Unpayable)));
     }
 
     #[test]

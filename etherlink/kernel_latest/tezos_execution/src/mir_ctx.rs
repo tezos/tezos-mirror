@@ -962,6 +962,11 @@ pub trait HasCrossRuntime<'host, Host: StorageV1 + KeySpaceLoader>:
         &mut tezosx_journal::TezosXJournal,
         &<Self as HasRegistry>::R,
     );
+
+    /// The frame's internal-operation counter. A cross-runtime dispatch
+    /// hands it to the journal, so that a nested Michelson frame resumes
+    /// from it, and takes back the value the nested frames reached.
+    fn internal_operation_counter_mut(&mut self) -> &mut u128;
 }
 
 impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
@@ -1019,6 +1024,10 @@ impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
         &R,
     ) {
         (&mut *self.tc_ctx.rk, self.journal, self.registry)
+    }
+
+    fn internal_operation_counter_mut(&mut self) -> &mut u128 {
+        self.operation_ctx.counter
     }
 }
 
@@ -3574,6 +3583,10 @@ pub(crate) mod mock {
             &R,
         ) {
             (&mut *self.rk, self.journal, self.registry)
+        }
+
+        fn internal_operation_counter_mut(&mut self) -> &mut u128 {
+            &mut self.operation_counter
         }
     }
 

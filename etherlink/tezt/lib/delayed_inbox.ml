@@ -137,11 +137,9 @@ let send_deposit_to_delayed_inbox ?(rlp = false) ~amount ~bridge ~depositor
   in
   unit
 
-let send_tezos_operation_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
-    ~sc_rollup_node ~client ~l1_contracts ~sc_rollup_address
-    ?(sender = Constant.bootstrap2) ?(tezosx_format = false) operation =
-  let* signature = Operation_core.sign operation client in
-  let* (`Hex hex) = Operation_core.hex ~signature operation client in
+let send_raw_tezos_operation_to_delayed_inbox ?(amount = Tez.one)
+    ?expect_failure ~sc_rollup_node ~client ~l1_contracts ~sc_rollup_address
+    ?(sender = Constant.bootstrap2) ?(tezosx_format = false) hex =
   let hex = if tezosx_format then "00" ^ hex else hex in
   let bytes = Hex.to_bytes (`Hex hex) in
   let op =
@@ -216,3 +214,19 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
   in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   unit
+
+let send_tezos_operation_to_delayed_inbox ?amount ?expect_failure
+    ~sc_rollup_node ~client ~l1_contracts ~sc_rollup_address ?sender
+    ?tezosx_format operation =
+  let* signature = Operation_core.sign operation client in
+  let* (`Hex hex) = Operation_core.hex ~signature operation client in
+  send_raw_tezos_operation_to_delayed_inbox
+    ?amount
+    ?expect_failure
+    ~sc_rollup_node
+    ~client
+    ~l1_contracts
+    ~sc_rollup_address
+    ?sender
+    ?tezosx_format
+    hex

@@ -991,6 +991,21 @@ where
         // is rejected (matching L1 `Internal_operation_replay`) instead
         // of being applied a second time under a fresh display nonce.
         let is_replay = !operation_ctx.applied_counters.insert(counter);
+        // A replayed copy still adds an entry to the receipt but did not
+        // advance the MIR counter, which is also the position checked
+        // against the per-block internal-operation cap. Reserve one for it,
+        // failing the operation at the cap like MIR does, so that the cap is
+        // reached here rather than at block finalization.
+        if is_replay {
+            if *operation_ctx.counter >= mir::interpreter::MAX_INTERNAL_OPERATIONS {
+                return Err(ApplyOperationError::from(TransferError::from(
+                    ContractInterpretError::InterpretError(
+                        InterpretError::TooManyInternalOperations,
+                    ),
+                )));
+            }
+            *operation_ctx.counter += 1;
+        }
         // Resolve the disposition once: a prior failure short-circuits
         // every kind to `Skip`, a replayed counter to `Replay`, and a
         // replay also fails the enclosing operation. Only `Apply` needs
@@ -3228,9 +3243,13 @@ where
     // Block-cumulative internal-operation counter: the block's prior count
     // (`internal_operations_base`) plus what this batch already produced
     // (`nonce_counter`). The MIR cap fires at L1's 65,535 limit against this.
+    // `nonce_counter` misses the receipts of re-entrant cross-runtime calls
+    // spliced into earlier operations of the batch; the journal counter,
+    // written back below, accounts for them.
     let mut counter = block_ctx
         .internal_operations_base
-        .saturating_add(u128::from(*nonce_counter));
+        .saturating_add(u128::from(*nonce_counter))
+        .max(journal.michelson.internal_operation_counter());
     let storage_limit = &validated_operation.content.storage_limit;
     let balance_updates = validated_operation.balance_updates;
     let receipt = match &validated_operation.content.operation {
@@ -3287,6 +3306,13 @@ where
                     // backtracks every internal receipt regardless.
                     Err(e) => (Err(e), Mutez::ZERO, SubtreeStatus::AllApplied),
                 };
+            // Keep the journal counter at least at this operation's counter,
+            // which includes the re-entrant cross-runtime calls it made, for
+            // the next operation of the batch.
+            let journal_counter = journal.michelson.internal_operation_counter();
+            journal.michelson.set_internal_operation_counter(
+                journal_counter.max(*operation_ctx.counter),
+            );
             let transfer_result = match transfer_result {
                 Ok(v) => Ok(v),
                 Err(CracError::BlockAbort(msg)) => {
@@ -8443,6 +8469,63 @@ mod tests {
         }
     }
 
+    /// A replayed copy adds a receipt entry without a MIR counter of its
+    /// own. Near the per-block cap, it must fail the operation instead of
+    /// adding an entry over the limit.
+    #[test]
+    fn test_internal_emit_replay_counts_towards_cap() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        let parent_hash = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &parent_hash,
+            "parameter unit; storage unit; code { CDR; PUSH nat 42; EMIT %foo nat; \
+             DUP; NIL operation; SWAP; CONS; SWAP; CONS; PAIR }",
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+        let operation = make_transfer_operation(
+            10,
+            1,
+            30000,
+            0,
+            src,
+            0.into(),
+            Contract::Originated(parent_hash),
+            Parameters::default(),
+        );
+        // Room for the event itself, not for its replayed copy.
+        let base = mir::interpreter::MAX_INTERNAL_OPERATIONS - 1;
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &BlockCtx {
+                    level: &0u32.into(),
+                    now: &0i64.into(),
+                    chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                    internal_operations_base: base,
+                    tracing_enabled: false,
+                    http_trace_enabled: false,
+                },
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .unwrap(),
+        );
+        assert!(!receipts[0].receipt.is_applied());
+        let entries = get_internal_receipts(&receipts[0].receipt).len() as u128;
+        assert!(base + entries <= mir::interpreter::MAX_INTERNAL_OPERATIONS);
+    }
+
     /// L2-1637, event variant: a contract `DUP`s an internal `EMIT`
     /// `operation` and returns both copies. They share one MIR counter,
     /// so the second must be rejected as a replay rather than emitting
@@ -8563,6 +8646,106 @@ mod tests {
                 panic!("Second copy should be a Failed event but is {other:?}")
             }
         }
+    }
+
+    /// The internal operations of a re-entrant gateway call count towards the
+    /// per-block cap of the next operation of the batch, even though they
+    /// add nothing to the `nonce_counter` of the batch.
+    #[test]
+    fn test_reentrant_gateway_call_counts_towards_cap_of_next_operation() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        let emitter = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut rk,
+            &emitter,
+            "parameter unit; storage unit; code { CDR; PUSH nat 42; EMIT %foo nat; \
+             NIL operation; SWAP; CONS; PAIR }",
+            &Micheline::from(()),
+            &100_u64.into(),
+        );
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap();
+        let arena = Arena::new();
+        let unit = Micheline::from(())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let operation = make_operation(
+            10,
+            1,
+            30000,
+            100,
+            src,
+            vec![
+                OperationContent::Transfer(TransferContent {
+                    amount: 0.into(),
+                    destination: Contract::Originated(gateway_kt1),
+                    parameters: Parameters {
+                        entrypoint: Entrypoint::try_from("call").unwrap(),
+                        value: gateway_call_transfer_param(
+                            &arena,
+                            "0x1111111111111111111111111111111111111111",
+                        )
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap(),
+                    },
+                }),
+                OperationContent::Transfer(TransferContent {
+                    amount: 0.into(),
+                    destination: Contract::Originated(emitter),
+                    parameters: Parameters {
+                        entrypoint: Entrypoint::default(),
+                        value: unit,
+                    },
+                }),
+            ],
+        );
+        // The re-entrant frame of the first operation fills the block up to
+        // the cap, so the event of the second operation does not fit.
+        let mut registry =
+            crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
+        registry.nested_internal_operations = 8;
+        let base = mir::interpreter::MAX_INTERNAL_OPERATIONS - 8;
+        let mut journal = TezosXJournal::new(
+            tezosx_journal::CracId::new(1, 0),
+            TezosXHashes::zero(),
+            tezos_ethereum::block::BlockConstants::dummy(),
+        );
+        journal.michelson.set_internal_operation_counter(base);
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                &registry,
+                &mut journal,
+                operation,
+                &BlockCtx {
+                    level: &0u32.into(),
+                    now: &0i64.into(),
+                    chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+                    internal_operations_base: base,
+                    tracing_enabled: false,
+                    http_trace_enabled: false,
+                },
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .unwrap(),
+        );
+        // The second operation fails on the cap, not on anything else.
+        let second = format!("{:?}", receipts[1].receipt);
+        assert!(
+            !receipts[1].receipt.is_applied()
+                && second.contains("too many internal operations"),
+            "got {second}"
+        );
     }
 
     #[test]
