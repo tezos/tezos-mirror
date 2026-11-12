@@ -106,8 +106,7 @@ pub(crate) const STORAGE_VERSION_KEY: Key = Key::from_static(b"/storage_version"
 const KERNEL_VERSION_KEY: Key = Key::from_static(b"/kernel_version");
 
 // Key to the admin, inside the `/base` keyspace. Resolves to the durable path
-// `/base/admin`. Both the reveal-storage bootstrap writer and the readers go
-// through the `/base` keyspace.
+// `/base/admin`.
 pub(crate) const ADMIN_KEY: Key = Key::from_static(b"/admin");
 // The sequencer-governance contract is written by the installer at its
 // absolute path; the kernel reads it through the `/evm/world_state` keyspace

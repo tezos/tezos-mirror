@@ -757,11 +757,6 @@ val sequencer_upgrade_payload :
 val init_from_rollup_node_data_dir :
   ?omit_delayed_tx_events:bool -> t -> Sc_rollup_node.t -> unit Lwt.t
 
-(** [transform_dump ~dump_json ~dump_rlp] transforms a JSON list of
-    instructions stored in [dump_json] to an RLP list, which is
-    stored in [dump_rlp].  *)
-val transform_dump : dump_json:string -> dump_rlp:string -> unit Lwt.t
-
 (** [reset evm_node ~l2_level] reset the store of the [evm_node] to
     l2_level. *)
 val reset : t -> l2_level:int -> unit Lwt.t

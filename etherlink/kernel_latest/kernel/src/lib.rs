@@ -20,14 +20,12 @@ use fallback_upgrade::fallback_backup_kernel;
 use inbox::StageOneStatus;
 use migration::MigrationStatus;
 use primitive_types::U256;
-use reveal_storage::{is_revealed_storage, reveal_storage};
 use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
 use storage::{
     enter_stage_one, leave_stage_one, read_da_fee, read_kernel_version,
     read_minimum_base_fee_per_gas, read_tracer_input, store_da_fee, store_kernel_version,
     store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
 };
-use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
@@ -36,7 +34,6 @@ use tezos_evm_runtime::runtime_keyspaces::{
     BlueprintKeyspaces, RuntimeKeyspaces, BASE_KEYSPACE_NAME,
 };
 use tezos_smart_rollup::entrypoint;
-use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::{CoreStorage, StorageV1};
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -107,7 +104,6 @@ mod linked_list;
 mod migration;
 mod parsing;
 pub mod registry_impl;
-mod reveal_storage;
 mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
@@ -532,21 +528,9 @@ where
             .unwrap();
     }
 
-    let Some(mut bk) = load_keyspaces_or_log(&mut kernel_host) else {
+    let Some(bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
-    if is_revealed_storage(bk.base()) {
-        reveal_storage(
-            &mut kernel_host,
-            &mut bk,
-            option_env!("EVM_SEQUENCER").map(|s| {
-                PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
-            }),
-            option_env!("EVM_ADMIN").map(|s| {
-                ContractKt1Hash::from_base58_check(s).expect("Failed parsing EVM_ADMIN")
-            }),
-        );
-    }
     match run(&mut kernel_host, bk) {
         Ok(()) => (),
         Err(err) => {
