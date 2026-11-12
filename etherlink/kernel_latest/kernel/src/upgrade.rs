@@ -238,7 +238,7 @@ where
     // no replayable signature, and the pending upgrade can be re-scheduled from
     // L1 before activation. Bumping here (rather than at store-time) thus keeps
     // the counter at exactly +1 per applied governance change.
-    increment_sequencer_change_counter(host)?;
+    increment_sequencer_change_counter(evm_world_state)?;
     store_sequencer_pool_address(evm_world_state, pool_address)?;
     delete_sequencer_upgrade(evm_world_state);
     delete_sequencer_key_change(host)?;
@@ -315,16 +315,47 @@ pub fn possible_sequencer_key_change(
 mod tests {
     use super::*;
     use crate::load_base;
+    use primitive_types::U256 as PrimitiveU256;
     use revm::primitives::U256;
-    use revm_etherlink::storage::sequencer_key_change::{
-        read_sequencer_change_counter, store_sequencer_key_change,
-    };
+    use revm_etherlink::helpers::storage::u256_to_le_bytes;
+    use revm_etherlink::storage::sequencer_key_change::read_sequencer_change_counter;
+    use revm_etherlink::storage::sequencer_key_change::store_sequencer_key_change;
+    use tezos_ethereum::keyspace::KeySpaceExtU256;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 
     fn test_public_key() -> PublicKey {
         PublicKey::from_b58check("edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2")
             .unwrap()
+    }
+
+    #[test]
+    fn sequencer_change_counter_keeps_the_legacy_absolute_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let legacy_path =
+            RefPath::assert_from(b"/evm/world_state/sequencer_change_counter");
+
+        rk.host_mut()
+            .store_write_all(&legacy_path, &u256_to_le_bytes(PrimitiveU256::from(7)))
+            .unwrap();
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::from(7)
+        );
+
+        rk.evm_world_state_mut()
+            .store_evm_u256_le(
+                &revm_etherlink::storage::world_state_handler::
+                    SEQUENCER_KEY_CHANGE_COUNTER_KEY,
+                U256::from(8),
+            )
+            .unwrap();
+        assert_eq!(
+            rk.host().store_read_all(&legacy_path).unwrap(),
+            u256_to_le_bytes(PrimitiveU256::from(8))
+        );
     }
 
     // A governance change advances the change counter by exactly one, and
@@ -336,7 +367,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut bk = crate::load_keyspaces(&mut host).unwrap();
 
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+        assert_eq!(
+            read_sequencer_change_counter(bk.evm_world_state()),
+            U256::ZERO
+        );
 
         store_sequencer_upgrade(
             &mut bk,
@@ -350,7 +384,10 @@ mod tests {
         .unwrap();
 
         // Merely scheduling the upgrade must not move the counter.
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+        assert_eq!(
+            read_sequencer_change_counter(bk.evm_world_state()),
+            U256::ZERO
+        );
 
         // Before activation nothing applies, so the counter stays put.
         storage::store_last_info_per_level_timestamp(
@@ -359,7 +396,10 @@ mod tests {
         )
         .unwrap();
         possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ZERO);
+        assert_eq!(
+            read_sequencer_change_counter(bk.evm_world_state()),
+            U256::ZERO
+        );
 
         // At/after activation the upgrade applies exactly once: counter is +1.
         storage::store_last_info_per_level_timestamp(
@@ -368,14 +408,20 @@ mod tests {
         )
         .unwrap();
         possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(bk.evm_world_state()),
+            U256::ONE
+        );
 
         // The applied upgrade is deleted, so a later call applies nothing.
         assert!(read_sequencer_upgrade(bk.evm_world_state())
             .unwrap()
             .is_none());
         possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
-        assert_eq!(read_sequencer_change_counter(&host).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(bk.evm_world_state()),
+            U256::ONE
+        );
     }
 
     // The precompile path bumps the counter at store-time (in
@@ -395,18 +441,27 @@ mod tests {
             EVMBasedSequencerKeyChange::new(test_public_key(), Timestamp::from(100i64)),
         )
         .unwrap();
-        increment_sequencer_change_counter(rk.host_mut()).unwrap();
-        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
+        increment_sequencer_change_counter(rk.evm_world_state_mut()).unwrap();
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::ONE
+        );
 
         // Before activation nothing applies.
         possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(50i64))
             .unwrap();
-        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::ONE
+        );
 
         // At/after activation the change applies but the counter is unchanged.
         possible_sequencer_key_change(rk.host_mut(), &mut base, Timestamp::from(100i64))
             .unwrap();
-        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::ONE
+        );
     }
 
     fn upgrade_with(sequencer: PublicKey) -> SequencerUpgrade {

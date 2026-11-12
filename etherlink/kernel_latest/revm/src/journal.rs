@@ -653,7 +653,7 @@ impl<
     /// through the layered state so a second inner precompile call in the same
     /// transaction sees the in-memory value (see
     /// `LayeredState::sequencer_change_counter`).
-    pub fn sequencer_change_counter(&self) -> Result<U256, LayeredStateError> {
+    pub fn sequencer_change_counter(&self) -> U256 {
         self.journal
             .evm
             .layered_state

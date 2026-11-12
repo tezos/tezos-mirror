@@ -4,15 +4,16 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::EvmDbError;
-use crate::helpers::storage::read_u256_le_default;
 use crate::storage::{
     block::{get_block_hash, BLOCKS_STORED},
     code::CodeStorage,
-    sequencer_key_change::{store_sequencer_key_change, write_sequencer_change_counter},
+    sequencer_key_change::{
+        read_sequencer_change_counter, store_sequencer_key_change,
+        write_sequencer_change_counter,
+    },
     world_state_handler::{
         read_ticketer, AccountInfo, AccountOrigin, StorageAccount,
-        GOVERNANCE_SEQUENCER_UPGRADE_KEY, NATIVE_TOKEN_TICKETER_KEY,
-        SEQUENCER_KEY_CHANGE_COUNTER_PATH, SEQUENCER_KEY_PATH,
+        GOVERNANCE_SEQUENCER_UPGRADE_KEY, NATIVE_TOKEN_TICKETER_KEY, SEQUENCER_KEY_PATH,
     },
 };
 use evm_inspectors::HasHost;
@@ -382,12 +383,8 @@ where
             .contains(&GOVERNANCE_SEQUENCER_UPGRADE_KEY)
     }
 
-    fn sequencer_change_counter(&self) -> Result<U256, PrecompileStateError> {
-        Ok(read_u256_le_default(
-            self.rk.host(),
-            &SEQUENCER_KEY_CHANGE_COUNTER_PATH,
-            U256::ZERO,
-        )?)
+    fn sequencer_change_counter(&self) -> U256 {
+        read_sequencer_change_counter(self.rk.evm_world_state())
     }
 }
 
@@ -464,7 +461,7 @@ where
             abort_on_error!(
                 self,
                 write_sequencer_change_counter(
-                    self.rk.host_mut(),
+                    self.rk.evm_world_state_mut(),
                     sequencer_change_counter
                 ),
                 "DatabaseCommitPrecompileStateChanges `write_sequencer_change_counter`"

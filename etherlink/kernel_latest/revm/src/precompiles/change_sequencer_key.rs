@@ -160,10 +160,7 @@ where
             // call in the same transaction sees the in-memory value; within a
             // transaction this equals the durable counter, so the value signed
             // against is unchanged.
-            let change_counter = context
-                .journal()
-                .sequencer_change_counter()
-                .map_err(|e| e.into_with_remainder(gas))?;
+            let change_counter = context.journal().sequencer_change_counter();
 
             let mut signed_payload = Vec::with_capacity(
                 SEQUENCER_KEY_CHANGE_SIGN_TAG.len()

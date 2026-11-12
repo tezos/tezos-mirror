@@ -2376,14 +2376,20 @@ mod test {
 
         // Storing the pending change bumps the change counter immediately,
         // even though the change has not been applied yet.
-        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::ONE
+        );
 
         // Replaying the exact same calldata is now rejected: its signature was
         // made against counter 0, which is stale, so it can no longer be used to
         // grief the pending change (e.g. resetting its activation delay).
         let ExecutionOutcome { result, .. } = submit(&mut rk, initial_calldata);
         assert!(!result.is_success());
-        assert_eq!(read_sequencer_change_counter(rk.host()).unwrap(), U256::ONE);
+        assert_eq!(
+            read_sequencer_change_counter(rk.evm_world_state()),
+            U256::ONE
+        );
 
         // The owner can still overwrite their own pending change by signing
         // against the new counter with the (still unchanged) current key. No
@@ -2392,7 +2398,7 @@ mod test {
         let ExecutionOutcome { result, .. } = submit(&mut rk, overwrite_calldata);
         assert!(result.is_success());
         assert_eq!(
-            read_sequencer_change_counter(rk.host()).unwrap(),
+            read_sequencer_change_counter(rk.evm_world_state()),
             U256::from(2)
         );
         let value = rk
