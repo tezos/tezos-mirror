@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 release_site.render:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -63,7 +63,7 @@ release_site.render:
   retry: 0
 
 teztale.build-arm64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_arm64
@@ -111,7 +111,7 @@ teztale.build-arm64:
     when: on_success
 
 teztale.build-x86_64:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -159,7 +159,7 @@ teztale.build-x86_64:
     when: on_success
 
 teztale.gitlab_release:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci-release:trixie-master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -183,7 +183,7 @@ teztale.gitlab_release:
   retry: 0
 
 teztale.release-page-deploy-assets:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-d74b3dc3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-release-page:master-a416870e
   stage: publish
   tags:
   - gcp_not_interruptible
