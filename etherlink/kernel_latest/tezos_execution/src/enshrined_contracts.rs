@@ -5131,8 +5131,14 @@ pub(crate) mod tests {
         ctx.operation_counter = mir::interpreter::MAX_INTERNAL_OPERATIONS;
         let result = dispatch_callback(&mut ctx, Some(make_test_address()), vec![]);
         assert!(
-            matches!(&result, Err(TransferError::MichelsonContractInterpretError(msg))
-                if msg.contains("too many internal operations")),
+            matches!(
+                &result,
+                Err(TransferError::MichelsonContractInterpretError(
+                    mir::interpreter::ContractInterpretError::InterpretError(
+                        mir::interpreter::InterpretError::TooManyInternalOperations
+                    )
+                ))
+            ),
             "got {result:?}"
         );
     }
@@ -6406,6 +6412,14 @@ pub(crate) mod tests {
             .expect("milligas within limit")
     }
 
+    /// A `MichelsonContractInterpretError` whose message ends with `len`
+    /// bytes, so that the test controls its size.
+    fn interpret_error(len: usize) -> TransferError {
+        TransferError::MichelsonContractInterpretError(
+            mir::typechecker::TcError::UnexpectedMicheline("x".repeat(len)).into(),
+        )
+    }
+
     /// A `MichelsonContractInterpretError` body is charged at the per-word
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
     /// stores the error once (on the synthetic alias(E_1)→target
@@ -6414,8 +6428,7 @@ pub(crate) mod tests {
     /// length of `ApplyOperationError::Transfer(error)`.
     #[test]
     fn charge_persisted_error_charges_per_byte() {
-        let msg = "x".repeat(10);
-        let err = TransferError::MichelsonContractInterpretError(msg.clone());
+        let err = interpret_error(10);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let expected_cost =
@@ -6427,7 +6440,7 @@ pub(crate) mod tests {
 
         // Original error is returned on success.
         assert!(
-            matches!(result, CracError::Operation(TransferError::MichelsonContractInterpretError(ref s)) if *s == msg),
+            matches!(result, CracError::Operation(ref e) if *e == interpret_error(10)),
             "expected original error returned, got: {result:?}"
         );
 
@@ -6441,11 +6454,8 @@ pub(crate) mod tests {
     /// A longer body costs proportionally more gas.
     #[test]
     fn charge_persisted_error_scales_with_length() {
-        let short_msg = "x".repeat(5);
-        let long_msg = "x".repeat(50);
-
-        let short_err = TransferError::MichelsonContractInterpretError(short_msg.clone());
-        let long_err = TransferError::MichelsonContractInterpretError(long_msg.clone());
+        let short_err = interpret_error(5);
+        let long_err = interpret_error(50);
 
         // Persisted once in the receipt (alias→target internal op only).
         let short_len = short_err.persisted_len();
@@ -6478,8 +6488,7 @@ pub(crate) mod tests {
     /// the original error.
     #[test]
     fn charge_persisted_error_oog_returns_out_of_gas() {
-        let msg = "x".repeat(100);
-        let err = TransferError::MichelsonContractInterpretError(msg);
+        let err = interpret_error(100);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let cost = u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);

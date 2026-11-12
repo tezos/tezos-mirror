@@ -2639,11 +2639,13 @@ mod tests {
         let parameters = Parameters::default();
 
         // A distinctive, attacker-shaped payload that won't otherwise appear
-        // in the serialized op. Bounded by `"` on both sides once rendered as
-        // `MichelsonContractInterpretError("ZZZ…")`, so a window of exactly
-        // its length matches once per persisted copy.
+        // in the serialized op. It ends the rendered `error_message`, between
+        // `syntax: ` and the 0 byte of the bson string, so a window of
+        // exactly its length matches once per persisted copy.
         let payload = "Z".repeat(2000);
-        let error = TransferError::MichelsonContractInterpretError(payload.clone());
+        let error = TransferError::MichelsonContractInterpretError(
+            mir::typechecker::TcError::UnexpectedMicheline(payload.clone()).into(),
+        );
 
         let applied = build_failed_crac_receipt(
             &null_pkh,

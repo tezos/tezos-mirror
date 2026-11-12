@@ -6345,35 +6345,42 @@ mod tests {
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
             receipt: OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result:  ContentResult::Failed(vec![
-                ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError(
-                // The type `string` in binary Micheline is 0x0368.
-                format!(
-                    "runtime failure while running the script: failed with: 0x{} of type 0x0368",
-                    hex::encode(
-                        Micheline::from("This contract always fails")
-                            .encode(&mut Gas::default())
-                            .unwrap()
-                            .unwrap()
-                    )
-                )
-            )
-        )].into()),
-            internal_operation_results: vec![],
-            })}];
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![ApplyOperationError::Transfer(
+                        TransferError::MichelsonContractInterpretError(
+                            mir::interpreter::ContractInterpretError::InterpretError(
+                                mir::interpreter::InterpretError::FailedWith {
+                                    // The type `string` in binary Micheline.
+                                    ty: mir::interpreter::MichelineBytes(vec![
+                                        0x03, 0x68,
+                                    ]),
+                                    with: mir::interpreter::MichelineBytes(
+                                        Micheline::from("This contract always fails")
+                                            .encode(&mut Gas::default())
+                                            .unwrap()
+                                            .unwrap(),
+                                    ),
+                                },
+                            ),
+                        ),
+                    )]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
@@ -14040,23 +14047,30 @@ mod tests {
         let (err_short, gas_short) = run_failwith_crac(N_SHORT, BUDGET);
         let (err_long, gas_long) = run_failwith_crac(N_LONG, BUDGET);
 
-        // Both should fail with an Operation-level error (MichelsonContractInterpretError).
-        assert!(
-            matches!(
-                err_short.error,
-                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
-            ),
-            "expected interpret error (short), got: {:?}",
-            err_short.error
-        );
-        assert!(
-            matches!(
-                err_long.error,
-                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
-            ),
-            "expected interpret error (long), got: {:?}",
-            err_long.error
-        );
+        // Both should fail with an Operation-level error carrying the
+        // encoded FAILWITH value.
+        let assert_rejected = |error: &CracError, n: usize| {
+            let expected = Micheline::from("x".repeat(n))
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            assert!(
+                matches!(
+                    error,
+                    CracError::Operation(TransferError::MichelsonContractInterpretError(
+                        mir::interpreter::ContractInterpretError::InterpretError(
+                            mir::interpreter::InterpretError::FailedWith {
+                                with: mir::interpreter::MichelineBytes(with),
+                                ..
+                            },
+                        ),
+                    )) if *with == expected
+                ),
+                "expected the rejection of a {n}-byte string, got: {error:?}"
+            );
+        };
+        assert_rejected(&err_short.error, N_SHORT);
+        assert_rejected(&err_long.error, N_LONG);
 
         // Exact per-byte delta: encode both scripts to get their binary sizes,
         // then compute each contribution independently.
@@ -14461,7 +14475,9 @@ mod tests {
         };
         // A bounded body must be much smaller than the N_LONG-byte payload.
         let long_payload_debug_len = ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError("x".repeat(N_LONG)),
+            TransferError::MichelsonContractInterpretError(
+                mir::typechecker::TcError::UnexpectedMicheline("x".repeat(N_LONG)).into(),
+            ),
         )
         .persisted_len();
         assert!(
