@@ -245,15 +245,23 @@ let test_observer_reset =
   *)
   let* () = Sc_rollup_node.terminate temp_sc_rollup_node in
   let*@ _ = Rpc.produce_block valid_sequencer in
+  (* Listen for the reset before the bakes, but wait for it after them: a
+     failed bake then fails the test at once. *)
+  let reset = Evm_node.wait_for_reset observer_victim1 in
+  (* The first baked level installs the kernel on the rollup node, which can
+     take more than 30s. *)
   let* () =
-    let* () =
-      bake_until_sync ~sc_rollup_node ~sequencer:valid_sequencer ~client ()
-    in
-    (* Make the published blueprint final. *)
-    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-    unit
-  and* () = Evm_node.wait_for_reset observer_victim1 in
+    bake_until_sync
+      ~timeout:120.
+      ~sc_rollup_node
+      ~sequencer:valid_sequencer
+      ~client
+      ()
+  in
+  (* Make the published blueprint final. *)
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = reset in
   (* The observer has reset because of the divergence. Let's see how it
      refuses blocks now. *)
   let* _ =
