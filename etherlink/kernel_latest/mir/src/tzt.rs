@@ -202,7 +202,7 @@ fn typecheck_tzt_operation<'a>(
             ))
         }
         _ => Err(TcError::InvalidValueForType(
-            format!("{v:?}"),
+            MichelineBytes(v.encode(ctx.gas())??),
             Type::Operation,
         )),
     }

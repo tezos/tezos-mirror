@@ -11128,7 +11128,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(ctx.gas(), true, true)
             .unwrap();
@@ -11194,7 +11194,7 @@ mod interpreter_tests {
                     UNIT ; SWAP ; PAIR }",
         )
         .unwrap()
-        .split_script()
+        .split_script(&mut Gas::default())
         .unwrap()
         .typecheck_script(&mut Gas::default(), true, true)
         .unwrap();
@@ -11237,7 +11237,7 @@ mod interpreter_tests {
             "parameter (lambda unit unit); storage unit; code { CDR; NIL operation; PAIR }",
         )
         .unwrap()
-        .split_script()
+        .split_script(&mut Gas::default())
         .unwrap()
         .typecheck_script(&mut Gas::default(), true, false)
         .unwrap();
@@ -11291,7 +11291,7 @@ mod interpreter_tests {
 
         let cs_mich = parse(code).unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
@@ -11403,7 +11403,7 @@ mod interpreter_tests {
 
         let cs_mich = parse(code).unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
@@ -11553,7 +11553,7 @@ mod interpreter_tests {
 
         let cs_mich = parse(code).unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
@@ -11703,7 +11703,7 @@ mod interpreter_tests {
 
         let cs_mich = parse(code).unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();

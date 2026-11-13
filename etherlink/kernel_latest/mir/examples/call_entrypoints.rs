@@ -65,7 +65,7 @@ fn main() {
     let contract_micheline = parser.parse_top_level(SCRIPT).unwrap();
     let mut ctx = Ctx::default();
     let contract_typechecked = contract_micheline
-        .split_script()
+        .split_script(ctx.gas())
         .unwrap()
         .typecheck_script(ctx.gas(), true, true)
         .unwrap();

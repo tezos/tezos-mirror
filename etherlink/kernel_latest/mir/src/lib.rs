@@ -108,7 +108,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true, true).unwrap();
+//! let contract_typechecked = contract_micheline.split_script(ctx.gas()).unwrap().typecheck_script(ctx.gas(), true, true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -453,10 +453,15 @@ mod tests {
                     None,
                     &[parse("nat").unwrap()]
                 ),
-            Err(typechecker::TcError::UnexpectedMicheline(format!(
-                "{:?}",
-                parse("DUP 4 GT").unwrap()
-            )))
+            Err(typechecker::TcError::UnexpectedMicheline(
+                interpreter::MichelineBytes(
+                    parse("DUP 4 GT")
+                        .unwrap()
+                        .encode(&mut Gas::default())
+                        .unwrap()
+                        .unwrap()
+                )
+            ))
         );
     }
 
@@ -478,7 +483,7 @@ mod tests {
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(ctx.gas(), true, true)
             .unwrap()
@@ -1178,7 +1183,7 @@ mod tests {
         )
         .unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
@@ -1397,7 +1402,7 @@ mod multisig_tests {
 
             let interp_res = parse_contract_script(MULTISIG_SRC)
                 .unwrap()
-                .split_script()
+                .split_script(&mut Gas::default())
                 .unwrap()
                 .typecheck_script(&mut Gas::default(), true, true)
                 .unwrap()
@@ -1475,7 +1480,7 @@ mod multisig_tests {
 
             let interp_res = parse_contract_script(MULTISIG_SRC)
                 .unwrap()
-                .split_script()
+                .split_script(&mut Gas::default())
                 .unwrap()
                 .typecheck_script(ctx.gas(), true, true)
                 .unwrap()
@@ -1536,7 +1541,7 @@ mod multisig_tests {
 
             let interp_res = parse_contract_script(MULTISIG_SRC)
                 .unwrap()
-                .split_script()
+                .split_script(&mut Gas::default())
                 .unwrap()
                 .typecheck_script(ctx.gas(), true, true)
                 .unwrap()

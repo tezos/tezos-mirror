@@ -1757,7 +1757,7 @@ fn typecheck_originated_script(
     let parser = Parser::new();
     let micheline = Micheline::decode_raw(&parser.arena, code, gas).ok()?.ok()?;
     let typechecked = micheline
-        .split_script()
+        .split_script(gas)
         .ok()?
         .typecheck_script(gas, true, false)
         .ok()?;
@@ -2545,7 +2545,7 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .split_script()
+        .split_script(ctx.gas())
         .map_err(|e| origination_tc_error("Splitting script", e))?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
         .map_err(|e| origination_tc_error("Script", e))?;
@@ -2849,10 +2849,9 @@ fn interpret_encoded_script<'a>(
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, code, ctx.gas())??;
-    let contract_typechecked =
-        contract_micheline
-            .split_script()?
-            .typecheck_script(ctx.gas(), true, false)?;
+    let contract_typechecked = contract_micheline
+        .split_script(ctx.gas())?
+        .typecheck_script(ctx.gas(), true, false)?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, storage, ctx.gas())??;
 
     // Execute the contract

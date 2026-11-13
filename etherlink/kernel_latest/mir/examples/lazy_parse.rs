@@ -36,7 +36,7 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
     let contract_micheline = contract();
     let mut ctx = Ctx::default();
     let contract_typechecked = contract_micheline
-        .split_script()
+        .split_script(ctx.gas())
         .unwrap()
         .typecheck_script(ctx.gas(), true, true)
         .unwrap();

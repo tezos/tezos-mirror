@@ -18,8 +18,8 @@ fn typecheck_script(file: &str) -> Result<(), String> {
     let script: mir::ast::Micheline<'_> = parser
         .parse_top_level(&contents)
         .map_err(|e| e.to_string())?;
-    let script = script.split_script().map_err(|e| format!("{e}"))?;
     let mut gas = Gas::default();
+    let script = script.split_script(&mut gas).map_err(|e| format!("{e}"))?;
     let allow_lazy_storage_in_storage = true;
     let typecheck_views = true;
     let _: ContractScript<'_> = script

@@ -2410,7 +2410,10 @@ mod tests {
     #[test]
     fn errors_without_l1_counterpart_carry_their_message() {
         let interpret_error = TransferError::MichelsonContractInterpretError(
-            mir::typechecker::TcError::UnexpectedMicheline("Nat(1)".to_string()).into(),
+            mir::typechecker::TcError::UnexpectedMicheline(
+                mir::interpreter::MichelineBytes(vec![0x00, 0x01]),
+            )
+            .into(),
         );
         let bare_len = interpret_error.persisted_len();
         let error = ApplyOperationError::Transfer(interpret_error);
