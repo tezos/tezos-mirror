@@ -7943,14 +7943,14 @@ let test_run_script_view () =
       ~input:"10"
       ~msg:(rex "A view was called on a contract with no script.")
   in
-  (* Match on the rejection value — the view's `(input, storage)` pair —
-     to prove it reaches the caller. *)
+  (* Match on the rejection value — the view's `(input, storage)` pair,
+     `Pair 10 5`, in binary Micheline — to prove it reaches the caller. *)
   let* () =
     failing
       "test_failwith"
       ~contract:kt1
       ~input:"10"
-      ~msg:(rex "Nat\\(10\\), Nat\\(5\\)")
+      ~msg:(rex "with: 0x0707000a0005")
   in
 
   (* `--gas` is honoured: recursive `fib` overruns a small budget. Unlike
