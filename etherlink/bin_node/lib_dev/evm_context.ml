@@ -46,6 +46,7 @@ type parameters = {
   sequencer_key_source : sequencer_key_source option;
   snapshot_source : snapshot_source option;
   preemptive_kernel_download : bool;
+  shadow : Shadow_kernel.t option;
 }
 
 type future_block_info = {
@@ -106,17 +107,20 @@ type t = {
   session : session_state;
   signer : Signer.map option;
   execution_pool : Lwt_domain.pool;
+  shadow : Shadow_kernel.t option;
+      (** Shadow kernel (observer only): each blueprint is also applied with
+          it, its result being discarded. *)
 }
 
 let is_sequencer t = Option.is_some t.signer
 
-let pvm_config ctxt =
+let pvm_config ~(configuration : Configuration.t) ~smart_rollup_address =
   Pvm.Kernel.config
-    ~preimage_directory:(Configuration.preimages_path ctxt.configuration)
-    ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
+    ~preimage_directory:(Configuration.preimages_path configuration)
+    ?preimage_endpoint:configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
-    ~destination:ctxt.smart_rollup_address
-    ~trace_host_funs:ctxt.configuration.opentelemetry.trace_host_functions
+    ~destination:smart_rollup_address
+    ~trace_host_funs:configuration.opentelemetry.trace_host_functions
     ()
 
 let select_blueprint_version storage_version tezosx_runtimes :
@@ -1684,6 +1688,17 @@ module State = struct
               let* applied_sequencer_upgrade =
                 handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
               in
+              (* The shadow kernel (if any) applies the blueprint concurrently
+                 with the kernel of the node, on the same state. *)
+              Option.iter
+                (fun shadow ->
+                  let (Qty level) = ctxt.session.next_blueprint_number in
+                  Shadow_kernel.push_blueprint
+                    shadow
+                    ~level
+                    ~pre_state:ctxt.session.evm_state
+                    ~chunks)
+                ctxt.shadow ;
               let+ result =
                 Evm_state.apply_unsigned_chunks
                   ~pool:ctxt.execution_pool
@@ -2661,7 +2676,7 @@ module State = struct
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
       ~store_perm ?sequencer_key_source ?snapshot_source
-      ~preemptive_kernel_download () =
+      ~preemptive_kernel_download ?shadow () =
     let open Lwt_result_syntax in
     let signer =
       match sequencer_key_source with
@@ -2828,6 +2843,7 @@ module State = struct
         store;
         signer;
         execution_pool = pool;
+        shadow;
       }
     in
     let* () = heal_shadownet_sequencer_key conn ctxt in
@@ -3128,6 +3144,7 @@ module Handlers = struct
         sequencer_key_source;
         snapshot_source;
         preemptive_kernel_download;
+        shadow;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -3139,10 +3156,14 @@ module Handlers = struct
         ?sequencer_key_source
         ?snapshot_source
         ~preemptive_kernel_download
+        ?shadow
         ()
     in
     Lwt.wakeup execution_config_waker
-    @@ (ctxt.configuration.data_dir, pvm_config ctxt) ;
+    @@ ( ctxt.configuration.data_dir,
+         pvm_config
+           ~configuration:ctxt.configuration
+           ~smart_rollup_address:ctxt.smart_rollup_address ) ;
     Lwt.wakeup init_status_waker status ;
     State.Transaction.initialize_head_info ctxt ;
     return ctxt
@@ -3413,7 +3434,7 @@ let worker_wait_for_request req =
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
     ~store_perm ?sequencer_key_source ?snapshot_source
-    ?(preemptive_kernel_download = false) () =
+    ?(preemptive_kernel_download = false) ?shadow () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
@@ -3428,6 +3449,7 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         sequencer_key_source;
         snapshot_source;
         preemptive_kernel_download;
+        shadow;
       }
       (module Handlers)
   in

@@ -2191,6 +2191,44 @@ sequencer_disabled_native_execution:
     { /* sequencer_disabled_native_execution version 0 */
       "sequencer_disabled_native_execution.v0": any }
   
+shadow_kernel_failed:
+  description: shadow mode: cannot apply level {level} with the shadow kernel: {trace}
+  level: warning
+  section: evm_node.dev.shadow
+  json format:
+    { /* shadow_kernel_failed version 0 */
+      "shadow_kernel_failed.v0": { "level": $bignum,
+                                   "trace": any } }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
+  
+shadow_kernel_no_block:
+  description: shadow mode: the shadow kernel produced no block for level {level}
+  level: warning
+  section: evm_node.dev.shadow
+  json format:
+    { /* shadow_kernel_no_block version 0 */
+      "shadow_kernel_no_block.v0": $bignum }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
+  
+shadow_kernel_started:
+  description: shadow mode: blueprints are also applied with the kernel {kernel}
+  level: notice
+  section: evm_node.dev.shadow
+  json format:
+    { /* shadow_kernel_started version 0 */
+      "shadow_kernel_started.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 shutting_down:
   description: stopping the EVM node with {exit_status}
   level: notice

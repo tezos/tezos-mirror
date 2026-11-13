@@ -29,6 +29,14 @@ type head = {
 
 val blueprint_version : head -> Sequencer_blueprint.blueprint_version
 
+(** [pvm_config ~configuration ~smart_rollup_address] is the configuration of
+    the PVM with which the worker applies the blueprints of the rollup
+    [smart_rollup_address]. *)
+val pvm_config :
+  configuration:Configuration.t ->
+  smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  Pvm_types.config
+
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
 (** [start] creates a new worker to manage a local EVM context where it
@@ -54,7 +62,11 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     [preemptive_kernel_download] (false by default) makes the node download in
     the background the preimages of the kernel upgrade that is pending, if
     any. It is meant for the daemons the upgrade will eventually be applied by,
-    not for the one-shot commands sharing this function. *)
+    not for the one-shot commands sharing this function.
+
+    [shadow] (observer only) makes the worker also apply with a shadow kernel
+    each blueprint it applies, see {!Shadow_kernel}. The blocks it assembles
+    from the preconfirmation stream instead are not applied with it. *)
 val start :
   configuration:Configuration.t ->
   ?kernel_path:Pvm_types.kernel ->
@@ -63,6 +75,7 @@ val start :
   ?sequencer_key_source:sequencer_key_source ->
   ?snapshot_source:snapshot_source ->
   ?preemptive_kernel_download:bool ->
+  ?shadow:Shadow_kernel.t ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 

@@ -503,6 +503,7 @@ let _etherlink_tezts =
       "compact_receipt_encoding";
       "tezosx_address_translation";
       "faults";
+      "shadow_kernel";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"

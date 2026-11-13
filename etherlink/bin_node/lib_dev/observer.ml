@@ -133,8 +133,9 @@ let on_inclusion (txn : Broadcast.transaction) hash =
     opt_receipt ;
   return_unit
 
-let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
-    finalizer_private_server finalizer_rpc_process telemetry_cleanup =
+let install_finalizer_observer ~rollup_node_tracking ~shadow
+    finalizer_public_server finalizer_private_server finalizer_rpc_process
+    telemetry_cleanup =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = telemetry_cleanup () in
@@ -146,12 +147,24 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let open Lwt_result_syntax in
   let* () = Tx_queue.shutdown () in
   let* () = Evm_context.shutdown () in
+  (* After the EVM context, which pushes the requests of the shadow worker. *)
+  let*! () = Option.iter_s Shadow_kernel.shutdown shadow in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
-    ~init_from_snapshot ~sandbox () =
+let main ?network ?kernel_path ?shadow_kernel ~(config : Configuration.t)
+    ~no_sync ~init_from_snapshot ~sandbox () =
   let open Lwt_result_syntax in
   let open Configuration in
+  let* () =
+    when_
+      (Option.is_some shadow_kernel
+      && config.experimental_features.preconfirmation_stream_enabled)
+    @@ fun () ->
+    failwith
+      "A shadow kernel cannot be used with the preconfirmation stream: the \
+       observer assembles the blocks of preconfirmed transactions instead of \
+       applying their blueprint"
+  in
   let* config =
     if config.experimental_features.preconfirmation_stream_enabled then
       let*! () = Events.forced_native_execution_instant_confirmation () in
@@ -231,6 +244,18 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     else None
   in
 
+  let* shadow =
+    Option.map_es
+      (fun kernel_path ->
+        Shadow_kernel.create
+          ~kernel_path
+          ~data_dir:config.data_dir
+          ~chain_family
+          ~config:
+            (Evm_context.pvm_config ~configuration:config ~smart_rollup_address))
+      shadow_kernel
+  in
+
   let* _loaded =
     Evm_context.start
       ~configuration:config
@@ -242,6 +267,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ?sequencer_key_source
       ?snapshot_source
       ~preemptive_kernel_download:true
+      ?shadow
       ()
   in
 
@@ -348,6 +374,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_observer
       ~rollup_node_tracking
+      ~shadow
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process

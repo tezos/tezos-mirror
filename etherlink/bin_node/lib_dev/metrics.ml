@@ -371,6 +371,44 @@ module Dal = struct
       "signals_sent"
 end
 
+module Shadow = struct
+  let executed_level =
+    Gauge.v
+      ~registry
+      ~help:"Last level applied with the shadow kernel"
+      ~namespace
+      ~subsystem
+      "shadow_executed_level"
+
+  let skipped_blocks =
+    Counter.v
+      ~registry
+      ~help:
+        "Number of blocks not applied with the shadow kernel, which was too \
+         slow"
+      ~namespace
+      ~subsystem
+      "shadow_skipped_blocks"
+
+  let patch_seconds =
+    Gauge.v
+      ~registry
+      ~help:
+        "Duration of the last patching of a state with the shadow kernel, \
+         which is done in the main thread of the node"
+      ~namespace
+      ~subsystem
+      "shadow_patch_seconds"
+
+  let execution_seconds =
+    Gauge.v
+      ~registry
+      ~help:"Duration of the last execution of the shadow kernel"
+      ~namespace
+      ~subsystem
+      "shadow_execution_seconds"
+end
+
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
@@ -501,3 +539,13 @@ let listing () =
     |> List.filter (String.starts_with ~prefix:"#")
   in
   String.concat "\n" metrics
+
+let set_shadow_executed_level ~level =
+  Gauge.set Shadow.executed_level (Z.to_float level)
+
+let inc_shadow_skipped () = Counter.inc_one Shadow.skipped_blocks
+
+let set_shadow_execution_time ~seconds =
+  Gauge.set Shadow.execution_seconds seconds
+
+let set_shadow_patch_time ~seconds = Gauge.set Shadow.patch_seconds seconds

@@ -61,6 +61,7 @@ val run_new_observer_node :
   ?history_mode:Evm_node.history_mode ->
   ?tx_queue:tx_queue_config ->
   ?l2_chain:Evm_node.l2_setup ->
+  ?extra_arguments:string list ->
   Evm_node.t ->
   Evm_node.t Lwt.t
 
