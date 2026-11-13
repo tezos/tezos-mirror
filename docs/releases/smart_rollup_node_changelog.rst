@@ -8,12 +8,48 @@ first release that contains it.
 
 See :doc:`smart_rollup_node` for the release procedure.
 
-Unreleased
-==========
+Version 20261113 (2026-11-13)
+=============================
 
-- The ``simulate`` RPC now refuses a ``log_kernel_debug_file`` that could leave
-  ``<data_dir>/simulation_kernel_logs``: it must be a relative path naming a
-  file inside that directory. (MR :gl:`!22889`)
+The Smart Rollup node is no longer part of the Octez suite. It has its own
+releases, with versions of the form ``YYYYMMDD`` (the release date) and tags of
+the form ``octez-smart-rollup-node-vYYYYMMDD``. From the next Octez suite
+release, the Octez static binaries, Docker images and Debian packages do not
+include the rollup node. Get it from the `release page
+<https://octez.tezos.com/releases/octez-smart-rollup-node/>`__ or from the
+Docker image ``tezos/tezos-bare:octez-smart-rollup-node-latest``, which follows
+the latest release. If you run the rollup node from an Octez Docker image, we
+recommend that you switch to this image now.
+
+This release supports the protocols from Oxford (018) to Ushuaia (025).
+
+- **Security fix** The ``simulate`` RPC now refuses a ``log_kernel_debug_file``
+  that could leave ``<data_dir>/simulation_kernel_logs``: it must be a relative
+  path naming a file inside that directory. (MR :gl:`!22889`)
+
+- **Security fix** The public ``secure`` RPC ACL now denies ``POST
+  /global/block/<id>/simulate``. (MR :gl:`!22890`)
+
+- **Security fix** The RPC server now rejects with HTTP 413 requests whose body
+  exceeds the cap set by the new ``--rpc-max-request-body`` option (in bytes,
+  32 MiB by default). (MRs :gl:`!22532`, :gl:`!22629`)
+
+- **Security fix, breaking change** ``snapshot import`` now stops at the last
+  block that carries a commitment, not at the snapshot head. The node checks
+  the state of this block against the commitment on L1, and gets the next
+  blocks from L1 when it starts. ``--level`` accepts ``head``, ``finalized``,
+  ``cemented``, ``commitment`` (default) or a block level. The default import
+  fails if the snapshot has no commitment. With ``--level head``, the node does
+  not check the state of the imported head and logs a warning. (MR
+  :gl:`!23128`)
+
+- **Security fix** ``snapshot import`` now extracts the snapshot into a
+  temporary directory, then moves only the entries of the snapshot format into
+  the data directory. It ignores the other members, for example
+  ``config.json``. The pre-images of the snapshot replace the local pre-images
+  of the same PVM kind. (MR :gl:`!23130`)
+
+- ``snapshot export`` accepts ``--level commitment``. (MR :gl:`!23128`)
 
 - The injector now adds a gas safety guard of 750 instead of 300 to the
   simulated gas of commitment publications. A conflicting commitment for the
@@ -25,7 +61,8 @@ Unreleased
 - The vendored Wasmer runtime used for fast execution was upgraded from 3.3.0
   to 7.2.1. This fixes a misaligned ``ucontext_t`` dereference that made the
   previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set
-  of WebAssembly proposals accepted by fast execution is unchanged.
+  of WebAssembly proposals accepted by fast execution is unchanged. (MR
+  :gl:`!22749`)
 
 - Fixed the WASM PVM fast execution engine (Wasmer) answering a different
   error code than the interpreter when a kernel reads an empty, or a
@@ -38,29 +75,6 @@ Unreleased
   results as the interpreter. A kernel importing them no longer panics the
   fast engine, so it runs at full speed without ``--slow-vm-fallback``.
   (MR :gl:`!22822`)
-
-- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
-  set by the new ``--rpc-max-request-body`` option (in bytes, 32 MiB by
-  default).
-
-- The public ``secure`` RPC ACL now denies ``POST
-  /global/block/<id>/simulate``. (MR :gl:`!22890`)
-
-- **Breaking change** ``snapshot import`` now stops at the last block that
-  carries a commitment, not at the snapshot head. The node checks the state of
-  this block against the commitment on L1, and gets the next blocks from L1 when
-  it starts. ``--level`` accepts ``head``, ``finalized``, ``cemented``,
-  ``commitment`` (default) or a block level. The default import fails if the
-  snapshot has no commitment. With ``--level head``, the node does not check the
-  state of the imported head and logs a warning. (MR :gl:`!23128`)
-
-- ``snapshot export`` accepts ``--level commitment``. (MR :gl:`!23128`)
-
-- ``snapshot import`` now extracts the snapshot into a temporary directory,
-  then moves only the entries of the snapshot format into the data directory.
-  It ignores the other members, for example ``config.json``. The pre-images of
-  the snapshot replace the local pre-images of the same PVM kind. (MR
-  :gl:`!23130`)
 
 Version 25.3 (2026-10-20)
 =========================
