@@ -14644,11 +14644,10 @@ mod tests {
             },
             other => panic!("expected Transfer internal receipt, got: {other:?}"),
         };
-        // A bounded body must be much smaller than the N_LONG-byte payload.
+        // A bounded body must be much smaller than the N_LONG-byte payload,
+        // here carried by an error whose message ends with it.
         let long_payload_debug_len = ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError(
-                mir::typechecker::TcError::UnexpectedMicheline("x".repeat(N_LONG)).into(),
-            ),
+            TransferError::GatewayError("x".repeat(N_LONG)),
         )
         .persisted_len();
         assert!(

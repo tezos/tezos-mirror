@@ -336,7 +336,7 @@ mod tztrunner_tests {
 
     const TZT_SAMPLE_TC_FAIL_SPECIFIC: &str = r#"code { ADD } ;
         input { Stack_elt mutez 5 ; Stack_elt int 5 } ;
-        output(StaticError "no matching overload for ADD on stack Stack([Int, Mutez])")"#;
+        output(StaticError "no matching overload for ADD")"#;
 
     const TZT_SAMPLE_IMPLICIT_PARAMETER: &str = r#"
       code SELF;

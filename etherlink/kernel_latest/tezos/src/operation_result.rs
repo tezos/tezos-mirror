@@ -214,15 +214,9 @@ pub enum TransferError {
         )
     )]
     MichelsonContractInterpretError(mir::interpreter::ContractInterpretError),
-    /// Typechecking failed. The MIR error can embed large types, so its
-    /// rendering is bounded.
-    #[error(
-        "Mir failed to typecheck the contract with {}",
-        mir::bounded_fmt::display_bounded(
-            .0,
-            mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
-        )
-    )]
+    /// Typechecking failed. The `Display` of the MIR error does not show its
+    /// payload.
+    #[error("Mir failed to typecheck the contract with {0}")]
     MirTypecheckingError(mir::typechecker::TcError),
     /// A read or a write of an account failed.
     #[error(transparent)]
@@ -314,15 +308,9 @@ pub enum OriginationError {
     CantOriginateEmptyContract,
     #[error("Mir failed to allocate big_map because {0}")]
     MirBigMapAllocation(String),
-    /// The `part` of the script failed to typecheck. The MIR error can
-    /// embed large types, so its rendering is bounded.
-    #[error(
-        "Mir failed to typecheck the contract with {part} : {}",
-        mir::bounded_fmt::display_bounded(
-            .error,
-            mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
-        )
-    )]
+    /// The `part` of the script failed to typecheck. The `Display` of the MIR
+    /// error does not show its payload.
+    #[error("Mir failed to typecheck the contract with {part} : {error}")]
     MirTypecheckingError {
         part: &'static str,
         error: mir::typechecker::TcError,
@@ -2432,17 +2420,19 @@ mod tests {
             expected_object(
                 "temporary",
                 "tezosx_internal.transfer.michelson_contract_interpret_error",
+                // A typechecking error shows its constant description, not
+                // its payload.
                 &[(
                     "error_message",
                     "Failed interpreting the Michelson contract with failed typechecking \
-                     input: unexpected syntax: Nat(1)"
+                     input: unexpected syntax"
                 )],
             )
         );
         assert_eq!(error.persisted_len(), encoded.len());
         assert_eq!(bare_len, encoded.len());
         // Pins the size, which the persisted-error gas is charged on.
-        assert_eq!(encoded.len(), 236);
+        assert_eq!(encoded.len(), 228);
 
         assert_eq!(
             encode_error(&ApplyOperationError::InternalOperationReplay),

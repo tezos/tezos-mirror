@@ -38,10 +38,16 @@ use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
+///
+/// The `Display` of an error does not show a payload that can be large, such
+/// as a type, a stack, a value, a string or an integer: rendering it can cost
+/// more than the gas charged for it. Converting a large integer to decimal is
+/// quadratic in its size, and a type can be a shared DAG whose unfolded
+/// rendering is exponential. The derived `Debug` shows the payload.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TcError {
     /// Two stacks didn't compare equal when they should have.
-    #[error("type stacks not equal: {0:?} != {1:?}")]
+    #[error("type stacks not equal")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
     /// Ran out of gas during typechecking (direct `Gas::consume`).
     #[error(transparent)]
@@ -58,7 +64,7 @@ pub enum TcError {
     #[error(transparent)]
     CompareError(#[from] CompareError),
     /// The type didn't satisfy a given [TypeProperty].
-    #[error("type is not {0}: {1:?}")]
+    #[error("type is not {0}")]
     InvalidTypeProperty(TypeProperty, Type),
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
@@ -90,7 +96,7 @@ pub enum TcError {
     #[error("numeric conversion failed: {0}")]
     NumericConversion(TryFromBigIntError<()>),
     /// Types are not equal when they should be.
-    #[error(transparent)]
+    #[error("types not equal")]
     TypesNotEqual(#[from] TypesNotEqual),
     /// Encountered the forbidden `DUP 0` instruction.
     #[error("DUP 0 is forbidden")]
@@ -100,27 +106,21 @@ pub enum TcError {
     #[error("{0} {1} is forbidden")]
     PairN01(Prim, u16),
     /// Failed typechecking the value as the given type.
-    #[error("value {0} is invalid for type {1:?}")]
+    #[error("value is invalid for its type")]
     InvalidValueForType(String, Type),
     /// When typechecking a `map` or `big_map`, encountered a non-`Elt` element
     /// in a sequence.
-    #[error("value {0:?} is invalid element for container type {1:?}")]
+    #[error("value is an invalid element for its container")]
     InvalidEltForMap(String, Type),
     /// Elements of a `map`, `set` or a `big_map` were not sorted in the
     /// ascending order.
-    #[error("sequence elements must be in strictly ascending order for type {0:?}")]
+    #[error("sequence elements must be in strictly ascending order")]
     ElementsNotSorted(Type),
     /// Duplicate keys/elements when typechecking a `map`, `set` or a `big_map`.
-    #[error("sequence elements must contain no duplicate keys for type {0:?}")]
+    #[error("sequence elements must contain no duplicate keys")]
     DuplicateElements(Type),
     /// The given instruction can not be used with its input stack.
-    // The optional `reason` is rendered through [`DisplayReason`] rather than
-    // an eager `format!`: the reason can embed a `Type` (e.g. `ExpectedPair`,
-    // `TypesNotEqual`) which, like the `stack`, may be a structurally-shared
-    // DAG whose unfolded render is exponential. Writing it straight
-    // into the caller's formatter lets a byte-bounded sink abort the walk;
-    // `format!` would materialise the full string first, defeating the cap.
-    #[error("no matching overload for {instr} on stack {stack:?}{}", DisplayReason(.reason.as_ref()))]
+    #[error("no matching overload for {instr}")]
     NoMatchingOverload {
         /// The instruction being typechecked.
         instr: Prim,
@@ -131,13 +131,13 @@ pub enum TcError {
     },
     /// Encountered an error when typechecking a value represented as raw bytes
     /// or a base58-check string.
-    #[error("invalid value for type {0:?}: {1}")]
+    #[error("invalid bytes or string representation of a value")]
     ByteReprError(Type, ByteReprError),
     /// Failed to typecheck an annotation as an entrypoint.
-    #[error("invalid entrypoint: {0}")]
+    #[error("invalid entrypoint")]
     EntrypointError(ByteReprError),
     /// Failed to typecheck value of type `chain_id`.
-    #[error("invalid value for chain_id: {0}")]
+    #[error("invalid value for chain_id")]
     ChainIdError(#[from] ChainIdError),
     /// Encountered a SELF instruction in a forbidden context.
     #[error("SELF instruction is forbidden in this context")]
@@ -150,14 +150,14 @@ pub enum TcError {
     NoSuchContract,
     /// Implicit account typechecked as a `contract 'ty` where `'ty` is neither
     /// `unit` nor `ticket 'a`
-    #[error("unexpected implicit account parameter type: {0:?}")]
+    #[error("unexpected implicit account parameter type")]
     UnexpectedImplicitAccountType(Type),
     /// In `CONTRACT` instruction, entrypoint was specified both in the address
     /// and as an annotation to the instruction.
     #[error("entrypoint specified from two different sources")]
     EntrypointAmbiguity,
     /// Encountered unexpected Micheline syntax.
-    #[error("unexpected syntax: {0}")]
+    #[error("unexpected syntax")]
     UnexpectedMicheline(String),
     /// When typechecking a complete script, encountered duplicate top-level
     /// field, viz. `code`, `parameter`, or `storage`.
@@ -170,15 +170,15 @@ pub enum TcError {
     /// Instructions like `DUP n` and `PAIR n` accept an argument that must be a
     /// natural between 0 and 1023 inclusive. Found an integer outside this
     /// bounds instead.
-    #[error("expected a natural between 0 and 1023, but got {0}")]
+    #[error("expected a natural between 0 and 1023")]
     ExpectedU10(BigInt),
     /// Instructions `GET n` and `UPDATE n` accept a comb-index argument that
     /// must be a natural between 0 and 2047 inclusive. Found an integer outside
     /// this bounds instead.
-    #[error("expected a natural between 0 and 2047, but got {0}")]
+    #[error("expected a natural between 0 and 2047")]
     ExpectedU11(BigInt),
     /// Encountered an error when working with annotations.
-    #[error(transparent)]
+    #[error("invalid annotation")]
     AnnotationError(#[from] AnnotationError),
     /// Found a duplicate entrypoint when parsing a type.
     #[error("duplicate entrypoint: {0}")]
@@ -194,7 +194,7 @@ pub enum TcError {
     #[error("Unhandled type: {0}")]
     TodoType(Prim),
     /// `big_map` with the supplied identifier not found in the storage.
-    #[error("big map with ID {0} not found in the lazy storage")]
+    #[error("big map not found in the lazy storage")]
     BigMapNotFound(BigInt),
     /// A forged lazy-storage id (a bare `big_map` id) was encountered in a
     /// position where it is not allowed, typically a user-supplied operation
@@ -203,12 +203,12 @@ pub enum TcError {
     /// only reference a `big_map` by id from its own storage or from an
     /// internal call, never from an externally-injected parameter.
     #[error(
-        "unexpected forged lazy storage id {0}: referencing a big_map by id is \
-         not allowed here"
+        "unexpected forged lazy storage id: referencing a big_map by id is not \
+         allowed here"
     )]
     UnexpectedForgedValue(BigInt),
     /// An error occurred when working with `big_map` storage.
-    #[error("lazy storage error: {0:?}")]
+    #[error("lazy storage error")]
     LazyStorageError(String),
     /// Output stack after `MAP` instruction's code block is empty.
     #[error("MAP block returned an empty stack")]
@@ -217,13 +217,13 @@ pub enum TcError {
     #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
     MapBlockFail,
     /// Two views with the same name where declared in a script
-    #[error("two views were declared with the same name {0}")]
+    #[error("two views were declared with the same name")]
     DuplicatedView(String),
     /// View names must be at most 31 characters and match the expression [a-zA-Z0-9_.%@]*
-    #[error("Invalid name for view {0}")]
+    #[error("invalid name for a view")]
     InvalidViewName(String),
     /// View instructions must be a sequence
-    #[error("{0} instructions are not a sequence")]
+    #[error("view instructions are not a sequence")]
     NonSeqViewInstrs(String),
     /// Side-effectful instruction used directly in a view body.
     /// Allowed in lambdas within views (they can be returned and executed elsewhere).
@@ -459,23 +459,6 @@ pub enum NoMatchingOverloadReason {
     /// comparable.
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
-}
-
-/// Lazy `Display` adapter for [`TcError::NoMatchingOverload`]'s optional
-/// `reason`. Renders `, reason: <reason>` (or nothing) straight into the
-/// caller's formatter, propagating any write error, instead of eagerly
-/// building the string via `format!`. This keeps the whole `TcError`
-/// `Display` chain abortable by a byte-bounded sink even when the reason
-/// embeds an exponentially-rendering `Type`.
-struct DisplayReason<'a>(Option<&'a NoMatchingOverloadReason>);
-
-impl std::fmt::Display for DisplayReason<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            Some(reason) => write!(f, ", reason: {reason}"),
-            None => Ok(()),
-        }
-    }
 }
 
 /// More detailed explanation for [TcError::StacksNotEqual]
@@ -6348,13 +6331,13 @@ mod typecheck_tests {
     /// larger than its node count, and the per-type parse cap
     /// ([`MICHELSON_MAXIMUM_TYPE_SIZE`]) does **not** bound
     /// instruction-synthesised types. Such a `Type` reaches the kernel's
-    /// typecheck-error sinks embedded in a [`TcError`] — rendered via
-    /// `Display` (`From<TcError> for TransferError`, origination typecheck)
-    /// and `Debug` (view-path `classify_tc_error`). Both must abort at the
-    /// byte ceiling. This covers a plain `{:?}` type-carrying variant and the
-    /// [`TcError::NoMatchingOverload`] arm, whose optional `reason` is the one
-    /// place the `Display` chain used to build the render eagerly via
-    /// `format!` (now [`DisplayReason`]).
+    /// typecheck-error sinks embedded in a [`TcError`]. Its `Display`, used
+    /// by `From<TcError> for TransferError` and the origination typecheck, does
+    /// not show the type at all. Its derived `Debug`, used by the view-path
+    /// `classify_tc_error`, shows it, so it must abort at the byte ceiling.
+    /// This covers a plain `{:?}` type-carrying variant and the
+    /// [`TcError::NoMatchingOverload`] arm, whose optional `reason` holds the
+    /// type.
     ///
     /// The DAG is built directly via shared `Rc::clone` (K=64) to stress the
     /// *renderer*: building a type this large through Michelson would cost
@@ -6364,8 +6347,7 @@ mod typecheck_tests {
     #[test]
     fn typecheck_exponential_type_renders_bounded() {
         use crate::bounded_fmt::{
-            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
-            TRUNCATION_SUFFIX,
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
         };
         use crate::stack::Stack;
 
@@ -6394,18 +6376,20 @@ mod typecheck_tests {
 
         // Plain `{0:?}` type-carrying variant.
         let direct = TcError::UnexpectedImplicitAccountType(ty.clone());
-        assert_bounded(display_bounded(&direct, CAP));
+        assert_eq!(
+            direct.to_string(),
+            "unexpected implicit account parameter type"
+        );
         assert_bounded(debug_bounded(&direct, CAP));
 
         // `NoMatchingOverload` with the exponential type in the optional
-        // `reason` — exercises the previously-eager `format!` path via the
-        // `Display` sink, and the derived `Debug` via the view sink.
+        // `reason`.
         let overload = TcError::NoMatchingOverload {
             instr: Prim::PAIR,
             stack: Stack::new(),
             reason: Some(NoMatchingOverloadReason::ExpectedPair(ty)),
         };
-        assert_bounded(display_bounded(&overload, CAP));
+        assert_eq!(overload.to_string(), "no matching overload for PAIR");
         assert_bounded(debug_bounded(&overload, CAP));
     }
 
