@@ -61,15 +61,7 @@ fn classify_tc_error(e: TcError) -> TezosXRuntimeError {
     if e.is_out_of_gas() {
         TezosXRuntimeError::OutOfGas
     } else {
-        // Bounded like `classify_interpret_error`: a `TcError` can embed a
-        // `Type` synthesised during typechecking whose render is far larger
-        // than its node count (gas-bounded to `O(gas)`, since the
-        // typechecker's `DUP` walks the unfolded type, but still large).
-        // This arm feeds the catchable `BadRequest` body on the view path.
-        TezosXRuntimeError::BadRequest(mir::bounded_fmt::debug_bounded(
-            &e,
-            mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
-        ))
+        TezosXRuntimeError::BadRequest(e.to_string())
     }
 }
 
@@ -106,7 +98,7 @@ fn classify_interpret_error(e: InterpretError) -> TezosXRuntimeError {
         InterpretError::AddressRegistryError(err) => {
             TezosXRuntimeError::Custom(err.to_string())
         }
-        other => TezosXRuntimeError::BadRequest(mir::bounded_fmt::debug_bounded(
+        other => TezosXRuntimeError::BadRequest(mir::bounded_fmt::display_bounded(
             other,
             mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
         )),
