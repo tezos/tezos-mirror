@@ -963,9 +963,59 @@ let post_export_checks ~snapshot_file =
     snapshot_header
     ~dest
 
+(* Directories of the data directory that a snapshot holds. *)
+let snapshot_dirs = ["context"; "wasm_2_0_0"; "arith"; "riscv"]
+
+(* Files of the data directory that a snapshot holds, except the store. *)
+let snapshot_files = ["metadata"; "storage/version"]
+
+(* Paths in the data directory of the files that [export_dir] exports. *)
 let snapshotable_files_regexp =
   Re.Str.regexp
-    "^\\(storage/version\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
+    ("^\\("
+    ^ String.concat
+        "\\|"
+        (List.map (fun dir -> Re.Str.quote dir ^ "/.*") snapshot_dirs
+        @ List.map (fun file -> Re.Str.quote file ^ "$") snapshot_files)
+    ^ "\\)")
+
+(* Entries that [import] moves into the data directory, the store last. *)
+let snapshot_entries = snapshot_dirs @ snapshot_files @ [Store.sqlite_file_name]
+
+(* Each entry of [snapshot_entries] in [src] replaces its [data_dir] entry. *)
+let move_snapshot_entries ~src ~data_dir =
+  let open Lwt_syntax in
+  let ( // ) = Filename.concat in
+  (* A symbolic link is removed, not its target. *)
+  let remove path =
+    let* stats = Option.catch_s (fun () -> Lwt_unix.lstat path) in
+    match stats with
+    | None -> return_unit
+    | Some {Unix.st_kind = Unix.S_DIR; _} -> Lwt_utils_unix.remove_dir path
+    | Some _ -> Lwt_unix.unlink path
+  in
+  trace_eval (fun () ->
+      error_of_fmt
+        "Cannot move the extracted snapshot into %s, so the data directory can \
+         be incomplete. Import the snapshot again with --force."
+        data_dir)
+  @@ catch_s
+  @@ fun () ->
+  let* () =
+    List.iter_s
+      (fun entry ->
+        let* exists = Lwt_unix.file_exists (src // entry) in
+        if not exists then return_unit
+        else
+          let* () = remove (data_dir // entry) in
+          let* () =
+            Lwt_utils_unix.create_dir (Filename.dirname (data_dir // entry))
+          in
+          Lwt_unix.rename (src // entry) (data_dir // entry))
+      snapshot_entries
+  in
+  (* Journal files of a replaced store do not apply to the new store. *)
+  List.iter_s (fun file -> remove (data_dir // file)) Store.extra_sqlite_files
 
 let maybe_cancel_gc ~rollup_node_endpoint =
   let open Lwt_syntax in
@@ -1412,19 +1462,23 @@ let import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ~level
     let* _original_metadata, original_history_mode, existing_head_level =
       pre_import_checks cctxt ~no_checks ~data_dir ~level header
     in
-    let*! () =
-      extract
-        snapshot_input
-        ~display_progress:`Bar
-        ~cancellable:false
-        ~dest:data_dir
+    let* () =
+      (* The temporary directory is in [data_dir], so each move is a rename. *)
+      Lwt_utils_unix.with_tempdir
+        ~temp_dir:data_dir
+        ".octez_smart_rollup_node_import_"
+      @@ fun tmp_dir ->
+      let*! () =
+        extract
+          snapshot_input
+          ~display_progress:`Bar
+          ~cancellable:false
+          ~dest:tmp_dir
+      in
+      move_snapshot_entries ~src:tmp_dir ~data_dir
     in
     return (header, original_history_mode, existing_head_level)
   in
-  let rm f =
-    try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
-  in
-  List.iter rm Store.extra_sqlite_files ;
   let* () = check_store_version (Configuration.default_storage_dir data_dir) in
   (* Reset first, so that only the kept levels are reconstructed. *)
   let* () =

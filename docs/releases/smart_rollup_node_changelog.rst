@@ -56,6 +56,12 @@ Unreleased
 
 - ``snapshot export`` accepts ``--level commitment``. (MR :gl:`!23128`)
 
+- ``snapshot import`` now extracts the snapshot into a temporary directory,
+  then moves only the entries of the snapshot format into the data directory.
+  It ignores the other members, for example ``config.json``. The pre-images of
+  the snapshot replace the local pre-images of the same PVM kind. (MR
+  :gl:`!23130`)
+
 Version 25.3 (2026-10-20)
 =========================
 

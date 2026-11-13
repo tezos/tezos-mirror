@@ -1581,6 +1581,7 @@ let _octez_stdlib_unix_test =
       "test_key_value_store";
       "test_key_value_store_fuzzy";
       "test_log_config_rules";
+      "test_remove_dir";
     ]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"octez-libs"

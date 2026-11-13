@@ -2091,6 +2091,121 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   unit
 
+(* A ustar header block for a regular file [name] of [size] bytes. *)
+let ustar_file_header ~name ~size =
+  let block = Bytes.make 512 '\000' in
+  let set offset field =
+    Bytes.blit_string field 0 block offset (String.length field)
+  in
+  set 0 name ;
+  set 100 "0000644\000" ;
+  set 108 "0000000\000" ;
+  set 116 "0000000\000" ;
+  set 124 (sf "%011o\000" size) ;
+  set 136 (sf "%011o\000" 0) ;
+  set 148 (String.make 8 ' ') ;
+  set 156 "0" ;
+  set 257 "ustar\000" ;
+  set 263 "00" ;
+  let checksum = Bytes.fold_left (fun sum c -> sum + Char.code c) 0 block in
+  set 148 (sf "%06o\000 " checksum) ;
+  Bytes.to_string block
+
+(* A copy of the uncompressed [snapshot_file] with an extra member [name]. *)
+let add_snapshot_member ~snapshot_file ~name ~data =
+  let contents = read_file snapshot_file in
+  (* The archive ends with two zero blocks. *)
+  let archive_end = String.length contents - 1024 in
+  let padding = (512 - (String.length data mod 512)) mod 512 in
+  let crafted_file = Temp.file "crafted_snapshot.uncompressed" in
+  write_file
+    crafted_file
+    ~contents:
+      (String.concat
+         ""
+         [
+           String.sub contents 0 archive_end;
+           ustar_file_header ~name ~size:(String.length data);
+           data;
+           String.make padding '\000';
+           String.make 1024 '\000';
+         ]) ;
+  crafted_file
+
+let test_snapshot_import_ignores_unknown_member ~kind =
+  test_full_scenario
+    {
+      tags = ["snapshot"; "import"; "member"];
+      variant = None;
+      description = "snapshot import ignores members outside the format";
+    }
+    ~kind
+    ~commitment_period:5
+    ~challenge_window:5
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = bake_levels 8 client in
+  let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
+  let* snapshot_file =
+    Sc_rollup_node.export_snapshot
+      ~no_check:true
+      ~uncompressed:true
+      sc_rollup_node
+      (Temp.dir "snapshots")
+    |> Runnable.run
+  in
+  let create_observer () =
+    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
+  in
+  let check_no_temporary_dir data_dir =
+    Sys.readdir data_dir
+    |> Array.iter (fun entry ->
+           if entry =~ rex "^\\.octez_smart_rollup_node_import_" then
+             Test.fail ~__LOC__ "The import left %s in %s" entry data_dir)
+  in
+  Log.info "Import a snapshot with an extra config.json member." ;
+  let crafted_file =
+    add_snapshot_member
+      ~snapshot_file
+      ~name:"config.json"
+      ~data:{|{ "smart-rollup-address": "sr1" }|}
+  in
+  let rollup_node = create_observer () in
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~no_check:true
+      rollup_node
+      ~snapshot_file:crafted_file
+  in
+  let data_dir = Sc_rollup_node.data_dir rollup_node in
+  Check.file_not_exists ~__LOC__ (data_dir // "config.json") ;
+  Check.file_exists ~__LOC__ (data_dir // "metadata") ;
+  Check.directory_exists ~__LOC__ (data_dir // "context") ;
+  check_no_temporary_dir data_dir ;
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  let* (_ : int) = Sc_rollup_node.wait_sync rollup_node ~timeout:30. in
+  Log.info "Import a truncated snapshot." ;
+  let contents = read_file snapshot_file in
+  let truncated_file = Temp.file "truncated_snapshot.uncompressed" in
+  (* Cuts the last member, before the two zero blocks that end the archive. *)
+  write_file
+    truncated_file
+    ~contents:(String.sub contents 0 (String.length contents - 1024 - 100)) ;
+  let rollup_node = create_observer () in
+  let*? process =
+    Sc_rollup_node.import_snapshot
+      ~no_check:true
+      rollup_node
+      ~snapshot_file:truncated_file
+  in
+  let* () = Process.check_error ~msg:(rex "Unexpected end of file") process in
+  let data_dir = Sc_rollup_node.data_dir rollup_node in
+  Check.file_not_exists ~__LOC__ (data_dir // "context") ;
+  Check.file_not_exists ~__LOC__ (data_dir // "storage") ;
+  Check.file_not_exists ~__LOC__ (data_dir // "metadata") ;
+  check_no_temporary_dir data_dir ;
+  unit
+
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
@@ -10821,6 +10936,7 @@ let register_protocol_independent () =
        ~compact:false
        protocols ;
   *)
+  test_snapshot_import_ignores_unknown_member ~kind protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
