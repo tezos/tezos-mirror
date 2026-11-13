@@ -5,7 +5,10 @@
 
 use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
 use database::EtherlinkVMDB;
-pub use error::{EvmDbError, EvmKernelError, EvmRunError, JournalCloseError};
+pub use error::{
+    EvmDbError, EvmKernelError, EvmRunError, JournalCloseError, RevmTxRefusal,
+    TxValidation,
+};
 use evm_inspectors::TracerInspector;
 use handler::EtherlinkHandler;
 use helpers::storage::u256_to_le_bytes;
@@ -21,8 +24,14 @@ use revm::{
         tx::TxEnvBuilder,
         BlockEnv, CfgEnv, ContextSetters, ContextTr, Evm, LocalContext, TxEnv,
     },
-    context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
-    handler::{instructions::EthInstructions, EthFrame, Handler},
+    context_interface::{
+        block::BlobExcessGasAndPrice, cfg::gas_params::Eip2780TxInfo,
+        journaled_state::JournalTr, Cfg, Transaction,
+    },
+    database_interface::EmptyDB,
+    handler::{
+        instructions::EthInstructions, pre_execution, validation, EthFrame, Handler,
+    },
     inspector::InspectorHandler,
     interpreter::{
         interpreter::EthInterpreter, InstructionExecResult, InstructionResult,
@@ -169,11 +178,6 @@ fn tx_env(
     chain_id: u64,
     origin: &mut TransactionOrigin,
 ) -> Result<TxEnv, EvmRunError> {
-    let kind = match destination {
-        Some(address) => TxKind::Call(address),
-        None => TxKind::Create,
-    };
-
     // Check journal first for uncommitted nonce changes from earlier
     // CrossRuntime transactions, then fall back to durable storage.
     let nonce = if let Some(account) = journal.evm.inner.state.get(&caller) {
@@ -195,6 +199,39 @@ fn tx_env(
         | TransactionOrigin::CrossRuntimeStatic => (),
     };
 
+    Ok(build_tx_env(
+        caller,
+        destination,
+        gas_data,
+        value,
+        data,
+        nonce,
+        chain_id,
+        journal.evm.get_access_list_copy(),
+        authorization_list,
+    )?)
+}
+
+/// Build the REVM transaction environment from already resolved fields.
+/// Pure: reads neither the journal nor the durable storage, so the
+/// pre-execution validation and the actual run build the same `TxEnv`.
+#[allow(clippy::too_many_arguments)]
+fn build_tx_env(
+    caller: Address,
+    destination: Option<Address>,
+    gas_data: &GasData,
+    value: U256,
+    data: Bytes,
+    nonce: u64,
+    chain_id: u64,
+    access_list: AccessList,
+    authorization_list: Option<Vec<SignedAuthorization>>,
+) -> Result<TxEnv, RevmTxRefusal> {
+    let kind = match destination {
+        Some(address) => TxKind::Call(address),
+        None => TxKind::Create,
+    };
+
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
     // fields of the transaction.
@@ -207,21 +244,135 @@ fn tx_env(
         .data(data)
         .nonce(nonce)
         .chain_id(Some(chain_id))
-        .access_list(journal.evm.get_access_list_copy());
+        .access_list(access_list);
 
     let tx_env_builder = match authorization_list {
         Some(authorization_list) => {
             if authorization_list.is_empty() {
-                return Err(EvmKernelError::EmptyAuthorizationList.into());
+                return Err(RevmTxRefusal::EmptyAuthorizationList);
             }
             tx_env_builder.authorization_list_signed(authorization_list)
         }
         None => tx_env_builder,
     };
 
-    let tx_env = tx_env_builder.build().map_err(EvmKernelError::from)?;
+    Ok(tx_env_builder.build()?)
+}
 
-    Ok(tx_env)
+/// Replay, without executing anything, the validation REVM performs on
+/// a top-level user transaction before running it: environment checks
+/// (`validate_env`), intrinsic gas, EIP-7623 floor and initcode size
+/// (`validate_initial_tx_gas`), and the caller balance check of
+/// `validate_against_state_and_deduct_caller`. The nonce and EIP-3607
+/// checks are left to the caller.
+///
+/// Opens no journal and touches no storage, so the kernel can reject a
+/// transaction REVM would refuse before charging anything for it.
+/// Returns `Ok(TxValidation::Refused(_))` for a transaction-level
+/// refusal, and `Err(_)` for a block-level failure that must keep
+/// aborting the block.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_user_transaction(
+    block_constants: &BlockConstants,
+    caller: Address,
+    destination: Option<Address>,
+    data: Bytes,
+    gas_data: &GasData,
+    value: U256,
+    nonce: u64,
+    caller_balance: U256,
+    access_list: AccessList,
+    authorization_list: Option<Vec<SignedAuthorization>>,
+) -> Result<TxValidation, EvmRunError> {
+    let block = block_env(block_constants)?;
+    let chain_id = block_constants.chain_id.as_u64();
+    let tx = match build_tx_env(
+        caller,
+        destination,
+        gas_data,
+        value,
+        data,
+        nonce,
+        chain_id,
+        access_list,
+        authorization_list,
+    ) {
+        Ok(tx) => tx,
+        Err(refusal) => return Ok(TxValidation::Refused(refusal)),
+    };
+    let cfg = cfg_env(
+        chain_id,
+        block_constants.spec_id,
+        gas_data.maximum_gas_per_transaction,
+        false,
+        false,
+    );
+    let mut ctx = Context::<BlockEnv, TxEnv, CfgEnv, EmptyDB>::new(
+        EmptyDB::default(),
+        block_constants.spec_id,
+    )
+    .with_block(block)
+    .with_tx(tx)
+    .with_cfg(cfg);
+
+    match validation::validate_env::<_, EVMError<EvmDbError>>(&mut ctx) {
+        Ok(()) => (),
+        Err(EVMError::Transaction(err)) => return Ok(TxValidation::Refused(err.into())),
+        Err(err) => return Err(err.into()),
+    }
+
+    // Same arguments as `Handler::validate_initial_tx_gas`.
+    let eip2780 = ctx
+        .cfg
+        .is_amsterdam_eip2780_enabled()
+        .then(|| Eip2780TxInfo {
+            value: ctx.tx.value(),
+            is_self_transfer: ctx.tx.kind().to() == Some(&ctx.tx.caller()),
+        });
+    if let Err(err) = validation::validate_initial_tx_gas_with_gas_params(
+        &ctx.tx,
+        block_constants.spec_id,
+        ctx.cfg.gas_params(),
+        ctx.cfg.is_eip7623_disabled(),
+        ctx.cfg.is_amsterdam_eip8037_enabled(),
+        ctx.cfg.tx_gas_limit_cap(),
+        eip2780,
+    ) {
+        return Ok(TxValidation::Refused(err.into()));
+    }
+
+    if let Err(err) =
+        pre_execution::calculate_caller_fee(caller_balance, &ctx.tx, &ctx.block, &ctx.cfg)
+    {
+        return Ok(TxValidation::Refused(err.into()));
+    }
+
+    Ok(TxValidation::Accepted)
+}
+
+/// Configuration environment shared by every EVM context.
+fn cfg_env(
+    chain_id: u64,
+    spec_id: SpecId,
+    maximum_gas_per_transaction: u64,
+    is_simulation: bool,
+    is_cross_runtime: bool,
+) -> CfgEnv {
+    let mut cfg = CfgEnv::new()
+        .with_chain_id(chain_id)
+        .with_spec_and_mainnet_gas_params(spec_id);
+    cfg.disable_eip3607 = is_simulation;
+    cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
+    // Cross-runtime calls carry `gas_price = 0` and now run against a
+    // live block environment, so the EIP-1559 basefee preflight (which
+    // validates a fee-paying user transaction) would reject every CRAC.
+    // Disable it for cross-runtime origins; CRAC payment is settled at
+    // the topmost frame. Native user transactions are unaffected. The
+    // block-gas-limit check needs no such opt-out: a CRAC forwards at
+    // most the caller's remaining gas (bounded by the per-transaction
+    // cap), which the live block gas limit always exceeds.
+    cfg.disable_base_fee = is_cross_runtime;
+    cfg
 }
 
 /// EVM opcode for `ORIGIN` (0x32). Stable across all hardforks since
@@ -364,20 +515,13 @@ where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
 {
-    let mut cfg = CfgEnv::new()
-        .with_chain_id(chain_id)
-        .with_spec_and_mainnet_gas_params(spec_id);
-    cfg.disable_eip3607 = is_simulation;
-    cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
-    // Cross-runtime calls carry `gas_price = 0` and now run against a
-    // live block environment, so the EIP-1559 basefee preflight (which
-    // validates a fee-paying user transaction) would reject every CRAC.
-    // Disable it for cross-runtime origins; CRAC payment is settled at
-    // the topmost frame. Native user transactions are unaffected. The
-    // block-gas-limit check needs no such opt-out: a CRAC forwards at
-    // most the caller's remaining gas (bounded by the per-transaction
-    // cap), which the live block gas limit always exceeds.
-    cfg.disable_base_fee = is_cross_runtime;
+    let cfg = cfg_env(
+        chain_id,
+        spec_id,
+        maximum_gas_per_transaction,
+        is_simulation,
+        is_cross_runtime,
+    );
 
     // IMPORTANT
     // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
@@ -429,15 +573,13 @@ fn build_evm_context<
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let mut cfg = CfgEnv::new()
-        .with_chain_id(chain_id)
-        .with_spec_and_mainnet_gas_params(spec_id);
-    cfg.disable_eip3607 = is_simulation;
-    cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
-    // See `build_evm_inspector_context` for the rationale: open the
-    // basefee preflight gate for cross-runtime origins, which run
-    // `gas_price = 0` against a live block.
-    cfg.disable_base_fee = is_cross_runtime;
+    let cfg = cfg_env(
+        chain_id,
+        spec_id,
+        maximum_gas_per_transaction,
+        is_simulation,
+        is_cross_runtime,
+    );
 
     // IMPORTANT
     // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.

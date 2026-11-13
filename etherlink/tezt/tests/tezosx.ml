@@ -8388,6 +8388,637 @@ let test_delayed_crac_abort_promotes_unbacked_credit =
            (Tez.to_mutez mint))) ;
   unit
 
+(* A delayed EVM transaction whose gas limit is below its intrinsic gas is
+   invalid: the block that includes it is produced, the transaction leaves the
+   delayed inbox, and it is not included. *)
+let test_delayed_evm_tx_below_intrinsic_gas_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EVM transaction below its intrinsic gas is dropped"
+    ~tags:["evm"; "gas"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  (* A fresh key without funds: a gas limit of 0 needs none. *)
+  let* sender =
+    let* wallets = Cast.gen_wallets ~number:1 () in
+    match wallets with
+    | [wallet] -> return wallet
+    | _ -> Test.fail "Expected one fresh wallet"
+  in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Cast.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:Wei.zero
+      ~gas:0
+      ~gas_price:1_000_000_000
+      ~address:"0x000000000000000000000000000000000000dEaD"
+      ()
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce =
+    Rpc.get_transaction_count ~address:sender.Cast.address sequencer
+  in
+  Check.((nonce = 0L) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
+(* A delayed EVM transaction whose gas limit covers its intrinsic gas but not
+   its EIP-7623 calldata floor is invalid: the block that includes it is
+   produced, the transaction leaves the delayed inbox, and it is not
+   included. *)
+let test_delayed_evm_tx_below_calldata_floor_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EVM transaction below its calldata floor is dropped"
+    ~tags:["evm"; "gas"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let*@ nonce_before =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  (* 1,000 non-zero bytes of calldata: the intrinsic gas is 37,000 and the
+     calldata floor 61,000. *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce_before)
+      ~value:Wei.zero
+      ~gas:49_000
+      ~gas_price:1_000_000_000
+      ~address:"0x000000000000000000000000000000000000dEaD"
+      ~signature:("0x" ^ String.make 2_000 'f')
+      ()
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce_after =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  Check.((nonce_after = nonce_before) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
+(* A delayed EVM transaction whose value exceeds its sender's balance is
+   invalid: the block that includes it is produced, the transaction leaves the
+   delayed inbox, and it is not included. *)
+let test_delayed_value_above_balance_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EVM transaction whose value exceeds the balance is dropped"
+    ~tags:["evm"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let*@ nonce_before =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  (* The gas is covered by the sender's balance, the value by no balance. *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce_before)
+      ~gas_price:1_000_000_000
+      ~gas:21_000
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~value:(Wei.to_wei_z (Z.shift_left Z.one 200))
+      ()
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce_after =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  Check.((nonce_after = nonce_before) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
+(* A delayed EVM contract creation whose initcode exceeds the EIP-3860 limit
+   is invalid: the block that includes it is produced, the transaction leaves
+   the delayed inbox, and it is not included. Such a transaction does not fit
+   in an L1 operation, so it is stored piece by piece in an L1 contract, which
+   then sends it to the delayed transaction bridge. *)
+let test_delayed_creation_above_initcode_limit_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EVM creation above the initcode size limit is dropped"
+    ~tags:["evm"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let*@ nonce_before =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  (* One byte above the 49152-byte limit. *)
+  let initcode_size = 49_153 in
+  let* raw_tx =
+    Cast.craft_deploy_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce_before)
+      ~gas:10_000_000
+      ~gas_price:1_000_000_000
+      ~data:("0x" ^ String.make (2 * initcode_size) '0')
+      ()
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let relay_code =
+    {|
+parameter (or (bytes %append) (pair %send (address %rollup) (address %bridge))) ;
+storage bytes ;
+code {
+       UNPAIR ;
+       IF_LEFT
+         {
+           # Append the piece to the stored payload.
+           SWAP ;
+           CONCAT ;
+           NIL operation ;
+           PAIR
+         }
+         {
+           # Send the stored payload to the bridge, with the received amount.
+           UNPAIR ;                   # rollup : bridge : payload
+           DUP 3 ;
+           SWAP ;
+           PAIR ;                     # (rollup, payload) : bridge : payload
+           SWAP ;
+           CONTRACT (pair address bytes) ;
+           ASSERT_SOME ;              # bridge : (rollup, payload) : payload
+           AMOUNT ;
+           DIG 2 ;                    # (rollup, payload) : amount : bridge : payload
+           TRANSFER_TOKENS ;
+           NIL operation ;
+           SWAP ;
+           CONS ;
+           PAIR
+         }
+     }|}
+  in
+  let* relay =
+    Client.originate_contract
+      ~alias:"payload_relay"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap3.public_key_hash
+      ~init:"0x"
+      ~prg:relay_code
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  (* Pieces of 30000 bytes, each in its own L1 operation. *)
+  let piece_length = 2 * 30_000 in
+  let rec append offset =
+    if offset >= String.length payload then unit
+    else
+      let length = min piece_length (String.length payload - offset) in
+      let* () =
+        Client.transfer
+          ~entrypoint:"append"
+          ~arg:("0x" ^ String.sub payload offset length)
+          ~amount:Tez.zero
+          ~giver:Constant.bootstrap2.public_key_hash
+          ~receiver:relay
+          ~burn_cap:(Tez.of_int 10)
+          client
+      in
+      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+      append (offset + length)
+  in
+  let* () = append 0 in
+  let* () =
+    Client.transfer
+      ~entrypoint:"send"
+      ~arg:
+        (sf
+           "Pair %S %S"
+           sc_rollup_address
+           l1_contracts.delayed_transaction_bridge)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:relay
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce_after =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  Check.((nonce_after = nonce_before) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
+(** [craft_eip7702_creation_tx ~private_key ~chain_id ~nonce] is the hex
+    encoding of an EIP-7702 transaction without destination, value, data nor
+    access list, with a gas limit of 100 000, signed with [private_key]. Its
+    authorization list holds one authorization, whose signature is not
+    checked before the transaction is applied. *)
+let craft_eip7702_creation_tx ~private_key ~chain_id ~nonce =
+  let open Evm_node_lib_dev_encoding.Rlp in
+  let big_endian z =
+    if Z.equal z Z.zero then Bytes.empty
+    else
+      let hex = Z.format "%x" z in
+      let hex = if String.length hex mod 2 = 1 then "0" ^ hex else hex in
+      Hex.to_bytes (`Hex hex)
+  in
+  let int n = Value (big_endian (Z.of_int n)) in
+  let authorization =
+    List
+      [
+        int chain_id;
+        Value (Hex.to_bytes (`Hex "000000000000000000000000000000000000dead"));
+        (* Nonce *)
+        int 0;
+        (* Signature: y-parity, r, s *)
+        int 0;
+        int 1;
+        int 1;
+      ]
+  in
+  let fields =
+    [
+      int chain_id;
+      int nonce;
+      (* Max priority fee per gas *)
+      int 1;
+      (* Max fee per gas *)
+      int 1_000_000_000;
+      (* Gas limit *)
+      int 100_000;
+      (* Destination *)
+      Value Bytes.empty;
+      (* Value *)
+      int 0;
+      (* Data *)
+      Value Bytes.empty;
+      (* Access list *)
+      List [];
+      List [authorization];
+    ]
+  in
+  let digest =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest
+      (Bytes.cat (Bytes.of_string "\x04") (encode (List fields)))
+  in
+  let* signature =
+    Process.run_and_read_stdout
+      "cast"
+      [
+        "wallet";
+        "sign";
+        "--no-hash";
+        "--private-key";
+        private_key;
+        "0x" ^ Hex.show (Hex.of_bytes digest);
+      ]
+  in
+  let signature = Test_helpers.remove_0x (String.trim signature) in
+  let component offset =
+    Value (big_endian (Z.of_string_base 16 (String.sub signature offset 64)))
+  in
+  let v = int_of_string ("0x" ^ String.sub signature 128 2) in
+  let y_parity = if v >= 27 then v - 27 else v in
+  let signed = List (fields @ [int y_parity; component 0; component 64]) in
+  return ("04" ^ Hex.show (Hex.of_bytes (encode signed)))
+
+(* A delayed EIP-7702 transaction without destination is invalid: the block
+   that includes it is produced, the transaction leaves the delayed inbox, and
+   it is not included. *)
+let test_delayed_eip7702_creation_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EIP-7702 transaction without destination is dropped"
+    ~tags:["evm"; "eip7702"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let*@ nonce_before =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  let* raw_tx =
+    craft_eip7702_creation_tx
+      ~private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce_before)
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce_after =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  Check.((nonce_after = nonce_before) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
+(** [craft_eip7702_tx ~private_key ~chain_id ~nonce ~max_priority_fee_per_gas
+    ~max_fee_per_gas ~gas_limit ?destination authorization_list] is the hex
+    encoding of an EIP-7702 transaction without value, data nor access list,
+    signed with [private_key]. Its authorization list is the RLP items
+    [authorization_list], encoded as given; without [destination], its [to]
+    is empty. *)
+let craft_eip7702_tx ~private_key ~chain_id ~nonce ~max_priority_fee_per_gas
+    ~max_fee_per_gas ~gas_limit ?destination authorization_list =
+  let open Evm_node_lib_dev_encoding.Rlp in
+  let big_endian z =
+    if Z.equal z Z.zero then Bytes.empty
+    else
+      let hex = Z.format "%x" z in
+      let hex = if String.length hex mod 2 = 1 then "0" ^ hex else hex in
+      Hex.to_bytes (`Hex hex)
+  in
+  let int n = Value (big_endian (Z.of_int n)) in
+  let fields =
+    [
+      int chain_id;
+      int nonce;
+      int max_priority_fee_per_gas;
+      int max_fee_per_gas;
+      int gas_limit;
+      (match destination with
+      | None -> Value Bytes.empty
+      | Some address ->
+          Value (Hex.to_bytes (`Hex (Test_helpers.remove_0x address))));
+      (* Value *)
+      int 0;
+      (* Data *)
+      Value Bytes.empty;
+      (* Access list *)
+      List [];
+      List authorization_list;
+    ]
+  in
+  let digest =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest
+      (Bytes.cat (Bytes.of_string "\x04") (encode (List fields)))
+  in
+  let* signature =
+    Process.run_and_read_stdout
+      "cast"
+      [
+        "wallet";
+        "sign";
+        "--no-hash";
+        "--private-key";
+        private_key;
+        "0x" ^ Hex.show (Hex.of_bytes digest);
+      ]
+  in
+  let signature = Test_helpers.remove_0x (String.trim signature) in
+  let component offset =
+    Value (big_endian (Z.of_string_base 16 (String.sub signature offset 64)))
+  in
+  let v = int_of_string ("0x" ^ String.sub signature 128 2) in
+  let y_parity = if v >= 27 then v - 27 else v in
+  let signed = List (fields @ [int y_parity; component 0; component 64]) in
+  return ("04" ^ Hex.show (Hex.of_bytes (encode signed)))
+
+(* A delayed EIP-7702 transaction whose authorization list is empty is invalid:
+   the block that includes it is produced, the transaction leaves the delayed
+   inbox, and it is not included. *)
+let test_delayed_eip7702_empty_authorization_list_dropped =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Delayed EIP-7702 transaction with no authorization is dropped"
+    ~tags:["evm"; "eip7702"; "liveness"; "delayed_inbox"; "security"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let*@ nonce_before =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  let* raw_tx =
+    craft_eip7702_tx
+      ~private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce_before)
+      ~max_priority_fee_per_gas:1
+      ~max_fee_per_gas:1_000_000_000
+      ~gas_limit:100_000
+      ~destination:"0x000000000000000000000000000000000000dEaD"
+      []
+  in
+  (* The delayed inbox tags each message with its runtime, 0x01 for the EVM,
+     and identifies the transaction by the hash of the tagged message. *)
+  let payload = "01" ^ raw_tx in
+  let tx_hash =
+    `Hex payload |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show
+  in
+  let* () =
+    Client.transfer
+      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:l1_contracts.delayed_transaction_bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:("0x" ^ tx_hash) sequencer
+  in
+  Check.is_true
+    (Option.is_none receipt)
+    ~error_msg:"The invalid transaction must not be included" ;
+  let*@ nonce_after =
+    Rpc.get_transaction_count ~address:sender.address sequencer
+  in
+  Check.((nonce_after = nonce_before) int64)
+    ~error_msg:
+      "The invalid transaction must not consume its sender's nonce: expected \
+       %R, got %L" ;
+  unit
+
 let () =
   test_native_branch_valid_applied () ;
   test_native_branch_valid_delayed_applied [Alpha] ;
@@ -8399,6 +9030,12 @@ let () =
   test_delayed_origination_balance_out_of_domain_dropped [Alpha] ;
   test_delayed_gas_limit_sum_overflow_dropped [Alpha] ;
   test_delayed_crac_abort_promotes_unbacked_credit [Alpha] ;
+  test_delayed_evm_tx_below_intrinsic_gas_dropped [Alpha] ;
+  test_delayed_evm_tx_below_calldata_floor_dropped [Alpha] ;
+  test_delayed_value_above_balance_dropped [Alpha] ;
+  test_delayed_creation_above_initcode_limit_dropped [Alpha] ;
+  test_delayed_eip7702_creation_dropped [Alpha] ;
+  test_delayed_eip7702_empty_authorization_list_dropped [Alpha] ;
   test_deposit [Alpha] ;
   test_reveal () ;
   test_reveal_in_funding_block () ;

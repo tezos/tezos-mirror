@@ -7,7 +7,10 @@ use evm_inspectors::error::InspectorError;
 use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     bytecode::BytecodeDecodeError,
-    context::{result::EVMError, tx::TxEnvBuildError},
+    context::{
+        result::{EVMError, InvalidTransaction},
+        tx::TxEnvBuildError,
+    },
     database_interface::DBErrorMarker,
     interpreter::Gas,
     primitives::{B256, U256},
@@ -117,6 +120,27 @@ impl From<Vec<EvmRunError>> for JournalCloseError {
     }
 }
 
+/// Reasons for which REVM refuses a user transaction before executing
+/// it. Such a transaction is invalid: it must be dropped, not abort the
+/// block.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum RevmTxRefusal {
+    #[error("Invalid transaction: {0}")]
+    Transaction(#[from] InvalidTransaction),
+    #[error("Failed to build the transaction environment: {0}")]
+    TxEnvBuild(#[from] TxEnvBuildError),
+    #[error("Authorization list cannot be empty per EIP-7702")]
+    EmptyAuthorizationList,
+}
+
+/// Outcome of `validate_user_transaction` for a transaction REVM can
+/// judge: accepted, or refused at the transaction level.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TxValidation {
+    Accepted,
+    Refused(RevmTxRefusal),
+}
+
 /// Top-level error from an EVM transaction run
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum EvmRunError {
@@ -130,6 +154,18 @@ pub enum EvmRunError {
     /// Failure from a DB call made outside the VM
     #[error(transparent)]
     DB(#[from] EvmDbError),
+}
+
+impl From<RevmTxRefusal> for EvmRunError {
+    fn from(refusal: RevmTxRefusal) -> Self {
+        match refusal {
+            RevmTxRefusal::Transaction(err) => EVMError::Transaction(err).into(),
+            RevmTxRefusal::TxEnvBuild(err) => EvmKernelError::TxEnvBuild(err).into(),
+            RevmTxRefusal::EmptyAuthorizationList => {
+                EvmKernelError::EmptyAuthorizationList.into()
+            }
+        }
+    }
 }
 
 impl From<EvmDbError> for KernelStorageError {

@@ -10,7 +10,9 @@ use alloy_sol_types::{sol, SolCall};
 use evm_inspectors::TracerInput;
 use primitive_types::{H160, U256};
 use revm::primitives::{Address, Bytes, B256};
-use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
+use revm_etherlink::helpers::legacy::{
+    access_list_to_revm, alloy_to_h160, FaDeposit, FaDepositWithProxy,
+};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -19,11 +21,11 @@ use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
+use revm_etherlink::{GasData, RevmTxRefusal, TxValidation};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
@@ -149,6 +151,8 @@ pub enum Validity {
     InvalidCode,
     InvalidMaxBaseFee,
     InvalidNotEnoughGasForFees,
+    /// REVM would refuse the transaction before executing it.
+    InvalidRevm(RevmTxRefusal),
 }
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
@@ -228,7 +232,70 @@ pub fn is_valid_ethereum_transaction_common(
         return Ok(Validity::InvalidNotEnoughGasForFees);
     };
     let capped_gas_limit = u64::min(gas_limit, limits.maximum_gas_limit);
+
+    // Replay REVM's own validation with the exact inputs the run will
+    // get, so a transaction REVM refuses is dropped here, before the DA
+    // fee is charged and the journal is opened, instead of aborting the
+    // block. The run validates again; the duplication is accepted to
+    // keep the refusal path free of any state to undo.
+    let balance_for_execution = if is_delayed {
+        info.balance
+    } else {
+        // The DA fee is debited before the run (see
+        // `apply_ethereum_transaction_common`). `InvalidPrePay` above
+        // ensures it does not exceed the balance.
+        info.balance
+            .saturating_sub(u256_to_alloy(&transaction_da_fee(
+                transaction,
+                block_constant,
+            )))
+    };
+    let gas_data = revm_gas_data(
+        capped_gas_limit,
+        effective_gas_price,
+        limits.maximum_gas_limit,
+    )?;
+    if let TxValidation::Refused(refusal) = revm_etherlink::validate_user_transaction(
+        block_constant,
+        h160_to_alloy(&caller),
+        transaction.to.as_ref().map(h160_to_alloy),
+        Bytes::from(transaction.data.clone()),
+        &gas_data,
+        u256_to_alloy(&transaction.value),
+        info.nonce,
+        balance_for_execution,
+        access_list_to_revm(transaction.access_list.clone()),
+        transaction
+            .authorization_list
+            .clone()
+            .map(signed_authorization),
+    )
+    .map_err(Error::InvalidRunTransaction)?
+    {
+        log!(
+            Benchmarking,
+            "Transaction status: ERROR_REVM_VALIDATION ({refusal})."
+        );
+        return Ok(Validity::InvalidRevm(refusal));
+    }
+
     Ok(Validity::Valid(caller, capped_gas_limit))
+}
+
+/// DA fee charged to a non-delayed transaction before its execution.
+fn transaction_da_fee(
+    transaction: &EthereumTransactionCommon,
+    block_constants: &BlockConstants,
+) -> U256 {
+    fees::da_fee(
+        block_constants.block_fees.da_fee_per_byte(),
+        &transaction.data,
+        &transaction.access_list,
+        transaction
+            .authorization_list
+            .as_ref()
+            .map_or(0, |al| al.len()),
+    )
 }
 
 /// Result of executing an Ethereum transaction.
@@ -538,6 +605,25 @@ fn log_transaction_type(to: Option<H160>, data: &[u8]) {
     }
 }
 
+fn revm_gas_data(
+    gas_limit: u64,
+    effective_gas_price: U256,
+    maximum_gas_per_transaction: u64,
+) -> Result<GasData, Error> {
+    let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
+        effective_gas_price.low_u128().to_le_bytes()
+    } else {
+        return Err(Error::Overflow(
+            "Given amount does not fit in a u128".to_string(),
+        ));
+    });
+    Ok(GasData::new(
+        gas_limit,
+        effective_gas_price,
+        maximum_gas_per_transaction,
+    ))
+}
+
 #[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
@@ -577,15 +663,8 @@ where
     // once we fully make the switch to REVM.
     let mut bytes = vec![0u8; 32];
     value.to_little_endian(&mut bytes);
-    let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
-        effective_gas_price.low_u128().to_le_bytes()
-    } else {
-        return Err(Error::Overflow(
-            "Given amount does not fit in a u128".to_string(),
-        ));
-    });
     let gas_data =
-        GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
+        revm_gas_data(gas_limit, effective_gas_price, maximum_gas_per_transaction)?;
     revm_etherlink::run_transaction(
         rk,
         registry,
@@ -655,16 +734,10 @@ where
         //           >= gas_for_fees * minimum_base_fee_per_gas
         //           >= da_fee
         // Nothing modifies the caller's balance between the validation check
-        // and this point, so `sub_balance` cannot fail.
-        let cost = fees::da_fee(
-            block_constants.block_fees.da_fee_per_byte(),
-            &transaction.data,
-            &transaction.access_list,
-            transaction
-                .authorization_list
-                .as_ref()
-                .map_or(0, |al| al.len()),
-        );
+        // and this point, so `sub_balance` cannot fail. The validation also
+        // replayed REVM's balance check against the balance left after
+        // this debit.
+        let cost = transaction_da_fee(transaction, block_constants);
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
@@ -716,9 +789,7 @@ where
                 transaction.authorization_list.clone(),
                 false,
                 TransactionOrigin::UserInput {
-                    access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
-                        transaction.access_list.clone(),
-                    ),
+                    access_list: access_list_to_revm(transaction.access_list.clone()),
                 },
             );
 
@@ -1356,20 +1427,28 @@ pub(crate) mod tests {
     #![allow(clippy::disallowed_methods)]
 
     use crate::{
-        apply::{is_valid_ethereum_transaction_common, Validity},
+        apply::{is_valid_ethereum_transaction_common, transaction_da_fee, Validity},
         chains::EvmLimits,
         fees::gas_for_fees,
     };
     use primitive_types::{H160, U256};
-    use revm::primitives::hardfork::SpecId;
+    use revm::context::{
+        result::InvalidTransaction,
+        tx::{DeriveTxTypeError, TxEnvBuildError},
+    };
+    use revm::interpreter::gas::calculate_initial_tx_gas;
+    use revm::primitives::{eip3860::MAX_INITCODE_SIZE, hardfork::SpecId};
     use revm_etherlink::{
         helpers::legacy::{h160_to_alloy, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
+        RevmTxRefusal,
     };
     use tezos_ethereum::{
         block::{BlockConstants, BlockFees},
         transaction::TransactionType,
-        tx_common::EthereumTransactionCommon,
+        tx_common::{
+            AuthorizationList, EthereumTransactionCommon, WrappedSignedAuthorization,
+        },
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
@@ -1446,6 +1525,11 @@ pub(crate) mod tests {
         .expect("should have been able to calculate fees")
     }
 
+    /// The validity of a transaction REVM refuses with `err`.
+    fn revm_refusal(err: InvalidTransaction) -> Validity {
+        Validity::InvalidRevm(RevmTxRefusal::Transaction(err))
+    }
+
     #[test]
     fn test_tx_is_valid() {
         let mut host = MockKernelHost::default();
@@ -1475,6 +1559,97 @@ pub(crate) mod tests {
             Validity::Valid(address, 21000),
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
+        );
+    }
+
+    fn eip7702_tx(authorization_list: AuthorizationList) -> EthereumTransactionCommon {
+        let transaction = EthereumTransactionCommon::new(
+            TransactionType::Eip7702,
+            Some(CHAIN_ID.into()),
+            0,
+            U256::zero(),
+            U256::from(21000),
+            100_000,
+            Some(H160::zero()),
+            U256::zero(),
+            vec![],
+            vec![],
+            Some(authorization_list),
+            None,
+        );
+        resign(transaction)
+    }
+
+    fn authorization() -> WrappedSignedAuthorization {
+        let mut stream = rlp::RlpStream::new_list(6);
+        stream
+            .append(&U256::from(CHAIN_ID))
+            .append(&H160::zero())
+            .append(&0u64)
+            .append(&0u8)
+            .append(&U256::one())
+            .append(&U256::one());
+        rlp::decode(&stream.out()).expect("Should have decoded the authorization")
+    }
+
+    #[test]
+    fn test_tx_invalid_empty_authorization_list() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        set_balance(eth_accounts, &address, U256::from(100_000) * gas_price);
+
+        for (is_delayed, expected) in [
+            (
+                true,
+                Validity::InvalidRevm(RevmTxRefusal::EmptyAuthorizationList),
+            ),
+            // The REVM checks come last: the gas for fees is missing first.
+            (false, Validity::InvalidNotEnoughGasForFees),
+        ] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &eip7702_tx(vec![]),
+                &block_constants,
+                gas_price,
+                is_delayed,
+                &EvmLimits::default(),
+            );
+            assert_eq!(
+                expected,
+                res.expect("Verification should not have raise an error"),
+                "Transaction should have been rejected (delayed: {is_delayed})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tx_with_authorization_is_valid() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        set_balance(eth_accounts, &address, U256::from(100_000) * gas_price);
+
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &eip7702_tx(vec![authorization()]),
+            &block_constants,
+            gas_price,
+            true,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, 100_000),
+            res.expect("Verification should not have raise an error"),
+            "Transaction with an authorization should have been accepted"
         );
     }
 
@@ -1509,6 +1684,108 @@ pub(crate) mod tests {
             Validity::InvalidPrePay,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_invalid_value_above_balance() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
+        // account has enough funds for the gas, not for the value
+        let balance = U256::from(fee_gas + 21000) * gas_price;
+        let gas_limit = 21000 + fee_gas;
+        // fund account
+        set_balance(eth_accounts, &address, balance);
+
+        for is_delayed in [false, true] {
+            // REVM checks the balance it is handed against the gas it
+            // executes with at the gas price, plus the value:
+            // - non-delayed: the balance left after the DA fee (priced at
+            //   the minimum base fee) and the gas left after the gas for
+            //   fees;
+            // - delayed: the whole balance and the gas limit capped to the
+            //   maximum.
+            let (available, execution_gas) = if is_delayed {
+                (balance, EvmLimits::default().maximum_gas_limit)
+            } else {
+                let da_fee = transaction_da_fee(&valid_tx(gas_limit), &block_constants);
+                (balance - da_fee, 21000)
+            };
+            // One wei more than what the balance covers.
+            let value_above = available - U256::from(execution_gas) * gas_price + 1;
+
+            for value in [value_above, U256::MAX] {
+                let mut transaction = valid_tx(gas_limit);
+                transaction.value = value;
+                let transaction = resign(transaction);
+
+                // act
+                let expected = if value == U256::MAX {
+                    revm_refusal(InvalidTransaction::OverflowPaymentInTransaction)
+                } else {
+                    revm_refusal(InvalidTransaction::LackOfFundForMaxFee {
+                        fee: Box::new(u256_to_alloy(&(available + 1))),
+                        balance: Box::new(u256_to_alloy(&available)),
+                    })
+                };
+                let res = is_valid_ethereum_transaction_common(
+                    eth_accounts,
+                    &transaction,
+                    &block_constants,
+                    gas_price,
+                    is_delayed,
+                    &EvmLimits::default(),
+                );
+                assert_eq!(
+                    expected,
+                    res.expect("Verification should not have raise an error"),
+                    "Unexpected validity (value: {value}, delayed: {is_delayed})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_tx_is_valid_value_within_balance() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
+        let value = U256::from(1_000_000);
+        // account has exactly enough funds for the gas and the value
+        let balance = U256::from(fee_gas + 21000) * gas_price + value;
+        let gas_limit = 21000 + fee_gas;
+        let mut transaction = valid_tx(gas_limit);
+        transaction.value = value;
+        let transaction = resign(transaction);
+        // fund account
+        set_balance(eth_accounts, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &transaction,
+            &block_constants,
+            gas_price,
+            false,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, 21000),
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been accepted"
         );
     }
 
@@ -1582,6 +1859,127 @@ pub(crate) mod tests {
         );
     }
 
+    fn funded_tx_with_data(
+        eth_accounts: &mut impl KeySpace,
+        block_constants: &BlockConstants,
+        to: Option<H160>,
+        data: Vec<u8>,
+    ) -> EthereumTransactionCommon {
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let fee_gas = gas_for_fees(
+            block_constants.block_fees.da_fee_per_byte(),
+            block_constants.block_fees.minimum_base_fee_per_gas(),
+            &data,
+            &[],
+            0,
+        )
+        .expect("should have been able to calculate fees");
+        let gas_limit = fee_gas + 10_000_000;
+        set_balance(
+            eth_accounts,
+            &address,
+            U256::from(gas_limit) * U256::from(21000),
+        );
+        let mut transaction = valid_tx(gas_limit);
+        transaction.to = to;
+        transaction.data = data;
+        resign(transaction)
+    }
+
+    #[test]
+    fn test_tx_is_invalid_creation_above_initcode_limit() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+        let transaction = funded_tx_with_data(
+            eth_accounts,
+            &block_constants,
+            None,
+            vec![0; MAX_INITCODE_SIZE + 1],
+        );
+
+        for is_delayed in [false, true] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &transaction,
+                &block_constants,
+                U256::from(21000),
+                is_delayed,
+                &EvmLimits::default(),
+            );
+            assert_eq!(
+                revm_refusal(InvalidTransaction::CreateInitCodeSizeLimit),
+                res.expect("Verification should not have raise an error"),
+                "Transaction should have been rejected (delayed: {is_delayed})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tx_is_valid_creation_at_initcode_limit() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+        let transaction = funded_tx_with_data(
+            eth_accounts,
+            &block_constants,
+            None,
+            vec![0; MAX_INITCODE_SIZE],
+        );
+
+        for is_delayed in [false, true] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &transaction,
+                &block_constants,
+                U256::from(21000),
+                is_delayed,
+                &EvmLimits::default(),
+            );
+            assert!(
+                matches!(
+                    res.expect("Verification should not have raise an error"),
+                    Validity::Valid(_, _)
+                ),
+                "Transaction should have been accepted (delayed: {is_delayed})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tx_is_valid_call_above_initcode_limit() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+        let transaction = funded_tx_with_data(
+            eth_accounts,
+            &block_constants,
+            Some(H160::zero()),
+            vec![0; MAX_INITCODE_SIZE + 1],
+        );
+
+        for is_delayed in [false, true] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &transaction,
+                &block_constants,
+                U256::from(21000),
+                is_delayed,
+                &EvmLimits::default(),
+            );
+            assert!(
+                matches!(
+                    res.expect("Verification should not have raise an error"),
+                    Validity::Valid(_, _)
+                ),
+                "Transaction should have been accepted (delayed: {is_delayed})"
+            );
+        }
+    }
+
     #[test]
     fn test_tx_is_invalid_wrong_chain_id() {
         let mut host = MockKernelHost::default();
@@ -1613,6 +2011,146 @@ pub(crate) mod tests {
             Validity::InvalidChainId,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
+        );
+    }
+
+    fn dummy_authorization() -> WrappedSignedAuthorization {
+        let mut stream = rlp::RlpStream::new_list(6);
+        stream
+            .append(&U256::from(CHAIN_ID))
+            .append(&H160::zero())
+            .append(&0u64)
+            .append(&0u8)
+            .append(&U256::one())
+            .append(&U256::one());
+        rlp::decode(&stream.out()).expect("Should have decoded the authorization")
+    }
+
+    fn gas_for_fees_one_authorization(block_constants: &BlockConstants) -> u64 {
+        gas_for_fees(
+            block_constants.block_fees.da_fee_per_byte(),
+            block_constants.block_fees.minimum_base_fee_per_gas(),
+            vec![].as_slice(),
+            vec![].as_slice(),
+            1,
+        )
+        .expect("should have been able to calculate fees")
+    }
+
+    #[test]
+    fn test_tx_is_invalid_eip7702_creation() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_one_authorization(&block_constants);
+        let balance = U256::from(fee_gas + 100_000) * gas_price;
+        let gas_limit = 100_000 + fee_gas;
+        let mut transaction = valid_tx(gas_limit);
+        transaction.type_ = TransactionType::Eip7702;
+        transaction.authorization_list = Some(vec![dummy_authorization()]);
+        transaction.to = None;
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(eth_accounts, &address, balance);
+
+        // act
+        for is_delayed in [false, true] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &transaction,
+                &block_constants,
+                gas_price,
+                is_delayed,
+                &EvmLimits::default(),
+            );
+            assert_eq!(
+                Validity::InvalidRevm(RevmTxRefusal::TxEnvBuild(
+                    TxEnvBuildError::DeriveErr(
+                        DeriveTxTypeError::MissingTargetForEip7702
+                    )
+                )),
+                res.expect("Verification should not have raise an error"),
+                "Transaction should have been rejected (delayed: {is_delayed})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tx_is_valid_eip7702_call() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_one_authorization(&block_constants);
+        let balance = U256::from(fee_gas + 100_000) * gas_price;
+        let gas_limit = 100_000 + fee_gas;
+        let mut transaction = valid_tx(gas_limit);
+        transaction.type_ = TransactionType::Eip7702;
+        transaction.authorization_list = Some(vec![dummy_authorization()]);
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(eth_accounts, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &transaction,
+            &block_constants,
+            gas_price,
+            false,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, 100_000),
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been accepted"
+        );
+    }
+
+    #[test]
+    fn test_tx_is_valid_creation() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        // setup
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
+        let balance = U256::from(fee_gas + 100_000) * gas_price;
+        let gas_limit = 100_000 + fee_gas;
+        let mut transaction = valid_tx(gas_limit);
+        transaction.to = None;
+        transaction = resign(transaction);
+
+        // fund account
+        set_balance(eth_accounts, &address, balance);
+
+        // act
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &transaction,
+            &block_constants,
+            gas_price,
+            false,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, 100_000),
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been accepted"
         );
     }
 
@@ -1660,11 +2198,11 @@ pub(crate) mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let balance = U256::from(21000) * gas_price;
+        let balance = U256::from(21040) * gas_price;
         // fund account
         set_balance(eth_accounts, &address, balance);
 
-        let gas_limit = 21000; // gas limit is not enough to cover fees
+        let gas_limit = 21040; // gas limit is not enough to cover fees
         let mut transaction = valid_tx(gas_limit);
         transaction.data = vec![1u8];
         transaction = resign(transaction);
@@ -1698,6 +2236,244 @@ pub(crate) mod tests {
                 Validity::Valid(_, _)
             ),
             "Transaction should have been accepted through delayed inbox"
+        );
+    }
+
+    #[test]
+    fn test_delayed_tx_invalid_below_intrinsic_gas() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        set_balance(eth_accounts, &address, U256::from(21000) * gas_price);
+
+        for gas_limit in [0, 20999] {
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &valid_tx(gas_limit),
+                &block_constants,
+                gas_price,
+                true,
+                &EvmLimits::default(),
+            );
+            assert_eq!(
+                revm_refusal(InvalidTransaction::CallGasCostMoreThanGasLimit {
+                    initial_gas: 21000,
+                    gas_limit,
+                }),
+                res.expect("Verification should not have raise an error"),
+                "Transaction with gas limit {gas_limit} should have been rejected"
+            );
+        }
+
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &valid_tx(21000),
+            &block_constants,
+            gas_price,
+            true,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, 21000),
+            res.expect("Verification should not have raise an error"),
+            "Transaction covering its intrinsic gas should have been accepted"
+        );
+    }
+
+    #[test]
+    fn test_tx_invalid_below_intrinsic_gas() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
+        set_balance(
+            eth_accounts,
+            &address,
+            U256::from(fee_gas + 21000) * gas_price,
+        );
+
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &valid_tx(fee_gas + 20999),
+            &block_constants,
+            gas_price,
+            false,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            revm_refusal(InvalidTransaction::CallGasCostMoreThanGasLimit {
+                initial_gas: 21000,
+                gas_limit: 20999,
+            }),
+            res.expect("Verification should not have raise an error"),
+            "Transaction should have been rejected"
+        );
+    }
+
+    #[test]
+    fn test_tx_invalid_below_calldata_floor() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        // Non-zero calldata costs more in the floor than in the intrinsic gas, so
+        // that initial_gas < floor_gas.
+        let data = vec![1u8; 1000];
+        let gas = calculate_initial_tx_gas(
+            block_constants.spec_id,
+            &data,
+            false,
+            0,
+            0,
+            0,
+            None,
+        );
+        assert!(gas.initial_regular_gas < gas.floor_gas);
+        let fee_gas = gas_for_fees(
+            block_constants.block_fees.da_fee_per_byte(),
+            block_constants.block_fees.minimum_base_fee_per_gas(),
+            &data,
+            &[],
+            0,
+        )
+        .expect("should have been able to calculate fees");
+        set_balance(
+            eth_accounts,
+            &address,
+            U256::from(fee_gas + gas.floor_gas) * gas_price,
+        );
+
+        let below_floor = |gas_limit| {
+            revm_refusal(InvalidTransaction::GasFloorMoreThanGasLimit {
+                gas_floor: gas.floor_gas,
+                gas_limit,
+            })
+        };
+        for is_delayed in [false, true] {
+            let fee_gas = if is_delayed { 0 } else { fee_gas };
+            for (execution_gas, expected) in [
+                (
+                    gas.initial_regular_gas,
+                    below_floor(gas.initial_regular_gas),
+                ),
+                (gas.floor_gas - 1, below_floor(gas.floor_gas - 1)),
+                (gas.floor_gas, Validity::Valid(address, gas.floor_gas)),
+            ] {
+                let mut transaction = valid_tx(fee_gas + execution_gas);
+                transaction.data = data.clone();
+                let res = is_valid_ethereum_transaction_common(
+                    eth_accounts,
+                    &resign(transaction),
+                    &block_constants,
+                    gas_price,
+                    is_delayed,
+                    &EvmLimits::default(),
+                );
+                assert_eq!(
+                    expected,
+                    res.expect("Verification should not have raise an error"),
+                    "Unexpected validity with execution gas {execution_gas} (delayed: {is_delayed})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_delayed_creation_invalid_below_intrinsic_gas() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let block_constants = mock_block_constants();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        // A creation's intrinsic gas exceeds both 21000 and its floor.
+        let gas =
+            calculate_initial_tx_gas(block_constants.spec_id, &[], true, 0, 0, 0, None);
+        let initial_gas = gas.initial_regular_gas;
+        assert!(initial_gas > gas.floor_gas.max(21000));
+        set_balance(eth_accounts, &address, U256::from(initial_gas) * gas_price);
+
+        for (gas_limit, expected) in [
+            (
+                initial_gas - 1,
+                revm_refusal(InvalidTransaction::CallGasCostMoreThanGasLimit {
+                    initial_gas,
+                    gas_limit: initial_gas - 1,
+                }),
+            ),
+            (initial_gas, Validity::Valid(address, initial_gas)),
+        ] {
+            let mut transaction = valid_tx(gas_limit);
+            transaction.to = None;
+            let res = is_valid_ethereum_transaction_common(
+                eth_accounts,
+                &resign(transaction),
+                &block_constants,
+                gas_price,
+                true,
+                &EvmLimits::default(),
+            );
+            assert_eq!(
+                expected,
+                res.expect("Verification should not have raise an error"),
+                "Unexpected validity with gas limit {gas_limit}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tx_valid_below_calldata_floor_before_prague() {
+        let mut host = MockKernelHost::default();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+        let eth_accounts = rk.eth_accounts_mut();
+        let mut block_constants = mock_block_constants();
+        block_constants.spec_id = SpecId::CANCUN;
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let gas_price = U256::from(21000);
+        let data = vec![1u8; 1000];
+        let gas = calculate_initial_tx_gas(
+            block_constants.spec_id,
+            &data,
+            false,
+            0,
+            0,
+            0,
+            None,
+        );
+        assert_eq!(gas.floor_gas, 0);
+        set_balance(
+            eth_accounts,
+            &address,
+            U256::from(gas.initial_regular_gas) * gas_price,
+        );
+
+        let mut transaction = valid_tx(gas.initial_regular_gas);
+        transaction.data = data;
+        let res = is_valid_ethereum_transaction_common(
+            eth_accounts,
+            &resign(transaction),
+            &block_constants,
+            gas_price,
+            true,
+            &EvmLimits::default(),
+        );
+        assert_eq!(
+            Validity::Valid(address, gas.initial_regular_gas),
+            res.expect("Verification should not have raise an error"),
+            "Before Prague, the intrinsic gas should be enough"
         );
     }
 
