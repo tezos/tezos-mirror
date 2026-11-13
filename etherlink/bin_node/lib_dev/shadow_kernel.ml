@@ -48,7 +48,12 @@ module Types = struct
   }
 
   type state = {
-    kernel : string;
+    kernel_subtree : Irmin_context.tree;
+        (** The kernel is stored in the durable storage as a chunked byte
+            vector of about 18,000 chunks of 512 bytes: writing it for each
+            block is expensive. Instead, it is written once, when the worker is
+            launched, and the resulting subtree (whose hashes are computed
+            once) is grafted into each state. *)
     data_dir : string;
     chain_family : L2_types.ex_chain_family;
     config : Pvm_types.config;
@@ -95,13 +100,48 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type t = Worker.infinite Worker.queue Worker.t
 
-(** Puts the shadow kernel in [pre_state], in place of the kernel of the
-    node. *)
-let patch_state (state : Types.state) pre_state =
-  Durable_storage.write
-    Kernel_boot_wasm
-    (Bytes.of_string state.kernel)
-    pre_state
+(** Where the chunked kernel lives in the state: the durable storage is under
+    ["durable"], and a value under the ["@"] marker of its key. *)
+let kernel_tree_path = ["durable"; "kernel"; "boot.wasm"; "@"]
+
+let write_kernel kernel state =
+  Durable_storage.write Kernel_boot_wasm (Bytes.of_string kernel) state
+
+let graft_kernel subtree state =
+  let open Lwt_syntax in
+  let+ tree =
+    Irmin_context.Tree.add_tree
+      (Pvm.Wasm_internal.to_irmin_exn state)
+      kernel_tree_path
+      subtree
+  in
+  Pvm.Wasm_internal.of_irmin tree
+
+(** Writes [kernel] in an empty state to retrieve its subtree, and checks that
+    grafting it into the empty state gives exactly the state obtained by writing
+    it: a wrong path would silently leave the kernel of the node in place. *)
+let init_kernel_subtree kernel =
+  let open Lwt_result_syntax in
+  let empty = Pvm.State.empty (module Pvm.Irmin_context) () in
+  let* written = write_kernel kernel empty in
+  let*! subtree =
+    Irmin_context.Tree.find_tree
+      (Pvm.Wasm_internal.to_irmin_exn written)
+      kernel_tree_path
+  in
+  match subtree with
+  | None -> failwith "the kernel was not found in the state after writing it"
+  | Some subtree ->
+      (* Compute the hashes now, so that the shared subtree is only read
+         afterwards. *)
+      let (_ : Context_hash.t) = Irmin_context.Tree.hash subtree in
+      let*! grafted = graft_kernel subtree empty in
+      if
+        Irmin_context.Tree.equal
+          (Pvm.Wasm_internal.to_irmin_exn grafted)
+          (Pvm.Wasm_internal.to_irmin_exn written)
+      then return subtree
+      else failwith "the grafted state differs from the written one"
 
 (** Logs the failure of the shadow execution [result] of level [level], if
     any. *)
@@ -119,7 +159,8 @@ let apply (state : Types.state) ~level ~pre_state ~chunks =
   let* result =
     protect @@ fun () ->
     let open Lwt_result_syntax in
-    let* shadow_pre_state = patch_state state pre_state in
+    (* Put the shadow kernel in place of the kernel of the node. *)
+    let*! shadow_pre_state = graft_kernel state.kernel_subtree pre_state in
     Metrics.set_shadow_patch_time ~seconds:(Unix.gettimeofday () -. started_at) ;
     let (Ex_chain_family chain_family) = state.chain_family in
     Evm_state.apply_unsigned_chunks
@@ -155,6 +196,7 @@ module Handlers = struct
       if is_binary then Lwt.return kernel
       else Wasm_utils_functor.wat2wasm kernel
     in
+    let* kernel_subtree = init_kernel_subtree kernel in
     let*! () =
       Event.(emit started)
         (match kernel_path with
@@ -163,7 +205,13 @@ module Handlers = struct
     in
     return
       Types.
-        {kernel; data_dir; chain_family; config; pool = Lwt_domain.setup_pool 1}
+        {
+          kernel_subtree;
+          data_dir;
+          chain_family;
+          config;
+          pool = Lwt_domain.setup_pool 1;
+        }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       [`Continue | `Shutdown] tzresult Lwt.t =
