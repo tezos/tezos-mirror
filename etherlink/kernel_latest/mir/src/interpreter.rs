@@ -232,7 +232,7 @@ pub enum EnshrinedViewDispatchError {
 impl InterpretError {
     /// Whether this error is a resource exhaustion, see
     /// [TcError::is_out_of_gas], including the exhaustions nested in a
-    /// typechecking or lazy storage error.
+    /// typechecking, lazy storage or view lookup error.
     pub fn is_out_of_gas(&self) -> bool {
         match self {
             InterpretError::OutOfGas
@@ -241,6 +241,7 @@ impl InterpretError {
             | InterpretError::CompareError(CompareError::OutOfGas(_)) => true,
             InterpretError::TcError(e) => e.is_out_of_gas(),
             InterpretError::LazyStorageError(e) => e.is_out_of_gas(),
+            InterpretError::ViewLookupError(e) => e.is_out_of_gas(),
             _ => false,
         }
     }
@@ -12014,5 +12015,25 @@ mod interpreter_tests {
                 InterpretError::AddressRegistryError(_)
             ));
         }
+    }
+
+    /// Running out of gas while a `VIEW` loads the code of its target is a
+    /// resource exhaustion like any other, so the kernel reports it as L1's
+    /// `gas_exhausted.operation` rather than as a failure of the script.
+    #[test]
+    fn view_lookup_out_of_gas_is_out_of_gas() {
+        use crate::context::LookupViewError;
+        use crate::gas::OutOfGas;
+        use crate::typechecker::TcError;
+        for error in [
+            LookupViewError::OutOfGas(OutOfGas),
+            LookupViewError::SplitScript(TcError::OutOfGas(OutOfGas)),
+        ] {
+            assert!(error.is_out_of_gas(), "{error:?}");
+            assert!(InterpretError::ViewLookupError(error).is_out_of_gas());
+        }
+        let host_error = LookupViewError::HostError("unreadable".to_string());
+        assert!(!host_error.is_out_of_gas());
+        assert!(!InterpretError::ViewLookupError(host_error).is_out_of_gas());
     }
 }
