@@ -159,6 +159,35 @@ module Simple = struct
       ~msg:"Acquiring lock on data directory."
       ()
 
+  let unchecked_imported_head =
+    declare_2
+      ~section
+      ~name:"unchecked_imported_head"
+      ~level:Warning
+      ~msg:
+        "The imported head at level {level} carries no commitment, so its \
+         state {state_hash} was not checked against Layer 1 and is trusted as \
+         is. Compare it with a trusted source, or import with --level \
+         commitment."
+      ("level", Data_encoding.int32)
+      ("state_hash", Data_encoding.option State_hash.encoding)
+      ~pp2:(fun fmt -> function
+        (* No context for the head, or the checks did not run. *)
+        | None -> Format.pp_print_string fmt "(not available)"
+        | Some h -> State_hash.pp fmt h)
+
+  let import_below_current_head =
+    declare_2
+      ~section
+      ~name:"import_below_current_head"
+      ~level:Warning
+      ~msg:
+        "The imported head is at level {level}, below the level \
+         {current_level} the rollup node was on. The rollup node recovers the \
+         levels in between from Layer 1 when it starts."
+      ("level", Data_encoding.int32)
+      ("current_level", Data_encoding.int32)
+
   let calling_gc =
     declare_2
       ~section
@@ -242,6 +271,12 @@ let detected_protocol_migration () =
   Simple.(emit detected_protocol_migration) ()
 
 let acquiring_lock () = Simple.(emit acquiring_lock) ()
+
+let unchecked_imported_head ~level ?state_hash () =
+  Simple.(emit unchecked_imported_head) (level, state_hash)
+
+let import_below_current_head ~level ~current_level =
+  Simple.(emit import_below_current_head) (level, current_level)
 
 let calling_gc ~gc_level ~head_level =
   Simple.(emit calling_gc) (gc_level, head_level)

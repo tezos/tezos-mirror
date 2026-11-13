@@ -75,7 +75,7 @@ val export_compact :
   level:Cli.snapshot_level ->
   string tzresult Lwt.t
 
-(** [import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ?level
+(** [import ~apply_unsafe_patches ~no_checks ~force ?dal_node_endpoint ~level
     cctxt ~data_dir ~snapshot_file] imports the snapshot at path
     [snapshot_file] into the data directory [data_dir]. If [no_checks] is
     [true], the integrity of the imported data is not checked at the end.
@@ -83,14 +83,14 @@ val export_compact :
     to [true]. if [apply_unsafe_patches] is [true] and there is
     [unsafe_pvm_patches] in the configuration they will be applied.  If
     [dal_node_endpoint] is provided, it is used to fetch DAL pages when
-    reconstructing the context from a compact snapshot. If [level] is
-    provided, the imported store is reset to this level. *)
+    reconstructing the context from a compact snapshot. The imported store is
+    reset to [level], resolved against the store contained in the snapshot. *)
 val import :
   apply_unsafe_patches:bool ->
   no_checks:bool ->
   force:bool ->
   ?dal_node_endpoint:Uri.t ->
-  ?level:int32 ->
+  level:Cli.snapshot_level ->
   #Client_context.full ->
   data_dir:string ->
   snapshot_file:string ->

@@ -188,6 +188,74 @@ let gc_test_reorg node_ctxt ~genesis =
   in
   return_unit
 
+(* [find_last_with_commitment] ignores rows on which [l2_blocks] and
+   [l2_levels] disagree, and rows above the requested level. *)
+let last_with_commitment_ignores_inconsistent_rows node_ctxt ~genesis =
+  let open Lwt_result_syntax in
+  let* chain = build_chain node_ctxt ~genesis ~length:10 in
+  let store = Node_context.Internal_for_tests.unsafe_get_store node_ctxt in
+  let*? head =
+    match List.rev chain with
+    | head :: _ -> Ok head
+    | [] -> error_with "empty chain"
+  in
+  let head_level = head.Sc_rollup_block.header.level in
+  (* The expected level is read from the store, not assumed. *)
+  let resolved () =
+    let* found =
+      Store.L2_blocks.find_last_with_commitment store ~level:head_level
+    in
+    match found with
+    | Some b -> return b.Sc_rollup_block.header.level
+    | None -> Assert.fail_msg "No block with a commitment was found"
+  in
+  let* expected = resolved () in
+  let stays_within_bound () =
+    let* level = resolved () in
+    if Compare.Int32.(level > expected) then
+      Assert.fail_msg
+        "Resolved to level %ld, above the expected level %ld and the level \
+         asked for %ld"
+        level
+        expected
+        head_level
+    else return_unit
+  in
+  let add_block ~name ~level ~recorded_at =
+    let block_hash = Block_hash.hash_string [name] in
+    let* () =
+      Store.L2_blocks.store
+        store
+        {
+          head with
+          header =
+            {
+              head.header with
+              block_hash;
+              level;
+              commitment_hash = Some (Commitment.Hash.hash_string [name]);
+            };
+        }
+    in
+    Store.L2_levels.store store recorded_at block_hash
+  in
+  (* Recorded at the expected level in [l2_levels], with a higher own level. *)
+  let* () =
+    add_block
+      ~name:"disagreeing"
+      ~level:(Int32.add head_level 5l)
+      ~recorded_at:expected
+  in
+  let* () = stays_within_bound () in
+  (* Agreeing levels, but above the requested level. *)
+  let* () =
+    add_block
+      ~name:"above"
+      ~level:(Int32.add head_level 9l)
+      ~recorded_at:(Int32.add head_level 9l)
+  in
+  stays_within_bound ()
+
 let mk_tests t =
   List.map
     (fun proto -> Helpers.alcotest `Quick Wasm_2_0_0 proto t)
@@ -197,5 +265,10 @@ let () =
   Alcotest_lwt.run
     ~__FILE__
     "lib_smart_rollup_node"
-    [("store_gc", mk_tests gc_test); ("store_gc_reorg", mk_tests gc_test_reorg)]
+    [
+      ("store_gc", mk_tests gc_test);
+      ("store_gc_reorg", mk_tests gc_test_reorg);
+      ( "store_last_with_commitment",
+        mk_tests last_with_commitment_ignores_inconsistent_rows );
+    ]
   |> Lwt_main.run

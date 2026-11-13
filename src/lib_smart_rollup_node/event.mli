@@ -88,6 +88,18 @@ val detected_protocol_migration : unit -> unit Lwt.t
     to acquire a lock on the data directory. *)
 val acquiring_lock : unit -> unit Lwt.t
 
+(** [unchecked_imported_head ~level ?state_hash ()] warns that the head of the
+    imported store carries no commitment, and that its state was therefore
+    taken from the snapshot without being checked against L1. [state_hash] is
+    omitted when the snapshot ships no context for that head. *)
+val unchecked_imported_head :
+  level:int32 -> ?state_hash:State_hash.t -> unit -> unit Lwt.t
+
+(** [import_below_current_head ~level ~current_level] warns that the snapshot
+    was imported at [level], below the [current_level] the rollup node was
+    on. *)
+val import_below_current_head : level:int32 -> current_level:int32 -> unit Lwt.t
+
 (** [calling_gc ~gc_level ~head_level] emits the event that the GC is started
     for level [gc_level].  *)
 val calling_gc : gc_level:int32 -> head_level:int32 -> unit Lwt.t

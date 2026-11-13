@@ -669,7 +669,7 @@ let import_snapshot =
           ~no_checks
           ~force
           ?dal_node_endpoint
-          ?level
+          ~level
           ~data_dir
           ~snapshot_file
       in

@@ -543,6 +543,40 @@ populated data directory of a rollup node.
    :ref:`snapshot info command <rollup_snapshot_info>` and to first import the
    snapshot in an empty directory to run all the checks.
 
+Option ``--level`` sets the last level kept in the imported store. It accepts
+``head``, ``finalized``, ``cemented``, ``commitment`` (the default) or a block
+level. With ``commitment``, the import stops at the last block of the snapshot
+which carries a commitment, so the state of the imported head is checked
+against the commitment published on L1. A snapshot whose head carries no
+commitment is imported normally; the blocks after the last commitment are
+dropped and the rollup node recovers them from L1 when it starts. The import
+fails if that leaves a head without a commitment, i.e. if the snapshot contains
+no commitment at all, since nothing would then attest to the imported state.
+
+The import also fails when the requested level is outside the range the
+snapshot holds, rather than falling back to a nearby one.
+
+.. warning::
+
+   With ``--level head``, with a ``--level`` after the last commitment, and
+   with ``finalized``, the head of the imported store can carry no commitment.
+   Its state is then taken from the snapshot without being checked against
+   anything; the rollup node logs a warning naming the state hash it trusts, so
+   that it can be compared with a trusted source.
+
+``finalized`` is two levels below the head of the snapshot. ``cemented`` is the
+last cemented commitment as reported by L1, or the last commitment of the
+snapshot when the snapshot stops before that level. Neither is read from the
+pointers the snapshot carries, which a malicious snapshot would control.
+
+.. warning::
+
+   Importing with ``--force`` into a populated data directory can leave the
+   node at a level *below* the one it was on, by up to a commitment period,
+   since the import stops at the snapshot's last commitment rather than at its
+   head. The rollup node logs a warning and recovers the missing levels from
+   L1 when it starts.
+
 While importing a snapshot, many checks are performed to ensure the consistency
 of the imported data. In order to speed up the process, but only if the
 snapshot's source is highly trusted (or exported by yourself), it is possible to
@@ -552,14 +586,19 @@ checks. To do so, use the ``--no-check`` option.
 
 .. warning::
 
-   The snapshot importing mechanism checks that the chain of commitments from
-   the LCC (last cemented commitment) to the last commitment is published on the
-   L1 chain but this does not prevent a malicious provider of snapshots from
-   providing snapshots with inaccurate data about the L2 state, as soon as she or
-   he is willing to also forfeit her/his deposit (these commitments were exposed
-   on L1 to eventual refutation games). The check described above gives some
-   acceptable level of assurance without having to recompute the whole chain
-   from the LCC (which can be costly depending on the rollup).
+   The import checks the state of every block that carries a commitment against
+   the commitment published on L1, but it does not recompute the chain between
+   two commitments, which would be costly depending on the rollup. The context
+   of the blocks in between, and the inbox of every block, are taken from the
+   snapshot as is. A malicious provider can therefore still ship a snapshot
+   whose data disagrees with L1 wherever no commitment covers it.
+
+   These checks establish that a commitment was *published*, not that it is
+   correct: a provider willing to forfeit their deposit can publish a
+   commitment for a state they made up, and a snapshot anchored on it passes.
+   Publication exposes them to a refutation game, which is what makes this
+   expensive rather than impossible — it is not a substitute for obtaining
+   snapshots from a source you trust.
 
 List of checks performed for import
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -569,13 +608,21 @@ List of checks performed for import
   - Rollup address matches (*)
   - History mode matches (*)
   - Snapshot head is fresher than the one on disk (*)
-  - Last commitment is published on L1
-- Metadata commitment matches the snapshot one
+  - The commitment of the snapshot header is published on L1, for ``--level
+    head`` and ``--level commitment``. For the other levels the imported head
+    is not the snapshot head, so only the check below applies.
+- The head of the imported store carries a commitment (*), unless a level other
+  than ``commitment`` or ``cemented`` was requested
+- The commitment of the imported head is published on L1
 - LCC on L1 is a valid commitment in the snapshot
 - Ensure the chain of commitments goes back to LCC
+- Metadata commitment matches the snapshot one, when the import kept the
+  snapshot head
 - For each L2 block:
 
   - The commitment, if any, must be for the PVM state of this block
+  - The most recent commitment of the block is the previous commitment of its
+    successor
   - Hashes are for the correct content (for state hash, commitment hash, inbox
     hash)
 
