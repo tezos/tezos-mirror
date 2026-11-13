@@ -59,7 +59,7 @@ pub enum InterpretError {
     /// failed value and its binary Micheline, unparsed in optimized legacy
     /// mode. L1 unparses it in `Optimized` mode instead, so combs of 4 or
     /// more elements differ (see https://linear.app/tezos/issue/L2-2260).
-    #[error("failed with: {with} of type {ty}")]
+    #[error("script reached FAILWITH instruction")]
     FailedWith {
         /// Type of the value raised by FAILWITH
         ty: MichelineBytes,
@@ -4162,15 +4162,14 @@ mod interpreter_tests {
         );
     }
 
-    /// The error text of `FAILWITH` renders its payload, whose size is only
+    /// The `Debug` text of `FAILWITH` renders its payload, whose size is only
     /// bounded by gas. Rendering through the byte-bounded writer must stop at
-    /// the ceiling, on both the `Display` (native receipt / CRAC) and `Debug`
-    /// (view) sinks.
+    /// the ceiling on the `Debug` (view) sink. The `Display` text (native
+    /// receipt / CRAC) does not show the payload.
     #[test]
     fn failwith_large_value_renders_bounded() {
         use crate::bounded_fmt::{
-            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
-            TRUNCATION_SUFFIX,
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
         };
 
         let payload = MichelineBytes(vec![0; CAP]);
@@ -4183,20 +4182,9 @@ mod interpreter_tests {
             ty: int_ty.clone(),
             with: payload.clone(),
         });
-        let rendered = display_bounded(&cie, CAP);
-        assert!(
-            rendered.len() <= CAP + TRUNCATION_SUFFIX.len(),
-            "display render must be bounded, got {} bytes",
-            rendered.len()
-        );
-        assert!(
-            rendered.ends_with(TRUNCATION_SUFFIX),
-            "must be marked truncated"
-        );
-        assert!(
-            rendered.starts_with("runtime failure while running the script:"),
-            "prefix preserved up to the cap: {}",
-            &rendered[..rendered.len().min(60)]
+        assert_eq!(
+            cie.to_string(),
+            "runtime failure while running the script: script reached FAILWITH instruction"
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
@@ -6526,12 +6514,12 @@ mod interpreter_tests {
 
     /// BB-118: a `FAILWITH` on a large number must not convert it to decimal,
     /// which is quadratic and not metered. The payload is the binary Micheline
-    /// of the number, encoded in linear time under gas, and the error text
-    /// shows its hex, bounded by the render cap.
+    /// of the number, encoded in linear time under gas, and the `Debug` text
+    /// of the error shows its hex, bounded by the render cap.
     #[test]
     fn failwith_large_number_is_not_rendered_in_decimal() {
         use crate::bounded_fmt::{
-            display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
         };
         // About 37 KiB of zarith: large enough for a slow decimal conversion,
         // and below the cap above which FAILWITH reports a placeholder.
@@ -6566,11 +6554,9 @@ mod interpreter_tests {
                     with: MichelineBytes(expected),
                 }
             );
-            let rendered = display_bounded(&ContractInterpretError::from(err), CAP);
+            let rendered = debug_bounded(&err, CAP);
             assert!(
-                rendered.starts_with(
-                    "runtime failure while running the script: failed with: 0x"
-                ),
+                rendered.starts_with("FailedWith { ty: 0x"),
                 "{}",
                 &rendered[..rendered.len().min(80)]
             );
