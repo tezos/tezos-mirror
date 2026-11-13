@@ -1215,7 +1215,7 @@ where
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
-                    log!(Error, "Found an invalid operation, dropping it: {:?}", err);
+                    log!(Error, "Found an invalid operation, dropping it: {}", err);
                     return Ok(crate::apply::ExecutionResult::Invalid);
                 }
                 Err(OperationError::RuntimeError(err)) => {

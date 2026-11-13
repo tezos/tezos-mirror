@@ -291,7 +291,9 @@ pub enum LazyStorageError {
     #[error("Error bin_writing value to store: {0}")]
     BinWriteError(#[from] tezos_data_encoding::enc::BinError),
     /// The requested big_map id was not found in the lazy storage.
-    #[error("big map with ID {0} not found in the lazy storage")]
+    /// The `Display` does not show the id, which can be large. The derived
+    /// `Debug` shows it.
+    #[error("big map not found in the lazy storage")]
     BigMapNotFound(BigMapId),
     /// Gas exhaustion while serializing a key.
     #[error("{0}")]
@@ -300,7 +302,7 @@ pub enum LazyStorageError {
     #[error("big_map entry value is not storable")]
     NonStorableValue,
     /// A big_map is lacking a total_bytes field, should not happen with recent kernels.
-    #[error("big_map ID {0} s missing total bytes counter")]
+    #[error("big map is missing its total bytes counter")]
     MissingTotalBytes(BigMapId),
 }
 
@@ -709,6 +711,25 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
 ///   something to the storage between typechecker and interpreter calls.
 #[allow(dead_code)]
 struct RollupStorage();
+
+#[cfg(test)]
+mod test_lazy_storage_error {
+    use super::*;
+
+    /// The `Display` of [LazyStorageError::BigMapNotFound] does not show the
+    /// id, whose decimal conversion is quadratic in its size and paid by no
+    /// gas.
+    #[test]
+    fn big_map_not_found_does_not_display_the_id() {
+        let id = BigMapId {
+            value: Zarith(num_bigint::BigInt::from(1) << 100_000),
+        };
+        assert_eq!(
+            LazyStorageError::BigMapNotFound(id).to_string(),
+            "big map not found in the lazy storage"
+        );
+    }
+}
 
 #[cfg(test)]
 mod test_big_map_operations {

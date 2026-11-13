@@ -67,11 +67,14 @@ pub enum ContextError {
     ImplicitToOriginated(#[from] ImplicitToOriginated),
 }
 
+/// The `Display` of an error does not show an integer that can be large:
+/// converting it to decimal takes time quadratic in its size, which no gas
+/// pays for. The derived `Debug` shows it.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ValidityError {
-    #[error("Counter in the past: {0:?}.")]
+    #[error("Counter in the past.")]
     CounterInThePast(CounterError),
-    #[error("Counter in the future: {0:?}.")]
+    #[error("Counter in the future.")]
     CounterInTheFuture(CounterError),
     #[error("The manager key for {0} has not been revealed yet.")]
     UnrevealedManagerKey(PublicKeyHash),
@@ -110,7 +113,7 @@ pub enum ValidityError {
     InconsistentPublicKey(PublicKeyHash),
     /// A `fee`, `amount` (Transaction) or `balance` (Origination) quantity
     /// exceeds the mutez domain (`i64::MAX`).
-    #[error("Amount {0:?} is out of the mutez domain.")]
+    #[error("Amount is out of the mutez domain.")]
     AmountOutOfDomain(Narith),
 }
 
@@ -2405,6 +2408,29 @@ mod tests {
             assert_eq!(encoded, expected_object(kind, id, &fields), "{error:?}");
             assert_eq!(error.persisted_len(), encoded.len(), "{error:?}");
         }
+    }
+
+    /// The `Display` of a validity error does not show its integers, whose
+    /// decimal conversion is quadratic in their size and paid by no gas.
+    #[test]
+    fn validity_errors_do_not_display_large_integers() {
+        let huge = || Narith(Narith::from(1u64).0 << 100_000usize);
+        let counter = || CounterError {
+            expected: huge(),
+            found: huge(),
+        };
+        assert_eq!(
+            ValidityError::CounterInThePast(counter()).to_string(),
+            "Counter in the past."
+        );
+        assert_eq!(
+            ValidityError::CounterInTheFuture(counter()).to_string(),
+            "Counter in the future."
+        );
+        assert_eq!(
+            ValidityError::AmountOutOfDomain(huge()).to_string(),
+            "Amount is out of the mutez domain."
+        );
     }
 
     #[test]
