@@ -196,7 +196,7 @@ let job_docker_mirror_to_gitlab_registry =
     ~script:
       [
         "./scripts/ci/docker_image_names.sh";
-        "./scripts/ci/docker_mirror_to_gitlab_registry.sh";
+        "./scripts/ci/docker_copy_images.sh --to gitlab-registry";
       ]
 
 let job_docker_promote_weekly =

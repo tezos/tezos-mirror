@@ -75,7 +75,7 @@ docker:mirror_to_gitlab_registry:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_image_names.sh
-  - ./scripts/ci/docker_mirror_to_gitlab_registry.sh
+  - ./scripts/ci/docker_copy_images.sh --to gitlab-registry
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
