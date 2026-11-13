@@ -1,0 +1,49 @@
+# UNPACK a lambda `{ n }` where n is an int of about 7 * 2^N bits. The
+# typechecker rejects n with `UnexpectedMicheline`, whose payload is n.
+# This is a regression test for ENG-99.
+
+input
+  {
+    # N such that the Zarith encoding of n has 2^N + 2 bytes. The gas limit
+    # allows N up to 25. With N = 22, the test stays fast, but a decimal
+    # conversion of n would take minutes.
+    Stack_elt int 22;
+  };
+output Gas_exhaustion;
+code
+  {
+    # Build the body of the Zarith encoding: 0xff repeated 2^N times.
+    PUSH bytes 0xff;
+    SWAP;
+    PUSH bool True;
+    LOOP
+      {
+        PUSH int -1;
+        ADD;
+        SWAP;
+        DUP;
+        CONCAT;
+        SWAP;
+        DUP;
+        GT
+      };
+    DROP;
+    # Close the Zarith encoding with 0x7f (last byte).
+    PUSH bytes 0x7f;
+    SWAP;
+    CONCAT;
+    # Prefix: 0x00 (int node) bf (first byte of a positive Zarith).
+    PUSH bytes 0x00bf;
+    CONCAT;
+    # Build the header 0x05 (packed data) 02 (sequence node) <4-byte length>:
+    # OR on bytes pads the shorter operand with zeros on the left, so the
+    # length lands in the last 4 bytes.
+    DUP;
+    SIZE;
+    BYTES;
+    PUSH bytes 0x050200000000;
+    OR;
+    CONCAT;
+    UNPACK (lambda unit unit);
+    DROP
+  }
