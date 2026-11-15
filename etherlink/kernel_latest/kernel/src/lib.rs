@@ -879,7 +879,8 @@ mod tests {
         let tx_hash = deposit.hash(&[0u8; 20]);
 
         // read transaction receipt
-        read_transaction_receipt_status(&mut host, &tx_hash.0).ok()
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        read_transaction_receipt_status(rk.evm_world_state(), &tx_hash.0).ok()
     }
 
     #[test]

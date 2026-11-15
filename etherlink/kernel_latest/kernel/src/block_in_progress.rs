@@ -523,8 +523,7 @@ impl BlockInProgress {
             crate::state_hash::evm_state_hash(rk.eth_accounts(), &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
-            rk.host_mut(),
-            &EVM_WORLD_STATE_ROOT_PATH,
+            rk.evm_world_state_mut(),
             &self.cumulative_receipts,
         )?;
         let transactions_root = self.transactions_root();

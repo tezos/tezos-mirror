@@ -14,10 +14,16 @@ use tezos_evm_logging::{log, Level::Info};
 use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
 
 use crate::l2block::L2Block;
 use rlp::Encodable;
+
+/// Key of the receipts of the transactions of the current block, as one rlp
+/// list, inside the `/evm/world_state` keyspace.
+const CURRENT_BLOCK_TRANSACTIONS_RECEIPTS_KEY: Key =
+    Key::from_static(b"/blocks/current/transactions_receipts");
 
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
@@ -25,8 +31,6 @@ mod path {
     const CURRENT_BLOCK_PATH: RefPath = RefPath::assert_from(b"/blocks/current/block");
     const CURRENT_BLOCK_TRANSACTIONS_OBJECTS: RefPath =
         RefPath::assert_from(b"/blocks/current/transactions_objects");
-    const CURRENT_BLOCK_TRANSACTIONS_RECEIPTS: RefPath =
-        RefPath::assert_from(b"/blocks/current/transactions_receipts");
     const CURRENT_BLOCK_NUMBER_PATH: RefPath =
         RefPath::assert_from(b"/blocks/current/number");
     const CURRENT_BLOCK_HASH_PATH: RefPath =
@@ -51,12 +55,6 @@ mod path {
         root: &impl Path,
     ) -> Result<OwnedPath, PathError> {
         concat(root, &CURRENT_BLOCK_TRANSACTIONS_OBJECTS)
-    }
-
-    pub fn current_block_transactions_receipts(
-        root: &impl Path,
-    ) -> Result<OwnedPath, PathError> {
-        concat(root, &CURRENT_BLOCK_TRANSACTIONS_RECEIPTS)
     }
 
     pub fn block_indexes(root: &impl Path) -> Result<OwnedPath, PathError> {
@@ -190,22 +188,18 @@ pub fn store_current_transactions_objects(
     Ok(())
 }
 
+/// Stores `receipts` as the receipts of the transactions of the current block
+/// of `evm_world_state`.
+///
+/// Errors when the write fails.
 pub fn store_current_transactions_receipts(
-    host: &mut impl StorageV1,
-    root: &impl Path,
+    evm_world_state: &mut impl KeySpace,
     receipts: &[TransactionReceipt],
-) -> Result<(), crate::Error> {
-    let stream = rlp::RlpStream::new_list(receipts.len());
-    let bytes = receipts
-        .iter()
-        .fold(stream, |mut acc, receipt| {
-            receipt.rlp_append(&mut acc);
-            acc
-        })
-        .out()
-        .to_vec();
-    host.store_write_all(&path::current_block_transactions_receipts(root)?, &bytes)?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    evm_world_state.set(
+        &CURRENT_BLOCK_TRANSACTIONS_RECEIPTS_KEY,
+        rlp::encode_list(receipts),
+    )
 }
 
 pub fn read_current_etherlink_block(
@@ -271,34 +265,35 @@ pub mod internal_for_tests {
         Ok(())
     }
 
+    /// Returns the receipt of `tx_hash` among the receipts of the current
+    /// block of `evm_world_state`.
+    ///
+    /// Errors when the block has no receipt of `tx_hash`, or when the
+    /// receipts do not decode.
     pub fn read_transaction_receipt(
-        host: &mut impl StorageV1,
+        evm_world_state: &impl KeySpace,
         tx_hash: &TransactionHash,
     ) -> Result<TransactionReceipt, Error> {
-        let receipts_path =
-            path::current_block_transactions_receipts(&EVM_WORLD_STATE_ROOT_PATH)?;
-        let bytes = &host.store_read_all(&receipts_path)?;
-        let rlp = rlp::Rlp::new(bytes);
-        for i in 0..rlp.item_count()? {
-            let receipt: TransactionReceipt = rlp.at(i)?.as_val()?;
-            if &receipt.hash == tx_hash {
-                return Ok(receipt);
-            }
-        }
-        Err(Error::RlpDecoderError(rlp::DecoderError::Custom(
-            "Receipt not found.",
-        )))
+        let receipts: Vec<TransactionReceipt> =
+            match evm_world_state.get(&CURRENT_BLOCK_TRANSACTIONS_RECEIPTS_KEY) {
+                Some(bytes) => rlp::Rlp::new(&bytes).as_list()?,
+                None => vec![],
+            };
+        receipts
+            .into_iter()
+            .find(|receipt| &receipt.hash == tx_hash)
+            .ok_or(Error::RlpDecoderError(rlp::DecoderError::Custom(
+                "Receipt not found.",
+            )))
     }
 
-    /// Reads status from the receipt in storage.
-    pub fn read_transaction_receipt_status<Host>(
-        host: &mut Host,
+    /// Returns the status of the receipt that [`read_transaction_receipt`]
+    /// returns.
+    pub fn read_transaction_receipt_status(
+        evm_world_state: &impl KeySpace,
         tx_hash: &TransactionHash,
-    ) -> Result<TransactionStatus, Error>
-    where
-        Host: StorageV1,
-    {
-        let receipt = read_transaction_receipt(host, tx_hash)?;
+    ) -> Result<TransactionStatus, Error> {
+        let receipt = read_transaction_receipt(evm_world_state, tx_hash)?;
         Ok(receipt.status)
     }
 }
@@ -392,5 +387,61 @@ mod live_blocks_tests {
         let mut host = MockKernelHost::default();
         let hash = store_tez_block(&mut host, 0, false);
         assert!(!is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hash).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use primitive_types::H160;
+    use tezos_ethereum::transaction::{TransactionStatus, TransactionType};
+    use tezos_ethereum::Bloom;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+
+    /// The receipts of the current block resolve to
+    /// `/evm/world_state/blocks/current/transactions_receipts`.
+    #[test]
+    fn current_block_transactions_receipts_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let receipt = TransactionReceipt {
+            hash: [1; 32],
+            index: 0,
+            block_number: U256::from(3),
+            from: H160::from_low_u64_be(1),
+            to: None,
+            cumulative_gas_used: U256::from(21_000),
+            effective_gas_price: U256::one(),
+            gas_used: U256::from(21_000),
+            contract_address: None,
+            logs: vec![],
+            logs_bloom: Bloom::default(),
+            type_: TransactionType::Legacy,
+            status: TransactionStatus::Success,
+        };
+
+        store_current_transactions_receipts(
+            rk.evm_world_state_mut(),
+            std::slice::from_ref(&receipt),
+        )
+        .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/blocks/current/transactions_receipts"
+                ))
+                .unwrap(),
+            rlp::encode_list(std::slice::from_ref(&receipt)).to_vec()
+        );
+        assert_eq!(
+            internal_for_tests::read_transaction_receipt(
+                rk.evm_world_state(),
+                &receipt.hash
+            )
+            .unwrap(),
+            receipt
+        );
     }
 }

@@ -289,7 +289,7 @@ where
     let computed = RuntimeKeyspaces::init(&mut safe_host)
         .map_err(anyhow::Error::from)
         .and_then(|mut rk| {
-            compute(
+            let computed = compute(
                 &mut rk,
                 &registry,
                 &config,
@@ -299,18 +299,24 @@ where
                 sequencer_pool_address,
                 None,
                 http_trace_enabled,
-            )
+            )?;
+
+            if let BlockInProgressComputationResult::Finished { .. } = computed {
+                block_storage::store_current_transactions_receipts(
+                    rk.evm_world_state_mut(),
+                    &block_in_progress.cumulative_receipts,
+                )?;
+            }
+
+            Ok(computed)
         });
 
     let err = match computed {
         Ok(BlockInProgressComputationResult::Finished { .. }) => {
-            storage::store_block_in_progress(&mut safe_host, &block_in_progress)?;
-            block_storage::store_current_transactions_receipts(
-                &mut safe_host,
-                &EVM_WORLD_STATE_ROOT_PATH,
-                &block_in_progress.cumulative_receipts,
-            )?;
-            return Ok(());
+            match storage::store_block_in_progress(&mut safe_host, &block_in_progress) {
+                Ok(()) => return Ok(()),
+                Err(err) => err,
+            }
         }
         Ok(BlockInProgressComputationResult::RebootNeeded) => {
             anyhow!("Critical: Reboot is required by a single transaction execution")
@@ -318,10 +324,10 @@ where
         Err(err) => err,
     };
 
-    // A transaction that fails takes the whole block with it: the mirror
-    // holds the block in progress and every write since its start.
+    // A run that fails, in the transaction or in a write after it, takes the
+    // whole block with it: the mirror holds the block in progress and every
+    // write since its start.
     match safe_host.revert() {
-        // The transaction's own error is the one the caller asked about.
         Ok(()) => Err(err),
         Err(why) => Err(err.context(why)),
     }

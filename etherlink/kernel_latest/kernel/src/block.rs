@@ -2786,10 +2786,10 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "Invalid transaction should not have a receipt"
         );
     }
@@ -2836,9 +2836,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -2894,13 +2894,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &below_hash).is_err(),
             "The transaction below its intrinsic gas must be dropped without a receipt"
         );
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &valid_hash)
             .expect("The valid transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -2970,13 +2970,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &below_hash).is_err(),
             "The transaction below its calldata floor must be dropped without a receipt"
         );
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &valid_hash)
             .expect("The valid transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -3037,9 +3037,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("The transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -3107,9 +3107,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("The transaction should have a receipt");
         assert_eq!(TransactionStatus::Failure, status);
     }
@@ -3155,8 +3155,8 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(
@@ -3317,10 +3317,10 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let receipt0 = read_transaction_receipt(rk.host_mut(), &tx_hash_0)
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let receipt0 = read_transaction_receipt(rk.evm_world_state(), &tx_hash_0)
             .expect("should have found receipt");
-        let receipt1 = read_transaction_receipt(rk.host_mut(), &tx_hash_1)
+        let receipt1 = read_transaction_receipt(rk.evm_world_state(), &tx_hash_1)
             .expect("should have found receipt");
 
         assert_eq!(receipt0.cumulative_gas_used, base_gas + gas_for_fees);
@@ -3477,15 +3477,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -3759,7 +3760,7 @@ mod tests {
         .expect("The block production failed.");
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert!(
-            read_transaction_receipt(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash).is_err(),
             "Transaction is invalid, so should not have a receipt"
         );
 
@@ -4204,15 +4205,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -4280,13 +4282,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // See address at https://www.multicall3.com/ on in the github repository linked above
         let expected_created_contract =
             H160::from_str("0xcA11bde05977b3631167028862bE2a173976CA11").unwrap();
 
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(Some(expected_created_contract), receipt.contract_address);
@@ -4348,17 +4350,18 @@ mod tests {
             None,
         )
         .expect("Block production must not be aborted by a delayed transaction");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // The poison transaction is skipped as invalid: it leaves no receipt.
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
 
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -4411,8 +4414,8 @@ mod tests {
         assert_eq!(ComputationResult::RebootNeeded, computation);
         let base = load_base(&mut host).unwrap();
         assert!(read_current_number(&base).is_err());
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        assert!(read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err());
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert!(read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err());
     }
 
     // Comment out `ignore` when resigning the dummy transactions
@@ -4489,18 +4492,20 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(receipt.type_, TransactionType::Legacy);
 
-        let receipt_eip1559 = read_transaction_receipt(rk.host_mut(), &tx_hash_eip1559)
-            .expect("Should have found receipt");
+        let receipt_eip1559 =
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash_eip1559)
+                .expect("Should have found receipt");
         assert_eq!(receipt_eip1559.type_, TransactionType::Eip1559);
 
-        let receipt_eip2930 = read_transaction_receipt(rk.host_mut(), &tx_hash_eip2930)
-            .expect("Should have found receipt");
+        let receipt_eip2930 =
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash_eip2930)
+                .expect("Should have found receipt");
         assert_eq!(receipt_eip2930.type_, TransactionType::Eip2930);
     }
 
@@ -4726,15 +4731,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 }
