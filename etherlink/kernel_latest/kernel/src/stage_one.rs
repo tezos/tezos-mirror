@@ -200,7 +200,6 @@ mod tests {
     };
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
@@ -613,8 +612,7 @@ mod tests {
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(&mut host, &EVM_WORLD_STATE_ROOT_PATH, U256::from(9))
-            .unwrap();
+        store_current_number(bk.evm_world_state_mut(), U256::from(9)).unwrap();
         if read_next_blueprint(bk.base_mut(), &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .0

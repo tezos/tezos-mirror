@@ -95,17 +95,6 @@ pub fn read_h256_be_default(
     }
 }
 
-/// Write a 32 bytes hash into storage at the given `path`.
-///
-/// NB: The hash is stored in big endian order.
-pub fn write_h256_be(
-    host: &mut impl StorageV1,
-    path: &impl Path,
-    hash: H256,
-) -> Result<(), Error> {
-    Ok(host.store_write(path, hash.as_bytes(), 0)?)
-}
-
 /// Return an unsigned 32 bytes value from storage at the given `path`.
 ///
 /// NB: The given bytes are interpreted in little endian order.
@@ -128,19 +117,6 @@ pub fn read_u256_le_default(
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
     }
-}
-
-/// Write an unsigned 32 bytes value into storage at the given `path`.
-///
-/// NB: The value is stored in little endian order.
-pub fn write_u256_le(
-    host: &mut impl StorageV1,
-    path: &impl Path,
-    value: U256,
-) -> Result<(), Error> {
-    let mut bytes: [u8; WORD_SIZE] = value.into();
-    value.to_little_endian(&mut bytes);
-    host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
 /// Return an unsigned 8 bytes value from storage at the given `path`.
