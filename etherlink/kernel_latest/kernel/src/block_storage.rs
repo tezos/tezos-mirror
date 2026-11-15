@@ -38,6 +38,13 @@ const CURRENT_BLOCK_HASH_KEY: Key = Key::from_static(b"/blocks/current/hash");
 /// Key of the encoding of the current block, inside a world-state keyspace.
 const CURRENT_BLOCK_KEY: Key = Key::from_static(b"/blocks/current/block");
 
+/// Returns the key that marks the block of hash `hash` as one of the last
+/// [`BLOCKS_STORED`] blocks of a world-state keyspace.
+fn live_block_key(hash: &H256) -> Key {
+    Key::try_from(format!("/live_blocks/{}", hex::encode(hash.as_bytes())))
+        .expect("`/live_blocks/` followed by 64 hex characters is a valid key")
+}
+
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 
@@ -135,7 +142,7 @@ pub(crate) fn update_block_indexes(
     }
     host.store_write_all(&full_path, block.hash().as_bytes())?;
     if maintain_live_blocks {
-        // Membership is tested with `store_has`, so an empty marker suffices;
+        // Membership is tested with `contains`, so an empty marker suffices;
         // the value is never read.
         let live_path = live_block_entry_path(root, &block.hash())?;
         host.store_write_all(&live_path, b"")?;
@@ -156,14 +163,10 @@ fn live_block_entry_path(
     Ok(entry)
 }
 
-/// Returns `true` when `hash` is one of the last [`BLOCKS_STORED`] blocks in the live_blocks set under `root`.
-pub fn is_recent_block_hash(
-    host: &impl StorageV1,
-    root: &impl Path,
-    hash: &H256,
-) -> Result<bool, crate::Error> {
-    let path = live_block_entry_path(root, hash)?;
-    Ok(host.store_has(&path)?.is_some())
+/// Returns `true` when `hash` is one of the last [`BLOCKS_STORED`] blocks in
+/// the live blocks of `world_state`.
+pub fn is_recent_block_hash(world_state: &impl KeySpace, hash: &H256) -> bool {
+    world_state.contains(&live_block_key(hash))
 }
 
 pub(crate) fn store_current_number(
@@ -262,13 +265,10 @@ pub mod internal_for_tests {
 
     /// Register `hash` as a recent block so [`super::is_recent_block_hash`] accepts it (test helper).
     pub fn register_live_block(
-        host: &mut impl StorageV1,
-        root: &impl Path,
+        world_state: &mut impl KeySpace,
         hash: &H256,
-    ) -> Result<(), crate::Error> {
-        let live_path = super::live_block_entry_path(root, hash)?;
-        host.store_write_all(&live_path, b"")?;
-        Ok(())
+    ) -> Result<(), KeySpaceError> {
+        world_state.set(&super::live_block_key(hash), b"")
     }
 
     /// Returns the receipt of `tx_hash` among the receipts of the current
@@ -309,7 +309,9 @@ mod live_blocks_tests {
     use super::*;
     use crate::l2block::L2Block;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH,
+    };
     use tezos_smart_rollup::types::Timestamp;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::protocol::{INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
@@ -348,51 +350,46 @@ mod live_blocks_tests {
     #[test]
     fn recent_branch_is_member_foreign_is_not() {
         let mut host = MockKernelHost::default();
-        let h0 = store_tez_block(&mut host, 0, true);
-        let h1 = store_tez_block(&mut host, 1, true);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let h0 = store_tez_block(rk.host_mut(), 0, true);
+        let h1 = store_tez_block(rk.host_mut(), 1, true);
 
-        assert!(is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &h0).unwrap());
-        assert!(is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &h1).unwrap());
+        assert!(is_recent_block_hash(rk.tez_world_state(), &h0));
+        assert!(is_recent_block_hash(rk.tez_world_state(), &h1));
         // A branch that is not a recent block of this instance (the replay case) is not a member.
         assert!(!is_recent_block_hash(
-            &host,
-            &TEZ_WORLD_STATE_ROOT_PATH,
+            rk.tez_world_state(),
             &H256::from([0xABu8; 32])
-        )
-        .unwrap());
+        ));
     }
 
     #[test]
     fn block_leaving_the_window_is_evicted() {
         let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut hashes = Vec::new();
         // Store BLOCKS_STORED + 1 blocks; storing block BLOCKS_STORED evicts block 0.
         for number in 0..=(BLOCKS_STORED as u32) {
-            hashes.push(store_tez_block(&mut host, number, true));
+            hashes.push(store_tez_block(rk.host_mut(), number, true));
         }
 
         // Block 0 fell out of the window and is no longer a valid branch.
-        assert!(
-            !is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hashes[0]).unwrap()
-        );
+        assert!(!is_recent_block_hash(rk.tez_world_state(), &hashes[0]));
         // The oldest still-in-window block and the latest one remain members.
-        assert!(
-            is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hashes[1]).unwrap()
-        );
+        assert!(is_recent_block_hash(rk.tez_world_state(), &hashes[1]));
         assert!(is_recent_block_hash(
-            &host,
-            &TEZ_WORLD_STATE_ROOT_PATH,
+            rk.tez_world_state(),
             &hashes[BLOCKS_STORED as usize]
-        )
-        .unwrap());
+        ));
     }
 
     #[test]
     fn maintain_flag_false_skips_live_blocks() {
         // The EVM path (maintain_live_blocks = false) must not populate live_blocks.
         let mut host = MockKernelHost::default();
-        let hash = store_tez_block(&mut host, 0, false);
-        assert!(!is_recent_block_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH, &hash).unwrap());
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let hash = store_tez_block(rk.host_mut(), 0, false);
+        assert!(!is_recent_block_hash(rk.tez_world_state(), &hash));
     }
 }
 
@@ -573,5 +570,23 @@ mod tests {
             read_current_etherlink_block(rk.evm_world_state()).unwrap(),
             Some(block)
         );
+    }
+
+    /// A live block resolves to `/tez/world_state/live_blocks/<hex hash>`.
+    #[test]
+    fn live_block_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let hash = H256::from([0xAB; 32]);
+
+        internal_for_tests::register_live_block(rk.tez_world_state_mut(), &hash).unwrap();
+
+        let path = format!("/tez/world_state/live_blocks/{}", "ab".repeat(32));
+        assert!(rk
+            .host()
+            .store_has(&RefPath::assert_from(path.as_bytes()))
+            .unwrap()
+            .is_some());
+        assert!(is_recent_block_hash(rk.tez_world_state(), &hash));
     }
 }

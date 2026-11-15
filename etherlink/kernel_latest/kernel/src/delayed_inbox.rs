@@ -22,7 +22,6 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
@@ -226,28 +225,23 @@ impl DelayedInbox {
         Ok(Self(linked_list))
     }
 
-    pub fn save_transaction<Host>(
+    pub fn save_transaction(
         &mut self,
-        host: &Host,
         bk: &mut BlueprintKeyspaces<impl KeySpace>,
         tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
         common: &CommonConfig,
-    ) -> Result<()>
-    where
-        Host: StorageV1,
-    {
+    ) -> Result<()> {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
                 let Transaction { tx_hash, content } = *tx.clone();
                 // Validate the branch at delayed-inbox entry; drop foreign/stale branches (cross-instance replay).
                 if let TransactionContent::TezosDelayed(op) = &content {
                     if !crate::chains::is_valid_tez_branch(
-                        host,
                         bk.tez_world_state(),
                         &H256(*op.branch),
-                    )? {
+                    ) {
                         log!(
                             Error,
                             "Dropping delayed Tezos operation {}: branch {} is not a recent block of this instance",
@@ -478,9 +472,7 @@ mod tests {
     use chrono::DateTime;
     use primitive_types::{H160, H256, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::{
-        RuntimeKeyspaces, TEZ_WORLD_STATE_ROOT_PATH,
-    };
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
     use crate::transaction::TransactionContent::{
@@ -547,7 +539,6 @@ mod tests {
             read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                &host,
                 &mut bk,
                 tx.clone().into(),
                 timestamp,
@@ -588,7 +579,6 @@ mod tests {
         let tx: Transaction = dummy_transaction(0);
         delayed_inbox
             .save_transaction(
-                &host,
                 &mut bk,
                 tx.into(),
                 Timestamp::from(0i64),
@@ -639,7 +629,6 @@ mod tests {
         let saved_at = DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET as i64;
         delayed_inbox
             .save_transaction(
-                &host,
                 &mut bk,
                 tx.into(),
                 Timestamp::from(saved_at),
@@ -671,8 +660,7 @@ mod tests {
         let op = make_test_operation();
         // Register the branch as live so the entry check accepts the operation.
         block_storage::internal_for_tests::register_live_block(
-            &mut host,
-            &TEZ_WORLD_STATE_ROOT_PATH,
+            bk.tez_world_state_mut(),
             &H256(*op.branch),
         )
         .expect("register live block");
@@ -685,7 +673,6 @@ mod tests {
             read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                &host,
                 &mut bk,
                 tx.clone().into(),
                 timestamp,
@@ -725,7 +712,6 @@ mod tests {
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
             .save_transaction(
-                &host,
                 &mut bk,
                 tx.clone().into(),
                 timestamp,
@@ -760,7 +746,6 @@ mod tests {
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(
-            &host,
             &mut bk,
             tx.into(),
             timestamp,
