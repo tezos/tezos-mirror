@@ -6,6 +6,7 @@
 use crate::migration::allow_path_not_found;
 use primitive_types::{H256, U256};
 use revm_etherlink::storage::block::BLOCKS_STORED;
+use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_ethereum::{
     block::EthBlock,
     transaction::{TransactionObject, TransactionReceipt},
@@ -15,7 +16,7 @@ use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
-use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
+use tezos_storage::{write_h256_be, write_u256_le};
 
 use crate::l2block::L2Block;
 
@@ -28,6 +29,9 @@ const CURRENT_BLOCK_TRANSACTIONS_OBJECTS_KEY: Key =
 /// list, inside the `/evm/world_state` keyspace.
 const CURRENT_BLOCK_TRANSACTIONS_RECEIPTS_KEY: Key =
     Key::from_static(b"/blocks/current/transactions_receipts");
+
+/// Key of the number of the current block, inside a world-state keyspace.
+const CURRENT_BLOCK_NUMBER_KEY: Key = Key::from_static(b"/blocks/current/number");
 
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
@@ -203,11 +207,10 @@ pub fn read_current_etherlink_block(
     Ok(block_from_bytes)
 }
 
-pub fn read_current_number(
-    host: &impl StorageV1,
-    root: &impl Path,
-) -> Result<U256, crate::Error> {
-    Ok(read_u256_le(host, &path::current_number(root)?)?)
+/// Returns the number of the current block of `world_state`, or `None` when
+/// it has no current block or its number holds fewer than 32 bytes.
+pub fn read_current_number(world_state: &impl KeySpace) -> Option<U256> {
+    world_state.get_u256_le(&CURRENT_BLOCK_NUMBER_KEY)
 }
 
 pub fn read_current_hash(
@@ -471,5 +474,30 @@ mod tests {
             .unwrap(),
             receipt
         );
+    }
+
+    /// The number of the current block resolves to
+    /// `/tez/world_state/blocks/current/number`.
+    #[test]
+    fn current_block_number_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let number = U256::from(7);
+
+        rk.tez_world_state_mut()
+            .store_u256_le(&CURRENT_BLOCK_NUMBER_KEY, number)
+            .unwrap();
+
+        let mut bytes = [0u8; 32];
+        number.to_little_endian(&mut bytes);
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/tez/world_state/blocks/current/number"
+                ))
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(read_current_number(rk.tez_world_state()), Some(number));
     }
 }

@@ -1458,9 +1458,9 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Verify that a TezBlock was stored (under /tez/world_state)
-        let tez_block_number =
-            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock number should be readable");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let tez_block_number = block_storage::read_current_number(bk.tez_world_state())
+            .expect("TezBlock number should be readable");
         // Block number is 0 for the first block (same as EVM block numbering)
         assert_eq!(U256::from(0), tez_block_number);
 
@@ -1619,11 +1619,8 @@ mod tests {
                 rk.tez_world_state()
             )
             .is_none());
+            assert!(block_storage::read_current_number(rk.tez_world_state()).is_none());
         }
-        assert!(
-            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .is_err()
-        );
         let alias_implementation = RefPath::assert_from(
             b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
         );

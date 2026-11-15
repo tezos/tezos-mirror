@@ -102,14 +102,7 @@ where
     let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
     let common = fetch_common_config(&bk);
     delayed_inbox
-        .save_transaction(
-            &kernel_host,
-            bk.base_mut(),
-            transaction,
-            0.into(),
-            0u32,
-            &common,
-        )
+        .save_transaction(&kernel_host, &mut bk, transaction, 0.into(), 0u32, &common)
         .unwrap();
 }
 

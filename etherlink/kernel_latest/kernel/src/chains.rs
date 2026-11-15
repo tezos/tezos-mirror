@@ -77,6 +77,7 @@ use revm_etherlink::journal::commit_evm_journal_from_external;
 /// True if `branch` is a recent block of this instance; genesis is accepted only while the chain is under [`BLOCKS_STORED`] blocks.
 pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
     host: &Host,
+    tez_world_state: &impl KeySpace,
     branch: &H256,
 ) -> Result<bool, crate::Error> {
     if crate::block_storage::is_recent_block_hash(
@@ -87,9 +88,8 @@ pub(crate) fn is_valid_tez_branch<Host: StorageV1>(
         return Ok(true);
     }
     if *branch == H256(*TezBlock::genesis_block_hash()) {
-        let current =
-            crate::block_storage::read_current_number(host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .unwrap_or_else(|_| U256::zero());
+        let current = crate::block_storage::read_current_number(tez_world_state)
+            .unwrap_or_default();
         return Ok(current < U256::from(BLOCKS_STORED));
     }
     Ok(false)
@@ -1179,7 +1179,9 @@ where
             let signature = operation.signature.clone();
 
             // The branch must be a recent block of this instance (see is_valid_tez_branch); reject otherwise.
-            if !skip_branch_check && !is_valid_tez_branch(rk.host(), &H256(*branch))? {
+            if !skip_branch_check
+                && !is_valid_tez_branch(rk.host(), rk.tez_world_state(), &H256(*branch))?
+            {
                 log!(
                     Error,
                     "Dropping Tezos operation {}: branch {} is not a recent block of this instance",

@@ -20,6 +20,7 @@ use tezos_ethereum::{
     tx_common::EthereumTransactionCommon,
 };
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
@@ -228,7 +229,7 @@ impl DelayedInbox {
     pub fn save_transaction<Host>(
         &mut self,
         host: &Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
@@ -242,7 +243,11 @@ impl DelayedInbox {
                 let Transaction { tx_hash, content } = *tx.clone();
                 // Validate the branch at delayed-inbox entry; drop foreign/stale branches (cross-instance replay).
                 if let TransactionContent::TezosDelayed(op) = &content {
-                    if !crate::chains::is_valid_tez_branch(host, &H256(*op.branch))? {
+                    if !crate::chains::is_valid_tez_branch(
+                        host,
+                        bk.tez_world_state(),
+                        &H256(*op.branch),
+                    )? {
                         log!(
                             Error,
                             "Dropping delayed Tezos operation {}: branch {} is not a recent block of this instance",
@@ -265,6 +270,7 @@ impl DelayedInbox {
                     level,
                 };
 
+                let base = bk.base_mut();
                 if self.0.push(base, &Hash(tx_hash), &item)? {
                     Event::NewDelayedTransaction(tx).store(base, common)?;
                     log!(
@@ -466,9 +472,9 @@ mod tests {
     use crate::block_storage;
     use crate::chains::make_test_operation;
     use crate::configuration::{CommonConfig, EVM_CHAIN_ID};
-    use crate::load_base;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
+    use crate::{load_base, load_keyspaces};
     use chrono::DateTime;
     use primitive_types::{H160, H256, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -531,19 +537,18 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip() {
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should be created");
 
         let tx: Transaction = dummy_transaction(0);
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                rk.host_mut(),
-                &mut base,
+                &host,
+                &mut bk,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -552,10 +557,10 @@ mod tests {
             .expect("Tx should be saved in the delayed inbox");
 
         let delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_transaction(&base, Hash(tx.tx_hash))
+            .find_transaction(bk.base(), Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
@@ -578,13 +583,13 @@ mod tests {
         // Before the sunset: one day > the 12h default timeout, but the
         // two-week floor must keep the transaction in the inbox.
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
         let tx: Transaction = dummy_transaction(0);
         delayed_inbox
             .save_transaction(
                 &host,
-                &mut base,
+                &mut bk,
                 tx.into(),
                 Timestamp::from(0i64),
                 0,
@@ -592,10 +597,12 @@ mod tests {
             )
             .unwrap();
         // Satisfy the min-levels side of the condition (default: 720).
-        store_l1_level(&mut base, 10_000).unwrap();
-        store_last_info_per_level_timestamp(&mut base, Timestamp::from(day)).unwrap();
+        store_l1_level(bk.base_mut(), 10_000).unwrap();
+        store_last_info_per_level_timestamp(bk.base_mut(), Timestamp::from(day)).unwrap();
         assert!(
-            !delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
+            !delayed_inbox
+                .first_has_timed_out(bk.base(), deployed)
+                .unwrap(),
             "before the sunset, a one-day-old delayed transaction must not \
              time out: the two-week floor applies"
         );
@@ -604,7 +611,7 @@ mod tests {
         // configured timeout, without waiting for the two-week floor.
         assert!(
             delayed_inbox
-                .first_has_timed_out(&base, U256::from(EVM_CHAIN_ID))
+                .first_has_timed_out(bk.base(), U256::from(EVM_CHAIN_ID))
                 .unwrap(),
             "the sandbox chain is exempt from the floor"
         );
@@ -612,40 +619,44 @@ mod tests {
         // Still before the sunset: once the transaction is two weeks old,
         // the floored timeout fires.
         store_last_info_per_level_timestamp(
-            &mut base,
+            bk.base_mut(),
             Timestamp::from(DELAYED_INBOX_TIMEOUT_FLOOR as i64),
         )
         .unwrap();
         assert!(
-            delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
+            delayed_inbox
+                .first_has_timed_out(bk.base(), deployed)
+                .unwrap(),
             "the two-week floor must still force-include old transactions"
         );
 
         // After the sunset: the configured (default, 12h) timeout applies
         // again, so a 13h-old transaction times out.
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut delayed_inbox = DelayedInbox::from_base(&base).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
         let tx: Transaction = dummy_transaction(1);
         let saved_at = DELAYED_INBOX_TIMEOUT_FLOOR_SUNSET as i64;
         delayed_inbox
             .save_transaction(
                 &host,
-                &mut base,
+                &mut bk,
                 tx.into(),
                 Timestamp::from(saved_at),
                 0,
                 &CommonConfig::default(),
             )
             .unwrap();
-        store_l1_level(&mut base, 10_000).unwrap();
+        store_l1_level(bk.base_mut(), 10_000).unwrap();
         store_last_info_per_level_timestamp(
-            &mut base,
+            bk.base_mut(),
             Timestamp::from(saved_at + 13 * 3_600),
         )
         .unwrap();
         assert!(
-            delayed_inbox.first_has_timed_out(&base, deployed).unwrap(),
+            delayed_inbox
+                .first_has_timed_out(bk.base(), deployed)
+                .unwrap(),
             "after the sunset, the configured 12h timeout must apply again"
         );
     }
@@ -653,15 +664,14 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_roundtrip() {
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should be created");
 
         let op = make_test_operation();
         // Register the branch as live so the entry check accepts the operation.
         block_storage::internal_for_tests::register_live_block(
-            rk.host_mut(),
+            &mut host,
             &TEZ_WORLD_STATE_ROOT_PATH,
             &H256(*op.branch),
         )
@@ -672,11 +682,11 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         delayed_inbox
             .save_transaction(
-                rk.host_mut(),
-                &mut base,
+                &host,
+                &mut bk,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -685,10 +695,10 @@ mod tests {
             .expect("Tezos operation should be saved in the delayed inbox");
 
         let delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should exist");
 
         let read = delayed_inbox
-            .find_transaction(&base, Hash(tx.tx_hash))
+            .find_transaction(bk.base(), Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
@@ -698,10 +708,9 @@ mod tests {
     #[test]
     fn test_delayed_inbox_tezos_dropped_on_stale_branch() {
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should be created");
 
         // A branch neither in live_blocks nor covered by the genesis fallback: must be rejected.
         let mut op = make_test_operation();
@@ -712,12 +721,12 @@ mod tests {
         };
 
         let timestamp =
-            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         // Dropping is not an error: the call succeeds but nothing is stored.
         delayed_inbox
             .save_transaction(
-                rk.host_mut(),
-                &mut base,
+                &host,
+                &mut bk,
                 tx.clone().into(),
                 timestamp,
                 0,
@@ -726,9 +735,9 @@ mod tests {
             .expect("save_transaction should drop, not fail");
 
         let delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should exist");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should exist");
         let read = delayed_inbox
-            .find_transaction(&base, Hash(tx.tx_hash))
+            .find_transaction(bk.base(), Hash(tx.tx_hash))
             .expect("Reading from the delayed inbox should work");
         assert!(
             read.is_none(),
@@ -739,10 +748,9 @@ mod tests {
     #[test]
     fn test_delayed_inbox_roundtrip_error_non_delayed() {
         let mut host = MockKernelHost::default();
-        let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut bk = load_keyspaces(&mut host).unwrap();
         let mut delayed_inbox =
-            DelayedInbox::from_base(&base).expect("Delayed inbox should be created");
+            DelayedInbox::from_base(bk.base()).expect("Delayed inbox should be created");
 
         let tx: Transaction = Transaction {
             tx_hash: [12; TRANSACTION_HASH_SIZE],
@@ -750,10 +758,10 @@ mod tests {
         };
 
         let timestamp: Timestamp =
-            read_last_info_per_level_timestamp(&base).unwrap_or(Timestamp::from(0));
+            read_last_info_per_level_timestamp(bk.base()).unwrap_or(Timestamp::from(0));
         let res = delayed_inbox.save_transaction(
-            rk.host_mut(),
-            &mut base,
+            &host,
+            &mut bk,
             tx.into(),
             timestamp,
             0,

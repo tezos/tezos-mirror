@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_storage::read_current_number;
 use crate::error::Error;
 use crate::error::UpgradeProcessError;
 use crate::storage::{read_evm_chain_id, StorageVersion};
@@ -16,6 +15,7 @@ use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpace;
+use tezos_storage::read_u256_le;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -103,9 +103,10 @@ where
         StorageVersion::V47 => Ok(MigrationStatus::Done),
         StorageVersion::V48 => {
             // Clean remaining leftover block indexes from V41.
-            if let Ok(current_number) =
-                read_current_number(host, &EVM_WORLD_STATE_ROOT_PATH)
-            {
+            if let Ok(current_number) = read_u256_le(
+                host,
+                &RefPath::assert_from(b"/evm/world_state/blocks/current/number"),
+            ) {
                 let last_to_keep = current_number.as_u64().saturating_sub(BLOCKS_STORED);
                 let paths_indexed_blocks = concat(
                     &EVM_WORLD_STATE_ROOT_PATH,
