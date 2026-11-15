@@ -528,8 +528,7 @@ impl BlockInProgress {
         )?;
         let transactions_root = self.transactions_root();
         block_storage::store_current_transactions_objects(
-            rk.host_mut(),
-            &EVM_WORLD_STATE_ROOT_PATH,
+            rk.evm_world_state_mut(),
             &self.cumulative_tx_objects,
         )?;
         let base_fee_per_gas = base_fee_per_gas(

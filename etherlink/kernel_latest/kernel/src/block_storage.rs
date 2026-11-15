@@ -18,7 +18,11 @@ use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
 
 use crate::l2block::L2Block;
-use rlp::Encodable;
+
+/// Key of the transaction objects of the current block, as one rlp list,
+/// inside the `/evm/world_state` keyspace.
+const CURRENT_BLOCK_TRANSACTIONS_OBJECTS_KEY: Key =
+    Key::from_static(b"/blocks/current/transactions_objects");
 
 /// Key of the receipts of the transactions of the current block, as one rlp
 /// list, inside the `/evm/world_state` keyspace.
@@ -29,8 +33,6 @@ mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 
     const CURRENT_BLOCK_PATH: RefPath = RefPath::assert_from(b"/blocks/current/block");
-    const CURRENT_BLOCK_TRANSACTIONS_OBJECTS: RefPath =
-        RefPath::assert_from(b"/blocks/current/transactions_objects");
     const CURRENT_BLOCK_NUMBER_PATH: RefPath =
         RefPath::assert_from(b"/blocks/current/number");
     const CURRENT_BLOCK_HASH_PATH: RefPath =
@@ -49,12 +51,6 @@ mod path {
 
     pub fn current_block(root: &impl Path) -> Result<OwnedPath, PathError> {
         concat(root, &CURRENT_BLOCK_PATH)
-    }
-
-    pub fn current_block_transactions_objects(
-        root: &impl Path,
-    ) -> Result<OwnedPath, PathError> {
-        concat(root, &CURRENT_BLOCK_TRANSACTIONS_OBJECTS)
     }
 
     pub fn block_indexes(root: &impl Path) -> Result<OwnedPath, PathError> {
@@ -170,22 +166,18 @@ pub(crate) fn store_current_number(
     Ok(())
 }
 
+/// Stores `transactions_objects` as the transaction objects of the current
+/// block of `evm_world_state`.
+///
+/// Errors when the write fails.
 pub fn store_current_transactions_objects(
-    host: &mut impl StorageV1,
-    root: &impl Path,
+    evm_world_state: &mut impl KeySpace,
     transactions_objects: &[TransactionObject],
-) -> Result<(), crate::Error> {
-    let stream = rlp::RlpStream::new_list(transactions_objects.len());
-    let bytes = transactions_objects
-        .iter()
-        .fold(stream, |mut acc, tx_obj| {
-            tx_obj.rlp_append(&mut acc);
-            acc
-        })
-        .out()
-        .to_vec();
-    host.store_write_all(&path::current_block_transactions_objects(root)?, &bytes)?;
-    Ok(())
+) -> Result<(), KeySpaceError> {
+    evm_world_state.set(
+        &CURRENT_BLOCK_TRANSACTIONS_OBJECTS_KEY,
+        rlp::encode_list(transactions_objects),
+    )
 }
 
 /// Stores `receipts` as the receipts of the transactions of the current block
@@ -398,6 +390,42 @@ mod tests {
     use tezos_ethereum::Bloom;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+
+    /// The transaction objects of the current block resolve to
+    /// `/evm/world_state/blocks/current/transactions_objects`.
+    #[test]
+    fn current_block_transactions_objects_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let object = TransactionObject {
+            block_number: U256::from(3),
+            from: H160::from_low_u64_be(1),
+            gas: U256::from(21_000),
+            gas_price: U256::one(),
+            hash: [1; 32],
+            input: vec![],
+            nonce: 0,
+            to: Some(H160::from_low_u64_be(2)),
+            index: 0,
+            value: U256::from(5),
+            signature: None,
+        };
+
+        store_current_transactions_objects(
+            rk.evm_world_state_mut(),
+            std::slice::from_ref(&object),
+        )
+        .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/blocks/current/transactions_objects"
+                ))
+                .unwrap(),
+            rlp::encode_list(std::slice::from_ref(&object)).to_vec()
+        );
+    }
 
     /// The receipts of the current block resolve to
     /// `/evm/world_state/blocks/current/transactions_receipts`.
