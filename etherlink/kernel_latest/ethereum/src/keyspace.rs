@@ -104,9 +104,19 @@ pub trait KeySpaceExtHash: KeySpace {
         self.get_prefix_exact(key).map(H256)
     }
 
+    /// [`Self::get_h256`], falling back to `default`.
+    fn get_h256_or(&self, key: &Key, default: H256) -> H256 {
+        self.get_h256(key).unwrap_or(default)
+    }
+
     /// [`Self::get_h256`] for the EVM's own hash type.
     fn get_b256(&self, key: &Key) -> Option<B256> {
         self.get_prefix_exact(key).map(B256::from)
+    }
+
+    /// [`Self::get_b256`], falling back to `default`.
+    fn get_b256_or(&self, key: &Key, default: B256) -> B256 {
+        self.get_b256(key).unwrap_or(default)
     }
 }
 
@@ -331,5 +341,33 @@ mod tests {
 
         ks.set(&key(b"/short"), [7u8; 31]).unwrap();
         assert_eq!(ks.get_b256(&key(b"/short")), None);
+    }
+
+    #[test]
+    fn a_missing_or_short_hash_takes_the_default() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let default = [9u8; 32];
+
+        assert_eq!(
+            ks.get_h256_or(&key(b"/absent"), H256(default)),
+            H256(default)
+        );
+        assert_eq!(
+            ks.get_b256_or(&key(b"/absent"), B256::from(default)),
+            B256::from(default)
+        );
+
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(
+            ks.get_h256_or(&key(b"/short"), H256(default)),
+            H256(default)
+        );
+
+        ks.set(&key(b"/hash"), [7u8; 32]).unwrap();
+        assert_eq!(
+            ks.get_b256_or(&key(b"/hash"), B256::from(default)),
+            B256::from([7u8; 32])
+        );
     }
 }
