@@ -6,7 +6,7 @@
 use crate::migration::allow_path_not_found;
 use primitive_types::{H256, U256};
 use revm_etherlink::storage::block::BLOCKS_STORED;
-use tezos_ethereum::keyspace::KeySpaceExtU256;
+use tezos_ethereum::keyspace::{KeySpaceExtHash, KeySpaceExtU256};
 use tezos_ethereum::{
     block::EthBlock,
     transaction::{TransactionObject, TransactionReceipt},
@@ -32,6 +32,9 @@ const CURRENT_BLOCK_TRANSACTIONS_RECEIPTS_KEY: Key =
 
 /// Key of the number of the current block, inside a world-state keyspace.
 const CURRENT_BLOCK_NUMBER_KEY: Key = Key::from_static(b"/blocks/current/number");
+
+/// Key of the hash of the current block, inside a world-state keyspace.
+const CURRENT_BLOCK_HASH_KEY: Key = Key::from_static(b"/blocks/current/hash");
 
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
@@ -213,16 +216,11 @@ pub fn read_current_number(world_state: &impl KeySpace) -> Option<U256> {
     world_state.get_u256_le(&CURRENT_BLOCK_NUMBER_KEY)
 }
 
-pub fn read_current_hash(
-    host: &impl StorageV1,
-    root: &impl Path,
-) -> Result<H256, crate::Error> {
-    let hash_path = path::current_hash(root)?;
-    let bytes = &host.store_read_all(&hash_path)?;
-    if bytes.len() != 32 {
-        return Err(crate::Error::InvalidConversion);
-    }
-    Ok(H256::from_slice(bytes))
+/// Returns the hash of the current block of `world_state`, or `None` when it
+/// has no current block or its hash holds fewer than 32 bytes. A longer hash
+/// reads as its first 32 bytes.
+pub fn read_current_hash(world_state: &impl KeySpace) -> Option<H256> {
+    world_state.get_h256(&CURRENT_BLOCK_HASH_KEY)
 }
 
 #[cfg(test)]
@@ -499,5 +497,28 @@ mod tests {
             bytes
         );
         assert_eq!(read_current_number(rk.tez_world_state()), Some(number));
+    }
+
+    /// The hash of the current block resolves to
+    /// `/evm/world_state/blocks/current/hash`.
+    #[test]
+    fn current_block_hash_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let hash = H256::from([9; 32]);
+
+        rk.evm_world_state_mut()
+            .set(&CURRENT_BLOCK_HASH_KEY, hash.as_bytes())
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/blocks/current/hash"
+                ))
+                .unwrap(),
+            hash.as_bytes()
+        );
+        assert_eq!(read_current_hash(rk.evm_world_state()), Some(hash));
     }
 }

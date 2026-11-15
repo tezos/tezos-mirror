@@ -17,7 +17,7 @@ use crate::{
         TezlinkBlockConstants, TezosXBlockConstants, TezosXChainConfig, TezosXTransaction,
     },
     configuration::{fetch_configuration, fetch_tezosx_configuration},
-    error::{Error, StorageError},
+    error::Error,
     fees::DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
     gas_price::base_fee_per_gas,
     retrieve_da_fee,
@@ -37,11 +37,9 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{
-    BlueprintKeyspaces, RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH,
-};
+use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
 use tezos_evm_runtime::safe_storage::SafeStorage;
-use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
+use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
@@ -261,7 +259,12 @@ where
                 cumulative_gas: U256::zero(),
                 index: 0,
                 michelson_index: 0,
-                ethereum_parent_hash: read_current_block_hash(&safe_host)?,
+                ethereum_parent_hash: match block_storage::read_current_hash(
+                    bk.evm_world_state(),
+                ) {
+                    Some(hash) => hash,
+                    None => H256::zero(),
+                },
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,
                 timestamp: input_data.timestamp,
@@ -272,13 +275,12 @@ where
                 cumulative_receipts: Vec::new(),
                 cumulative_tx_objects: Vec::new(),
                 cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
-                tezos_parent_hash: crate::block_storage::read_current_hash(
-                    &safe_host,
-                    &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
-                )
-                .unwrap_or_else(|_| {
-                    H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
-                }),
+                tezos_parent_hash: match block_storage::read_current_hash(
+                    bk.tez_world_state(),
+                ) {
+                    Some(hash) => hash,
+                    None => H256(*tezos_tezlink::block::TezBlock::genesis_block_hash()),
+                },
             }
         }
     };
@@ -330,16 +332,6 @@ where
     match safe_host.revert() {
         Ok(()) => Err(err),
         Err(why) => Err(err.context(why)),
-    }
-}
-
-fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
-    match block_storage::read_current_hash(host, &EVM_WORLD_STATE_ROOT_PATH) {
-        Ok(block_hash) => Ok(block_hash),
-        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
-            Ok(H256::zero())
-        }
-        Err(err) => Err(err),
     }
 }
 

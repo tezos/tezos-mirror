@@ -4,14 +4,14 @@
 
 //! Reads and writes, at a key space key, the two 256-bit integers the kernel
 //! uses: the `primitive_types` one the storage speaks, and the `revm` one the
-//! EVM demands.
+//! EVM demands. Also reads the 32-byte hashes, stored as their bytes.
 //!
-//! Either one is the four `u64`s it is made of, stored least or most
+//! Either integer is the four `u64`s it is made of, stored least or most
 //! significant first depending on the accessor. This crate is the deepest one
 //! the storage and the EVM sides both depend on, which is why the accessors
 //! live here rather than next to either of them.
 
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use revm::primitives::U256 as EvmU256;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
@@ -92,6 +92,20 @@ pub trait KeySpaceExtU256: KeySpace {
 }
 
 impl<KS: KeySpace> KeySpaceExtU256 for KS {}
+
+/// Reads 32-byte hashes at a key.
+///
+/// Implemented for every [`KeySpace`], so bringing the trait into scope is
+/// enough to call these on any key space handle.
+pub trait KeySpaceExtHash: KeySpace {
+    /// Returns the hash at `key`, or `None` when the key is absent or holds
+    /// fewer than 32 bytes. A longer value reads as its first 32 bytes.
+    fn get_h256(&self, key: &Key) -> Option<H256> {
+        self.get_prefix_exact(key).map(H256)
+    }
+}
+
+impl<KS: KeySpace> KeySpaceExtHash for KS {}
 
 /// Returns the `N` `u64`s of the value at `key`, least significant first, or
 /// `None` when the key is absent or holds fewer than `N * 8` bytes.
@@ -278,5 +292,22 @@ mod tests {
             ks.get_evm_u256_le(&k).unwrap().to_string(),
             value.to_string()
         );
+    }
+
+    #[test]
+    fn a_hash_reads_its_first_32_bytes() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let hash = [7u8; 32];
+
+        ks.set(&key(b"/hash"), hash).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/hash")), Some(H256(hash)));
+
+        // A longer value reads as its first 32 bytes, a shorter one as missing.
+        ks.set(&key(b"/long"), [7u8; 33]).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/long")), Some(H256(hash)));
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/short")), None);
+        assert_eq!(ks.get_h256(&key(b"/absent")), None);
     }
 }

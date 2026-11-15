@@ -271,13 +271,10 @@ where
                     return Ok(BlueprintParsing::Postponed);
                 }
             }
-            let tezos_parent_hash = block_storage::read_current_hash(
-                host,
-                &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
-            )
-            .unwrap_or_else(|_| {
-                H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
-            });
+            let tezos_parent_hash =
+                block_storage::read_current_hash(bk.tez_world_state()).unwrap_or_else(
+                    || H256(*tezos_tezlink::block::TezBlock::genesis_block_hash()),
+                );
             let bip: BlockInProgress = bip_from_blueprint(
                 bk.evm_world_state(),
                 chain_config,
@@ -1464,9 +1461,8 @@ mod tests {
         // Block number is 0 for the first block (same as EVM block numbering)
         assert_eq!(U256::from(0), tez_block_number);
 
-        let tez_block_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock hash should be readable");
+        let tez_block_hash = block_storage::read_current_hash(bk.tez_world_state())
+            .expect("TezBlock hash should be readable");
         // The hash should not be zero (it's computed from the block content)
         assert_ne!(H256::zero(), tez_block_hash);
     }
@@ -1524,9 +1520,11 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Record block 0 hash
-        let block_0_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock 0 hash should be readable");
+        let block_0_hash = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            block_storage::read_current_hash(rk.tez_world_state())
+        }
+        .expect("TezBlock 0 hash should be readable");
         assert_ne!(H256::zero(), block_0_hash);
 
         // Block 1: transfer operation
@@ -1565,9 +1563,11 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Block 1 hash should be different from block 0
-        let block_1_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock 1 hash should be readable");
+        let block_1_hash = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            block_storage::read_current_hash(rk.tez_world_state())
+        }
+        .expect("TezBlock 1 hash should be readable");
         assert_ne!(block_0_hash, block_1_hash);
 
         // Read block 1 from storage and check its previous_hash equals block 0's hash
