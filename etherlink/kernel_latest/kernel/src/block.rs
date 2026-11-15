@@ -764,7 +764,7 @@ mod tests {
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::path::{concat, RefPath};
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameters;
     use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
@@ -1368,9 +1368,10 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity(host: &mut impl StorageV1) {
-        match block_storage::read_current_etherlink_block(host) {
-            Ok(_) => (),
+    fn assert_current_block_reading_validity(evm_world_state: &impl KeySpace) {
+        match block_storage::read_current_etherlink_block(evm_world_state) {
+            Ok(Some(_)) => (),
+            Ok(None) => panic!("No current block\n"),
             Err(e) => {
                 panic!("Block reading failed: {e:?}\n")
             }
@@ -1571,14 +1572,11 @@ mod tests {
         assert_ne!(block_0_hash, block_1_hash);
 
         // Read block 1 from storage and check its previous_hash equals block 0's hash
-        let block_path = concat(
-            &TEZ_WORLD_STATE_ROOT_PATH,
-            &RefPath::assert_from(b"/blocks/current/block"),
-        )
-        .expect("Block path should be valid");
-        let block_bytes = host
-            .store_read_all(&block_path)
-            .expect("Should read block bytes");
+        let block_bytes = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            read_tez_current_block(rk.tez_world_state())
+        }
+        .expect("Should read block bytes");
         let rlp = rlp::Rlp::new(&block_bytes);
         // TezBlock RLP layout: [version, hash, number, previous_hash, timestamp, operations]
         let previous_hash: H256 = rlp
@@ -3336,7 +3334,8 @@ mod tests {
 
         produce_block_with_several_valid_txs(&mut host, bk);
 
-        assert_current_block_reading_validity(&mut host);
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_current_block_reading_validity(rk.evm_world_state());
     }
 
     #[test]
@@ -4558,10 +4557,10 @@ mod tests {
         let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tez_current_block(rk.host_mut()).unwrap();
+        let block = read_tez_current_block(rk.tez_world_state()).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, previous_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -4580,10 +4579,10 @@ mod tests {
         let bk = load_keyspaces(&mut host).unwrap();
         let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tez_current_block(rk.host_mut()).unwrap();
+        let block = read_tez_current_block(rk.tez_world_state()).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, current_protocol);
         assert_eq!(next_protocol, current_protocol);

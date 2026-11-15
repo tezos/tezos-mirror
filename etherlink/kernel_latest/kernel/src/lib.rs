@@ -212,11 +212,11 @@ fn retrieve_minimum_base_fee_per_gas(evm_world_state: &mut impl KeySpace) -> U25
 
 #[cfg(test)]
 fn retrieve_base_fee_per_gas(
-    host: &mut impl StorageV1,
+    evm_world_state: &impl KeySpace,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
-    match block_storage::read_current_etherlink_block(host) {
-        Ok(current_block) => {
+    match block_storage::read_current_etherlink_block(evm_world_state) {
+        Ok(Some(current_block)) => {
             let current_base_fee_per_gas = current_block.base_fee_per_gas;
             if current_base_fee_per_gas < minimum_base_fee_per_gas {
                 minimum_base_fee_per_gas
@@ -224,7 +224,7 @@ fn retrieve_base_fee_per_gas(
                 current_base_fee_per_gas
             }
         }
-        Err(_) => minimum_base_fee_per_gas,
+        Ok(None) | Err(_) => minimum_base_fee_per_gas,
     }
 }
 
@@ -249,7 +249,7 @@ where
     let minimum_base_fee_per_gas =
         retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
     let base_fee_per_gas =
-        retrieve_base_fee_per_gas(rk.host_mut(), minimum_base_fee_per_gas);
+        retrieve_base_fee_per_gas(rk.evm_world_state(), minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(rk.evm_world_state_mut())?;
     let block_fees = tezos_ethereum::block::BlockFees::new(
         minimum_base_fee_per_gas,

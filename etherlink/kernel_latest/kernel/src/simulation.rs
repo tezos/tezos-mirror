@@ -409,9 +409,10 @@ impl Evaluation {
         let experimental_features = ExperimentalFeatures::read_from_storage(base);
         let debug_features = DebugFeatures::read_from_storage(base);
 
-        let current_block = block_storage::read_current_etherlink_block(rk.host_mut());
+        let current_block =
+            block_storage::read_current_etherlink_block(rk.evm_world_state());
         let constants = match current_block {
-            Ok(block) => {
+            Ok(Some(block)) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
                 // default to last block timestamp.
@@ -439,7 +440,7 @@ impl Evaluation {
                     spec_id: *spec_id,
                 }
             }
-            Err(_) => {
+            Ok(None) | Err(_) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
                 // default to current timestamp.

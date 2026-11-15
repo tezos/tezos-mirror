@@ -12,7 +12,6 @@ use tezos_ethereum::{
     transaction::{TransactionObject, TransactionReceipt},
 };
 use tezos_evm_logging::{log, Level::Info};
-use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
@@ -35,6 +34,9 @@ const CURRENT_BLOCK_NUMBER_KEY: Key = Key::from_static(b"/blocks/current/number"
 
 /// Key of the hash of the current block, inside a world-state keyspace.
 const CURRENT_BLOCK_HASH_KEY: Key = Key::from_static(b"/blocks/current/hash");
+
+/// Key of the encoding of the current block, inside a world-state keyspace.
+const CURRENT_BLOCK_KEY: Key = Key::from_static(b"/blocks/current/block");
 
 mod path {
     use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
@@ -201,13 +203,25 @@ pub fn store_current_transactions_receipts(
     )
 }
 
+/// Returns the current block of `evm_world_state`, or `None` when it has no
+/// current block.
+///
+/// Errors when the stored bytes do not decode as a block.
 pub fn read_current_etherlink_block(
-    host: &mut impl StorageV1,
-) -> anyhow::Result<EthBlock> {
-    let block_path = path::current_block(&EVM_WORLD_STATE_ROOT_PATH)?;
-    let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = EthBlock::from_bytes(bytes)?;
-    Ok(block_from_bytes)
+    evm_world_state: &impl KeySpace,
+) -> Result<Option<EthBlock>, KeySpaceError> {
+    evm_world_state
+        .get(&CURRENT_BLOCK_KEY)
+        .map(|bytes| {
+            EthBlock::from_bytes(&bytes).map_err(|err| {
+                KeySpaceError::read(
+                    evm_world_state.name(),
+                    &CURRENT_BLOCK_KEY,
+                    err.into(),
+                )
+            })
+        })
+        .transpose()
 }
 
 /// Returns the number of the current block of `world_state`, or `None` when
@@ -223,12 +237,11 @@ pub fn read_current_hash(world_state: &impl KeySpace) -> Option<H256> {
     world_state.get_h256(&CURRENT_BLOCK_HASH_KEY)
 }
 
+/// Returns the encoding of the current block of `tez_world_state`, or `None`
+/// when it has no current block.
 #[cfg(test)]
-pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
-    use tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH;
-    let block_path = path::current_block(&TEZ_WORLD_STATE_ROOT_PATH)?;
-    let bytes = host.store_read_all(&block_path)?;
-    Ok(bytes)
+pub fn read_tez_current_block(tez_world_state: &impl KeySpace) -> Option<Vec<u8>> {
+    tez_world_state.get(&CURRENT_BLOCK_KEY)
 }
 
 #[cfg(test)]
@@ -387,10 +400,13 @@ mod live_blocks_tests {
 mod tests {
     use super::*;
     use primitive_types::H160;
+    use tezos_ethereum::block::BlockConstants;
+    use tezos_ethereum::rlp_helpers::VersionedEncoding;
     use tezos_ethereum::transaction::{TransactionStatus, TransactionType};
     use tezos_ethereum::Bloom;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_smart_rollup::types::Timestamp;
 
     /// The transaction objects of the current block resolve to
     /// `/evm/world_state/blocks/current/transactions_objects`.
@@ -520,5 +536,42 @@ mod tests {
             hash.as_bytes()
         );
         assert_eq!(read_current_hash(rk.evm_world_state()), Some(hash));
+    }
+
+    /// The current block resolves to `/evm/world_state/blocks/current/block`.
+    #[test]
+    fn current_block_key_keeps_its_durable_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let block = EthBlock::new(
+            U256::from(3),
+            vec![[4; 32]],
+            Timestamp::from(5),
+            H256::from([6; 32]),
+            Bloom::default(),
+            vec![7; 32],
+            vec![8; 32],
+            vec![9; 32],
+            U256::from(21_000),
+            &BlockConstants::dummy(),
+            U256::one(),
+        );
+
+        rk.evm_world_state_mut()
+            .set(&CURRENT_BLOCK_KEY, block.to_bytes())
+            .unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(
+                    b"/evm/world_state/blocks/current/block"
+                ))
+                .unwrap(),
+            block.to_bytes()
+        );
+        assert_eq!(
+            read_current_etherlink_block(rk.evm_world_state()).unwrap(),
+            Some(block)
+        );
     }
 }
