@@ -12,7 +12,7 @@
 //! live here rather than next to either of them.
 
 use primitive_types::{H256, U256};
-use revm::primitives::U256 as EvmU256;
+use revm::primitives::{B256, U256 as EvmU256};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 /// Reads and writes 256-bit integers at a key.
@@ -102,6 +102,11 @@ pub trait KeySpaceExtHash: KeySpace {
     /// fewer than 32 bytes. A longer value reads as its first 32 bytes.
     fn get_h256(&self, key: &Key) -> Option<H256> {
         self.get_prefix_exact(key).map(H256)
+    }
+
+    /// [`Self::get_h256`] for the EVM's own hash type.
+    fn get_b256(&self, key: &Key) -> Option<B256> {
+        self.get_prefix_exact(key).map(B256::from)
     }
 }
 
@@ -309,5 +314,22 @@ mod tests {
         ks.set(&key(b"/short"), [7u8; 31]).unwrap();
         assert_eq!(ks.get_h256(&key(b"/short")), None);
         assert_eq!(ks.get_h256(&key(b"/absent")), None);
+    }
+
+    #[test]
+    fn both_hash_types_read_the_same_bytes() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let hash = [7u8; 32];
+
+        ks.set(&key(b"/hash"), hash).unwrap();
+        assert_eq!(ks.get_b256(&key(b"/hash")), Some(B256::from(hash)));
+        assert_eq!(
+            ks.get_b256(&key(b"/hash")).map(|hash| hash.0),
+            ks.get_h256(&key(b"/hash")).map(|hash| hash.0)
+        );
+
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(ks.get_b256(&key(b"/short")), None);
     }
 }

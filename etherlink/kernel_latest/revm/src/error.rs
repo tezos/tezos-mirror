@@ -17,10 +17,10 @@ use revm::{
 };
 use tezos_evm_runtime::snapshot::SnapshotError;
 use tezos_indexable_storage::IndexableStorageError;
-use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use tezosx_interfaces::{KernelStorageError, TezosXRuntimeError};
-use tezosx_types::{GasConversionError, Wei};
+use tezosx_types::{GasConversionError, StorageReadErrorKind, Wei};
 use thiserror::Error;
 
 /// Failures from the EVM database when reading or writing storage
@@ -28,23 +28,14 @@ use thiserror::Error;
 pub enum EvmDbError {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
-    #[error("Path error: {0}")]
-    Path(#[from] PathError),
     #[error(transparent)]
     Key(#[from] KeyError),
     #[error(transparent)]
-    KeySpace(#[from] KeySpaceError),
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
     #[error("Bytecode at {hash} failed validation: {source}")]
     InvalidBytecode {
         hash: B256,
         source: BytecodeDecodeError,
-    },
-    #[error(
-        "Block hash entry for block {block_number} is malformed (length {actual_length})"
-    )]
-    MalformedBlockHash {
-        block_number: u64,
-        actual_length: usize,
     },
     #[error("Bytes from storage had length {actual}, expected {expected}")]
     UnexpectedBytesLength { expected: usize, actual: usize },
@@ -54,6 +45,12 @@ pub enum EvmDbError {
     BalanceUnderflow { current: Wei, amount: Wei },
     #[error("Commit ended in an inconsistent state")]
     CommitMismatch,
+}
+
+impl From<KeySpaceError> for EvmDbError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.into())
+    }
 }
 
 impl DBErrorMarker for EvmDbError {}

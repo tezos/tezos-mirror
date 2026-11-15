@@ -5,7 +5,7 @@
 
 use crate::error::EvmDbError;
 use crate::storage::{
-    block::{get_block_hash, BLOCKS_STORED},
+    block::{block_index_key, BLOCKS_STORED},
     code::CodeStorage,
     sequencer_key_change::{
         read_sequencer_change_counter, store_sequencer_key_change,
@@ -33,6 +33,7 @@ use revm::{
 };
 use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::keyspace::KeySpaceExtHash;
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -437,7 +438,17 @@ where
             Some(block_diff)
                 if block_diff <= BLOCKS_STORED.into() && !block_diff.is_zero() =>
             {
-                get_block_hash(self.rk.host(), number)
+                let evm_world_state = self.rk.evm_world_state();
+                let key = block_index_key(number);
+                match evm_world_state.get_b256(&key) {
+                    Some(hash) => Ok(hash),
+                    None => Err(KeySpaceError::read(
+                        evm_world_state.name(),
+                        &key,
+                        ReadKind::Ext(StorageReadErrorKind::NotFound),
+                    )
+                    .into()),
+                }
             }
             _ => Ok(B256::ZERO),
         }
