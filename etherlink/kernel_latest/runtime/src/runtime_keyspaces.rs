@@ -23,6 +23,7 @@ use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
 
 use crate::runtime::MockKernelHost;
+use crate::snapshot::{Snapshot, SnapshotError};
 
 /// Name of the `/base` keyspace, holding kernel configuration and
 /// node-interaction values that do not belong to any world state.
@@ -80,6 +81,9 @@ pub const TEZ_WORLD_STATE_ROOT_PATH: RefPath =
 pub struct RuntimeKeyspaces<'host, Host: KeySpaceLoader> {
     host: &'host mut Host,
     keyspaces: Keyspaces<Host::KeySpace>,
+    /// The snapshot of `/tez/tez_accounts`, on which the Michelson journal
+    /// opens, releases and rolls back the savepoints of its checkpoints.
+    tez_accounts_snapshot: Snapshot<Host::KeySpace>,
 }
 
 impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
@@ -101,6 +105,78 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     /// Returns the `/tez/tez_accounts` keyspace for writing.
     pub fn tez_accounts_mut(&mut self) -> &mut Host::KeySpace {
         &mut self.keyspaces.tez_accounts
+    }
+
+    /// Releases every savepoint of `/tez/tez_accounts`: deletes the backups
+    /// its snapshot still holds, keeping the live writes. The next savepoint
+    /// starts the stack again at index 0.
+    ///
+    /// Reserved for the Michelson journal, as [`Self::tez_accounts_savepoint`].
+    pub fn tez_accounts_release_all(&mut self) {
+        self.tez_accounts_snapshot.commit()
+    }
+
+    /// The snapshot of `/tez/tez_accounts`.
+    pub fn tez_accounts_snapshot(&self) -> &Snapshot<Host::KeySpace> {
+        &self.tez_accounts_snapshot
+    }
+
+    /// Opens a savepoint of `/tez/tez_accounts` on its snapshot, loading its
+    /// backup through the host the keyspace was loaded from.
+    ///
+    /// Fails with [`SnapshotError::Loader`], and opens no savepoint, when the
+    /// host cannot load the backup keyspace, e.g. when its name exceeds the
+    /// keyspace name size limit.
+    ///
+    /// Reserved for the Michelson journal, like the other functions that open,
+    /// release or roll back the savepoints of this snapshot: the journal
+    /// counts the savepoints open across the snapshots it drives, and derives
+    /// its checkpoint indices and frame watermarks from that count. A
+    /// savepoint opened, released or rolled back here by anything else
+    /// leaves the count wrong.
+    // TODO: L2-2253
+    // Keep the count with the snapshot, so that nothing has to be in sync.
+    pub fn tez_accounts_savepoint(&mut self) -> Result<(), SnapshotError> {
+        self.tez_accounts_snapshot
+            .savepoint(self.host, &self.keyspaces.tez_accounts)
+    }
+
+    /// Releases the savepoints of `/tez/tez_accounts` above the `height`
+    /// oldest of its snapshot, keeping the live writes.
+    ///
+    /// Fails with [`SnapshotError::ReleaseAboveHeight`], and releases
+    /// nothing, when fewer than `height` savepoints are open.
+    ///
+    /// Reserved for the Michelson journal, as [`Self::tez_accounts_savepoint`].
+    pub fn tez_accounts_release_to(
+        &mut self,
+        height: usize,
+    ) -> Result<(), SnapshotError> {
+        self.tez_accounts_snapshot.release_to(height)
+    }
+
+    /// Restores `/tez/tez_accounts` from the top savepoint of its snapshot,
+    /// and releases it.
+    ///
+    /// Fails with [`SnapshotError::NoSavepoint`], and leaves
+    /// `/tez/tez_accounts` unchanged, when no savepoint is open.
+    ///
+    /// Reserved for the Michelson journal, as [`Self::tez_accounts_savepoint`].
+    pub fn tez_accounts_rollback(&mut self) -> Result<(), SnapshotError> {
+        self.tez_accounts_snapshot
+            .rollback(&mut self.keyspaces.tez_accounts)
+    }
+
+    /// Restores `/tez/tez_accounts` from the top savepoint of its snapshot,
+    /// keeping it for a later restore.
+    ///
+    /// Fails with [`SnapshotError::NoSavepoint`], and leaves
+    /// `/tez/tez_accounts` unchanged, when no savepoint is open.
+    ///
+    /// Reserved for the Michelson journal, as [`Self::tez_accounts_savepoint`].
+    pub fn tez_accounts_restore_top(&mut self) -> Result<(), SnapshotError> {
+        self.tez_accounts_snapshot
+            .restore_top(&mut self.keyspaces.tez_accounts)
     }
 
     /// Returns the `/evm/world_state` keyspace.
@@ -125,12 +201,12 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
 
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host(&self) -> &Host {
-        &*self.host
+        self.host
     }
 
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host_mut(&mut self) -> &mut Host {
-        &mut *self.host
+        self.host
     }
 
     /// Loads the keyspaces from `host`.
@@ -150,6 +226,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
                 evm_world_state,
                 tez_world_state,
             },
+            tez_accounts_snapshot: Snapshot::new(),
         })
     }
 }
@@ -236,7 +313,7 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_storage::{safe_path, SafeStorage};
+    use crate::safe_storage::{safe_path, SafeStorage, TMP_PATH};
     use tezos_smart_rollup_host::path::{OwnedPath, Path};
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace};
@@ -341,5 +418,85 @@ mod tests {
             Some(&b"live"[..])
         );
         assert_eq!(base.name().to_string(), "/base");
+    }
+
+    #[test]
+    fn tez_accounts_snapshot_starts_empty() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(rk.tez_accounts_snapshot().len(), 0);
+        assert_eq!(rk.tez_accounts_release_to(0), Ok(()));
+        assert_eq!(
+            rk.tez_accounts_release_to(1),
+            Err(SnapshotError::ReleaseAboveHeight { height: 1, len: 0 })
+        );
+        assert_eq!(rk.tez_accounts_rollback(), Err(SnapshotError::NoSavepoint));
+        assert_eq!(
+            rk.tez_accounts_restore_top(),
+            Err(SnapshotError::NoSavepoint)
+        );
+    }
+
+    #[test]
+    fn tez_accounts_snapshot_restores_and_commit_keeps_the_writes() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        rk.tez_accounts_mut().set(&PROBE, b"v0").unwrap();
+        rk.tez_accounts_savepoint().unwrap();
+        rk.tez_accounts_mut().set(&PROBE, b"v1").unwrap();
+        rk.tez_accounts_restore_top().unwrap();
+        assert_eq!(rk.tez_accounts().get(&PROBE).as_deref(), Some(&b"v0"[..]));
+
+        rk.tez_accounts_mut().set(&PROBE, b"v2").unwrap();
+        rk.tez_accounts_savepoint().unwrap();
+        rk.tez_accounts_mut().set(&PROBE, b"v3").unwrap();
+        rk.tez_accounts_rollback().unwrap();
+        assert_eq!(rk.tez_accounts().get(&PROBE).as_deref(), Some(&b"v2"[..]));
+        assert_eq!(rk.tez_accounts_snapshot().len(), 1);
+
+        rk.tez_accounts_mut().set(&PROBE, b"v4").unwrap();
+        rk.tez_accounts_release_all();
+        assert_eq!(rk.tez_accounts().get(&PROBE).as_deref(), Some(&b"v4"[..]));
+        assert_eq!(rk.tez_accounts_snapshot().len(), 0);
+        // Releasing every savepoint dropped the backup still held.
+        let backup = RefPath::assert_from(b"/__savepoint/0/tez/tez_accounts/probe");
+        assert!(rk.host().store_has(&backup).unwrap().is_none());
+        // And the stack starts again at index 0.
+        rk.tez_accounts_savepoint().unwrap();
+        assert_eq!(rk.host().store_read_all(&backup).unwrap(), b"v4");
+    }
+
+    #[test]
+    fn tez_accounts_savepoint_in_a_mirror_is_dropped_by_revert() {
+        let mut host = MockKernelHost::default();
+        // `start` copies the roots, so they have to exist.
+        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"root")
+            .unwrap();
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH)],
+        };
+        safe.start().unwrap();
+
+        let backup =
+            RefPath::assert_from(b"/tmp/__savepoint/0/tmp/tez/tez_accounts/probe");
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
+            rk.tez_accounts_mut().set(&PROBE, b"v0").unwrap();
+            rk.tez_accounts_savepoint().unwrap();
+            // The backup is named after the mirrored root, and loaded through
+            // the mirror: it lands under `/tmp`, and nowhere else.
+            assert_eq!(rk.host().host.store_read_all(&backup).unwrap(), b"v0");
+            assert!(rk
+                .host()
+                .host
+                .store_has(&RefPath::assert_from(b"/__savepoint"))
+                .unwrap()
+                .is_none());
+        }
+
+        safe.revert().unwrap();
+        assert!(safe.host.store_has(&backup).unwrap().is_none());
+        assert!(safe.host.store_has(&TMP_PATH).unwrap().is_none());
     }
 }
