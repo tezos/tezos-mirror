@@ -13170,9 +13170,10 @@ let test_crac_failwith_receipt_is_gas_bounded () =
           prefix
           target
   in
-  let failed_error_message ~target () =
+  (* The FAILWITH payload, a string, as the receipt carries it. *)
+  let failed_payload ~target () =
     let* err = failed_error ~target () in
-    return JSON.(err |-> "error_message" |> as_string)
+    return JSON.(err |-> "with" |-> "string" |> as_string)
   in
   (* 1. Measure the gas a successful small-payload CRAC consumes. Its per-byte
      charge is negligible, so this budget reflects alias + dispatch +
@@ -13183,21 +13184,17 @@ let test_crac_failwith_receipt_is_gas_bounded () =
       ~gas_limit:generous_gas
       small_caller
   in
-  let* small_msg = failed_error_message ~target:small_kt1 () in
-  Log.info
-    "%s: small-payload error_message = %d bytes; gas_used = %Ld"
-    prefix
-    (String.length small_msg)
-    gas_used_small ;
-  (* The small payload must be persisted in full (a ~128-byte interpret error,
-     vs. a message-less gas exhaustion error): this confirms the small CRAC's
-     charge succeeded, so gas_used_small is a complete measurement. *)
+  let* small_payload_run = failed_payload ~target:small_kt1 () in
+  Log.info "%s: small-payload gas_used = %Ld" prefix gas_used_small ;
+  (* The small payload must be persisted in full (vs. a payload-less gas
+     exhaustion error): this confirms the small CRAC's charge succeeded, so
+     gas_used_small is a complete measurement. *)
   Check.(
-    (String.length small_msg > 100)
-      int
+    (small_payload_run = String.make small_payload 'x')
+      string
       ~error_msg:
-        "small-payload run error_message is only %L bytes (≤ 100): the small \
-         CRAC out-of-gassed instead of persisting its payload, so the gas \
+        "small-payload run is rejected with %L instead of %R: the small CRAC \
+         out-of-gassed instead of persisting its payload, so the gas \
          measurement would be unreliable") ;
   (* 2. Baseline: with ample gas the large payload leaks in full. *)
   Log.debug ~prefix "Large-payload CRAC (generous gas): full payload leaks" ;
@@ -13206,17 +13203,13 @@ let test_crac_failwith_receipt_is_gas_bounded () =
       ~gas_limit:generous_gas
       large_caller
   in
-  let* large_msg = failed_error_message ~target:large_kt1 () in
-  Log.info
-    "%s: large-payload error_message = %d bytes (full payload leaks)"
-    prefix
-    (String.length large_msg) ;
+  let* large_payload_run = failed_payload ~target:large_kt1 () in
   Check.(
-    (String.length large_msg > 1000)
+    (String.length large_payload_run = large_payload)
       int
       ~error_msg:
-        "large-payload run error_message is only %L bytes (≤ 1000): expected \
-         the full FAILWITH payload to leak with ample gas") ;
+        "large-payload run is rejected with a %L-byte payload: expected the \
+         full %R-byte FAILWITH payload to leak with ample gas") ;
   (* 3. Tight: forward the small run's budget to the large CRAC. It covers
      alias + dispatch + execution but not the large per-byte charge, so the
      kernel swaps the body for a compact OutOfGas. *)
@@ -13236,7 +13229,7 @@ let test_crac_failwith_receipt_is_gas_bounded () =
         "tight-run error is %L: expected the full FAILWITH payload to be \
          replaced by %R") ;
   Check.is_true
-    JSON.(tight_error |-> "error_message" |> is_null)
+    JSON.(tight_error |-> "with" |> is_null)
     ~error_msg:"tight-run error leaks the FAILWITH payload" ;
   unit
 
@@ -13249,8 +13242,8 @@ let test_crac_failwith_receipt_is_gas_bounded () =
  *  testing shape, not the OOG path).  Assert:
  *
  *  - Top-level has [status: failed] with an EMPTY errors list.
- *  - Exactly one internal op of kind "transaction" is [failed] and its
- *    [error_message] is non-empty (the payload lives here).
+ *  - Exactly one internal op of kind "transaction" is [failed] and is
+ *    rejected with the payload (the payload lives here).
  *  - The 'x'-payload run appears exactly once across the whole operation
  *    JSON (not twice as it did before de-duplication). *)
 let test_crac_failed_receipt_error_stored_once () =
@@ -13310,17 +13303,16 @@ let test_crac_failed_receipt_error_stored_once () =
           prefix
           target_kt1
   in
-  let error_msg =
+  let rejected_with =
     JSON.(
-      failed_iop |-> "result" |-> "errors" |=> 0 |-> "error_message"
+      failed_iop |-> "result" |-> "errors" |=> 0 |-> "with" |-> "string"
       |> as_string)
   in
-  Log.info "%s: alias→target error_message = %S" prefix error_msg ;
   Check.(
-    (String.length error_msg > 0)
-      int
+    (rejected_with = String.make payload_length 'x')
+      string
       ~error_msg:
-        "alias→target internal op error_message must be non-empty; the error \
+        "alias→target internal op must be rejected with %R, got %L; the error \
          payload must live here, not on the top-level") ;
   (* Count how many times the 200-'x' run appears in the whole operation
      JSON text.  Before de-duplication it appeared twice (top-level result
@@ -19289,27 +19281,19 @@ let test_crac_deep_failure_backtracks_alias_target () =
             FAILWITH payload (the error lives on this deeper entry, not on \
             alias→C1). Got %%L"
            prefix)) ;
-  let c1_to_c2_error =
+  (* The receipt carries the FAILWITH value as a Micheline expression. *)
+  let c1_to_c2_rejected =
     JSON.(
-      List.hd c1_to_c2_ops |-> "result" |-> "errors" |=> 0 |-> "error_message"
-      |> as_string)
+      List.hd c1_to_c2_ops |-> "result" |-> "errors" |=> 0 |-> "with"
+      |-> "string" |> as_string)
   in
-  Log.info "%s: C1→C2 error_message = %S" prefix c1_to_c2_error ;
-  let payload_run = String.make payload_length 'x' in
   Check.(
-    (String.length c1_to_c2_error > 0)
-      int
+    (c1_to_c2_rejected = String.make payload_length 'x')
+      string
       ~error_msg:
-        "C1→C2 error_message must be non-empty (carries the FAILWITH payload)") ;
-  (* The receipt carries the message of the Michelson error, which embeds
-     the FAILWITH value ([... failed with: String("xxx...") ...]), so the
-     marker is matched rather than the whole message. *)
-  if not (c1_to_c2_error =~ rex payload_run) then
-    Test.fail
-      "%s: C1→C2 error_message must embed the FAILWITH marker (%s), got %s"
-      prefix
-      payload_run
-      c1_to_c2_error ;
+        (sf
+           "%s: C1→C2 must be rejected with the FAILWITH payload %%R, got %%L"
+           prefix)) ;
   check_crac_brackets ~prefix internals ;
   unit
 

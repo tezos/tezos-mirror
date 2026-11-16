@@ -159,6 +159,12 @@ The L1 version is more permissive than MIR for the Ed25519 scheme: the former ac
 * `0x776f726c64` for the data;
 * `0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000` for the signature.
 
+##### `FAILWITH`
+
+On L1, a `FAILWITH` reports its value in the receipt of the operation, whatever its size. The protocol does not serialize the receipt. It gives the receipt to the shell as an OCaml value. The shell serializes the receipt, and does not store it when it takes `operation_metadata_size_limit` (a configurable parameter defaulting 10 MB) or more.
+
+MIR reports the value and its type in binary Micheline, and the kernel serializes and stores every receipt itself. When the two encodings together take more than 64 KiB (`MAX_INTERPRET_ERROR_RENDER_BYTES`), MIR reports the string `"FAILWITH value too large"` of type `string` instead. This is the cap that bounds rendered error messages since !22312.
+
 ##### Errors
 
 The errors returned by MIR or the L1 interpreter are not always the same. This comes from the different capabilities of the source languages (Rust and OCaml), their implementation specificities and their handling of errors.

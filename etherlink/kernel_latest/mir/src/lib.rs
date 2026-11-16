@@ -1278,12 +1278,11 @@ mod multisig_tests {
     use crate::ast::*;
     use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
-    use crate::interpreter::{ContractInterpretError, InterpretError};
+    use crate::interpreter::{ContractInterpretError, InterpretError, MichelineBytes};
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
     use num_bigint::BigUint;
     use typed_arena::Arena;
-    use Type as T;
     use TypedValue as TV;
 
     // The comments below detail the steps used to
@@ -1567,7 +1566,11 @@ mod multisig_tests {
             assert_eq!(
                 collect_ops(interp_res),
                 Err(ContractInterpretError::InterpretError(
-                    InterpretError::FailedWith(T::Unit, RcTypedValue::new(TV::Unit))
+                    // `Unit` of type `unit`, in binary Micheline.
+                    InterpretError::FailedWith {
+                        ty: MichelineBytes(vec![0x03, 0x6c]),
+                        with: MichelineBytes(vec![0x03, 0x0b]),
+                    }
                 ))
             );
         })
@@ -1579,10 +1582,9 @@ mod multisig_tests {
     fn collect_ops<'a>(
         result: Result<
             (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
-            ContractInterpretError<'a>,
+            ContractInterpretError,
         >,
-    ) -> Result<(Vec<OperationInfo<'a>>, RcTypedValue<'a>), ContractInterpretError<'a>>
-    {
+    ) -> Result<(Vec<OperationInfo<'a>>, RcTypedValue<'a>), ContractInterpretError> {
         result.map(|(ops, val)| (ops.collect(), val))
     }
 

@@ -51,11 +51,8 @@ implementation)
 ///
 /// `Debug` is implemented manually as an iterative walk over the
 /// `Apply` chain so a closure built by many nested `APPLY`s does not
-/// blow the WASM call stack when formatted into an error message
-/// (`InterpretError::FailedWith` embeds a `TypedValue` via `{1:?}`,
-/// which in turn formats `TypedValue::Lambda(Closure)` via `Closure`'s
-/// `Debug`; the kernel runs `err.to_string()` outside MIR's gas
-/// accounting).
+/// blow the WASM call stack when formatted, for instance through the
+/// `Debug` of `TypedValue::Lambda`.
 #[derive(Clone)]
 pub enum Closure<'a> {
     /// Simple [Lambda].
@@ -244,10 +241,9 @@ mod tests {
     };
 
     /// L2-1436: a lambda value with a deeply nested body must not overflow when
-    /// formatted (reachable via `FAILWITH` -> `InterpretError::FailedWith`,
-    /// which the kernel turns into a string outside gas). `micheline_code` goes
-    /// through the iterative `Micheline` Debug; the typechecked `code` (whose
-    /// derived `Instruction` Debug is still recursive) is elided as `code: ..`.
+    /// formatted. `micheline_code` goes through the iterative `Micheline`
+    /// Debug; the typechecked `code` (whose derived `Instruction` Debug is
+    /// still recursive) is elided as `code: ..`.
     #[test]
     fn deep_lambda_debug_does_not_overflow() {
         use crate::ast::Micheline;

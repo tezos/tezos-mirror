@@ -39,11 +39,11 @@ pub enum TztTestError<'a> {
         (FailingTypeStack, IStack<'a>),
     ),
     /// An error happened, when the test expected a success.
-    UnexpectedError(TestError<'a>),
+    UnexpectedError(TestError),
     /// Execution completed successfully, when the test expected an error.
     UnexpectedSuccess(ErrorExpectation<'a>, IStack<'a>),
     /// Expected one error, but got another.
-    ExpectedDifferentError(Box<(ErrorExpectation<'a>, TestError<'a>)>),
+    ExpectedDifferentError(Box<(ErrorExpectation<'a>, TestError)>),
 }
 
 impl fmt::Display for TztTestError<'_> {
@@ -699,17 +699,17 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
 /// This represents possibilities in which the execution of
 /// the code in a test can fail.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum TestError<'a> {
+pub enum TestError {
     /// Error happened during typechecking.
     #[error(transparent)]
     TypecheckerError(#[from] TcError),
     /// Error happened during interpretation.
     #[error(transparent)]
-    InterpreterError(InterpretError<'a>),
+    InterpreterError(InterpretError),
 }
 
-impl<'a> From<InterpretError<'a>> for TestError<'a> {
-    fn from(x: InterpretError<'a>) -> Self {
+impl From<InterpretError> for TestError {
+    fn from(x: InterpretError) -> Self {
         Self::InterpreterError(x)
     }
 }
@@ -814,7 +814,7 @@ fn execute_tzt_test_code<'a>(
     arena: &'a Arena<Micheline<'a>>,
     m_parameter: Option<Entrypoints>,
     input: Vec<(Type, TypedValue<'a>)>,
-) -> Result<(FailingTypeStack, IStack<'a>), TestError<'a>> {
+) -> Result<(FailingTypeStack, IStack<'a>), TestError> {
     // Build initial stacks (type and value) for running the test from the test input
     // stack.
     let (typs, vals): (Vec<Type>, Vec<TypedValue>) = input.into_iter().unzip();

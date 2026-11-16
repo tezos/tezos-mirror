@@ -42,7 +42,7 @@ use crate::typechecker::{
 
 /// Errors possible during interpretation.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum InterpretError<'a> {
+pub enum InterpretError {
     /// Interpreter ran out of gas.
     #[error("Gas_exhaustion")]
     OutOfGas,
@@ -55,9 +55,17 @@ pub enum InterpretError<'a> {
     /// During a type conversion, a negative mutez was found.
     #[error("negative mutez")]
     NegativeMutez,
-    /// Interpreter reached a `FAILWITH` instruction.
-    #[error("failed with: {1:?} of type {0:?}")]
-    FailedWith(Type, RcTypedValue<'a>),
+    /// Interpreter reached a `FAILWITH` instruction. Carries the type of the
+    /// failed value and its binary Micheline, unparsed in optimized legacy
+    /// mode. L1 unparses it in `Optimized` mode instead, so combs of 4 or
+    /// more elements differ (see https://linear.app/tezos/issue/L2-2260).
+    #[error("script reached FAILWITH instruction")]
+    FailedWith {
+        /// Type of the value raised by FAILWITH
+        ty: MichelineBytes,
+        /// Value raised by FAILWITH
+        with: MichelineBytes,
+    },
     /// Encountered an argument outside of the bounds defined in the documentation. We keep the message prompted by the octez implementaiton.
     #[error("Overflow")]
     Overflow,
@@ -118,7 +126,7 @@ pub enum InterpretError<'a> {
     AddressRegistryError(crate::context::AddressRegistryError),
 }
 
-impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
+impl From<crate::context::AddressRegistryError> for InterpretError {
     fn from(e: crate::context::AddressRegistryError) -> Self {
         use crate::context::AddressRegistryError;
         match e {
@@ -133,23 +141,38 @@ impl<'a> From<crate::context::AddressRegistryError> for InterpretError<'a> {
     }
 }
 
-/// The `FailedWith` payload is held behind a shared `Rc`, so this `Drop` must
-/// not mutate a value that other holders still see. It drains the deep spine
-/// in place — severing a `LOOP`/`PAIR`-built comb so the derived destructor
-/// cannot recurse and overflow the kernel's Rust stack — only when the error
-/// uniquely owns the value (`Rc::get_mut`). A still-shared value is dropped as
-/// a plain refcount decrement and torn down later by its last owner's own
-/// iterative `TypedValue` `Drop`.
-///
-/// The impl also forbids partial-move destructuring of `InterpretError`; every
-/// match site consumes the error by reference.
-impl<'a> Drop for InterpretError<'a> {
-    fn drop(&mut self) {
-        if let InterpretError::FailedWith(_, v) = self {
-            v.drain_if_unique();
+/// The binary Micheline of a value. Its `Display` and `Debug` both render it
+/// as hex, one byte at a time, so that a bounded sink (see
+/// [`crate::bounded_fmt`]) stops the render early.
+#[derive(Clone, PartialEq, Eq)]
+pub struct MichelineBytes(pub Vec<u8>);
+
+impl std::fmt::Display for MichelineBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("0x")?;
+        for byte in &self.0 {
+            write!(f, "{byte:02x}")?;
         }
+        Ok(())
     }
 }
+
+impl std::fmt::Debug for MichelineBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+/// The string "FAILWITH value too large" in binary Micheline: the string tag,
+/// the 4-byte length (24), then the UTF-8 bytes. A `FAILWITH` reports it in
+/// place of its value when the binary Micheline of the value and of its type
+/// takes more than [`crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES`].
+pub const FAILWITH_PLACEHOLDER_BYTES: &[u8] =
+    b"\x01\x00\x00\x00\x18FAILWITH value too large";
+
+/// The binary Micheline of the type `string`: the tag of a primitive without
+/// arguments, then the code of `string`.
+pub const FAILWITH_PLACEHOLDER_TYPE_BYTES: &[u8] = &[0x03, 0x68];
 
 /// Categorises invariant violations reachable only on a typechecker bug or
 /// malformed Micheline that bypassed typechecking. Mirrors
@@ -206,7 +229,7 @@ pub enum EnshrinedViewDispatchError {
     UnclassifiableResponse { status: u16 },
 }
 
-impl InterpretError<'_> {
+impl InterpretError {
     /// Whether this error is a resource exhaustion, see
     /// [TcError::is_out_of_gas], including the exhaustions nested in a
     /// typechecking or lazy storage error.
@@ -223,7 +246,7 @@ impl InterpretError<'_> {
     }
 }
 
-impl ContractInterpretError<'_> {
+impl ContractInterpretError {
     /// Whether this error is a resource exhaustion, see
     /// [TcError::is_out_of_gas].
     pub fn is_out_of_gas(&self) -> bool {
@@ -235,13 +258,13 @@ impl ContractInterpretError<'_> {
     }
 }
 
-impl<'a> From<OutOfGas> for InterpretError<'a> {
+impl From<OutOfGas> for InterpretError {
     fn from(_: OutOfGas) -> Self {
         InterpretError::OutOfGas
     }
 }
 
-impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
+impl From<BorrowedUnparseError> for InterpretError {
     fn from(error: BorrowedUnparseError) -> Self {
         match error {
             BorrowedUnparseError::OutOfGas => InterpretError::OutOfGas,
@@ -259,7 +282,7 @@ impl<'a> From<BorrowedUnparseError> for InterpretError<'a> {
     }
 }
 
-impl<'a> From<SigCostError> for InterpretError<'a> {
+impl From<SigCostError> for InterpretError {
     fn from(e: SigCostError) -> Self {
         match e {
             SigCostError::Crypto(err) => err.into(),
@@ -270,21 +293,21 @@ impl<'a> From<SigCostError> for InterpretError<'a> {
 
 /// Errors possible when interpreting a full contract script.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ContractInterpretError<'a> {
+pub enum ContractInterpretError {
     /// Failed to typecheck the provided input as the type expected by the
     /// script.
     #[error("failed typechecking input: {0}")]
     TcError(#[from] crate::typechecker::TcError),
     /// Failed during the interpretation of the script code.
     #[error("runtime failure while running the script: {0}")]
-    InterpretError(InterpretError<'a>),
+    InterpretError(InterpretError),
     /// Failed during lazy storage manipulation
     #[error(transparent)]
     LazyStorageError(#[from] LazyStorageError),
 }
 
-impl<'a> From<InterpretError<'a>> for ContractInterpretError<'a> {
-    fn from(x: InterpretError<'a>) -> Self {
+impl From<InterpretError> for ContractInterpretError {
+    fn from(x: InterpretError) -> Self {
         Self::InterpretError(x)
     }
 }
@@ -307,7 +330,7 @@ impl<'a> ContractScript<'a> {
         parameter_allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
     ) -> Result<
         (impl Iterator<Item = OperationInfo<'a>>, RcTypedValue<'a>),
-        ContractInterpretError<'a>,
+        ContractInterpretError,
     > {
         let wrapped_parameter = self.wrap_parameter(
             arena,
@@ -324,10 +347,10 @@ impl<'a> ContractScript<'a> {
 
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
-        // The interpreter has already drained the restored caller stack
-        // and the embedded `FailedWith` value on the error path (see
-        // `fn interpret`), so the `?` propagation here is safe regardless
-        // of how deep the runtime-built values were (L2-1446).
+        // The interpreter has already drained the restored caller stack on
+        // the error path (see `fn interpret`), and the `FailedWith` payload
+        // holds bytes, so the `?` propagation here is safe regardless of how
+        // deep the runtime-built values were (L2-1446).
         self.code.interpret(ctx, arena, &mut stack)?;
 
         use TypedValue as V;
@@ -529,7 +552,7 @@ impl<'a> Instruction<'a> {
         ctx: &mut impl CtxTrait<'a>,
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
-    ) -> Result<(), InterpretError<'a>> {
+    ) -> Result<(), InterpretError> {
         // Unwrap a top-level `Seq` so its body forms the outermost block,
         // matching the recursive `interpret_one(Seq) -> interpret(body)`:
         // both charge exactly one `INTERPRET_RET` (L1 `KNil`). Wrapping the
@@ -665,7 +688,7 @@ fn interpret<'a, 'b>(
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
-) -> Result<(), InterpretError<'a>> {
+) -> Result<(), InterpretError> {
     // Keep-alive storage for runtime (`EXEC`/`VIEW`) lambda bodies: holding
     // each body `Rc` for the whole run lets the driver borrow every nested
     // sub-block as a plain sub-slice. Deep-cloning sub-blocks instead
@@ -876,7 +899,7 @@ fn drain_value_frames(frames: Vec<InterpFrame<'_, '_>>) {
 /// driver invariant violation rather than a Michelson-level error.
 fn active_stack_mut<'a, 'c>(
     stacks: &'c mut [IStack<'a>],
-) -> Result<&'c mut IStack<'a>, InterpretError<'a>> {
+) -> Result<&'c mut IStack<'a>, InterpretError> {
     stacks.last_mut().ok_or(InterpretError::InternalError(
         InterpretInvariant::UnreachableState,
     ))
@@ -885,7 +908,7 @@ fn active_stack_mut<'a, 'c>(
 /// Pop a value off a sub stack, turning an empty stack into the structured
 /// `EmptyValueStackPop` invariant (the recursive interpreter relied on
 /// typechecking having ensured the value was present).
-fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<RcTypedValue<'a>, InterpretError<'a>> {
+fn pop_value<'a>(stk: &mut IStack<'a>) -> Result<RcTypedValue<'a>, InterpretError> {
     stk.pop().ok_or(InterpretError::InternalError(
         InterpretInvariant::EmptyValueStackPop,
     ))
@@ -944,7 +967,7 @@ fn run_done_until<'a, 'b>(
     stack: &mut IStack<'a>,
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
-) -> Result<Option<StepResult<'a, 'b>>, InterpretError<'a>> {
+) -> Result<Option<StepResult<'a, 'b>>, InterpretError> {
     loop {
         if *idx >= instrs.len() {
             ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
@@ -965,7 +988,7 @@ fn run_interp_driver<'a, 'b>(
     body_arena: &'b Arena<Rc<[Instruction<'a>]>>,
     stacks: &mut Vec<IStack<'a>>,
     frames: &mut Vec<InterpFrame<'a, 'b>>,
-) -> Result<(), InterpretError<'a>> {
+) -> Result<(), InterpretError> {
     while let Some(frame) = frames.pop() {
         match frame {
             InterpFrame::NextInstr { block, mut idx } => {
@@ -1200,7 +1223,7 @@ fn handle_step<'a, 'b>(
     stacks: &mut Vec<IStack<'a>>,
     frames: &mut Vec<InterpFrame<'a, 'b>>,
     body_arena: &'b Arena<Rc<[Instruction<'a>]>>,
-) -> Result<(), InterpretError<'a>> {
+) -> Result<(), InterpretError> {
     match step {
         StepResult::Done => {}
         StepResult::OpenBlock(body) => {
@@ -1379,11 +1402,11 @@ fn handle_step<'a, 'b>(
 /// `Ok(false)` on a genuine type mismatch (the caller pushes `None`, like
 /// L1's `return_none`), and `Err` for gas exhaustion / cost overflow, which
 /// abort the operation like L1 rather than collapsing into a `None` push.
-fn view_ty_eq<'a>(
+fn view_ty_eq(
     gas: &mut crate::gas::Gas,
     ty1: &Type,
     ty2: &Type,
-) -> Result<bool, InterpretError<'a>> {
+) -> Result<bool, InterpretError> {
     use crate::typechecker::TcError;
     match crate::typechecker::ensure_ty_eq(gas, ty1, ty2) {
         Ok(()) => Ok(true),
@@ -1403,7 +1426,7 @@ fn interpret_step<'a, 'b>(
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
-) -> Result<StepResult<'a, 'b>, InterpretError<'a>> {
+) -> Result<StepResult<'a, 'b>, InterpretError> {
     use Instruction as I;
     use TypedValue as V;
 
@@ -1766,7 +1789,7 @@ pub const MAX_INTERNAL_OPERATIONS: u128 = 65_535;
 /// through it, including those outside the interpreter.
 pub fn fresh_operation_counter<'a>(
     ctx: &mut impl CtxTrait<'a>,
-) -> Result<u128, InterpretError<'a>> {
+) -> Result<u128, InterpretError> {
     let counter = ctx.operation_counter();
     if counter >= MAX_INTERNAL_OPERATIONS {
         return Err(InterpretError::TooManyInternalOperations);
@@ -1779,7 +1802,7 @@ fn interpret_one<'a>(
     ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
-) -> Result<(), InterpretError<'a>> {
+) -> Result<(), InterpretError> {
     use Instruction as I;
     use TypedValue as V;
 
@@ -2675,9 +2698,31 @@ fn interpret_one<'a>(
             stack.swap(0, 1)?;
         }
         I::Failwith(ty) => {
-            // `pop_rc!` keeps the value shared instead of deep-copying it.
-            let x = pop_rc!();
-            return Err(InterpretError::FailedWith(ty.clone(), x));
+            // The failed value is unparsed and encoded at the expense of the
+            // operation gas, as L1 does. `pop_rc!` + borrowed unparse: read
+            // the value through its shared `Rc` instead of deep-copying it.
+            let with = pop_rc!()
+                .clone_into_micheline_optimized_legacy(arena, ctx.gas(), None)?
+                .encode(ctx.gas())??;
+            let ty = ty
+                .into_micheline_optimized_legacy(arena, ctx.gas())?
+                .encode(ctx.gas())??;
+            // Above the cap, the error carries a small placeholder of type
+            // `string` instead, so that a large value does not make a large
+            // receipt. L1 has no such cap, see the `FAILWITH` divergence in
+            // `DESIGN.md`.
+            if with.len().saturating_add(ty.len())
+                > crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
+            {
+                return Err(InterpretError::FailedWith {
+                    ty: MichelineBytes(FAILWITH_PLACEHOLDER_TYPE_BYTES.to_vec()),
+                    with: MichelineBytes(FAILWITH_PLACEHOLDER_BYTES.to_vec()),
+                });
+            }
+            return Err(InterpretError::FailedWith {
+                ty: MichelineBytes(ty),
+                with: MichelineBytes(with),
+            });
         }
         I::Never => {
             return Err(InterpretError::InternalError(
@@ -3524,7 +3569,7 @@ fn interpret_one<'a>(
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let pairs: Vec<(&bls::G1, &bls::G2)> = list
                 .iter()
-                .map(|elt| -> Result<_, InterpretError<'a>> {
+                .map(|elt| -> Result<_, InterpretError> {
                     let (g1, g2) = match elt.as_ref() {
                         V::Pair(g1, g2) => (g1, g2),
                         _ => {
@@ -3623,7 +3668,7 @@ pub fn compute_contract_address(
 fn get_nth_field_slot_mut<'a, 'b>(
     mut m: u16,
     mut slot: &'a mut RcTypedValue<'b>,
-) -> Result<&'a mut RcTypedValue<'b>, InterpretError<'b>> {
+) -> Result<&'a mut RcTypedValue<'b>, InterpretError> {
     use TypedValue as V;
     loop {
         if m == 0 {
@@ -3665,7 +3710,7 @@ fn get_nth_field_slot_mut<'a, 'b>(
 fn get_nth_field_rc<'b>(
     mut m: u16,
     mut val: &RcTypedValue<'b>,
-) -> Result<RcTypedValue<'b>, InterpretError<'b>> {
+) -> Result<RcTypedValue<'b>, InterpretError> {
     use TypedValue as V;
     loop {
         match (m, &**val) {
@@ -3718,7 +3763,7 @@ mod interpreter_tests {
         ast: &[Instruction<'a>],
         ctx: &mut impl CtxTrait<'a>,
         stack: &mut IStack<'a>,
-    ) -> Result<(), InterpretError<'a>> {
+    ) -> Result<(), InterpretError> {
         let temp = Box::leak(Box::default());
         super::interpret(ast, ctx, temp, stack)
     }
@@ -3727,7 +3772,7 @@ mod interpreter_tests {
         i: &Instruction<'a>,
         ctx: &mut impl CtxTrait<'a>,
         stack: &mut IStack<'a>,
-    ) -> Result<(), InterpretError<'a>> {
+    ) -> Result<(), InterpretError> {
         let temp = Box::leak(Box::default());
         super::interpret_one(i, ctx, temp, stack)
     }
@@ -3849,33 +3894,43 @@ mod interpreter_tests {
         );
     }
 
-    /// L2-1837: `FAILWITH` on a shared value must embed it behind its `Rc`,
-    /// not deep-copy it. A `DUP` leaves the operand shared (refcount 2); pre-
-    /// fix `FAILWITH` popped with `pop!` -> `unwrap_or_clone`, deep-cloning the
-    /// whole `~SIZE`-byte value into a second allocation — enough coexisting
-    /// copies exceed the 4 GiB wasm heap and trap the kernel. Post-fix
-    /// `FAILWITH` pops with `pop_rc!`, so the allocation is O(1) in `SIZE`.
-    /// The bound is far below `SIZE`, so a linear deep copy fails it while
-    /// the shared-`Rc` path passes.
+    /// L2-1837: `FAILWITH` on a shared value must not allocate more than it
+    /// pays for. A `DUP` leaves the operand shared (refcount 2); pre-fix
+    /// `FAILWITH` popped with `pop!` -> `unwrap_or_clone`, deep-cloning the
+    /// whole `~SIZE`-byte value into a second allocation for free — enough
+    /// coexisting copies exceed the 4 GiB wasm heap and trap the kernel.
+    /// `FAILWITH` now unparses and encodes the value into the error payload,
+    /// which copies the leaf, but charges gas for each byte before copying
+    /// it. So the allocation stays bounded by the charged gas.
     #[test]
-    fn failwith_shared_value_is_not_deep_copied() {
-        const SIZE: usize = 16 * 1024 * 1024; // 16 MiB leaf value
+    fn failwith_shared_value_allocates_in_line_with_charged_gas() {
+        // 1 MiB leaf value: its unparsing and encoding cost well under the
+        // default gas limit.
+        const SIZE: usize = 1024 * 1024;
         let mut stack = stk![V::Bytes(vec![0u8; SIZE])];
         let mut ctx = Ctx::default();
-        // DUP shares the operand; FAILWITH then embeds the (still shared)
-        // value in the error. Built before measuring so only interpretation
-        // is counted.
+        // DUP shares the operand; FAILWITH then unparses and encodes the
+        // (still shared) value into the error. Built before measuring so only
+        // interpretation is counted.
         let prog = [Dup(None), Failwith(Type::Bytes)];
+        let gas_before = ctx.gas().milligas().unwrap();
         let bytes_before = thread_allocated_bytes();
         let outcome = interpret(&prog, &mut ctx, &mut stack);
         let allocated = thread_allocated_bytes() - bytes_before;
-        assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+        let charged = u64::from(gas_before - ctx.gas().milligas().unwrap());
+        assert!(matches!(outcome, Err(InterpretError::FailedWith { .. })));
+        // Fixed allocations of the run (frames, payload node), independent
+        // of `SIZE`.
+        const OVERHEAD: u64 = 16 * 1024;
+        // Unparsing and encoding each charge 10 mg per byte and copy the
+        // byte once, so a byte is allocated per 10 mg charged. An extra
+        // uncharged deep copy adds `SIZE` bytes and fails the bound.
+        let bound = charged / 10 + OVERHEAD;
         assert!(
-            allocated < (SIZE as u64) / 8,
+            allocated <= bound,
             "FAILWITH on a shared {SIZE}-byte value allocated {allocated} bytes \
-             (bound {}): the shared operand was deep-copied instead of being \
-             held behind its Rc.",
-            SIZE / 8,
+             for {charged} milligas (bound {bound}): the operand was copied more \
+             than its charged unparsing and encoding pay for.",
         );
         // Keep both alive until after the measurement, then drop explicitly.
         drop(outcome);
@@ -4000,7 +4055,7 @@ mod interpreter_tests {
         // (a) Top-level FAILWITH: the caller's bottom stack is preserved.
         let mut top = stk![marker.clone(), V::int(7)];
         let r1 = interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut top);
-        assert!(matches!(r1, Err(InterpretError::FailedWith(..))));
+        assert!(matches!(r1, Err(InterpretError::FailedWith { .. })));
         assert_eq!(top, stk![marker.clone()]);
 
         // (b) Same FAILWITH reached from inside an EXEC sub-computation: the
@@ -4015,7 +4070,7 @@ mod interpreter_tests {
             V::int(7)
         ];
         let r2 = interpret(&[Exec], &mut Ctx::default(), &mut nested);
-        assert!(matches!(r2, Err(InterpretError::FailedWith(..))));
+        assert!(matches!(r2, Err(InterpretError::FailedWith { .. })));
         assert_eq!(nested, stk![marker]);
     }
 
@@ -4075,7 +4130,7 @@ mod interpreter_tests {
                 stack.push(RcTypedValue::new(V::int(42)));
                 let outcome =
                     interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
-                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                assert!(matches!(outcome, Err(InterpretError::FailedWith { .. })));
                 drop(outcome);
                 drop(stack);
             })
@@ -4086,56 +4141,58 @@ mod interpreter_tests {
 
     /// Regression (L2-1705 / F-1566): a `{ DUP; DUP; PAIR }` loop builds a
     /// shared-pointer DAG of `K + 1` heap nodes for `O(K)` gas, but its
-    /// *unfolded* form is `2^(K+1) - 1` nodes. `FAILWITH` embeds that value
-    /// and the error text renders it through the (sharing-unaware) `Debug`
-    /// walk, so rendering it unbounded materialises `2^K` bytes — a kernel
-    /// OOM for a fraction of a tez. Rendering through the byte-bounded
-    /// writer must abort the walk at the ceiling instead, on both the
-    /// `Display` (native receipt / CRAC) and `Debug` (view) sinks. Built
-    /// directly via shared `Rc::clone` to match the runtime shape without
-    /// actually paying `2^K` to construct it.
+    /// *unfolded* form is `2^(K+1) - 1` nodes. `FAILWITH` unparses its value
+    /// into the error and pays gas for each unfolded node, so it runs out of
+    /// gas instead of materialising `2^K` nodes. Built directly via shared
+    /// `Rc::clone` to match the runtime shape without actually paying `2^K`
+    /// to construct it.
     #[test]
-    fn failwith_exponential_value_renders_bounded() {
-        use crate::bounded_fmt::{
-            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
-            TRUNCATION_SUFFIX,
-        };
-
-        // K=64 ⇒ 2^65 unfolded nodes: rendering this unbounded is
-        // physically impossible (it would never terminate / would OOM), so
-        // a passing assertion proves the walk was actually cut short.
+    fn failwith_exponential_value_runs_out_of_gas() {
+        // K=64 ⇒ 2^65 unfolded nodes: unparsing this unbounded is physically
+        // impossible (it would never terminate / would OOM), so a passing
+        // assertion proves the unparsing was actually cut short.
         const K: usize = 64;
         let mut node = RcTypedValue::new(V::int(0));
         for _ in 0..K {
             node = RcTypedValue::new(V::new_pair_rc(node.clone(), node.clone()));
         }
-        // O(1) clones of the shared DAG root (two refcount bumps each).
-        let value = (*node).clone();
+        let mut stack = stk![(*node).clone()];
+        assert_eq!(
+            interpret_one(&Failwith(Type::Int), &mut Ctx::default(), &mut stack),
+            Err(InterpretError::OutOfGas)
+        );
+    }
+
+    /// The `Debug` text of `FAILWITH` renders its payload, whose size is only
+    /// bounded by gas. Rendering through the byte-bounded writer must stop at
+    /// the ceiling on the `Debug` (view) sink. The `Display` text (native
+    /// receipt / CRAC) does not show the payload.
+    #[test]
+    fn failwith_large_value_renders_bounded() {
+        use crate::bounded_fmt::{
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
+        };
+
+        let payload = MichelineBytes(vec![0; CAP]);
+        // `int` in binary Micheline.
+        let int_ty = MichelineBytes(vec![0x03, 0x5b]);
 
         // Display sink (native failed-operation receipt / CRAC BadRequest),
         // through the full `ContractInterpretError` Display chain.
-        let cie = ContractInterpretError::from(InterpretError::FailedWith(
-            Type::Int,
-            RcTypedValue::new(value.clone()),
-        ));
-        let rendered = display_bounded(&cie, CAP);
-        assert!(
-            rendered.len() <= CAP + TRUNCATION_SUFFIX.len(),
-            "display render must be bounded, got {} bytes",
-            rendered.len()
-        );
-        assert!(
-            rendered.ends_with(TRUNCATION_SUFFIX),
-            "must be marked truncated"
-        );
-        assert!(
-            rendered.starts_with("runtime failure while running the script:"),
-            "prefix preserved up to the cap: {}",
-            &rendered[..rendered.len().min(60)]
+        let cie = ContractInterpretError::from(InterpretError::FailedWith {
+            ty: int_ty.clone(),
+            with: payload.clone(),
+        });
+        assert_eq!(
+            cie.to_string(),
+            "runtime failure while running the script: script reached FAILWITH instruction"
         );
 
         // Debug sink (view path `classify_interpret_error` default arm).
-        let err = InterpretError::FailedWith(Type::Int, RcTypedValue::new(value));
+        let err = InterpretError::FailedWith {
+            ty: int_ty,
+            with: payload,
+        };
         let rendered_dbg = debug_bounded(&err, CAP);
         assert!(
             rendered_dbg.len() <= CAP + TRUNCATION_SUFFIX.len(),
@@ -4177,7 +4234,7 @@ mod interpreter_tests {
                 let mut stack: IStack = stk![deep, marker.clone()];
                 let outcome =
                     interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
-                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                assert!(matches!(outcome, Err(InterpretError::FailedWith { .. })));
                 // In-place drain preserves stack length and atomic values;
                 // the marker is still observable post-Err. The deep value
                 // is structurally flattened; only its variant tag remains.
@@ -4190,15 +4247,12 @@ mod interpreter_tests {
             .expect("worker thread completes");
     }
 
-    /// Regression: `FAILWITH` of a deep runtime-built value embeds the value
-    /// in `InterpretError::FailedWith(_, TypedValue<'a>)`. Pre-fix the
-    /// resulting `Err` propagates through `fn interpret`'s leftover-stack /
-    /// frame drain — both of which target the value *stack*, not the error
-    /// variant — and lands at the caller's `drop` site with the deep value
-    /// still recursive. The auto-derived `TypedValue` destructor overflows
-    /// the kernel's ~1 MiB Rust stack. Drain the embedded value at the
-    /// driver-error boundary so `Err` propagation is safe for any caller
-    /// (L2-1446 + the multi-agent review BLOCKER).
+    /// Regression: `FAILWITH` of a deep runtime-built value must not overflow
+    /// the kernel's ~1 MiB Rust stack. Pre-fix, the error embedded the value
+    /// itself, and its auto-derived `TypedValue` destructor recursed when the
+    /// `Err` was dropped (L2-1446). Now `FAILWITH` unparses and encodes the
+    /// value into flat bytes, so this checks that the unparsing, the encoding
+    /// and the drop of the error stay iterative.
     #[test]
     fn failwith_with_deep_value_does_not_overflow_on_drop() {
         const DEPTH: usize = 100_000;
@@ -4212,7 +4266,7 @@ mod interpreter_tests {
                 let mut stack: IStack = stk![deep];
                 let outcome =
                     interpret(&[Failwith(Type::Int)], &mut Ctx::default(), &mut stack);
-                assert!(matches!(outcome, Err(InterpretError::FailedWith(..))));
+                assert!(matches!(outcome, Err(InterpretError::FailedWith { .. })));
                 drop(outcome);
             })
             .unwrap()
@@ -6398,11 +6452,150 @@ mod interpreter_tests {
                 &mut Ctx::default(),
                 &mut stk![V::nat(20)]
             ),
-            Err(InterpretError::FailedWith(
-                Type::Nat,
-                RcTypedValue::new(V::nat(20))
-            ))
+            // `20` in binary Micheline: the integer tag, then its zarith. Its
+            // type `nat`: the tag of a primitive without arguments, then the
+            // code of `nat`.
+            Err(InterpretError::FailedWith {
+                ty: MichelineBytes(vec![0x03, 0x62]),
+                with: MichelineBytes(vec![0x00, 0x14])
+            })
         );
+    }
+
+    /// When the binary Micheline of the value and of its type takes more than
+    /// the cap, `FAILWITH` reports a placeholder of type `string` instead of
+    /// the value. At the cap, it reports the value.
+    #[test]
+    fn failwith_above_the_cap_reports_a_placeholder() {
+        let encode = |m: Micheline| m.encode(&mut Gas::default()).unwrap().unwrap();
+        let bytes_ty = encode(Micheline::prim0_uncarbonated(Prim::bytes));
+        let run = |len: usize| {
+            interpret_one(
+                &Failwith(Type::Bytes),
+                &mut Ctx::default(),
+                &mut stk![V::Bytes(vec![0xab; len])],
+            )
+            .unwrap_err()
+        };
+        // The bytes value in binary Micheline: a tag, a 4-byte length, then
+        // the bytes.
+        let len =
+            crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES - bytes_ty.len() - 5;
+        assert_eq!(
+            run(len),
+            InterpretError::FailedWith {
+                ty: MichelineBytes(bytes_ty),
+                with: MichelineBytes(encode(Micheline::Bytes(vec![0xab; len]))),
+            }
+        );
+        assert_eq!(
+            run(len + 1),
+            InterpretError::FailedWith {
+                ty: MichelineBytes(FAILWITH_PLACEHOLDER_TYPE_BYTES.to_vec()),
+                with: MichelineBytes(FAILWITH_PLACEHOLDER_BYTES.to_vec()),
+            }
+        );
+    }
+
+    /// The constant bytes of the `FAILWITH` placeholder are the binary
+    /// Micheline of the string "FAILWITH value too large" and of the type
+    /// `string`.
+    #[test]
+    fn failwith_placeholder_bytes_are_its_binary_micheline() {
+        let encode = |m: Micheline| m.encode(&mut Gas::default()).unwrap().unwrap();
+        assert_eq!(
+            FAILWITH_PLACEHOLDER_BYTES,
+            encode(Micheline::String("FAILWITH value too large".to_owned()))
+        );
+        assert_eq!(
+            FAILWITH_PLACEHOLDER_TYPE_BYTES,
+            encode(Micheline::prim0_uncarbonated(Prim::string))
+        );
+    }
+
+    /// BB-118: a `FAILWITH` on a large number must not convert it to decimal,
+    /// which is quadratic and not metered. The payload is the binary Micheline
+    /// of the number, encoded in linear time under gas, and the `Debug` text
+    /// of the error shows its hex, bounded by the render cap.
+    #[test]
+    fn failwith_large_number_is_not_rendered_in_decimal() {
+        use crate::bounded_fmt::{
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
+        };
+        // About 37 KiB of zarith: large enough for a slow decimal conversion,
+        // and below the cap above which FAILWITH reports a placeholder.
+        let n = BigUint::from(1u8) << (256 * 1024_usize);
+        // The types in binary Micheline: the tag of a primitive without
+        // arguments, then the code of `nat` or `int`.
+        for (ty, ty_bytes, v, i) in [
+            (
+                Type::Nat,
+                vec![0x03, 0x62],
+                V::Nat(n.clone()),
+                BigInt::from(n.clone()),
+            ),
+            (
+                Type::Int,
+                vec![0x03, 0x5b],
+                V::Int(-BigInt::from(n.clone())),
+                -BigInt::from(n),
+            ),
+        ] {
+            let err =
+                interpret_one(&Failwith(ty.clone()), &mut Ctx::default(), &mut stk![v])
+                    .unwrap_err();
+            let expected = Micheline::Int(i)
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                err,
+                InterpretError::FailedWith {
+                    ty: MichelineBytes(ty_bytes),
+                    with: MichelineBytes(expected),
+                }
+            );
+            let rendered = debug_bounded(&err, CAP);
+            assert!(
+                rendered.starts_with("FailedWith { ty: 0x"),
+                "{}",
+                &rendered[..rendered.len().min(80)]
+            );
+            assert!(rendered.len() <= CAP + TRUNCATION_SUFFIX.len());
+        }
+    }
+
+    /// Unparsing and encoding the `FAILWITH` payload are charged: with less
+    /// gas than they cost, `FAILWITH` returns `OutOfGas` instead of
+    /// `FailedWith`.
+    #[test]
+    fn failwith_out_of_gas_while_unparsing() {
+        let payload = || {
+            V::List(MichelsonList::from(
+                (0..1000).map(V::int).collect::<Vec<_>>(),
+            ))
+        };
+        let ty = Type::new_list(Type::Int);
+        let run = |milligas: u32| {
+            let mut ctx = Ctx::default();
+            ctx.gas = Gas::new(milligas);
+            let res =
+                interpret_one(&Failwith(ty.clone()), &mut ctx, &mut stk![payload()]);
+            (res, ctx.gas.milligas().unwrap_or(0))
+        };
+        let full = Gas::default().milligas().unwrap();
+        let (res, left) = run(full);
+        assert!(
+            matches!(res, Err(InterpretError::FailedWith { .. })),
+            "{res:?}"
+        );
+        let cost = full - left;
+        assert!(cost > 0, "unparsing the payload must be charged");
+        assert!(matches!(
+            run(cost).0,
+            Err(InterpretError::FailedWith { .. })
+        ));
+        assert_eq!(run(cost - 1).0, Err(InterpretError::OutOfGas));
     }
 
     #[test]

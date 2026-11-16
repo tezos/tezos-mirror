@@ -2057,7 +2057,7 @@ fn is_host_fault(err: &LazyStorageError) -> bool {
     )
 }
 
-impl From<ScriptError<'_>> for RunCodeError {
+impl From<ScriptError> for RunCodeError {
     fn from(err: ScriptError) -> Self {
         match err {
             ScriptError::OutOfGas(_) => Self::Execution(GAS_EXHAUSTED.to_string()),
@@ -2814,7 +2814,7 @@ fn apply_balance_changes(
 /// TODO: https://gitlab.com/tezos/tezos/-/issues/8003
 /// migrate [TransferError]'s remaining stringly sinks onto this type.
 #[derive(Debug, thiserror::Error)]
-enum ScriptError<'a> {
+enum ScriptError {
     /// Gas ran out outside interpretation and unparsing, which report
     /// their own exhaustion through [ScriptError::Interpret] and the
     /// unparse fold in [interpret_encoded_script].
@@ -2829,7 +2829,7 @@ enum ScriptError<'a> {
     /// Execution failed: `FAILWITH`, an ill-typed parameter or storage,
     /// gas, or a lazy-storage fault.
     #[error("script execution failed")]
-    Interpret(ContractInterpretError<'a>),
+    Interpret(#[from] ContractInterpretError),
     /// The resulting storage cannot be unparsed.
     #[error("resulting storage cannot be unparsed")]
     Unparse(BorrowedUnparseError),
@@ -2838,15 +2838,7 @@ enum ScriptError<'a> {
     Encode(#[from] tezos_data_encoding::enc::BinError),
 }
 
-/// Hand-written: `#[from]` refuses a non-`'static` source
-/// ([Error::source] must be `dyn Error + 'static`).
-impl<'a> From<ContractInterpretError<'a>> for ScriptError<'a> {
-    fn from(e: ContractInterpretError<'a>) -> Self {
-        Self::Interpret(e)
-    }
-}
-
-impl From<ScriptError<'_>> for TransferError {
+impl From<ScriptError> for TransferError {
     fn from(err: ScriptError) -> Self {
         match err {
             ScriptError::OutOfGas(e) => Self::OutOfGas(e),
@@ -2870,7 +2862,7 @@ fn interpret_encoded_script<'a>(
     parser: &'a Parser<'a>,
     ctx: &mut impl CtxTrait<'a>,
     allow_forged_lazy_storage_id: AllowForgedLazyStorageId,
-) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError<'a>> {
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, code, ctx.gas())??;
     let contract_typechecked =
@@ -3754,7 +3746,7 @@ mod tests {
                 "a FAILWITH is not a host failure: {err:?}"
             );
             assert!(
-                err.to_string().contains("boom"),
+                err.to_string().contains(&hex::encode("boom")),
                 "the failure value should survive into the message: {err}"
             );
         }
@@ -6353,26 +6345,42 @@ mod tests {
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
             receipt: OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result:  ContentResult::Failed(vec![
-                ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError(
-                "runtime failure while running the script: failed with: String(\"This contract always fails\") of type String".into()
-            )
-        )].into()),
-            internal_operation_results: vec![],
-            })}];
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![ApplyOperationError::Transfer(
+                        TransferError::MichelsonContractInterpretError(
+                            mir::interpreter::ContractInterpretError::InterpretError(
+                                mir::interpreter::InterpretError::FailedWith {
+                                    // The type `string` in binary Micheline.
+                                    ty: mir::interpreter::MichelineBytes(vec![
+                                        0x03, 0x68,
+                                    ]),
+                                    with: mir::interpreter::MichelineBytes(
+                                        Micheline::from("This contract always fails")
+                                            .encode(&mut Gas::default())
+                                            .unwrap()
+                                            .unwrap(),
+                                    ),
+                                },
+                            ),
+                        ),
+                    )]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
@@ -6401,6 +6409,88 @@ mod tests {
                 .unwrap(),
             "Storage should not have been updated"
         )
+    }
+
+    /// BB-118: the receipt of a transfer to a contract failing with a large
+    /// number carries the binary Micheline of the number, encoded in linear
+    /// time, and never its decimal form, whose computation is quadratic.
+    #[test]
+    fn apply_transfer_failing_with_large_number() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &src);
+
+        let large = num_bigint::BigUint::from(1u8) << 1000_usize;
+        let script = format!(
+            "parameter unit; storage unit; code {{ DROP; PUSH nat {large}; FAILWITH }}"
+        );
+        init_contract(&mut rk, &dest, &script, &Micheline::from(()), &0_u64.into());
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            1040,
+            5,
+            src,
+            0_u64.into(),
+            Contract::Originated(dest),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::default(),
+                value: Micheline::from(())
+                    .encode(&mut Gas::default())
+                    .unwrap()
+                    .unwrap(),
+            },
+        );
+
+        let processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &test_safe_roots(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        let receipt = ProcessedOperation::into_receipts(processed);
+
+        let OperationResultSum::Transfer(OperationResult { result, .. }) =
+            &receipt[0].receipt
+        else {
+            panic!("expected a transfer receipt, got {receipt:?}");
+        };
+        let with = Micheline::Int(large.into())
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            *result,
+            ContentResult::Failed(
+                vec![ApplyOperationError::Transfer(
+                    TransferError::MichelsonContractInterpretError(
+                        mir::interpreter::ContractInterpretError::InterpretError(
+                            mir::interpreter::InterpretError::FailedWith {
+                                // The type `nat` in binary Micheline.
+                                ty: mir::interpreter::MichelineBytes(vec![0x03, 0x62]),
+                                with: mir::interpreter::MichelineBytes(with),
+                            },
+                        ),
+                    )
+                )]
+                .into()
+            )
+        );
     }
 
     #[test]
@@ -14039,23 +14129,30 @@ mod tests {
         let (err_short, gas_short) = run_failwith_crac(N_SHORT, BUDGET);
         let (err_long, gas_long) = run_failwith_crac(N_LONG, BUDGET);
 
-        // Both should fail with an Operation-level error (MichelsonContractInterpretError).
-        assert!(
-            matches!(
-                err_short.error,
-                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
-            ),
-            "expected interpret error (short), got: {:?}",
-            err_short.error
-        );
-        assert!(
-            matches!(
-                err_long.error,
-                CracError::Operation(TransferError::MichelsonContractInterpretError(_))
-            ),
-            "expected interpret error (long), got: {:?}",
-            err_long.error
-        );
+        // Both should fail with an Operation-level error carrying the
+        // encoded FAILWITH value.
+        let assert_rejected = |error: &CracError, n: usize| {
+            let expected = Micheline::from("x".repeat(n))
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap();
+            assert!(
+                matches!(
+                    error,
+                    CracError::Operation(TransferError::MichelsonContractInterpretError(
+                        mir::interpreter::ContractInterpretError::InterpretError(
+                            mir::interpreter::InterpretError::FailedWith {
+                                with: mir::interpreter::MichelineBytes(with),
+                                ..
+                            },
+                        ),
+                    )) if *with == expected
+                ),
+                "expected the rejection of a {n}-byte string, got: {error:?}"
+            );
+        };
+        assert_rejected(&err_short.error, N_SHORT);
+        assert_rejected(&err_long.error, N_LONG);
 
         // Exact per-byte delta: encode both scripts to get their binary sizes,
         // then compute each contribution independently.
@@ -14103,13 +14200,33 @@ mod tests {
         let check_printable_delta = mir::gas::tc_cost::check_printable(N_LONG).unwrap()
             as u64
             - mir::gas::tc_cost::check_printable(N_SHORT).unwrap() as u64;
+        // Unparsing and encoding the FAILWITH value, charged on the operation
+        // as on L1.
+        let rejection_cost = |n: usize| {
+            let arena = Arena::new();
+            let mut gas = Gas::default();
+            let before = gas.milligas().unwrap();
+            TypedValue::String("x".repeat(n))
+                .clone_into_micheline_optimized_legacy(&arena, &mut gas, None)
+                .unwrap()
+                .encode(&mut gas)
+                .unwrap()
+                .unwrap();
+            u64::from(before - gas.milligas().unwrap())
+        };
+        let rejection_delta = rejection_cost(N_LONG) - rejection_cost(N_SHORT);
 
         assert_eq!(
             gas_long - gas_short,
-            storage_read_delta + decode_delta + metering_delta + check_printable_delta,
+            storage_read_delta
+                + decode_delta
+                + metering_delta
+                + check_printable_delta
+                + rejection_delta,
             "exact per-byte delta: storage_read({storage_read_delta}) \
              + decode({decode_delta}) + metering({metering_delta}) \
-             + check_printable({check_printable_delta})"
+             + check_printable({check_printable_delta}) \
+             + rejection({rejection_delta})"
         );
     }
 
@@ -14440,7 +14557,9 @@ mod tests {
         };
         // A bounded body must be much smaller than the N_LONG-byte payload.
         let long_payload_debug_len = ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError("x".repeat(N_LONG)),
+            TransferError::MichelsonContractInterpretError(
+                mir::typechecker::TcError::UnexpectedMicheline("x".repeat(N_LONG)).into(),
+            ),
         )
         .persisted_len();
         assert!(

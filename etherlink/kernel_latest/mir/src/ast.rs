@@ -751,10 +751,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
 ///    this when comparing `TypedValue` in client code. [PartialOrd] is safe to
 ///    use, it'll just return [None] for incomparable values.
 /// 3. `Debug` is implemented manually as an iterative tree walk so deeply
-///    nested values do not blow the WASM call stack when they appear in an
-///    error message. `InterpretError::FailedWith` carries a `TypedValue`
-///    via `{1:?}`, and the kernel formats those errors via
-///    `err.to_string()` outside MIR's gas accounting.
+///    nested values do not blow the WASM call stack when they are formatted.
 #[derive(Clone, Eq, PartialEq)]
 #[allow(missing_docs)]
 pub enum TypedValue<'a> {
@@ -964,9 +961,7 @@ mod test_rc_typed_value {
 }
 
 /// Iterative `Debug` so deeply nested values do not blow the WASM call
-/// stack when formatted for error output. `InterpretError::FailedWith`
-/// embeds a `TypedValue` via `{1:?}` and the kernel formats those errors
-/// with `err.to_string()` outside MIR's gas accounting.
+/// stack when formatted.
 ///
 /// Leaf variants delegate to the underlying type's `Debug` (`BigInt`,
 /// `BigUint`, `bool`, `String`, etc., none of which are recursive in the
@@ -1419,6 +1414,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     // representation of the reference implementation, because
                     // reference implementation optimizes the size of combs and uses
                     // an untyped representation that is the shortest.
+                    // FAILWITH values are thus not L1-compatible for combs of 4
+                    // or more elements, see https://linear.app/tezos/issue/L2-2260.
                     TV::Pair(l, r) => {
                         frames.push(TvImFrame::BuildPrim2(Prim::Pair));
                         frames
@@ -3651,9 +3648,8 @@ mod debug_tests {
         join.join().expect("worker thread completes");
     }
 
-    /// Same for `TypedValue`: `InterpretError::FailedWith` embeds a value via
-    /// `{1:?}` and a contract emitting `FAILWITH` with a runtime built deep
-    /// pair would otherwise trap the kernel during error formatting.
+    /// Same for `TypedValue`: formatting a runtime-built deep pair must not
+    /// overflow the stack.
     #[test]
     fn deeply_nested_typed_value_debug_format() {
         use std::thread;

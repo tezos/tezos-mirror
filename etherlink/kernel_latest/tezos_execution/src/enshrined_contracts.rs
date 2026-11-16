@@ -528,10 +528,9 @@ fn charge_persisted_bytes(
 /// (`test_crac_failwith_receipt_is_gas_bounded`). It is therefore kept at the
 /// per-byte rate rather than the ~145× cheaper EVM per-word crossing rate;
 /// the two were the same constant before L2-1726 and are now deliberately
-/// decoupled. The drop-time / observation-time overflow on a deep
-/// structurally-shared value is a separate rendering concern, closed by the
-/// iterative `Debug for TypedValue` and the `FailedWith` `Drop` drain
-/// (L2-1436 / L2-1446).
+/// decoupled. The rendering of a deep or structurally-shared `FAILWITH`
+/// payload is a separate concern: `FAILWITH` unparses and encodes it to
+/// binary Micheline under gas, and its error text is bounded.
 ///
 /// On success the **original** error is returned wrapped in
 /// [`CracError::Operation`] so the receipt body is unchanged.  On gas
@@ -1708,13 +1707,13 @@ const RESOLUTION_DERIVED_NAT: u64 = 1;
 /// covers the primary alias lookup and, for EVM sources, the code-presence
 /// back-stop when it fires — is converted back to milligas and charged
 /// to `operation_gas`. Callers do not pre-charge anything.
-fn classify_origin_for_view<'a, Host, R>(
+fn classify_origin_for_view<Host, R>(
     rk: &RuntimeKeyspaces<'_, Host>,
     registry: &R,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     source_runtime: RuntimeId,
     addr_str: &str,
-) -> Result<Classification, mir::interpreter::InterpretError<'a>>
+) -> Result<Classification, mir::interpreter::InterpretError>
 where
     Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -1775,7 +1774,7 @@ fn derive_alias_for_view<'a, Host, R>(
     source_runtime: RuntimeId,
     target_runtime: RuntimeId,
     basis: String,
-) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError>
 where
     Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -1821,21 +1820,23 @@ where
 /// - Alias   → `Right (Right (Pair (<home_runtime as nat>, <native_str>)))`
 ///
 /// On an invalid runtime ID (`source_runtime` does not map to a known
-/// [`RuntimeId`]), returns `Err(InterpretError::FailedWith(...))` with
-/// the Michelson payload `(Pair "INVALID_RUNTIME_ID" received_nat)`.
+/// [`RuntimeId`]), returns `Err(InterpretError::FailedWith { .. })` carrying
+/// the binary Micheline of `(Pair "INVALID_RUNTIME_ID" received_nat)` and of
+/// its type `pair string nat`.
 pub fn dispatch_origin_of_get<'a, Host, R>(
     rk: &RuntimeKeyspaces<'_, Host>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
     addr_str: &str,
     source_runtime_nat: &num_bigint::BigUint,
-) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError>
 where
     Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
 {
     // ── Runtime ID validation ────────────────────────────────────────────
-    let source_runtime = runtime_id_from_nat(source_runtime_nat)?;
+    let source_runtime =
+        runtime_id_from_nat(&mut operation_gas.remaining, source_runtime_nat)?;
 
     // ── Origin lookup (back-stop included inside classify_origin_for_view) ──
     let classification =
@@ -1860,7 +1861,7 @@ pub fn dispatch_resolve_address_get<'a, Host, R>(
     addr_str: &str,
     source_runtime_nat: &num_bigint::BigUint,
     target_runtime_nat: &num_bigint::BigUint,
-) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>>
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError>
 where
     Host: StorageV1 + KeySpaceLoader,
     R: tezosx_interfaces::Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -1874,8 +1875,10 @@ where
     // observability needs it.
 
     // ── Runtime ID validation ────────────────────────────────────────────
-    let source_runtime = runtime_id_from_nat(source_runtime_nat)?;
-    let target_runtime = runtime_id_from_nat(target_runtime_nat)?;
+    let source_runtime =
+        runtime_id_from_nat(&mut operation_gas.remaining, source_runtime_nat)?;
+    let target_runtime =
+        runtime_id_from_nat(&mut operation_gas.remaining, target_runtime_nat)?;
 
     // ── Same-source short-circuit ────────────────────────────────────────
     // No storage reads needed.  A malformed address still returns None.
@@ -1947,37 +1950,58 @@ where
 }
 
 /// Convert a Michelson nat to a [`RuntimeId`], returning
-/// `Err(InterpretError::FailedWith(...))` with a structured Michelson
+/// `Err(InterpretError::FailedWith { .. })` with a structured Michelson
 /// payload if the nat does not map to a known runtime.
 ///
 /// The FAILWITH payload is `(Pair "INVALID_RUNTIME_ID" received_nat)`,
 /// causing the caller's operation to revert with that value on-stack —
 /// standard Michelson FAILWITH semantics.
-fn runtime_id_from_nat<'a>(
+fn runtime_id_from_nat(
+    gas: &mut mir::gas::Gas,
     nat: &num_bigint::BigUint,
-) -> Result<RuntimeId, mir::interpreter::InterpretError<'a>> {
+) -> Result<RuntimeId, mir::interpreter::InterpretError> {
     use num_traits::ToPrimitive as _;
     let raw = nat
         .to_u64()
         .and_then(|n| u8::try_from(n).ok())
-        .ok_or_else(|| make_invalid_runtime_id_error(nat))?;
-    RuntimeId::try_from(raw).map_err(|_| make_invalid_runtime_id_error(nat))
+        .ok_or_else(|| make_invalid_runtime_id_error(gas, nat))?;
+    RuntimeId::try_from(raw).map_err(|_| make_invalid_runtime_id_error(gas, nat))
 }
 
 /// Build the `InterpretError::FailedWith` payload for an unrecognised
 /// runtime ID nat.  The Michelson type of the payload is
 /// `pair string nat`, consistent with how the EVM precompile's
-/// `InvalidRuntimeId(uint8)` error is displayed to callers.
-fn make_invalid_runtime_id_error<'a>(
+/// `InvalidRuntimeId(uint8)` error is displayed to callers. The payload and
+/// its type are unparsed and encoded at the expense of `gas`, as the
+/// interpreter does for `FAILWITH`.
+fn make_invalid_runtime_id_error(
+    gas: &mut mir::gas::Gas,
     received: &num_bigint::BigUint,
-) -> mir::interpreter::InterpretError<'a> {
-    mir::interpreter::InterpretError::FailedWith(
-        mir::ast::Type::new_pair(mir::ast::Type::String, mir::ast::Type::Nat),
-        RcTypedValue::new(TypedValue::new_pair(
-            TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
-            TypedValue::Nat(received.clone()),
-        )),
-    )
+) -> mir::interpreter::InterpretError {
+    use mir::ast::{IntoMicheline, Type};
+    use mir::interpreter::{InterpretError, MichelineBytes};
+    let failed_with =
+        |gas: &mut mir::gas::Gas| -> Result<InterpretError, InterpretError> {
+            let arena = typed_arena::Arena::new();
+            let value = TypedValue::new_pair(
+                TypedValue::String("INVALID_RUNTIME_ID".to_owned()),
+                TypedValue::Nat(received.clone()),
+            );
+            let with = value
+                .into_micheline_optimized_legacy(&arena, gas)?
+                .encode(gas)??;
+            let ty = Type::new_pair(Type::String, Type::Nat);
+            let ty = (&ty)
+                .into_micheline_optimized_legacy(&arena, gas)?
+                .encode(gas)??;
+            Ok(InterpretError::FailedWith {
+                ty: MichelineBytes(ty),
+                with: MichelineBytes(with),
+            })
+        };
+    match failed_with(gas) {
+        Ok(error) | Err(error) => error,
+    }
 }
 
 /// Encode an origin classification as the Michelson type
@@ -1989,7 +2013,7 @@ fn make_invalid_runtime_id_error<'a>(
 fn encode_origin_of<'a>(
     classification: Classification,
     source_runtime: RuntimeId,
-) -> Result<TypedValue<'a>, mir::interpreter::InterpretError<'a>> {
+) -> Result<TypedValue<'a>, mir::interpreter::InterpretError> {
     use mir::ast::or::Or;
     Ok(match classification {
         Classification::Unknown => {
@@ -2081,7 +2105,7 @@ fn is_cross_runtime_oog(status: http::StatusCode) -> bool {
 /// at call time, so it scales with the outer view's remaining
 /// budget rather than a hardcoded magic.
 #[allow(clippy::too_many_arguments)]
-pub fn dispatch_staticcall_evm_get<'a, Host, R>(
+pub fn dispatch_staticcall_evm_get<Host, R>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     operation_gas: &mut crate::gas::TezlinkOperationGas,
     registry: &R,
@@ -2094,7 +2118,7 @@ pub fn dispatch_staticcall_evm_get<'a, Host, R>(
     crac_chain_depth: u32,
     destination: &str,
     calldata: &[u8],
-) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'a>>
+) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError>
 where
     Host: StorageV1 + KeySpaceLoader,
     R: Registry<Journal = tezosx_journal::TezosXJournal>,
@@ -3713,7 +3737,7 @@ pub(crate) mod tests {
     // the response classifier with a generous gas budget.
     fn run_staticcall_evm_get(
         status: u16,
-    ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'static>> {
+    ) -> Result<Option<Vec<u8>>, mir::interpreter::InterpretError> {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let registry = MockRegistry::new("KT1_mock_alias".to_string())
@@ -3778,7 +3802,7 @@ pub(crate) mod tests {
         source: &PublicKeyHash,
         original_source: Option<OriginalSource>,
     ) -> (
-        Result<Option<Vec<u8>>, mir::interpreter::InterpretError<'static>>,
+        Result<Option<Vec<u8>>, mir::interpreter::InterpretError>,
         u64,
         String,
         String,
@@ -5106,8 +5130,14 @@ pub(crate) mod tests {
         ctx.operation_counter = mir::interpreter::MAX_INTERNAL_OPERATIONS;
         let result = dispatch_callback(&mut ctx, Some(make_test_address()), vec![]);
         assert!(
-            matches!(&result, Err(TransferError::MichelsonContractInterpretError(msg))
-                if msg.contains("too many internal operations")),
+            matches!(
+                &result,
+                Err(TransferError::MichelsonContractInterpretError(
+                    mir::interpreter::ContractInterpretError::InterpretError(
+                        mir::interpreter::InterpretError::TooManyInternalOperations
+                    )
+                ))
+            ),
             "got {result:?}"
         );
     }
@@ -5738,21 +5768,25 @@ pub(crate) mod tests {
             &num_bigint::BigUint::from(9u64), // 9 is not a valid RuntimeId
         );
         match result {
-            Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv.as_ref() else {
-                    panic!("expected Pair payload, got: {tv:?}")
-                };
-                assert!(
-                    matches!(msg.as_ref(), TypedValue::String(s) if s == "INVALID_RUNTIME_ID"),
-                    "expected INVALID_RUNTIME_ID message"
-                );
-                assert!(
-                    matches!(received.as_ref(), TypedValue::Nat(n) if *n == num_bigint::BigUint::from(9u64)),
-                    "expected received nat = 9"
-                );
+            Err(mir::interpreter::InterpretError::FailedWith { ref with, .. }) => {
+                assert_eq!(with.0, invalid_runtime_id_payload(9));
             }
             other => panic!("expected FailedWith INVALID_RUNTIME_ID, got: {other:?}"),
         }
+    }
+
+    /// The binary Micheline of `Pair "INVALID_RUNTIME_ID" received`, the
+    /// payload of the `FAILWITH` of an invalid runtime ID.
+    fn invalid_runtime_id_payload(received: u64) -> Vec<u8> {
+        use mir::ast::annotations::NO_ANNS;
+        let args = [
+            Micheline::from("INVALID_RUNTIME_ID"),
+            Micheline::Int(BigInt::from(received)),
+        ];
+        Micheline::App(Prim::Pair, &args, NO_ANNS)
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap()
     }
 
     // ── resolveAddress tests ───────────────────────────────────────────────
@@ -6068,18 +6102,8 @@ pub(crate) mod tests {
             &num_bigint::BigUint::from(1u64),
         );
         match result {
-            Err(mir::interpreter::InterpretError::FailedWith(_, ref tv)) => {
-                let TypedValue::Pair(msg, received) = tv.as_ref() else {
-                    panic!("expected Pair payload, got: {tv:?}")
-                };
-                assert!(
-                    matches!(msg.as_ref(), TypedValue::String(s) if s == "INVALID_RUNTIME_ID"),
-                    "expected INVALID_RUNTIME_ID message"
-                );
-                assert!(
-                    matches!(received.as_ref(), TypedValue::Nat(n) if *n == num_bigint::BigUint::from(99u64)),
-                    "expected received nat = 99"
-                );
+            Err(mir::interpreter::InterpretError::FailedWith { ref with, .. }) => {
+                assert_eq!(with.0, invalid_runtime_id_payload(99));
             }
             other => panic!("expected FailedWith INVALID_RUNTIME_ID, got: {other:?}"),
         }
@@ -6387,6 +6411,14 @@ pub(crate) mod tests {
             .expect("milligas within limit")
     }
 
+    /// A `MichelsonContractInterpretError` whose message ends with `len`
+    /// bytes, so that the test controls its size.
+    fn interpret_error(len: usize) -> TransferError {
+        TransferError::MichelsonContractInterpretError(
+            mir::typechecker::TcError::UnexpectedMicheline("x".repeat(len)).into(),
+        )
+    }
+
     /// A `MichelsonContractInterpretError` body is charged at the per-word
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
     /// stores the error once (on the synthetic alias(E_1)→target
@@ -6395,8 +6427,7 @@ pub(crate) mod tests {
     /// length of `ApplyOperationError::Transfer(error)`.
     #[test]
     fn charge_persisted_error_charges_per_byte() {
-        let msg = "x".repeat(10);
-        let err = TransferError::MichelsonContractInterpretError(msg.clone());
+        let err = interpret_error(10);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let expected_cost =
@@ -6408,7 +6439,7 @@ pub(crate) mod tests {
 
         // Original error is returned on success.
         assert!(
-            matches!(result, CracError::Operation(TransferError::MichelsonContractInterpretError(ref s)) if *s == msg),
+            matches!(result, CracError::Operation(ref e) if *e == interpret_error(10)),
             "expected original error returned, got: {result:?}"
         );
 
@@ -6422,11 +6453,8 @@ pub(crate) mod tests {
     /// A longer body costs proportionally more gas.
     #[test]
     fn charge_persisted_error_scales_with_length() {
-        let short_msg = "x".repeat(5);
-        let long_msg = "x".repeat(50);
-
-        let short_err = TransferError::MichelsonContractInterpretError(short_msg.clone());
-        let long_err = TransferError::MichelsonContractInterpretError(long_msg.clone());
+        let short_err = interpret_error(5);
+        let long_err = interpret_error(50);
 
         // Persisted once in the receipt (alias→target internal op only).
         let short_len = short_err.persisted_len();
@@ -6459,8 +6487,7 @@ pub(crate) mod tests {
     /// the original error.
     #[test]
     fn charge_persisted_error_oog_returns_out_of_gas() {
-        let msg = "x".repeat(100);
-        let err = TransferError::MichelsonContractInterpretError(msg);
+        let err = interpret_error(100);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let cost = u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);

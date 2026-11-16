@@ -141,6 +141,9 @@ module type Tezlink_block_service = sig
   val mock_block_header_metadata :
     Tezos_types.level -> Proto.block_header_metadata tzresult
 
+  (** [deserialize_operations ~chain_id bytes] decodes the operations and
+      receipts of a block. The [tezosx.failwith] errors of the kernel are
+      decoded as L1's [michelson_v1.script_rejected]. *)
   val deserialize_operations :
     chain_id:Chain_id.t -> bytes -> operation list tzresult
 
@@ -324,6 +327,70 @@ let () =
     Data_encoding.(obj1 (req "error_msg" string))
     (function Deserialize_operations_header error -> Some error | _ -> None)
     (fun error -> Deserialize_operations_header error)
+
+(* The kernel cannot write nested bson objects, so it reports a [FAILWITH] as
+   the error [tezosx.failwith], whose [with] field is a string that holds the
+   binary Micheline of the failed value. The node registers this error in each
+   protocol and decodes it as L1's [michelson_v1.script_rejected], which the
+   RPCs serve with the failed value as a Micheline expression. MIR does not
+   track the location of the failure (L2-363), so the node reports
+   [Micheline.dummy_location]. The registered error is never used to encode
+   an error: [Reject] keeps its L1 encoding. *)
+
+(* [failwith_value_encoding expr_encoding] is the encoding of the failed value
+   as the kernel writes it. The bson reader keeps the bytes of a string as they
+   are, so the string holds the binary Micheline even when it is not valid
+   UTF-8. A string that is not a binary Micheline expression is rejected, so
+   the error falls back to an unregistered error. *)
+let failwith_value_encoding expr_encoding =
+  Data_encoding.conv_with_guard
+    (Data_encoding.Binary.to_string_exn expr_encoding)
+    (fun binary ->
+      match Data_encoding.Binary.of_string_opt expr_encoding binary with
+      | Some expr -> Ok expr
+      | None -> Error "not a binary Micheline expression")
+    Data_encoding.string
+
+let tezosx_failwith_id = "tezosx.failwith"
+
+let tezosx_failwith_title = "Script failed"
+
+let tezosx_failwith_description =
+  "A FAILWITH instruction was reached, as reported by the Tezos X kernel."
+
+let () =
+  TALLiN_env.Error_monad.register_error_kind
+    `Temporary
+    ~id:tezosx_failwith_id
+    ~title:tezosx_failwith_title
+    ~description:tezosx_failwith_description
+    Data_encoding.(
+      obj2
+        (req "ty" (failwith_value_encoding TALLiN_context.Script.expr_encoding))
+        (req
+           "with"
+           (failwith_value_encoding TALLiN_context.Script.expr_encoding)))
+    (fun _ -> None)
+    (fun (_ty, expr) ->
+      TALLiN_protocol.Script_interpreter.Reject
+        (Tezos_micheline.Micheline.dummy_location, expr, None))
+
+let () =
+  Ushuai_env.Error_monad.register_error_kind
+    `Temporary
+    ~id:tezosx_failwith_id
+    ~title:tezosx_failwith_title
+    ~description:tezosx_failwith_description
+    Data_encoding.(
+      obj2
+        (req "ty" (failwith_value_encoding Ushuai_context.Script.expr_encoding))
+        (req
+           "with"
+           (failwith_value_encoding Ushuai_context.Script.expr_encoding)))
+    (fun _ -> None)
+    (fun (_ty, expr) ->
+      Ushuai_protocol.Script_interpreter_errors.Reject
+        (Tezos_micheline.Micheline.dummy_location, expr, None))
 
 module Make_block_service
     (Proto : Tezlink_protocol)

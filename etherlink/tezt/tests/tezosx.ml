@@ -7392,19 +7392,18 @@ let test_michelson_address_registry_view_lambda () =
      view before the operation was reverted: index 0 is the pre-registered
      zero address, so the first fresh registration takes 1. This pins that
      the instruction did run and its durable write was then undone — rather
-     than never having happened. Tezlink receipts flatten errors into a
-     single {kind; id; error_message} object (L2-363), so unlike on L1 there
-     is no structured "with" field to read the rejection value from: look for
-     the interpreter's "failed with: Nat(1)" rendering instead. *)
-  let error_messages =
+     than never having happened. The rejection value is read from the [with]
+     field of the script rejection, as on L1. *)
+  let rejected_values =
     JSON.(operation_result |-> "errors" |> as_list)
-    |> List.map (fun err ->
-           JSON.(err |-> "error_message" |> as_string_opt)
-           |> Option.value ~default:(JSON.encode err))
-    |> String.concat "; "
+    |> List.filter_map (fun err -> JSON.(err |-> "with" |> as_opt))
+    |> List.map JSON.encode
   in
-  Check.(error_messages =~ rex "failed with: Nat\\(1\\)")
-    ~error_msg:"Expected the failure receipt (%L) to mention %R" ;
+  Check.(
+    (rejected_values = [JSON.encode_u (`O [("int", `String "1")])])
+      (list string)
+      ~__LOC__
+      ~error_msg:"Expected the operation to be rejected with %R, got %L") ;
   (* The reverted registration left no durable trace: no entry for the
      address... *)
   let* () =
@@ -7944,14 +7943,14 @@ let test_run_script_view () =
       ~input:"10"
       ~msg:(rex "A view was called on a contract with no script.")
   in
-  (* Match on the rejection value — the view's `(input, storage)` pair —
-     to prove it reaches the caller. *)
+  (* Match on the rejection value — the view's `(input, storage)` pair,
+     `Pair 10 5`, in binary Micheline — to prove it reaches the caller. *)
   let* () =
     failing
       "test_failwith"
       ~contract:kt1
       ~input:"10"
-      ~msg:(rex "Nat\\(10\\), Nat\\(5\\)")
+      ~msg:(rex "with: 0x0707000a0005")
   in
 
   (* `--gas` is honoured: recursive `fib` overruns a small budget. Unlike

@@ -27,7 +27,7 @@ fn tc_is_resource_exhaustion(e: &TcError) -> bool {
 fn check_error_expectation<'a>(
     ctx: &mut Ctx<'a>,
     err_exp: ErrorExpectation<'a>,
-    err: TestError<'a>,
+    err: TestError,
 ) -> Result<(), TztTestError<'a>> {
     use ErrorExpectation as Ex;
     use TestError as Er;
@@ -91,16 +91,28 @@ fn unify_interpreter_error<'a>(
 ) -> bool {
     use InterpreterErrorExpectation::*;
     match (exp, err) {
-        (FailedWith(value), InterpretError::FailedWith(typ, failed_typed_value)) => {
+        (FailedWith(value), InterpretError::FailedWith { ty, with }) => {
             // Here we typecheck the untyped value from the expectation using the
             // typed of the failed value we get from the interpreter. The
             // expectation may reference a big_map from the test environment.
-            match typecheck_value(value, ctx, typ, AllowForgedLazyStorageId::Yes) {
-                Ok(exp_typed_val) => compare_typed_values(
-                    exp_typed_val,
-                    // `err` keeps its handle, so a move is impossible: clone.
-                    failed_typed_value.as_ref().clone(),
-                ),
+            // The interpreter reports the failed value encoded, so the
+            // expected value is unparsed and encoded the same way.
+            let arena = typed_arena::Arena::new();
+            let mut gas = Gas::default();
+            let ty = match Micheline::decode_raw(&arena, &ty.0, &mut gas) {
+                Ok(Ok(ty_mich)) => match parse_ty(&mut gas, &ty_mich) {
+                    Ok(ty) => ty,
+                    Err(_) => return false,
+                },
+                Ok(Err(_)) | Err(_) => return false,
+            };
+            match typecheck_value(value, ctx, &ty, AllowForgedLazyStorageId::Yes) {
+                Ok(exp_typed_val) => {
+                    let encoded = exp_typed_val
+                        .into_micheline_optimized_legacy(&arena, &mut gas)
+                        .map(|mich| mich.encode(&mut gas));
+                    matches!(encoded, Ok(Ok(Ok(bytes))) if bytes == with.0)
+                }
                 Err(_) => false,
             }
         }
@@ -136,7 +148,7 @@ fn unify_interpreter_error<'a>(
 pub fn check_expectation<'a>(
     ctx: &mut Ctx<'a>,
     expected: TestExpectation<'a>,
-    real: Result<(FailingTypeStack, IStack<'a>), TestError<'a>>,
+    real: Result<(FailingTypeStack, IStack<'a>), TestError>,
 ) -> Result<(), TztTestError<'a>> {
     use TestExpectation::*;
     use TztTestError::*;
