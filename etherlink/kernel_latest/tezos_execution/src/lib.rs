@@ -2982,15 +2982,6 @@ where
     log!(Debug, "Batch is valid!");
 
     safe_host.promote()?;
-
-    // Skip trace promotion (and its store_has probe) when the tracer is off:
-    // no trace data was written, so there is nothing to move out of /tmp.
-    if block_ctx.tracing_enabled {
-        safe_host.promote_trace()?;
-    }
-    if block_ctx.http_trace_enabled {
-        safe_host.promote_http_trace()?;
-    }
     safe_host.start()?;
 
     // Each operation uses 0-based nonces; block-sequential nonces are
@@ -3025,12 +3016,6 @@ where
             "Committing the changes because the batch was successfully applied."
         );
         safe_host.promote()?;
-        if block_ctx.tracing_enabled {
-            safe_host.promote_trace()?;
-        }
-        if block_ctx.http_trace_enabled {
-            safe_host.promote_http_trace()?;
-        }
     } else {
         log!(
             Debug,
@@ -3405,7 +3390,7 @@ mod tests {
     use tezosx_journal::TezosXHashes;
 
     use tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin;
-    use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
+    use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
 
     use crate::account_storage::TezosImplicitAccount;
     use crate::account_storage::{self, Code};
@@ -3432,7 +3417,9 @@ mod tests {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::{Narith, Zarith};
-    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
+    use tezos_evm_runtime::runtime_keyspaces::{
+        MockRuntimeKeyspaces, RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH,
+    };
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -3771,10 +3758,67 @@ mod tests {
                 now: &0i64.into(),
                 chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                 internal_operations_base: 0,
-                tracing_enabled: false,
-                http_trace_enabled: false,
             }
         };
+    }
+
+    /// The inner mirror of an operation that is not accounts-only copies
+    /// `/evm/world_state` in and promotes it back, so trace output written
+    /// before the operation survives it. The root list is given here, so
+    /// `operation_safe_roots` is not exercised.
+    #[test]
+    fn inner_mirror_keeps_earlier_traces() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let trace = Key::from_static(b"/trace/call_trace/0");
+        rk.evm_world_state_mut().set(&trace, b"earlier").unwrap();
+
+        let src = bootstrap1();
+        init_account(rk.tez_accounts_mut(), &src.pkh, 1000000_u64);
+        reveal_account(rk.tez_accounts_mut(), &src);
+        // parameter string; storage string; code { CAR; NIL operation; PAIR }
+        let code =
+            hex::decode("02000000170500036805010368050202000000080316053d036d0342")
+                .unwrap();
+        let storage = hex::decode("010000000568656c6c6f").unwrap();
+        let operation = make_origination_operation(
+            15,
+            1,
+            5000,
+            500,
+            src,
+            30,
+            Script { code, storage },
+        );
+        assert!(!operation.touches_only_accounts());
+        let mut roots = test_safe_roots();
+        roots.push(OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH));
+
+        let processed = validate_and_apply_operation(
+            &mut rk,
+            &NotWiredRegistry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+            &roots,
+        )
+        .unwrap();
+
+        let receipts = ProcessedOperation::into_receipts(processed);
+        assert!(matches!(
+            receipts[0].receipt,
+            OperationResultSum::Origination(OperationResult {
+                result: ContentResult::Applied(_),
+                ..
+            })
+        ));
+        assert_eq!(
+            rk.evm_world_state().get(&trace).as_deref(),
+            Some(b"earlier".as_slice())
+        );
     }
 
     #[derive(Clone)]
@@ -8601,8 +8645,6 @@ mod tests {
                     now: &0i64.into(),
                     chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                     internal_operations_base: base,
-                    tracing_enabled: false,
-                    http_trace_enabled: false,
                 },
                 false,
                 None,
@@ -8819,8 +8861,6 @@ mod tests {
                     now: &0i64.into(),
                     chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                     internal_operations_base: base,
-                    tracing_enabled: false,
-                    http_trace_enabled: false,
                 },
                 false,
                 None,
@@ -9482,8 +9522,6 @@ mod tests {
                     now: &0i64.into(),
                     chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
                     internal_operations_base: base,
-                    tracing_enabled: false,
-                    http_trace_enabled: false,
                 },
                 false,
                 None,

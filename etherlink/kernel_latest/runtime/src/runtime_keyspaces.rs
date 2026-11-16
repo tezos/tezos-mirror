@@ -14,6 +14,10 @@
 //! state of the two runtimes, and `/evm/world_state` and `/tez/world_state`,
 //! their chain-level state.
 //!
+//! `trace` and `__http_trace` are reserved children of `/evm/world_state`:
+//! they hold the node-local output of `debug_trace*` and `http_trace*`, and
+//! only exist on the throwaway states of a replay or a simulation.
+//!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
 //! it holds `/base`, `/tez/world_state` and `/evm/world_state`, loaded on the
 //! live host, and [`BlueprintKeyspaces::into_base`] keeps only `/base` once

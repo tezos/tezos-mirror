@@ -16,8 +16,6 @@ use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 /// The prefix the mirror copies its roots under.
 const TMP: &str = "/tmp";
 pub const TMP_PATH: RefPath = RefPath::assert_from(TMP.as_bytes());
-pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/base/trace");
-pub const HTTP_TRACE_PATH: RefPath = RefPath::assert_from(b"/base/__http_trace");
 
 pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
@@ -163,30 +161,6 @@ impl<Host: StorageV1> SafeStorage<&mut Host> {
         Ok(())
     }
 
-    // Only used in tracing mode, so that the trace doesn't polute the world
-    // state but is still promoted at the end and accessible from the node.
-    pub fn promote_trace(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&TRACE_PATH)?;
-        if let Ok(Some(_)) = self.host.store_has(&tmp_path) {
-            self.host.store_move(&tmp_path, &TRACE_PATH)?
-        }
-        Ok(())
-    }
-
-    // Per-tx HTTP trace replay output is captured under
-    // `/base/__http_trace` but written through the `SafeStorage`-wrapped
-    // host, so the writes land in `/tmp/base/__http_trace`. We promote
-    // them out of `/tmp/` at block end without making `/base/__http_trace`
-    // a SafeStorage root (which would copy/move the subtree on every
-    // block instead of only trace replays).
-    pub fn promote_http_trace(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&HTTP_TRACE_PATH)?;
-        if let Ok(Some(_)) = self.host.store_has(&tmp_path) {
-            self.host.store_move(&tmp_path, &HTTP_TRACE_PATH)?
-        }
-        Ok(())
-    }
-
     pub fn revert(&mut self) -> Result<(), RuntimeError> {
         self.host.store_delete(&TMP_PATH)
     }
@@ -227,7 +201,8 @@ mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
     use crate::runtime_keyspaces::{
-        ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH, EVM_WORLD_STATE_ROOT_PATH,
+        ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH,
+        EVM_WORLD_STATE_KEYSPACE_NAME, EVM_WORLD_STATE_ROOT_PATH,
     };
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
@@ -287,178 +262,38 @@ mod tests {
         ));
     }
 
-    fn trace_call_trace_path() -> OwnedPath {
-        // /tmp/evm/trace/call_trace — where traces land through SafeStorage
-        safe_path(&concat(&TRACE_PATH, &RefPath::assert_from(b"/call_trace")).unwrap())
-            .unwrap()
-    }
-
-    fn trace_length_path() -> OwnedPath {
-        concat(&trace_call_trace_path(), &RefPath::assert_from(b"/length")).unwrap()
-    }
-
-    fn trace_entry_path(index: u32) -> OwnedPath {
-        let suffix: Vec<u8> = format!("/{index}").into();
-        concat(&trace_call_trace_path(), &RefPath::assert_from(&suffix)).unwrap()
-    }
-
-    /// Simulate writing trace entries into /tmp/evm/trace/call_trace/,
-    /// as the kernel's IndexableStorage would during block-level tracing.
-    fn write_fake_traces(host: &mut MockKernelHost, count: u32) {
-        let length_path = trace_length_path();
-        host.store_write_all(&length_path, &(count as u64).to_le_bytes())
-            .unwrap();
-        for i in 0..count {
-            let path = trace_entry_path(i);
-            host.store_write_all(&path, &[0xAA, 0xBB]).unwrap();
-        }
-    }
-
     #[test]
-    fn start_clears_stale_trace_data() {
+    fn start_clears_stale_mirror_data() {
         let mut host = MockKernelHost::default();
-
-        // Set up some initial world state
+        // `start` copies the root, so it has to exist.
         let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
         host.store_write_all(&world_state_data, b"some_account_data")
             .unwrap();
-
+        let trace = Key::from_static(b"/trace/call_trace/0");
+        let tmp_trace = RefPath::assert_from(b"/tmp/evm/world_state/trace/call_trace/0");
         let mut safe = SafeStorage {
             host: &mut host,
             world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
         };
 
-        // First start: copy world state to /tmp
+        // An interrupted block leaves a trace in the mirror.
         safe.start().unwrap();
+        {
+            let mut keyspace =
+                safe.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME).unwrap();
+            keyspace.set(&trace, [0xAA, 0xBB]).unwrap();
+        }
+        assert_eq!(safe.host.store_read_all(&tmp_trace).unwrap(), [0xAA, 0xBB]);
 
-        // Simulate traces written during block production (through SafeStorage)
-        write_fake_traces(safe.host, 2);
-
-        // Verify the stale traces exist in /tmp
-        assert!(safe.host.store_has(&trace_length_path()).unwrap().is_some());
-        assert!(safe.host.store_has(&trace_entry_path(0)).unwrap().is_some());
-        assert!(safe.host.store_has(&trace_entry_path(1)).unwrap().is_some());
-
-        // Simulate: kernel was interrupted, no BIP saved.
-        // On restart, start() is called again.
+        // The next `start` wipes it and copies the root again.
         safe.start().unwrap();
-
-        // The fix: stale trace entries must be gone
-        assert_eq!(
-            safe.host.store_has(&trace_length_path()).unwrap(),
-            None,
-            "Stale trace length should be cleaned up by start()"
-        );
-        assert_eq!(
-            safe.host.store_has(&trace_entry_path(0)).unwrap(),
-            None,
-            "Stale trace entry 0 should be cleaned up by start()"
-        );
-        assert_eq!(
-            safe.host.store_has(&trace_entry_path(1)).unwrap(),
-            None,
-            "Stale trace entry 1 should be cleaned up by start()"
-        );
-
-        // World state should still be correctly copied
-        let tmp_accounts = safe_path(&world_state_data).unwrap();
-        assert_eq!(
-            safe.host.store_read_all(&tmp_accounts).unwrap(),
-            b"some_account_data"
-        );
-    }
-
-    fn http_trace_entry_path(tx_hash_hex: &str) -> OwnedPath {
-        let suffix: Vec<u8> = format!("/traces/{tx_hash_hex}").into();
-        concat(&HTTP_TRACE_PATH, &RefPath::assert_from(&suffix)).unwrap()
-    }
-
-    fn http_trace_tmp_entry_path(tx_hash_hex: &str) -> OwnedPath {
-        safe_path(&http_trace_entry_path(tx_hash_hex)).unwrap()
-    }
-
-    #[test]
-    fn promote_http_trace_moves_tmp_to_real_path() {
-        let mut host = MockKernelHost::default();
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
-        };
-
-        // Write through the SafeStorage wrap, so the data lands in /tmp.
-        let tx_hash = "deadbeef";
-        let traces_payload = b"rlp-encoded-traces";
-        let path = http_trace_entry_path(tx_hash);
-        safe.store_write_all(&path, traces_payload).unwrap();
-
-        // Confirm the write is shadowed in /tmp and not yet at the real path.
+        assert_eq!(safe.host.store_has(&tmp_trace).unwrap(), None);
         assert_eq!(
             safe.host
-                .store_read_all(&http_trace_tmp_entry_path(tx_hash))
+                .store_read_all(&safe_path(&world_state_data).unwrap())
                 .unwrap(),
-            traces_payload
+            b"some_account_data"
         );
-        assert!(safe.host.store_has(&path).unwrap().is_none());
-
-        // Promote the trace subtree out of /tmp.
-        safe.promote_http_trace().unwrap();
-
-        // The data must now live at the real path, and /tmp must be empty
-        // for that subtree.
-        assert_eq!(safe.host.store_read_all(&path).unwrap(), traces_payload);
-        assert!(safe
-            .host
-            .store_has(&http_trace_tmp_entry_path(tx_hash))
-            .unwrap()
-            .is_none());
-    }
-
-    #[test]
-    fn promote_http_trace_is_noop_when_tmp_empty() {
-        let mut host = MockKernelHost::default();
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
-        };
-
-        // No writes done — promote must be a no-op.
-        safe.promote_http_trace().unwrap();
-        assert!(safe.host.store_has(&HTTP_TRACE_PATH).unwrap().is_none());
-    }
-
-    #[test]
-    fn start_clears_stale_http_trace_data() {
-        let mut host = MockKernelHost::default();
-
-        // Pre-populate world_state so start()'s store_copy of the safe root
-        // succeeds (mirrors `start_clears_stale_trace_data`).
-        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
-        host.store_write_all(&world_state_data, b"account_data")
-            .unwrap();
-
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)],
-        };
-
-        // Simulate an interrupted block that left a /tmp/base/__http_trace entry.
-        safe.start().unwrap();
-        let tx_hash = "cafebabe";
-        let path = http_trace_entry_path(tx_hash);
-        safe.store_write_all(&path, b"orphan-traces").unwrap();
-        assert!(safe
-            .host
-            .store_has(&http_trace_tmp_entry_path(tx_hash))
-            .unwrap()
-            .is_some());
-
-        // A new start() must wipe /tmp, so the stale traces are gone.
-        safe.start().unwrap();
-        assert!(safe
-            .host
-            .store_has(&http_trace_tmp_entry_path(tx_hash))
-            .unwrap()
-            .is_none());
     }
 
     #[test]

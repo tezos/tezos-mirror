@@ -78,6 +78,7 @@ pub enum StorageVersion {
     V67,
     V68,
     V69,
+    V70,
 }
 
 impl From<StorageVersion> for u64 {
@@ -92,7 +93,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V69;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V70;
 
 // Legacy storage version path, outside the `/base` keyspace. Only read once,
 // by `init_storage_versioning` at stage zero, which promotes the recorded
@@ -218,31 +219,15 @@ const SIMULATION_RESULT_KEY: Key = Key::from_static(b"/evm_simulation_result");
 // Resolves to the durable path `/base/simulation_http_traces`.
 const SIMULATION_HTTP_TRACES_KEY: Key = Key::from_static(b"/simulation_http_traces");
 
-/// Flag path enabling per-transaction HTTP trace capture during block
-/// replay. The `__` prefix follows the existing convention for node-driven
-/// control keys — cf. `/base/__evm_node`, `/base/__simulation/...`,
-/// `/base/__delayed_input`: the node writes the key via `alter_evm_state`
-/// just before the replay and the kernel reads it exactly once at the top
-/// of `block::produce` (outside the `SafeStorage` wrapper), then threads
-/// the resulting boolean through `compute_bip` → `compute` →
-/// `TezosXChainConfig::apply_transaction` → the three apply sites. The
-/// flag therefore has no lifetime beyond a single replay and nothing
-/// else in the kernel touches this path. Resolves to the durable path
-/// `/base/__http_trace_enabled`.
+/// Flag enabling per-transaction HTTP trace capture during a block replay:
+/// written by the node before the replay, read once per block by the kernel.
+/// Resolves to the durable path `/base/__http_trace_enabled`.
 const HTTP_TRACE_ENABLED_KEY: Key = Key::from_static(b"/__http_trace_enabled");
 
-/// Storage root under which traces are persisted per transaction.
-///
-/// The writes happen through the `SafeStorage`-wrapped host (the apply
-/// sites have no direct access to the underlying host), so they land in
-/// `/tmp/base/__http_trace/traces`. The block-finalization path calls
-/// [`SafeStorage::promote_http_trace`] to move that subtree out of
-/// `/tmp/` to the real `/base/__http_trace/traces` location. We do *not*
-/// add `/base/__http_trace` to the SafeStorage roots — it would force a
-/// `store_copy` of the subtree on every block, while HTTP traces only
-/// exist during the dedicated per-tx replay driven by
-/// [`HTTP_TRACE_ENABLED_KEY`].
-const HTTP_TRACES_ROOT: RefPath = RefPath::assert_from(b"/base/__http_trace/traces");
+/// Root of the per-transaction HTTP traces, inside the `/evm/world_state`
+/// keyspace. Resolves to the durable path
+/// `/evm/world_state/__http_trace/traces`.
+const HTTP_TRACES_KEY: Key = Key::from_static(b"/__http_trace/traces");
 
 // Key to the number of seconds until delayed txs are timed out, inside the
 // `/base` keyspace. Resolves to the durable path `/base/delayed_inbox_timeout`.
@@ -333,12 +318,10 @@ pub fn is_http_trace_enabled(base: &impl KeySpace) -> bool {
     base.contains(&HTTP_TRACE_ENABLED_KEY)
 }
 
-/// Returns the durable storage path under which the HTTP traces for the
-/// transaction `tx_hash` are written when HTTP trace capture is enabled.
-pub fn http_traces_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
-    let raw_suffix: Vec<u8> = format!("/{}", hex::encode(tx_hash)).into();
-    let suffix = OwnedPath::try_from(raw_suffix)?;
-    concat(&HTTP_TRACES_ROOT, &suffix).map_err(Error::from)
+/// Key of the HTTP traces of the transaction `tx_hash`, inside the
+/// `/evm/world_state` keyspace.
+pub fn http_traces_key(tx_hash: &TransactionHash) -> Result<Key, KeyError> {
+    HTTP_TRACES_KEY.concat(format!("/{}", hex::encode(tx_hash)))
 }
 
 /// Store the HTTP traces collected for a single transaction during a replay
@@ -346,26 +329,25 @@ pub fn http_traces_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
 /// using the same shape as [`store_simulation_http_traces`] so both outputs
 /// share the EVM-node-side decoder.
 pub fn store_http_traces_for_tx(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     tx_hash: &TransactionHash,
     traces: &[tezosx_journal::HttpTrace],
 ) -> Result<(), anyhow::Error> {
-    let path = http_traces_path(tx_hash)?;
+    let key = http_traces_key(tx_hash)?;
     let mut stream = rlp::RlpStream::new_list(traces.len());
     for trace in traces {
         stream.append(trace);
     }
     let encoded = stream.out();
-    host.store_write_all(&path, &encoded)
+    evm_world_state
+        .set(&key, encoded)
         .context("Failed to write the per-transaction HTTP traces.")
 }
 
 /// When `enabled` is set and the journal captured at least one HTTP
-/// exchange, persist the traces for `tx_hash`. `enabled` comes from a
-/// single read of [`HTTP_TRACE_ENABLED_KEY`] done once per block outside the
-/// `SafeStorage` wrap (see `block::produce`), so the apply sites do not
-/// re-read the flag per transaction and the flag itself does not need
-/// to live inside the world-state subtree.
+/// exchange, write the traces for `tx_hash` into the `/evm/world_state`
+/// keyspace. `enabled` comes from the single read of
+/// [`HTTP_TRACE_ENABLED_KEY`] done once per block (see `block::produce`).
 ///
 /// Transactions that performed no cross-runtime HTTP call write nothing
 /// — the EVM node side treats a missing key as the empty list, so there
@@ -374,7 +356,7 @@ pub fn store_http_traces_for_tx(
 /// transactions perform CRACs. Failures are logged but never
 /// propagated, so instrumentation cannot break the replay itself.
 pub fn maybe_store_http_traces_for_tx(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     enabled: bool,
     tx_hash: &TransactionHash,
     journal: &tezosx_journal::TezosXJournal,
@@ -386,7 +368,7 @@ pub fn maybe_store_http_traces_for_tx(
     if traces.is_empty() {
         return;
     }
-    if let Err(err) = store_http_traces_for_tx(host, tx_hash, traces) {
+    if let Err(err) = store_http_traces_for_tx(evm_world_state, tx_hash, traces) {
         log!(
             Error,
             "Failed to store HTTP traces for tx {}: {:?}",
@@ -1629,9 +1611,15 @@ mod tests {
             TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
-        let path = super::http_traces_path(&tx_hash).unwrap();
-        assert!(matches!(host.store_has(&path), Ok(None)));
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        super::maybe_store_http_traces_for_tx(
+            rk.evm_world_state_mut(),
+            false,
+            &tx_hash,
+            &journal,
+        );
+        let key = super::http_traces_key(&tx_hash).unwrap();
+        assert_eq!(rk.evm_world_state().get(&key), None);
     }
 
     #[test]
@@ -1647,16 +1635,22 @@ mod tests {
             TezosXHashes::zero(),
             tezos_ethereum::block::BlockConstants::dummy(),
         );
-        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
-        let path = super::http_traces_path(&tx_hash).unwrap();
-        assert!(matches!(host.store_has(&path), Ok(None)));
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        super::maybe_store_http_traces_for_tx(
+            rk.evm_world_state_mut(),
+            true,
+            &tx_hash,
+            &journal,
+        );
+        let key = super::http_traces_key(&tx_hash).unwrap();
+        assert_eq!(rk.evm_world_state().get(&key), None);
     }
 
     #[test]
     fn maybe_store_http_traces_persists_rlp_when_journal_has_trace() {
         // Happy path: enabled, journal captured one HTTP exchange.
         // [maybe_store_http_traces_for_tx] writes an RLP-encoded
-        // one-element list under [http_traces_path(tx_hash)], which is what
+        // one-element list under [http_traces_key(tx_hash)], which is what
         // the EVM node expects to decode through [Simulation.decode_http_traces].
         let mut host = MockKernelHost::default();
 
@@ -1682,14 +1676,23 @@ mod tests {
         assert_eq!(journal.http_traces().len(), 1);
 
         let tx_hash = [0xABu8; 32];
-        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        super::maybe_store_http_traces_for_tx(
+            rk.evm_world_state_mut(),
+            true,
+            &tx_hash,
+            &journal,
+        );
 
-        let path = super::http_traces_path(&tx_hash).unwrap();
-        let bytes = host.store_read_all(&path).unwrap();
-        // Non-empty: the empty-list RLP encoding is a single 0xc0 byte.
-        assert!(
-            bytes.len() > 1,
-            "expected a non-trivial RLP payload, got {bytes:?}"
+        let key = super::http_traces_key(&tx_hash).unwrap();
+        let bytes = rk.evm_world_state().get(&key).unwrap();
+        // The traces resolve to `/evm/world_state/__http_trace/traces/<hex>`.
+        let path = format!("/evm/world_state/__http_trace/traces/{}", "ab".repeat(32));
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(path.as_bytes()))
+                .unwrap(),
+            bytes
         );
 
         // Decoding the payload as an RLP list of [HttpTrace] yields the one
@@ -1750,10 +1753,16 @@ mod tests {
         assert_eq!(journal.http_traces().len(), 2);
 
         let tx_hash = [0xCDu8; 32];
-        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        super::maybe_store_http_traces_for_tx(
+            rk.evm_world_state_mut(),
+            true,
+            &tx_hash,
+            &journal,
+        );
 
-        let path = super::http_traces_path(&tx_hash).unwrap();
-        let bytes = host.store_read_all(&path).unwrap();
+        let key = super::http_traces_key(&tx_hash).unwrap();
+        let bytes = rk.evm_world_state().get(&key).unwrap();
         let rlp = rlp::Rlp::new(&bytes);
         let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
 

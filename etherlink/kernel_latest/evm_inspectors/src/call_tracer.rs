@@ -25,7 +25,7 @@ use revm::{
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, Level::Debug};
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_keyspace::KeySpace;
 
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
 
@@ -278,17 +278,17 @@ impl CallTracer {
     }
 
     /// Flush the buffered traces to storage in one batch.
-    pub fn finalize<Host>(
+    pub fn finalize<KS>(
         &mut self,
-        host: &mut Host,
+        evm_world_state: &mut KS,
         _result: &ExecutionResult,
     ) -> Result<(), InspectorError>
     where
-        Host: StorageV1,
+        KS: KeySpace,
     {
         if !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(host, &traces, &self.transaction_hash)
+            flush_call_traces(evm_world_state, &traces, &self.transaction_hash)
                 .inspect_err(|err| {
                     log!(Debug, "Flushing call traces failed with: {err:?}");
                 })

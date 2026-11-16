@@ -68,18 +68,18 @@ fn prepare_tezosx_journal(
 /// Also reports a leaked EVM frame checkpoint, which mis-points the CRAC receipt
 /// watermarks, by returning an error that aborts the block.
 fn close_tezosx_journal<Host>(
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     mut journal: TezosXJournal,
     result: Option<&ExecutionResult>,
 ) -> Result<(), JournalCloseError>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     // A collection of fallible clean-up routines.
     let errors: Vec<EvmRunError> = [
         // Temporary big maps are scoped to the transaction.
         tezos_execution::mir_ctx::clear_temporary_big_maps(
-            host,
+            rk.host_mut(),
             &journal.michelson.temporary_big_map_id_allocator(),
         )
         .map_err(|err| EvmKernelError::TemporaryBigMapCleanup(err.to_string()).into()),
@@ -94,7 +94,9 @@ where
         },
         // Finalize the EVM tracer with the transaction's execution result.
         if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
-            tracer.finalize(host, result).map_err(EvmRunError::from)
+            tracer
+                .finalize(rk.evm_world_state_mut(), result)
+                .map_err(EvmRunError::from)
         } else {
             Ok(())
         },
@@ -176,7 +178,7 @@ where
         tracer_input,
     );
     let outcome = apply(rk, &mut journal);
-    let close_outcome = close_tezosx_journal(rk.host_mut(), journal, outcome.result());
+    let close_outcome = close_tezosx_journal(rk, journal, outcome.result());
 
     let res = outcome?;
     close_outcome.map_err(EvmRunError::from)?;

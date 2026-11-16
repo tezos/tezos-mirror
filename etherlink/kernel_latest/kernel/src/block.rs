@@ -116,12 +116,9 @@ pub fn compute<Host>(
     block_constants: &TezosXBlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-    // Per-replay flag threaded down from [produce] / [handle_run_transaction]:
-    // when [true], each transaction's HTTP CRAC traces are persisted under
-    // [HTTP_TRACES_ROOT] via [maybe_store_http_traces_for_tx]. Plumbed as a
-    // parameter (rather than read from durable storage inside apply_*) so the
-    // flag doesn't need to live inside the [SafeStorage]-mirrored world state
-    // subtree, and so the check happens exactly once per replay.
+    // Read once per block by [produce] / [handle_run_transaction]: when
+    // [true], each transaction's HTTP CRAC traces are written into the
+    // [/evm/world_state] keyspace via [maybe_store_http_traces_for_tx].
     http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
@@ -497,8 +494,6 @@ where
         storage::delete_block_in_progress(host)?;
     }
     host.promote()?;
-    host.promote_trace()?;
-    host.promote_http_trace()?;
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
 
@@ -535,12 +530,7 @@ where
 {
     let da_fee_per_byte = crate::retrieve_da_fee(bk.evm_world_state_mut())?;
 
-    // Read the HTTP-trace replay flag once, before any [SafeStorage]
-    // wrapping, and thread the resulting boolean through [compute_bip] →
-    // [compute] → apply sites. The flag therefore doesn't need to live in
-    // the [SafeStorage]-mirrored world state subtree, and the common
-    // (unset) case costs a single [store_has] per block instead of one
-    // per transaction.
+    // Read the HTTP-trace replay flag once per block, on the live host.
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(bk.base())?;

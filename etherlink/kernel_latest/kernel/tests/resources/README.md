@@ -64,15 +64,15 @@ index 81eb488168..f8c555abbd 100644
      V16,
 +    V17,
  }
- 
+
  impl From<StorageVersion> for u64 {
 @@ -61,7 +62,7 @@ impl StorageVersion {
      }
  }
- 
+
 -pub const STORAGE_VERSION: StorageVersion = StorageVersion::V16;
 +pub const STORAGE_VERSION: StorageVersion = StorageVersion::V17;
- 
+
  pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 ```
 - Fail during the migration:
@@ -120,10 +120,10 @@ index 5c5086b640e..941b593fb29 100644
 +++ b/etherlink/kernel_latest/kernel/src/block.rs
 @@ -578,6 +578,7 @@ where
      let coinbase = sequencer_pool_address.unwrap_or_default();
- 
-     let (next_bip_number, timestamp, chain_header) = get_next_bip_info(rk.base());
-+    drop_blueprint(rk.base_mut(), next_bip_number)?;
- 
+
+     let (next_bip_number, timestamp, chain_header) = get_next_bip_info(bk.base());
++    drop_blueprint(bk.base_mut(), next_bip_number)?;
+
      let world_states = chain_config.world_states(next_bip_number);
 ```
 

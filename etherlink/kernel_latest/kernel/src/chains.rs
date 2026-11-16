@@ -825,8 +825,6 @@ impl TezosXChainConfig {
                             Some(&block_constants.evm_runtime_block_constants),
                             journal,
                             self.experimental_features.is_michelson_gas_refund_enabled(),
-                            tracer_input.is_some(),
-                            http_trace_enabled,
                             da_fees_enabled,
                         );
                         // Persist HTTP traces regardless of [result] so that partial
@@ -843,7 +841,7 @@ impl TezosXChainConfig {
                         // traces under each generated Ethereum fake hash once the
                         // mapping is available here.
                         crate::storage::maybe_store_http_traces_for_tx(
-                            rk.host_mut(),
+                            rk.evm_world_state_mut(),
                             http_trace_enabled,
                             &tx_hash,
                             journal,
@@ -1127,10 +1125,6 @@ pub fn apply_tezos_operation<Host>(
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
     enable_gas_refund: bool,
-    // Forwarded to validate_and_apply_operation to gate per-op trace promotion
-    // (and its store_has probe) on whether each tracer is actually active.
-    tracing_enabled: bool,
-    http_trace_enabled: bool,
     enable_da_fees: bool,
 ) -> Result<crate::apply::ExecutionResult<TezosExecutionInfo>, anyhow::Error>
 where
@@ -1145,8 +1139,6 @@ where
         internal_operations_base: crate::apply::count_internal_operations(
             &block_in_progress.cumulative_tezos_operation_receipts.list,
         ),
-        tracing_enabled,
-        http_trace_enabled,
     };
 
     match operation.content {

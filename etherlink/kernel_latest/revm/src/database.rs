@@ -16,7 +16,7 @@ use crate::storage::{
         GOVERNANCE_SEQUENCER_UPGRADE_KEY, NATIVE_TOKEN_TICKETER_KEY, SEQUENCER_KEY_KEY,
     },
 };
-use evm_inspectors::HasHost;
+use evm_inspectors::HasEvmWorldState;
 use evm_types::{
     DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
     FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,
@@ -75,11 +75,13 @@ pub struct EtherlinkVMDB<'a, 'host, Host: KeySpaceLoader, R> {
     staged_alias_origins: HashMap<Address, AliasInfo>,
 }
 
-impl<'a, 'host, Host: KeySpaceLoader, R> HasHost for EtherlinkVMDB<'a, 'host, Host, R> {
-    type H = Host;
+impl<'a, 'host, Host: KeySpaceLoader, R> HasEvmWorldState
+    for EtherlinkVMDB<'a, 'host, Host, R>
+{
+    type KeySpace = Host::KeySpace;
 
-    fn as_host_mut(&mut self) -> &mut Self::H {
-        self.rk.host_mut()
+    fn evm_world_state_mut(&mut self) -> &mut Self::KeySpace {
+        self.rk.evm_world_state_mut()
     }
 }
 

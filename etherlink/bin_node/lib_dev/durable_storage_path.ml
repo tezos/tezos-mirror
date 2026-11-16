@@ -536,28 +536,16 @@ module Evm_events = struct
 end
 
 module Http_trace = struct
-  (* Durable storage paths used by the per-transaction HTTP trace replay
-     RPCs.
+  (* Reserved child of [/evm/world_state], replay-only output: the root on
+     V70+ kernels, and on kernels before V60. *)
+  let world_state_root = EVM.World_state.make "/__http_trace/traces"
 
-     The [enabled_flag] key sits at [/base/__http_trace_enabled] —
-     alongside the other node-driven control keys ([/base/__evm_node],
-     [/base/__simulation/...], [/base/__delayed_input]). The EVM node
-     writes it via [alter_evm_state] before the replay, and the kernel
-     reads it exactly once at the top of [block::produce] before any
-     [SafeStorage] wrapping, so nothing inside the apply chain has to
-     round-trip through [SafeStorage] to see it.
-
-     [root ~storage_version] is where the kernel persists the per-tx
-     traces. On V60+ kernels the subtree is dedicated under [/base/]
-     and the kernel promotes [/tmp/base/__http_trace] through
-     [SafeStorage::promote_http_trace] at block finalisation; on older
-     kernels it lived under [/evm/world_state/] because all writes went
-     through the [SafeStorage]-wrapped host, requiring it to sit under a
-     promoted subtree to be readable from the post-replay state. *)
   let root ~storage_version =
-    if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
-      BASE.make "/__http_trace/traces"
-    else EVM.World_state.make "/__http_trace/traces"
+    if Storage_version.traces_moved_to_evm_world_state ~storage_version then
+      world_state_root
+    else if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version
+    then BASE.make "/__http_trace/traces"
+    else world_state_root
 
   let enabled_flag = BASE.make "/__http_trace_enabled"
 
@@ -566,9 +554,14 @@ module Http_trace = struct
 end
 
 module Trace = struct
+  (* V70+: reserved child of [/evm/world_state], replay/simulation output. *)
+  let world_state_root = EVM.World_state.make "/trace"
+
   let root ~storage_version =
-    if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
-      BASE.make "/trace"
+    if Storage_version.traces_moved_to_evm_world_state ~storage_version then
+      world_state_root
+    else if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version
+    then BASE.make "/trace"
     else EVM.make "/trace"
 
   let root_indexed_by_hash ~storage_version ~transaction_hash =
@@ -576,7 +569,10 @@ module Trace = struct
     | Some transaction_hash -> root ~storage_version ^ "/" ^ transaction_hash
     | None -> root ~storage_version
 
-  let input ~storage_version = root ~storage_version ^ "/input"
+  let input ~storage_version =
+    if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version then
+      BASE.make "/trace/input"
+    else EVM.make "/trace/input"
 
   let output_gas ~storage_version ~transaction_hash =
     root_indexed_by_hash ~storage_version ~transaction_hash ^ "/gas"

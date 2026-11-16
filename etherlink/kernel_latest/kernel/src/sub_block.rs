@@ -228,8 +228,8 @@ where
         != H160::default())
     .then_some(block_constants.evm_runtime_block_constants.coinbase);
 
-    // Read the HTTP-trace replay flag before wrapping the host in
-    // [SafeStorage] — see [block::produce] for the rationale.
+    // Read the HTTP-trace replay flag once, on the live host, as in
+    // [block::produce].
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
     let mut safe_host = SafeStorage {
