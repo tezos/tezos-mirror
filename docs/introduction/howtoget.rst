@@ -228,6 +228,13 @@ you can download and import our public GPG key and use ``gpg`` to verify the sig
 Using Homebrew
 --------------
 
+.. warning::
+
+   Octez v25.3 deprecates the Homebrew formula published by Nomadic Labs, which
+   is scheduled for removal in Octez v26. Homebrew formulae providing prebuilt binaries
+   for macOS, called Tzinit formulae, are available instead. See
+   :doc:`tzinit-homebrew` for instructions on how to migrate.
+
 On macOS and Linux, you can compile and install Octez using Homebrew. If
 Homebrew is not yet installed on your system, please refer to the official
 `Homebrew installation guide <https://brew.sh/>`__ for detailed instructions.
@@ -546,5 +553,6 @@ Appendix
 
    howtobuild
    tzinit-packages
+   tzinit-homebrew
    cosign-verify
    get_troubleshooting

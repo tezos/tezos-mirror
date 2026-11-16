@@ -30,7 +30,7 @@ its robustness by:
 
 This release also adds the ``smart_rollups/all/signals`` RPC in the :doc:`protocol plugin <../active/plugins>` for the Ushuaia protocol.
 
-Octez v25.3 also deprecates Homebrew packages, which may be removed in Octez v26.
+Octez v25.3 also deprecates Homebrew packages, which are scheduled for removal in Octez v26.
 As a reminder, Debian and Ubuntu packages are deprecated too (see
 :ref:`the Octez packages section <octez_packages_v25>`).
 
@@ -81,9 +81,15 @@ and running of static binaries in a more user-friendly way than source or binary
 This tool is in early development and should be used for testnets only for now.
 
 - **Debian and Ubuntu packages** have been deprecated since Octez v25.0.
-  Users relying on these packages are encouraged to migrate to the packages
-  published by the Tezos Foundation; see
+  Users relying on these packages are encouraged to migrate to the
+  Tzinit packages; see
   :doc:`the migration instructions <../introduction/tzinit-packages>`.
+
+- **Homebrew packages** have been deprecated since Octez v25.3, and are
+  scheduled for removal in Octez v26.
+  Users relying on the Homebrew formula are encouraged to migrate to the
+  Homebrew formulae called the *Tzinit formulae*; see
+  :doc:`the migration instructions <../introduction/tzinit-homebrew>`.
 
 .. _baker_v25:
 
