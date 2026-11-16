@@ -201,12 +201,12 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
 
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host(&self) -> &Host {
-        &*self.host
+        self.host
     }
 
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host_mut(&mut self) -> &mut Host {
-        &mut *self.host
+        self.host
     }
 
     /// Loads the keyspaces from `host`.
