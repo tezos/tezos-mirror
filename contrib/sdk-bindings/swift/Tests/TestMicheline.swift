@@ -13,7 +13,9 @@ class TestMicheline: XCTestCase {
     ]
 
     /*
+     octez-client convert data "
      { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+     " from Michelson to binary
      */
     func testBuildBasicScriptMicheline() {
         let micheline = Micheline.seq(
@@ -53,10 +55,18 @@ class TestMicheline: XCTestCase {
             "{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }"
         )
         XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: parsedMicheline))
+
+        let rawMicheline = try! michelineManager.encode(micheline: micheline)
+        let expectedBytes: [UInt8] = [
+          0x02, 0x00, 0x00, 0x00, 0x17, 0x05, 0x00, 0x03, 0x6c, 0x05,
+          0x01, 0x03, 0x6c, 0x05, 0x02, 0x02, 0x00, 0x00, 0x00, 0x08,
+          0x03, 0x17, 0x05, 0x3d, 0x03, 0x6d, 0x03, 0x42
+        ]
+        XCTAssertEqual(Array(rawMicheline), expectedBytes)
     }
 
     /*
-     (Pair :foo "string" 0 0x00)
+     octez-client convert data '(Pair :foo "string" 0 0x00)' from Michelson to binary
     */
     func testBuildSimpleDataMicheline() {
         let micheline = Micheline.app(
@@ -75,6 +85,15 @@ class TestMicheline: XCTestCase {
           micheline: "(Pair :foo \"string\" 0 0x00)"
         )
         XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: parsedMicheline))
+
+        let rawMicheline = try! michelineManager.encode(micheline: micheline)
+        let expectedBytes: [UInt8] = [
+          0x09, 0x07, 0x00, 0x00, 0x00, 0x13, 0x01, 0x00, 0x00, 0x00,
+          0x06, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00, 0x0a,
+          0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x3a,
+          0x66, 0x6f, 0x6f
+        ]
+        XCTAssertEqual(Array(rawMicheline), expectedBytes)
     }
 
 }
