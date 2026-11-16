@@ -2709,7 +2709,8 @@ fn interpret_one<'a>(
                 .encode(ctx.gas())??;
             // Above the cap, the error carries a small placeholder of type
             // `string` instead, so that a large value does not make a large
-            // receipt.
+            // receipt. L1 has no such cap, see the `FAILWITH` divergence in
+            // `DESIGN.md`.
             if with.len().saturating_add(ty.len())
                 > crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
             {
