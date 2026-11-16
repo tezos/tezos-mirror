@@ -23,22 +23,24 @@ use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_evm_logging::{log, Level::*};
 use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtBin, KeySpaceExtNum};
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
+use tezos_smart_rollup_keyspace::extensions::{
+    KeySpaceExtBin, KeySpaceExtNum, KeySpaceExtRlp,
+};
+use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_storage::keyspace::KeySpaceExtB58;
-use tezos_storage::store_read_slice;
 use tezosx_types::StorageReadErrorKind;
 
-use crate::error::{Error, StorageError};
-use rlp::{Decodable, Encodable, Rlp};
-use tezos_ethereum::rlp_helpers::{FromRlpBytes, VersionedEncoding};
+use crate::error::{ChunkedTransactionError, Error};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use tezos_ethereum::rlp_helpers::{
+    check_is_list, decode_tx_hash, FromRlpBytes, VersionedEncoding,
+};
 use tezos_ethereum::transaction::TransactionHash;
 
 use primitive_types::{H160, U256};
@@ -75,6 +77,7 @@ pub enum StorageVersion {
     V66,
     V67,
     V68,
+    V69,
 }
 
 impl From<StorageVersion> for u64 {
@@ -89,7 +92,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V68;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V69;
 
 // Legacy storage version path, outside the `/base` keyspace. Only read once,
 // by `init_storage_versioning` at stage zero, which promotes the recorded
@@ -393,212 +396,199 @@ pub fn maybe_store_http_traces_for_tx(
     }
 }
 
-const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
-const CHUNKED_TRANSACTION_NUM_CHUNKS: RefPath = RefPath::assert_from(b"/num_chunks");
-const CHUNKED_HASHES: RefPath = RefPath::assert_from(b"/chunk_hashes");
+/// Resolves to `/base/chunked_transactions`, one subtree per transaction hash.
+const CHUNKED_TRANSACTIONS_KEY: Key = Key::from_static(b"/chunked_transactions");
+const CHUNKED_TRANSACTION_NUM_CHUNKS: Key = Key::from_static(b"/num_chunks");
+const CHUNKED_HASHES: Key = Key::from_static(b"/chunk_hashes");
 
-pub fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
-    let hash = hex::encode(tx_hash);
-    let raw_chunked_transaction_path: Vec<u8> = format!("/{hash}").into();
-    let chunked_transaction_path = OwnedPath::try_from(raw_chunked_transaction_path)?;
-    concat(&CHUNKED_TRANSACTIONS, &chunked_transaction_path).map_err(Error::from)
-}
+/// The announced chunk hashes, an rlp list of 32-byte strings.
+struct ChunkHashes(Vec<TransactionHash>);
 
-fn chunked_transaction_num_chunks_path(
-    chunked_transaction_path: &OwnedPath,
-) -> Result<OwnedPath, Error> {
-    concat(chunked_transaction_path, &CHUNKED_TRANSACTION_NUM_CHUNKS).map_err(Error::from)
-}
-
-pub fn chunked_hashes_transaction_path(
-    chunked_transaction_path: &OwnedPath,
-) -> Result<OwnedPath, Error> {
-    concat(chunked_transaction_path, &CHUNKED_HASHES).map_err(Error::from)
-}
-
-pub fn chunked_transaction_hash_exists(
-    host: &mut impl StorageV1,
-    chunked_transaction_path: &OwnedPath,
-    hash: &TransactionHash,
-) -> Result<bool, Error> {
-    let path = chunked_hashes_transaction_path(chunked_transaction_path)?;
-    let value = host.store_read_all(&path)?;
-    let rlp = rlp::Rlp::new(value.as_slice());
-    for e in rlp.as_list::<Vec<u8>>()? {
-        let h = TransactionHash::try_from(e.as_slice())
-            .map_err(|_| Error::RlpDecoderError(rlp::DecoderError::RlpInvalidLength))?;
-        if h == *hash {
-            return Ok(true);
+impl Encodable for ChunkHashes {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(self.0.len());
+        for chunk_hash in &self.0 {
+            s.append(&chunk_hash.as_slice());
         }
     }
-    Ok(false)
 }
 
-pub fn transaction_chunk_path(
-    chunked_transaction_path: &OwnedPath,
+impl Decodable for ChunkHashes {
+    fn decode(rlp: &Rlp) -> Result<Self, DecoderError> {
+        check_is_list(rlp)?;
+        rlp.iter()
+            .map(decode_tx_hash)
+            .collect::<Result<_, _>>()
+            .map(Self)
+    }
+}
+
+/// Key of the subtree of the chunked transaction `tx_hash`.
+pub fn chunked_transaction_key(tx_hash: &TransactionHash) -> Result<Key, KeyError> {
+    CHUNKED_TRANSACTIONS_KEY.concat(format!("/{}", hex::encode(tx_hash)))
+}
+
+fn chunked_transaction_num_chunks_key(
+    chunked_transaction_key: &Key,
+) -> Result<Key, KeyError> {
+    chunked_transaction_key.concat(&CHUNKED_TRANSACTION_NUM_CHUNKS)
+}
+
+fn chunked_hashes_transaction_key(
+    chunked_transaction_key: &Key,
+) -> Result<Key, KeyError> {
+    chunked_transaction_key.concat(&CHUNKED_HASHES)
+}
+
+/// Whether `hash` is an announced chunk hash. `false` without an announcement.
+pub fn chunked_transaction_hash_exists(
+    base: &impl KeySpace,
+    chunked_transaction_key: &Key,
+    hash: &TransactionHash,
+) -> Result<bool, ChunkedTransactionError> {
+    let key = chunked_hashes_transaction_key(chunked_transaction_key)?;
+    Ok(base
+        .read_rlp::<ChunkHashes>(&key)?
+        .is_some_and(|ChunkHashes(hashes)| hashes.contains(hash)))
+}
+
+/// Key of chunk `i` of the chunked transaction at `chunked_transaction_key`.
+pub fn transaction_chunk_key(
+    chunked_transaction_key: &Key,
     i: u16,
-) -> Result<OwnedPath, Error> {
-    let raw_i_path: Vec<u8> = format!("/{i}").into();
-    let i_path = OwnedPath::try_from(raw_i_path)?;
-    concat(chunked_transaction_path, &i_path).map_err(Error::from)
+) -> Result<Key, KeyError> {
+    chunked_transaction_key.concat(format!("/{i}"))
 }
 
 fn is_transaction_complete(
-    host: &mut impl StorageV1,
-    chunked_transaction_path: &OwnedPath,
+    base: &impl KeySpace,
+    chunked_transaction_key: &Key,
     num_chunks: u16,
-) -> Result<bool, Error> {
+) -> Result<bool, KeyError> {
     for i in 0..num_chunks {
-        let transaction_chunk_path = transaction_chunk_path(chunked_transaction_path, i)?;
-        if host.store_has(&transaction_chunk_path)?.is_none() {
+        if !base.contains(&transaction_chunk_key(chunked_transaction_key, i)?) {
             return Ok(false);
         }
     }
     Ok(true)
 }
 
-fn chunked_transaction_num_chunks_by_path(
-    host: &mut impl StorageV1,
-    chunked_transaction_path: &OwnedPath,
-) -> Result<u16, Error> {
-    let chunked_transaction_num_chunks_path =
-        chunked_transaction_num_chunks_path(chunked_transaction_path)?;
-    let mut buffer = [0u8; 2];
-    store_read_slice(host, &chunked_transaction_num_chunks_path, &mut buffer, 2)?;
-    Ok(u16::from_le_bytes(buffer))
+fn chunked_transaction_num_chunks_by_key(
+    base: &impl KeySpace,
+    chunked_transaction_key: &Key,
+) -> Result<Option<u16>, KeyError> {
+    Ok(base.get_le(&chunked_transaction_num_chunks_key(
+        chunked_transaction_key,
+    )?))
 }
 
+/// The announced chunk count, `None` when the transaction was never announced.
 pub fn chunked_transaction_num_chunks(
-    host: &mut impl StorageV1,
+    base: &impl KeySpace,
     tx_hash: &TransactionHash,
-) -> Result<u16, Error> {
-    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
-    chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)
+) -> Result<Option<u16>, KeyError> {
+    chunked_transaction_num_chunks_by_key(base, &chunked_transaction_key(tx_hash)?)
 }
 
+/// A chunk received twice keeps its first content.
 fn store_transaction_chunk_data(
-    host: &mut impl StorageV1,
-    transaction_chunk_path: &OwnedPath,
+    base: &mut impl KeySpace,
+    transaction_chunk_key: &Key,
     data: Vec<u8>,
-) -> Result<(), Error> {
-    match host.store_has(transaction_chunk_path)? {
-        Some(ValueType::Value | ValueType::ValueWithSubtree) => Ok(()),
-        _ => {
-            if data.len() > MAX_FILE_CHUNK_SIZE {
-                // It comes from an input so it's maximum 4096 bytes (with the message header).
-                let (data1, data2) = data.split_at(MAX_FILE_CHUNK_SIZE);
-                host.store_write(transaction_chunk_path, data1, 0)?;
-                host.store_write(transaction_chunk_path, data2, MAX_FILE_CHUNK_SIZE)
-            } else {
-                host.store_write(transaction_chunk_path, &data, 0)
-            }?;
-            Ok(())
-        }
+) -> Result<(), KeySpaceError> {
+    if !base.contains(transaction_chunk_key) {
+        base.set(transaction_chunk_key, data)?;
     }
-}
-
-pub fn read_transaction_chunk_data(
-    host: &mut impl StorageV1,
-    transaction_chunk_path: &OwnedPath,
-) -> Result<Vec<u8>, Error> {
-    let data_size = host.store_value_size(transaction_chunk_path)?;
-
-    if data_size > MAX_FILE_CHUNK_SIZE {
-        let mut data1 =
-            host.store_read(transaction_chunk_path, 0, MAX_FILE_CHUNK_SIZE)?;
-        let mut data2 = host.store_read(
-            transaction_chunk_path,
-            MAX_FILE_CHUNK_SIZE,
-            MAX_FILE_CHUNK_SIZE,
-        )?;
-        let _ = &mut data1.append(&mut data2);
-        Ok(data1)
-    } else {
-        Ok(host.store_read(transaction_chunk_path, 0, MAX_FILE_CHUNK_SIZE)?)
-    }
-}
-
-fn get_full_transaction(
-    host: &mut impl StorageV1,
-    chunked_transaction_path: &OwnedPath,
-    num_chunks: u16,
-) -> Result<Vec<u8>, Error> {
-    let mut buffer = Vec::new();
-    for i in 0..num_chunks {
-        let transaction_chunk_path = transaction_chunk_path(chunked_transaction_path, i)?;
-        let mut data = read_transaction_chunk_data(host, &transaction_chunk_path)?;
-        let _ = &mut buffer.append(&mut data);
-    }
-    Ok(buffer)
-}
-
-pub fn remove_chunked_transaction(
-    host: &mut impl StorageV1,
-    tx_hash: &TransactionHash,
-) -> Result<(), Error> {
-    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
-    let nb_chunks =
-        match chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path) {
-            Ok(n) => n,
-            Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
-                return Ok(())
-            }
-            Err(e) => return Err(e),
-        };
-    for i in 0..nb_chunks {
-        let transaction_chunk_path =
-            transaction_chunk_path(&chunked_transaction_path, i)?;
-        host.store_delete(&transaction_chunk_path)?;
-    }
-    host.store_delete(&chunked_transaction_num_chunks_path(
-        &chunked_transaction_path,
-    )?)?;
-    host.store_delete(&chunked_hashes_transaction_path(&chunked_transaction_path)?)?;
     Ok(())
 }
 
-/// Store the transaction chunk in the storage. Returns the full transaction
-/// if the last chunk to store is the last missing chunk.
-pub fn store_transaction_chunk(
-    host: &mut impl StorageV1,
+/// `None` when the chunk was not received.
+pub fn read_transaction_chunk_data(
+    base: &impl KeySpace,
+    transaction_chunk_key: &Key,
+) -> Option<Vec<u8>> {
+    base.get(transaction_chunk_key)
+}
+
+/// The chunks in index order, `None` when one chunk was not received.
+fn get_full_transaction(
+    base: &impl KeySpace,
+    chunked_transaction_key: &Key,
+    num_chunks: u16,
+) -> Result<Option<Vec<u8>>, KeyError> {
+    let mut buffer = Vec::new();
+    for i in 0..num_chunks {
+        let Some(mut data) = read_transaction_chunk_data(
+            base,
+            &transaction_chunk_key(chunked_transaction_key, i)?,
+        ) else {
+            return Ok(None);
+        };
+        buffer.append(&mut data);
+    }
+    Ok(Some(buffer))
+}
+
+/// Drops the announcement and the chunks. Nothing to drop is not an error.
+pub fn remove_chunked_transaction(
+    base: &mut impl KeySpace,
     tx_hash: &TransactionHash,
+) -> Result<(), KeyError> {
+    let chunked_transaction_key = chunked_transaction_key(tx_hash)?;
+    let Some(nb_chunks) =
+        chunked_transaction_num_chunks_by_key(base, &chunked_transaction_key)?
+    else {
+        return Ok(());
+    };
+    for i in 0..nb_chunks {
+        base.delete(&transaction_chunk_key(&chunked_transaction_key, i)?);
+    }
+    base.delete(&chunked_transaction_num_chunks_key(
+        &chunked_transaction_key,
+    )?);
+    base.delete(&chunked_hashes_transaction_key(&chunked_transaction_key)?);
+    Ok(())
+}
+
+/// Stores chunk `i` of `tx_hash`. When all `num_chunks` chunks are stored,
+/// returns their concatenation and drops the chunked transaction.
+/// `num_chunks` must be the count announced for `tx_hash`.
+pub fn store_transaction_chunk(
+    base: &mut impl KeySpace,
+    tx_hash: &TransactionHash,
+    num_chunks: u16,
     i: u16,
     data: Vec<u8>,
-) -> Result<Option<Vec<u8>>, Error> {
-    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
-    let num_chunks =
-        chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)?;
+) -> Result<Option<Vec<u8>>, ChunkedTransactionError> {
+    let chunked_transaction_key = chunked_transaction_key(tx_hash)?;
 
     // Store the new transaction chunk.
-    let transaction_chunk_path = transaction_chunk_path(&chunked_transaction_path, i)?;
-    store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
+    let transaction_chunk_key = transaction_chunk_key(&chunked_transaction_key, i)?;
+    store_transaction_chunk_data(base, &transaction_chunk_key, data)?;
 
     // If the chunk was the last one, we gather all the chunks and remove the
     // sub elements.
-    if is_transaction_complete(host, &chunked_transaction_path, num_chunks)? {
-        let data = get_full_transaction(host, &chunked_transaction_path, num_chunks)?;
-        remove_chunked_transaction(host, tx_hash)?;
-        Ok(Some(data))
+    if is_transaction_complete(base, &chunked_transaction_key, num_chunks)? {
+        let data = get_full_transaction(base, &chunked_transaction_key, num_chunks)?;
+        remove_chunked_transaction(base, tx_hash)?;
+        Ok(data)
     } else {
         Ok(None)
     }
 }
 
-pub fn create_chunked_transaction<Host>(
-    host: &mut Host,
+/// A transaction already announced keeps its first announcement.
+pub fn create_chunked_transaction(
+    base: &mut impl KeySpace,
     tx_hash: &TransactionHash,
     num_chunks: u16,
     chunk_hashes: Vec<TransactionHash>,
-) -> Result<(), Error>
-where
-    Host: StorageV1,
-{
-    let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
+) -> Result<(), ChunkedTransactionError> {
+    let chunked_transaction_key = chunked_transaction_key(tx_hash)?;
 
     // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
     // is at least one key, it was already created.
-    if chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)
-        .unwrap_or(0)
+    if chunked_transaction_num_chunks_by_key(base, &chunked_transaction_key)?.unwrap_or(0)
         > 0
     {
         log!(
@@ -609,22 +599,13 @@ where
         return Ok(());
     }
 
-    let chunked_transaction_num_chunks_path =
-        chunked_transaction_num_chunks_path(&chunked_transaction_path)?;
-    host.store_write(
-        &chunked_transaction_num_chunks_path,
-        &u16::to_le_bytes(num_chunks),
-        0,
+    base.store_le(
+        &chunked_transaction_num_chunks_key(&chunked_transaction_key)?,
+        num_chunks,
     )?;
-
-    let mut rlp = rlp::RlpStream::new_list(chunk_hashes.len());
-    for chunk_hash in chunk_hashes.iter() {
-        rlp.append(&chunk_hash.as_slice());
-    }
-    host.store_write(
-        &chunked_hashes_transaction_path(&chunked_transaction_path)?,
-        &rlp.out(),
-        0,
+    base.store_rlp(
+        &chunked_hashes_transaction_key(&chunked_transaction_key)?,
+        &ChunkHashes(chunk_hashes),
     )?;
     Ok(())
 }
@@ -2217,5 +2198,49 @@ mod tests {
                 .unwrap()
             )
         );
+    }
+
+    // The keys resolve to `/base/chunked_transactions/<hash>/..`, where the
+    // V69 migration moves the old `/chunked_transactions` root.
+    #[test]
+    fn chunked_transaction_resolves_to_the_base_paths() {
+        use tezos_smart_rollup_host::path::OwnedPath;
+
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let tx_hash = [0x11u8; 32];
+        let chunk_hashes = vec![[1u8; 32], [2u8; 32]];
+        super::create_chunked_transaction(&mut base, &tx_hash, 2, chunk_hashes.clone())
+            .unwrap();
+        let root = format!("/base/chunked_transactions/{}", hex::encode(tx_hash));
+        let path = |suffix: &str| OwnedPath::try_from(format!("{root}{suffix}")).unwrap();
+        assert_eq!(
+            rk.host_mut().store_read_all(&path("/num_chunks")).unwrap(),
+            2u16.to_le_bytes()
+        );
+        let announced: Vec<Vec<u8>> = rlp::Rlp::new(
+            &rk.host_mut()
+                .store_read_all(&path("/chunk_hashes"))
+                .unwrap(),
+        )
+        .as_list()
+        .unwrap();
+        assert_eq!(announced, chunk_hashes);
+
+        let reassembled =
+            super::store_transaction_chunk(&mut base, &tx_hash, 2, 0, b"first".to_vec())
+                .unwrap();
+        assert_eq!(reassembled, None);
+        assert_eq!(rk.host_mut().store_read_all(&path("/0")).unwrap(), b"first");
+        let reassembled =
+            super::store_transaction_chunk(&mut base, &tx_hash, 2, 1, b"second".to_vec())
+                .unwrap();
+        assert_eq!(reassembled, Some(b"firstsecond".to_vec()));
+        // The reassembled transaction leaves nothing behind.
+        for suffix in ["/num_chunks", "/chunk_hashes", "/0", "/1"] {
+            assert!(rk.host_mut().store_has(&path(suffix)).unwrap().is_none());
+        }
     }
 }

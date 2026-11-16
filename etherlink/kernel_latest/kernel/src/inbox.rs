@@ -17,12 +17,14 @@ use crate::parsing::{
     SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
+use crate::error::ChunkedTransactionError;
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
-    chunked_transaction_hash_exists, chunked_transaction_num_chunks,
-    chunked_transaction_path, clear_events, create_chunked_transaction, read_l1_level,
-    read_last_info_per_level_timestamp, remove_chunked_transaction, remove_sequencer,
-    store_l1_level, store_last_info_per_level_timestamp, store_transaction_chunk,
+    chunked_transaction_hash_exists, chunked_transaction_key,
+    chunked_transaction_num_chunks, clear_events, create_chunked_transaction,
+    read_l1_level, read_last_info_per_level_timestamp, remove_chunked_transaction,
+    remove_sequencer, store_l1_level, store_last_info_per_level_timestamp,
+    store_transaction_chunk,
 };
 use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
@@ -123,8 +125,8 @@ impl InputHandler for ProxyInput {
     type Inbox = ProxyInboxContent;
 
     fn handle_input<Host>(
-        host: &mut Host,
-        _base: &mut impl KeySpace,
+        _host: &mut Host,
+        base: &mut impl KeySpace,
         input: Self,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
@@ -140,7 +142,7 @@ impl InputHandler for ProxyInput {
                 tx_hash,
                 num_chunks,
                 chunk_hashes,
-            } => create_chunked_transaction(host, &tx_hash, num_chunks, chunk_hashes)?,
+            } => create_chunked_transaction(base, &tx_hash, num_chunks, chunk_hashes)?,
             Self::TransactionChunk {
                 tx_hash,
                 i,
@@ -148,7 +150,7 @@ impl InputHandler for ProxyInput {
                 data,
             } => {
                 if let Some(tx) =
-                    handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
+                    handle_transaction_chunk(base, tx_hash, i, chunk_hash, data)?
                 {
                     inbox_content.transactions.push(tx.into())
                 }
@@ -329,48 +331,42 @@ impl InputHandler for SequencerInput {
     }
 }
 
-fn handle_transaction_chunk<Host>(
-    host: &mut Host,
+fn handle_transaction_chunk(
+    base: &mut impl KeySpace,
     tx_hash: TransactionHash,
     i: u16,
     chunk_hash: TransactionHash,
     data: Vec<u8>,
-) -> Result<Option<Transaction>, Error>
-where
-    Host: StorageV1,
-{
+) -> Result<Option<Transaction>, ChunkedTransactionError> {
     // If the number of chunks doesn't exist in the storage, the chunked
     // transaction wasn't created, so the chunk is ignored.
-    let num_chunks = match chunked_transaction_num_chunks(host, &tx_hash) {
-        Ok(x) => x,
-        Err(_) => {
-            log!(
-                Info,
-                "Ignoring chunk {} of unknown transaction {}",
-                i,
-                hex::encode(tx_hash)
-            );
-            return Ok(None);
-        }
+    let Some(num_chunks) = chunked_transaction_num_chunks(base, &tx_hash)? else {
+        log!(
+            Info,
+            "Ignoring chunk {} of unknown transaction {}",
+            i,
+            hex::encode(tx_hash)
+        );
+        return Ok(None);
     };
     // Checks that the transaction is not out of bounds.
     if i >= num_chunks {
         return Ok(None);
     }
     // Check if the chunk hash is part of the announced chunked hashes.
-    let chunked_transaction_path = chunked_transaction_path(&tx_hash)?;
-    if !chunked_transaction_hash_exists(host, &chunked_transaction_path, &chunk_hash)? {
+    let chunked_transaction_key = chunked_transaction_key(&tx_hash)?;
+    if !chunked_transaction_hash_exists(base, &chunked_transaction_key, &chunk_hash)? {
         return Ok(None);
     }
     // Sanity check to verify that the transaction chunk uses the maximum
     // space capacity allowed.
     if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
-        remove_chunked_transaction(host, &tx_hash)?;
+        remove_chunked_transaction(base, &tx_hash)?;
         return Ok(None);
     };
     // When the transaction is stored in the storage, it returns the full transaction
     // if `data` was the missing chunk.
-    if let Some(data) = store_transaction_chunk(host, &tx_hash, i, data)? {
+    if let Some(data) = store_transaction_chunk(base, &tx_hash, num_chunks, i, data)? {
         let full_data_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(&data).into();
         if full_data_hash == tx_hash {
             if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
@@ -1070,7 +1066,8 @@ mod tests {
             read_proxy_inbox(host, bk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap();
 
-        let num_chunks = chunked_transaction_num_chunks(host, &tx_hash)
+        let num_chunks = chunked_transaction_num_chunks(bk.base(), &tx_hash)
+            .unwrap()
             .expect("The number of chunks should exist");
         // Only the first `NewChunkedTransaction` should be considered.
         assert_eq!(num_chunks, 2);
@@ -1119,10 +1116,10 @@ mod tests {
                 .unwrap();
 
         // The out of bounds chunk should not exist.
-        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
-        let transaction_chunk_path =
-            transaction_chunk_path(&chunked_transaction_path, out_of_bound_i).unwrap();
-        if read_transaction_chunk_data(host, &transaction_chunk_path).is_ok() {
+        let chunked_transaction_key = chunked_transaction_key(&tx_hash).unwrap();
+        let transaction_chunk_key =
+            transaction_chunk_key(&chunked_transaction_key, out_of_bound_i).unwrap();
+        if read_transaction_chunk_data(bk.base(), &transaction_chunk_key).is_some() {
             panic!("The chunk should not exist in the storage")
         }
     }
@@ -1155,11 +1152,81 @@ mod tests {
                 .unwrap();
 
         // The unknown chunk should not exist.
-        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
-        let transaction_chunk_path =
-            transaction_chunk_path(&chunked_transaction_path, index).unwrap();
-        if read_transaction_chunk_data(host, &transaction_chunk_path).is_ok() {
+        let chunked_transaction_key = chunked_transaction_key(&tx_hash).unwrap();
+        let transaction_chunk_key =
+            transaction_chunk_key(&chunked_transaction_key, index).unwrap();
+        if read_transaction_chunk_data(bk.base(), &transaction_chunk_key).is_some() {
             panic!("The chunk should not exist in the storage")
+        }
+    }
+
+    #[test]
+    // A non-last chunk below `MAX_SIZE_PER_CHUNK` drops the announcement, and
+    // the later chunks of the transaction are ignored.
+    fn short_non_last_chunk_drops_the_announcement() {
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+
+        let tx_hash = ZERO_TX_HASH;
+        let short_data = vec![1u8; MAX_SIZE_PER_CHUNK - 1];
+        let short_hash: TransactionHash = Keccak256::digest(&short_data).into();
+        let full_data = vec![2u8; MAX_SIZE_PER_CHUNK];
+        let full_hash: TransactionHash = Keccak256::digest(&full_data).into();
+        let inputs = [
+            Input::ModeSpecific(ProxyInput::NewChunkedTransaction {
+                tx_hash,
+                num_chunks: 3,
+                chunk_hashes: vec![short_hash, full_hash, [3; TRANSACTION_HASH_SIZE]],
+            }),
+            Input::ModeSpecific(ProxyInput::TransactionChunk {
+                tx_hash,
+                i: 0,
+                chunk_hash: short_hash,
+                data: short_data,
+            }),
+            Input::ModeSpecific(ProxyInput::TransactionChunk {
+                tx_hash,
+                i: 1,
+                chunk_hash: full_hash,
+                data: full_data,
+            }),
+        ];
+        for input in inputs {
+            host.host
+                .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
+        }
+
+        let (host, bk) = (&mut host, &mut bk);
+        let inbox_content =
+            read_proxy_inbox(host, bk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            inbox_content,
+            ProxyInboxContent {
+                transactions: vec![],
+            }
+        );
+
+        // Nothing is left under the transaction, chunk 1 included.
+        let chunked_transaction_key = chunked_transaction_key(&tx_hash).unwrap();
+        assert_eq!(
+            chunked_transaction_num_chunks(bk.base(), &tx_hash).unwrap(),
+            None
+        );
+        assert!(!chunked_transaction_hash_exists(
+            bk.base(),
+            &chunked_transaction_key,
+            &short_hash
+        )
+        .unwrap());
+        for i in 0..3 {
+            let transaction_chunk_key =
+                transaction_chunk_key(&chunked_transaction_key, i).unwrap();
+            assert_eq!(
+                read_transaction_chunk_data(bk.base(), &transaction_chunk_key),
+                None
+            );
         }
     }
 
@@ -1219,6 +1286,74 @@ mod tests {
             host.host
                 .add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
+        let inbox_content =
+            read_proxy_inbox(host, bk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
+                .unwrap()
+                .unwrap();
+
+        let expected_transactions = vec![Transaction {
+            tx_hash,
+            content: Ethereum(tx),
+        }
+        .into()];
+        assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
+    // A reassembly started at the legacy root completes after the V69 move.
+    fn chunked_transaction_survives_the_v69_migration() {
+        use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+
+        let mut host = MockKernelHost::default();
+
+        let (data, tx) = large_transaction();
+        let tx_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(data.clone()).into();
+        let inputs = make_chunked_transactions(tx_hash, data);
+        assert_eq!(inputs.len(), 3);
+
+        let Input::ModeSpecific(ProxyInput::NewChunkedTransaction {
+            num_chunks,
+            chunk_hashes,
+            ..
+        }) = &inputs[0]
+        else {
+            panic!("Expected a new chunked transaction")
+        };
+        let Input::ModeSpecific(ProxyInput::TransactionChunk { data: chunk0, .. }) =
+            &inputs[1]
+        else {
+            panic!("Expected a transaction chunk")
+        };
+        let mut rlp = rlp::RlpStream::new_list(chunk_hashes.len());
+        for chunk_hash in chunk_hashes {
+            rlp.append(&chunk_hash.as_slice());
+        }
+        let legacy = |suffix: &str| {
+            OwnedPath::try_from(format!(
+                "/chunked_transactions/{}{suffix}",
+                hex::encode(tx_hash)
+            ))
+            .unwrap()
+        };
+        host.store_write_all(&legacy("/num_chunks"), &num_chunks.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&legacy("/chunk_hashes"), &rlp.out())
+            .unwrap();
+        host.store_write_all(&legacy("/0"), chunk0).unwrap();
+
+        host.store_write_all(
+            &RefPath::assert_from(b"/base/storage_version"),
+            &68u64.to_le_bytes(),
+        )
+        .unwrap();
+        crate::migration::storage_migration(&mut host).unwrap();
+
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        host.host.add_external(Bytes::from(input_to_bytes(
+            SMART_ROLLUP_ADDRESS,
+            inputs[2].clone(),
+        )));
+        let (host, bk) = (&mut host, &mut bk);
         let inbox_content =
             read_proxy_inbox(host, bk, SMART_ROLLUP_ADDRESS, &CommonConfig::default())
                 .unwrap()
