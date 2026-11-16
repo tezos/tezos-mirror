@@ -43,7 +43,7 @@ let before_merging =
     "before_merging"
     (lazy Rules.(If.(merge_request && not merge_train)))
     ~with_job_trigger:true
-    ~with_condition:true
+    ~merge_request:true
     ~with_datadog_pipeline_trace:false
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
@@ -60,7 +60,7 @@ let merge_train =
         If.(
           merge_request && merge_train
           && (on_tezos_namespace || not merge_request_targets_default_branch))))
-    ~with_condition:true
+    ~merge_request:true
     ~allow_manual_jobs:false
     ~auto_cancel:Types.{on_job_failure = true; on_new_commit = false}
     ~description:

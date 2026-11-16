@@ -59,10 +59,7 @@ let sccache ?error_log ?log ?policy () = {error_log; log; policy}
    but a rule can only test one changeset ([changes:]), and cannot test that
    files of a changeset were not modified. *)
 module Condition : sig
-  (** Conditions for a job to be included.
-
-      Conditions are ignored for pipelines which are not merge request pipelines:
-      jobs are included unconditionally for those pipelines. *)
+  (** Conditions for a job to be included. *)
   type t
 
   (** Condition that never holds (never include the job). *)
@@ -98,6 +95,14 @@ module Condition : sig
       is defined: [job] calls this function with the [paths] of its component.
       [encode] must only be called on conditions that were resolved this way. *)
   val resolve_component_changes : Tezos_ci.Changeset.t -> t -> t
+
+  (** Replace conditions that only make sense for merge requests by the value
+      that GitLab gives them outside of merge request pipelines:
+      changesets by [true_] (GitLab evaluates [changes:] to true in pipelines
+      that have no Git push event, and in other pipelines, we do not want to
+      depend on the changes of the last push), and labels by [false_]
+      ([CI_MERGE_REQUEST_LABELS] is not set outside of merge requests). *)
+  val assume_merge_request_conditions : t -> t
 
   (** Convert a condition to a set of GitLab [rules].
 
@@ -149,6 +154,20 @@ end = struct
     | True, _ | _, True -> True
     | False, c | c, False -> c
     | _ -> Or (a, b)
+
+  let rec assume_merge_request_conditions = function
+    | (True | False) as c -> c
+    | Atom (Changes _ | Component_changes) -> True
+    | Atom (Label _) -> False
+    | Not c -> not_ (assume_merge_request_conditions c)
+    | And (a, b) ->
+        and_
+          (assume_merge_request_conditions a)
+          (assume_merge_request_conditions b)
+    | Or (a, b) ->
+        or_
+          (assume_merge_request_conditions a)
+          (assume_merge_request_conditions b)
 
   let rec resolve_component_changes set = function
     | (True | False | Atom (Changes _ | Label _)) as c -> c
@@ -721,11 +740,11 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
    [interruptible_pipeline] has no impact on the choice of runners.
    Setting [interruptible_publish] to [true] allows publish jobs to use interruptible runners.
 
-   If [with_condition] is [true], the job [rules] will include its conditions.
-   If it is [false], its conditions are ignored.
-   Conditions are typically only used in merge request pipelines such as [before_merging]. *)
+   The job [rules] encode the conditions of jobs. If [merge_request] is [false],
+   conditions that only make sense for merge requests are replaced by their
+   value outside of merge requests (see [assume_merge_request_conditions]). *)
 let convert_graph ?(interruptible_pipeline = true)
-    ?(interruptible_publish = false) ?(with_condition = false)
+    ?(interruptible_publish = false) ?(merge_request = false)
     (graph : fixed_job_graph) : tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
@@ -795,7 +814,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 | Artifacts -> Tezos_ci.Artifacts dep
               in
               (* Compute [rules] from on the job's fixed changeset,
-                 whether we actually want the condition ([with_condition]),
+                 whether this is a merge request pipeline ([merge_request]),
                  and the [trigger]. *)
               let rules =
                 let (when_, allow_failure) :
@@ -814,7 +833,8 @@ let convert_graph ?(interruptible_pipeline = true)
                         | None | Some (Yes | With_exit_codes _) -> None )
                 in
                 let condition =
-                  if with_condition then only_if else Condition.true_
+                  if merge_request then only_if
+                  else Condition.assume_merge_request_conditions only_if
                 in
                 try Condition.encode ?when_ ?allow_failure condition
                 with Failure message ->
@@ -915,16 +935,13 @@ let convert_graph ?(interruptible_pipeline = true)
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
 let convert_jobs ?interruptible_pipeline ?interruptible_publish
-    ?with_job_trigger ?with_condition (jobs : (trigger * job) list) :
+    ?with_job_trigger ?merge_request (jobs : (trigger * job) list) :
     Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
   |> (match with_job_trigger with
      | None -> Fun.id
      | Some job_trigger -> add_dependency_on_job_trigger job_trigger)
-  |> convert_graph
-       ?interruptible_pipeline
-       ?interruptible_publish
-       ?with_condition
+  |> convert_graph ?interruptible_pipeline ?interruptible_publish ?merge_request
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -1042,7 +1059,7 @@ module Global_pipeline = struct
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
     interruptible_pipeline : bool option;
     interruptible_publish : bool option;
-    with_condition : bool option;
+    merge_request : bool option;
     with_job_trigger : bool;
     with_datadog_pipeline_trace : bool;
     allow_manual_jobs : bool;
@@ -1064,7 +1081,7 @@ let check_not_closed what =
     failwith (sf "cannot register %s: Cacio.close has already been called" what)
 
 let new_global_pipeline ?variables ?auto_cancel ?interruptible_pipeline
-    ?interruptible_publish ?with_condition ?(with_job_trigger = false)
+    ?interruptible_publish ?merge_request ?(with_job_trigger = false)
     ?(with_datadog_pipeline_trace = true) ?(allow_manual_jobs = true)
     ~description name rule =
   check_not_closed (sf "pipeline %s" name) ;
@@ -1078,7 +1095,7 @@ let new_global_pipeline ?variables ?auto_cancel ?interruptible_pipeline
         auto_cancel;
         interruptible_pipeline;
         interruptible_publish;
-        with_condition;
+        merge_request;
         with_job_trigger;
         with_datadog_pipeline_trace;
         allow_manual_jobs;
@@ -1138,7 +1155,7 @@ let get_jobs (pipeline : global_pipeline) =
   convert_jobs
     ?interruptible_pipeline:pipeline.interruptible_pipeline
     ?interruptible_publish:pipeline.interruptible_publish
-    ?with_condition:pipeline.with_condition
+    ?merge_request:pipeline.merge_request
     ?with_job_trigger:
       (if pipeline.with_job_trigger then Some job_trigger else None)
     jobs
