@@ -485,6 +485,55 @@ impl MichelsonJournal {
         });
     }
 
+    /// Pop the checkpoint of the open EVM frame, or an all-zero one if
+    /// none is open.
+    fn pop_external_checkpoint(&mut self) -> ExternalCheckpoint {
+        self.external_checkpoints
+            .pop()
+            .unwrap_or(ExternalCheckpoint {
+                snapshot_watermark: 0,
+                receipt_count: 0,
+                origination_index: 0,
+                alias_internals_count: 0,
+            })
+    }
+
+    /// Undo the journal bookkeeping of a reverted EVM frame — everything
+    /// but the durable state, which the caller restores from a snapshot.
+    fn backtrack_frame(&mut self, checkpoint: &ExternalCheckpoint) {
+        // Roll the origination-nonce index back to its value at
+        // checkpoint entry: any `CREATE_CONTRACT` performed inside the
+        // reverted EVM frame is undone (the child KT1 was never
+        // durably written, since Michelson is all-or-nothing inside a
+        // CRAC and the snapshot mechanism also reverts the durable
+        // state), and the freed indices are reusable by the next CRAC.
+        // Done unconditionally so a partial inbound CRAC followed by a
+        // caller-side EVM revert does not leak burned indices.
+        self.origination_index = checkpoint.origination_index;
+        // The MIR internal-operation counter is NOT rolled back: the
+        // receipts of the reverted frame stay in the block (as
+        // backtracked or failed), so their entries must keep counting
+        // towards the per-block internal-operation cap.
+        self.pending_alias_origination_internals
+            .truncate(checkpoint.alias_internals_count);
+        // Drain (not truncate) the CRAC receipts pushed during this
+        // frame, transform their statuses to `BackTracked`, and
+        // migrate them to the backtracked list.  Like
+        // `failed_crac_receipts`, the backtracked list is NOT subject
+        // to further revert: once migrated, a subsequent inner revert
+        // does not re-delete the entry.
+        // Clamped: `receipt_count` can outlive the list.
+        let drain_from = checkpoint
+            .receipt_count
+            .min(self.pending_crac_receipts.len());
+        let drained: Vec<(u64, AppliedOperation)> =
+            self.pending_crac_receipts.drain(drain_from..).collect();
+        for (seq, mut receipt) in drained {
+            backtrack_receipt(&mut receipt);
+            self.backtracked_crac_receipts.push((seq, receipt));
+        }
+    }
+
     /// Open a fresh dispatch slot for the current `serve` invocation.
     /// Paired with [`take_dispatch_result`]; not touched by REVM
     /// checkpoints. The slot has no owner until
@@ -576,15 +625,7 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let checkpoint = self
-            .external_checkpoints
-            .pop()
-            .unwrap_or(ExternalCheckpoint {
-                snapshot_watermark: 0,
-                receipt_count: 0,
-                origination_index: 0,
-                alias_internals_count: 0,
-            });
+        let checkpoint = self.pop_external_checkpoint();
         // The saved origination index is dropped on commit: any
         // increments performed during this frame are kept, so a later
         // CRAC in the same synthetic op continues from the post-frame
@@ -621,47 +662,8 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let checkpoint = self
-            .external_checkpoints
-            .pop()
-            .unwrap_or(ExternalCheckpoint {
-                snapshot_watermark: 0,
-                receipt_count: 0,
-                origination_index: 0,
-                alias_internals_count: 0,
-            });
-        // Roll the origination-nonce index back to its value at
-        // checkpoint entry: any `CREATE_CONTRACT` performed inside the
-        // reverted EVM frame is undone (the child KT1 was never
-        // durably written, since Michelson is all-or-nothing inside a
-        // CRAC and the snapshot mechanism above also reverts the
-        // durable state), and the freed indices are reusable by the
-        // next CRAC.  Done unconditionally so a partial inbound CRAC
-        // followed by a caller-side EVM revert does not leak burned
-        // indices.
-        self.origination_index = checkpoint.origination_index;
-        // The MIR internal-operation counter is NOT rolled back: the
-        // receipts of the reverted frame stay in the block (as
-        // backtracked or failed), so their entries must keep counting
-        // towards the per-block internal-operation cap.
-        self.pending_alias_origination_internals
-            .truncate(checkpoint.alias_internals_count);
-        // Drain (not truncate) the CRAC receipts pushed during this
-        // frame, transform their statuses to `BackTracked`, and
-        // migrate them to the backtracked list.  Like
-        // `failed_crac_receipts`, the backtracked list is NOT subject
-        // to further revert: once migrated, a subsequent inner revert
-        // does not re-delete the entry.
-        // Clamped like `commit_frame`: `receipt_count` can outlive the list.
-        let drain_from = checkpoint
-            .receipt_count
-            .min(self.pending_crac_receipts.len());
-        let drained: Vec<(u64, AppliedOperation)> =
-            self.pending_crac_receipts.drain(drain_from..).collect();
-        for (seq, mut receipt) in drained {
-            backtrack_receipt(&mut receipt);
-            self.backtracked_crac_receipts.push((seq, receipt));
-        }
+        let checkpoint = self.pop_external_checkpoint();
+        self.backtrack_frame(&checkpoint);
         if checkpoint.snapshot_watermark >= self.snapshots.len() {
             return Ok(());
         }
