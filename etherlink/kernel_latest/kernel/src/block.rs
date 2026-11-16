@@ -567,9 +567,9 @@ where
                 (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
-                // The upgrade writes through `safe_host.host` and `bk`, which address
-                // the durable roots: `safe_host.start` below copies them into the mirror.
-                upgrade::possible_sequencer_upgrade(safe_host.host, &mut bk)?;
+                // The upgrade writes through `bk`, which addresses the durable
+                // roots: `safe_host.start` below copies them into the mirror.
+                upgrade::possible_sequencer_upgrade(&mut bk)?;
 
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
@@ -668,8 +668,11 @@ where
             // `promote_block` moves to `/evm/world_state`. Its error is
             // returned after the promotion: a rejected block fails again on
             // each retry.
-            let key_change =
-                upgrade::possible_sequencer_key_change(&mut rk, &mut base, timestamp);
+            let key_change = upgrade::possible_sequencer_key_change(
+                rk.evm_world_state_mut(),
+                &mut base,
+                timestamp,
+            );
             promote_block(
                 rk.host_mut(),
                 &mut base,
@@ -748,7 +751,7 @@ mod tests {
     use revm::primitives::{eip3860::MAX_INITCODE_SIZE, hardfork::SpecId};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::{
-        StorageAccount, SEQUENCER_KEY_CHANGE_PATH,
+        StorageAccount, SEQUENCER_KEY_CHANGE_KEY,
     };
     use sha3::{Digest, Keccak256};
     use std::str::FromStr;
@@ -3874,10 +3877,11 @@ mod tests {
         store_inbox_blueprint(&mut base, almost_empty_blueprint())
             .expect("Should store a blueprint");
         store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        rk.evm_world_state_mut()
+            .set(&SEQUENCER_KEY_CHANGE_KEY, b"not a key change")
+            .unwrap();
         drop(rk);
         drop(base);
-        host.store_write_all(&SEQUENCER_KEY_CHANGE_PATH, b"not a key change")
-            .unwrap();
 
         let bk = load_keyspaces(&mut host).unwrap();
         let err = produce(
@@ -3890,7 +3894,11 @@ mod tests {
         )
         .expect_err("The broken key change should have been returned");
 
-        assert_eq!(err.to_string(), "Failed to decode sequencer key change");
+        assert_eq!(
+            err.to_string(),
+            "at key /sequencer_key_change of key space /tmp/evm/world_state: \
+             value does not decode as rlp: RlpExpectedToBeList"
+        );
         let base = load_base(&mut host).unwrap();
         check_current_block_number(&base, 0);
     }

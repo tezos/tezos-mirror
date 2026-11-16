@@ -15,15 +15,13 @@ use helpers::is_incomplete;
 use nom::error::ParseError;
 use nom::Finish;
 use primitive_types::{H256, U256};
-use rlp::Decodable;
 
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::NomReader;
-use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_nom::error::DecodeError;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 
 /// The size of one 256 bit word. Size in bytes.
@@ -164,32 +162,6 @@ pub fn write_u64_le(
 ) -> Result<(), Error> {
     host.store_write(path, value.to_le_bytes().as_slice(), 0)
         .map_err(Error::from)
-}
-
-/// Return a decodable value from storage as rlp bytes
-/// at the given `path`.
-pub fn read_rlp<T: Decodable>(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> Result<T, Error> {
-    let bytes = host.store_read_all(path)?;
-    FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
-}
-
-/// Return a potential decodable value from storage as rlp bytes
-/// at the given `path`.
-///
-/// If there is no data, `None` is returned.
-pub fn read_optional_rlp<T: Decodable>(
-    host: &impl StorageV1,
-    path: &impl Path,
-) -> Result<Option<T>, anyhow::Error> {
-    if let Some(ValueType::Value) = host.store_has(path)? {
-        let elt = read_rlp(host, path)?;
-        Ok(Some(elt))
-    } else {
-        Ok(None)
-    }
 }
 
 /// Store the `value` into the storage at the given `path`

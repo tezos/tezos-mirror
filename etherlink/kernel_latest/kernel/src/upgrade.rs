@@ -9,7 +9,7 @@ use crate::configuration::CommonConfig;
 use crate::fallback_upgrade::backup_current_kernel;
 use core::fmt;
 
-use crate::error::UpgradeProcessError;
+use crate::error::{Error, UpgradeProcessError};
 use crate::event::Event;
 use crate::storage;
 use crate::storage::{store_sequencer, store_sequencer_pool_address};
@@ -25,24 +25,22 @@ use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
+use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
-use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError, KeySpaceLoader};
-use tezos_storage::read_optional_rlp;
+use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
 pub const KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/kernel_root_hash");
 use revm_etherlink::storage::sequencer_key_change::increment_sequencer_change_counter;
 use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_KEY;
-use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_KEY;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
@@ -220,15 +218,11 @@ fn delete_sequencer_upgrade(evm_world_state: &mut impl KeySpace) {
     evm_world_state.delete(&GOVERNANCE_SEQUENCER_UPGRADE_KEY);
 }
 
-fn sequencer_upgrade<Host>(
-    host: &mut Host,
+fn sequencer_upgrade(
     evm_world_state: &mut impl KeySpace,
     pool_address: H160,
     sequencer: &PublicKey,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-{
+) -> Result<(), KeySpaceError> {
     log!(Info, "sequencer upgrade initialisation.");
 
     store_sequencer(evm_world_state, sequencer)?;
@@ -241,13 +235,12 @@ where
     increment_sequencer_change_counter(evm_world_state)?;
     store_sequencer_pool_address(evm_world_state, pool_address)?;
     delete_sequencer_upgrade(evm_world_state);
-    delete_sequencer_key_change(host)?;
+    delete_sequencer_key_change(evm_world_state);
     log!(Info, "Sequencer has been updated.");
     Ok(())
 }
 
 pub fn possible_sequencer_upgrade(
-    host: &mut impl StorageV1,
     bk: &mut BlueprintKeyspaces<impl KeySpace>,
 ) -> anyhow::Result<()> {
     let upgrade = read_sequencer_upgrade(bk.evm_world_state())?;
@@ -255,7 +248,6 @@ pub fn possible_sequencer_upgrade(
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(bk.base())?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(
-                host,
                 bk.evm_world_state_mut(),
                 upgrade.pool_address,
                 &upgrade.sequencer,
@@ -266,45 +258,43 @@ pub fn possible_sequencer_upgrade(
     Ok(())
 }
 
-pub use revm_etherlink::storage::sequencer_key_change::SequencerKeyChange as EVMBasedSequencerKeyChange;
+pub use revm_etherlink::storage::sequencer_key_change::{
+    read_sequencer_key_change, SequencerKeyChange as EVMBasedSequencerKeyChange,
+};
 
-pub fn read_sequencer_key_change(
-    host: &impl StorageV1,
-) -> anyhow::Result<Option<EVMBasedSequencerKeyChange>> {
-    let path = OwnedPath::from(SEQUENCER_KEY_CHANGE_PATH);
-    read_optional_rlp(host, &path).context("Failed to decode sequencer key change")
+fn delete_sequencer_key_change(evm_world_state: &mut impl KeySpace) {
+    evm_world_state.delete(&SEQUENCER_KEY_CHANGE_KEY);
 }
 
-fn delete_sequencer_key_change(host: &mut impl StorageV1) -> anyhow::Result<()> {
-    host.store_delete_value(&SEQUENCER_KEY_CHANGE_PATH)
-        .context("Failed to delete sequencer key change")
-}
-
-fn sequencer_key_change<Host>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+fn sequencer_key_change(
+    evm_world_state: &mut impl KeySpace,
     key_change: EVMBasedSequencerKeyChange,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1 + KeySpaceLoader,
-{
+) -> Result<(), KeySpaceError> {
     log!(Info, "EVM based sequencer key change initialisation.");
 
-    store_sequencer(rk.evm_world_state_mut(), key_change.sequencer_key())?;
-    delete_sequencer_key_change(rk.host_mut())?;
+    store_sequencer(evm_world_state, key_change.sequencer_key())?;
+    delete_sequencer_key_change(evm_world_state);
 
     log!(Info, "Sequencer key has been updated.");
     Ok(())
 }
 
-fn apply_active_sequencer_key_change<Host: StorageV1 + KeySpaceLoader>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+/// Applies the pending sequencer key change once `evm_timestamp` reaches its
+/// activation timestamp. Does nothing when no change is pending or when it is
+/// not active yet.
+///
+/// The pending change is read from and deleted in `evm_world_state`, the new
+/// key is written there, and the blueprints of `base` are cleared.
+/// Errors when the pending change does not decode or when a write fails.
+pub fn apply_active_sequencer_key_change(
+    evm_world_state: &mut impl KeySpace,
     base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
-) -> anyhow::Result<()> {
-    let upgrade = read_sequencer_key_change(rk.host())?;
+) -> Result<(), Error> {
+    let upgrade = read_sequencer_key_change(evm_world_state)?;
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {
-            sequencer_key_change(rk, upgrade)?;
+            sequencer_key_change(evm_world_state, upgrade)?;
             blueprint_storage::clear_all_blueprints(base)?;
         }
     }
@@ -320,14 +310,14 @@ fn apply_active_sequencer_key_change<Host: StorageV1 + KeySpaceLoader>(
 /// of `base` are cleared.
 /// Errors when the pending change does not decode or when a write fails, and
 /// logs the error.
-pub fn possible_sequencer_key_change<Host: StorageV1 + KeySpaceLoader>(
-    rk: &mut RuntimeKeyspaces<'_, Host>,
+pub fn possible_sequencer_key_change(
+    evm_world_state: &mut impl KeySpace,
     base: &mut impl KeySpace,
     evm_timestamp: Timestamp,
-) -> anyhow::Result<()> {
-    apply_active_sequencer_key_change(rk, base, evm_timestamp).inspect_err(|err| {
-        log!(Error, "Failed to apply the sequencer key change: {err:?}")
-    })
+) -> Result<(), Error> {
+    apply_active_sequencer_key_change(evm_world_state, base, evm_timestamp).inspect_err(
+        |err| log!(Error, "Failed to apply the sequencer key change: {err:?}"),
+    )
 }
 
 #[cfg(test)]
@@ -339,9 +329,14 @@ mod tests {
     use revm_etherlink::helpers::storage::u256_to_le_bytes;
     use revm_etherlink::storage::sequencer_key_change::read_sequencer_change_counter;
     use revm_etherlink::storage::sequencer_key_change::store_sequencer_key_change;
+    use revm_etherlink::storage::world_state_handler::read_sequencer;
     use tezos_ethereum::keyspace::KeySpaceExtU256;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        RuntimeKeyspaces, EVM_WORLD_STATE_KEYSPACE_NAME,
+    };
     use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+    use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     fn test_public_key() -> PublicKey {
         PublicKey::from_b58check("edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2")
@@ -374,6 +369,25 @@ mod tests {
             rk.host().store_read_all(&legacy_path).unwrap(),
             u256_to_le_bytes(PrimitiveU256::from(8))
         );
+    }
+
+    #[test]
+    fn sequencer_key_change_keeps_the_legacy_absolute_path() {
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let legacy_path = RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
+        let key_change =
+            EVMBasedSequencerKeyChange::new(test_public_key(), Timestamp::from(100i64));
+        let bytes = key_change.rlp_bytes();
+
+        rk.host_mut().store_write_all(&legacy_path, &bytes).unwrap();
+        let stored = read_sequencer_key_change(rk.evm_world_state())
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.sequencer_key(), key_change.sequencer_key());
+
+        store_sequencer_key_change(rk.evm_world_state_mut(), key_change).unwrap();
+        assert_eq!(rk.host().store_read_all(&legacy_path).unwrap(), bytes);
     }
 
     // A governance change advances the change counter by exactly one, and
@@ -413,11 +427,12 @@ mod tests {
             Timestamp::from(50i64),
         )
         .unwrap();
-        possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
+        possible_sequencer_upgrade(&mut bk).unwrap();
         assert_eq!(
             read_sequencer_change_counter(bk.evm_world_state()),
             U256::ZERO
         );
+        assert_eq!(read_sequencer(bk.evm_world_state()).unwrap(), None);
 
         // At/after activation the upgrade applies exactly once: counter is +1.
         storage::store_last_info_per_level_timestamp(
@@ -425,17 +440,21 @@ mod tests {
             Timestamp::from(100i64),
         )
         .unwrap();
-        possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
+        possible_sequencer_upgrade(&mut bk).unwrap();
         assert_eq!(
             read_sequencer_change_counter(bk.evm_world_state()),
             U256::ONE
+        );
+        assert_eq!(
+            read_sequencer(bk.evm_world_state()).unwrap(),
+            Some(test_public_key())
         );
 
         // The applied upgrade is deleted, so a later call applies nothing.
         assert!(read_sequencer_upgrade(bk.evm_world_state())
             .unwrap()
             .is_none());
-        possible_sequencer_upgrade(&mut host, &mut bk).unwrap();
+        possible_sequencer_upgrade(&mut bk).unwrap();
         assert_eq!(
             read_sequencer_change_counter(bk.evm_world_state()),
             U256::ONE
@@ -450,36 +469,48 @@ mod tests {
     fn precompile_change_apply_does_not_increment_counter() {
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut evm_world_state =
+            host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME).unwrap();
 
         // Simulate the precompile store-time effects: the pending change is
         // stored and the counter is bumped exactly once.
         store_sequencer_key_change(
-            rk.host_mut(),
+            &mut evm_world_state,
             EVMBasedSequencerKeyChange::new(test_public_key(), Timestamp::from(100i64)),
         )
         .unwrap();
-        increment_sequencer_change_counter(rk.evm_world_state_mut()).unwrap();
-        assert_eq!(
-            read_sequencer_change_counter(rk.evm_world_state()),
-            U256::ONE
-        );
+        increment_sequencer_change_counter(&mut evm_world_state).unwrap();
+        assert_eq!(read_sequencer_change_counter(&evm_world_state), U256::ONE);
 
         // Before activation nothing applies.
-        possible_sequencer_key_change(&mut rk, &mut base, Timestamp::from(50i64))
-            .unwrap();
-        assert_eq!(
-            read_sequencer_change_counter(rk.evm_world_state()),
-            U256::ONE
-        );
+        possible_sequencer_key_change(
+            &mut evm_world_state,
+            &mut base,
+            Timestamp::from(50i64),
+        )
+        .unwrap();
+        assert_eq!(read_sequencer_change_counter(&evm_world_state), U256::ONE);
+        assert!(read_sequencer_key_change(&evm_world_state)
+            .unwrap()
+            .is_some());
+        assert_eq!(read_sequencer(&evm_world_state).unwrap(), None);
 
         // At/after activation the change applies but the counter is unchanged.
-        possible_sequencer_key_change(&mut rk, &mut base, Timestamp::from(100i64))
-            .unwrap();
+        possible_sequencer_key_change(
+            &mut evm_world_state,
+            &mut base,
+            Timestamp::from(100i64),
+        )
+        .unwrap();
+        assert_eq!(read_sequencer_change_counter(&evm_world_state), U256::ONE);
+        // The new key is stored and the pending change is deleted.
         assert_eq!(
-            read_sequencer_change_counter(rk.evm_world_state()),
-            U256::ONE
+            read_sequencer(&evm_world_state).unwrap(),
+            Some(test_public_key())
         );
+        assert!(read_sequencer_key_change(&evm_world_state)
+            .unwrap()
+            .is_none());
     }
 
     fn upgrade_with(sequencer: PublicKey) -> SequencerUpgrade {

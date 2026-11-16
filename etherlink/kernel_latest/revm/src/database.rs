@@ -451,7 +451,10 @@ where
         if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
             abort_on_error!(
                 self,
-                store_sequencer_key_change(self.rk.host_mut(), new_sequencer_key_change),
+                store_sequencer_key_change(
+                    self.rk.evm_world_state_mut(),
+                    new_sequencer_key_change,
+                ),
                 "DatabaseCommitPrecompileStateChanges `store_sequencer_key_change`"
             );
         }

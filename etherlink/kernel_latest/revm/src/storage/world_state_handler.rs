@@ -13,7 +13,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::public_key::PublicKey;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::keyspace::KeySpaceExtU256;
-use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_storage::keyspace::KeySpaceExtB58;
@@ -37,10 +37,9 @@ pub fn read_ticketer(
     evm_world_state.get_b58_kt1(&NATIVE_TOKEN_TICKETER_KEY)
 }
 
-/// Path where a possible waiting sequencer upgrade triggered by a precompile
-/// is store.
-pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
+/// Key of the pending sequencer key change that the `change_sequencer_key`
+/// precompile stores, inside the `/evm/world_state` keyspace.
+pub const SEQUENCER_KEY_CHANGE_KEY: Key = Key::from_static(b"/sequencer_key_change");
 
 /// Reads the sequencer public key from the `/evm/world_state` keyspace.
 ///
