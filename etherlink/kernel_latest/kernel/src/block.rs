@@ -664,6 +664,12 @@ where
                         anyhow::anyhow!("seeding address registry failed: {e}")
                     })?;
             }
+            // The key change writes into the block mirror, which
+            // `promote_block` moves to `/evm/world_state`. Its error is
+            // returned after the promotion: a rejected block fails again on
+            // each retry.
+            let key_change =
+                upgrade::possible_sequencer_key_change(&mut rk, &mut base, timestamp);
             promote_block(
                 rk.host_mut(),
                 &mut base,
@@ -673,13 +679,7 @@ where
                 config,
                 included_delayed_transactions,
             )?;
-            // The mirror is promoted, so its `/tmp` copy is gone: the
-            // sequencer key change runs on the live host.
-            upgrade::possible_sequencer_key_change(
-                rk.host_mut().host,
-                &mut base,
-                timestamp,
-            )?;
+            key_change?;
 
             if config.common.evm_node_flag {
                 Ok(ComputationResult::Finished)
@@ -747,7 +747,9 @@ mod tests {
     use primitive_types::{H160, U256};
     use revm::primitives::{eip3860::MAX_INITCODE_SIZE, hardfork::SpecId};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
-    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use revm_etherlink::storage::world_state_handler::{
+        StorageAccount, SEQUENCER_KEY_CHANGE_PATH,
+    };
     use sha3::{Digest, Keccak256};
     use std::str::FromStr;
     use tezos_crypto_rs::hash::HashTrait;
@@ -3857,6 +3859,40 @@ mod tests {
         .expect("Empty block should have been produced");
         let base = load_base(&mut host).unwrap();
         check_current_block_number(&base, 2);
+    }
+
+    /// Makes sure that a pending sequencer key change that does not decode
+    /// does not stop the chain: the block is promoted, and `produce` returns
+    /// the error.
+    #[test]
+    fn test_broken_sequencer_key_change_promotes_the_block() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        // SafeStorage::start()'s store_copy needs each safe root to exist.
+        init_safe_storage_roots(rk.host_mut());
+        store_inbox_blueprint(&mut base, almost_empty_blueprint())
+            .expect("Should store a blueprint");
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        drop(rk);
+        drop(base);
+        host.store_write_all(&SEQUENCER_KEY_CHANGE_PATH, b"not a key change")
+            .unwrap();
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        let err = produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect_err("The broken key change should have been returned");
+
+        assert_eq!(err.to_string(), "Failed to decode sequencer key change");
+        let base = load_base(&mut host).unwrap();
+        check_current_block_number(&base, 0);
     }
 
     fn hash_from_nonce(nonce: u64) -> TransactionHash {

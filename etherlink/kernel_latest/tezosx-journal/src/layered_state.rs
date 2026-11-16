@@ -354,10 +354,11 @@ mod tests {
             )
         }
 
-        fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
+        fn sequencer(&self) -> Result<PublicKey, KeySpaceError<StorageReadErrorKind>> {
             Ok(PublicKey::from_b58check(
                 "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
-            )?)
+            )
+            .unwrap())
         }
 
         fn governance_sequencer_upgrade_exists(&self) -> bool {

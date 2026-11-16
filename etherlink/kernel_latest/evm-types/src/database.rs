@@ -5,9 +5,7 @@
 
 use alloy_primitives::{Address, U256};
 use revm_interpreter::Gas;
-use tezos_crypto_rs::{
-    base58::FromBase58CheckError, hash::ContractKt1Hash, public_key::PublicKey,
-};
+use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 use tezos_evm_logging::Level;
 use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
@@ -26,10 +24,6 @@ pub enum PrecompileStateError {
     Path(#[from] PathError),
     #[error(transparent)]
     Key(#[from] KeyError),
-    #[error("UTF-8 decode: {0}")]
-    Utf8(#[from] std::str::Utf8Error),
-    #[error("Base58Check decode: {0}")]
-    Base58(#[from] FromBase58CheckError),
     #[error("RLP decode: {0}")]
     Rlp(#[from] rlp::DecoderError),
 }
@@ -51,7 +45,7 @@ pub trait DatabasePrecompileStateChanges {
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<U256, PrecompileStateError>;
-    fn sequencer(&self) -> Result<PublicKey, PrecompileStateError>;
+    fn sequencer(&self) -> Result<PublicKey, KeySpaceError<StorageReadErrorKind>>;
     fn governance_sequencer_upgrade_exists(&self) -> bool;
     /// Counter the next sequencer key change must be signed against, used to
     /// make a captured change calldata non-replayable once the key rotates again.

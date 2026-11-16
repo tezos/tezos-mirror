@@ -250,9 +250,7 @@ const DELAYED_INBOX_TIMEOUT_KEY: Key = Key::from_static(b"/delayed_inbox_timeout
 // `/base/delayed_inbox_min_levels`.
 const DELAYED_INBOX_MIN_LEVELS_KEY: Key = Key::from_static(b"/delayed_inbox_min_levels");
 
-// Path to the tz1 administrating the sequencer. If there is nothing
-// at this path, the kernel is in proxy mode.
-use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_KEY;
 
 // Key to the one-shot "keep rollup events" flag, inside the `/base` keyspace.
 // Written by the installer/node; the reader goes through the `/base` keyspace.
@@ -968,21 +966,6 @@ pub fn delete_block_in_progress(host: &mut impl StorageV1) -> anyhow::Result<()>
         .context("Failed to delete block in progress")
 }
 
-pub fn sequencer(host: &impl StorageV1) -> anyhow::Result<Option<PublicKey>> {
-    if host.store_has(&SEQUENCER_KEY_PATH)?.is_some() {
-        let bytes = host.store_read_all(&SEQUENCER_KEY_PATH)?;
-        let Ok(tz1_b58) = String::from_utf8(bytes) else {
-            return Ok(None);
-        };
-        let Ok(tz1) = PublicKey::from_b58check(&tz1_b58) else {
-            return Ok(None);
-        };
-        Ok(Some(tz1))
-    } else {
-        Ok(None)
-    }
-}
-
 pub fn enable_dal(base: &impl KeySpace, is_evm_node: bool) -> bool {
     // When run from the EVM node, the DAL feature is always considered as
     // disabled. The flag is passed as a boolean because it is read through
@@ -1061,18 +1044,23 @@ pub fn read_dal_publishers_whitelist(
     }
 }
 
-pub fn remove_sequencer(host: &mut impl StorageV1) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER_KEY_PATH).map_err(Into::into)
+/// Removes the sequencer public key from the `/evm/world_state` keyspace.
+/// Does nothing when no key is stored.
+pub fn remove_sequencer(evm_world_state: &mut impl KeySpace) {
+    evm_world_state.delete(&SEQUENCER_KEY_KEY);
 }
 
+/// Stores the base58check encoding of `public_key` in the
+/// `/evm/world_state` keyspace.
+///
+/// Returns an error when the write fails.
 pub fn store_sequencer(
-    host: &mut impl StorageV1,
+    evm_world_state: &mut impl KeySpace,
     public_key: &PublicKey,
-) -> anyhow::Result<()> {
+) -> Result<(), KeySpaceError> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write_all(&SEQUENCER_KEY_PATH, bytes)
-        .map_err(Into::into)
+    evm_world_state.set(&SEQUENCER_KEY_KEY, bytes)
 }
 
 pub fn clear_events(base: &mut impl KeySpace) -> anyhow::Result<()> {
@@ -1180,6 +1168,7 @@ mod tests {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -2002,6 +1991,36 @@ mod tests {
             super::read_sequencer_pool_address(rk.evm_world_state()),
             Some(pool)
         );
+    }
+
+    /// The sequencer key resolves to `/evm/world_state/sequencer`.
+    #[test]
+    fn sequencer_key_keeps_its_durable_path() {
+        use revm_etherlink::storage::world_state_handler::read_sequencer;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let public_key = PublicKey::from_b58check(
+            "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
+        )
+        .unwrap();
+
+        assert_eq!(read_sequencer(rk.evm_world_state()).unwrap(), None);
+        super::store_sequencer(rk.evm_world_state_mut(), &public_key).unwrap();
+
+        assert_eq!(
+            rk.host()
+                .store_read_all(&RefPath::assert_from(b"/evm/world_state/sequencer"))
+                .unwrap(),
+            public_key.to_b58check().as_bytes()
+        );
+        assert_eq!(
+            read_sequencer(rk.evm_world_state()).unwrap(),
+            Some(public_key)
+        );
+
+        super::remove_sequencer(rk.evm_world_state_mut());
+        assert_eq!(read_sequencer(rk.evm_world_state()).unwrap(), None);
     }
 
     /// The maximum gas per transaction resolves to

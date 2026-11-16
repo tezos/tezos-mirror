@@ -971,7 +971,7 @@ mod test {
             sequencer_key_change::{read_sequencer_change_counter, SequencerKeyChange},
             world_state_handler::{
                 AccountInfo, AccountOrigin, StorageAccount, NATIVE_TOKEN_TICKETER_KEY,
-                SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
+                SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_KEY,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
@@ -2446,8 +2446,8 @@ mod test {
 
         let pk_b58 = PublicKey::to_b58check(&public_key);
         let storage_bytes = String::as_bytes(&pk_b58);
-        rk.host_mut()
-            .store_write_all(&SEQUENCER_KEY_PATH, storage_bytes)
+        rk.evm_world_state_mut()
+            .set(&SEQUENCER_KEY_KEY, storage_bytes)
             .unwrap();
 
         // The sequencer signs the new key bound to the chain id and the current
@@ -2582,8 +2582,8 @@ mod test {
         )
         .unwrap();
         let pk_b58 = PublicKey::to_b58check(&public_key);
-        rk.host_mut()
-            .store_write_all(&SEQUENCER_KEY_PATH, String::as_bytes(&pk_b58))
+        rk.evm_world_state_mut()
+            .set(&SEQUENCER_KEY_KEY, String::as_bytes(&pk_b58))
             .unwrap();
 
         // Replacement key: secp256k1 tag (0x01), compression byte 0x02, then 32

@@ -12,8 +12,8 @@ use crate::storage::{
         write_sequencer_change_counter,
     },
     world_state_handler::{
-        read_ticketer, AccountInfo, AccountOrigin, StorageAccount,
-        GOVERNANCE_SEQUENCER_UPGRADE_KEY, NATIVE_TOKEN_TICKETER_KEY, SEQUENCER_KEY_PATH,
+        read_sequencer, read_ticketer, AccountInfo, AccountOrigin, StorageAccount,
+        GOVERNANCE_SEQUENCER_UPGRADE_KEY, NATIVE_TOKEN_TICKETER_KEY, SEQUENCER_KEY_KEY,
     },
 };
 use evm_inspectors::HasHost;
@@ -371,10 +371,15 @@ where
         })
     }
 
-    fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
-        let bytes = self.rk.host().store_read_all(&SEQUENCER_KEY_PATH)?;
-        let s = std::str::from_utf8(&bytes)?;
-        Ok(PublicKey::from_b58check(s)?)
+    fn sequencer(&self) -> Result<PublicKey, KeySpaceError<StorageReadErrorKind>> {
+        let evm_world_state = self.rk.evm_world_state();
+        read_sequencer(evm_world_state)?.ok_or_else(|| {
+            KeySpaceError::read(
+                evm_world_state.name(),
+                &SEQUENCER_KEY_KEY,
+                ReadKind::Ext(StorageReadErrorKind::NotFound),
+            )
+        })
     }
 
     fn governance_sequencer_upgrade_exists(&self) -> bool {
