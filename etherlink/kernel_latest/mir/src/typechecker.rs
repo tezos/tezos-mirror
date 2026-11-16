@@ -399,15 +399,29 @@ impl TcError {
     }
 }
 
-/// The payload of a typechecking error about the Micheline `m`: its binary
-/// encoding, which consumes `gas` as [Micheline::encode] does. Encoding takes
-/// time linear in the size of `m`, contrary to its `Debug` rendering, which
-/// converts integers to decimal.
+/// The string "Micheline value too large" in binary Micheline: the string
+/// tag, the 4-byte length (25), then the UTF-8 bytes. A typechecking error
+/// carries it in place of a Micheline whose binary encoding takes more than
+/// [`crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES`].
+pub const MICHELINE_PAYLOAD_PLACEHOLDER_BYTES: &[u8] =
+    b"\x01\x00\x00\x00\x19Micheline value too large";
+
+/// The payload of a typechecking error about the Micheline `m`: its
+/// binary encoding, which consumes `gas` as [Micheline::encode]
+/// does. Encoding takes time linear in the size of `m`, contrary to
+/// its `Debug` rendering, which converts integers to decimal. The
+/// produced value is guaranteed to never take more than
+/// [MICHELINE_PAYLOAD_PLACEHOLDER_BYTES], a placeholder is used if
+/// the serialization of the Micheline node is larger than that.
 fn micheline_payload(
     m: &Micheline<'_>,
     gas: &mut Gas,
 ) -> Result<MichelineBytes, TcError> {
-    Ok(MichelineBytes(m.encode(gas)??))
+    let bytes = m.encode(gas)??;
+    if bytes.len() > crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES {
+        return Ok(MichelineBytes(MICHELINE_PAYLOAD_PLACEHOLDER_BYTES.to_vec()));
+    }
+    Ok(MichelineBytes(bytes))
 }
 
 impl TcError {
@@ -13566,6 +13580,28 @@ code { DROP ;
             TcError::InvalidTypeProperty(TypeProperty::BigMapValue, _) => {}
             other => panic!("expected BigMapValue rejection; got {other:?}"),
         }
+    }
+
+    /// Above the cap, the payload of a typechecking error is the binary
+    /// Micheline of the placeholder string.
+    #[test]
+    fn micheline_payload_above_the_cap_is_the_placeholder() {
+        let payload = |s: String| {
+            micheline_payload(&Micheline::String(s), &mut Gas::default()).unwrap()
+        };
+        let build_string = |n: usize| "a".repeat(n);
+        assert_eq!(
+            payload(build_string(
+                crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES - 5
+            ))
+            .0
+            .len(),
+            crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
+        );
+        assert_eq!(
+            payload("a".repeat(crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES - 4)),
+            payload("Micheline value too large".to_owned())
+        );
     }
 
     // The payload of `InvalidValueForType` is the rejected value in binary
