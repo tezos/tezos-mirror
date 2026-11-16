@@ -145,6 +145,27 @@ if [ "$1" = "--tps" ]; then
   opam install caqti-driver-postgresql
 fi
 
+# Install the Sapling parameters where Octez executables look for them
+# (see [find_params] in src/lib_sapling/rustzcash.ml). They are committed in
+# this repository, in images/ci/zcash-params.
+#
+# Two Docker builds copy this script without that directory. Neither needs the
+# parameters in the switch, so the [else] branch only reports and continues:
+# - build.Dockerfile: the executables it produces run in the alpine runtime
+#   image, which has the parameters in /usr/share/zcash-params (see
+#   images/ci/Dockerfile.runtime), the last directory [find_params] tries;
+# - images/base-images/Dockerfile.debian-build: the Debian packaging takes the
+#   parameters from the repository (see scripts/packaging/build-deb-local.sh).
+zcash_params_src="$src_dir/images/ci/zcash-params"
+if [ -d "$zcash_params_src" ]; then
+  mkdir -p "$OPAM_SWITCH_PREFIX/share/zcash-params"
+  cp "$zcash_params_src"/sapling-output.params \
+    "$zcash_params_src"/sapling-spend.params \
+    "$OPAM_SWITCH_PREFIX/share/zcash-params/"
+else
+  echo "$zcash_params_src not found, not installing the Sapling parameters."
+fi
+
 # add back the default repo if asked to or it was present in the first
 # place.  we add the rank here even if it wasn't there just to be on
 # the safe side
