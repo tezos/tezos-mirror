@@ -54,13 +54,10 @@ let sccache ?error_log ?log ?policy () = {error_log; log; policy}
    because predicates are easier to reason with than GitLab's rules.
    This module can then encode those predicates into GitLab rules.
 
-   This module does not support conjunctions because GitLab rules are not general enough.
-   To convince yourself, try to encode [(changes a.ml or b.ml) and (changes c.ml or d.ml)]
-   into GitLab rules.
-
-   And since the negation of a disjunction is a conjunction,
-   this module does not support negations
-   for the same reason it does not support disjunctions. *)
+   Not all predicates can be encoded into GitLab rules, so [encode] is partial.
+   In GitLab rules, conditions on variables ([if:]) can be combined freely,
+   but a rule can only test one changeset ([changes:]), and cannot test that
+   files of a changeset were not modified. *)
 module Condition : sig
   (** Conditions for a job to be included.
 
@@ -75,122 +72,280 @@ module Condition : sig
   val true_ : t
 
   (** Include the job if the merge request modifies
-      at least one of the files in a given changeset. *)
-  val changes : Tezos_ci.Changeset.t -> t
+      at least one of the files that match given paths. *)
+  val changes : string list -> t
 
-  (** Include the job if the merge request labels include any of the given labels. *)
-  val label : string list -> t
+  (** Include the job if the merge request modifies
+      at least one of the files of the component of the job. *)
+  val component_changes : t
+
+  (** Include the job if the merge request has a given label. *)
+  val mr_has_label : string -> t
+
+  (** Negation: include the job if a condition does not hold. *)
+  val not_ : t -> t
+
+  (** Conjunction: include the job if both conditions hold. *)
+  val ( && ) : t -> t -> t
 
   (** Disjunction: include the job if at least one condition holds. *)
-  val or_ : t -> t -> t
+  val ( || ) : t -> t -> t
+
+  (** Replace [component_changes] by [changes] of a given changeset.
+
+      [component_changes] lets users refer to the changeset of the component
+      of a job without knowing it. The changeset is only known when the job
+      is defined: [job] calls this function with the [paths] of its component.
+      [encode] must only be called on conditions that were resolved this way. *)
+  val resolve_component_changes : Tezos_ci.Changeset.t -> t -> t
 
   (** Convert a condition to a set of GitLab [rules].
 
       [when_] should be positive ([Always], [On_success] or [Manual]).
-      It is the [when_] clause for rules when the condition holds. *)
+      It is the [when_] clause for rules when the condition holds.
+
+      Fails if the condition cannot be encoded, i.e. if it contains
+      the negation of a changeset, or a conjunction of two changesets,
+      once put in disjunctive normal form. *)
   val encode :
     ?when_:Gitlab_ci.Types.when_ ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_rule ->
     t ->
     Gitlab_ci.Types.job_rule list option
 end = struct
-  type base_predicate =
-    | False
-    | True
+  type atom =
     | Changes of Tezos_ci.Changeset.t
-    | Label of string list
+    (* The changeset of the component of the job. [Changes] could express
+       the same condition, but users would then need to know where the paths
+       of their component are defined. Since it is also the default condition
+       of jobs, [component_changes || c] reads as "the default, or [c]".
+       It is replaced by [Changes] when the job is defined,
+       see [resolve_component_changes]. *)
+    | Component_changes
+    | Label of string
 
-  (* Conditions are disjunctions of base predicates.
-     Following the usual conventions, the empty disjunction is equivalent to [True]. *)
-  type t = base_predicate list
+  type t = True | False | Atom of atom | Not of t | And of t * t | Or of t * t
 
-  let false_ = [False]
+  let false_ = False
 
-  let true_ = [True]
+  let true_ = True
 
-  let changes set = [Changes set]
+  let changes paths = Atom (Changes (Tezos_ci.Changeset.make paths))
 
-  let label label = [Label label]
+  let component_changes = Atom Component_changes
 
-  let or_ = ( @ )
+  let mr_has_label label = Atom (Label label)
 
-  let empty_changeset = Tezos_ci.Changeset.make []
+  let not_ = function True -> False | False -> True | Not c -> c | c -> Not c
+
+  let and_ a b =
+    match (a, b) with
+    | False, _ | _, False -> False
+    | True, c | c, True -> c
+    | _ -> And (a, b)
+
+  let or_ a b =
+    match (a, b) with
+    | True, _ | _, True -> True
+    | False, c | c, False -> c
+    | _ -> Or (a, b)
+
+  let rec resolve_component_changes set = function
+    | (True | False | Atom (Changes _ | Label _)) as c -> c
+    | Atom Component_changes -> Atom (Changes set)
+    | Not c -> not_ (resolve_component_changes set c)
+    | And (a, b) ->
+        and_ (resolve_component_changes set a) (resolve_component_changes set b)
+    | Or (a, b) ->
+        or_ (resolve_component_changes set a) (resolve_component_changes set b)
+
+  (* ENCODING
+
+     The condition is put in disjunctive normal form, i.e. as a disjunction
+     of terms, where each term is a conjunction of at most one changeset
+     and of an [if:] expression. Terms are then encoded as rules that include
+     the job: [changes: changeset, if: expression]. The job is included
+     if any of the rules matches, i.e. if the disjunction holds.
+
+     This only supports the conditions that our pipelines actually need.
+     It fails if a term needs to test that files of a changeset were not
+     modified, or that files of two different changesets were modified.
+     Some of those conditions could be encoded with more work:
+     - A term [changes a && not (changes b) && e] could be encoded with a rule
+       [changes: b, if: e, when: never] followed by [changes: a, if: e],
+       provided that this term comes last, since the [never] rule would
+       also exclude the terms that come after it.
+     - If, assuming that files of a changeset [a] were modified,
+       the condition no longer depends on changesets, it can be decided first:
+       [changes: a, if: (the rest)], then [changes: a, when: never],
+       followed by the rules for the condition assuming that files
+       of [a] were not modified.
+     - One can also split the condition on the value of a predicate of an
+       [if:] expression, encode both halves, and add this predicate (resp. its
+       negation) to the [if:] of each rule of the first (resp. second) half:
+       the rules of the two halves then cannot match the same pipelines.
+     Changesets that are subsets of each other could also be simplified,
+     e.g. [changes a && changes (a @ b)] is [changes a]. *)
+
+  (* [if:] expressions, i.e. conditions without changesets. *)
+  type if_expression =
+    | If_true
+    | If_false
+    | If_label of {label : string; positive : bool}
+    | If_and of if_expression * if_expression
+    | If_or of if_expression * if_expression
+
+  let if_and a b =
+    match (a, b) with
+    | If_false, _ | _, If_false -> If_false
+    | If_true, c | c, If_true -> c
+    | _ -> If_and (a, b)
+
+  let if_or a b =
+    match (a, b) with
+    | If_true, _ | _, If_true -> If_true
+    | If_false, c | c, If_false -> c
+    | _ -> If_or (a, b)
+
+  let rec convert_if_expression = function
+    | If_true | If_false ->
+        (* Constant folding removes those from non-constant expressions,
+           and constant expressions are handled separately. *)
+        assert false
+    | If_label {label; positive = true} -> Tezos_ci.Rules.has_mr_label label
+    | If_label {label; positive = false} ->
+        Gitlab_ci.If.not (Tezos_ci.Rules.has_mr_label label)
+    | If_and (a, b) ->
+        Gitlab_ci.If.(convert_if_expression a && convert_if_expression b)
+    | If_or (a, b) ->
+        Gitlab_ci.If.(convert_if_expression a || convert_if_expression b)
+
+  (* A term of the disjunctive normal form: [changes && if_],
+     where [changes = None] means that the term does not test changesets. *)
+  type term = {changes : Tezos_ci.Changeset.t option; if_ : if_expression}
+
+  let and_terms t1 t2 =
+    let changes =
+      match (t1.changes, t2.changes) with
+      | None, changes | changes, None -> changes
+      | Some a, Some b ->
+          if Tezos_ci.Changeset.encode a = Tezos_ci.Changeset.encode b then
+            Some a
+          else
+            failwith
+              (sf
+                 "cannot encode a conjunction of changesets: [%s] and [%s]"
+                 (String.concat ", " (Tezos_ci.Changeset.encode a))
+                 (String.concat ", " (Tezos_ci.Changeset.encode b)))
+    in
+    {changes; if_ = if_and t1.if_ t2.if_}
+
+  (* Compute the disjunctive normal form of [condition],
+     or of its negation if [positive] is [false]. *)
+  let rec terms ~positive condition =
+    match condition with
+    | True -> if positive then [{changes = None; if_ = If_true}] else []
+    | False -> if positive then [] else [{changes = None; if_ = If_true}]
+    | Atom (Label label) -> [{changes = None; if_ = If_label {label; positive}}]
+    | Atom Component_changes ->
+        (* [resolve_component_changes] is supposed to be called first. *)
+        invalid_arg "Cacio.Condition.encode: unresolved [component_changes]"
+    | Atom (Changes set) ->
+        if positive then [{changes = Some set; if_ = If_true}]
+        else
+          failwith
+            (sf
+               "cannot encode the negation of a changeset: [%s]"
+               (String.concat ", " (Tezos_ci.Changeset.encode set)))
+    | Not condition -> terms ~positive:(not positive) condition
+    | Or (a, b) when positive -> terms ~positive a @ terms ~positive b
+    | And (a, b) when not positive -> terms ~positive a @ terms ~positive b
+    | And (a, b) | Or (a, b) ->
+        let terms_a = terms ~positive a in
+        let terms_b = terms ~positive b in
+        Fun.flip List.concat_map terms_a @@ fun term_a ->
+        List.map (and_terms term_a) terms_b
 
   let encode ?when_ ?allow_failure condition =
-    if List.mem True condition then
-      (* If any of the base predicate is [True],
+    let terms =
+      terms ~positive:true condition
+      |> List.filter (fun term ->
+             term.if_ <> If_false
+             &&
+             match term.changes with
+             | None -> true
+             | Some set ->
+                 (* The empty changeset never holds. *)
+                 Tezos_ci.Changeset.encode set <> [])
+    in
+    if List.exists (fun term -> term.changes = None && term.if_ = If_true) terms
+    then
+      (* If any of the terms is [True],
          the whole condition is equivalent to [True]. *)
       match when_ with
       | None -> None
       | Some when_ -> Some [Gitlab_ci.Util.job_rule ~when_ ?allow_failure ()]
     else
-      (* Else, the condition can be rewritten to have the form
-         [changes or labels] where [changes] is a disjunction of [Changes] predicates
-         and labels is a disjunction of [Label] predicates.
-         We ignore [False] while doing so because [False] has no effect on disjunctions. *)
-      let changes =
-        Fun.flip List.concat_map condition @@ function
-        | False -> []
-        | True ->
-            (* Impossible due to the check above. *)
-            assert false
-        | Changes set -> [set]
-        | Label _ -> []
-      in
-      let labels =
-        Fun.flip List.concat_map condition @@ function
-        | False -> []
-        | True ->
-            (* Impossible due to the check above. *)
-            assert false
-        | Changes _ -> []
-        | Label label -> label
-      in
-      (* The condition is [changes or labels].
-         We encode it into the following GitLab rules:
-         - if changes => include the job (named [rules_from_changes] below)
-         - else if labels => include the job (named [rules_from_labels] below)
-         - (implicitly) else => do not include the job *)
-      let rules_from_changes =
-        (* Changesets are disjunctions themselves.
-           So the big disjunction of changesets, [changes],
-           can simply be merged into one big changeset. *)
-        let changes =
-          changes
-          |> List.fold_left Tezos_ci.Changeset.union empty_changeset
-          |> Tezos_ci.Changeset.encode
+      (* Terms without changesets are merged into one rule,
+         whose [if:] expression is the disjunction of those of the terms.
+         Their [if:] expressions are sorted and deduplicated,
+         so that the result does not depend on their order. *)
+      let rules_without_changes =
+        let if_expressions =
+          terms
+          |> List.filter_map (fun term ->
+                 match term.changes with
+                 | None -> Some term.if_
+                 | Some _ -> None)
+          |> List.sort_uniq compare
         in
-        match changes with
-        | [] ->
-            (* The [changes] part of the disjunction is equivalent to [False].
-                 Don't add a rule. *)
-            []
-        | _ :: _ -> [Gitlab_ci.Util.job_rule ~changes ?when_ ?allow_failure ()]
-      in
-      let rules_from_labels =
-        (* Simplify the disjunction by observing that [a or b] is equivalent to [a]
-           when [b = a]. In our case, this means when labels are equal. *)
-        let labels = labels |> String_set.of_list |> String_set.elements in
-        match labels with
-        | [] ->
-            (* The [labels] part of the disjunction is equivalent to [False].
-                 Don't add a rule. *)
-            []
-        | first_label :: other_labels ->
+        match if_expressions with
+        | [] -> []
+        | first :: others ->
             [
               Gitlab_ci.Util.job_rule
-                ~if_:
-                  (List.fold_left
-                     (fun acc label ->
-                       Gitlab_ci.If.(acc || Tezos_ci.Rules.has_mr_label label))
-                     (Tezos_ci.Rules.has_mr_label first_label)
-                     other_labels)
+                ~if_:(convert_if_expression (List.fold_left if_or first others))
                 ?when_
                 ?allow_failure
                 ();
             ]
       in
-      Some (rules_from_labels @ rules_from_changes)
+      (* Terms with changesets and the same [if:] expression are merged into
+         one rule, since [changes a || changes b] is [changes (a @ b)]. *)
+      let rules_with_changes =
+        let groups =
+          List.fold_left
+            (fun groups term ->
+              match term.changes with
+              | None -> groups
+              | Some set -> (
+                  match List.assoc_opt term.if_ groups with
+                  | None -> (term.if_, set) :: groups
+                  | Some other ->
+                      (term.if_, Tezos_ci.Changeset.union other set)
+                      :: List.remove_assoc term.if_ groups))
+            []
+            terms
+        in
+        groups
+        |> List.sort (fun (a, _) (b, _) -> compare a b)
+        |> List.map @@ fun (if_, set) ->
+           Gitlab_ci.Util.job_rule
+             ~changes:(Tezos_ci.Changeset.encode set)
+             ?if_:
+               (match if_ with
+               | If_true -> None
+               | _ -> Some (convert_if_expression if_))
+             ?when_
+             ?allow_failure
+             ()
+      in
+      Some (rules_without_changes @ rules_with_changes)
+
+  (* Defined last, so that they do not shadow the boolean operators above. *)
+  let ( && ) = and_
+
+  let ( || ) = or_
 end
 
 type job = {
@@ -501,7 +656,7 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                 in
                 rev_deps
                 |> List.map (fun node -> node.only_if)
-                |> List.fold_left Condition.or_ initial_only_if
+                |> List.fold_left Condition.( || ) initial_only_if
               in
               {job; trigger; only_if; explicit}
         in
@@ -661,7 +816,14 @@ let convert_graph ?(interruptible_pipeline = true)
                 let condition =
                   if with_condition then only_if else Condition.true_
                 in
-                Condition.encode ?when_ ?allow_failure condition
+                try Condition.encode ?when_ ?allow_failure condition
+                with Failure message ->
+                  error
+                    source_location
+                    "job %s: %s, either in its ~only_if or in the ~only_if of \
+                     a job that needs it"
+                    name
+                    message
               in
               let interruptible, interruptible_runner =
                 match stage with
@@ -792,9 +954,7 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?image:Tezos_ci.Image.t ->
-    ?only_if_changed:string list ->
-    ?force:bool ->
-    ?force_if_label:string list ->
+    ?only_if:Condition.t ->
     ?needs:(need * job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
@@ -826,7 +986,7 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
-    ?only_if_changed:string list ->
+    ?only_if:Condition.t ->
     ?needs:(need * job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
@@ -1050,7 +1210,7 @@ let output_tezt_job_list path =
    but in practice this would be less convenient since all functions need at least
    one of them. *)
 module Make (Component : COMPONENT) : COMPONENT_API = struct
-  let default_only_if_changed = Tezos_ci.Changeset.make Component.paths
+  let component_changeset = Tezos_ci.Changeset.make Component.paths
 
   let is_a_valid_name =
     String.for_all (function
@@ -1085,12 +1245,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ?tag ?image ?only_if_changed ?(force = false)
-      ?(force_if_label = []) ?(needs = []) ?parallel ?environment
-      ?resource_group ?(variables = []) ?artifacts ?(cache = [])
-      ?(cargo_cache = false) ?sccache ?(dune_cache = false)
-      ?(disable_datadog = false) ?allow_failure ?retry ?timeout ?services
-      ?id_tokens ?(script = []) name =
+      ?storage ?tag ?image ?(only_if = Condition.component_changes)
+      ?(needs = []) ?parallel ?environment ?resource_group ?(variables = [])
+      ?artifacts ?(cache = []) ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?services ?id_tokens ?(script = []) name =
     let name = make_name name in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     let before_script = [] in
@@ -1215,15 +1374,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       parallel;
-      only_if =
-        (if force then Condition.true_
-         else
-           Condition.or_
-             (Condition.changes
-                (match only_if_changed with
-                | None -> default_only_if_changed
-                | Some list -> Tezos_ci.Changeset.make list))
-             (Condition.label force_if_label));
+      only_if = Condition.resolve_component_changes component_changeset only_if;
       variables;
       before_script;
       script;
@@ -1265,12 +1416,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
-      ?(needs = []) ?disable_datadog ?allow_failure ?tezt_exe
-      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
-      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = [])
-      ?(select_tezts = true) variant =
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if ?(needs = [])
+      ?disable_datadog ?allow_failure ?tezt_exe ?(global_timeout = Minutes 30)
+      ?(test_timeout = Minutes 9) ?(parallel_jobs = 1) ?(parallel_tests = 1)
+      ?retry_jobs ?(retry_tests = 0) ?(test_selection = Tezt_core.TSL_AST.True)
+      ?(before_script = []) ?(select_tezts = true) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
@@ -1444,7 +1594,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?storage
       ?tag
       ~image:Tezos_ci.Images.Base_images.alpine_e2etest
-      ?only_if_changed
+      ?only_if
       ~needs
       ?parallel:
         (if parallel_jobs > 1 then Some (Vector parallel_jobs) else None)
@@ -1621,7 +1771,7 @@ let () =
          ~stage:Start
          ~timeout:(Minutes 10)
          ~allow_failure:No
-         ~force:true
+         ~only_if:Condition.true_
          ~script:
            [
              "echo 'Trigger pipeline!'";
@@ -1642,7 +1792,7 @@ let () =
          ~allow_failure:Yes
          ~image:Tezos_ci.Images.datadog_ci
          ~stage:Start
-         ~force:true
+         ~only_if:Condition.true_
          ~script:
            [
              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";

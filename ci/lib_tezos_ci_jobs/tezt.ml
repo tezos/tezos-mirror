@@ -68,7 +68,9 @@ let common_needs : (Cacio.need * Cacio.job) list =
    to Tezt jobs defined in this module / the [Shared] component. *)
 let tezt_job ?(retry_tests = 1) ?(needs = common_needs) =
   CI.tezt_job
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~needs
     ~retry_tests
 

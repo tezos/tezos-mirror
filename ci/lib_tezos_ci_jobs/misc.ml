@@ -21,11 +21,12 @@ let job_check_lift_limits_patch =
     ~description:
       "Check that src/bin_tps_evaluation/lift_limits.patch still applies."
     ~image:Tezos_ci.Images.Base_images.alpine_build
-    ~only_if_changed:
-      [
-        "src/bin_tps_evaluation/lift_limits.patch";
-        "src/proto_alpha/lib_protocol/main.ml";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "src/bin_tps_evaluation/lift_limits.patch";
+           "src/proto_alpha/lib_protocol/main.ml";
+         ])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
@@ -48,7 +49,8 @@ let job_python_check =
       "Run Python checks (environment in sync. with the image, lint, \
        typecheck)."
     ~image:Tezos_ci.Images.Base_images.alpine_test
-    ~only_if_changed:["poetry.lock"; "pyproject.toml"; "**/*.py"]
+    ~only_if:
+      (Cacio.Condition.changes ["poetry.lock"; "pyproject.toml"; "**/*.py"])
     ~script:
       [
         "./scripts/ci/take_ownership.sh";
@@ -64,7 +66,9 @@ let job_integration_compiler_rejections =
     ~stage:Test
     ~description:"Run the tests defined under dune alias @runtest_rejections."
     ~image:Tezos_ci.Images.Base_images.alpine_build
-    ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
@@ -82,7 +86,9 @@ let job_script_test_gen_genesis =
     ~description:"Check that scripts/gen-genesis/gen_genesis.exe still builds."
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cargo_cache:true
-    ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~script:
       [
         "eval $(opam env)";
@@ -99,13 +105,14 @@ let job_script_snapshot_alpha_and_link =
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~cpu:Very_high
     ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
-    ~only_if_changed:
-      [
-        "src/proto_alpha/**/*";
-        "scripts/snapshot_alpha_and_link.sh";
-        "scripts/snapshot_alpha.sh";
-        "scripts/user_activated_upgrade.sh";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "src/proto_alpha/**/*";
+           "scripts/snapshot_alpha_and_link.sh";
+           "scripts/snapshot_alpha.sh";
+           "scripts/user_activated_upgrade.sh";
+         ])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
@@ -126,11 +133,12 @@ let job_script_b58_prefix =
     ~stage:Test
     ~description:""
     ~image:Tezos_ci.Images.Base_images.alpine_test
-    ~only_if_changed:
-      [
-        "scripts/b58_prefix/b58_prefix.py";
-        "scripts/b58_prefix/test_b58_prefix.py";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "scripts/b58_prefix/b58_prefix.py";
+           "scripts/b58_prefix/test_b58_prefix.py";
+         ])
     ~script:
       [
         ". ./scripts/version.sh";
@@ -153,12 +161,13 @@ let job_test_liquidity_baking_scripts =
         (Artifacts, Build.job_build_extra_dev Amd64);
         (Artifacts, Build.job_build_exp Amd64);
       ]
-    ~only_if_changed:
-      [
-        "src/**/*";
-        "scripts/ci/test_liquidity_baking_scripts.sh";
-        "scripts/check-liquidity-baking-scripts.sh";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "src/**/*";
+           "scripts/ci/test_liquidity_baking_scripts.sh";
+           "scripts/check-liquidity-baking-scripts.sh";
+         ])
     ~script:
       [
         ". ./scripts/version.sh";
@@ -173,8 +182,9 @@ let job_oc_script_test_release_versions =
     ~stage:Test
     ~description:"Test how src/lib_version parses Git tags."
     ~image:Tezos_ci.Images.Base_images.alpine_build
-    ~only_if_changed:
-      ["scripts/test_octez_release_version.sh"; "src/lib_version/**/*"]
+    ~only_if:
+      (Cacio.Condition.changes
+         ["scripts/test_octez_release_version.sh"; "src/lib_version/**/*"])
     ~script:
       [
         "./scripts/ci/take_ownership.sh";
@@ -191,12 +201,13 @@ let job_test_release_versions =
       "Test the values defined in scripts/ci/octez-packages-version.sh."
     ~image:Tezos_ci.Images.Base_images.alpine_prebuild
     ~stage:Test
-    ~only_if_changed:
-      [
-        "scripts/releases/octez-release.sh";
-        "scripts/ci/octez-packages-version.sh";
-        "scripts/ci/test_release_values.sh";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "scripts/releases/octez-release.sh";
+           "scripts/ci/octez-packages-version.sh";
+           "scripts/ci/test_release_values.sh";
+         ])
     ~script:["scripts/ci/test_release_values.sh"]
 
 let job_resto_unit =
@@ -210,7 +221,7 @@ let job_resto_unit =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
     ~timeout:(Minutes 10)
-    ~only_if_changed:["resto/**/*"]
+    ~only_if:(Cacio.Condition.changes ["resto/**/*"])
     ~script:["eval $(opam env)"; "dune runtest resto"]
 
 (* "de" stands for "data-encoding". *)
@@ -224,7 +235,7 @@ let job_de_unit =
     ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~stage:Test
-    ~only_if_changed:["data-encoding/**/*"]
+    ~only_if:(Cacio.Condition.changes ["data-encoding/**/*"])
     ~script:["eval $(opam env)"; "dune runtest data-encoding"]
 
 let job_oc_unit_protocol_compiles =
@@ -238,7 +249,9 @@ let job_oc_unit_protocol_compiles =
     ~cpu:Very_high
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
@@ -257,7 +270,9 @@ let job_oc_unit_webassembly_x86_64 =
     ~image:Tezos_ci.Images.Base_images.alpine_test
     ~cargo_cache:true
     ~stage:Test
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~timeout:(Minutes 20)
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
          This test takes around 2 to 4min to complete, but it sometimes
@@ -286,7 +301,9 @@ let job_oc_unit_non_proto_x86_64 =
       "Run unit tests for the non-protocol parts of Octez (on amd64)."
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~image:Tezos_ci.Images.Base_images.alpine_test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Amd64
@@ -313,7 +330,9 @@ let job_oc_unit_non_proto_arm64 =
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
     ~parallel:(Vector 2)
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~image:Tezos_ci.Images.Base_images.alpine_test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Arm64
@@ -352,7 +371,9 @@ let job_oc_unit_proto_x86_64 =
     ~description:"Run unit tests for the protocol parts of Octez."
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~arch:Amd64
     ~cpu:Very_high
@@ -372,7 +393,9 @@ let job_oc_unit_other_x86_64 =
     ~description:"Run unit tests for some non-Octez parts of the repository."
     ~stage:Test
     ~retry:Tezos_ci.retry_twice
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Tezos_ci.Changeset.encode Changesets.changeset_octez))
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~arch:Amd64
     ~cpu:High
@@ -392,8 +415,9 @@ let job_ocaml_check =
     ~cpu:Very_high
     ~image:Tezos_ci.Images.Base_images.alpine_build
     ~stage:Test
-    ~only_if_changed:
-      ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"]
+    ~only_if:
+      (Cacio.Condition.changes
+         ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
     ~variables:[("CARGO_NET_OFFLINE", "false")]
     ~dune_cache:true
     ~script:
@@ -414,11 +438,13 @@ let job_test_sdk_rust =
     ~description:"Run the tests for sdk/rust/."
     ~image:Tezos_ci.Images.Base_images.debian_rust_trixie
     ~stage:Test
-    ~only_if_changed:
+    ~only_if:
       (* Rerun when [sdk/rust/] changes, or when the [debian-rust] base image
          this job runs in is rebuilt.
          NB: [debian-rust] is on top of base [debian] thus rebuilt when base [debian] image is. *)
-      (Base_images.Files.(debian_rust_build @ debian_base) @ ["sdk/rust/**/*"])
+      (Cacio.Condition.changes
+         (Base_images.Files.(debian_rust_build @ debian_base)
+         @ ["sdk/rust/**/*"]))
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     ~script:["make -C sdk/rust check"; "make -C sdk/rust test"]

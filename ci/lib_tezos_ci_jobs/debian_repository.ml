@@ -11,21 +11,22 @@
    This pipeline builds the old and old Debian (and Ubuntu)
    packages. *)
 
-let only_if_changed =
-  [
-    "scripts/packaging/build-deb-local.sh";
-    "scripts/packaging/Release.conf";
-    "scripts/packaging/octez/debian/*";
-    "scripts/ci/build-debian-packages_current.sh";
-    "scripts/ci/build-debian-packages.sh";
-    "scripts/ci/prepare-apt-repo.sh";
-    "scripts/ci/create_debian_repo.sh";
-    "scripts/packaging/octez-archive-keyring/**/*";
-    "scripts/ci/build-keyring-deb.sh";
-    "scripts/packaging/tests/deb/test-keyring*";
-    "docs/introduction/install-bin-deb.sh";
-    "scripts/version.sh";
-  ]
+let only_if =
+  Cacio.Condition.changes
+    [
+      "scripts/packaging/build-deb-local.sh";
+      "scripts/packaging/Release.conf";
+      "scripts/packaging/octez/debian/*";
+      "scripts/ci/build-debian-packages_current.sh";
+      "scripts/ci/build-debian-packages.sh";
+      "scripts/ci/prepare-apt-repo.sh";
+      "scripts/ci/create_debian_repo.sh";
+      "scripts/packaging/octez-archive-keyring/**/*";
+      "scripts/ci/build-keyring-deb.sh";
+      "scripts/packaging/tests/deb/test-keyring*";
+      "docs/introduction/install-bin-deb.sh";
+      "scripts/version.sh";
+    ]
 
 open Tezos_ci
 module CI = Cacio.Shared
@@ -174,7 +175,7 @@ let job_apt_repo =
   CI.job
     ("apt_repo_" ^ Distro.name_for_scripts distro)
     ~__POS__
-    ~only_if_changed
+    ~only_if
     ~description:
       (sf
          "Create the apt repository for %s packages and sign it."
@@ -209,7 +210,7 @@ let job_lintian =
   CI.job
     ("oc.lintian_" ^ Distro.name_for_scripts distro)
     ~__POS__
-    ~only_if_changed
+    ~only_if
     ~stage:Test_publication
     ~description:
       (sf "Run lintian on %s packages." (Distro.name_for_humans distro))
@@ -279,7 +280,7 @@ let job_install_bin =
   CI.job
     (sf "oc.install_bin_%s" (Distro.name_for_scripts name))
     ~__POS__
-    ~only_if_changed
+    ~only_if
     ~stage:Test_publication
     ~description:
       (sf
@@ -293,7 +294,7 @@ let job_install_bin =
 
 let make_systemd_test_job ~script ~(name : Distro.name) ~pipeline_type =
   CI.job
-    ~only_if_changed
+    ~only_if
     ~stage:Test_publication
     ~needs:[(Job, job_apt_repo name pipeline_type)]
     ~image:Images.Base_images.alpine_docker_ci

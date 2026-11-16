@@ -141,9 +141,50 @@ module type COMPONENT = sig
 
   (** Files that belong to the component.
 
-      This is added as [changes] clauses for jobs of this component
-      in the [before_merging] pipeline. *)
+      This is the changeset of {!Condition.component_changes},
+      which is the default condition of jobs. *)
   val paths : string list
+end
+
+(** Conditions for jobs to be included in pipelines (see [only_if] in
+    {!COMPONENT_API.job}).
+
+    Conditions are boolean formulas. Not all of them can be encoded into
+    GitLab rules: in a conjunction, at most one subformula can test changesets,
+    and changesets cannot be negated. Defining a pipeline in which a job has
+    a condition that cannot be encoded fails. *)
+module Condition : sig
+  (** Conditions for a job to be included. *)
+  type t
+
+  (** Condition that never holds (never include the job). *)
+  val false_ : t
+
+  (** Condition that always holds (always include the job). *)
+  val true_ : t
+
+  (** Include the job if the merge request modifies
+      at least one of the files that match given paths.
+
+      Paths can include glob patterns such as [dir/**/*.ml]. *)
+  val changes : string list -> t
+
+  (** Include the job if the merge request modifies
+      at least one of the files of the component of the job
+      (see {!COMPONENT.paths}). *)
+  val component_changes : t
+
+  (** Include the job if the merge request has a given label. *)
+  val mr_has_label : string -> t
+
+  (** Negation: include the job if a condition does not hold. *)
+  val not_ : t -> t
+
+  (** Conjunction: include the job if both conditions hold. *)
+  val ( && ) : t -> t -> t
+
+  (** Disjunction: include the job if at least one condition holds. *)
+  val ( || ) : t -> t -> t
 end
 
 module type COMPONENT_API = sig
@@ -173,12 +214,8 @@ module type COMPONENT_API = sig
       Instead, each pipeline can decide to add jobs with a different trigger.
 
       When added to the [before_merging] or [merge_train] pipeline,
-      jobs are only included to the pipeline if
-      any file listed in [only_if_changed] has been modified,
-      or if the merge request has any label listed in [force_if_label],
-      or if [force] is set to [true].
-      [only_if_changed] can include glob patterns such as [dir/**/*.ml].
-      Its default value is the [paths] of the current component.
+      jobs are only included to the pipeline if [only_if] holds.
+      Its default value is {!Condition.component_changes}.
 
       The job will not start before all [needs] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
@@ -212,9 +249,7 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
     ?image:Tezos_ci.Image.t ->
-    ?only_if_changed:string list ->
-    ?force:bool ->
-    ?force_if_label:string list ->
+    ?only_if:Condition.t ->
     ?needs:(need * job) list ->
     ?parallel:Gitlab_ci.Types.parallel ->
     ?environment:Gitlab_ci.Types.environment ->
@@ -302,7 +337,7 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
-    ?only_if_changed:string list ->
+    ?only_if:Condition.t ->
     ?needs:(need * job) list ->
     ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
@@ -528,8 +563,9 @@ val output_tezt_job_list : string -> unit
       not test release pipelines (those can use the GitLab registry instead for instance);
     - ... *)
 
-(** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
-    Or to automatically add this label to the list. *)
+(** Another idea would be to give components a label, e.g. ["ci--" ^ component_name],
+    and to make {!Condition.component_changes} also hold if the merge request
+    has this label. *)
 
 (** Pipelines that are declared by components, with the
     [register_*_pipeline] functions of {!COMPONENT_API}, are registered with

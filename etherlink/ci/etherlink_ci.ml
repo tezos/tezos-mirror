@@ -143,7 +143,7 @@ let job_build_evm_node_static =
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
     ~image:Images.Base_images.alpine_build
-    ~only_if_changed:Files.(node @ sdks)
+    ~only_if:(Cacio.Condition.changes Files.(node @ sdks))
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"octez-binaries"
@@ -183,7 +183,7 @@ let job_lint_wasm_runtime =
     ~stage:Test
     ~description:"Run the linter on lib_wasm_runtime."
     ~image:Images.Base_images.alpine_build
-    ~only_if_changed:Files.lib_wasm_runtime_rust
+    ~only_if:(Cacio.Condition.changes Files.lib_wasm_runtime_rust)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~script:
@@ -201,11 +201,12 @@ let job_lint_solidity_artifacts =
     ~stage:Test
     ~description:"Check committed bytecode are up to date."
     ~image:Images.Base_images.alpine_e2etest
-    ~only_if_changed:
-      [
-        "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";
-        "etherlink/kernel_latest/revm/contracts/predeployed/*.bin";
-      ]
+    ~only_if:
+      (Cacio.Condition.changes
+         [
+           "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";
+           "etherlink/kernel_latest/revm/contracts/predeployed/*.bin";
+         ])
     ~script:
       [
         "./scripts/ci/take_ownership.sh";
@@ -253,7 +254,7 @@ let job_check_changelog =
          "Check that the merge request declares its %s changelog entry."
          (changelog_label changelog))
     ~image:Images.Base_images.debian_trixie
-    ~only_if_changed:(changelog_paths changelog)
+    ~only_if:(Cacio.Condition.changes (changelog_paths changelog))
     ~script:[sf "%s %s check" changelog_script (changelog_id changelog)]
 
 (* Manual counterpart of [job_check_changelog], for release merge requests:
@@ -270,11 +271,12 @@ let job_preview_changelog =
          "Print the %s changelog section assembled from the fragments."
          (changelog_label changelog))
     ~image:Images.Base_images.debian_trixie
-    ~only_if_changed:
-      ((match changelog with
-       | Tezosx -> Files.tezosx_changelog
-       | Node -> Files.node_changelog)
-      @ [changelog_script])
+    ~only_if:
+      (Cacio.Condition.changes
+         ((match changelog with
+          | Tezosx -> Files.tezosx_changelog
+          | Node -> Files.node_changelog)
+         @ [changelog_script]))
     ~script:[sf "%s %s preview" changelog_script (changelog_id changelog)]
 
 let job_unit_tests =
@@ -285,7 +287,7 @@ let job_unit_tests =
     ~description:"Etherlink unit tests."
     ~image:Images.Base_images.alpine_build
     ~cpu:Runner.CPU.Very_high
-    ~only_if_changed:Files.(node @ sdks)
+    ~only_if:(Cacio.Condition.changes Files.(node @ sdks))
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-x86_64"
@@ -308,7 +310,8 @@ let job_test_kernel =
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
     ~image:Images.Base_images.debian_rust_trixie
-    ~only_if_changed:Files.(kernel @ kernel_test_data @ sdks @ mir)
+    ~only_if:
+      (Cacio.Condition.changes Files.(kernel @ kernel_test_data @ sdks @ mir))
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
@@ -322,7 +325,7 @@ let job_test_evm_compatibility =
     ~stage:Test
     ~description:"Check and test EVM compatibility."
     ~image:Images.Base_images.debian_rust_trixie
-    ~only_if_changed:Files.evm_compatibility
+    ~only_if:(Cacio.Condition.changes Files.evm_compatibility)
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
@@ -348,7 +351,7 @@ let job_test_revm_compatibility =
     ~stage:Test
     ~description:"Check and test REVM compatibility."
     ~image:Images.Base_images.debian_rust_trixie
-    ~only_if_changed:Files.revm_compatibility
+    ~only_if:(Cacio.Condition.changes Files.revm_compatibility)
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
@@ -373,7 +376,7 @@ let job_mir_tzt =
     ~description:"Run MIR's tzt_runner on the tzt reference test suite."
     ~image:Images.Base_images.alpine_test
     ~stage:Test
-    ~only_if_changed:Files.(mir @ tzt)
+    ~only_if:(Cacio.Condition.changes Files.(mir @ tzt))
     ~cargo_cache:true
     ~script:
       [
@@ -397,7 +400,7 @@ let job_mir_no_tickets =
       "Check and test MIR with tickets disabled, as shipped in the kernel \
        (L2-1680)."
     ~image:Images.Base_images.debian_rust_trixie
-    ~only_if_changed:Files.mir
+    ~only_if:(Cacio.Condition.changes Files.mir)
     ~variables:[("CC", "clang")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -442,7 +445,9 @@ let job_build_tezt =
 let tezt_job ?(retry_tests = 1) =
   CI.tezt_job
     ~tezt_exe:"etherlink/tezt/tests/main.exe"
-    ~only_if_changed:(Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
+    ~only_if:
+      (Cacio.Condition.changes
+         (Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez))
     ~needs:
       [
         (Artifacts, job_build_tezt);
