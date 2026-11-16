@@ -177,6 +177,21 @@ module Condition : sig
   (** Include the job if the merge request has a given label. *)
   val mr_has_label : string -> t
 
+  (** Include the job if the value of a variable matches a regular expression.
+
+      [variable_matches variable regex] holds if the value of [variable]
+      matches [regex]. [regex] is anchored: it must match the whole value,
+      so [variable_matches "VAR" "true"] holds only if [VAR] is exactly [true].
+      To match a part of the value, use [.*], e.g. [".*true.*"].
+      Slashes in [regex] must not be escaped.
+      An unset variable matches no regular expression.
+
+      Contrary to conditions on changesets and labels, conditions on variables
+      are taken into account in all pipelines. They can thus express that
+      some jobs only make sense in some contexts, for instance only in some
+      projects, or only for some tags. *)
+  val variable_matches : string -> string -> t
+
   (** Negation: include the job if a condition does not hold. *)
   val not_ : t -> t
 

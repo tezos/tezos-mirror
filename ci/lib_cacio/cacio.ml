@@ -49,6 +49,12 @@ type sccache_config = {
 
 let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 
+(* Make a GitLab regular expression literal from a regular expression,
+   anchored to match whole values, and escaping the slashes that delimit it.
+   The group makes anchors apply to all branches of alternations. *)
+let regex_literal regex =
+  "/^(?:" ^ String.concat "\\/" (String.split_on_char '/' regex) ^ ")$/"
+
 (* The [Condition] module provides an interface that makes it look like Cacio
    supports generic predicates for job rules,
    because predicates are easier to reason with than GitLab's rules.
@@ -78,6 +84,11 @@ module Condition : sig
 
   (** Include the job if the merge request has a given label. *)
   val mr_has_label : string -> t
+
+  (** Include the job if the value of a variable matches a regular expression.
+
+      The regular expression is anchored: it must match the whole value. *)
+  val variable_matches : string -> string -> t
 
   (** Negation: include the job if a condition does not hold. *)
   val not_ : t -> t
@@ -128,6 +139,7 @@ end = struct
        see [resolve_component_changes]. *)
     | Component_changes
     | Label of string
+    | Variable_matches of {variable : string; regex : string}
 
   type t = True | False | Atom of atom | Not of t | And of t * t | Or of t * t
 
@@ -140,6 +152,9 @@ end = struct
   let component_changes = Atom Component_changes
 
   let mr_has_label label = Atom (Label label)
+
+  let variable_matches variable regex =
+    Atom (Variable_matches {variable; regex})
 
   let not_ = function True -> False | False -> True | Not c -> c | c -> Not c
 
@@ -156,7 +171,7 @@ end = struct
     | _ -> Or (a, b)
 
   let rec assume_merge_request_conditions = function
-    | (True | False) as c -> c
+    | (True | False | Atom (Variable_matches _)) as c -> c
     | Atom (Changes _ | Component_changes) -> True
     | Atom (Label _) -> False
     | Not c -> not_ (assume_merge_request_conditions c)
@@ -170,7 +185,7 @@ end = struct
           (assume_merge_request_conditions b)
 
   let rec resolve_component_changes set = function
-    | (True | False | Atom (Changes _ | Label _)) as c -> c
+    | (True | False | Atom (Changes _ | Label _ | Variable_matches _)) as c -> c
     | Atom Component_changes -> Atom (Changes set)
     | Not c -> not_ (resolve_component_changes set c)
     | And (a, b) ->
@@ -211,6 +226,11 @@ end = struct
     | If_true
     | If_false
     | If_label of {label : string; positive : bool}
+    | If_variable_matches of {
+        variable : string;
+        regex : string;
+        positive : bool;
+      }
     | If_and of if_expression * if_expression
     | If_or of if_expression * if_expression
 
@@ -234,6 +254,10 @@ end = struct
     | If_label {label; positive = true} -> Tezos_ci.Rules.has_mr_label label
     | If_label {label; positive = false} ->
         Gitlab_ci.If.not (Tezos_ci.Rules.has_mr_label label)
+    | If_variable_matches {variable; regex; positive = true} ->
+        Gitlab_ci.If.(var variable =~ regex_literal regex)
+    | If_variable_matches {variable; regex; positive = false} ->
+        Gitlab_ci.If.(var variable =~! regex_literal regex)
     | If_and (a, b) ->
         Gitlab_ci.If.(convert_if_expression a && convert_if_expression b)
     | If_or (a, b) ->
@@ -266,6 +290,10 @@ end = struct
     | True -> if positive then [{changes = None; if_ = If_true}] else []
     | False -> if positive then [] else [{changes = None; if_ = If_true}]
     | Atom (Label label) -> [{changes = None; if_ = If_label {label; positive}}]
+    | Atom (Variable_matches {variable; regex}) ->
+        [
+          {changes = None; if_ = If_variable_matches {variable; regex; positive}};
+        ]
     | Atom Component_changes ->
         (* [resolve_component_changes] is supposed to be called first. *)
         invalid_arg "Cacio.Condition.encode: unresolved [component_changes]"
