@@ -34,14 +34,21 @@ use crate::ast::*;
 use crate::bls;
 use crate::context::TypecheckingCtx;
 use crate::gas::{self, tc_cost, CompareError, CostOverflow, Gas, OutOfGas};
+use crate::interpreter::MichelineBytes;
 use crate::lexer::Prim;
 use crate::stack::*;
 
 /// Typechecker error type.
+///
+/// The `Display` of an error does not show a payload that can be large, such
+/// as a type, a stack, a value, a string or an integer: rendering it can cost
+/// more than the gas charged for it. Converting a large integer to decimal is
+/// quadratic in its size, and a type can be a shared DAG whose unfolded
+/// rendering is exponential. The derived `Debug` shows the payload.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum TcError {
     /// Two stacks didn't compare equal when they should have.
-    #[error("type stacks not equal: {0:?} != {1:?}")]
+    #[error("type stacks not equal")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
     /// Ran out of gas during typechecking (direct `Gas::consume`).
     #[error(transparent)]
@@ -58,7 +65,7 @@ pub enum TcError {
     #[error(transparent)]
     CompareError(#[from] CompareError),
     /// The type didn't satisfy a given [TypeProperty].
-    #[error("type is not {0}: {1:?}")]
+    #[error("type is not {0}")]
     InvalidTypeProperty(TypeProperty, Type),
     /// Encountered FAIL instruction not in tail position.
     #[error("FAIL instruction is not in tail position")]
@@ -77,6 +84,9 @@ pub enum TcError {
     /// path is guard-free (iterative, bounded by gas only).
     #[error("too many recursive calls during typechecking")]
     TypecheckingTooManyRecursiveCalls,
+    /// Encoding the payload of an error in binary Micheline failed.
+    #[error("encoding error")]
+    EncodeError(#[from] tezos_data_encoding::enc::BinError),
     /// A type expression exceeded [`MICHELSON_MAXIMUM_TYPE_SIZE`] nodes.
     #[error("type too large: {size} nodes exceeds the maximum of {max}")]
     TypeTooLarge {
@@ -90,7 +100,7 @@ pub enum TcError {
     #[error("numeric conversion failed: {0}")]
     NumericConversion(TryFromBigIntError<()>),
     /// Types are not equal when they should be.
-    #[error(transparent)]
+    #[error("types not equal")]
     TypesNotEqual(#[from] TypesNotEqual),
     /// Encountered the forbidden `DUP 0` instruction.
     #[error("DUP 0 is forbidden")]
@@ -99,28 +109,22 @@ pub enum TcError {
     /// instruction.
     #[error("{0} {1} is forbidden")]
     PairN01(Prim, u16),
-    /// Failed typechecking the value as the given type.
-    #[error("value {0} is invalid for type {1:?}")]
-    InvalidValueForType(String, Type),
-    /// When typechecking a `map` or `big_map`, encountered a non-`Elt` element
-    /// in a sequence.
-    #[error("value {0:?} is invalid element for container type {1:?}")]
-    InvalidEltForMap(String, Type),
+    /// Failed typechecking the value, in binary Micheline, as the given type.
+    #[error("value is invalid for its type")]
+    InvalidValueForType(MichelineBytes, Type),
+    /// When typechecking a `map` or `big_map`, encountered a non-`Elt` element,
+    /// in binary Micheline, in a sequence.
+    #[error("value is an invalid element for its container")]
+    InvalidEltForMap(MichelineBytes, Type),
     /// Elements of a `map`, `set` or a `big_map` were not sorted in the
     /// ascending order.
-    #[error("sequence elements must be in strictly ascending order for type {0:?}")]
+    #[error("sequence elements must be in strictly ascending order")]
     ElementsNotSorted(Type),
     /// Duplicate keys/elements when typechecking a `map`, `set` or a `big_map`.
-    #[error("sequence elements must contain no duplicate keys for type {0:?}")]
+    #[error("sequence elements must contain no duplicate keys")]
     DuplicateElements(Type),
     /// The given instruction can not be used with its input stack.
-    // The optional `reason` is rendered through [`DisplayReason`] rather than
-    // an eager `format!`: the reason can embed a `Type` (e.g. `ExpectedPair`,
-    // `TypesNotEqual`) which, like the `stack`, may be a structurally-shared
-    // DAG whose unfolded render is exponential. Writing it straight
-    // into the caller's formatter lets a byte-bounded sink abort the walk;
-    // `format!` would materialise the full string first, defeating the cap.
-    #[error("no matching overload for {instr} on stack {stack:?}{}", DisplayReason(.reason.as_ref()))]
+    #[error("no matching overload for {instr}")]
     NoMatchingOverload {
         /// The instruction being typechecked.
         instr: Prim,
@@ -131,13 +135,13 @@ pub enum TcError {
     },
     /// Encountered an error when typechecking a value represented as raw bytes
     /// or a base58-check string.
-    #[error("invalid value for type {0:?}: {1}")]
+    #[error("invalid bytes or string representation of a value")]
     ByteReprError(Type, ByteReprError),
     /// Failed to typecheck an annotation as an entrypoint.
-    #[error("invalid entrypoint: {0}")]
+    #[error("invalid entrypoint")]
     EntrypointError(ByteReprError),
     /// Failed to typecheck value of type `chain_id`.
-    #[error("invalid value for chain_id: {0}")]
+    #[error("invalid value for chain_id")]
     ChainIdError(#[from] ChainIdError),
     /// Encountered a SELF instruction in a forbidden context.
     #[error("SELF instruction is forbidden in this context")]
@@ -150,15 +154,15 @@ pub enum TcError {
     NoSuchContract,
     /// Implicit account typechecked as a `contract 'ty` where `'ty` is neither
     /// `unit` nor `ticket 'a`
-    #[error("unexpected implicit account parameter type: {0:?}")]
+    #[error("unexpected implicit account parameter type")]
     UnexpectedImplicitAccountType(Type),
     /// In `CONTRACT` instruction, entrypoint was specified both in the address
     /// and as an annotation to the instruction.
     #[error("entrypoint specified from two different sources")]
     EntrypointAmbiguity,
-    /// Encountered unexpected Micheline syntax.
-    #[error("unexpected syntax: {0}")]
-    UnexpectedMicheline(String),
+    /// Encountered unexpected Micheline syntax, given in binary Micheline.
+    #[error("unexpected syntax")]
+    UnexpectedMicheline(MichelineBytes),
     /// When typechecking a complete script, encountered duplicate top-level
     /// field, viz. `code`, `parameter`, or `storage`.
     #[error("duplicate top-level element: {0}")]
@@ -170,15 +174,15 @@ pub enum TcError {
     /// Instructions like `DUP n` and `PAIR n` accept an argument that must be a
     /// natural between 0 and 1023 inclusive. Found an integer outside this
     /// bounds instead.
-    #[error("expected a natural between 0 and 1023, but got {0}")]
+    #[error("expected a natural between 0 and 1023")]
     ExpectedU10(BigInt),
     /// Instructions `GET n` and `UPDATE n` accept a comb-index argument that
     /// must be a natural between 0 and 2047 inclusive. Found an integer outside
     /// this bounds instead.
-    #[error("expected a natural between 0 and 2047, but got {0}")]
+    #[error("expected a natural between 0 and 2047")]
     ExpectedU11(BigInt),
     /// Encountered an error when working with annotations.
-    #[error(transparent)]
+    #[error("invalid annotation")]
     AnnotationError(#[from] AnnotationError),
     /// Found a duplicate entrypoint when parsing a type.
     #[error("duplicate entrypoint: {0}")]
@@ -194,7 +198,7 @@ pub enum TcError {
     #[error("Unhandled type: {0}")]
     TodoType(Prim),
     /// `big_map` with the supplied identifier not found in the storage.
-    #[error("big map with ID {0} not found in the lazy storage")]
+    #[error("big map not found in the lazy storage")]
     BigMapNotFound(BigInt),
     /// A forged lazy-storage id (a bare `big_map` id) was encountered in a
     /// position where it is not allowed, typically a user-supplied operation
@@ -203,12 +207,12 @@ pub enum TcError {
     /// only reference a `big_map` by id from its own storage or from an
     /// internal call, never from an externally-injected parameter.
     #[error(
-        "unexpected forged lazy storage id {0}: referencing a big_map by id is \
-         not allowed here"
+        "unexpected forged lazy storage id: referencing a big_map by id is not \
+         allowed here"
     )]
     UnexpectedForgedValue(BigInt),
     /// An error occurred when working with `big_map` storage.
-    #[error("lazy storage error: {0:?}")]
+    #[error("lazy storage error")]
     LazyStorageError(String),
     /// Output stack after `MAP` instruction's code block is empty.
     #[error("MAP block returned an empty stack")]
@@ -217,13 +221,13 @@ pub enum TcError {
     #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
     MapBlockFail,
     /// Two views with the same name where declared in a script
-    #[error("two views were declared with the same name {0}")]
+    #[error("two views were declared with the same name")]
     DuplicatedView(String),
     /// View names must be at most 31 characters and match the expression [a-zA-Z0-9_.%@]*
-    #[error("Invalid name for view {0}")]
+    #[error("invalid name for a view")]
     InvalidViewName(String),
     /// View instructions must be a sequence
-    #[error("{0} instructions are not a sequence")]
+    #[error("view instructions are not a sequence")]
     NonSeqViewInstrs(String),
     /// Side-effectful instruction used directly in a view body.
     /// Allowed in lambdas within views (they can be returned and executed elsewhere).
@@ -395,6 +399,60 @@ impl TcError {
     }
 }
 
+/// The string "Micheline value too large" in binary Micheline: the string
+/// tag, the 4-byte length (25), then the UTF-8 bytes. A typechecking error
+/// carries it in place of a Micheline whose binary encoding takes more than
+/// [`crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES`].
+pub const MICHELINE_PAYLOAD_PLACEHOLDER_BYTES: &[u8] =
+    b"\x01\x00\x00\x00\x19Micheline value too large";
+
+/// The payload of a typechecking error about the Micheline `m`: its
+/// binary encoding, which consumes `gas` as [Micheline::encode]
+/// does. Encoding takes time linear in the size of `m`, contrary to
+/// its `Debug` rendering, which converts integers to decimal. The
+/// produced value is guaranteed to never take more than
+/// [MICHELINE_PAYLOAD_PLACEHOLDER_BYTES], a placeholder is used if
+/// the serialization of the Micheline node is larger than that.
+fn micheline_payload(
+    m: &Micheline<'_>,
+    gas: &mut Gas,
+) -> Result<MichelineBytes, TcError> {
+    let bytes = m.encode(gas)??;
+    if bytes.len() > crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES {
+        return Ok(MichelineBytes(MICHELINE_PAYLOAD_PLACEHOLDER_BYTES.to_vec()));
+    }
+    Ok(MichelineBytes(bytes))
+}
+
+impl TcError {
+    /// [TcError::InvalidValueForType] of the value `v` and the type `t`, or
+    /// the error of the encoding of `v`, see [micheline_payload].
+    fn invalid_value_for_type(v: &Micheline<'_>, t: &Type, gas: &mut Gas) -> Self {
+        match micheline_payload(v, gas) {
+            Ok(v) => TcError::InvalidValueForType(v, t.clone()),
+            Err(e) => e,
+        }
+    }
+
+    /// [TcError::InvalidEltForMap] of the element `elt` of a map of type
+    /// `map_ty`, as [Self::invalid_value_for_type].
+    fn invalid_elt_for_map(elt: &Micheline<'_>, map_ty: &Type, gas: &mut Gas) -> Self {
+        match micheline_payload(elt, gas) {
+            Ok(elt) => TcError::InvalidEltForMap(elt, map_ty.clone()),
+            Err(e) => e,
+        }
+    }
+
+    /// [TcError::UnexpectedMicheline] of `m`, as
+    /// [Self::invalid_value_for_type].
+    fn unexpected_micheline(m: &Micheline<'_>, gas: &mut Gas) -> Self {
+        match micheline_payload(m, gas) {
+            Ok(m) => TcError::UnexpectedMicheline(m),
+            Err(e) => e,
+        }
+    }
+}
+
 impl From<TryFromBigIntError<()>> for TcError {
     fn from(error: TryFromBigIntError<()>) -> Self {
         TcError::NumericConversion(error)
@@ -459,23 +517,6 @@ pub enum NoMatchingOverloadReason {
     /// comparable.
     #[error("type not comparable: {0:?}")]
     TypeNotComparable(Type),
-}
-
-/// Lazy `Display` adapter for [`TcError::NoMatchingOverload`]'s optional
-/// `reason`. Renders `, reason: <reason>` (or nothing) straight into the
-/// caller's formatter, propagating any write error, instead of eagerly
-/// building the string via `format!`. This keeps the whole `TcError`
-/// `Display` chain abortable by a byte-bounded sink even when the reason
-/// embeds an exponentially-rendering `Type`.
-struct DisplayReason<'a>(Option<&'a NoMatchingOverloadReason>);
-
-impl std::fmt::Display for DisplayReason<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            Some(reason) => write!(f, ", reason: {reason}"),
-            None => Ok(()),
-        }
-    }
 }
 
 /// More detailed explanation for [TcError::StacksNotEqual]
@@ -754,15 +795,17 @@ impl<'a> Micheline<'a> {
         Ok(entrypoints)
     }
 
-    /// Separate script into its components
+    /// Separate script into its components. Only the error path consumes
+    /// `gas`, to encode the unexpected Micheline.
     pub fn split_script(
         &self,
+        gas: &mut Gas,
     ) -> Result<MichelineContractScript<&'a Micheline<'a>>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
             Micheline::Seq(seq) => seq,
-            x => return Err(TcError::UnexpectedMicheline(format!("{x:?}"))),
+            x => return Err(TcError::unexpected_micheline(x, gas)),
         };
         let mut parameter_ty = None;
         let mut storage_ty = None;
@@ -815,7 +858,7 @@ impl<'a> Micheline<'a> {
                 | micheline_types!()
                 | micheline_fields!()
                 | micheline_values!() => {
-                    return Err(TcError::UnexpectedMicheline(format!("{elt:?}")));
+                    return Err(TcError::unexpected_micheline(elt, gas));
                 }
             }
         }
@@ -1002,7 +1045,8 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         max: MICHELSON_MAXIMUM_TYPE_SIZE,
                     });
                 }
-                let unexpected = || Err(TcError::UnexpectedMicheline(format!("{ty:?}")));
+                let unexpected =
+                    |gas: &mut Gas| Err(TcError::unexpected_micheline(ty, gas));
                 // Small helper that captures the current Visit's metadata so
                 // leaf arms can finalize in one short line.
                 macro_rules! emit_leaf {
@@ -1020,64 +1064,64 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                 }
                 match ty {
                     App(int, [], _) => emit_leaf!(Type::Int),
-                    App(int, ..) => return unexpected(),
+                    App(int, ..) => return unexpected(gas),
 
                     App(nat, [], _) => emit_leaf!(Type::Nat),
-                    App(nat, ..) => return unexpected(),
+                    App(nat, ..) => return unexpected(gas),
 
                     App(bool, [], _) => emit_leaf!(Type::Bool),
-                    App(bool, ..) => return unexpected(),
+                    App(bool, ..) => return unexpected(gas),
 
                     App(mutez, [], _) => emit_leaf!(Type::Mutez),
-                    App(mutez, ..) => return unexpected(),
+                    App(mutez, ..) => return unexpected(gas),
 
                     App(string, [], _) => emit_leaf!(Type::String),
-                    App(string, ..) => return unexpected(),
+                    App(string, ..) => return unexpected(gas),
 
                     App(operation, [], _) => emit_leaf!(Type::Operation),
-                    App(operation, ..) => return unexpected(),
+                    App(operation, ..) => return unexpected(gas),
 
                     App(never, [], _) => emit_leaf!(Type::Never),
-                    App(never, ..) => return unexpected(),
+                    App(never, ..) => return unexpected(gas),
 
                     App(unit, [], _) => emit_leaf!(Type::Unit),
-                    App(unit, ..) => return unexpected(),
+                    App(unit, ..) => return unexpected(gas),
 
                     App(address, [], _) => emit_leaf!(Type::Address),
-                    App(address, ..) => return unexpected(),
+                    App(address, ..) => return unexpected(gas),
 
                     App(chain_id, [], _) => emit_leaf!(Type::ChainId),
-                    App(chain_id, ..) => return unexpected(),
+                    App(chain_id, ..) => return unexpected(gas),
 
                     App(timestamp, [], _) => emit_leaf!(Type::Timestamp),
-                    App(timestamp, ..) => return unexpected(),
+                    App(timestamp, ..) => return unexpected(gas),
 
                     App(bytes, [], _) => emit_leaf!(Type::Bytes),
-                    App(bytes, ..) => return unexpected(),
+                    App(bytes, ..) => return unexpected(gas),
 
                     App(key, [], _) => emit_leaf!(Type::Key),
-                    App(key, ..) => return unexpected(),
+                    App(key, ..) => return unexpected(gas),
 
                     App(key_hash, [], _) => emit_leaf!(Type::KeyHash),
-                    App(key_hash, ..) => return unexpected(),
+                    App(key_hash, ..) => return unexpected(gas),
 
                     App(signature, [], _) => emit_leaf!(Type::Signature),
-                    App(signature, ..) => return unexpected(),
+                    App(signature, ..) => return unexpected(gas),
 
                     #[cfg(feature = "bls")]
                     App(bls12_381_fr, [], _) => emit_leaf!(Type::Bls12381Fr),
                     #[cfg(feature = "bls")]
-                    App(bls12_381_fr, ..) => return unexpected(),
+                    App(bls12_381_fr, ..) => return unexpected(gas),
 
                     #[cfg(feature = "bls")]
                     App(bls12_381_g1, [], _) => emit_leaf!(Type::Bls12381G1),
                     #[cfg(feature = "bls")]
-                    App(bls12_381_g1, ..) => return unexpected(),
+                    App(bls12_381_g1, ..) => return unexpected(gas),
 
                     #[cfg(feature = "bls")]
                     App(bls12_381_g2, [], _) => emit_leaf!(Type::Bls12381G2),
                     #[cfg(feature = "bls")]
-                    App(bls12_381_g2, ..) => return unexpected(),
+                    App(bls12_381_g2, ..) => return unexpected(gas),
 
                     #[cfg(feature = "tickets")]
                     App(ticket, [t], _) => push_single_child_visit(
@@ -1089,7 +1133,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         t,
                     ),
                     #[cfg(feature = "tickets")]
-                    App(ticket, ..) => return unexpected(),
+                    App(ticket, ..) => return unexpected(gas),
 
                     App(pair, [ty1, ty2, rest @ ..], _) => {
                         // The recursive shape is right leaning:
@@ -1150,7 +1194,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                             path: Vec::new(),
                         });
                     }
-                    App(pair, ..) => return unexpected(),
+                    App(pair, ..) => return unexpected(gas),
 
                     App(or, [l, r], _) => {
                         let mut left_path = path.clone();
@@ -1174,7 +1218,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                             path: left_path,
                         });
                     }
-                    App(or, ..) => return unexpected(),
+                    App(or, ..) => return unexpected(gas),
 
                     App(option, [t], _) => push_single_child_visit(
                         &mut frames,
@@ -1184,7 +1228,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         BuildKind::Option,
                         t,
                     ),
-                    App(option, ..) => return unexpected(),
+                    App(option, ..) => return unexpected(gas),
 
                     App(list, [t], _) => push_single_child_visit(
                         &mut frames,
@@ -1194,7 +1238,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         BuildKind::List,
                         t,
                     ),
-                    App(list, ..) => return unexpected(),
+                    App(list, ..) => return unexpected(gas),
 
                     App(lambda, [ty1, ty2], _) => push_pair_children_visit(
                         &mut frames,
@@ -1205,7 +1249,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         ty1,
                         ty2,
                     ),
-                    App(lambda, ..) => return unexpected(),
+                    App(lambda, ..) => return unexpected(gas),
 
                     App(contract, [t], _) => push_single_child_visit(
                         &mut frames,
@@ -1215,7 +1259,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         BuildKind::Contract,
                         t,
                     ),
-                    App(contract, ..) => return unexpected(),
+                    App(contract, ..) => return unexpected(gas),
 
                     App(set, [k], _) => push_single_child_visit(
                         &mut frames,
@@ -1225,7 +1269,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                         BuildKind::Set,
                         k,
                     ),
-                    App(set, ..) => return unexpected(),
+                    App(set, ..) => return unexpected(gas),
 
                     App(map, [k, v], _) => {
                         // Push order matches the recursive code's evaluation
@@ -1251,7 +1295,7 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                             path: Vec::new(),
                         });
                     }
-                    App(map, ..) => return unexpected(),
+                    App(map, ..) => return unexpected(gas),
 
                     App(big_map, [k, v], _) => {
                         // Push order matches the recursive code: parse k →
@@ -1280,13 +1324,13 @@ fn parse_ty_with_entrypoints<'a, 'b>(
                             path: Vec::new(),
                         });
                     }
-                    App(big_map, ..) => return unexpected(),
+                    App(big_map, ..) => return unexpected(gas),
 
                     Seq(..)
                     | micheline_fields!()
                     | micheline_instructions!()
                     | micheline_literals!()
-                    | micheline_values!() => return unexpected(),
+                    | micheline_values!() => return unexpected(gas),
 
                     App(prim @ micheline_unsupported_types!(), ..) => {
                         return Err(TcError::TodoType(*prim));
@@ -3101,7 +3145,7 @@ fn typecheck_instruction_step<'a, 'b>(
 
     macro_rules! unexpected_micheline {
         () => {
-            return Err(TcError::UnexpectedMicheline(format!("{i:?}")))
+            return Err(TcError::unexpected_micheline(i, gas))
         };
     }
 
@@ -4713,7 +4757,7 @@ fn typecheck_instruction_step<'a, 'b>(
                 storage_ty,
                 code: child_code,
                 views: mich_views,
-            } = cs.split_script()?;
+            } = cs.split_script(gas)?;
             // Parse types and view types now (stack-safe); the code body and the
             // view bodies are deferred to the worklist so a nested origination
             // through a view does not grow the native stack (L2-1702).
@@ -4761,7 +4805,7 @@ fn typecheck_instruction_step<'a, 'b>(
                     check_view_name(s)?;
                     s.clone()
                 }
-                _ => return Err(TcError::UnexpectedMicheline(format!("{name:?}"))),
+                _ => return Err(TcError::unexpected_micheline(name, gas)),
             };
             let arg_type = pop!();
             pop!();
@@ -4943,8 +4987,12 @@ enum TvFrame<'a, 'b> {
     /// Ticket from the explicit four argument form: pop ticketer, content,
     /// and amount results (in that LIFO order they were pushed) and build.
     BuildTicketExplicit { content_type: Rc<Type> },
-    /// Ticket from the legacy pair form: pop one `TV::Pair`, destructure.
-    BuildTicketLegacy { content_type: Type },
+    /// Ticket from the legacy pair form `v`: pop one `TV::Pair`,
+    /// destructure.
+    BuildTicketLegacy {
+        content_type: Type,
+        v: &'b Micheline<'a>,
+    },
 }
 
 /// How a map style iteration finishes once all elements are typed.
@@ -5013,18 +5061,16 @@ fn map_key_ordering_check<'a>(
 /// Destructure a Micheline as `Elt(key, val)` (the element shape inside
 /// a typed `map`, `big_map`, or `set`-encoded sequence). Returns the
 /// inner key and value Micheline, or a `TcError::InvalidEltForMap`
-/// carrying a cloned copy of `map_ty` for context. The clone runs only
-/// on the error path.
+/// carrying a cloned copy of `map_ty` for context. The clone, and the
+/// encoding of `elt`, which consumes `gas`, run only on the error path.
 fn expect_elt<'a, 'b>(
     elt: &'b Micheline<'a>,
     map_ty: &Type,
+    gas: &mut Gas,
 ) -> Result<(&'b Micheline<'a>, &'b Micheline<'a>), TcError> {
     match elt {
         Micheline::App(Prim::Elt, [k_expr, v_expr], _) => Ok((k_expr, v_expr)),
-        _ => Err(TcError::InvalidEltForMap(
-            format!("{elt:?}"),
-            map_ty.clone(),
-        )),
+        _ => Err(TcError::invalid_elt_for_map(elt, map_ty, gas)),
     }
 }
 
@@ -5151,15 +5197,12 @@ fn step_typecheck_value<'a, 'b>(
                     });
                     Ok(())
                 }
-                _ => Err(TcError::InvalidValueForType(
-                    // Format via the same synthetic App the recursive
-                    // typecheck_value built. `Micheline`'s manual,
-                    // iterative `Debug` (L2-1436) is the contract that
-                    // keeps this rendering stable as `Annotations`' Debug
-                    // evolves — and that does not overflow the kernel
-                    // stack on adversarially deep payloads.
-                    format!("{:?}", Micheline::App(Prim::Pair, vs, NO_ANNS)),
-                    t,
+                // The value is the same synthetic App the recursive
+                // typecheck_value built.
+                _ => Err(TcError::invalid_value_for_type(
+                    &Micheline::App(Prim::Pair, vs, NO_ANNS),
+                    &t,
+                    ctx.gas(),
                 )),
             }
         }
@@ -5316,7 +5359,8 @@ fn step_typecheck_value<'a, 'b>(
                 let mut acc = acc;
                 acc.insert(key, value);
                 if let Some((next_elt, rest)) = remaining.split_first() {
-                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    let (next_k_expr, next_v_expr) =
+                        expect_elt(next_elt, &map_ty, ctx.gas())?;
                     frames.push(TvFrame::MapAccum {
                         remaining: rest,
                         key_t: key_t.clone(),
@@ -5404,7 +5448,7 @@ fn step_typecheck_value<'a, 'b>(
                         acc.insert(key, None);
                         if let Some((next_elt, rest)) = remaining.split_first() {
                             let (next_k_expr, next_v_expr) =
-                                expect_elt(next_elt, &map_ty)?;
+                                expect_elt(next_elt, &map_ty, ctx.gas())?;
                             frames.push(TvFrame::BigMapDiffAccum {
                                 remaining: rest,
                                 key_t: key_t.clone(),
@@ -5445,9 +5489,10 @@ fn step_typecheck_value<'a, 'b>(
                         }
                     }
                     other => {
-                        return Err(TcError::InvalidEltForMap(
-                            format!("{other:?}"),
-                            map_ty,
+                        return Err(TcError::invalid_elt_for_map(
+                            other,
+                            &map_ty,
+                            ctx.gas(),
                         ));
                     }
                 }
@@ -5464,7 +5509,8 @@ fn step_typecheck_value<'a, 'b>(
                 let mut acc = acc;
                 acc.insert(key, Some(value));
                 if let Some((next_elt, rest)) = remaining.split_first() {
-                    let (next_k_expr, next_v_expr) = expect_elt(next_elt, &map_ty)?;
+                    let (next_k_expr, next_v_expr) =
+                        expect_elt(next_elt, &map_ty, ctx.gas())?;
                     frames.push(TvFrame::BigMapDiffAccum {
                         remaining: rest,
                         key_t: key_t.clone(),
@@ -5546,7 +5592,7 @@ fn step_typecheck_value<'a, 'b>(
             }));
             Ok(())
         }
-        TvFrame::BuildTicketLegacy { content_type } => {
+        TvFrame::BuildTicketLegacy { content_type, v } => {
             let pair = results.pop().ok_or(TcError::InternalError(
                 TcInvariant::EmptyResultStack {
                     expected: "ticket legacy pair",
@@ -5590,12 +5636,13 @@ fn step_typecheck_value<'a, 'b>(
                     }));
                     Ok(())
                 }
-                other => {
+                _ => {
                     // The synthetic pair value did not typecheck as a Pair,
-                    // which means the legacy ticket form was rejected.
-                    Err(TcError::InvalidValueForType(
-                        format!("{other:?}"),
-                        Type::new_ticket(content_type),
+                    // which means the legacy ticket form `v` was rejected.
+                    Err(TcError::invalid_value_for_type(
+                        v,
+                        &Type::new_ticket(content_type),
+                        ctx.gas(),
                     ))
                 }
             }
@@ -5619,7 +5666,7 @@ fn visit_value<'a, 'b>(
     use TypedValue as TV;
 
     ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
-    let invalid = || TcError::InvalidValueForType(format!("{v:?}"), t.clone());
+    let invalid = |gas: &mut Gas| TcError::invalid_value_for_type(v, &t, gas);
 
     match (&t, v) {
         (T::Nat, V::Int(n)) => results.push(TV::Nat(BigUint::try_from(n)?)),
@@ -5739,6 +5786,7 @@ fn visit_value<'a, 'b>(
                 MapFinalize::Map,
                 frames,
                 results,
+                ctx.gas(),
             )?;
         }
         (T::BigMap(m), V::Seq(vs)) => {
@@ -5758,13 +5806,14 @@ fn visit_value<'a, 'b>(
                 },
                 frames,
                 results,
+                ctx.gas(),
             )?;
         }
         (T::BigMap(m), v) => {
             let (id, vs_opt, diff) = match v {
                 V::Int(i) => (i, None, false),
                 V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
-                _ => return Err(invalid()),
+                _ => return Err(invalid(ctx.gas())),
             };
             if allow_forged_lazy_storage_id == AllowForgedLazyStorageId::No {
                 return Err(TcError::UnexpectedForgedValue(id.clone()));
@@ -5801,7 +5850,7 @@ fn visit_value<'a, 'b>(
                         vs.len(),
                     )?)?;
                     if let Some((first_elt, rest)) = vs.split_first() {
-                        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+                        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty, ctx.gas())?;
                         if !diff {
                             // Non-diff form happens only when vs_opt is None;
                             // reaching here means we matched the diff shape.
@@ -5952,11 +6001,11 @@ fn visit_value<'a, 'b>(
                 let leap_offset = i64::from(dt.timestamp_subsec_nanos() >= 1_000_000_000);
                 results.push(TV::Timestamp(BigInt::from(dt.timestamp() + leap_offset)));
             } else if n.len() > MAX_DECIMAL_TIMESTAMP_LENGTH {
-                return Err(invalid());
+                return Err(invalid(ctx.gas()));
             } else if let Ok(z) = n.parse::<tezos_data_encoding::types::Zarith>() {
                 results.push(TV::Timestamp(z.0));
             } else {
-                return Err(invalid());
+                return Err(invalid(ctx.gas()));
             }
         }
         (
@@ -6053,7 +6102,7 @@ fn visit_value<'a, 'b>(
             // Recursive call into the iterative driver. Any Err inside the
             // synthetic pair typecheck is remapped to InvalidValueForType
             // against the ticket type, matching the recursive form's
-            // outer `_ => Err(invalid())` arm. Pushing BuildTicketLegacy
+            // outer `_ => Err(invalid(..))` arm. Pushing BuildTicketLegacy
             // afterwards keeps the deconstruction in the worklist.
             let pair = typecheck_value_with_views(
                 m,
@@ -6062,9 +6111,9 @@ fn visit_value<'a, 'b>(
                 typecheck_views,
                 allow_forged_lazy_storage_id,
             )
-            .map_err(|_| invalid())?;
+            .map_err(|_| invalid(ctx.gas()))?;
             results.push(pair);
-            frames.push(TvFrame::BuildTicketLegacy { content_type });
+            frames.push(TvFrame::BuildTicketLegacy { content_type, v: m });
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
@@ -6074,28 +6123,31 @@ fn visit_value<'a, 'b>(
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_FR)?;
-            results.push(TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(invalid)?));
+            results.push(TV::Bls12381Fr(
+                bls::Fr::from_bytes(bs).ok_or_else(|| invalid(ctx.gas()))?,
+            ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G1)?;
             results.push(TV::new_bls12381_g1(
-                bls::G1::from_bytes(bs).ok_or_else(invalid)?,
+                bls::G1::from_bytes(bs).ok_or_else(|| invalid(ctx.gas()))?,
             ));
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::BLS_G2)?;
             results.push(TV::new_bls12381_g2(
-                bls::G2::from_bytes(bs).ok_or_else(invalid)?,
+                bls::G2::from_bytes(bs).ok_or_else(|| invalid(ctx.gas()))?,
             ));
         }
-        (_, _) => return Err(invalid()),
+        (_, _) => return Err(invalid(ctx.gas())),
     }
     Ok(())
 }
 
 /// Shared setup for the (T::Map, Seq) and (T::BigMap, Seq) arms.
+#[allow(clippy::too_many_arguments)]
 fn visit_map_or_bigmap_inmem<'a, 'b>(
     map_ty: Type,
     vs: &'b [Micheline<'a>],
@@ -6104,11 +6156,12 @@ fn visit_map_or_bigmap_inmem<'a, 'b>(
     finalize: MapFinalize,
     frames: &mut FrameStack<'a, 'b>,
     results: &mut Vec<TypedValue<'a>>,
+    gas: &mut Gas,
 ) -> Result<(), TcError> {
     use TypedValue as TV;
 
     if let Some((first_elt, rest)) = vs.split_first() {
-        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty)?;
+        let (k_expr, v_expr) = expect_elt(first_elt, &map_ty, gas)?;
         frames.push(TvFrame::MapAccum {
             remaining: rest,
             key_t: key_t.clone(),
@@ -6276,6 +6329,18 @@ mod typecheck_tests {
     use Instruction::*;
     use Option::None;
 
+    /// The Micheline expression `src`, in binary, as the payload of a
+    /// [TcError].
+    fn micheline_bytes(src: &str) -> MichelineBytes {
+        MichelineBytes(
+            parse(src)
+                .unwrap()
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+        )
+    }
+
     /// L2-1706: `parse_ty` rejects a type past `MICHELSON_MAXIMUM_TYPE_SIZE`
     /// with `TypeTooLarge`; one at the cap still parses. (Deep-`Type`
     /// stack-safety lives in `deeply_nested_if_unifies_deep_types`, which
@@ -6348,13 +6413,13 @@ mod typecheck_tests {
     /// larger than its node count, and the per-type parse cap
     /// ([`MICHELSON_MAXIMUM_TYPE_SIZE`]) does **not** bound
     /// instruction-synthesised types. Such a `Type` reaches the kernel's
-    /// typecheck-error sinks embedded in a [`TcError`] — rendered via
-    /// `Display` (`From<TcError> for TransferError`, origination typecheck)
-    /// and `Debug` (view-path `classify_tc_error`). Both must abort at the
-    /// byte ceiling. This covers a plain `{:?}` type-carrying variant and the
-    /// [`TcError::NoMatchingOverload`] arm, whose optional `reason` is the one
-    /// place the `Display` chain used to build the render eagerly via
-    /// `format!` (now [`DisplayReason`]).
+    /// typecheck-error sinks embedded in a [`TcError`]. Its `Display`, used
+    /// by `From<TcError> for TransferError` and the origination typecheck, does
+    /// not show the type at all. Its derived `Debug`, used by the view-path
+    /// `classify_tc_error`, shows it, so it must abort at the byte ceiling.
+    /// This covers a plain `{:?}` type-carrying variant and the
+    /// [`TcError::NoMatchingOverload`] arm, whose optional `reason` holds the
+    /// type.
     ///
     /// The DAG is built directly via shared `Rc::clone` (K=64) to stress the
     /// *renderer*: building a type this large through Michelson would cost
@@ -6364,8 +6429,7 @@ mod typecheck_tests {
     #[test]
     fn typecheck_exponential_type_renders_bounded() {
         use crate::bounded_fmt::{
-            debug_bounded, display_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP,
-            TRUNCATION_SUFFIX,
+            debug_bounded, MAX_INTERPRET_ERROR_RENDER_BYTES as CAP, TRUNCATION_SUFFIX,
         };
         use crate::stack::Stack;
 
@@ -6394,18 +6458,20 @@ mod typecheck_tests {
 
         // Plain `{0:?}` type-carrying variant.
         let direct = TcError::UnexpectedImplicitAccountType(ty.clone());
-        assert_bounded(display_bounded(&direct, CAP));
+        assert_eq!(
+            direct.to_string(),
+            "unexpected implicit account parameter type"
+        );
         assert_bounded(debug_bounded(&direct, CAP));
 
         // `NoMatchingOverload` with the exponential type in the optional
-        // `reason` — exercises the previously-eager `format!` path via the
-        // `Display` sink, and the derived `Debug` via the view sink.
+        // `reason`.
         let overload = TcError::NoMatchingOverload {
             instr: Prim::PAIR,
             stack: Stack::new(),
             reason: Some(NoMatchingOverloadReason::ExpectedPair(ty)),
         };
-        assert_bounded(display_bounded(&overload, CAP));
+        assert_eq!(overload.to_string(), "no matching overload for PAIR");
         assert_bounded(debug_bounded(&overload, CAP));
     }
 
@@ -7858,7 +7924,7 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Err(TcError::InvalidValueForType("Bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(), Type::Bls12381Fr))
+            Err(TcError::InvalidValueForType(micheline_bytes(r#"0x000000000000000000000000000000000000000000000000000000000000000000"#), Type::Bls12381Fr))
         );
     }
 
@@ -7889,7 +7955,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                micheline_bytes(&format!("0x{hex_val}")),
                 Type::Bls12381G1,
             ))
         );
@@ -7906,7 +7972,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                micheline_bytes(&format!("0x{hex_val}")),
                 Type::Bls12381G1,
             ))
         );
@@ -7939,7 +8005,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                micheline_bytes(&format!("0x{hex_val}")),
                 Type::Bls12381G2,
             ))
         );
@@ -7956,7 +8022,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "Bytes([64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(),
+                micheline_bytes(&format!("0x{hex_val}")),
                 Type::Bls12381G2,
             ))
         );
@@ -8688,7 +8754,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "App(Unit, [], [])".into(),
+                micheline_bytes("Unit"),
                 Type::Int
             ))
         );
@@ -8984,7 +9050,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "String(\"1\")".into(),
+                micheline_bytes(r#""1""#),
                 Type::Int
             ))
         );
@@ -9087,7 +9153,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
-                "String(\"1\")".into(),
+                micheline_bytes(r#""1""#),
                 Type::Int
             ))
         );
@@ -9103,7 +9169,7 @@ mod typecheck_tests {
                 &mut stack
             ),
             Err(TcError::InvalidEltForMap(
-                "String(\"bar\")".to_owned(),
+                micheline_bytes(r#""bar""#),
                 Type::new_map(Type::Int, Type::String)
             ))
         );
@@ -10249,7 +10315,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10269,7 +10335,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10291,7 +10357,7 @@ mod typecheck_tests {
         fn origination(src: &str) -> Result<(), TcError> {
             parse_contract_script(src)
                 .unwrap()
-                .split_script()
+                .split_script(&mut Gas::default())
                 .unwrap()
                 .typecheck_script(&mut Gas::default(), true, true)
                 .map(|_| ())
@@ -10299,7 +10365,7 @@ mod typecheck_tests {
         fn re_typecheck(src: &str) -> Result<(), TcError> {
             parse_contract_script(src)
                 .unwrap()
-                .split_script()
+                .split_script(&mut Gas::default())
                 .unwrap()
                 .typecheck_script(&mut Gas::default(), true, false)
                 .map(|_| ())
@@ -10423,7 +10489,7 @@ mod typecheck_tests {
             "parameter unit; storage (lambda unit unit); code { CDR; NIL operation; PAIR }",
         )
         .unwrap()
-        .split_script()
+        .split_script(&mut Gas::default())
         .unwrap()
         .typecheck_script(&mut Gas::default(), true, false)
         .unwrap();
@@ -10468,7 +10534,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10509,7 +10575,7 @@ mod typecheck_tests {
                 "code FAILWITH",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10529,7 +10595,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10549,7 +10615,7 @@ mod typecheck_tests {
                 "code { UNIT; FAILWITH };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10666,7 +10732,7 @@ mod typecheck_tests {
                 crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::InvalidValueForType(
-                "String(\"a\")".into(),
+                micheline_bytes(r#""a""#),
                 Type::Int
             ))
         );
@@ -10680,7 +10746,7 @@ mod typecheck_tests {
                 crate::typechecker::AllowForgedLazyStorageId::Yes,
             ),
             Err(TcError::InvalidEltForMap(
-                "Int(8)".into(),
+                micheline_bytes("8"),
                 Type::BigMap(PairBox::new(Type::Int, Type::Int))
             ))
         );
@@ -10735,7 +10801,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10771,7 +10837,7 @@ mod typecheck_tests {
                 "code FAILWITH;"
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10791,7 +10857,7 @@ mod typecheck_tests {
                 "code { CAR; NIL operation; PAIR };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -10818,7 +10884,7 @@ mod typecheck_tests {
                 r#"view "this_view_name_has_31_char_okay" unit unit { CAR };"#,
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -10853,7 +10919,7 @@ mod typecheck_tests {
                 r#"view "b" unit unit { CDR };"#,
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -10897,7 +10963,7 @@ mod typecheck_tests {
                 r#"view "a" unit unit { CDR };"#,
             ))
             .unwrap()
-            .split_script(),
+            .split_script(&mut Gas::default()),
             Err(TcError::DuplicatedView("a".into()))
         );
     }
@@ -10912,7 +10978,7 @@ mod typecheck_tests {
                 r#"view "this_is_a_very_long_view_name_32" unit unit { CAR };"#,
             ))
             .unwrap()
-            .split_script(),
+            .split_script(&mut Gas::default()),
             Err(TcError::InvalidViewName(
                 "this_is_a_very_long_view_name_32".into()
             ))
@@ -10929,7 +10995,7 @@ mod typecheck_tests {
                 r#"view "?_cannot_be_view_name" unit unit { CAR };"#,
             ))
             .unwrap()
-            .split_script(),
+            .split_script(&mut Gas::default()),
             Err(TcError::InvalidViewName("?_cannot_be_view_name".into()))
         );
     }
@@ -10945,7 +11011,7 @@ mod typecheck_tests {
                 r#"view "big_map_input_view" (big_map string nat) unit { CDR };"#,
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -10966,7 +11032,7 @@ mod typecheck_tests {
                 r#"view "big_map_output_view" unit (big_map string nat) { DROP ; EMPTY_BIG_MAP string nat; };"#,
             ))
             .unwrap()
-            .split_script().unwrap().typecheck_script(&mut gas, true, true),
+            .split_script(&mut Gas::default()).unwrap().typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewOutput,
                 Type::BigMap(PairBox::new(Type::String, Type::Nat))
@@ -10985,7 +11051,7 @@ mod typecheck_tests {
                 r#"view "multiply_view" nat nat { UNPAIR ; MUL; };"#,
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::NoMatchingOverload {
@@ -11007,7 +11073,7 @@ mod typecheck_tests {
                 r#"view "non_seq_view" nat nat UNPAIR;"#,
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::NonSeqViewInstrs("non_seq_view".into()))
@@ -11024,7 +11090,7 @@ mod typecheck_tests {
                 r#"code { CAR ; NIL operation ; PAIR ; PUSH address "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" ; UNIT ; VIEW "hello_view" string ; DROP ; };"#
             ))
             .unwrap()
-            .split_script().unwrap().typecheck_script(&mut gas, true, true),
+            .split_script(&mut Gas::default()).unwrap().typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -11062,7 +11128,7 @@ mod typecheck_tests {
                 "code { DROP; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -11088,7 +11154,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
@@ -11623,7 +11689,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %foo; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -11660,7 +11726,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
@@ -11682,7 +11748,7 @@ mod typecheck_tests {
                 "code { DROP; SELF; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
@@ -11789,7 +11855,7 @@ mod typecheck_tests {
         let go = |s| {
             parse_contract_script(s)
                 .unwrap()
-                .split_script()?
+                .split_script(&mut Gas::default())?
                 .typecheck_script(&mut Gas::default(), true, true)
         };
 
@@ -12403,7 +12469,7 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::InvalidValueForType(
-                "App(Unit, [], [])".to_owned(),
+                micheline_bytes("Unit"),
                 Type::new_lambda(Type::Unit, Type::Unit)
             ))
         );
@@ -13249,7 +13315,7 @@ mod typecheck_tests {
                 let script = nested_create_contract_script(&arena, DEPTH);
                 let mut gas = Gas::unmetered();
                 let result = script
-                    .split_script()
+                    .split_script(&mut Gas::default())
                     .expect("nested script splits")
                     .typecheck_script(&mut gas, true, true);
                 let ts =
@@ -13308,7 +13374,7 @@ mod typecheck_tests {
         let outer_src = format!("CREATE_CONTRACT {child_src}");
         let child_mich = parse(child_src).unwrap();
         let child_cs = child_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
@@ -13440,7 +13506,7 @@ mod typecheck_tests {
                 let script = nested_view_create_contract_script(&arena, DEPTH);
                 let mut gas = Gas::unmetered();
                 let ts = script
-                    .split_script()
+                    .split_script(&mut Gas::default())
                     .expect("splits")
                     .typecheck_script(&mut gas, true, true)
                     .expect("view-nested CREATE_CONTRACT must typecheck iteratively");
@@ -13467,7 +13533,7 @@ code { DROP ;
   } ;
   NIL operation ; PAIR }"#)
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true),
             Err(TcError::DuplicateElements(Type::new_set(Type::Signature)))
@@ -13516,6 +13582,71 @@ code { DROP ;
         }
     }
 
+    /// Above the cap, the payload of a typechecking error is the binary
+    /// Micheline of the placeholder string.
+    #[test]
+    fn micheline_payload_above_the_cap_is_the_placeholder() {
+        let payload = |s: String| {
+            micheline_payload(&Micheline::String(s), &mut Gas::default()).unwrap()
+        };
+        let build_string = |n: usize| "a".repeat(n);
+        assert_eq!(
+            payload(build_string(
+                crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES - 5
+            ))
+            .0
+            .len(),
+            crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES
+        );
+        assert_eq!(
+            payload("a".repeat(crate::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES - 4)),
+            payload("Micheline value too large".to_owned())
+        );
+    }
+
+    // The payload of `InvalidValueForType` is the rejected value in binary
+    // Micheline, whose encoding consumes `micheline_encoding`. When the gas
+    // does not cover it, the error is `OutOfGas`.
+    #[test]
+    fn invalid_value_for_type_payload_consumes_gas() {
+        let consumed = |src: &str| {
+            let mut ctx = Ctx::default();
+            let before = ctx.gas.milligas().unwrap();
+            assert_eq!(
+                typecheck_value(
+                    &parse(src).unwrap(),
+                    &mut ctx,
+                    &Type::Int,
+                    AllowForgedLazyStorageId::No,
+                ),
+                Err(TcError::InvalidValueForType(
+                    micheline_bytes(src),
+                    Type::Int
+                ))
+            );
+            before - ctx.gas.milligas().unwrap()
+        };
+        let encoding = |src: &str| {
+            gas::interpret_cost::micheline_encoding(&parse(src).unwrap()).unwrap()
+        };
+        let unit = consumed("Unit");
+        assert_eq!(
+            consumed("Pair Unit Unit") - unit,
+            encoding("Pair Unit Unit") - encoding("Unit")
+        );
+        let mut ctx = Ctx::default();
+        ctx.gas = Gas::new(unit - 1);
+        assert_eq!(
+            typecheck_value(
+                &parse("Unit").unwrap(),
+                &mut ctx,
+                &Type::Int,
+                AllowForgedLazyStorageId::No,
+            ),
+            Err(TcError::OutOfGas(OutOfGas))
+        );
+    }
+
     // Locks in the wording of `InvalidValueForType` when a legacy-ticket
     // value (the 3-tuple form) is malformed. The recursive code wrapped
     // the synthetic pair typecheck in a match whose `_ =>` arm remapped
@@ -13546,11 +13677,11 @@ code { DROP ;
         }
     }
 
-    // Locks in the wording of `InvalidValueForType` when typechecking an
+    // Locks in the payload of `InvalidValueForType` when typechecking an
     // over-long Pair literal against a shorter Pair type. The new iterative
-    // worklist hand-formats the synthetic-pair tail; this test guards that
-    // the format stays byte-identical with `format!("{:?}", App(Pair, vs,
-    // NO_ANNS))`, which is what the recursive code emitted.
+    // worklist encodes the synthetic-pair tail; this test guards that the
+    // payload stays `App(Pair, vs, NO_ANNS)`, which is what the recursive
+    // code emitted.
     #[test]
     fn invalid_value_for_type_n_ary_pair_tail_wording() {
         let mut ctx = Ctx::default();
@@ -13562,21 +13693,15 @@ code { DROP ;
         );
         // Three values for a 2-tuple: the third value (3) hits the
         // VisitPairTail fallback against the inner Type::Int.
-        let msg = match result {
-            Err(TcError::InvalidValueForType(s, _)) => s,
+        let payload = match result {
+            Err(TcError::InvalidValueForType(payload, _)) => payload,
             other => panic!("expected InvalidValueForType, got {other:?}"),
         };
-        // Format must match what `format!("{:?}", App(Pair, [Int(2), Int(3)], NO_ANNS))`
-        // produces under the auto-derived Debug — same as the recursive code.
-        let expected = format!(
-            "{:?}",
-            Micheline::App(
-                Prim::Pair,
-                &[Micheline::Int(2.into()), Micheline::Int(3.into())],
-                NO_ANNS,
-            ),
+        assert_eq!(
+            payload,
+            micheline_bytes("Pair 2 3"),
+            "n-ary pair tail payload diverged"
         );
-        assert_eq!(msg, expected, "n-ary pair tail wording diverged");
     }
 
     #[cfg(feature = "tickets")]
@@ -14069,7 +14194,7 @@ code { DROP ;
                 stk
             ),
             Err(TcError::InvalidValueForType(
-                "String(\"ABCD\")".to_string(),
+                micheline_bytes(r#""ABCD""#),
                 Type::Timestamp
             ))
         );
@@ -14082,7 +14207,7 @@ code { DROP ;
                 stk
             ),
             Err(TcError::InvalidValueForType(
-                "String(\"3.5\")".to_string(),
+                micheline_bytes(r#""3.5""#),
                 Type::Timestamp
             ))
         );
@@ -14170,7 +14295,12 @@ code { DROP ;
                     stk
                 ),
                 Err(TcError::InvalidValueForType(
-                    format!("{:?}", Micheline::String(s)),
+                    MichelineBytes(
+                        Micheline::String(s)
+                            .encode(&mut Gas::default())
+                            .unwrap()
+                            .unwrap()
+                    ),
                     Type::Timestamp
                 ))
             );
@@ -14606,10 +14736,9 @@ code { DROP ;
                 &mut Gas::default(),
                 stk
             ),
-            Err(TcError::UnexpectedMicheline(
-                "App(EMIT, [App(nat, [], []), App(nat, [], [])], [Field(\"mytag\")])"
-                    .to_string()
-            ))
+            Err(TcError::UnexpectedMicheline(micheline_bytes(
+                "EMIT %mytag nat nat"
+            )))
         );
 
         // Too long tag
@@ -14650,7 +14779,7 @@ code { DROP ;
         )
         .unwrap();
         let cs = cs_mich
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut gas, true, true)
             .unwrap();
@@ -14756,9 +14885,9 @@ code { DROP ;
         let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(&parse("CAST nat nat").unwrap(), &mut gas, &mut stack),
-            Err(TcError::UnexpectedMicheline(
-                "App(CAST, [App(nat, [], []), App(nat, [], [])], [])".to_string()
-            ))
+            Err(TcError::UnexpectedMicheline(micheline_bytes(
+                "CAST nat nat"
+            )))
         );
     }
 
@@ -14768,9 +14897,7 @@ code { DROP ;
         let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(&parse("CAST").unwrap(), &mut gas, &mut stack),
-            Err(TcError::UnexpectedMicheline(
-                "App(CAST, [], [])".to_string()
-            ))
+            Err(TcError::UnexpectedMicheline(micheline_bytes("CAST")))
         );
     }
 
@@ -14795,9 +14922,7 @@ code { DROP ;
         let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(&parse("RENAME bool").unwrap(), &mut gas, &mut stack),
-            Err(TcError::UnexpectedMicheline(
-                "App(RENAME, [App(bool, [], [])], [])".to_string()
-            ))
+            Err(TcError::UnexpectedMicheline(micheline_bytes("RENAME bool")))
         );
     }
 
@@ -14811,7 +14936,7 @@ code { DROP ;
         );
         parse_contract_script(&src)
             .unwrap()
-            .split_script()
+            .split_script(&mut Gas::default())
             .unwrap()
             .typecheck_script(&mut Gas::default(), true, true)?;
         Ok(())

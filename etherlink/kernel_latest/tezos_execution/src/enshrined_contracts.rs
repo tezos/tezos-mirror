@@ -6411,15 +6411,14 @@ pub(crate) mod tests {
             .expect("milligas within limit")
     }
 
-    /// A `MichelsonContractInterpretError` whose message ends with `len`
-    /// bytes, so that the test controls its size.
-    fn interpret_error(len: usize) -> TransferError {
-        TransferError::MichelsonContractInterpretError(
-            mir::typechecker::TcError::UnexpectedMicheline("x".repeat(len)).into(),
-        )
+    /// A `TransferError` whose message ends with `len` bytes, so that the test
+    /// controls its size. A typechecking error would not do: its message is a
+    /// constant description.
+    fn error_of_length(len: usize) -> TransferError {
+        TransferError::GatewayError("x".repeat(len))
     }
 
-    /// A `MichelsonContractInterpretError` body is charged at the per-word
+    /// An error body is charged at the per-word
     /// rate, against the size *actually persisted*.  The failed CRAC receipt
     /// stores the error once (on the synthetic alias(E_1)→target
     /// failed-transfer internal op), so the charge equals
@@ -6427,7 +6426,7 @@ pub(crate) mod tests {
     /// length of `ApplyOperationError::Transfer(error)`.
     #[test]
     fn charge_persisted_error_charges_per_byte() {
-        let err = interpret_error(10);
+        let err = error_of_length(10);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let expected_cost =
@@ -6439,7 +6438,7 @@ pub(crate) mod tests {
 
         // Original error is returned on success.
         assert!(
-            matches!(result, CracError::Operation(ref e) if *e == interpret_error(10)),
+            matches!(result, CracError::Operation(ref e) if *e == error_of_length(10)),
             "expected original error returned, got: {result:?}"
         );
 
@@ -6453,8 +6452,8 @@ pub(crate) mod tests {
     /// A longer body costs proportionally more gas.
     #[test]
     fn charge_persisted_error_scales_with_length() {
-        let short_err = interpret_error(5);
-        let long_err = interpret_error(50);
+        let short_err = error_of_length(5);
+        let long_err = error_of_length(50);
 
         // Persisted once in the receipt (alias→target internal op only).
         let short_len = short_err.persisted_len();
@@ -6487,7 +6486,7 @@ pub(crate) mod tests {
     /// the original error.
     #[test]
     fn charge_persisted_error_oog_returns_out_of_gas() {
-        let err = interpret_error(100);
+        let err = error_of_length(100);
         // Persisted once in the receipt (alias→target internal op only).
         let wrapped_len = err.persisted_len();
         let cost = u64::from(PERSISTED_ERROR_PER_BYTE_MILLIGAS * wrapped_len as u64);

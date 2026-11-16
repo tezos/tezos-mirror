@@ -476,7 +476,7 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
                     parameter_ty: _,
                     storage_ty,
                     views,
-                } = decoded.split_script()?;
+                } = decoded.split_script(&mut self.tc_ctx.operation_gas.remaining)?;
                 let Some(view) = views.get(view_name) else {
                     return Ok(None);
                 };

@@ -60,6 +60,19 @@ pub enum LookupViewError {
     OutOfGas(#[from] OutOfGas),
 }
 
+impl LookupViewError {
+    /// Whether this error is a resource exhaustion, see
+    /// [crate::typechecker::TcError::is_out_of_gas], including an
+    /// exhaustion while splitting the script of the contract.
+    pub fn is_out_of_gas(&self) -> bool {
+        match self {
+            LookupViewError::OutOfGas(_) => true,
+            LookupViewError::SplitScript(e) => e.is_out_of_gas(),
+            _ => false,
+        }
+    }
+}
+
 impl From<tezos_data_encoding::enc::BinError> for LookupViewError {
     fn from(err: tezos_data_encoding::enc::BinError) -> Self {
         LookupViewError::Encode(std::rc::Rc::new(err))

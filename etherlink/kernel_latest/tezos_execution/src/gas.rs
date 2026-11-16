@@ -76,11 +76,12 @@ pub struct TezlinkOperationGas {
 }
 
 /// Every error should express the gas in unit (1 gas unit = 1000 milligas).
+/// The `Display` of an error does not show the gas limit of the operation,
+/// which can be large, as for `ValidityError`.
+/// The derived `Debug` shows it.
 #[derive(Debug, Error)]
 pub enum GasLimitError {
-    #[error(
-        "The gas limit provided is too high the limit is {0} gas units but {1} gas units were given"
-    )]
+    #[error("The gas limit provided is too high, the limit is {0} gas units")]
     GasLimitTooHigh(u32, num_bigint::BigUint),
     #[error("Failed gas limit conversion: {0}")]
     CannotConvertToU32(num_bigint::TryFromBigIntError<num_bigint::BigUint>),
@@ -286,5 +287,25 @@ impl Default for TezlinkOperationGas {
             current_limit: limit,
             remaining: gas::Gas::new(limit),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GasLimitError;
+
+    /// The `Display` of [GasLimitError::GasLimitTooHigh] does not show the
+    /// gas limit of the operation, whose decimal conversion is quadratic in
+    /// its size and paid by no gas.
+    #[test]
+    fn gas_limit_too_high_does_not_display_the_gas_limit() {
+        let error = GasLimitError::GasLimitTooHigh(
+            1_040_000,
+            num_bigint::BigUint::from(1u8) << 100_000,
+        );
+        assert_eq!(
+            error.to_string(),
+            "The gas limit provided is too high, the limit is 1040000 gas units"
+        );
     }
 }

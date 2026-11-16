@@ -1105,7 +1105,7 @@ where
                             }
                             Err(CracError::Operation(err)) => {
                                 frame.failed = true;
-                                log!(Error, "Internal transfer failed: {err:?}");
+                                log!(Debug, "Internal transfer failed: {err:?}");
                                 (
                                     ContentResult::Failed(
                                         ApplyOperationError::from(err).into(),
@@ -1757,7 +1757,7 @@ fn typecheck_originated_script(
     let parser = Parser::new();
     let micheline = Micheline::decode_raw(&parser.arena, code, gas).ok()?.ok()?;
     let typechecked = micheline
-        .split_script()
+        .split_script(gas)
         .ok()?
         .typecheck_script(gas, true, false)
         .ok()?;
@@ -2513,32 +2513,16 @@ where
 /// time (defense-in-depth on top of the per-type cap, L2-1706).
 pub const MICHELSON_MAXIMUM_SCRIPT_SIZE: usize = 32 * 1024;
 
-/// Render a typechecking error, capped at
-/// [`mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES`]. Origination
-/// typechecks attacker-supplied code, which can synthesise a
-/// structurally-shared `Type` DAG whose render is far larger than its node
-/// count; the per-type parse cap does not bound instruction-synthesised
-/// types. Building such a type is gas-bounded (the typechecker's `DUP` walks
-/// the unfolded type in its `Duplicable` check), so the render is `O(gas)`
-/// rather than unbounded, but that ceiling is still large, so the error text
-/// is capped here as on the transfer and view sinks.
-fn bounded_tc_error(e: &mir::typechecker::TcError) -> String {
-    mir::bounded_fmt::display_bounded(
-        e,
-        mir::bounded_fmt::MAX_INTERPRET_ERROR_RENDER_BYTES,
-    )
-}
-
-/// Typechecking failure of an originated script, part `what` of it. Running
+/// Typechecking failure of an originated script, part `part` of it. Running
 /// out of gas is reported as such, like on L1.
-fn origination_tc_error(what: &str, e: &mir::typechecker::TcError) -> OriginationError {
-    if e.is_out_of_gas() {
+fn origination_tc_error(
+    part: &'static str,
+    error: mir::typechecker::TcError,
+) -> OriginationError {
+    if error.is_out_of_gas() {
         OriginationError::OutOfGas(mir::gas::OutOfGas)
     } else {
-        OriginationError::MirTypecheckingError(format!(
-            "{what} : {}",
-            bounded_tc_error(e)
-        ))
+        OriginationError::MirTypecheckingError { part, error }
     }
 }
 
@@ -2561,10 +2545,10 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
             .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .split_script()
-        .map_err(|e| origination_tc_error("Splitting script", &e))?
+        .split_script(ctx.gas())
+        .map_err(|e| origination_tc_error("Splitting script", e))?
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
-        .map_err(|e| origination_tc_error("Script", &e))?;
+        .map_err(|e| origination_tc_error("Script", e))?;
     let storage_micheline =
         Micheline::decode_raw(&parser.arena, &script.storage, ctx.gas())
             .map_err(OriginationError::from)?
@@ -2584,7 +2568,7 @@ pub fn typecheck_code_and_storage<'a, Host: KeySpaceLoader + StorageV1>(
             TypecheckViews::Enabled,
             AllowForgedLazyStorageId::No,
         )
-        .map_err(|e| origination_tc_error("Storage", &e))
+        .map_err(|e| origination_tc_error("Storage", e))
 }
 
 /// Dump the initial storage's big maps and serialize it.
@@ -2865,10 +2849,9 @@ fn interpret_encoded_script<'a>(
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), ScriptError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, code, ctx.gas())??;
-    let contract_typechecked =
-        contract_micheline
-            .split_script()?
-            .typecheck_script(ctx.gas(), true, false)?;
+    let contract_typechecked = contract_micheline
+        .split_script(ctx.gas())?
+        .typecheck_script(ctx.gas(), true, false)?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, storage, ctx.gas())??;
 
     // Execute the contract
@@ -3300,7 +3283,7 @@ where
                     return Err(msg);
                 }
                 Err(CracError::Operation(e)) => {
-                    log!(Error, "Transfer failed because of: {e:?}");
+                    log!(Debug, "Transfer failed because of: {e:?}");
                     Err(e)
                 }
             };
@@ -10338,10 +10321,77 @@ mod tests {
             }) if errors.len() == 1 && matches!(
             &errors[0],
             ApplyOperationError::Origination(
-                OriginationError::MirTypecheckingError(_)
+                OriginationError::MirTypecheckingError { .. }
             )
             )
         ), "Expected Failed Origination operation result with MirTypecheckingError, got {:?}", receipts[0]);
+    }
+
+    // `DUP 1024` in the originated code is reported as L1 reports it, an
+    // invalid syntactic constant, with `1024` in binary Micheline.
+    #[test]
+    fn test_origination_dup_above_1023_is_an_invalid_syntactic_constant() {
+        let mut host = test_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let src = bootstrap1();
+
+        init_account(rk.tez_accounts_mut(), &src.pkh, 50000);
+        reveal_account(rk.tez_accounts_mut(), &src);
+
+        let code = mir::parser::Parser::new()
+            .parse_top_level("parameter unit; storage int; code { DUP 1024; FAILWITH }")
+            .expect("Should have succeeded to parse the script")
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let storage = Micheline::from(42)
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let origination_content = OriginationContent {
+            balance: 10.into(),
+            delegate: None,
+            script: Script { code, storage },
+        };
+        let operation = make_operation(
+            10,
+            1,
+            1000,
+            0,
+            src.clone(),
+            vec![OperationContent::Origination(origination_content)],
+        );
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+                &test_safe_roots(),
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        let expected =
+            ApplyOperationError::Origination(OriginationError::MirTypecheckingError {
+                part: "Script",
+                error: mir::typechecker::TcError::ExpectedU10(1024.into()),
+            });
+        match &receipts[0].receipt {
+            OperationResultSum::Origination(OperationResult {
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+            }) => assert_eq!(errors, &vec![expected]),
+            receipt => panic!("Expected a failed origination, got {receipt:?}"),
+        }
     }
 
     // L2-1706: an oversized script is rejected at origination with
@@ -10481,8 +10531,8 @@ mod tests {
             }) if errors.len() == 1 && matches!(
             &errors[0],
             ApplyOperationError::Origination(
-                OriginationError::MirTypecheckingError(msg)
-            ) if msg.contains("type too large")
+                OriginationError::MirTypecheckingError { error, .. }
+            ) if error.to_string().contains("type too large")
             )
         ), "Expected Failed Origination with MirTypecheckingError(type too large), got {:?}", receipts[0]);
     }
@@ -14593,11 +14643,10 @@ mod tests {
             },
             other => panic!("expected Transfer internal receipt, got: {other:?}"),
         };
-        // A bounded body must be much smaller than the N_LONG-byte payload.
+        // A bounded body must be much smaller than the N_LONG-byte payload,
+        // here carried by an error whose message ends with it.
         let long_payload_debug_len = ApplyOperationError::Transfer(
-            TransferError::MichelsonContractInterpretError(
-                mir::typechecker::TcError::UnexpectedMicheline("x".repeat(N_LONG)).into(),
-            ),
+            TransferError::GatewayError("x".repeat(N_LONG)),
         )
         .persisted_len();
         assert!(

@@ -18,11 +18,9 @@ use crate::{
 /// arena allocator, like, e.g. [typed_arena].
 ///
 /// `Debug` is implemented manually as an iterative tree walk (see below) so a
-/// deeply nested Micheline does not blow the WASM call stack when formatted in
-/// an error message: `TcError::UnexpectedMicheline` is built with
-/// `format!("{x:?}")`, and the kernel turns errors into strings via
-/// `err.to_string()` outside MIR's gas accounting. The output is byte-identical
-/// to the derived `Debug`.
+/// deeply nested Micheline does not blow the WASM call stack when formatted,
+/// for example in a log message, outside MIR's gas accounting. The output is
+/// byte-identical to the derived `Debug`.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Micheline<'a> {
     /// Micheline integer literal.
@@ -872,9 +870,8 @@ mod tests {
         );
     }
 
-    /// L2-1436: formatting a deeply nested Micheline (reachable via
-    /// `TcError::UnexpectedMicheline = format!("{x:?}")`, formatted by the
-    /// kernel outside gas) must not overflow the ~1 MiB Rust stack. The old
+    /// L2-1436: formatting a deeply nested Micheline (for example in a log
+    /// message, outside gas) must not overflow the ~1 MiB Rust stack. The old
     /// derived `Debug` recursed and aborted here.
     #[test]
     fn deep_micheline_debug_does_not_overflow() {
