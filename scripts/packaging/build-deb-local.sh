@@ -41,16 +41,15 @@ packages() {
 }
 
 zcash() {
-  eval "$(opam env)"
-  # Link the zcash DAL parameters to be packaged
+  # Link the Sapling parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
     if ! md5sum --status -c script-inputs/sapling-params.md5; then
       echo "Sapling params md5 mismatch. You can fix this problem running :"
-      echo "md5sum _opam/share/zcash-params/* > script-inputs/sapling-params.md5"
+      echo "md5sum images/ci/zcash-params/* > script-inputs/sapling-params.md5"
       md5sum -c script-inputs/sapling-params.md5
       exit 1
     fi
-    ln -s "$OPAM_SWITCH_PREFIX/share/zcash-params" scripts/packaging/octez-data/
+    ln -s "$(pwd)/images/ci/zcash-params" scripts/packaging/octez-data/
   fi
 
   cd scripts/packaging/octez-data
