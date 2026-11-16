@@ -177,6 +177,21 @@ module Condition : sig
   (** Include the job if the merge request has a given label. *)
   val mr_has_label : string -> t
 
+  (** Include the job if the value of a variable matches a regular expression.
+
+      [variable_matches variable regex] holds if the value of [variable]
+      matches [regex]. [regex] is anchored: it must match the whole value,
+      so [variable_matches "VAR" "true"] holds only if [VAR] is exactly [true].
+      To match a part of the value, use [.*], e.g. [".*true.*"].
+      Slashes in [regex] must not be escaped.
+      An unset variable matches no regular expression.
+
+      Contrary to conditions on changesets and labels, conditions on variables
+      are taken into account in all pipelines. They can thus express that
+      some jobs only make sense in some contexts, for instance only in some
+      projects, or only for some tags. *)
+  val variable_matches : string -> string -> t
+
   (** Negation: include the job if a condition does not hold. *)
   val not_ : t -> t
 
@@ -213,9 +228,15 @@ module type COMPONENT_API = sig
       Jobs themselves do not carry their [!trigger].
       Instead, each pipeline can decide to add jobs with a different trigger.
 
-      When added to the [before_merging] or [merge_train] pipeline,
-      jobs are only included to the pipeline if [only_if] holds.
+      Jobs are only included in pipelines in which [only_if] holds.
       Its default value is {!Condition.component_changes}.
+      Conditions on changesets and labels only make sense for merge requests.
+      In pipelines that are not merge request pipelines (see [merge_request]
+      in {!new_global_pipeline}), conditions on changesets are considered to
+      hold, and conditions on labels are considered not to hold, since there
+      is no merge request, and thus no label. For instance, a job with
+      [Condition.(not_ (mr_has_label "x"))] is included in those pipelines,
+      and a job with [Condition.mr_has_label "x"] is not.
 
       The job will not start before all [needs] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
@@ -479,9 +500,12 @@ type global_pipeline
       (for instance, scheduled pipelines usually are not supposed to be interruptible);
     - if [interruptible_publish] is [true], jobs of the [Publish] stage are
       interruptible;
-    - if [with_condition] is [true], the conditions of jobs (see [only_if])
-      are taken into account; use this for merge request pipelines only,
-      as other pipelines run all of their jobs unconditionally;
+    - if [merge_request] is [true], the pipeline is a merge request pipeline:
+      jobs are only included if their condition holds (see [only_if] in
+      {!COMPONENT_API.job}), as well as the jobs they need; otherwise,
+      conditions on changesets are considered to hold, and conditions on
+      labels are considered not to hold (see [only_if] in
+      {!COMPONENT_API.job});
     - if [with_job_trigger] is [true], the manual [trigger] job is added to the
       pipeline and all jobs that are not [Immediate] or [Manual] are made to
       depend on it;
@@ -495,7 +519,7 @@ val new_global_pipeline :
   ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
   ?interruptible_pipeline:bool ->
   ?interruptible_publish:bool ->
-  ?with_condition:bool ->
+  ?merge_request:bool ->
   ?with_job_trigger:bool ->
   ?with_datadog_pipeline_trace:bool ->
   ?allow_manual_jobs:bool ->
