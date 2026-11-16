@@ -267,7 +267,6 @@ depends: [
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
   "terminal" {= "0.5.0"}
-  "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.3.0"}
   "tezt-bam" {= "0.4"}
   "thread-local-storage" {= "0.2"}
