@@ -1,5 +1,8 @@
-ARG RUST_IMAGE=us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain
-ARG RUST_TAG=master
+# check=skip=InvalidDefaultArgInFrom
+# RUST_TAG has no default to avoid drifting from ci/ci_version.sh: it is set
+# by etherlink/scripts/build-wasm.sh from base_images_tag.
+ARG RUST_IMAGE=us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/debian-rust
+ARG RUST_TAG
 ARG BASE_IMAGE=debian:sid-slim
 
 FROM ${RUST_IMAGE}:${RUST_TAG} AS kernel_build

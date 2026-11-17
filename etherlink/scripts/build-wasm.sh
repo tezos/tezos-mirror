@@ -7,8 +7,12 @@ etherlink_dir="$script_dir/.."
 tezos_dir="$etherlink_dir/.."
 commit=$(git rev-parse HEAD)
 
-rust_image=${rust_image:-"us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"}
-rust_image_tag=${rust_image_tag:-"master"}
+# The default image is the one used by the kernel jobs of the CI. Its tag is
+# derived from the version of the CI base images.
+# shellcheck source=ci/ci_version.sh
+. "$tezos_dir/ci/ci_version.sh"
+rust_image=${rust_image:-"us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/debian-rust"}
+rust_image_tag=${rust_image_tag:-"trixie-${base_images_tag}"}
 platform=${platform:-"linux/amd64"}
 
 # register information about the rust-toolchain image
@@ -60,8 +64,8 @@ options:
 - evm_config_file_path: input the config for the evm kernel installer (default=etherlink/config/dev.yaml)
 - output_dir: directory where the wasm files (kernels, preimages) will be copied (default=etherlink/kernels-${commit})
 env_options:
-- rust_image (default="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain")
-- rust_image_tag (default="master")
+- rust_image (default="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/debian-rust")
+- rust_image_tag (default="trixie-${base_images_tag}", base_images_tag being defined in ci/ci_version.sh)
 - platform (default="linux/amd64")
 This script builds evm kernels and preimages using the configuration given in <evm_config_file_path>.
 For it to be reproducible, they are build in a docker container then copied on the local filesystem.
@@ -70,7 +74,7 @@ EOF
 *)
   evm_config=${1:-"$etherlink_dir/config/dev.yaml"}
   output_dir=${2:-"$etherlink_dir/kernels-$commit"}
-  echo "fetching rust-toolchain image info: $rust_image:$rust_image_tag"
+  echo "fetching rust image info: $rust_image:$rust_image_tag"
   rust_image_id=$(rust_toolchain_image_id)
   echo "building the docker image with $evm_config"
   build "$evm_config"
