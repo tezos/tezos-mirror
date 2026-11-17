@@ -584,7 +584,7 @@ pub fn create_chunked_transaction(
 
     base.store_le(
         &chunked_transaction_num_chunks_key(&chunked_transaction_key)?,
-        num_chunks,
+        &num_chunks,
     )?;
     base.store_rlp(
         &chunked_hashes_transaction_key(&chunked_transaction_key)?,
@@ -639,7 +639,7 @@ pub fn store_backlog(
     evm_world_state: &mut impl KeySpace,
     value: u64,
 ) -> Result<(), KeySpaceError> {
-    evm_world_state.store_le(&BACKLOG_KEY, value)
+    evm_world_state.store_le(&BACKLOG_KEY, &value)
 }
 
 /// Reads the timestamp of the last block counted in the gas backlog from the
@@ -656,7 +656,7 @@ pub fn store_backlog_timestamp(
     evm_world_state: &mut impl KeySpace,
     value: u64,
 ) -> Result<(), KeySpaceError> {
-    evm_world_state.store_le(&BACKLOG_TIMESTAMP_KEY, value)
+    evm_world_state.store_le(&BACKLOG_TIMESTAMP_KEY, &value)
 }
 
 /// Writes the minimum base fee per gas to the `/evm/world_state` keyspace.
@@ -684,7 +684,7 @@ pub fn store_michelson_to_evm_gas_multiplier(
     evm_world_state: &mut impl KeySpace,
     value: u64,
 ) -> Result<(), KeySpaceError> {
-    evm_world_state.store_le(&EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER_KEY, value)
+    evm_world_state.store_le(&EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER_KEY, &value)
 }
 
 /// Writes the DA fee per byte to the `/evm/world_state` keyspace.
@@ -765,7 +765,7 @@ pub fn read_l1_level(base: &impl KeySpace) -> Result<u32, Error> {
 }
 
 pub fn store_l1_level(base: &mut impl KeySpace, level: u32) -> Result<(), Error> {
-    base.store_le(&L1_LEVEL_KEY, level)?;
+    base.store_le(&L1_LEVEL_KEY, &level)?;
     Ok(())
 }
 
@@ -773,7 +773,7 @@ pub fn store_last_info_per_level_timestamp(
     base: &mut impl KeySpace,
     timestamp: Timestamp,
 ) -> Result<(), Error> {
-    base.store_le(&INFO_PER_LEVEL_TIMESTAMP_KEY, timestamp.i64())?;
+    base.store_le(&INFO_PER_LEVEL_TIMESTAMP_KEY, &timestamp.i64())?;
     Ok(())
 }
 
@@ -840,7 +840,7 @@ pub fn read_or_set_maximum_gas_per_transaction(
         Some(_) => Ok(u64::from_le_bytes(bytes)),
         None => {
             evm_world_state
-                .store_le(&MAXIMUM_GAS_PER_TRANSACTION_KEY, MAXIMUM_GAS_LIMIT)?;
+                .store_le(&MAXIMUM_GAS_PER_TRANSACTION_KEY, &MAXIMUM_GAS_LIMIT)?;
             Ok(MAXIMUM_GAS_LIMIT)
         }
     }
@@ -851,7 +851,7 @@ pub fn store_storage_version(
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
-    base.store_le(&STORAGE_VERSION_KEY, storage_version)?;
+    base.store_le(&STORAGE_VERSION_KEY, &storage_version)?;
     Ok(())
 }
 
@@ -2036,7 +2036,7 @@ mod tests {
         let gas_limit: u64 = 17;
 
         rk.evm_world_state_mut()
-            .store_le(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY, gas_limit)
+            .store_le(&super::MAXIMUM_GAS_PER_TRANSACTION_KEY, &gas_limit)
             .unwrap();
 
         assert_eq!(

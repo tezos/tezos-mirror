@@ -270,7 +270,7 @@ fn store_blueprint_nb_chunks(
     nb_chunks: u16,
 ) -> Result<(), Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    base.store_le(&key, nb_chunks).map_err(Error::from)
+    base.store_le(&key, &nb_chunks).map_err(Error::from)
 }
 
 fn store_blueprint_chunk(

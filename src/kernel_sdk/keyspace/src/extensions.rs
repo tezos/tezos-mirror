@@ -56,12 +56,20 @@ pub trait KeySpaceExtNum: KeySpace {
     }
 
     /// Writes `value` little-endian at `key`.
-    fn store_le<T: ToBytes>(&mut self, key: &Key, value: T) -> Result<(), KeySpaceError> {
+    fn store_le<T: ToBytes>(
+        &mut self,
+        key: &Key,
+        value: &T,
+    ) -> Result<(), KeySpaceError> {
         self.set(key, value.to_le_bytes())
     }
 
     /// The big-endian counterpart of [`Self::store_le`].
-    fn store_be<T: ToBytes>(&mut self, key: &Key, value: T) -> Result<(), KeySpaceError> {
+    fn store_be<T: ToBytes>(
+        &mut self,
+        key: &Key,
+        value: &T,
+    ) -> Result<(), KeySpaceError> {
         self.set(key, value.to_be_bytes())
     }
 }
@@ -194,12 +202,12 @@ mod tests {
         let mut ks = load(&mut registry, &mut host, "/ints");
         let k = key(b"/n");
 
-        ks.store_le(&k, 0x0102_0304u32).unwrap();
+        ks.store_le(&k, &0x0102_0304u32).unwrap();
         assert_eq!(ks.get_le(&k), Some(0x0102_0304u32));
         // Read the other way round, the same bytes give the swapped value.
         assert_eq!(ks.get_be(&k), Some(0x0403_0201u32));
 
-        ks.store_be(&k, 0x0102_0304u32).unwrap();
+        ks.store_be(&k, &0x0102_0304u32).unwrap();
         assert_eq!(ks.get_be(&k), Some(0x0102_0304u32));
 
         // An absent key falls back to the default.

@@ -63,7 +63,7 @@ pub fn store_trace_gas(
     gas: u64,
     hash: &Option<B256>,
 ) -> Result<(), InspectorError> {
-    evm_world_state.store_le(&trace_tx_key(hash, GAS_SEGMENT)?, gas)?;
+    evm_world_state.store_le(&trace_tx_key(hash, GAS_SEGMENT)?, &gas)?;
     Ok(())
 }
 
