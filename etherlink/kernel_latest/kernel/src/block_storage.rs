@@ -130,7 +130,7 @@ pub(crate) fn store_current_number(
     world_state: &mut impl KeySpace,
     number: U256,
 ) -> Result<(), KeySpaceError> {
-    world_state.store_u256_le(&CURRENT_BLOCK_NUMBER_KEY, number)
+    world_state.store_u256_le(&CURRENT_BLOCK_NUMBER_KEY, &number)
 }
 
 /// Stores `transactions_objects` as the transaction objects of the current
@@ -481,7 +481,7 @@ mod tests {
         let number = U256::from(7);
 
         rk.tez_world_state_mut()
-            .store_u256_le(&CURRENT_BLOCK_NUMBER_KEY, number)
+            .store_u256_le(&CURRENT_BLOCK_NUMBER_KEY, &number)
             .unwrap();
 
         let mut bytes = [0u8; 32];

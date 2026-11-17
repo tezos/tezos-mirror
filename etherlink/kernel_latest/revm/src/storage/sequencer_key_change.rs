@@ -49,7 +49,7 @@ pub fn read_sequencer_change_counter(evm_world_state: &impl KeySpace) -> U256 {
 /// Errors when the write fails.
 pub fn write_sequencer_change_counter(
     evm_world_state: &mut impl KeySpace,
-    value: U256,
+    value: &U256,
 ) -> Result<(), KeySpaceError> {
     evm_world_state.store_evm_u256_le(&SEQUENCER_KEY_CHANGE_COUNTER_KEY, value)
 }
@@ -65,5 +65,5 @@ pub fn increment_sequencer_change_counter(
     evm_world_state: &mut impl KeySpace,
 ) -> Result<(), KeySpaceError> {
     let next = read_sequencer_change_counter(evm_world_state).saturating_add(U256::ONE);
-    write_sequencer_change_counter(evm_world_state, next)
+    write_sequencer_change_counter(evm_world_state, &next)
 }

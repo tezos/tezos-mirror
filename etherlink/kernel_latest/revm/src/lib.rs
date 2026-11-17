@@ -1482,7 +1482,7 @@ mod test {
                     .checked_add(primitive_types::U256::from(amount.as_u64()))
                     .expect("Balance overflow");
                 rk.tez_accounts_mut()
-                    .store_u256_le(&key, new_balance)
+                    .store_u256_le(&key, &new_balance)
                     .unwrap();
 
                 // Record the trusted identity headers so a test can
@@ -2932,7 +2932,7 @@ mod test {
                 rk.eth_accounts_mut(),
                 &U256::from_be_bytes(ticket_hash.0),
                 &caller,
-                default_ticket_balance,
+                &default_ticket_balance,
             )
             .unwrap();
 
@@ -3571,7 +3571,7 @@ mod test {
         fn setup_ticket(
             eth_accounts: &mut impl KeySpace,
             owner: Address,
-            amount: U256,
+            amount: &U256,
         ) -> (FixedBytes<22>, Vec<u8>, Vec<u8>) {
             let ticket = dummy_ticket();
             let ticket_hash = ticket_hash(&ticket);
@@ -3820,7 +3820,7 @@ mod test {
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(rk.eth_accounts_mut(), ticket_owner, amount);
+                setup_ticket(rk.eth_accounts_mut(), ticket_owner, &amount);
             let res = execute_call(
                 &mut rk,
                 caller,
@@ -3861,7 +3861,7 @@ mod test {
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(rk.eth_accounts_mut(), ticket_owner, amount);
+                setup_ticket(rk.eth_accounts_mut(), ticket_owner, &amount);
             let res = execute_call(
                 &mut rk,
                 caller,
@@ -3898,7 +3898,7 @@ mod test {
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(rk.eth_accounts_mut(), ticket_owner, amount);
+                setup_ticket(rk.eth_accounts_mut(), ticket_owner, &amount);
 
             let res = execute_fa_bridge(
                 &mut rk,
@@ -3972,7 +3972,7 @@ mod test {
                     rk.eth_accounts_mut(),
                     &ticket_hash(&ticket),
                     &reentrancy_tester,
-                    U256::from(100),
+                    &U256::from(100),
                 )
                 .unwrap();
             let res = execute_fa_bridge(
@@ -4176,7 +4176,7 @@ mod test {
                     rk.eth_accounts_mut(),
                     &ticket_hash(&ticket),
                     &proxy,
-                    U256::MAX,
+                    &U256::MAX,
                 )
                 .unwrap();
 
@@ -4285,7 +4285,7 @@ mod test {
                     rk.eth_accounts_mut(),
                     &ticket_hash(&ticket),
                     &proxy,
-                    fa_withdrawal.amount,
+                    &fa_withdrawal.amount,
                 )
                 .unwrap();
 
@@ -4353,7 +4353,7 @@ mod test {
             let proxy = Address::from([2; 20]);
             let amount = U256::from(10u64);
             let (ticketer, content, routing_info) =
-                setup_ticket(rk.eth_accounts_mut(), caller, amount);
+                setup_ticket(rk.eth_accounts_mut(), caller, &amount);
 
             let outcome = execute_fa_bridge(
                 &mut rk,

@@ -13,6 +13,7 @@
 
 use primitive_types::{H256, U256};
 use revm::primitives::{B256, U256 as EvmU256};
+use std::array::from_fn;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 /// Reads and writes 256-bit integers at a key.
@@ -42,13 +43,13 @@ pub trait KeySpaceExtU256: KeySpace {
     }
 
     /// Writes `value` least significant first.
-    fn store_u256_le(&mut self, key: &Key, value: U256) -> Result<(), KeySpaceError> {
-        store_le_array(self, key, value.0)
+    fn store_u256_le(&mut self, key: &Key, value: &U256) -> Result<(), KeySpaceError> {
+        store_le_array(self, key, &value.0)
     }
 
     /// Writes `value` most significant first.
-    fn store_u256_be(&mut self, key: &Key, value: U256) -> Result<(), KeySpaceError> {
-        store_be_array(self, key, value.0)
+    fn store_u256_be(&mut self, key: &Key, value: &U256) -> Result<(), KeySpaceError> {
+        store_be_array(self, key, &value.0)
     }
 
     /// [`Self::get_u256_le`] for the EVM's own integer.
@@ -76,18 +77,18 @@ pub trait KeySpaceExtU256: KeySpace {
     fn store_evm_u256_le(
         &mut self,
         key: &Key,
-        value: EvmU256,
+        value: &EvmU256,
     ) -> Result<(), KeySpaceError> {
-        store_le_array(self, key, value.into_limbs())
+        store_le_array(self, key, value.as_limbs())
     }
 
     /// [`Self::store_u256_be`] for the EVM's own integer.
     fn store_evm_u256_be(
         &mut self,
         key: &Key,
-        value: EvmU256,
+        value: &EvmU256,
     ) -> Result<(), KeySpaceError> {
-        store_be_array(self, key, value.into_limbs())
+        store_be_array(self, key, value.as_limbs())
     }
 }
 
@@ -147,9 +148,9 @@ fn get_be_array<KS: KeySpace + ?Sized, const N: usize>(
 fn store_le_array<KS: KeySpace + ?Sized, const N: usize>(
     ks: &mut KS,
     key: &Key,
-    values: [u64; N],
+    values: &[u64; N],
 ) -> Result<(), KeySpaceError> {
-    let chunks = values.map(u64::to_le_bytes);
+    let chunks: [[u8; 8]; N] = from_fn(|i| values[i].to_le_bytes());
     ks.set(key, chunks.as_flattened())
 }
 
@@ -157,10 +158,9 @@ fn store_le_array<KS: KeySpace + ?Sized, const N: usize>(
 fn store_be_array<KS: KeySpace + ?Sized, const N: usize>(
     ks: &mut KS,
     key: &Key,
-    values: [u64; N],
+    values: &[u64; N],
 ) -> Result<(), KeySpaceError> {
-    let mut chunks = values.map(u64::to_be_bytes);
-    chunks.reverse();
+    let chunks: [[u8; 8]; N] = from_fn(|i| values[N - 1 - i].to_be_bytes());
     ks.set(key, chunks.as_flattened())
 }
 
@@ -207,14 +207,14 @@ mod tests {
         let value = U256(LIMBS);
         let mut expected = [0u8; 32];
 
-        ks.store_u256_le(&k, value).unwrap();
+        ks.store_u256_le(&k, &value).unwrap();
         assert_eq!(ks.get_u256_le(&k), Some(value));
         // The bytes the type converts itself to, so the accessors and the
         // type's own conversions stay interchangeable.
         value.to_little_endian(&mut expected);
         assert_eq!(ks.get(&k), Some(expected.to_vec()));
 
-        ks.store_u256_be(&k, value).unwrap();
+        ks.store_u256_be(&k, &value).unwrap();
         assert_eq!(ks.get_u256_be(&k), Some(value));
         value.to_big_endian(&mut expected);
         assert_eq!(ks.get(&k), Some(expected.to_vec()));
@@ -230,11 +230,11 @@ mod tests {
         let k = key(b"/n");
         let value = EvmU256::from_limbs(LIMBS);
 
-        ks.store_evm_u256_le(&k, value).unwrap();
+        ks.store_evm_u256_le(&k, &value).unwrap();
         assert_eq!(ks.get_evm_u256_le(&k), Some(value));
         assert_eq!(ks.get(&k), Some(value.to_le_bytes::<32>().to_vec()));
 
-        ks.store_evm_u256_be(&k, value).unwrap();
+        ks.store_evm_u256_be(&k, &value).unwrap();
         assert_eq!(ks.get_evm_u256_be(&k), Some(value));
         assert_eq!(ks.get(&k), Some(value.to_be_bytes::<32>().to_vec()));
 
@@ -247,10 +247,10 @@ mod tests {
         let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
         let k = key(b"/n");
 
-        ks.store_u256_le(&k, U256(LIMBS)).unwrap();
+        ks.store_u256_le(&k, &U256(LIMBS)).unwrap();
         assert_eq!(ks.get_evm_u256_le(&k), Some(EvmU256::from_limbs(LIMBS)));
 
-        ks.store_evm_u256_be(&k, EvmU256::from_limbs(LIMBS))
+        ks.store_evm_u256_be(&k, &EvmU256::from_limbs(LIMBS))
             .unwrap();
         assert_eq!(ks.get_u256_be(&k), Some(U256(LIMBS)));
     }
@@ -289,20 +289,20 @@ mod tests {
         // the wrong place would fail: the carry would land elsewhere.
         let value = U256(HUGE);
         let carried = U256(HUGE_PLUS_ONE);
-        ks.store_u256_le(&k, value).unwrap();
+        ks.store_u256_le(&k, &value).unwrap();
         assert_eq!(ks.get_u256_le(&k).unwrap() + U256::one(), carried);
-        ks.store_u256_be(&k, value).unwrap();
+        ks.store_u256_be(&k, &value).unwrap();
         assert_eq!(ks.get_u256_be(&k).unwrap() + U256::one(), carried);
 
         let evm_value = EvmU256::from_limbs(HUGE);
         let evm_carried = EvmU256::from_limbs(HUGE_PLUS_ONE);
-        ks.store_evm_u256_le(&k, evm_value).unwrap();
+        ks.store_evm_u256_le(&k, &evm_value).unwrap();
         assert_eq!(ks.get_evm_u256_le(&k).unwrap() + EvmU256::ONE, evm_carried);
-        ks.store_evm_u256_be(&k, evm_value).unwrap();
+        ks.store_evm_u256_be(&k, &evm_value).unwrap();
         assert_eq!(ks.get_evm_u256_be(&k).unwrap() + EvmU256::ONE, evm_carried);
 
         // And the two libraries read the same bytes as the same number.
-        ks.store_u256_le(&k, value).unwrap();
+        ks.store_u256_le(&k, &value).unwrap();
         assert_eq!(
             ks.get_evm_u256_le(&k).unwrap().to_string(),
             value.to_string()

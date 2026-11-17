@@ -60,6 +60,11 @@ impl Wei {
         self.0
     }
 
+    /// Borrows the raw `U256` wei amount.
+    pub fn as_u256_ref(&self) -> &U256 {
+        &self.0
+    }
+
     /// Whether the amount is zero.
     pub const fn is_zero(self) -> bool {
         self.0.is_zero()

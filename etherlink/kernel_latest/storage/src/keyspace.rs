@@ -25,7 +25,7 @@ use crate::KT1_B58_SIZE;
 /// not decode as `T`. Otherwise, it reads as the `T` that these bytes encode.
 ///
 /// [`KeySpaceExtBin::read_nom`]: tezos_smart_rollup_keyspace::extensions::KeySpaceExtBin::read_nom
-pub trait KeySpaceExtBounded: KeySpace + Sized {
+pub trait KeySpaceExtBounded: KeySpace {
     /// Returns the value whose binary encoding is stored at `key`, or `None`
     /// when the key is absent. The read takes at most `max_bytes` bytes.
     ///

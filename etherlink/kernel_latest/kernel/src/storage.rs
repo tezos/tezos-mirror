@@ -597,7 +597,7 @@ pub fn create_chunked_transaction(
 /// Errors when the write fails.
 pub fn store_evm_chain_id(
     evm_world_state: &mut impl KeySpace,
-    evm_chain_id: U256,
+    evm_chain_id: &U256,
 ) -> Result<(), KeySpaceError> {
     evm_world_state.store_u256_le(&EVM_CHAIN_ID_KEY, evm_chain_id)
 }
@@ -663,7 +663,7 @@ pub fn store_backlog_timestamp(
 /// Errors when the write fails.
 pub fn store_minimum_base_fee_per_gas(
     evm_world_state: &mut impl KeySpace,
-    price: U256,
+    price: &U256,
 ) -> Result<(), KeySpaceError> {
     evm_world_state.store_u256_le(&EVM_MINIMUM_BASE_FEE_PER_GAS_KEY, price)
 }
@@ -691,7 +691,7 @@ pub fn store_michelson_to_evm_gas_multiplier(
 /// Errors when the write fails.
 pub fn store_da_fee(
     evm_world_state: &mut impl KeySpace,
-    base_fee_per_gas: U256,
+    base_fee_per_gas: &U256,
 ) -> Result<(), KeySpaceError> {
     evm_world_state.store_u256_le(&EVM_DA_FEE_KEY, base_fee_per_gas)
 }
@@ -709,9 +709,9 @@ fn read_wei(evm_world_state: &impl KeySpace, key: &Key) -> Option<Wei> {
 fn write_wei(
     evm_world_state: &mut impl KeySpace,
     key: &Key,
-    value: Wei,
+    value: &Wei,
 ) -> Result<(), KeySpaceError> {
-    evm_world_state.store_u256_le(key, value.as_u256())
+    evm_world_state.store_u256_le(key, value.as_u256_ref())
 }
 
 /// Adds `burned_fee` to the burned-fees total of the `/evm/world_state`
@@ -723,7 +723,7 @@ pub fn update_burned_fees(
 ) -> Result<(), KeySpaceError> {
     let current = read_wei(evm_world_state, &EVM_BURNED_FEES_KEY).unwrap_or(Wei::ZERO);
     let new = current.saturating_add(burned_fee);
-    write_wei(evm_world_state, &EVM_BURNED_FEES_KEY, new)
+    write_wei(evm_world_state, &EVM_BURNED_FEES_KEY, &new)
 }
 
 #[cfg(test)]
@@ -959,7 +959,7 @@ pub fn read_michelson_runtime_target_sunrise_level(base: &impl KeySpace) -> Opti
 
 pub fn store_michelson_runtime_sunrise_level(
     tez_world_state: &mut impl KeySpace,
-    level: U256,
+    level: &U256,
 ) -> Result<(), KeySpaceError> {
     tez_world_state.store_u256_le(&MICHELSON_RUNTIME_SUNRISE_LEVEL_KEY, level)
 }
@@ -1800,7 +1800,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let level = primitive_types::U256::from(11);
 
-        super::store_michelson_runtime_sunrise_level(rk.tez_world_state_mut(), level)
+        super::store_michelson_runtime_sunrise_level(rk.tez_world_state_mut(), &level)
             .unwrap();
 
         let mut bytes = [0u8; 32];
@@ -1869,7 +1869,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let price = primitive_types::U256::from(17);
 
-        super::store_minimum_base_fee_per_gas(rk.evm_world_state_mut(), price).unwrap();
+        super::store_minimum_base_fee_per_gas(rk.evm_world_state_mut(), &price).unwrap();
 
         let mut bytes = [0u8; 32];
         price.to_little_endian(&mut bytes);
@@ -1894,7 +1894,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let da_fee = primitive_types::U256::from(29);
 
-        super::store_da_fee(rk.evm_world_state_mut(), da_fee).unwrap();
+        super::store_da_fee(rk.evm_world_state_mut(), &da_fee).unwrap();
 
         let mut bytes = [0u8; 32];
         da_fee.to_little_endian(&mut bytes);
@@ -2104,7 +2104,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let evm_chain_id = primitive_types::U256::from(42793);
 
-        super::store_evm_chain_id(rk.evm_world_state_mut(), evm_chain_id).unwrap();
+        super::store_evm_chain_id(rk.evm_world_state_mut(), &evm_chain_id).unwrap();
 
         let mut bytes = [0u8; 32];
         evm_chain_id.to_little_endian(&mut bytes);
