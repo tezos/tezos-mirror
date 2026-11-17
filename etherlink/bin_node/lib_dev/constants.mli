@@ -42,6 +42,7 @@ type kernel =
   | Ganesha
   | GaneshaR1
   | GaneshaR2
+  | GaneshaR3
   | Latest
 
 val kernel_from_string : string -> kernel option

@@ -44,6 +44,7 @@ let storage_version_of_kernel : Constants.kernel -> int = function
   | Ganesha -> 65 (* 6d47b6a1:etherlink/kernel_latest/kernel/src/storage.rs *)
   | GaneshaR1 -> 65 (* da2977ec:etherlink/kernel_latest/kernel/src/storage.rs *)
   | GaneshaR2 -> 65 (* 54a7b092:etherlink/kernel_latest/kernel/src/storage.rs *)
+  | GaneshaR3 -> 65 (* 42d5a5ca:etherlink/kernel_latest/kernel/src/storage.rs *)
   | Latest -> Int.max_int
 
 let simulation_v0 ~storage_version = storage_version < 12

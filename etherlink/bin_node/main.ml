@@ -219,7 +219,7 @@ module Params = struct
          \"calypso\", \"calypso2\", \"dionysus\", \"dionysus-r1\", \"ebisu\", \
          \"farfadet\", \"farfadet-r1\", \"farfadet-r2\", \"farfadet-r3\", \
          \"farfadet-r4\", \"farfadet-r5\", \"farfadet-r6\", \"ganesha\", \
-         \"ganesha-r1\" or \"ganesha-r2\")."
+         \"ganesha-r1\", \"ganesha-r2\" or \"ganesha-r3\")."
       (parameter (fun _ str ->
            let open Evm_node_lib_dev.Constants in
            let open Lwt_result_syntax in
@@ -640,8 +640,8 @@ let kernel_compat_arg =
        Supported values: mainnet-beta, mainnet-gamma, bifrost, calypso, \
        calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, \
        farfadet-r2, farfadet-r3, farfadet-r4, farfadet-r5, farfadet-r6, \
-       ganesha, ganesha-r1, ganesha-r2, previewnet-0.2, previewnet-0.4, \
-       previewnet-0.5, previewnet-0.6, latest."
+       ganesha, ganesha-r1, ganesha-r2, ganesha-r3, previewnet-0.2, \
+       previewnet-0.4, previewnet-0.5, previewnet-0.6, latest."
   @@ Tezos_clic.parameter (fun _ kernel_name ->
          match Evm_node_lib_dev.Constants.kernel_from_string kernel_name with
          | Some kernel -> Lwt.return_ok kernel
