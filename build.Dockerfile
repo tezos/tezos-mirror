@@ -108,12 +108,12 @@ ARG CARGO_INCREMENTAL="0"
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
-# The [build-deps] target reconciles the opam dependencies with this commit's
-# lockfiles on top of the deps baked into the alpine-build base image, so the
-# build never links stale dependencies. It is a near no-op on a fresh base
-# and installs only the delta when the base has drifted. Kept in the [release]
-# RUN rather than a separate one: with no layer cache a separate layer would
-# buy nothing.
+# [build-deps] reconciles the opam dependencies with this commit's lockfiles,
+# including their pin-depends, which the base image does not apply, so the build
+# never links deps that went stale in the base image. [OPAMSWITCH] aims it at
+# the switch the base image populated; without it, [build-deps] creates a local
+# switch and rebuilds every dependency from scratch. Kept in the [release] RUN
+# rather than a separate one: with no layer cache a separate layer buys nothing.
 # hadolint ignore=DL3059
 RUN --network=host \
     if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
@@ -126,6 +126,7 @@ RUN --network=host \
     else \
       echo "### sccache disabled (no bucket configured)"; \
     fi && \
+    OPAMSWITCH="$(opam switch show)" && export OPAMSWITCH && \
     opam exec -- make -C tezos build-deps release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin && \
     if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
       echo "### sccache stats:"; \
