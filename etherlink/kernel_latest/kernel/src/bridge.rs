@@ -66,8 +66,10 @@ pub enum BridgeError {
     InvalidDepositReceiver(Vec<u8>),
     #[error("Invalid RLP bytes: {0}")]
     RlpError(DecoderError),
-    #[error("Invalid amount for a deposit: {0:?}")]
-    InvalidAmount(U256),
+    #[error("Invalid ticket amount for a deposit: {0:?}")]
+    InvalidTicketAmount(U256),
+    #[error("Invalid amount for a deposit: {0}")]
+    InvalidAmount(Wei),
 }
 
 alloy_sol_types::sol! {
@@ -298,7 +300,7 @@ impl Deposit {
         let amount_mutez = u64::try_from(amount_u256)
             .ok()
             .and_then(|raw| Mutez::try_from(raw).ok())
-            .ok_or(BridgeError::InvalidAmount(amount_u256))?;
+            .ok_or(BridgeError::InvalidTicketAmount(amount_u256))?;
         let amount = amount_mutez.to_wei();
 
         // EVM address of the receiver and chain id both come from the
@@ -666,7 +668,7 @@ pub fn execute_tezlink_deposit(
     let amount = deposit
         .amount
         .to_mutez_exact()
-        .map_err(|_| BridgeError::InvalidAmount(deposit.amount.as_u256()))?;
+        .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
 
     let content = TransferContent {
         amount: amount.to_narith(),
@@ -785,7 +787,7 @@ mod tests {
         let receiver = MichelsonBytes(vec![1u8; 20]);
         let result = Deposit::try_parse(ticket, receiver, 0, 0);
         assert!(
-            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            matches!(result, Err(BridgeError::InvalidTicketAmount(_))),
             "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
         );
     }
@@ -800,7 +802,7 @@ mod tests {
         let receiver = MichelsonBytes(vec![1u8; 20]);
         let result = Deposit::try_parse(ticket, receiver, 0, 0);
         assert!(
-            matches!(result, Err(BridgeError::InvalidAmount(_))),
+            matches!(result, Err(BridgeError::InvalidTicketAmount(_))),
             "amount past the mutez domain must be a parse error, not a panic; got {result:?}"
         );
     }
