@@ -12,7 +12,8 @@ stranded above a freshly cut release header. See
 This new release notably aligns the sequencer prevalidation of
 `eth_sendRawTransaction` with the kernel, and brings L1-compatible FAILWITH
 errors for the Michelson runtime of Tezos X kernels. This release is also
-necessary before running a kernel at storage version 70 or higher.
+necessary before running a kernel at storage version 70 or higher, such as
+the Etherlink 8.0 kernel.
 
 This release will not apply any migration to the node’s store (version 25),
 meaning it is possible to downgrade to version 0.68.
