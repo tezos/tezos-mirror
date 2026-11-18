@@ -286,6 +286,7 @@ oc.build_arm64-exp:
     - fa-bridge-watchtower
     - etherlink-governance-observer
     - octez-evm-node
+    - octez-smart-rollup-node
     - octez-accuser-alpha
     - octez-baker-alpha
     - octez-teztale-snitch
@@ -397,7 +398,6 @@ oc.build_arm64-released:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-smart-rollup-node
     - octez-dal-node
     - octez-signer
     - octez-codec

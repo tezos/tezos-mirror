@@ -641,9 +641,11 @@ documentation.manuals:
   - trigger
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -3207,6 +3209,7 @@ oc.build_arm64-exp:
     - fa-bridge-watchtower
     - etherlink-governance-observer
     - octez-evm-node
+    - octez-smart-rollup-node
     - octez-accuser-alpha
     - octez-baker-alpha
     - octez-teztale-snitch
@@ -3362,7 +3365,6 @@ oc.build_arm64-released:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-smart-rollup-node
     - octez-dal-node
     - octez-signer
     - octez-codec
@@ -3463,15 +3465,20 @@ oc.build_x86_64-exp:
   tags:
   - gcp_very_high_cpu
   rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
   - changes:
+    - '**/*.rst'
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
     - data-encoding/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
+    - grafazos/doc/**/*
     - irmin/**/*
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
@@ -3485,6 +3492,7 @@ oc.build_x86_64-exp:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - trigger
@@ -3537,6 +3545,7 @@ oc.build_x86_64-exp:
     - fa-bridge-watchtower
     - etherlink-governance-observer
     - octez-evm-node
+    - octez-smart-rollup-node
     - octez-accuser-alpha
     - octez-baker-alpha
     - octez-teztale-snitch
@@ -3714,7 +3723,6 @@ oc.build_x86_64-released:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-smart-rollup-node
     - octez-dal-node
     - octez-signer
     - octez-codec

@@ -201,9 +201,11 @@ documentation.manuals:
   needs:
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.build_x86_64-released
   - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -287,6 +289,70 @@ documentation.rst-check:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+oc.build_x86_64-exp:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/sccache-start.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    CARGO_INCREMENTAL: "0"
+    CARGO_NET_OFFLINE: "false"
+    DUNE_CACHE: enabled
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+  artifacts:
+    name: build-x86_64-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - fa-bridge-watchtower
+    - etherlink-governance-observer
+    - octez-evm-node
+    - octez-smart-rollup-node
+    - octez-accuser-alpha
+    - octez-baker-alpha
+    - octez-teztale-snitch
+    - octez-teztale-archiver
+    - octez-teztale-server
+    - src/proto_*/parameters/*.json
+    when: on_success
 
 oc.build_x86_64-extra-dev:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-build:master-a416870e
@@ -395,7 +461,6 @@ oc.build_x86_64-released:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-smart-rollup-node
     - octez-dal-node
     - octez-signer
     - octez-codec
