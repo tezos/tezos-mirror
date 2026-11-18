@@ -734,10 +734,14 @@ mod tests {
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
+    use crate::migration::storage_migration;
     use crate::registry_impl::RegistryImpl;
     use crate::retrieve_block_fees;
     use crate::storage::read_last_info_per_level_timestamp;
-    use crate::storage::{read_block_in_progress, store_block_in_progress};
+    use crate::storage::{
+        read_block_in_progress, store_block_in_progress, store_storage_version,
+        StorageVersion,
+    };
     use crate::sub_block::{
         assemble_block, handle_run_transaction, AssembleBlockInput,
         SingleTxExecutionInput,
@@ -4268,6 +4272,83 @@ mod tests {
             .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
             .unwrap()
             .is_none());
+    }
+
+    /// The V71 migration drops a block in progress a V70 kernel left under
+    /// `/tmp/evm/world_state`, and the next run rebuilds the block from its
+    /// blueprint.
+    #[test]
+    fn migrated_block_in_progress_is_rebuilt() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let sender = H160::from_str(TEST_ADDR).unwrap();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+        let [create_transaction, loop_300_tx, loop_300_tx2] =
+            loop_contract_transactions();
+        store_blueprints(
+            &mut base,
+            vec![blueprint(vec![
+                wrap_transaction(0, create_transaction),
+                wrap_transaction(1, loop_300_tx),
+                wrap_transaction(2, loop_300_tx2),
+            ])],
+        );
+        let mut chain_config = dummy_tezosx_config(SpecId::default());
+        chain_config.limits_mut().maximum_gas_limit = 560_000;
+        let mut configuration = dummy_configuration();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        drop(rk);
+        drop(base);
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation_result =
+            produce(&mut host, bk, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
+        assert!(matches!(
+            computation_result,
+            ComputationResult::RebootNeeded
+        ));
+
+        // Lay the block in progress out the way a V70 kernel left it, then run
+        // the migration the way stage zero does.
+        let legacy = RefPath::assert_from(b"/tmp/evm/world_state/blocks/in_progress");
+        let current = RefPath::assert_from(b"/tmp/common_world_state/block_in_progress");
+        host.store_move(&current, &legacy).unwrap();
+        // A V70 mirror has no `/common_world_state`.
+        host.store_delete(&RefPath::assert_from(b"/tmp/common_world_state"))
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        store_storage_version(&mut base, StorageVersion::V70).unwrap();
+        drop(base);
+        storage_migration(&mut host).unwrap();
+        assert!(host.store_has(&legacy).unwrap().is_none());
+
+        // A rebuilt block starts a new mirror, so the probe is not promoted.
+        let probe = RefPath::assert_from(b"/tmp/evm/world_state/probe");
+        host.store_write_all(&probe, b"probe").unwrap();
+        produce_until_finished(&mut host, &chain_config, &mut configuration);
+        let base = load_base(&mut host).unwrap();
+        assert_eq!(read_current_number(&base).unwrap(), U256::zero());
+        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(host
+            .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
+            .unwrap()
+            .is_none());
+        let block = block_storage::read_current_etherlink_block(
+            RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
+        )
+        .unwrap()
+        .expect("a current block");
+        assert_eq!(block.transactions.len(), 3);
+        let promoted_probe = RefPath::assert_from(b"/evm/world_state/probe");
+        assert!(host.store_has(&promoted_probe).unwrap().is_none());
     }
 
     /// Runs `produce` until the block in progress finishes, a few reboots at
