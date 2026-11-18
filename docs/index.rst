@@ -160,7 +160,6 @@ You may also access this whole documentation (for the stable release) as a singl
 
    introduction/tezos
    introduction/howtoget
-   introduction/linux_support
    introduction/howtouse
    introduction/howtorun
    introduction/services

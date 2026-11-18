@@ -119,9 +119,6 @@ We support the following distribution/releases:
 
 both on ``amd64`` and ``arm64`` architectures.
 
-For the full support matrix, the support policy, and the planned end-of-support
-dates, see :doc:`linux_support`.
-
 In order to set the Tezos package repository to your machine, do:
 
 ::
