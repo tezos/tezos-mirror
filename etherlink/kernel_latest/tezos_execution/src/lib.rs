@@ -42,9 +42,9 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_storage::error::Error as StorageError;
@@ -81,6 +81,7 @@ pub use crate::mir_ctx::address_from_contract;
 use crate::mir_ctx::{
     convert_big_map_diff, BlockCtx, Ctx, ExecCtx, InterpretContext, OperationCtx, TcCtx,
 };
+use crate::scope::{Close, CracOperationScope, OperationScope, Phase};
 
 /// Result of applying a single operation within a batch.
 ///
@@ -196,6 +197,7 @@ pub(crate) mod counting_host;
 pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
+pub mod scope;
 pub mod storage_fees;
 mod validate;
 
@@ -2345,6 +2347,24 @@ impl From<TransferError> for CracTransferError {
     }
 }
 
+impl From<RuntimeError> for CracTransferError {
+    fn from(error: RuntimeError) -> Self {
+        Self::from(gw(error))
+    }
+}
+
+/// Outcome of the transfer [`cross_runtime_transfer`] runs in its scope and of
+/// the internal operations it drove, carrying what the post-close processing
+/// needs once the scope itself has committed or reverted.
+enum CrossRuntimeTransferOutcome {
+    /// The transfer and all the internal operations it drove applied.
+    Applied(TransferTarget),
+    /// The transfer applied but one of its internal operations failed.
+    InternalFailure,
+    /// The transfer itself failed.
+    Failed(CracError),
+}
+
 /// Execute a cross-runtime transfer with automatic rollback on failure.
 ///
 /// Snapshots the world state before executing the transfer.  On success
@@ -2376,112 +2396,109 @@ where
     let world_state = tezos_smart_rollup_host::path::OwnedPath::from(
         &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
     );
-    let checkpoint_index = journal
-        .michelson
-        .checkpoint(tc_ctx.rk.host_mut(), &world_state)
-        .map_err(|e| CracTransferError::from(gw(e)))?;
-
     let mut internal_receipts = Vec::new();
-    match transfer(
-        tc_ctx,
-        operation_ctx,
-        registry,
-        journal,
-        sender,
-        amount,
-        dest,
-        entrypoint,
-        value,
-        parser,
-        &mut internal_receipts,
-        true, // skip_sender_debit: the calling runtime already debited the sender
-        // big maps cannot be sent across runtimes
-        AllowForgedLazyStorageId::No,
-        nonce_counter,
-    ) {
-        Ok(TransferOutcome {
-            success, subtree, ..
-        }) => {
-            // transfer() returns Ok even when internal operations failed: the
-            // failure is contained and only reported. `subtree` carries the
-            // verdict of the ops it drove, and the last own receipt catches a
-            // failure no frame saw — the same pair [`finalize_statuses`] uses
-            // in the normal Tezos operation path. Deciding on the receipts
-            // alone would commit the snapshot of a failed sub-execution
-            // (L2-1863). The CRAC frames drained by `transfer` are ignored: a
-            // failure the EVM side caught must not revert this crossing.
-            let all_internal_succeeded =
-                subtree.all_applied() && last_own_receipt_applied(&internal_receipts);
-            if all_internal_succeeded {
-                // promote: discard the snapshot, keep changes
-                journal
-                    .michelson
-                    .checkpoint_commit(tc_ctx.rk.host_mut(), checkpoint_index)
-                    .map_err(|e| CracTransferError::from(gw(e)))?;
-
-                let target: TransferTarget = success.into();
-                let own_storage_cost =
-                    storage_fees::compute_storage_fees::<TransferContent>(&target)?;
-                let own_storage_cost: Mutez = internal_receipts
-                    .iter()
-                    .filter(|t| t.is_own())
-                    .try_fold(own_storage_cost, |acc, t| {
-                        let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
-                        acc.checked_add(fee).map_err(|e| {
-                            TransferError::StorageFeesConversion(e.to_string())
-                        })
-                    })?;
-
-                Ok(CrossRuntimeTransferResult {
-                    target,
-                    internal_receipts: untag_internals(internal_receipts),
-                    own_storage_cost,
-                })
-            } else {
-                // revert: restore the snapshot
-                journal
-                    .michelson
-                    .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
-                    .map_err(|e| CracTransferError::from(gw(e)))?;
-                internal_receipts
-                    .iter_mut()
-                    .for_each(|t| t.op.transform_result_backtrack());
-                // Meter the persisted error bodies of internal-op failures
-                // before recording the failed CRAC receipt.  Each
-                // `ContentResult::Failed` entry carries the FAILWITH body;
-                // charging here closes the bypass by which an attacker
-                // whose KT1 issues an internal TRANSFER_TOKENS to a
-                // FAILWITHing contract would otherwise route a large body
-                // into the receipt unmetered.  On OOG the oversized body is
-                // replaced with `OutOfGas` while the entry is preserved so
-                // the failed CRAC receipt always carries its internal-op list.
-                let mut internal_receipts = untag_internals(internal_receipts);
-                charge_internal_receipt_bodies(
-                    tc_ctx.operation_gas,
-                    &mut internal_receipts,
-                );
-                // Return the internal receipts so the failed CRAC
-                // receipt can include backtracked/failed/skipped ops.
-                // deep_failure=true: the target's own call returned Ok
-                // but one of its internal ops recorded a Failed receipt.
-                // The real error is already present in internal_receipts;
-                // the alias→target synthetic op should be BackTracked.
-                Err(CracTransferError {
-                    error: CracError::Operation(
-                        TransferError::FailedToExecuteInternalOperation(
-                            "internal operation failed during cross-runtime call".into(),
-                        ),
-                    ),
-                    internal_receipts,
-                    deep_failure: true,
-                })
+    let outcome = CracOperationScope::run(
+        &mut *tc_ctx,
+        &mut *journal,
+        &world_state,
+        |scope| -> Result<Close<CrossRuntimeTransferOutcome>, CracTransferError> {
+            let (scoped_ctx, scoped_journal) = scope.parts_mut();
+            match transfer(
+                scoped_ctx,
+                operation_ctx,
+                registry,
+                scoped_journal,
+                sender,
+                amount,
+                dest,
+                entrypoint,
+                value,
+                parser,
+                &mut internal_receipts,
+                true, // skip_sender_debit: the calling runtime already debited the sender
+                // big maps cannot be sent across runtimes
+                AllowForgedLazyStorageId::No,
+                nonce_counter,
+            ) {
+                Ok(TransferOutcome {
+                    success, subtree, ..
+                }) => {
+                    // transfer() returns Ok even when internal operations failed: the
+                    // failure is contained and only reported. `subtree` carries the
+                    // verdict of the ops it drove, and the last own receipt catches a
+                    // failure no frame saw — the same pair [`finalize_statuses`] uses
+                    // in the normal Tezos operation path. Deciding on the receipts
+                    // alone would commit the snapshot of a failed sub-execution
+                    // (L2-1863). The CRAC frames drained by `transfer` are ignored: a
+                    // failure the EVM side caught must not revert this crossing.
+                    let all_internal_succeeded = subtree.all_applied()
+                        && last_own_receipt_applied(&internal_receipts);
+                    if all_internal_succeeded {
+                        // promote: discard the snapshot, keep changes
+                        Ok(Close::Commit(CrossRuntimeTransferOutcome::Applied(
+                            success.into(),
+                        )))
+                    } else {
+                        // revert: restore the snapshot
+                        Ok(Close::Revert(CrossRuntimeTransferOutcome::InternalFailure))
+                    }
+                }
+                Err(e) => Ok(Close::Revert(CrossRuntimeTransferOutcome::Failed(e))),
             }
+        },
+    )?;
+
+    match outcome {
+        CrossRuntimeTransferOutcome::Applied(target) => {
+            let own_storage_cost =
+                storage_fees::compute_storage_fees::<TransferContent>(&target)?;
+            let own_storage_cost: Mutez = internal_receipts
+                .iter()
+                .filter(|t| t.is_own())
+                .try_fold(own_storage_cost, |acc, t| {
+                    let fee = storage_fees::compute_internal_op_storage_fees(&t.op)?;
+                    acc.checked_add(fee)
+                        .map_err(|e| TransferError::StorageFeesConversion(e.to_string()))
+                })?;
+
+            Ok(CrossRuntimeTransferResult {
+                target,
+                internal_receipts: untag_internals(internal_receipts),
+                own_storage_cost,
+            })
         }
-        Err(e) => {
-            journal
-                .michelson
-                .checkpoint_revert(tc_ctx.rk.host_mut(), checkpoint_index)
-                .map_err(|e| CracTransferError::from(gw(e)))?;
+        CrossRuntimeTransferOutcome::InternalFailure => {
+            internal_receipts
+                .iter_mut()
+                .for_each(|t| t.op.transform_result_backtrack());
+            // Meter the persisted error bodies of internal-op failures
+            // before recording the failed CRAC receipt.  Each
+            // `ContentResult::Failed` entry carries the FAILWITH body;
+            // charging here closes the bypass by which an attacker
+            // whose KT1 issues an internal TRANSFER_TOKENS to a
+            // FAILWITHing contract would otherwise route a large body
+            // into the receipt unmetered.  On OOG the oversized body is
+            // replaced with `OutOfGas` while the entry is preserved so
+            // the failed CRAC receipt always carries its internal-op list.
+            let mut internal_receipts = untag_internals(internal_receipts);
+            charge_internal_receipt_bodies(tc_ctx.operation_gas, &mut internal_receipts);
+            // Return the internal receipts so the failed CRAC
+            // receipt can include backtracked/failed/skipped ops.
+            // deep_failure=true: the target's own call returned Ok
+            // but one of its internal ops recorded a Failed receipt.
+            // The real error is already present in internal_receipts;
+            // the alias→target synthetic op should be BackTracked.
+            Err(CracTransferError {
+                error: CracError::Operation(
+                    TransferError::FailedToExecuteInternalOperation(
+                        "internal operation failed during cross-runtime call".into(),
+                    ),
+                ),
+                internal_receipts,
+                deep_failure: true,
+            })
+        }
+        CrossRuntimeTransferOutcome::Failed(e) => {
             internal_receipts
                 .iter_mut()
                 .for_each(|t| t.op.transform_result_backtrack());
@@ -2930,97 +2947,76 @@ pub fn validate_and_apply_operation<Host>(
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let mut safe_host = SafeStorage {
-        host: rk.host_mut(),
-        world_states: safe_roots.to_vec(),
-    };
-
-    safe_host.start()?;
-
     log!(Debug, "Verifying that the batch is valid");
 
-    // The validation writes the counter and the balance of the source on `safe_host`.
-    // When the batch is invalid, `safe_host.revert()` below drops these writes.
-    let validation = {
-        let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
-        validate::execute_validation(
-            rk.tez_accounts_mut(),
-            operation,
-            skip_signature_check,
-            required_fees,
-        )
-    };
-    let validation_info = match validation {
-        Ok(validation_info) => validation_info,
-        Err(validity_err) => {
-            log!(Debug, "Reverting the changes because the batch is invalid.");
-            safe_host.revert()?;
-            return Err(OperationError::Validation(validity_err));
-        }
-    };
+    let validation_info = OperationScope::run(
+        &mut *rk,
+        safe_roots,
+        &mut *journal,
+        Phase::Validation,
+        |validation| -> Result<Close<_>, OperationError> {
+            // The validation writes the counter and the balance of the source
+            // on the validation scope. When the batch is invalid, the error
+            // reverts the scope and drops these writes.
+            let (mut rk, _) = validation.parts_mut()?;
+            match validate::execute_validation(
+                rk.tez_accounts_mut(),
+                operation,
+                skip_signature_check,
+                required_fees,
+            ) {
+                Ok(validation_info) => Ok(Close::Commit(validation_info)),
+                Err(validity_err) => {
+                    log!(Debug, "Reverting the changes because the batch is invalid.");
+                    Err(OperationError::Validation(validity_err))
+                }
+            }
+        },
+    )?;
 
     let fee_refund_config =
         fee_refund_config.map(|config| (config, validation_info.total_fees));
 
     log!(Debug, "Batch is valid!");
 
-    safe_host.promote()?;
-    safe_host.start()?;
-
     // Each operation uses 0-based nonces; block-sequential nonces are
     // assigned at block finalization by renumber_nonces().
     let mut nonce_counter: u16 = 0;
-    // The origination nonce lives on the journal.
-    // Snapshot the index so the revert branch below can put it back: unlike an EVM-driven frame,
-    // this path never opens a journal frame, so `revert_frame` does not roll it back for us — and a
-    // backtracked batch must not consume indices, since on L1 the nonce dies with the reverted
-    // context.
-    let origination_index_before = journal.michelson.origination_index();
     // We use `mut` here because apply_batch does not handle fee refund,
     // so we append the refund balance updates to processed_ops afterwards.
-    let (mut processed_ops, applied) = {
-        // Loaded under the mirror, so the batch's account writes follow the
-        // promote or revert below.
-        let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
-        apply_batch(
-            &mut rk,
-            registry,
-            journal,
-            validation_info,
-            block_ctx,
-            &mut nonce_counter,
-        )
-        .map_err(OperationError::BlockAbort)?
-    };
+    let mut processed_ops = OperationScope::run(
+        &mut *rk,
+        safe_roots,
+        &mut *journal,
+        Phase::Application,
+        |application| -> Result<Close<_>, OperationError> {
+            let (mut rk, journal) = application.parts_mut()?;
+            let (processed_ops, applied) = apply_batch(
+                &mut rk,
+                registry,
+                journal,
+                validation_info,
+                block_ctx,
+                &mut nonce_counter,
+            )
+            .map_err(OperationError::BlockAbort)?;
 
-    if applied {
-        log!(
-            Debug,
-            "Committing the changes because the batch was successfully applied."
-        );
-        safe_host.promote()?;
-    } else {
-        log!(
-            Debug,
-            "Reverting the changes because some operation failed."
-        );
-        log!(Debug, "Processed operations: {processed_ops:#?}");
-        safe_host.revert()?;
-        // Clear the in-memory EVM journal: `safe_host.revert()` only rolls
-        // back durable storage and cannot affect the in-memory REVM
-        // JournalInner. Without this, commit_evm_journal_from_external()
-        // would persist EVM state changes from a backtracked operation.
-        journal.evm.clear();
-        // The captured cross-runtime originator now lives on the shared
-        // journal (not `evm`), so drop it here too — a backtracked
-        // operation's originator must not leak into the next one.
-        journal.reset_original_source();
-        // Give the origination-nonce indices back: none of this batch's
-        // originations survived, so none of them may consume an index.
-        journal
-            .michelson
-            .restore_origination_index(origination_index_before);
-    }
+            if applied {
+                log!(
+                    Debug,
+                    "Committing the changes because the batch was successfully applied."
+                );
+                Ok(Close::Commit(processed_ops))
+            } else {
+                log!(
+                    Debug,
+                    "Reverting the changes because some operation failed."
+                );
+                log!(Debug, "Processed operations: {processed_ops:#?}");
+                Ok(Close::Revert(processed_ops))
+            }
+        },
+    )?;
 
     // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
     // keeps the refund. A rollback of the storage under `rk` drops the refund too.
