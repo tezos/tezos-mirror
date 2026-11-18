@@ -772,8 +772,36 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
    conditions that only make sense for merge requests are replaced by their
    value outside of merge requests (see [assume_merge_request_conditions]). *)
 let convert_graph ?(interruptible_pipeline = true)
-    ?(interruptible_publish = false) ?(merge_request = false)
+    ?(interruptible_publish = false) ?(merge_request = false) ~pipeline_name
     (graph : fixed_job_graph) : tezos_job_graph =
+  let condition only_if =
+    if merge_request then only_if
+    else Condition.assume_merge_request_conditions only_if
+  in
+  (* Check that jobs that were explicitly added to the pipeline can be
+     included. A job whose condition never holds in this pipeline, for instance
+     because it is the changeset of a component that has no [paths], was
+     probably not meant to be added. Jobs that were only added because other
+     jobs need them have the conditions of those jobs, so checking those jobs
+     is enough. This check is done before converting jobs, because converting
+     a job with no rule fails, and dependencies are converted first: the error
+     would then be about a dependency instead of the job that was added. *)
+  ( Fun.flip UID_map.iter graph @@ fun _ {job; only_if; explicit; trigger = _} ->
+    let never_included =
+      match Condition.encode (condition only_if) with
+      | Some [] -> true
+      | Some (_ :: _) | None -> false
+      | exception Failure _ ->
+          (* Reported when converting the job, with a better error message. *)
+          false
+    in
+    if explicit && never_included then
+      error
+        job.source_location
+        "job %s was explicitly added to pipeline %s, in which its condition \
+         never holds, so it would never be included: check its ~only_if"
+        job.name
+        pipeline_name ) ;
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -860,11 +888,7 @@ let convert_graph ?(interruptible_pipeline = true)
                             Some No
                         | None | Some (Yes | With_exit_codes _) -> None )
                 in
-                let condition =
-                  if merge_request then only_if
-                  else Condition.assume_merge_request_conditions only_if
-                in
-                try Condition.encode ?when_ ?allow_failure condition
+                try Condition.encode ?when_ ?allow_failure (condition only_if)
                 with Failure message ->
                   error
                     source_location
@@ -963,13 +987,17 @@ let convert_graph ?(interruptible_pipeline = true)
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
 let convert_jobs ?interruptible_pipeline ?interruptible_publish
-    ?with_job_trigger ?merge_request (jobs : (trigger * job) list) :
-    Tezos_ci.tezos_job list =
+    ?with_job_trigger ?merge_request ~pipeline_name
+    (jobs : (trigger * job) list) : Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
   |> (match with_job_trigger with
      | None -> Fun.id
      | Some job_trigger -> add_dependency_on_job_trigger job_trigger)
-  |> convert_graph ?interruptible_pipeline ?interruptible_publish ?merge_request
+  |> convert_graph
+       ?interruptible_pipeline
+       ?interruptible_publish
+       ?merge_request
+       ~pipeline_name
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -1184,6 +1212,7 @@ let get_jobs (pipeline : global_pipeline) =
     ?interruptible_pipeline:pipeline.interruptible_pipeline
     ?interruptible_publish:pipeline.interruptible_publish
     ?merge_request:pipeline.merge_request
+    ~pipeline_name:pipeline.name
     ?with_job_trigger:
       (if pipeline.with_job_trigger then Some job_trigger else None)
     jobs
@@ -1695,6 +1724,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ~jobs:
         (convert_jobs
            ?interruptible_pipeline
+           ~pipeline_name:(make_name name)
            ((Auto, job_datadog_pipeline_trace) :: jobs))
       (make_name name)
       rules
