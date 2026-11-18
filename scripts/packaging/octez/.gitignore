@@ -41,6 +41,5 @@ debian/octez-baker/
 debian/octez-evm-node/
 debian/octez-experimental/
 debian/octez-signer/
-debian/octez-smartrollup-node/
 debian/octez-zcash-params/
 debian/octez-dal-node/

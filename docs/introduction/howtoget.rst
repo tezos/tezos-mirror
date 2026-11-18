@@ -542,7 +542,6 @@ There are several packages:
 - ``octez-client``: the client for manipulating wallets and signing items
 - ``octez-node``: the Octez node
 - ``octez-baker``: the Octez baking and VDF daemons
-- ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
 Appendix
