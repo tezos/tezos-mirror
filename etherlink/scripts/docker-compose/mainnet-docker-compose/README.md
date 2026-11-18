@@ -32,7 +32,8 @@ used for each binary:
 
     Octez-evm-node: Octez EVM node release 0.12
     Octez-node: Octez Release 21
-    Octez-smart-rollup-node: Octez Release 21
 
-Please ensure you use the latest available versions and update the
-tags in the .env file accordingly.
+The smart rollup node uses the ``octez-smart-rollup-node-latest`` tag, which
+always points at the most recent rollup node release. Please ensure you use the
+latest available versions for the other components and update the tags in the
+.env file accordingly.
