@@ -59,7 +59,9 @@ fn prepare_tezosx_journal(
 }
 
 /// Close the journal at the end of a transaction application, performing
-/// the necessary bookkeeping required by each supported runtime.
+/// the necessary bookkeeping required by each supported runtime, starting
+/// with releasing the savepoints still open on the Michelson accounts of
+/// `rk`.
 ///
 /// Must be called on every code path (error paths pass `result: None`) so
 /// extending the close logic cannot miss one; taking the journal by value
@@ -75,8 +77,13 @@ fn close_tezosx_journal<Host>(
 where
     Host: StorageV1 + KeySpaceLoader,
 {
+    // Drop all backup of tez_accounts and bring the journal's
+    // savepoint count back to zero.
+    let released = journal.michelson.release_all_savepoints(rk);
     // A collection of fallible clean-up routines.
     let errors: Vec<EvmRunError> = [
+        // The savepoint count was out of sync with the accounts snapshot.
+        released.map_err(|err| EvmKernelError::Snapshot(err).into()),
         // Temporary big maps are scoped to the transaction.
         tezos_execution::mir_ctx::clear_temporary_big_maps(
             rk.host_mut(),
@@ -147,6 +154,11 @@ impl<T: HasExecutionResult, U> HasExecutionResult for (T, U) {
 }
 
 /// Prepare a journal, run the continuation, and close it on success or error.
+///
+/// The journal checkpoints of the continuation open their savepoints on the
+/// snapshot of the Michelson accounts of `rk`. Closing the journal releases
+/// the ones still open, on success or error: nothing reverts the accounts at
+/// this level, frame reverts go through savepoints.
 ///
 /// The continuation supplies the EVM result used to finalize the tracer, or
 /// `None` for invalid operations. Errors close without finalizing the tracer.

@@ -54,6 +54,10 @@ pub enum SnapshotError {
     /// A release asked to keep more backups than the stack holds.
     #[error("cannot release snapshot to height {height}: {len} backups held")]
     ReleaseAboveHeight { height: usize, len: usize },
+    /// The snapshot holds more savepoints than its caller counts across
+    /// the snapshots it drives: the count and the snapshot are out of sync.
+    #[error("{held} snapshot savepoints held, only {tracked} tracked")]
+    UntrackedSavepoints { held: usize, tracked: usize },
 }
 
 const SAVEPOINT_PREFIX: &str = "/__savepoint";

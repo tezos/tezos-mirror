@@ -8,8 +8,9 @@ use crate::{EvmJournal, MichelsonJournal};
 use revm::primitives::{keccak256, Address, B256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::block::BlockConstants;
-use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SnapshotError;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_types::{OriginalSource, RuntimeId};
 
 /// Domain tags for the synthetic hash derivations below. Each names the
@@ -361,31 +362,32 @@ impl TezosXJournal {
 
     /// Commit the innermost global checkpoint opened by
     /// [`Self::global_checkpoint`]: keep this frame's durable-overlay
-    /// changes across every runtime. The michelson commit is fallible
-    /// (it touches durable storage); the EVM layered-state commit is an
-    /// in-memory pop, so the two are independent and their order is
-    /// immaterial.
+    /// changes across every runtime. The michelson commit releases the
+    /// frame's savepoints of the accounts snapshot of `rk`; the EVM layered-state
+    /// commit is an in-memory pop, so the two are independent and their
+    /// order is immaterial.
     #[inline]
-    pub fn global_commit<Host: StorageV1>(
+    pub fn global_commit<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
-    ) -> Result<(), RuntimeError> {
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
         self.evm.layered_state.checkpoint_commit();
-        self.michelson.commit_frame(host)
+        self.michelson.commit_frame(rk)
     }
 
     /// Revert the innermost global checkpoint opened by
     /// [`Self::global_checkpoint`]: roll back this frame's
     /// durable-overlay changes across every runtime. The michelson and
     /// EVM reverts touch disjoint state (Michelson durable storage vs the
-    /// in-memory EVM overlay), so their order is immaterial.
+    /// in-memory EVM overlay), so their order is immaterial. The
+    /// michelson revert restores the accounts of `rk` from their snapshot.
     #[inline]
-    pub fn global_revert<Host: StorageV1>(
+    pub fn global_revert<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
-    ) -> Result<(), RuntimeError> {
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
         self.evm.layered_state.checkpoint_revert();
-        self.michelson.revert_frame(host)
+        self.michelson.revert_frame(rk)
     }
 
     /// Canonical derivation of an operation hash for an *EVM-entered*

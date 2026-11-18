@@ -37,8 +37,7 @@ use revm::{
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::Bytes,
 };
-use tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH;
-use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::Registry;
 
@@ -143,10 +142,7 @@ where
             journal
                 .journal
                 .michelson
-                .checkpoint(
-                    journal.database.rk.host_mut(),
-                    &OwnedPath::from(&TEZ_ACCOUNTS_ROOT_PATH),
-                )
+                .checkpoint(journal.database.rk)
                 .map_err(|e| {
                     CustomPrecompileError::Revert(
                         format!("leak_snapshot precompile failed: {e:?}"),

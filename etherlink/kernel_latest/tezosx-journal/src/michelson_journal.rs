@@ -5,11 +5,9 @@
 use std::{cell::Cell, rc::Rc};
 
 use tezos_crypto_rs::hash::OperationHash;
-use tezos_smart_rollup_host::{
-    path::{concat, OwnedPath, Path, RefPath},
-    runtime::RuntimeError,
-    storage::StorageV1,
-};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SnapshotError;
+use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezos_tezlink::{
     block::AppliedOperation,
     operation_result::{
@@ -42,8 +40,8 @@ fn backtrack_receipt(receipt: &mut AppliedOperation) {
 
 #[derive(Debug, PartialEq, Eq)]
 struct ExternalCheckpoint {
-    /// Index into `snapshots` at the time the checkpoint was created.
-    snapshot_watermark: usize,
+    /// `savepoints` at the time the checkpoint was created.
+    savepoint_watermark: usize,
     /// Length of `pending_crac_receipts` at the time the checkpoint was
     /// created.  On revert, receipts are truncated back to this count.
     receipt_count: usize,
@@ -100,22 +98,39 @@ struct DispatchSlot {
 
 impl std::error::Error for DispatchSlotError {}
 
-/// A pending revert target: the indexed location where the world-state
-/// subtree was copied at checkpoint time, paired with the original path
-/// it was copied from. On revert we [`store_move`] the snapshot back to
-/// `from_path`, so each snapshot must remember its own origin — different
-/// CRACs may snapshot different subtrees (e.g. `/tez/tez_accounts`
-/// for the Michelson context), and the EVM frame revert path must not
-/// hard-code one of them.
-#[derive(Debug, PartialEq, Eq)]
-struct Snapshot {
-    snapshot_path: OwnedPath,
-    from_path: OwnedPath,
-}
-
+/// Michelson side of the cross-runtime journal of a transaction.
+///
+/// # Snapshot, savepoint, checkpoint
+///
+/// The journal undoes the Michelson account writes of a reverted call. Three
+/// names cover it, from storage up to the journal API:
+///
+/// - **Snapshot**: the [`Snapshot`](tezos_evm_runtime::snapshot::Snapshot)
+///   held by a [`RuntimeKeyspaces`] for its `/tez/tez_accounts`. It is a
+///   stack of backups of that keyspace, not a backup itself. There is one
+///   per `RuntimeKeyspaces`: the transaction's and, during a Tezos operation
+///   batch, the one of the batch's `SafeStorage` mirror, nested in the
+///   transaction's.
+/// - **Savepoint**: one backup on a snapshot's stack, a copy of the accounts
+///   taken at some point (`/__savepoint/<index><root>`). Released, it is
+///   deleted and the writes made since are kept. Rolled back, it is moved
+///   back over the accounts. `savepoints` counts those open across every
+///   snapshot the journal drives, oldest first.
+/// - **Checkpoint**: the journal-level operation that opens a savepoint
+///   and returns its index ([`Self::checkpoint`]), to commit or revert it
+///   later ([`Self::checkpoint_commit`], [`Self::checkpoint_revert`]). The
+///   names mirror the EVM journal's checkpoints, and an *external*
+///   checkpoint is an EVM call frame: it records the savepoint count as
+///   its watermark, with the receipt and counter state that
+///   [`Self::commit_frame`] / [`Self::revert_frame`] keep or roll back.
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelsonJournal {
-    snapshots: Vec<Snapshot>,
+    /// Number of savepoints opened by the checkpoint functions and not yet
+    /// released or rolled back, across the accounts snapshots of the scopes
+    /// ended by [`Self::release_all_savepoints`]: the transaction's and, inside
+    /// it, a Tezos operation batch's. Callers must route every savepoint of a
+    /// snapshot through these functions to keep the two in sync.
+    savepoints: usize,
     external_checkpoints: Vec<ExternalCheckpoint>,
     /// Per-Michelson-dispatch slot stack for the `%collect_result`
     /// payload.  Pushed and popped exclusively by `TezosRuntime::serve`,
@@ -281,7 +296,7 @@ impl MichelsonJournal {
     /// [`crate::TezosXJournal::synthetic_operation_hash`].
     pub fn new(operation_hash: OperationHash) -> Self {
         Self {
-            snapshots: Vec::new(),
+            savepoints: 0,
             external_checkpoints: Vec::new(),
             dispatch_result_slots: Vec::new(),
             pending_crac_receipts: Vec::new(),
@@ -465,20 +480,14 @@ impl MichelsonJournal {
     }
 }
 
-pub fn indexed_path<T: Path>(depth: usize, path: &T) -> Result<OwnedPath, RuntimeError> {
-    let path_bytes = format!("/{depth}");
-    let indexed_path = RefPath::assert_from(path_bytes.as_bytes());
-    concat(&indexed_path, path).map_err(|_| RuntimeError::PathNotFound)
-}
-
 impl MichelsonJournal {
     // Called by an external journal on checkpoint creation.
-    // Records the current snapshot count, receipt count and
+    // Records the current savepoint count, receipt count and
     // origination-nonce index as the lower boundary for this call
     // frame.
     pub fn push_external_checkpoint(&mut self) {
         self.external_checkpoints.push(ExternalCheckpoint {
-            snapshot_watermark: self.snapshots.len(),
+            savepoint_watermark: self.savepoints,
             receipt_count: self.pending_crac_receipts.len(),
             origination_index: self.origination_index,
             alias_internals_count: self.pending_alias_origination_internals.len(),
@@ -491,7 +500,7 @@ impl MichelsonJournal {
         self.external_checkpoints
             .pop()
             .unwrap_or(ExternalCheckpoint {
-                snapshot_watermark: 0,
+                savepoint_watermark: 0,
                 receipt_count: 0,
                 origination_index: 0,
                 alias_internals_count: 0,
@@ -499,13 +508,13 @@ impl MichelsonJournal {
     }
 
     /// Undo the journal bookkeeping of a reverted EVM frame — everything
-    /// but the durable state, which the caller restores from a snapshot.
+    /// but the durable state, which the caller restores from a savepoint.
     fn backtrack_frame(&mut self, checkpoint: &ExternalCheckpoint) {
         // Roll the origination-nonce index back to its value at
         // checkpoint entry: any `CREATE_CONTRACT` performed inside the
         // reverted EVM frame is undone (the child KT1 was never
         // durably written, since Michelson is all-or-nothing inside a
-        // CRAC and the snapshot mechanism also reverts the durable
+        // CRAC and the savepoint rollback also reverts the durable
         // state), and the freed indices are reusable by the next CRAC.
         // Done unconditionally so a partial inbound CRAC followed by a
         // caller-side EVM revert does not leak burned indices.
@@ -615,16 +624,43 @@ impl MichelsonJournal {
             .map(|slot| slot.payload)
     }
 
+    /// Release every savepoint still open on the snapshot of `rk`,
+    /// the one the checkpoint functions below open theirs on: keep
+    /// the writes made since, delete the backups, and count the open
+    /// savepoints back to those of the enclosing snapshots. Savepoint
+    /// indices and frame watermarks keep counting from the savepoints
+    /// still open on an enclosing snapshot, e.g. the transaction's
+    /// while a Tezos operation batch runs on its mirror.
+    ///
+    /// Whoever runs a scope on `rk` (a transaction, a Tezos operation batch
+    /// on its mirror) calls it at the end, on every path, error paths
+    /// included. Otherwise the journal would keep counting these savepoints,
+    /// and every later index, watermark and release would be off by that
+    /// many.
+    ///
+    /// Fails `UntrackedSavepoints` if the snapshot of `rk` holds more
+    /// savepoints than the journal counts. Its savepoints are released
+    /// anyway, and the count is left as is.
+    pub fn release_all_savepoints<Host: KeySpaceLoader>(
+        &mut self,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
+        let enclosing = self.enclosing_savepoints(rk);
+        rk.tez_accounts_release_all();
+        self.savepoints = enclosing?;
+        Ok(())
+    }
+
     // Called by EVM journal on checkpoint commit.
     //
     // Pops the current frame's watermark. If a parent EVM frame exists,
-    // leaves the snapshot at watermark for the parent's potential revert.
-    // If this is the outermost frame, deletes it too.
+    // leaves the savepoint at the watermark for the parent's potential
+    // revert. If this is the outermost frame, releases it too.
     // Receipts are kept (commit preserves them).
-    pub fn commit_frame<Host>(&mut self, host: &mut Host) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
+    pub fn commit_frame<Host: KeySpaceLoader>(
+        &mut self,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
         let checkpoint = self.pop_external_checkpoint();
         // The saved origination index is dropped on commit: any
         // increments performed during this frame are kept, so a later
@@ -632,182 +668,230 @@ impl MichelsonJournal {
         // value rather than re-using already-burned indices.
         let _ = checkpoint.origination_index;
         let _ = checkpoint.alias_internals_count;
-        // The snapshot at the watermark is left for the parent frame, if any.
+        // The savepoint at the watermark is left for the parent frame, if any.
         let height = if self.external_checkpoints.is_empty() {
-            checkpoint.snapshot_watermark
+            checkpoint.savepoint_watermark
         } else {
-            checkpoint.snapshot_watermark + 1
+            checkpoint.savepoint_watermark + 1
         };
-        self.release_to(host, height)
+        self.release_to(rk, height)
     }
 
     // Called by EVM journal on checkpoint revert.
     //
-    // Pops the current frame's watermark, reverts durable storage to
-    // the state captured at the start of this call frame, and migrates
+    // Pops the current frame's watermark, restores the accounts of `rk`
+    // to their state at the start of this call frame, and migrates
     // applied CRAC receipts pushed during this frame to the
     // backtracked list with every result transformed to `BackTracked`.
-    // The state effects of those CRACs are rolled back via the
-    // snapshot mechanism — the receipt is kept purely as an indexer
-    // record of what was attempted (matching L1 manager-op semantics
-    // where applied internals reverted by a later failure appear as
-    // `backtracked` rather than vanishing). The revert target is
-    // recovered from the snapshot itself — see [`Snapshot`] for why
-    // this must not be a caller-supplied parameter.
-    pub fn revert_frame<Host>(&mut self, host: &mut Host) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
+    // The state effects of those CRACs are rolled back via the frame's
+    // savepoint — the receipt is kept purely as an indexer record of
+    // what was attempted (matching L1 manager-op semantics where
+    // applied internals reverted by a later failure appear as
+    // `backtracked` rather than vanishing).
+    pub fn revert_frame<Host: KeySpaceLoader>(
+        &mut self,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
         let checkpoint = self.pop_external_checkpoint();
         self.backtrack_frame(&checkpoint);
-        if checkpoint.snapshot_watermark >= self.snapshots.len() {
+        if checkpoint.savepoint_watermark >= self.savepoints {
             return Ok(());
         }
-        self.release_to(host, checkpoint.snapshot_watermark + 1)?;
-        self.rollback(host)
+        self.release_to(rk, checkpoint.savepoint_watermark + 1)?;
+        self.rollback(rk)
     }
 
     // Called by Michelson CRAC logic.
     //
-    // Creates a temporary copy of the provided path before execution
-    // and returns an index used to commit or revert.
-    pub fn checkpoint<Host>(
+    // Backs up the accounts of `rk` in a new savepoint before
+    // execution and returns an index used to commit or revert.
+    pub fn checkpoint<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
-        from_path: &OwnedPath,
-    ) -> Result<usize, RuntimeError>
-    where
-        Host: StorageV1,
-    {
-        let new_index = self.snapshots.len();
-        let snapshot_path = indexed_path(new_index, from_path)?;
-        host.store_copy(from_path, &snapshot_path)?;
-        self.snapshots.push(Snapshot {
-            snapshot_path,
-            from_path: from_path.clone(),
-        });
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<usize, SnapshotError> {
+        let new_index = self.savepoints;
+        rk.tez_accounts_savepoint()?;
+        self.savepoints += 1;
         Ok(new_index)
     }
 
     // Called by Michelson CRAC logic.
     //
-    // Removes snapshots taken after checkpoint_index, keeping the snapshot at
-    // checkpoint_index so a parent caller can still revert through it.
-    pub fn checkpoint_commit<Host>(
+    // Releases the savepoints opened after `checkpoint_index`, keeping the
+    // one at `checkpoint_index` so a parent caller can still revert through
+    // it. Fails `NoSavepoint`, leaving everything untouched, if the accounts
+    // snapshot of `rk` does not hold that savepoint, as
+    // `checkpoint_revert` does.
+    pub fn checkpoint_commit<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         checkpoint_index: usize,
-    ) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
-        self.release_to(host, checkpoint_index + 1)
+    ) -> Result<(), SnapshotError> {
+        self.check_open(rk, checkpoint_index)?;
+        self.release_to(rk, checkpoint_index + 1)
     }
 
-    /// Number of snapshots currently held, to be passed to
-    /// [`Self::release_snapshots_from`].
-    pub fn snapshot_count(&self) -> usize {
-        self.snapshots.len()
+    // Called by Michelson CRAC logic.
+    //
+    // Releases the savepoints opened after `checkpoint_index`, then rolls
+    // the accounts of `rk` back to the savepoint at `checkpoint_index`.
+    // Fails `NoSavepoint`, leaving everything untouched, if the accounts
+    // snapshot of `rk` does not hold that savepoint: it was released
+    // already, or it belongs to an enclosing snapshot.
+    pub fn checkpoint_revert<Host: KeySpaceLoader>(
+        &mut self,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+        checkpoint_index: usize,
+    ) -> Result<(), SnapshotError> {
+        self.check_open(rk, checkpoint_index)?;
+        self.release_to(rk, checkpoint_index + 1)?;
+        self.rollback(rk)
     }
 
-    /// Whether the snapshot at `index` is the revert point of the open EVM
-    /// frame, which [`Self::revert_frame`] restores: it must outlive the work
-    /// that took it.
-    fn is_frame_revert_point(&self, index: usize) -> bool {
-        self.external_checkpoints
-            .last()
-            .is_some_and(|frame| frame.snapshot_watermark == index)
+    /// Fails `NoSavepoint` unless the accounts snapshot of `rk` holds the
+    /// savepoint at `checkpoint_index`: it is neither released already nor
+    /// held by an enclosing snapshot.
+    fn check_open<Host: KeySpaceLoader>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host>,
+        checkpoint_index: usize,
+    ) -> Result<(), SnapshotError> {
+        if checkpoint_index < self.enclosing_savepoints(rk)?
+            || checkpoint_index >= self.savepoints
+        {
+            return Err(SnapshotError::NoSavepoint);
+        }
+        Ok(())
     }
 
-    /// Release the snapshots taken since `watermark` (a [`Self::snapshot_count`])
-    /// by work that succeeded, e.g. an alias materialized from a Michelson
-    /// operation, whose snapshot no EVM frame would otherwise clean up.
+    /// Number of savepoints currently open, to be passed to
+    /// [`Self::release_savepoints_from`].
+    pub fn savepoint_count(&self) -> usize {
+        self.savepoints
+    }
+
+    /// Release the savepoints opened since `watermark` (a
+    /// [`Self::savepoint_count`]) by work that succeeded, e.g. an alias
+    /// materialized from a Michelson operation, whose savepoint no EVM frame
+    /// would otherwise release.
     ///
     /// The revert point of an open EVM frame is kept. It is one of these
-    /// snapshots only if the work took the first snapshot of the frame: on the
-    /// paths that reach this, a cross-runtime transfer took one before, so all
-    /// of them are released.
-    pub fn release_snapshots_from<Host>(
+    /// savepoints only if the work opened the first savepoint of the frame:
+    /// on the paths that reach this, a cross-runtime transfer opened one
+    /// before, so all of them are released.
+    pub fn release_savepoints_from<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         watermark: usize,
-    ) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
+    ) -> Result<(), SnapshotError> {
         let height = if self.is_frame_revert_point(watermark) {
             watermark.saturating_add(1)
         } else {
             watermark
         };
-        self.release_to(host, height)
+        self.release_to(rk, height)
     }
 
-    /// Undo work that failed after taking snapshots since `watermark` (a
-    /// [`Self::snapshot_count`]): restore the world state from the first of
-    /// them, and release them. Nothing is restored if the work took none.
+    /// Undo work that failed after opening savepoints since `watermark` (a
+    /// [`Self::savepoint_count`]): restore the accounts of `rk` from the
+    /// first of them, and release them. Nothing is restored if the work
+    /// opened none.
     ///
-    /// As in [`Self::release_snapshots_from`], the revert point of an open EVM
-    /// frame is restored from but kept.
-    pub fn revert_snapshots_from<Host>(
+    /// As in [`Self::release_savepoints_from`], the revert point of an open
+    /// EVM frame is restored from but kept.
+    pub fn revert_savepoints_from<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         watermark: usize,
-    ) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
-        if self.snapshots.len() <= watermark {
+    ) -> Result<(), SnapshotError> {
+        if self.savepoints <= watermark {
             return Ok(());
         }
-        self.release_to(host, watermark.saturating_add(1))?;
+        self.release_to(rk, watermark.saturating_add(1))?;
         if self.is_frame_revert_point(watermark) {
-            if let Some(snapshot) = self.snapshots.last() {
-                host.store_copy(&snapshot.snapshot_path, &snapshot.from_path)?;
-            }
-            Ok(())
+            rk.tez_accounts_restore_top()
         } else {
-            self.rollback(host)
+            self.rollback(rk)
         }
     }
 
-    // Called by Michelson CRAC logic.
-    //
-    // Removes snapshots taken after checkpoint_index, then restores durable
-    // storage from the snapshot at checkpoint_index. The revert target is
-    // recovered from the snapshot itself.
-    pub fn checkpoint_revert<Host>(
-        &mut self,
-        host: &mut Host,
-        checkpoint_index: usize,
-    ) -> Result<(), RuntimeError>
-    where
-        Host: StorageV1,
-    {
-        self.release_to(host, checkpoint_index + 1)?;
-        self.rollback(host)
+    /// Whether the savepoint at `index` is the revert point of the open EVM
+    /// frame, which [`Self::revert_frame`] restores: it must outlive the work
+    /// that opened it.
+    fn is_frame_revert_point(&self, index: usize) -> bool {
+        self.external_checkpoints
+            .last()
+            .is_some_and(|frame| frame.savepoint_watermark == index)
     }
 
-    /// Release the snapshots above the `height` oldest, keeping the writes
-    /// made since. Releases nothing if at most `height` snapshots are held.
-    fn release_to<Host: StorageV1>(
+    /// Number of savepoints open on the snapshots enclosing the accounts
+    /// snapshot of `rk`, e.g. the transaction's while `rk` is the mirror of a
+    /// Tezos operation batch.
+    ///
+    /// `self.savepoints` counts the savepoints open across every snapshot the
+    /// journal drives, oldest snapshot first, while the snapshot of `rk` holds
+    /// only its own, the top ones. The difference is what the enclosing
+    /// snapshots hold: 0 for the outermost one.
+    ///
+    /// Fails `UntrackedSavepoints` if the snapshot of `rk` holds more
+    /// savepoints than the journal counts: the count is out of sync, and
+    /// every index, watermark and release derived from it would be wrong.
+    fn enclosing_savepoints<Host: KeySpaceLoader>(
+        &self,
+        rk: &RuntimeKeyspaces<'_, Host>,
+    ) -> Result<usize, SnapshotError> {
+        let held = rk.tez_accounts_snapshot().len();
+        self.savepoints
+            .checked_sub(held)
+            .ok_or(SnapshotError::UntrackedSavepoints {
+                held,
+                tracked: self.savepoints,
+            })
+    }
+
+    /// Release the savepoints above the `height` oldest, keeping their
+    /// writes.
+    ///
+    /// `height` may be one above the savepoints held: a frame that opened
+    /// no savepoint keeps the one above the top for its parent, and there
+    /// is nothing to release. Fails `ReleaseAboveHeight` if it is higher:
+    /// the caller asks to keep savepoints that no longer exist. Fails
+    /// `NoSavepoint` if it is below the savepoints of the enclosing
+    /// snapshots: those cannot be released through `rk`.
+    fn release_to<Host: KeySpaceLoader>(
         &mut self,
-        host: &mut Host,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
         height: usize,
-    ) -> Result<(), RuntimeError> {
-        let height = height.min(self.snapshots.len());
-        for snapshot in self.snapshots.drain(height..) {
-            host.store_delete(&snapshot.snapshot_path)?;
+    ) -> Result<(), SnapshotError> {
+        // Nothing above `height` to release, e.g. for a frame that opened no
+        // savepoint: the snapshot is left untouched.
+        if height >= self.savepoints {
+            return if height > self.savepoints + 1 {
+                Err(SnapshotError::ReleaseAboveHeight {
+                    height,
+                    len: self.savepoints,
+                })
+            } else {
+                Ok(())
+            };
         }
+        let enclosing = self.enclosing_savepoints(rk)?;
+        if height < enclosing {
+            return Err(SnapshotError::NoSavepoint);
+        }
+        rk.tez_accounts_release_to(height - enclosing)?;
+        self.savepoints = enclosing + rk.tez_accounts_snapshot().len();
         Ok(())
     }
 
-    /// Restore durable storage from the top snapshot, and release it.
-    /// Restores nothing if no snapshot is held.
-    fn rollback<Host: StorageV1>(&mut self, host: &mut Host) -> Result<(), RuntimeError> {
-        if let Some(snapshot) = self.snapshots.pop() {
-            host.store_move(&snapshot.snapshot_path, &snapshot.from_path)?;
-        }
+    /// Restore the accounts of `rk` from the top savepoint, and release it.
+    fn rollback<Host: KeySpaceLoader>(
+        &mut self,
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+    ) -> Result<(), SnapshotError> {
+        let enclosing = self.enclosing_savepoints(rk)?;
+        rk.tez_accounts_rollback()?;
+        self.savepoints = enclosing + rk.tez_accounts_snapshot().len();
         Ok(())
     }
 }
@@ -815,330 +899,343 @@ impl MichelsonJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_evm_runtime::safe_storage::SafeStorage;
+    use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
+    use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
-    fn world_path() -> OwnedPath {
-        OwnedPath::try_from("/world".to_string()).unwrap()
+    /// The single key the tests write in the accounts.
+    const DATA: Key = Key::from_static(b"/data");
+
+    /// Load the keyspaces, whose accounts snapshot the savepoints go on.
+    fn start_world(host: &mut MockKernelHost) -> MockRuntimeKeyspaces<'_> {
+        RuntimeKeyspaces::init(host).unwrap()
     }
 
-    fn write_data(host: &mut MockHost, path: &OwnedPath, data: &[u8]) {
-        host.store_write(path, data, 0).unwrap();
+    fn write_data<Host: KeySpaceLoader>(
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+        data: &[u8],
+    ) {
+        rk.tez_accounts_mut().set(&DATA, data).unwrap();
     }
 
-    fn read_data(host: &MockHost, path: &OwnedPath) -> Vec<u8> {
-        host.store_read(path, 0, 1024).unwrap()
+    fn read_data<Host: KeySpaceLoader>(rk: &RuntimeKeyspaces<'_, Host>) -> Vec<u8> {
+        rk.tez_accounts().get(&DATA).unwrap()
     }
 
-    fn has_snap(host: &MockHost, i: usize, world: &OwnedPath) -> bool {
-        let path = indexed_path(i, world).unwrap();
-        host.store_has(&path).map(|v| v.is_some()).unwrap_or(false)
+    /// Whether the backup of savepoint `i` is held.
+    fn has_snap(rk: &MockRuntimeKeyspaces<'_>, i: usize) -> bool {
+        let path = OwnedPath::try_from(format!("/__savepoint/{i}/tez/tez_accounts/data"))
+            .unwrap();
+        rk.host().store_has(&path).unwrap().is_some()
     }
 
     // US-1: EVM(A), Mich(B), FAILWITH
     // B reverts its own changes, A catches and sees the pre-B state
     #[test]
     fn test_us1_evm_calls_mich_failwith() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters: watermark=0, no snapshots
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
         // B FAILWITH: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, idx_b).unwrap();
+        journal.checkpoint_revert(&mut rk, idx_b).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
 
         // A catches: no snapshots in A's frame, commit is noop
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     // US-2: EVM(A), Mich(B), Mich(C), Mich(D), FAILWITH
     // D fails, C and B propagate: native Michelson all-or-nothing, A catches
     #[test]
     fn test_us2_evm_calls_deep_mich_chain_all_revert() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters: watermark=0
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
         // C starts: snap 1 captures vb, C writes vc
-        let idx_c = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
+        let idx_c = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
         // D starts: snap 2 captures vc, D writes vd
-        let idx_d = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vd");
+        let idx_d = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vd");
 
         // D FAILWITH: snap 2 consumed, world restored to vc
-        journal.checkpoint_revert(&mut host, idx_d).unwrap();
-        assert_eq!(read_data(&host, &world), b"vc");
+        journal.checkpoint_revert(&mut rk, idx_d).unwrap();
+        assert_eq!(read_data(&rk), b"vc");
 
         // C propagates: snap 1 consumed, world restored to vb
-        journal.checkpoint_revert(&mut host, idx_c).unwrap();
-        assert_eq!(read_data(&host, &world), b"vb");
+        journal.checkpoint_revert(&mut rk, idx_c).unwrap();
+        assert_eq!(read_data(&rk), b"vb");
 
         // B propagates: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, idx_b).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
+        journal.checkpoint_revert(&mut rk, idx_b).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
 
         // A catches: no snapshots remain, commit is noop
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
-        assert!(!has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
-        assert!(!has_snap(&host, 2, &world));
+        assert!(!has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
+        assert!(!has_snap(&rk, 2));
     }
 
     // US-3: EVM(A), Mich(B), EVM(C, try-catch), Mich(D), FAILWITH
     // D fails, C catches and commits, B is unaffected, A commits
     #[test]
     fn test_us3_mich_nested_in_inner_evm_failwith_caught() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters: watermark=0
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
 
         // C enters: watermark=1 (snap 0 exists)
         journal.push_external_checkpoint();
 
         // D starts: snap 1 captures vb, D writes vd
-        let idx_d = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vd");
+        let idx_d = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vd");
         // D FAILWITH: snap 1 consumed, world restored to vb
-        journal.checkpoint_revert(&mut host, idx_d).unwrap();
-        assert_eq!(read_data(&host, &world), b"vb");
+        journal.checkpoint_revert(&mut rk, idx_d).unwrap();
+        assert_eq!(read_data(&rk), b"vb");
 
         // C catches: sub-call (A still on stack), drains snaps[2..], nothing to drain
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
         // snap 0 from B is intact
-        assert!(has_snap(&host, 0, &world));
+        assert!(has_snap(&rk, 0));
 
         // B commits: snaps above idx_b drained (none), snap 0 remains
-        journal.checkpoint_commit(&mut host, idx_b).unwrap();
+        journal.checkpoint_commit(&mut rk, idx_b).unwrap();
 
         // A commits: outermost, snap 0 deleted
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
-        assert!(!has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"vb");
+        assert!(!has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"vb");
     }
 
     // US-4: Mich(A), EVM(B, no catch), Mich(C), FAILWITH
     // C reverts, B's EVM revert is noop on the journal, A reverts all
     #[test]
     fn test_us4_mich_outer_evm_no_catch_mich_failwith_all_revert() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A starts: snap 0 captures v0, A writes va
-        let idx_a = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"va");
+        let idx_a = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"va");
 
         // B enters: watermark=1 (snap 0 exists)
         journal.push_external_checkpoint();
 
         // C starts: snap 1 captures va, C writes vc
-        let idx_c = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
+        let idx_c = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
         // C FAILWITH: snap 1 consumed, world restored to va
-        journal.checkpoint_revert(&mut host, idx_c).unwrap();
-        assert_eq!(read_data(&host, &world), b"va");
+        journal.checkpoint_revert(&mut rk, idx_c).unwrap();
+        assert_eq!(read_data(&rk), b"va");
 
         // B has no catch: revert_frame is noop (no snaps at watermark or above remain)
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"va");
-        assert!(has_snap(&host, 0, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"va");
+        assert!(has_snap(&rk, 0));
 
         // A propagates failure: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, idx_a).unwrap();
+        journal.checkpoint_revert(&mut rk, idx_a).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // US-5: EVM(A, try-catch): Mich(B) succeeds, then EVM op fails
     // try block reverts: B's pending snapshot is consumed, catch runs on clean state
     #[test]
     fn test_us5_evm_try_mich_succeeds_then_evm_op_fails() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters try block: watermark=0
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb, B commits (snap 0 remains)
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx_b).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_b).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // EVM op fails: try block reverts, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // US-6: EVM(A), Mich(B), EVM(C), Mich(D), EVM(E), Mich(F), FAILWITH
     // only F reverts, E's revert is noop, C is sub-call (snap 1 deferred to A's commit)
     #[test]
     fn test_us6_deep_alternating_stack_innermost_failwith() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters: watermark=0
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb, B commits
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx_b).unwrap();
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_b).unwrap();
 
         // C enters: watermark=1
         journal.push_external_checkpoint();
 
         // D starts: snap 1 captures vb, D writes vd, D commits
-        let idx_d = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vd");
-        journal.checkpoint_commit(&mut host, idx_d).unwrap();
+        let idx_d = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vd");
+        journal.checkpoint_commit(&mut rk, idx_d).unwrap();
 
         // E enters: watermark=2
         journal.push_external_checkpoint();
 
         // F starts: snap 2 captures vd, F writes vf
-        let idx_f = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vf");
+        let idx_f = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vf");
         // F FAILWITH: snap 2 consumed, world restored to vd
-        journal.checkpoint_revert(&mut host, idx_f).unwrap();
-        assert_eq!(read_data(&host, &world), b"vd");
+        journal.checkpoint_revert(&mut rk, idx_f).unwrap();
+        assert_eq!(read_data(&rk), b"vd");
 
         // E reverts: noop (no snaps at watermark=2 or above remain)
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"vd");
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"vd");
 
         // snaps 0 and 1 are intact: only F's snap was consumed
-        assert!(has_snap(&host, 0, &world));
-        assert!(has_snap(&host, 1, &world));
+        assert!(has_snap(&rk, 0));
+        assert!(has_snap(&rk, 1));
 
         // C commits: sub-call (A still on stack), snap 1 deferred to A's commit
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // A commits: outermost, snaps 0 and 1 deleted
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
 
-        assert_eq!(read_data(&host, &world), b"vd");
+        assert_eq!(read_data(&rk), b"vd");
     }
 
     // US-7: EVM(A), Mich(B), EVM(C): B and C succeed (pending), then A reverts
     // B's committed snapshot is consumed by A's revert, neither B nor C takes effect
     #[test]
     fn test_us7_mich_evm_succeed_then_outer_evm_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A enters: watermark=0
         journal.push_external_checkpoint();
 
         // B starts: snap 0 captures v0, B writes vb, B commits
-        let idx_b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx_b).unwrap();
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_b).unwrap();
 
         // C enters: watermark=1, no Michelson CRACs
         journal.push_external_checkpoint();
         // C commits: sub-call (A still on stack), drains snaps[2..], nothing to drain
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
         // snap 0 from B is still present
-        assert!(has_snap(&host, 0, &world));
+        assert!(has_snap(&rk, 0));
 
         // A reverts: outermost, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // US-8: Mich(A), EVM(B), Mich(C) succeed, then Mich(A), EVM(D) REVERT
     // all-or-nothing: A reverts everything including B and C's committed changes
     #[test]
     fn test_us8_mich_outer_second_evm_call_reverts_all() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A starts: snap 0 captures v0, A writes va
-        let idx_a = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"va");
+        let idx_a = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"va");
 
         // B enters: watermark=1
         journal.push_external_checkpoint();
 
         // C starts: snap 1 captures va, C writes vc, C commits
-        let idx_c = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx_c).unwrap();
+        let idx_c = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx_c).unwrap();
 
         // B commits: outermost EVM frame, snap 1 deleted
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 1, &world));
-        assert!(has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"vc");
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 1));
+        assert!(has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"vc");
 
         // A makes a second EVM call: D enters, no Michelson CRACs
         journal.push_external_checkpoint();
         // D reverts: outermost, noop (no snaps at watermark=1 or above)
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"vc");
-        assert!(has_snap(&host, 0, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"vc");
+        assert!(has_snap(&rk, 0));
 
         // A reverts all-or-nothing: snap 0 consumed, world restored to v0
-        journal.checkpoint_revert(&mut host, idx_a).unwrap();
+        journal.checkpoint_revert(&mut rk, idx_a).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // US-9: EVM(top) -> EVM(1) ~CRAC~> Mich -> REVERT
@@ -1146,11 +1243,11 @@ mod tests {
     // The CRAC snapshot must survive EVM(1)'s sub-call commit so EVM(top) can restore.
     #[test]
     fn test_us9_evm_subcall_crac_commits_then_outer_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // EVM(top) enters
         journal.push_external_checkpoint();
@@ -1159,127 +1256,127 @@ mod tests {
         journal.push_external_checkpoint();
 
         // Michelson CRAC inside EVM(1): snap 0 captures v0, writes vb, commits
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // EVM(1) commits: sub-call (EVM(top) is still on the stack)
         // snap 0 must survive for EVM(top)'s potential revert
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // EVM(top) reverts: outermost, snap 0 consumed, world restored to v0
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // edge case: revert with no snapshots is a noop
     #[test]
     fn test_edge_revert_on_empty_journal() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     // edge case: external frame with no Michelson CRACs, revert is noop
     #[test]
     fn test_edge_external_frame_no_cracs_revert_noop() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // a CRAC committed outside the frame: snap 0 remains
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
 
         // frame with no CRACs: watermark=1, revert is noop
         journal.push_external_checkpoint();
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v1");
-        assert!(has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v1");
+        assert!(has_snap(&rk, 0));
     }
 
     // edge case: external frame with no Michelson CRACs, commit is noop
     #[test]
     fn test_edge_external_frame_no_cracs_commit_noop() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // a CRAC committed outside the frame: snap 0 remains
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
 
         // frame with no CRACs: watermark=1, commit is noop
         journal.push_external_checkpoint();
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v1");
-        assert!(has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v1");
+        assert!(has_snap(&rk, 0));
     }
 
     // edge case: commit and revert scoped to watermark do not touch earlier snapshots
     #[test]
     fn test_edge_watermark_isolates_earlier_snapshots() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // two CRACs committed before the frame: snaps 0 and 1 belong to an outer context
-        let idx0 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal.checkpoint_commit(&mut host, idx0).unwrap();
+        let idx0 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.checkpoint_commit(&mut rk, idx0).unwrap();
 
-        let idx1 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v2");
-        journal.checkpoint_commit(&mut host, idx1).unwrap();
+        let idx1 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v2");
+        journal.checkpoint_commit(&mut rk, idx1).unwrap();
 
         // inner frame adds one more CRAC: snap 2 belongs to this frame
         journal.push_external_checkpoint();
-        let idx2 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v3");
-        journal.checkpoint_commit(&mut host, idx2).unwrap();
+        let idx2 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v3");
+        journal.checkpoint_commit(&mut rk, idx2).unwrap();
 
         // commit: outermost, only snap 2 deleted, snaps 0 and 1 untouched
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
-        assert!(!has_snap(&host, 2, &world));
-        assert!(has_snap(&host, 0, &world));
-        assert!(has_snap(&host, 1, &world));
-        assert_eq!(read_data(&host, &world), b"v3");
+        assert!(!has_snap(&rk, 2));
+        assert!(has_snap(&rk, 0));
+        assert!(has_snap(&rk, 1));
+        assert_eq!(read_data(&rk), b"v3");
 
         // inner frame adds another CRAC: snap 2 again (index reused after deletion)
         journal.push_external_checkpoint();
-        let idx2b = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v4");
-        journal.checkpoint_commit(&mut host, idx2b).unwrap();
+        let idx2b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v4");
+        journal.checkpoint_commit(&mut rk, idx2b).unwrap();
 
         // revert: outermost, only snap 2 consumed, snaps 0 and 1 untouched, world restored to v3
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
-        assert!(!has_snap(&host, 2, &world));
-        assert!(has_snap(&host, 0, &world));
-        assert!(has_snap(&host, 1, &world));
-        assert_eq!(read_data(&host, &world), b"v3");
+        assert!(!has_snap(&rk, 2));
+        assert!(has_snap(&rk, 0));
+        assert!(has_snap(&rk, 1));
+        assert_eq!(read_data(&rk), b"v3");
     }
 
     // US-9b: EVM(top) -> EVM(1) ~CRAC~> Mich -> COMMIT (complement of US-9)
@@ -1287,28 +1384,28 @@ mod tests {
     // Changes must persist; the deferred snapshot is deleted at outermost commit.
     #[test]
     fn test_us9b_evm_subcall_crac_commits_then_outer_commits() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // EVM(1) commits: sub-call, snap 0 deferred
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // EVM(top) commits: outermost, snap 0 deleted, vb persists
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"vb");
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"vb");
     }
 
     // EVM(top) -> EVM(B1) ~CRAC~> [commits] -> EVM(B2) ~CRAC~> [commits] -> REVERT
@@ -1316,66 +1413,66 @@ mod tests {
     // oldest (snap 0, v0) and delete the later one (snap 1).
     #[test]
     fn test_sequential_subcalls_with_cracs_outer_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
 
         // B1: CRAC v0->vb, commits as sub-call
         journal.push_external_checkpoint();
-        let idx_b1 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx_b1).unwrap();
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        let idx_b1 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_b1).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // B2: CRAC vb->vc, commits as sub-call
         journal.push_external_checkpoint();
-        let idx_b2 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx_b2).unwrap();
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
-        assert!(has_snap(&host, 1, &world));
+        let idx_b2 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx_b2).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
+        assert!(has_snap(&rk, 1));
 
         // EVM(top) reverts: snap 1 deleted, snap 0 restores v0
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
     }
 
     // Same as above but outer commits: both sub-calls' changes persist.
     #[test]
     fn test_sequential_subcalls_with_cracs_outer_commits() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
 
         journal.push_external_checkpoint();
-        let idx_b1 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx_b1).unwrap();
-        journal.commit_frame(&mut host).unwrap();
+        let idx_b1 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_b1).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
         journal.push_external_checkpoint();
-        let idx_b2 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx_b2).unwrap();
-        journal.commit_frame(&mut host).unwrap();
+        let idx_b2 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx_b2).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
         // EVM(top) commits: all snaps deleted, vc persists
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
-        assert_eq!(read_data(&host, &world), b"vc");
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
+        assert_eq!(read_data(&rk), b"vc");
     }
 
     // EVM(top) -> EVM(B) with two CRACs inside -> B commits -> REVERT
@@ -1383,146 +1480,146 @@ mod tests {
     // (first CRAC, at watermark) for top's revert.
     #[test]
     fn test_subcall_two_cracs_outer_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx1 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx1).unwrap();
+        let idx1 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx1).unwrap();
 
-        let idx2 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx2).unwrap();
+        let idx2 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx2).unwrap();
 
         // B commits: sub-call, snap 1 pruned, snap 0 deferred
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
 
         // EVM(top) reverts: snap 0 restores v0
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // Same as above but outer commits: both CRACs' net effect (vc) persists.
     #[test]
     fn test_subcall_two_cracs_outer_commits() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx1 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx1).unwrap();
+        let idx1 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx1).unwrap();
 
-        let idx2 = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx2).unwrap();
+        let idx2 = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx2).unwrap();
 
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"vc");
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"vc");
     }
 
     // EVM(A) -> EVM(B) -> EVM(C) ~CRAC~> [commits] -> C commits -> B commits -> A reverts
     // Three-level nesting: snap 0 propagates up through two sub-call commits.
     #[test]
     fn test_three_nested_evm_frames_outer_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vc");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
 
         // C commits: sub-call (B, A still on stack)
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // B commits: sub-call (A still on stack)
-        journal.commit_frame(&mut host).unwrap();
-        assert!(has_snap(&host, 0, &world));
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(has_snap(&rk, 0));
 
         // A reverts: outermost, snap 0 restores v0
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
     }
 
     // EVM(top) -> EVM(B) ~CRAC~> [B reverts via revert_frame] -> EVM(top) reverts
     // B's revert consumes the snapshot; top's revert finds nothing and is a noop.
     #[test]
     fn test_subcall_reverts_then_outer_reverts() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
 
         // B reverts: restores v0, snap 0 consumed
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert!(!has_snap(&host, 0, &world));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
+        assert!(!has_snap(&rk, 0));
 
         // EVM(top) reverts: no snaps, noop
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     // EVM(top) -> EVM(B) ~CRAC~> [B reverts] -> EVM(top) commits
     // B reverted its CRAC; top commits with no net Michelson change.
     #[test]
     fn test_subcall_reverts_then_outer_commits() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         journal.push_external_checkpoint();
         journal.push_external_checkpoint();
 
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"vb");
-        journal.checkpoint_commit(&mut host, idx).unwrap();
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx).unwrap();
 
         // B reverts: snap 0 consumed, world back to v0
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
 
         // EVM(top) commits: no snaps to clean up, v0 persists
-        journal.commit_frame(&mut host).unwrap();
-        assert!(!has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"v0");
+        journal.commit_frame(&mut rk).unwrap();
+        assert!(!has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     /// Build a distinguishable dummy receipt whose top-level destination
@@ -1610,14 +1707,14 @@ mod tests {
     //   A commits → receipts = [0, 2]; backtracked = [1]
     #[test]
     fn test_revert_frame_migrates_receipts_to_backtracked() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A checkpoint
         journal.push_external_checkpoint();
-        let _idx_a = journal.checkpoint(&mut host, &world).unwrap();
+        let _idx_a = journal.checkpoint(&mut rk).unwrap();
         journal.push_pending_crac_receipt(dummy_receipt(0));
 
         // B checkpoint
@@ -1627,7 +1724,7 @@ mod tests {
         assert_eq!(journal.backtracked_crac_receipts.len(), 0);
 
         // B reverts — receipt 1 migrated to backtracked, receipt 0 kept.
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 1);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
@@ -1641,8 +1738,8 @@ mod tests {
 
         // A commits — pending receipts preserved; backtracked list is
         // NOT subject to commit/revert so receipt 1 remains.
-        journal.checkpoint_commit(&mut host, 0).unwrap();
-        journal.commit_frame(&mut host).unwrap();
+        journal.checkpoint_commit(&mut rk, 0).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 2);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[1].1), 2);
@@ -1656,22 +1753,22 @@ mod tests {
     // further revert").
     #[test]
     fn test_revert_frame_does_not_re_revert_backtracked() {
-        let mut host = MockHost::default();
-        let world = world_path();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
         // A checkpoint
         journal.push_external_checkpoint();
-        let _idx_a = journal.checkpoint(&mut host, &world).unwrap();
+        let _idx_a = journal.checkpoint(&mut rk).unwrap();
         // B checkpoint — push and revert: B's receipt migrates.
         journal.push_external_checkpoint();
         journal.push_pending_crac_receipt(dummy_receipt(7));
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
 
         // A reverts as well: must not affect the already-migrated entry.
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.backtracked_crac_receipts.len(), 1);
         assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 7);
     }
@@ -1880,7 +1977,8 @@ mod tests {
     // reverted frame are released for reuse.
     #[test]
     fn test_origination_index_rolls_back_on_revert_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         // Outer EVM frame enters at index 0.
         journal.push_external_checkpoint();
@@ -1889,7 +1987,7 @@ mod tests {
         journal.next_origination_index();
         assert_eq!(journal.origination_index(), 2);
         // Outer frame reverts: index must drop back to 0.
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.origination_index(), 0);
     }
 
@@ -1898,12 +1996,13 @@ mod tests {
     // index, never re-using already-burned KT1 slots.
     #[test]
     fn test_origination_index_persists_on_commit_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.next_origination_index();
         journal.next_origination_index();
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.origination_index(), 2);
     }
 
@@ -1911,7 +2010,8 @@ mod tests {
     // frame's increments; the outer's prior increments survive.
     #[test]
     fn test_origination_index_nested_revert_only_inner() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         // Outer frame: outer CRAC originates 2.
         journal.push_external_checkpoint();
@@ -1924,10 +2024,10 @@ mod tests {
         journal.next_origination_index();
         assert_eq!(journal.origination_index(), 5);
         // Inner reverts: index back to 2 (outer's tail), NOT to 0.
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.origination_index(), 2);
         // Outer commits: index stays at 2.
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.origination_index(), 2);
     }
 
@@ -1971,7 +2071,8 @@ mod tests {
     // internal-operation cap.
     #[test]
     fn test_internal_operation_counter_persists_on_revert_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         // Outer EVM frame enters at counter 0.
         journal.push_external_checkpoint();
@@ -1979,7 +2080,7 @@ mod tests {
         journal.set_internal_operation_counter(2);
         assert_eq!(journal.internal_operation_counter(), 2);
         // Outer frame reverts: counter stays at 2.
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert_eq!(journal.internal_operation_counter(), 2);
     }
 
@@ -1988,11 +2089,12 @@ mod tests {
     // never re-using an already-assigned replay identity.
     #[test]
     fn test_internal_operation_counter_persists_on_commit_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.set_internal_operation_counter(2);
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.internal_operation_counter(), 2);
     }
 
@@ -2023,128 +2125,122 @@ mod tests {
     // Outside an EVM frame, nothing else would delete the snapshots: they are
     // all released, and the world state is left as written.
     #[test]
-    fn release_snapshots_from_deletes_them_outside_an_evm_frame() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn release_savepoints_from_deletes_them_outside_an_evm_frame() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
-        let watermark = journal.snapshot_count();
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal
-            .release_snapshots_from(&mut host, watermark)
-            .unwrap();
+        let watermark = journal.savepoint_count();
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.release_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(journal.snapshot_count(), 0);
-        assert!(!has_snap(&host, 0, &world));
-        assert_eq!(read_data(&host, &world), b"v1");
+        assert_eq!(journal.savepoint_count(), 0);
+        assert!(!has_snap(&rk, 0));
+        assert_eq!(read_data(&rk), b"v1");
     }
 
     // Inside an EVM frame whose first snapshot the work took, that snapshot
     // is kept so the frame can still revert through it, and later ones are
     // released.
     #[test]
-    fn release_snapshots_from_keeps_the_frame_revert_point() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn release_savepoints_from_keeps_the_frame_revert_point() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
         journal.push_external_checkpoint();
 
-        let watermark = journal.snapshot_count();
-        journal.checkpoint(&mut host, &world).unwrap();
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal
-            .release_snapshots_from(&mut host, watermark)
-            .unwrap();
+        let watermark = journal.savepoint_count();
+        journal.checkpoint(&mut rk).unwrap();
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.release_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(journal.snapshot_count(), 1);
-        assert!(has_snap(&host, 0, &world));
-        assert!(!has_snap(&host, 1, &world));
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     // The usual case inside an EVM frame: a cross-runtime transfer took the
     // frame's revert point first, so all the work's snapshots are released.
     #[test]
-    fn release_snapshots_from_releases_all_after_the_frame_revert_point() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn release_savepoints_from_releases_all_after_the_frame_revert_point() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
         journal.push_external_checkpoint();
-        journal.checkpoint(&mut host, &world).unwrap();
+        journal.checkpoint(&mut rk).unwrap();
 
-        let watermark = journal.snapshot_count();
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal
-            .release_snapshots_from(&mut host, watermark)
-            .unwrap();
+        let watermark = journal.savepoint_count();
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.release_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(journal.snapshot_count(), 1);
-        assert!(!has_snap(&host, 1, &world));
-        journal.revert_frame(&mut host).unwrap();
-        assert_eq!(read_data(&host, &world), b"v0");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(!has_snap(&rk, 1));
+        journal.revert_frame(&mut rk).unwrap();
+        assert_eq!(read_data(&rk), b"v0");
     }
 
     // A failed work is undone without relying on an enclosing rollback.
     #[test]
-    fn revert_snapshots_from_restores_the_state_before_the_work() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn revert_savepoints_from_restores_the_state_before_the_work() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
 
-        let watermark = journal.snapshot_count();
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+        let watermark = journal.savepoint_count();
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.revert_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert_eq!(journal.snapshot_count(), 0);
-        assert!(!has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert_eq!(journal.savepoint_count(), 0);
+        assert!(!has_snap(&rk, 0));
     }
 
     // A work that failed before taking any snapshot must not restore one taken
     // by its caller.
     #[test]
-    fn revert_snapshots_from_without_snapshot_leaves_the_caller_one() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn revert_savepoints_from_without_savepoint_leaves_the_caller_one() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
+        write_data(&mut rk, b"v0");
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
 
-        let watermark = journal.snapshot_count();
-        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+        let watermark = journal.savepoint_count();
+        journal.revert_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v1");
-        assert_eq!(journal.snapshot_count(), 1);
+        assert_eq!(read_data(&rk), b"v1");
+        assert_eq!(journal.savepoint_count(), 1);
     }
 
     // Undoing a work that took the frame's first snapshot restores from it
     // but keeps it, so the frame can still revert through it.
     #[test]
-    fn revert_snapshots_from_keeps_the_frame_revert_point() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn revert_savepoints_from_keeps_the_frame_revert_point() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
-        write_data(&mut host, &world, b"v0");
+        write_data(&mut rk, b"v0");
         journal.push_external_checkpoint();
 
-        let watermark = journal.snapshot_count();
-        journal.checkpoint(&mut host, &world).unwrap();
-        write_data(&mut host, &world, b"v1");
-        journal.revert_snapshots_from(&mut host, watermark).unwrap();
+        let watermark = journal.savepoint_count();
+        journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"v1");
+        journal.revert_savepoints_from(&mut rk, watermark).unwrap();
 
-        assert_eq!(read_data(&host, &world), b"v0");
-        assert_eq!(journal.snapshot_count(), 1);
-        assert!(has_snap(&host, 0, &world));
+        assert_eq!(read_data(&rk), b"v0");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(has_snap(&rk, 0));
     }
 
     // Only the originations pushed since the watermark are taken: the earlier
@@ -2169,11 +2265,12 @@ mod tests {
 
     #[test]
     fn test_pending_alias_originations_roll_back_on_revert_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.push_pending_alias_origination_internal(dummy_alias_internal());
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
         assert!(journal
             .take_pending_alias_origination_internals()
             .is_empty());
@@ -2181,25 +2278,27 @@ mod tests {
 
     #[test]
     fn test_pending_alias_originations_persist_on_commit_frame() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.push_pending_alias_origination_internal(dummy_alias_internal());
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
     }
 
     #[test]
     fn test_pending_alias_originations_nested_revert_only_inner() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(dummy_hash(0x42));
         journal.push_external_checkpoint();
         journal.push_pending_alias_origination_internal(dummy_alias_internal());
         journal.push_external_checkpoint();
         journal.push_pending_alias_origination_internal(dummy_alias_internal());
         journal.push_pending_alias_origination_internal(dummy_alias_internal());
-        journal.revert_frame(&mut host).unwrap();
-        journal.commit_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
         assert_eq!(journal.take_pending_alias_origination_internals().len(), 1);
     }
 
@@ -2219,7 +2318,8 @@ mod tests {
     /// guards the derived drain, this one the drain at the source.
     #[test]
     fn revert_frame_with_a_receipt_count_past_the_end_does_not_trap() {
-        let mut host = MockHost::default();
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
         journal.push_pending_crac_receipt(dummy_receipt(0));
@@ -2230,7 +2330,7 @@ mod tests {
         // the recorded count now points past the end.
         journal.pending_crac_receipts.clear();
 
-        journal.revert_frame(&mut host).unwrap();
+        journal.revert_frame(&mut rk).unwrap();
 
         assert!(
             journal.pending_crac_receipts.is_empty(),
@@ -2242,30 +2342,270 @@ mod tests {
         );
     }
 
-    /// `commit_frame`'s outermost-frame branch used to pass its watermark raw,
-    /// so it trapped on the same imbalance the other branch already guarded.
+    /// `commit_frame`'s outermost-frame branch must not trap on a watermark
+    /// past the open savepoints.
     ///
-    /// Sequence: a snapshot is taken, a frame opens over it (watermark = 1), the
-    /// snapshot is consumed by a revert (length back to 0), then the frame
-    /// commits with an empty checkpoint stack — `drain(1..)` over no snapshots.
+    /// Sequence: a savepoint is opened, a frame opens over it (watermark = 1),
+    /// the savepoint is consumed by a revert (count back to 0), then the frame
+    /// commits with an empty checkpoint stack — over no savepoints.
     #[test]
-    fn commit_frame_with_a_snapshot_watermark_past_the_end_does_not_trap() {
-        let mut host = MockHost::default();
-        let world = world_path();
+    fn commit_frame_with_a_savepoint_watermark_past_the_end_does_not_trap() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
         let mut journal = MichelsonJournal::new(OperationHash::default());
 
-        write_data(&mut host, &world, b"v0");
-        let idx = journal.checkpoint(&mut host, &world).unwrap();
-        journal.push_external_checkpoint(); // snapshot_watermark = 1
-        journal.checkpoint_revert(&mut host, idx).unwrap(); // snapshots back to 0
+        write_data(&mut rk, b"v0");
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        journal.push_external_checkpoint(); // savepoint_watermark = 1
+        journal.checkpoint_revert(&mut rk, idx).unwrap(); // savepoints back to 0
 
-        journal.commit_frame(&mut host).unwrap();
+        journal.commit_frame(&mut rk).unwrap();
 
         assert_eq!(
             journal.open_frame_count(),
             0,
-            "the frame was popped; reaching this line at all is the point, the \
-             unclamped drain panicked here"
+            "the frame was popped; reaching this line at all is the point"
         );
+    }
+
+    // A savepoint released already (here by its parent's commit) cannot be
+    // reverted to: the revert fails instead of restoring the savepoint left
+    // on top, and changes nothing.
+    #[test]
+    fn test_checkpoint_revert_released_index_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut rk, b"v0");
+        let idx_a = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"va");
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vb");
+        journal.checkpoint_commit(&mut rk, idx_a).unwrap();
+
+        assert_eq!(
+            journal.checkpoint_revert(&mut rk, idx_b),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(read_data(&rk), b"vb");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(has_snap(&rk, 0));
+    }
+
+    // A savepoint held by an enclosing snapshot cannot be reverted to
+    // through an inner one: the revert fails and leaves the inner
+    // savepoints in place.
+    #[test]
+    fn test_checkpoint_revert_enclosing_index_fails() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut outer, b"v0");
+        let idx_outer = journal.checkpoint(&mut outer).unwrap();
+
+        // The accounts of a mirror, as for a Tezos operation batch.
+        let mut mirror = SafeStorage {
+            host: outer.host_mut(),
+            world_states: vec![],
+        };
+        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        journal.checkpoint(&mut inner).unwrap();
+        write_data(&mut inner, b"inner");
+
+        assert_eq!(
+            journal.checkpoint_revert(&mut inner, idx_outer),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(inner.tez_accounts_snapshot().len(), 1);
+        assert_eq!(journal.savepoint_count(), 2);
+        assert_eq!(read_data(&inner), b"inner");
+
+        journal.release_all_savepoints(&mut inner).unwrap();
+        assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // While the transaction holds a savepoint, a frame reverted on a batch
+    // mirror restores the accounts as they were when the frame started.
+    #[test]
+    fn test_revert_frame_inside_an_enclosing_snapshot() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut outer, b"v0");
+        journal.checkpoint(&mut outer).unwrap();
+
+        // The accounts of a mirror, as for a Tezos operation batch.
+        let mut mirror = SafeStorage {
+            host: outer.host_mut(),
+            world_states: vec![],
+        };
+        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        write_data(&mut inner, b"i0");
+
+        // Watermark 1: savepoint 0 is on the enclosing snapshot.
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut inner).unwrap();
+        write_data(&mut inner, b"ia");
+        journal.checkpoint(&mut inner).unwrap();
+        write_data(&mut inner, b"ib");
+
+        journal.revert_frame(&mut inner).unwrap();
+        assert_eq!(read_data(&inner), b"i0");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(inner.tez_accounts_snapshot().is_empty());
+    }
+
+    // A savepoint released already (here by a commit of an older one)
+    // cannot be committed: the commit fails instead of doing nothing, and
+    // changes nothing.
+    #[test]
+    fn test_checkpoint_commit_released_index_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut rk, b"v0");
+        let idx_a = journal.checkpoint(&mut rk).unwrap();
+        let idx_b = journal.checkpoint(&mut rk).unwrap();
+        let idx_c = journal.checkpoint(&mut rk).unwrap();
+        write_data(&mut rk, b"vc");
+        journal.checkpoint_commit(&mut rk, idx_a).unwrap();
+
+        assert_eq!(
+            journal.checkpoint_commit(&mut rk, idx_b),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(
+            journal.checkpoint_commit(&mut rk, idx_c),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(read_data(&rk), b"vc");
+        assert_eq!(journal.savepoint_count(), 1);
+        assert!(has_snap(&rk, 0));
+    }
+
+    // A savepoint held by an enclosing snapshot cannot be committed
+    // through an inner one: the commit fails and leaves the inner
+    // savepoints in place.
+    #[test]
+    fn test_checkpoint_commit_enclosing_index_fails() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        let idx_outer = journal.checkpoint(&mut outer).unwrap();
+
+        // The accounts of a mirror, as for a Tezos operation batch.
+        let mut mirror = SafeStorage {
+            host: outer.host_mut(),
+            world_states: vec![],
+        };
+        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        journal.checkpoint(&mut inner).unwrap();
+
+        assert_eq!(
+            journal.checkpoint_commit(&mut inner, idx_outer),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(inner.tez_accounts_snapshot().len(), 1);
+        assert_eq!(journal.savepoint_count(), 2);
+
+        journal.release_all_savepoints(&mut inner).unwrap();
+        assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // A frame whose watermark is below the savepoints of the enclosing
+    // snapshot cannot release them through an inner one: the commit fails
+    // instead of releasing only the inner savepoints.
+    #[test]
+    fn test_commit_frame_below_the_enclosing_snapshot_fails() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        // Watermark 0, below the savepoint the enclosing snapshot opens next.
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut outer).unwrap();
+
+        // The accounts of a mirror, as for a Tezos operation batch.
+        let mut mirror = SafeStorage {
+            host: outer.host_mut(),
+            world_states: vec![],
+        };
+        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        journal.checkpoint(&mut inner).unwrap();
+
+        assert_eq!(
+            journal.commit_frame(&mut inner),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(inner.tez_accounts_snapshot().len(), 1);
+        assert_eq!(journal.savepoint_count(), 2);
+
+        journal.release_all_savepoints(&mut inner).unwrap();
+        assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // With a parent frame open, a child frame whose watermark is past the
+    // open savepoints fails to commit instead of clamping the release.
+    //
+    // Sequence: the parent frame opens (watermark 0), a savepoint is opened,
+    // the child frame opens over it (watermark 1), the savepoint is consumed
+    // by a revert (count back to 0), then the child frame commits: it would
+    // keep savepoint 1 for its parent, past the end.
+    #[test]
+    fn test_nested_commit_frame_with_a_watermark_past_the_end_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        journal.push_external_checkpoint(); // parent, savepoint_watermark = 0
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        journal.push_external_checkpoint(); // child, savepoint_watermark = 1
+        journal.checkpoint_revert(&mut rk, idx).unwrap(); // savepoints back to 0
+
+        assert_eq!(
+            journal.commit_frame(&mut rk),
+            Err(SnapshotError::ReleaseAboveHeight { height: 2, len: 0 })
+        );
+        assert_eq!(journal.open_frame_count(), 1);
+        assert_eq!(journal.savepoint_count(), 0);
+    }
+
+    // A savepoint opened on the accounts snapshot behind the journal's back
+    // puts the count out of sync: the functions that derive the enclosing
+    // savepoints from it fail instead of counting from a clamped value, and
+    // the final release still deletes the backups.
+    #[test]
+    fn test_untracked_savepoint_fails() {
+        let mut host = MockKernelHost::default();
+        let mut rk = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+
+        write_data(&mut rk, b"v0");
+        let idx = journal.checkpoint(&mut rk).unwrap();
+        rk.tez_accounts_savepoint().unwrap();
+        write_data(&mut rk, b"va");
+        let untracked = || {
+            Err(SnapshotError::UntrackedSavepoints {
+                held: 2,
+                tracked: 1,
+            })
+        };
+
+        assert_eq!(journal.checkpoint_revert(&mut rk, idx), untracked());
+        assert_eq!(journal.checkpoint_commit(&mut rk, idx), untracked());
+        assert_eq!(read_data(&rk), b"va");
+        assert_eq!(rk.tez_accounts_snapshot().len(), 2);
+        assert_eq!(journal.savepoint_count(), 1);
+
+        assert_eq!(journal.release_all_savepoints(&mut rk), untracked());
+        assert_eq!(read_data(&rk), b"va");
+        assert!(rk.tez_accounts_snapshot().is_empty());
+        assert!(!has_snap(&rk, 0));
+        assert!(!has_snap(&rk, 1));
     }
 }

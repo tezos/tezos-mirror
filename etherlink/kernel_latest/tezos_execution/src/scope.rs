@@ -10,14 +10,15 @@
 //! writes into the mirror too.
 //!
 //! [`CracOperationScope`] borrows a keyspace handle through
-//! [`ScopeRuntimeKeyspace`], while [`OperationScope`] owns the operation
-//! mirror and builds the keyspace handle over it.
+//! [`ScopeRuntimeKeyspace`] and opens a savepoint on the snapshot of its
+//! Michelson accounts, while [`OperationScope`] owns the operation mirror and
+//! builds the keyspace handle over it.
 
 use crate::mir_ctx::TcCtx;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_evm_runtime::snapshot::SnapshotError;
 use tezos_smart_rollup_host::path::OwnedPath;
-use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError};
 use tezos_tezlink::operation_result::OperationError;
@@ -64,10 +65,11 @@ pub enum Close<T> {
 
 /// The scope of the Michelson side of a cross-runtime call.
 ///
-/// Open snapshots a world-state subtree through the journal; close keeps the
-/// writes made under it or restores the subtree. Only [`Self::run`] opens and
-/// closes it, around a body; [`Self::checkpoint_for_parent`] opens one whose
-/// close is left to the enclosing code.
+/// Open checkpoints the Michelson accounts of the keyspace handle through the
+/// journal, opening a savepoint on their snapshot; close keeps the writes made
+/// under it or restores the accounts. Only [`Self::run`] opens and closes it,
+/// around a body; [`Self::checkpoint_for_parent`] opens one whose close is
+/// left to the enclosing code.
 pub struct CracOperationScope<'s, C> {
     ctx: &'s mut C,
     journal: &'s mut TezosXJournal,
@@ -75,15 +77,12 @@ pub struct CracOperationScope<'s, C> {
 }
 
 impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
-    /// Open the scope: snapshot the subtree at `from_path`.
+    /// Open the scope: checkpoint the Michelson accounts.
     fn open(
         ctx: &'s mut C,
         journal: &'s mut TezosXJournal,
-        from_path: &OwnedPath,
-    ) -> Result<Self, RuntimeError> {
-        let index = journal
-            .michelson
-            .checkpoint(ctx.rk_mut().host_mut(), from_path)?;
+    ) -> Result<Self, SnapshotError> {
+        let index = journal.michelson.checkpoint(ctx.rk_mut())?;
         Ok(Self {
             ctx,
             journal,
@@ -91,31 +90,27 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
         })
     }
 
-    /// Close the scope on success: `checkpoint_commit`, which drops the
-    /// snapshots taken under this scope and keeps its own for the enclosing
+    /// Close the scope on success: `checkpoint_commit`, which releases the
+    /// savepoints opened under this scope and keeps its own for the enclosing
     /// EVM frame to revert through.
-    fn commit(self) -> Result<(), RuntimeError> {
+    fn commit(self) -> Result<(), SnapshotError> {
         let Self {
             ctx,
             journal,
             index,
         } = self;
-        journal
-            .michelson
-            .checkpoint_commit(ctx.rk_mut().host_mut(), index)
+        journal.michelson.checkpoint_commit(ctx.rk_mut(), index)
     }
 
-    /// Close the scope on failure: `checkpoint_revert`, restoring the subtree
-    /// as it was at open.
-    fn revert(self) -> Result<(), RuntimeError> {
+    /// Close the scope on failure: `checkpoint_revert`, restoring the accounts
+    /// as they were at open.
+    fn revert(self) -> Result<(), SnapshotError> {
         let Self {
             ctx,
             journal,
             index,
         } = self;
-        journal
-            .michelson
-            .checkpoint_revert(ctx.rk_mut().host_mut(), index)
+        journal.michelson.checkpoint_revert(ctx.rk_mut(), index)
     }
 
     /// The context and the journal, for callees that need both at once.
@@ -123,19 +118,18 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
         (&mut *self.ctx, &mut *self.journal)
     }
 
-    /// Runs `body` under a journal checkpoint of `from_path`, then keeps the
-    /// writes on [`Close::Commit`] or restores `from_path` on [`Close::Revert`]
-    /// or a body error.
+    /// Runs `body` under a journal checkpoint of the Michelson accounts, then
+    /// keeps the writes on [`Close::Commit`] or restores the accounts on
+    /// [`Close::Revert`] or a body error.
     ///
     /// A commit leaves the checkpoint to the enclosing EVM frame, which can
     /// still revert it. A close error takes precedence over the body's result.
-    pub fn run<T, E: From<RuntimeError>>(
+    pub fn run<T, E: From<SnapshotError>>(
         ctx: &'s mut C,
         journal: &'s mut TezosXJournal,
-        from_path: &OwnedPath,
         body: impl FnOnce(&mut Self) -> Result<Close<T>, E>,
     ) -> Result<T, E> {
-        let mut scope = Self::open(ctx, journal, from_path)?;
+        let mut scope = Self::open(ctx, journal)?;
         match body(&mut scope) {
             Ok(Close::Commit(t)) => scope.commit().map(|()| t).map_err(E::from),
             Ok(Close::Revert(t)) => scope.revert().map(|()| t).map_err(E::from),
@@ -146,17 +140,17 @@ impl<'s, 'h, C: ScopeRuntimeKeyspace<'h>> CracOperationScope<'s, C> {
         }
     }
 
-    /// Checkpoints `from_path` and leaves the checkpoint to the enclosing code,
-    /// which closes it through the journal: an EVM frame's `commit_frame` or
-    /// `revert_frame`, or `release_snapshots_from` or `revert_snapshots_from`.
+    /// Checkpoints the Michelson accounts and leaves the checkpoint to the
+    /// enclosing code, which closes it through the journal: an EVM frame's
+    /// `commit_frame` or `revert_frame`, or `release_savepoints_from` or
+    /// `revert_savepoints_from`.
     ///
-    /// Fails if `from_path` cannot be copied.
+    /// Fails if the savepoint cannot be opened.
     pub fn checkpoint_for_parent(
         ctx: &'s mut C,
         journal: &'s mut TezosXJournal,
-        from_path: &OwnedPath,
-    ) -> Result<(), RuntimeError> {
-        let _scope = Self::open(ctx, journal, from_path)?;
+    ) -> Result<(), SnapshotError> {
+        let _scope = Self::open(ctx, journal)?;
         Ok(())
     }
 }
@@ -363,8 +357,7 @@ mod tests {
         CracOperationScope::run(
             &mut rk,
             &mut journal,
-            &world_state(),
-            |scope| -> Result<Close<()>, RuntimeError> {
+            |scope| -> Result<Close<()>, SnapshotError> {
                 let (ctx, _journal) = scope.parts_mut();
                 ctx.host_mut()
                     .store_write_all(&probe(), b"inside")
@@ -394,8 +387,7 @@ mod tests {
         CracOperationScope::run(
             &mut rk,
             &mut journal,
-            &world_state(),
-            |scope| -> Result<Close<()>, RuntimeError> {
+            |scope| -> Result<Close<()>, SnapshotError> {
                 let (ctx, _journal) = scope.parts_mut();
                 ctx.host_mut()
                     .store_write_all(&probe(), b"inside")
@@ -425,17 +417,16 @@ mod tests {
         let result = CracOperationScope::run(
             &mut rk,
             &mut journal,
-            &world_state(),
-            |scope| -> Result<Close<()>, RuntimeError> {
+            |scope| -> Result<Close<()>, SnapshotError> {
                 let (ctx, _journal) = scope.parts_mut();
                 ctx.host_mut()
                     .store_write_all(&probe(), b"inside")
                     .expect("the write goes through");
-                Err(RuntimeError::PathNotFound)
+                Err(SnapshotError::NoSavepoint)
             },
         );
 
-        assert!(matches!(result, Err(RuntimeError::PathNotFound)));
+        assert_eq!(result, Err(SnapshotError::NoSavepoint));
         assert_eq!(
             rk.host_mut()
                 .store_read_all(&probe())
@@ -456,8 +447,7 @@ mod tests {
         let value = CracOperationScope::run(
             &mut rk,
             &mut journal,
-            &world_state(),
-            |scope| -> Result<Close<u8>, RuntimeError> {
+            |scope| -> Result<Close<u8>, SnapshotError> {
                 let (ctx, _journal) = scope.parts_mut();
                 ctx.host_mut()
                     .store_write_all(&probe(), b"inside")
@@ -486,14 +476,14 @@ mod tests {
             .expect("the probe is written");
 
         journal.michelson.push_external_checkpoint();
-        CracOperationScope::checkpoint_for_parent(&mut rk, &mut journal, &world_state())
+        CracOperationScope::checkpoint_for_parent(&mut rk, &mut journal)
             .expect("the checkpoint is taken");
         rk.host_mut()
             .store_write_all(&probe(), b"inside")
             .expect("the write goes through");
         journal
             .michelson
-            .revert_frame(rk.host_mut())
+            .revert_frame(&mut rk)
             .expect("the frame is reverted");
 
         assert_eq!(

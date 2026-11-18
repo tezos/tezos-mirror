@@ -42,9 +42,9 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+use tezos_evm_runtime::snapshot::SnapshotError;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
-use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezos_storage::error::Error as StorageError;
@@ -2347,8 +2347,8 @@ impl From<TransferError> for CracTransferError {
     }
 }
 
-impl From<RuntimeError> for CracTransferError {
-    fn from(error: RuntimeError) -> Self {
+impl From<SnapshotError> for CracTransferError {
+    fn from(error: SnapshotError) -> Self {
         Self::from(gw(error))
     }
 }
@@ -2393,14 +2393,10 @@ where
         .map_err(|oog: OutOfGas| CracTransferError::from(TransferError::from(oog)))?
         .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
-    let world_state = tezos_smart_rollup_host::path::OwnedPath::from(
-        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-    );
     let mut internal_receipts = Vec::new();
     let outcome = CracOperationScope::run(
         &mut *tc_ctx,
         &mut *journal,
-        &world_state,
         |scope| -> Result<Close<CrossRuntimeTransferOutcome>, CracTransferError> {
             let (scoped_ctx, scoped_journal) = scope.parts_mut();
             match transfer(
@@ -2991,15 +2987,24 @@ where
         Phase::Application,
         |application| -> Result<Close<_>, OperationError> {
             let (mut rk, journal) = application.parts_mut()?;
-            let (processed_ops, applied) = apply_batch(
+            let applied = apply_batch(
                 &mut rk,
                 registry,
                 journal,
                 validation_info,
                 block_ctx,
                 &mut nonce_counter,
-            )
-            .map_err(OperationError::BlockAbort)?;
+            );
+            // Keep the batch's account writes and delete the backups of the
+            // savepoints still open on the mirror, before the scope promotes
+            // or reverts it: a backup restored after the revert would clear
+            // the live accounts. This also brings the journal's savepoint
+            // count back to the transaction's.
+            let released = journal.michelson.release_all_savepoints(&mut rk);
+            let (processed_ops, applied) = applied.map_err(OperationError::BlockAbort)?;
+            released.map_err(|e| {
+                OperationError::BlockAbort(format!("Batch savepoints release: {e}"))
+            })?;
 
             if applied {
                 log!(
@@ -12973,15 +12978,7 @@ mod tests {
         where
             Host: StorageV1 + KeySpaceLoader,
         {
-            journal
-                .michelson
-                .checkpoint(
-                    rk.host_mut(),
-                    &OwnedPath::from(
-                        &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-                    ),
-                )
-                .unwrap();
+            journal.michelson.checkpoint(rk).unwrap();
             journal
                 .michelson
                 .push_pending_alias_origination_internal(parked_alias_origination());
@@ -13169,11 +13166,13 @@ mod tests {
             .michelson
             .take_pending_alias_origination_internals()
             .is_empty());
-        assert_eq!(journal.michelson.snapshot_count(), 0);
-        // Where the journal keeps the first snapshot of the accounts.
-        let snapshot =
-            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
-        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
+        assert_eq!(journal.michelson.savepoint_count(), 0);
+        // Where the operation's snapshot keeps its backups, in the mirror
+        // and once promoted.
+        for backups in [&b"/tmp/__savepoint"[..], &b"/__savepoint"[..]] {
+            let backups = tezos_smart_rollup_host::path::RefPath::assert_from(backups);
+            assert_eq!(rk.host().store_has(&backups).unwrap(), None);
+        }
     }
 
     // --- Tezos alias forwarder tests ---

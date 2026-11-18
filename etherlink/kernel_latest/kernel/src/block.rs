@@ -2445,10 +2445,12 @@ mod tests {
             Some(Mutez::try_from(500_000 - 1 - storage_cost).unwrap())
         );
 
-        // No snapshot of the accounts is left behind.
-        let snapshot =
-            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
-        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
+        // No backup of the accounts is left behind, in the mirror or once
+        // promoted.
+        for backups in [&b"/tmp/__savepoint"[..], &b"/__savepoint"[..]] {
+            let backups = tezos_smart_rollup_host::path::RefPath::assert_from(backups);
+            assert_eq!(rk.host().store_has(&backups).unwrap(), None);
+        }
     }
 
     #[test]

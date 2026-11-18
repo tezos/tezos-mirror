@@ -692,11 +692,13 @@ mod tests {
 
         // Only the call's own snapshot is left for its EVM frame, which
         // releases it when it commits.
-        assert_eq!(journal.michelson.snapshot_count(), 1);
-        journal.michelson.commit_frame(rk.host_mut()).unwrap();
-        assert_eq!(journal.michelson.snapshot_count(), 0);
-        let snapshot =
-            tezos_smart_rollup_host::path::RefPath::assert_from(b"/0/tez/tez_accounts");
-        assert_eq!(rk.host().store_has(&snapshot).unwrap(), None);
+        assert_eq!(journal.michelson.savepoint_count(), 1);
+        journal.michelson.commit_frame(&mut rk).unwrap();
+        assert_eq!(journal.michelson.savepoint_count(), 0);
+        // Where the snapshot keeps the backup of that savepoint.
+        let backup = tezos_smart_rollup_host::path::RefPath::assert_from(
+            b"/__savepoint/0/tez/tez_accounts",
+        );
+        assert_eq!(rk.host().store_has(&backup).unwrap(), None);
     }
 }

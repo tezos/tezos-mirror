@@ -58,8 +58,6 @@ use tezosx_interfaces::{
 };
 use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
-use tezos_smart_rollup_host::path::OwnedPath;
-
 /// Re-export the canonical null PKH from `tezos_execution` so the rest
 /// of this crate can keep its short name.  Both the synthetic CRAC
 /// markers built here and the `synthetic_crac_marker_tag` helper in
@@ -1190,18 +1188,11 @@ impl RuntimeInterface for TezosRuntime {
             ))
         })?;
 
-        let world_state = OwnedPath::from(
-            &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-        );
         // The caller disposes of this snapshot: the enclosing EVM CALL frame
         // when it commits or reverts, or the Michelson gateway's
         // `%materialize_alias` once the alias is created.
-        CracOperationScope::checkpoint_for_parent(&mut *rk, journal, &world_state)
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to snapshot world state for alias: {e:?}"
-                ))
-            })?;
+        CracOperationScope::checkpoint_for_parent(&mut *rk, journal)
+            .map_err(|e| TezosXRuntimeError::Snapshot(e.to_string()))?;
 
         // Deploy the forwarder via the
         // shared `originate_contract` path, passing `Origin::Alias` so
