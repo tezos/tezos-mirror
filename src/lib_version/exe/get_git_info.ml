@@ -107,7 +107,8 @@ let lines =
     Format.asprintf
       "let git_describe_octez_smart_rollup_node = %a"
       Tezos_version_parser.pp
-      (git_describe ["octez-smart-rollup-node-v*"; "octez-v*"]);
+      (* Matches only the node's tags; GIT_VERSION and tarballs bypass it. *)
+      (git_describe ["octez-smart-rollup-node-v*"]);
   ]
 
 let () =

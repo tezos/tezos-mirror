@@ -36,6 +36,9 @@
 let evm_executables =
   ["octez-evm-node"; "etherlink-governance-observer"; "fa-bridge-watchtower"]
 
+(* Executables released on their own tags, with their own version. *)
+let independently_versioned_executables = ["octez-smart-rollup-node"]
+
 (* TODO: tezos/tezos#4769
 
    We should be able to get the Version flag string from the Node
@@ -75,8 +78,8 @@ let read_executable_list path =
   |> List.map lookup_or_fail
 
 (* Test that all released and experimental executables support the --version flag,
-   and that they report the same version as the main node of the release
-   (Octez node or Octez EVM node). *)
+   and that, except [independently_versioned_executables], they report the same
+   version as the main node of the release (Octez node or Octez EVM node). *)
 let register_protocol_independent () =
   let released_executables =
     read_executable_list Constant.released_executables
@@ -88,25 +91,30 @@ let register_protocol_independent () =
   Fun.flip List.iter executables @@ fun executable ->
   let executable_name = Filename.basename (Uses.path executable) in
   let compare_with_executable =
-    if List.mem executable_name evm_executables then Constant.octez_evm_node
-    else Constant.octez_node
+    if List.mem executable_name independently_versioned_executables then None
+    else if List.mem executable_name evm_executables then
+      Some Constant.octez_evm_node
+    else Some Constant.octez_node
   in
   Test.register
     ~__FILE__
     ~title:(executable_name ^ " --version")
     ~tags:["version"]
-    ~uses:[executable; compare_with_executable]
+    ~uses:(executable :: Option.to_list compare_with_executable)
     ~uses_node:false
     ~uses_client:false
     ~uses_admin_client:false
   @@ fun () ->
-  let* expected_version = get_and_check_version compare_with_executable in
-  Log.info
-    "Check that %s supports %s as version flag, and returns version %s."
-    executable_name
-    version_flag
-    expected_version ;
   let* version = get_and_check_version executable in
-  let error_msg = executable_name ^ ": expected version %R, got %L" in
-  Check.((version = expected_version) ~__LOC__ string ~error_msg) ;
-  unit
+  match compare_with_executable with
+  | None -> unit
+  | Some compare_with_executable ->
+      let* expected_version = get_and_check_version compare_with_executable in
+      Log.info
+        "Check that %s supports %s as version flag, and returns version %s."
+        executable_name
+        version_flag
+        expected_version ;
+      let error_msg = executable_name ^ ": expected version %R, got %L" in
+      Check.((version = expected_version) ~__LOC__ string ~error_msg) ;
+      unit
