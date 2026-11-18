@@ -69,12 +69,15 @@ Minor versions usually include bug fixes and minor improvements.
 Components
 ----------
 
-An Octez component is defined as a sub-part of the monorepo (https://gitlab.com/tezos/tezos). For example: the Layer 1 executables, the rollup node, or Teztale.
+An Octez component is defined as a sub-part of the monorepo (https://gitlab.com/tezos/tezos). For example: the Layer 1 executables or Teztale.
 
 All components are released together with each Octez major release.
 However, each component has its own minor release cycle, meaning that components
 can be released independently with minor releases, following their own
 incrementation schedule.
+
+The smart rollup node and the EVM node are not part of the Octez suite. Each is
+released on its own, on its own schedule.
 
 .. seealso::
 
