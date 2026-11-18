@@ -63,6 +63,10 @@ Thus, in Octez v25, installing packages would display a warning about the deprec
 Alternatively, Debian and Ubuntu packages built along the same lines as the Octez packages, called Tzinit packages, are available.
 See :doc:`tzinit-packages` for instructions on how to migrate to these packages.
 
+Octez v25.3 also deprecates the Homebrew formula, which is scheduled for removal in Octez v26.
+Homebrew formulae providing prebuilt binaries for macOS, called Tzinit formulae, are available instead.
+See :doc:`tzinit-homebrew` for instructions on how to migrate to these formulae.
+
 
 Removal of Adaptive Issuance vote argument from the baker
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
