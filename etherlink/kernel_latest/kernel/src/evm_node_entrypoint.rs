@@ -1276,6 +1276,7 @@ mod tests {
                 TEZ_WORLD_STATE_ROOT_PATH,
                 TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
+                tezos_evm_runtime::runtime_keyspaces::COMMON_WORLD_STATE_ROOT_PATH,
             ] {
                 host.store_write_all(&root, b"seed").unwrap();
             }

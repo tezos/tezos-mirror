@@ -528,6 +528,22 @@ where
             .unwrap();
     }
 
+    let common_world_state_subkeys = kernel_host
+        .store_count_subkeys(
+            &tezos_evm_runtime::runtime_keyspaces::COMMON_WORLD_STATE_ROOT_PATH,
+        )
+        .expect("The kernel failed to read the number of /common_world_state subkeys");
+
+    if common_world_state_subkeys == 0 {
+        kernel_host
+            .store_write(
+                &tezos_evm_runtime::runtime_keyspaces::COMMON_WORLD_STATE_ROOT_PATH,
+                b"Une ribambelle de catamorphismes",
+                0,
+            )
+            .unwrap();
+    }
+
     let Some(bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
@@ -571,7 +587,9 @@ mod tests {
     use tezos_ethereum::{
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
-    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_evm_runtime::runtime_keyspaces::{
+        RuntimeKeyspaces, COMMON_WORLD_STATE_ROOT_PATH,
+    };
 
     use alloy_sol_types::SolCall;
     use tezos_protocol::contract::Contract;
@@ -672,6 +690,8 @@ mod tests {
     fn test_xtz_withdrawal_applied() {
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -795,6 +815,8 @@ mod tests {
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -896,6 +918,8 @@ mod tests {
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
