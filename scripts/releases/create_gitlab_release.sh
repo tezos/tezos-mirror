@@ -76,8 +76,10 @@ docker_image_url() {
     fi
     echo "https://hub.docker.com/layers/${docker_hub_path}/${CI_COMMIT_TAG}/images/sha256-${docker_image_digest}"
   else
-    ## Other namespaces => GitLab container registry of the project
-    echo "${CI_PROJECT_URL}/container_registry?search[]=${CI_COMMIT_TAG}"
+    ## Other namespaces => GitLab container registry of the project.
+    ## Not filtered on the tag: on this page, [search[]] filters repository
+    ## names, and filtering tags requires the ID of a repository.
+    echo "${CI_PROJECT_URL}/container_registry"
   fi
 }
 
