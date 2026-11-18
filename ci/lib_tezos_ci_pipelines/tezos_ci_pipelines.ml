@@ -325,6 +325,44 @@ let non_release_tag_test =
        create this pipeline by pushing a tag to a fork of 'tezos/tezos', e.g. \
        to the 'nomadic-labs/tezos' project."
 
+(* Release pipeline for Octez, and for the components that are released
+   together with Octez.
+
+   This pipeline does not depend on the kind of release (major, minor,
+   release candidate, beta, packaging revision): jobs that publish are manual,
+   and the release manager decides which ones to run. On protected tags, jobs
+   that publish are included if they can publish from this project. On
+   unprotected tags, they are replaced by jobs with a different name that do
+   not actually publish, so that one can test releases.
+
+   This pipeline will replace the [octez_*_release_tag], [octez_packaging_revision],
+   [non_release_tag] and [octez_latest_release] pipelines, as well as
+   their test variants. Until then, its rule must not overlap with the rules
+   of those pipelines, as GitLab would include the jobs of both. So it is only
+   created through the API, outside tezos/tezos, by
+   [ci/run_pipeline/octez_release.sh], which allows to test it on a fork. *)
+let octez_release =
+  Cacio.new_global_pipeline
+    "octez_release"
+    (lazy
+      Rules.(
+        If.(
+          api
+          && var "TZ_API_KIND" == str "OCTEZ_RELEASE"
+          && not_on_tezos_namespace
+          && Predefined_vars.ci_commit_tag != null)))
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release pipeline for Octez.\n\n\
+        This pipeline is created when a tag is pushed, unless it is the \
+        release tag of a component that has its own release pipelines. It \
+        builds Octez automatically, but the jobs that publish are manual: the \
+        release manager decides what to publish. Jobs that publish are only \
+        included for protected tags, and jobs that publish publicly only for \
+        protected tags of tezos/tezos. For unprotected tags, jobs with other \
+        names, such as names ending with _dry_run or -test-bucket, are \
+        included instead, which do not publish." ^ release_description)
+
 (* Add jobs to the release pipelines of all components. *)
 let register_release_jobs jobs =
   Cacio.register_jobs octez_major_release_tag jobs ;

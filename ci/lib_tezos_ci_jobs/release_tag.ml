@@ -47,8 +47,7 @@ let job_docker_container_scanning =
          ~reports:
            (Gitlab_ci.Util.reports ~container_scanning:scanning_report ())
          [vuln_predicate])
-    ~variables:
-      [("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true")]
+    ~variables:[Docker.docker_hub_variable mode]
     ~script:
       [
         "./scripts/ci/docker_image_names.sh";
@@ -267,7 +266,7 @@ let job_dispatch_call =
        tez-capital/tezos-macos-pipeline"
     ~needs:
       [
-        (Job, job_gitlab_release `real);
+        (Job, job_gitlab_release `docker_hub);
         (Job, job_deploy_release_page_assets `real);
       ]
     ~environment:
@@ -284,9 +283,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_major_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -306,9 +305,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_minor_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real);
       (Auto, job_dispatch_call);
@@ -328,9 +327,9 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.octez_beta_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Auto, job_gitlab_release `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Auto, job_gitlab_release `docker_hub);
       (Manual, job_deploy_release_page_assets `real);
       (Auto, job_render_site `real ~components:component_deploys);
       (Auto, job_dispatch_call);
@@ -349,8 +348,8 @@ let () =
   Cacio.register_jobs
     Tezos_ci_pipelines.non_release_tag
     [
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   Cacio.register_jobs
@@ -394,18 +393,8 @@ let job_docker_promote_to_version =
     ~retry:no_retry
     ~services:[{name = Images.Base_images.dind_service}]
     ~variables:
-      [
-        ("DOCKER_VERSION", Docker.version);
-        ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
-      ]
-      (* Docker Hub credentials (CI_DOCKER_AUTH) are scoped to the
-       [docker-publish] environment; only [`real] jobs (CI_DOCKER_HUB=true)
-       authenticate and thus need access. *)
-    ?environment:
-      (match mode with
-      | `real ->
-          Some Gitlab_ci.Types.{name = "docker-publish"; action = Some Access}
-      | `test -> None)
+      [("DOCKER_VERSION", Docker.version); Docker.docker_hub_variable mode]
+    ?environment:(Docker.docker_publish_environment mode)
     ~script:
       [
         "./scripts/ci/docker_initialize.sh --image-names";
@@ -454,11 +443,11 @@ let () =
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
-      (Manual, job_docker `real Amd64);
-      (Manual, job_docker `real Arm64);
-      (Auto, job_docker_merge_manifests `real);
-      (Manual, job_docker_mirror_to_gitlab_registry `real);
-      (Manual, job_docker_promote_to_version `real);
+      (Manual, job_docker `docker_hub Amd64);
+      (Manual, job_docker `docker_hub Arm64);
+      (Auto, job_docker_merge_manifests `docker_hub);
+      (Manual, job_docker_mirror_to_gitlab_registry `docker_hub);
+      (Manual, job_docker_promote_to_version `docker_hub);
       (Manual, job_deploy_release_page_assets_packaging_revision `real);
       ( Auto,
         Release_site_ci.job_render
@@ -484,3 +473,18 @@ let () =
             [(Job, job_deploy_release_page_assets_packaging_revision `test)] );
     ] ;
   ()
+
+(* Jobs of the [octez_release] pipeline.
+
+   This pipeline does not depend on the kind of release.
+   Build jobs are automatic. They push Docker images to the GCP registry.
+   Jobs that publish are manual. *)
+let () =
+  Cacio.register_jobs
+    Tezos_ci_pipelines.octez_release
+    [
+      (Auto, Build.job_build_static_linux_released_binaries Amd64 `release);
+      (Auto, Build.job_build_static_linux_released_binaries Arm64 `release);
+      (Auto, job_docker_merge_manifests `release);
+      (Auto, job_docker_container_scanning `release);
+    ]
