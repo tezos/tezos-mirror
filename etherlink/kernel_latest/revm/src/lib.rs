@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{journal::Journal, storage::world_state_handler::StorageAccount};
+use crate::{
+    helpers::legacy::wei_to_alloy, journal::Journal,
+    storage::world_state_handler::StorageAccount,
+};
 use database::EtherlinkVMDB;
 pub use error::{
     EvmDbError, EvmKernelError, EvmRunError, JournalCloseError, RevmTxRefusal,
@@ -48,6 +51,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
+use tezosx_types::Wei;
 
 pub mod database;
 mod error;
@@ -92,7 +96,7 @@ pub enum TransactionOrigin {
     /// Note: the credit lives behind an extra `journaled_state.checkpoint()`;
     /// the `CallTracer` keeps its own frame stack, so recorded traces are
     /// unaffected (`test_credit_checkpoint_keeps_call_tracer_depths`).
-    CrossRuntime { credit: Option<(Address, U256)> },
+    CrossRuntime { credit: Option<(Address, Wei)> },
     /// Read-only cross-runtime call: no balance credit, no journal
     /// commit, and the top-level frame runs with `is_static = true`
     /// (routed through [`EtherlinkHandler::new_static`]). REVM then
@@ -757,13 +761,13 @@ where
         let credit_checkpoint = match origin {
             TransactionOrigin::CrossRuntime {
                 credit: Some((addr, amount)),
-            } if amount > U256::ZERO => {
+            } if amount > Wei::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
                 // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
-                    .balance_incr(addr, amount)
+                    .balance_incr(addr, wei_to_alloy(amount))
                     .map_err(EVMError::Database)?;
                 Some(cp)
             }
@@ -836,13 +840,13 @@ where
         let credit_checkpoint = match origin {
             TransactionOrigin::CrossRuntime {
                 credit: Some((addr, amount)),
-            } if amount > U256::ZERO => {
+            } if amount > Wei::ZERO => {
                 let cp = evm_context.ctx.journaled_state.checkpoint();
                 // Note: an error here leaves the credit checkpoint open.
                 evm_context
                     .ctx
                     .journaled_state
-                    .balance_incr(addr, amount)
+                    .balance_incr(addr, wei_to_alloy(amount))
                     .map_err(EVMError::Database)?;
                 Some(cp)
             }
@@ -932,6 +936,7 @@ mod test {
     use tezosx_interfaces::RuntimeId;
     use tezosx_interfaces::{AliasInfo, Registry as RegistryTrait};
     use tezosx_journal::TezosXJournal;
+    use tezosx_types::{Wei, ONE_MUTEZ_WEI};
     use utilities::MOCK_TEZOS_GAS_CONSUMED;
 
     use tezos_ethereum::block::BlockConstants;
@@ -1803,7 +1808,7 @@ mod test {
                 tezosx_interfaces::Gas::new(1_000_000, RuntimeId::Ethereum),
             )
             .unwrap();
-        let value_sent = U256::from(5000000000000u64);
+        let value_sent = U256::from(5 * ONE_MUTEZ_WEI);
         let caller_info = AccountInfo {
             balance: U256::MAX,
             nonce: 0,
@@ -2131,7 +2136,7 @@ mod test {
         let bytecode = Bytecode::new_raw(Bytes::from_hex(code_hex).unwrap());
         let callee_bytecode = Bytecode::new_raw(Bytes::from_hex("00").unwrap());
 
-        let run_with_credit = |credit: Option<(Address, U256)>| -> Vec<Vec<u8>> {
+        let run_with_credit = |credit: Option<(Address, Wei)>| -> Vec<Vec<u8>> {
             let mut host = MockKernelHost::default();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
             let block_constants = BlockConstants::test_block_with_no_fees();
@@ -2228,7 +2233,7 @@ mod test {
         let without_credit = run_with_credit(None);
         let with_credit = run_with_credit(Some((
             Address::from_hex("1111111111111111111111111111111111111111").unwrap(),
-            U256::from(42u64),
+            Wei::from_u256(42u64.into()),
         )));
         assert!(
             !without_credit.is_empty(),
@@ -2362,7 +2367,7 @@ mod test {
         // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
 
         let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
-        let withdrawn_amount = U256::from(1_000_000_000_000u64);
+        let withdrawn_amount = U256::from(ONE_MUTEZ_WEI);
 
         let registry = Registry::new();
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
@@ -6701,11 +6706,6 @@ mod test {
         );
     }
 
-    // One mutez expressed in wei (10^12), mirroring the forwarder's own
-    // `ONE_MUTEZ_IN_WEI` gate. Amounts below this are left resident instead
-    // of being forwarded.
-    const ONE_MUTEZ_WEI: u128 = 1_000_000_000_000;
-
     /// Compute the deterministic Ethereum alias address for `native_address`,
     /// mirroring `ensure_alias`'s `keccak256(native_address)[0..20]` scheme.
     fn alias_address_for(native_address: &str) -> Address {
@@ -7070,7 +7070,7 @@ mod test {
         let native_address = "tz1ResidueZeroPoke";
         let alias = alias_address_for(native_address);
 
-        let residue = U256::from(3_000_000_000_000u128); // 3 mutez, no dust
+        let residue = U256::from(3 * ONE_MUTEZ_WEI); // 3 mutez, no dust
         set_balance(rk.eth_accounts_mut(), alias, residue);
 
         let (_, registry, mut journal) =

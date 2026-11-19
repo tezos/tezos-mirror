@@ -17,19 +17,20 @@
 //!
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
+use crate::error::Error;
 use crate::simulation::SimulationOutcome;
 use crate::transaction::TransactionContent;
 
 use primitive_types::{H160, H256, U256};
-use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
+use revm_etherlink::helpers::legacy::h160_to_alloy;
 use revm_etherlink::{storage::world_state_handler::StorageAccount, EvmKernelError};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_ethereum::wei::{ceil_div, gas_from_wei};
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
+use tezosx_types::{wei_to_evm_gas, Wei, ONE_MUTEZ_WEI};
 
 use std::mem::size_of;
 
@@ -69,16 +70,16 @@ const ASSUMED_TX_ENCODED_SIZE: usize = 150;
 // Since multiple messages are grouped up into a single operation of
 // 'add smart rollup messages', together they will cover the larger base
 // fee for this operation.
-pub(crate) const DA_FEE_PER_BYTE: u64 = 4 * 10_u64.pow(12);
+pub(crate) const DA_FEE_PER_BYTE: u64 = 4 * ONE_MUTEZ_WEI;
 
 /// Instructions for 'balancing the books'.
 #[derive(Debug)]
 pub struct FeeUpdates {
     pub overall_gas_price: U256,
     pub overall_gas_used: U256,
-    pub burn_amount: U256,
-    pub charge_user_amount: U256,
-    pub compensate_sequencer_amount: U256,
+    pub burn_amount: Wei,
+    pub charge_user_amount: Wei,
+    pub compensate_sequencer_amount: Wei,
 }
 
 impl TransactionContent {
@@ -93,14 +94,14 @@ impl TransactionContent {
         &self,
         block_fees: &BlockFees,
         execution_gas_used: U256,
-    ) -> FeeUpdates {
+    ) -> Result<FeeUpdates, Error> {
         match self {
-            Self::Deposit(_) => FeeUpdates::for_deposit(execution_gas_used),
+            Self::Deposit(_) => Ok(FeeUpdates::for_deposit(execution_gas_used)),
             Self::Ethereum(tx) => FeeUpdates::for_tx(tx, block_fees, execution_gas_used),
             Self::EthereumDelayed(_) | Self::TezosDelayed(_) => {
                 FeeUpdates::for_delayed_tx(block_fees, execution_gas_used)
             }
-            Self::FaDeposit(_) => FeeUpdates::for_fa_deposit(execution_gas_used),
+            Self::FaDeposit(_) => Ok(FeeUpdates::for_fa_deposit(execution_gas_used)),
         }
     }
 }
@@ -110,9 +111,9 @@ impl FeeUpdates {
         Self {
             overall_gas_used: gas_used,
             overall_gas_price: U256::zero(),
-            burn_amount: U256::zero(),
-            charge_user_amount: U256::zero(),
-            compensate_sequencer_amount: U256::zero(),
+            burn_amount: Wei::ZERO,
+            charge_user_amount: Wei::ZERO,
+            compensate_sequencer_amount: Wei::ZERO,
         }
     }
 
@@ -120,9 +121,9 @@ impl FeeUpdates {
         Self {
             overall_gas_used: gas_used,
             overall_gas_price: U256::zero(),
-            burn_amount: U256::zero(),
-            charge_user_amount: U256::zero(),
-            compensate_sequencer_amount: U256::zero(),
+            burn_amount: Wei::ZERO,
+            charge_user_amount: Wei::ZERO,
+            compensate_sequencer_amount: Wei::ZERO,
         }
     }
 
@@ -130,7 +131,7 @@ impl FeeUpdates {
         tx: &EthereumTransactionCommon,
         block_fees: &BlockFees,
         execution_gas_used: U256,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let da_fee = da_fee(
             block_fees.da_fee_per_byte(),
             &tx.data,
@@ -141,37 +142,65 @@ impl FeeUpdates {
         Self::of_gas_and_da_fee(block_fees, execution_gas_used, da_fee)
     }
 
-    fn for_delayed_tx(block_fees: &BlockFees, execution_gas_used: U256) -> Self {
-        Self::of_gas_and_da_fee(block_fees, execution_gas_used, U256::zero())
+    fn for_delayed_tx(
+        block_fees: &BlockFees,
+        execution_gas_used: U256,
+    ) -> Result<Self, Error> {
+        Self::of_gas_and_da_fee(block_fees, execution_gas_used, Wei::ZERO)
     }
 
     fn of_gas_and_da_fee(
         block_fees: &BlockFees,
         execution_gas_used: U256,
-        da_fee: U256,
-    ) -> Self {
-        let execution_gas_fees = execution_gas_used * block_fees.base_fee_per_gas();
+        da_fee: Wei,
+    ) -> Result<Self, Error> {
+        // A gas times a base fee cannot saturate: both fit in a u64.
+        let execution_gas_fees = Wei::from_u256(
+            execution_gas_used.saturating_mul(block_fees.base_fee_per_gas()),
+        );
 
         let initial_added_fees = da_fee;
-        let initial_total_fees = initial_added_fees + execution_gas_fees;
+        let initial_total_fees = initial_added_fees
+            .checked_add(execution_gas_fees)
+            .map_err(|_| {
+                Error::Overflow("the DA and execution fees overflow U256".to_string())
+            })?;
 
         let gas_price = block_fees.base_fee_per_gas();
 
-        let gas_used = ceil_div(initial_total_fees, gas_price);
+        let gas_used = U256::from(u64::from(
+            wei_to_evm_gas(initial_total_fees, gas_price)
+                .map_err(EvmKernelError::from)?,
+        ));
 
-        let total_fees = gas_price * gas_used;
+        // A gas times a base fee cannot saturate: both fit in a u64.
+        let total_fees = Wei::from_u256(gas_price.saturating_mul(gas_used));
 
         // Due to rounding, we may have a small amount of unaccounted-for gas.
         // Assign this to the burned fee.
-        let burn_amount = execution_gas_fees + total_fees - initial_total_fees;
+        let burn_amount = execution_gas_fees
+            .checked_add(total_fees)
+            .and_then(|fees| fees.checked_sub(initial_total_fees))
+            .map_err(|_| {
+                Error::Overflow(
+                    "the rounded fees fall below the fees they round up".to_string(),
+                )
+            })?;
 
-        Self {
+        let charge_user_amount =
+            total_fees.checked_sub(execution_gas_fees).map_err(|_| {
+                Error::Overflow(
+                    "the rounded fees fall below the execution fees".to_string(),
+                )
+            })?;
+
+        Ok(Self {
             overall_gas_price: gas_price,
             overall_gas_used: gas_used,
             burn_amount,
-            charge_user_amount: total_fees - execution_gas_fees,
+            charge_user_amount,
             compensate_sequencer_amount: da_fee,
-        }
+        })
     }
 
     pub fn modify_outcome(&self, outcome: &mut SimulationOutcome) {
@@ -209,10 +238,9 @@ impl FeeUpdates {
         };
 
         let mut account = StorageAccount::from_address(&h160_to_alloy(&sequencer))?;
-        if let Err(e) = account.add_balance(
-            rk.eth_accounts_mut(),
-            u256_to_alloy(&self.compensate_sequencer_amount),
-        ) {
+        if let Err(e) =
+            account.add_balance(rk.eth_accounts_mut(), self.compensate_sequencer_amount)
+        {
             return Err(anyhow::anyhow!(
                 "Failed to compensate sequencer {sequencer} of {}: {}",
                 self.compensate_sequencer_amount,
@@ -295,7 +323,9 @@ pub(crate) fn gas_for_fees(
         authorization_list_len,
     );
 
-    gas_from_wei(fees, gas_price).ok_or(EvmKernelError::GasForFeesOverflow)
+    wei_to_evm_gas(fees, gas_price)
+        .map(u64::from)
+        .map_err(EvmKernelError::from)
 }
 
 // Size of a single EIP-7702 authorization entry:
@@ -313,7 +343,7 @@ pub(crate) fn da_fee(
     tx_data: &[u8],
     access_list: &[AccessListItem],
     authorization_list_len: usize,
-) -> U256 {
+) -> Wei {
     let access_data_size: usize = access_list
         .iter()
         .map(|ali| size_of::<H160>() + size_of::<H256>() * ali.storage_keys.len())
@@ -321,11 +351,11 @@ pub(crate) fn da_fee(
 
     let authorization_data_size = authorization_list_len * AUTHORIZATION_ENTRY_SIZE;
 
-    U256::from(tx_data.len())
+    let size = U256::from(tx_data.len())
         .saturating_add(ASSUMED_TX_ENCODED_SIZE.into())
         .saturating_add(access_data_size.into())
-        .saturating_add(authorization_data_size.into())
-        .saturating_mul(da_fee_per_byte)
+        .saturating_add(authorization_data_size.into());
+    Wei::from_u256(size.saturating_mul(da_fee_per_byte))
 }
 
 #[cfg(test)]
@@ -335,7 +365,7 @@ mod tests {
     use alloy_primitives::Bytes;
     use primitive_types::{H160, U256};
     use revm::context::result::{ExecutionResult, Output, ResultGas};
-    use revm_etherlink::helpers::legacy::alloy_to_u256;
+    use revm_etherlink::helpers::legacy::{alloy_to_u256, u256_to_alloy};
     use revm_etherlink::ExecutionOutcome;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
@@ -359,7 +389,7 @@ mod tests {
             let block_fees = BlockFees::new(min_fee_per_gas, base_fee_per_gas, da_fee);
 
             // Act
-            let updates = FeeUpdates::for_tx(&tx, &block_fees, execution_gas_used);
+            let updates = FeeUpdates::for_tx(&tx, &block_fees, execution_gas_used).unwrap();
 
             // Assert
             let assumed_execution_gas_cost = base_fee_per_gas * execution_gas_used;
@@ -367,10 +397,10 @@ mod tests {
             let expected_sequencer_comp = da_fee * (data_size + ASSUMED_TX_ENCODED_SIZE);
 
             assert_eq!(updates.overall_gas_price, base_fee_per_gas, "gas price should be 'base fee per gas'");
-            assert!(updates.burn_amount >= assumed_execution_gas_cost, "inconsistent burn amount");
-            assert_eq!(updates.charge_user_amount, total_fee - assumed_execution_gas_cost, "inconsistent user charge");
-            assert_eq!(total_fee, updates.burn_amount + updates.compensate_sequencer_amount, "inconsistent total fees");
-            assert_eq!(updates.compensate_sequencer_amount, expected_sequencer_comp, "inconsistent sequencer comp");
+            assert!(updates.burn_amount.as_u256() >= assumed_execution_gas_cost, "inconsistent burn amount");
+            assert_eq!(updates.charge_user_amount.as_u256(), total_fee - assumed_execution_gas_cost, "inconsistent user charge");
+            assert_eq!(total_fee, updates.burn_amount.as_u256() + updates.compensate_sequencer_amount.as_u256(), "inconsistent total fees");
+            assert_eq!(updates.compensate_sequencer_amount.as_u256(), expected_sequencer_comp, "inconsistent sequencer comp");
         }
     }
 
@@ -403,9 +433,9 @@ mod tests {
         let fee_updates = FeeUpdates {
             overall_gas_used: U256::zero(),
             overall_gas_price: U256::zero(),
-            burn_amount,
-            charge_user_amount: balance / 2,
-            compensate_sequencer_amount,
+            burn_amount: Wei::from_u256(burn_amount),
+            charge_user_amount: Wei::from_u256(balance / 2),
+            compensate_sequencer_amount: Wei::from_u256(compensate_sequencer_amount),
         };
 
         // Act
@@ -424,7 +454,10 @@ mod tests {
         let burned = crate::storage::read_burned_fees(rk.evm_world_state());
 
         // no sequencer reward address set - so everything is burned
-        assert_eq!(burn_amount + compensate_sequencer_amount, burned);
+        assert_eq!(
+            Wei::from_u256(burn_amount + compensate_sequencer_amount),
+            burned
+        );
     }
 
     #[test]
@@ -448,9 +481,9 @@ mod tests {
         let fee_updates = FeeUpdates {
             overall_gas_used: U256::zero(),
             overall_gas_price: U256::zero(),
-            burn_amount,
-            charge_user_amount: balance / 2,
-            compensate_sequencer_amount,
+            burn_amount: Wei::from_u256(burn_amount),
+            charge_user_amount: Wei::from_u256(balance / 2),
+            compensate_sequencer_amount: Wei::from_u256(compensate_sequencer_amount),
         };
 
         // Act
@@ -467,7 +500,7 @@ mod tests {
         assert_eq!(balance / 2, new_balance);
 
         let burned = crate::storage::read_burned_fees(rk.evm_world_state());
-        assert_eq!(burn_amount, burned);
+        assert_eq!(Wei::from_u256(burn_amount), burned);
 
         let sequencer_new_balance = get_balance(rk.eth_accounts_mut(), sequencer_address);
         assert_eq!(
@@ -489,7 +522,11 @@ mod tests {
         set_balance(rk.eth_accounts_mut(), address, balance);
 
         // This panics because sub_balance fails and the helper unwraps
-        mock_charge_inclusion_fees(rk.eth_accounts_mut(), address, balance * 2);
+        mock_charge_inclusion_fees(
+            rk.eth_accounts_mut(),
+            address,
+            Wei::from_u256(balance * 2),
+        );
     }
 
     #[test]
@@ -511,7 +548,25 @@ mod tests {
         let expected_fee =
             (expected_bytes + ASSUMED_TX_ENCODED_SIZE) as u64 * DA_FEE_PER_BYTE;
 
-        assert_eq!(fee, expected_fee.into());
+        assert_eq!(fee, Wei::from_u256(expected_fee.into()));
+    }
+
+    #[test]
+    fn fee_settlement_with_zero_base_fee_is_an_error() {
+        let block_fees = BlockFees::new(U256::zero(), U256::zero(), U256::zero());
+        let result = FeeUpdates::of_gas_and_da_fee(&block_fees, U256::one(), Wei::ZERO);
+        assert!(matches!(result, Err(Error::Simulation(_))));
+    }
+
+    #[test]
+    fn fee_settlement_overflow_is_an_error() {
+        let block_fees = BlockFees::new(U256::one(), U256::one(), U256::zero());
+        let result = FeeUpdates::of_gas_and_da_fee(
+            &block_fees,
+            U256::one(),
+            Wei::from_u256(U256::MAX),
+        );
+        assert!(matches!(result, Err(Error::Overflow(_))));
     }
 
     fn address_from_str(s: &str) -> H160 {
@@ -538,12 +593,10 @@ mod tests {
     fn mock_charge_inclusion_fees(
         eth_accounts: &mut impl KeySpace,
         address: H160,
-        charge_amount: U256,
+        charge_amount: Wei,
     ) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
-        account
-            .sub_balance(eth_accounts, u256_to_alloy(&charge_amount))
-            .unwrap();
+        account.sub_balance(eth_accounts, charge_amount).unwrap();
     }
 
     fn mock_execution_outcome(gas_used: u64) -> SimulationOutcome {

@@ -22,11 +22,11 @@ use tezosx_interfaces::{
     X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_SOURCE_RUNTIME,
     X_TEZOS_STORAGE_COST, X_TEZOS_TIMESTAMP,
 };
-use tezosx_types::{mutez_to_evm_gas, Mutez};
+use tezosx_types::{mutez_to_evm_gas, Mutez, Wei};
 
 use crate::{
     database::EtherlinkVMDB,
-    helpers::legacy::alloy_to_u256,
+    helpers::legacy::{alloy_to_wei, wei_to_alloy},
     journal::{CrossRuntimeCall, Journal, MaterializedAlias},
     precompiles::{
         constants::{
@@ -370,7 +370,7 @@ fn charge_delegated_storage_cost(
         ));
     }
     let g2 = mutez_to_evm_gas(v, PU256::from(base_fee_per_gas))
-        .ok_or(CustomPrecompileError::OutOfGas)?;
+        .map_err(|_| CustomPrecompileError::OutOfGas)?;
     charge(gas, g2)
 }
 
@@ -616,7 +616,7 @@ fn emit_crac_sent<'j, 'host, CTX, Host, R>(
     crac_id: String,
     target_runtime: &str,
     target_address: String,
-    amount: U256,
+    amount: Wei,
 ) where
     'host: 'j,
     Host: StorageV1 + KeySpaceLoader + 'host,
@@ -632,7 +632,7 @@ fn emit_crac_sent<'j, 'host, CTX, Host, R>(
             crossRuntimeCallId: crac_id,
             targetRuntime: target_runtime.to_string(),
             targetAddress: target_address,
-            amount,
+            amount: wei_to_alloy(amount),
         }
         .into_log_data(),
     };
@@ -872,7 +872,7 @@ fn inject_tezos_headers(
     sender_alias: &str,
     source_alias: &str,
     source_runtime: RuntimeId,
-    amount: U256,
+    amount: Wei,
     gas_limit: TezosXGas,
     timestamp: U256,
     block_number: U256,
@@ -895,10 +895,7 @@ fn inject_tezos_headers(
     );
     // Format the amount (in wei) as a TEZ decimal string.
     // The receiving runtime truncates to its own precision (ADR L2-1004).
-    headers.insert(
-        X_TEZOS_AMOUNT,
-        parse_value(&format_tez_from_wei(alloy_to_u256(&amount)))?,
-    );
+    headers.insert(X_TEZOS_AMOUNT, parse_value(&format_tez_from_wei(amount))?);
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&gas_limit.to_string())?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
     headers.insert(
@@ -922,7 +919,7 @@ fn inject_tezos_headers_from_context<'j, 'host, CTX, Host, R>(
     sender_alias: &str,
     source_alias: &str,
     source_runtime: RuntimeId,
-    amount: U256,
+    amount: Wei,
     gas_limit: TezosXGas,
     gas: Gas,
 ) -> Result<(), CustomPrecompileError>
@@ -1071,7 +1068,7 @@ where
             let destination = call.destination;
             let entrypoint = call.entrypoint;
             let parameters = call.parameters;
-            let amount = inputs.value.get();
+            let amount = alloy_to_wei(&inputs.value.get());
 
             // Build HTTP request targeting the Tezos runtime.
             let url = if entrypoint.is_empty() {
@@ -1198,7 +1195,7 @@ where
                 &sender_alias,
                 &source_alias,
                 source.runtime(),
-                U256::ZERO,
+                Wei::ZERO,
                 gas_limit,
                 gas,
             )?;
@@ -1257,7 +1254,7 @@ where
             // read-only path that never writes to storage. POST keeps
             // the existing state-mutating behavior.
             let is_get = request.method() == http::Method::GET;
-            let amount = inputs.value.get();
+            let amount = alloy_to_wei(&inputs.value.get());
 
             let (sender_alias, source_alias, source_runtime) = if is_get {
                 if !amount.is_zero() {
@@ -1618,6 +1615,7 @@ mod tests {
     use tezos_protocol::contract::Contract;
     use tezosx_interfaces::testing::StubRegistry;
     use tezosx_interfaces::{AliasInfo, Classification, RuntimeId};
+    use tezosx_types::ONE_MUTEZ_WEI;
 
     use super::*;
 
@@ -2438,7 +2436,8 @@ mod tests {
         let source_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
         // 42 TEZ in wei
-        let amount = U256::from(42u64) * U256::from(10u64).pow(U256::from(18u64));
+        let amount =
+            alloy_to_wei(&(U256::from(42u64) * U256::from(10u64).pow(U256::from(18u64))));
         let gas_limit = 100_000u64;
         let timestamp = U256::from(1_700_000_000u64);
         let block_number = U256::from(12345u64);
@@ -2562,7 +2561,7 @@ mod tests {
             alias,
             alias,
             RuntimeId::Tezos,
-            U256::ZERO,
+            Wei::ZERO,
             TezosXGas::new(0, RuntimeId::Tezos),
             U256::ZERO,
             U256::ZERO,
@@ -2684,7 +2683,7 @@ mod tests {
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
-            U256::ZERO,
+            Wei::ZERO,
             TezosXGas::new(100_000, RuntimeId::Ethereum),
             U256::from(1_700_000_000u64),
             U256::from(1u64),
@@ -2721,7 +2720,8 @@ mod tests {
         let source_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
         // 0.5 TEZ in wei
-        let amount = U256::from(5u64) * U256::from(10u64).pow(U256::from(17u64));
+        let amount =
+            alloy_to_wei(&(U256::from(5u64) * U256::from(10u64).pow(U256::from(17u64))));
 
         inject_tezos_headers(
             request.headers_mut(),
@@ -2770,7 +2770,7 @@ mod tests {
             &sender_alias.to_b58check(),
             &source_alias.to_b58check(),
             RuntimeId::Tezos,
-            U256::ZERO,
+            Wei::ZERO,
             TezosXGas::new(0, RuntimeId::Ethereum),
             U256::ZERO,
             U256::ZERO,
@@ -2950,7 +2950,7 @@ mod tests {
             &sender_alias.to_b58check(),
             RuntimeId::Tezos,
             // 1 TEZ in wei
-            U256::from(10u64).pow(U256::from(18u64)),
+            alloy_to_wei(&U256::from(10u64).pow(U256::from(18u64))),
             TezosXGas::new(50_000, RuntimeId::Ethereum),
             U256::from(100u64),
             U256::from(42u64),
@@ -3072,7 +3072,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(1u64).unwrap()),
-            1_000_000_000_000,
+            ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(
@@ -3090,7 +3090,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(3u64).unwrap()),
-            2_000_000_000_000,
+            2 * ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(
@@ -3109,7 +3109,7 @@ mod tests {
         charge_delegated_storage_cost(
             &mut gas,
             Some(Mutez::try_from(1u64).unwrap()),
-            3_000_000_000_000,
+            3 * ONE_MUTEZ_WEI,
         )
         .expect("should succeed");
         assert_eq!(

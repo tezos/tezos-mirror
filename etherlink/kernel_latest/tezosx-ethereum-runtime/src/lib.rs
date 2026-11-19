@@ -15,6 +15,7 @@ use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{EVMError, ExecutionResult, HaltReason, Output};
 use revm::primitives::KECCAK_EMPTY;
+use revm_etherlink::helpers::legacy::wei_to_alloy;
 use revm_etherlink::precompiles::constants::{
     alias_forwarder_delegation_code_hash, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
 };
@@ -461,7 +462,7 @@ where
             senderAddress: hdrs.sender.to_string(),
             sourceAddress: hdrs.source.unwrap_or_default().to_string(),
             targetAddress: parsed.destination.to_string(),
-            amount: hdrs.amount,
+            amount: wei_to_alloy(hdrs.amount),
         }
         .into_log_data(),
     };
@@ -501,7 +502,7 @@ where
         Some(parsed.destination),
         call_data,
         gas_data,
-        hdrs.amount,
+        wei_to_alloy(hdrs.amount),
         None,
         // Disable EIP-3607 (via `is_simulation = true`): an inbound CRAC
         // caller is not a user-signed EVM transaction but a trusted,

@@ -22,7 +22,7 @@ use revm_etherlink::precompiles::send_outbox_message::{
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::{
-    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    helpers::legacy::{alloy_to_wei, h160_to_alloy, u256_to_alloy, wei_to_alloy},
     ExecutionOutcome, TransactionOrigin,
 };
 use revm_etherlink::{GasData, RevmTxRefusal, TxValidation};
@@ -46,6 +46,7 @@ use tezos_tezlink::operation_result::{
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
+use tezosx_types::Wei;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{
@@ -203,11 +204,13 @@ pub fn is_valid_ethereum_transaction_common(
 
     // The sender account balance contains at least the cost.
     let total_gas_limit = U256::from(transaction.gas_limit_with_fees());
-    let cost = total_gas_limit.saturating_mul(effective_gas_price);
+    let cost = Wei::from_u256(total_gas_limit.saturating_mul(effective_gas_price));
     // The sender can afford the max gas fee he set, see EIP-1559
-    let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
+    let max_fee =
+        Wei::from_u256(total_gas_limit.saturating_mul(transaction.max_fee_per_gas));
+    let balance = alloy_to_wei(&info.balance);
 
-    if info.balance < u256_to_alloy(&cost) || info.balance < u256_to_alloy(&max_fee) {
+    if balance < cost || balance < max_fee {
         log!(Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
@@ -244,11 +247,10 @@ pub fn is_valid_ethereum_transaction_common(
         // The DA fee is debited before the run (see
         // `apply_ethereum_transaction_common`). `InvalidPrePay` above
         // ensures it does not exceed the balance.
-        info.balance
-            .saturating_sub(u256_to_alloy(&transaction_da_fee(
-                transaction,
-                block_constant,
-            )))
+        info.balance.saturating_sub(wei_to_alloy(transaction_da_fee(
+            transaction,
+            block_constant,
+        )))
     };
     let gas_data = revm_gas_data(
         capped_gas_limit,
@@ -286,7 +288,7 @@ pub fn is_valid_ethereum_transaction_common(
 fn transaction_da_fee(
     transaction: &EthereumTransactionCommon,
     block_constants: &BlockConstants,
-) -> U256 {
+) -> Wei {
     fees::da_fee(
         block_constants.block_fees.da_fee_per_byte(),
         &transaction.data,
@@ -741,9 +743,7 @@ where
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
 
-        if let Err(e) =
-            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&cost))
-        {
+        if let Err(e) = caller_account.sub_balance(rk.eth_accounts_mut(), cost) {
             return Err(anyhow::anyhow!(
                 "Failed to charge {caller} additional fees of {}: {}",
                 cost,
@@ -874,7 +874,7 @@ where
     // below. `TransactionOrigin::CrossRuntime { credit }` would revert
     // the credit automatically, but it also skips the journal commit
     // this top-level transaction needs.
-    caller_account.add_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+    caller_account.add_balance(rk.eth_accounts_mut(), value)?;
     let call_data = handle_xtz_depositCall {
         deposit: SolXTZDeposit::from(deposit),
     }
@@ -903,7 +903,7 @@ where
                 Some(transaction_hash),
                 caller,
                 to,
-                value,
+                value.as_u256(),
                 call_data,
                 gas_limit,
                 effective_gas_price,
@@ -917,8 +917,7 @@ where
             if let Ok(execution_outcome) = &outcome {
                 // Refund an EVM revert before closing, as on the previous success path.
                 if !execution_outcome.result.is_success() {
-                    caller_account
-                        .sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+                    caller_account.sub_balance(rk.eth_accounts_mut(), value)?;
                 }
             }
             // Keep a runtime error as the value so its prefund refund runs after closing.
@@ -929,7 +928,7 @@ where
         Ok(outcome) => Ok(outcome),
         Err(err) => {
             // Something went wrong, remove the XTZ deposit's prefund.
-            caller_account.sub_balance(rk.eth_accounts_mut(), u256_to_alloy(&value))?;
+            caller_account.sub_balance(rk.eth_accounts_mut(), value)?;
             Err(err)
         }
     }
@@ -1254,9 +1253,11 @@ where
             let tx_type = transaction.type_();
             let gas_used = execution_outcome.result.tx_gas_used();
 
+            // The validation and the u64 gas used and base fee ensure the fee
+            // amounts stay in bounds. Fails only if the base fee is zero.
             let fee_updates = transaction
                 .content
-                .fee_updates(&block_constants.block_fees, gas_used.into());
+                .fee_updates(&block_constants.block_fees, gas_used.into())?;
 
             log!(
                 Debug,
@@ -1455,6 +1456,7 @@ pub(crate) mod tests {
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_keyspace::KeySpace;
     use tezosx_journal::TezosXHashes;
+    use tezosx_types::ONE_MUTEZ_WEI;
 
     const CHAIN_ID: u32 = 1337;
 
@@ -1462,7 +1464,7 @@ pub(crate) mod tests {
         let block_fees = BlockFees::new(
             U256::from(12345),
             U256::from(12345),
-            U256::from(2_000_000_000_000u64),
+            U256::from(2 * ONE_MUTEZ_WEI),
         );
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),
@@ -1716,7 +1718,7 @@ pub(crate) mod tests {
                 (balance, EvmLimits::default().maximum_gas_limit)
             } else {
                 let da_fee = transaction_da_fee(&valid_tx(gas_limit), &block_constants);
-                (balance - da_fee, 21000)
+                (balance - da_fee.as_u256(), 21000)
             };
             // One wei more than what the balance covers.
             let value_above = available - U256::from(execution_gas) * gas_price + 1;

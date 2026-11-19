@@ -10,11 +10,11 @@
 //!
 //! Also home to the amount newtypes of the native-token unit boundary.
 //! Every kernel-authored amount is an explicit [`Mutez`] (the Tezos-side
-//! unit) or [`Wei`] (the seam-only EVM-side unit, used only in the
-//! mutez/wei conversion API, header amounts, and bridge amounts — never
-//! threaded into general EVM code, which stays on alloy's `U256`). Every
-//! unit crossing is an explicit, named conversion: mixing the two units,
-//! or converting without naming a rounding policy, does not compile.
+//! unit) or [`Wei`] (the EVM-side unit, for the wei amounts the kernel
+//! authors outside the EVM execution, which itself stays on alloy's
+//! `U256`). Every unit crossing is an explicit, named conversion: mixing
+//! the two units, or converting without naming a rounding policy, does not
+//! compile.
 
 mod gas;
 pub mod headers;
@@ -24,8 +24,10 @@ mod wei;
 
 pub use gas::{EvmGas, Gas, Milligas};
 pub use mutez::{Mutez, MutezError};
-pub use pricing::{michelson_gas_to_mutez, mutez_to_evm_gas};
-pub use wei::{Wei, WeiToMutezError, ONE_MUTEZ_WEI};
+pub use pricing::{
+    michelson_gas_to_mutez, mutez_to_evm_gas, wei_to_evm_gas, GasConversionError,
+};
+pub use wei::{Wei, WeiError, WeiToMutezError, ONE_MUTEZ_WEI};
 
 use primitive_types::U256;
 use tezos_crypto_rs::base58::FromBase58CheckError;

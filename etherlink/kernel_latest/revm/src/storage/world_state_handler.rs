@@ -19,10 +19,15 @@ use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
 use tezos_storage::keyspace::KeySpaceExtB58;
 use tezosx_interfaces::{AliasInfo, Origin};
 use tezosx_types::StorageReadErrorKind;
+use tezosx_types::Wei;
 
 use evm_types::{FaDepositWithProxy, PrecompileStateError};
 
-use crate::{error::EvmDbError, storage::code::CodeStorage};
+use crate::{
+    error::EvmDbError,
+    helpers::legacy::{alloy_to_wei, wei_to_alloy},
+    storage::code::CodeStorage,
+};
 
 /// Key to the L1 address of the withdrawal ticketer, inside the
 /// `/evm/world_state` keyspace.
@@ -574,13 +579,16 @@ impl StorageAccount {
     pub fn add_balance(
         &mut self,
         eth_accounts: &mut impl KeySpace,
-        amount: U256,
+        amount: Wei,
     ) -> Result<(), EvmDbError> {
         let mut info = self.info(eth_accounts)?;
         let current = info.balance;
-        info.balance = current
-            .checked_add(amount)
-            .ok_or(EvmDbError::BalanceOverflow { current, amount })?;
+        info.balance = current.checked_add(wei_to_alloy(amount)).ok_or_else(|| {
+            EvmDbError::BalanceOverflow {
+                current: alloy_to_wei(&current),
+                amount,
+            }
+        })?;
         self.write_info(eth_accounts, info)
     }
 
@@ -588,13 +596,16 @@ impl StorageAccount {
     pub fn sub_balance(
         &mut self,
         eth_accounts: &mut impl KeySpace,
-        amount: U256,
+        amount: Wei,
     ) -> Result<(), EvmDbError> {
         let mut info = self.info(eth_accounts)?;
         let current = info.balance;
-        info.balance = current
-            .checked_sub(amount)
-            .ok_or(EvmDbError::BalanceUnderflow { current, amount })?;
+        info.balance = current.checked_sub(wei_to_alloy(amount)).ok_or_else(|| {
+            EvmDbError::BalanceUnderflow {
+                current: alloy_to_wei(&current),
+                amount,
+            }
+        })?;
         self.write_info(eth_accounts, info)
     }
 

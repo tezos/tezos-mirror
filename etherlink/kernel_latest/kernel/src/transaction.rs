@@ -171,7 +171,7 @@ impl Transaction {
 
     pub fn value(&self) -> U256 {
         match &self.content {
-            TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
+            TransactionContent::Deposit(Deposit { amount, .. }) => amount.as_u256(),
             &TransactionContent::FaDeposit(_) => U256::zero(),
             TransactionContent::TezosDelayed(_) => U256::zero(),
             TransactionContent::Ethereum(transaction)

@@ -16,13 +16,14 @@ pub use tezosx_interfaces::{
     X_TEZOS_TIMESTAMP,
 };
 
-use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
+use alloy_primitives::{hex::FromHex, Address};
 use primitive_types::U256;
 use tezosx_interfaces::headers::{
     check_crac_depth, parse_str, parse_tez_to_wei, parse_u32_default, require_gas,
     require_str, require_u32, require_u64,
 };
 use tezosx_interfaces::{Gas, RuntimeId, TezosXRuntimeError};
+use tezosx_types::Wei;
 
 /// Values contained in the `X-Tezos-*` request headers, in their Ethereum
 /// runtime types.
@@ -31,7 +32,7 @@ pub struct EthereumHeaders {
     /// Sender EVM address (for `msg.sender`).
     pub sender: Address,
     /// Transfer amount (for `msg.value`).
-    pub amount: AlloyU256,
+    pub amount: Wei,
     /// Gas limit in gas units.
     pub gas_limit: Gas,
     /// Block timestamp.
@@ -107,16 +108,13 @@ pub fn parse_request_headers(
     })
 }
 
-/// Parse the `X-Tezos-Amount` TEZ decimal string and convert to wei as
-/// `AlloyU256`.
+/// Parse the `X-Tezos-Amount` TEZ decimal string into wei.
 fn require_tez_as_wei(
     headers: &http::HeaderMap,
     name: &str,
-) -> Result<AlloyU256, TezosXRuntimeError> {
+) -> Result<Wei, TezosXRuntimeError> {
     let s = require_str(headers, name)?;
-    let wei = parse_tez_to_wei(&s)?;
-    // Convert primitive_types::U256 to alloy U256 via limbs.
-    Ok(AlloyU256::from_limbs(wei.0))
+    parse_tez_to_wei(&s)
 }
 
 fn require_address(
@@ -155,7 +153,7 @@ mod tests {
         let headers = headers_from(&required_headers());
         let parsed = parse_request_headers(&headers).unwrap();
         assert_eq!(parsed.sender, Address::from_hex(ADDR).unwrap());
-        assert_eq!(parsed.amount, AlloyU256::ZERO);
+        assert_eq!(parsed.amount, Wei::ZERO);
         assert_eq!(parsed.gas_limit, Gas::new(1_000_000, RuntimeId::Tezos));
         assert_eq!(parsed.timestamp, U256::from(1_000_000));
         assert_eq!(parsed.block_number, U256::from(1));
@@ -198,7 +196,10 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "1.5");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, AlloyU256::from(1_500_000_000_000_000_000u64));
+        assert_eq!(
+            parsed.amount,
+            Wei::from_u256(U256::from(1_500_000_000_000_000_000u64))
+        );
     }
 
     #[test]
@@ -208,8 +209,9 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "1000000000000");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        let expected =
-            AlloyU256::from_str_radix("1000000000000000000000000000000", 10).unwrap();
+        let expected = Wei::from_u256(
+            U256::from_dec_str("1000000000000000000000000000000").unwrap(),
+        );
         assert_eq!(parsed.amount, expected);
     }
 
@@ -269,7 +271,7 @@ mod tests {
     fn amount_zero_parsed_correctly() {
         let hdrs = required_headers(); // default amount is "0"
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, AlloyU256::ZERO);
+        assert_eq!(parsed.amount, Wei::ZERO);
     }
 
     #[test]
@@ -279,7 +281,7 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.000000000000000001");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, AlloyU256::from(1u64));
+        assert_eq!(parsed.amount, Wei::from_u256(U256::from(1u64)));
     }
 
     #[test]
@@ -298,7 +300,7 @@ mod tests {
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.0000000000000000001");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
-        assert_eq!(parsed.amount, AlloyU256::ZERO);
+        assert_eq!(parsed.amount, Wei::ZERO);
     }
 
     // --- Gas limit edge cases ---

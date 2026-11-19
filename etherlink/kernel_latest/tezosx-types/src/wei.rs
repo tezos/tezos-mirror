@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! `Wei` — the seam-only EVM-side unit. Intended only for the mutez/wei
-//! conversion API and the amount seams (bridge deposits, CRAC header
-//! amounts); never threaded into general EVM code (the revm side stays on
-//! alloy's `U256`; existing seams convert at the boundary, e.g.
-//! `u256_to_alloy`).
+//! `Wei` — the EVM-side unit of the wei amounts the kernel authors outside
+//! the EVM execution: bridge deposits, cross-runtime header amounts, fees,
+//! and the credits the kernel writes to the EVM ledger. The EVM execution
+//! itself stays on alloy's `U256`; the kernel converts at the calls into it.
+
+use std::fmt;
 
 use primitive_types::U256;
 use thiserror::Error;
@@ -29,6 +30,17 @@ pub enum WeiToMutezError {
     AmountTooLarge,
 }
 
+/// Errors computing with a [`Wei`].
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum WeiError {
+    /// Checked addition or multiplication overflowed `U256`.
+    #[error("wei arithmetic overflow")]
+    Overflow,
+    /// Checked subtraction underflowed zero.
+    #[error("wei arithmetic underflow")]
+    Underflow,
+}
+
 /// A non-negative amount of wei.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
 pub struct Wei(U256);
@@ -46,6 +58,40 @@ impl Wei {
     /// (e.g. `u256_to_alloy`).
     pub fn as_u256(self) -> U256 {
         self.0
+    }
+
+    /// Whether the amount is zero.
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
+    }
+
+    /// Checked addition; errs on overflow.
+    pub fn checked_add(self, other: Wei) -> Result<Wei, WeiError> {
+        self.0
+            .checked_add(other.0)
+            .map(Wei)
+            .ok_or(WeiError::Overflow)
+    }
+
+    /// Checked subtraction; errs on underflow below zero.
+    pub fn checked_sub(self, other: Wei) -> Result<Wei, WeiError> {
+        self.0
+            .checked_sub(other.0)
+            .map(Wei)
+            .ok_or(WeiError::Underflow)
+    }
+
+    /// Saturating addition; stays at the `U256` maximum on overflow.
+    pub fn saturating_add(self, other: Wei) -> Wei {
+        Wei(self.0.saturating_add(other.0))
+    }
+
+    /// Checked multiplication by a count; errs on overflow.
+    pub fn checked_mul(self, factor: u64) -> Result<Wei, WeiError> {
+        self.0
+            .checked_mul(U256::from(factor))
+            .map(Wei)
+            .ok_or(WeiError::Overflow)
     }
 
     /// Bridge policy (today: deposit amount parsing): refuse any sub-mutez
@@ -81,6 +127,12 @@ impl Wei {
     }
 }
 
+impl fmt::Display for Wei {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Mutez {
     /// Exact embedding into wei: every mutez amount is representable in
     /// wei, since `i64::MAX * 10^12` fits comfortably in a `U256`.
@@ -105,6 +157,12 @@ mod tests {
     #[test]
     fn mutez_to_wei_zero() {
         assert_eq!(Mutez::ZERO.to_wei(), Wei::ZERO);
+    }
+
+    #[test]
+    fn is_zero_only_for_zero() {
+        assert!(Wei::ZERO.is_zero());
+        assert!(!Wei::from_u256(U256::one()).is_zero());
     }
 
     #[test]
@@ -165,6 +223,63 @@ mod tests {
         let wei =
             Wei::from_u256(U256::from(x) * U256::from(ONE_MUTEZ_WEI) + U256::from(r));
         assert_eq!(wei.to_mutez_floor(), Ok(Mutez::try_from(x).unwrap()));
+    }
+
+    #[test]
+    fn checked_add_sums() {
+        let wei = Wei::from_u256(U256::from(2u64))
+            .checked_add(Wei::from_u256(U256::from(3u64)));
+        assert_eq!(wei, Ok(Wei::from_u256(U256::from(5u64))));
+    }
+
+    #[test]
+    fn checked_add_rejects_overflow() {
+        let wei = Wei::from_u256(U256::MAX).checked_add(Wei::from_u256(U256::one()));
+        assert_eq!(wei, Err(WeiError::Overflow));
+    }
+
+    #[test]
+    fn saturating_add_sums() {
+        let wei = Wei::from_u256(U256::from(2u64))
+            .saturating_add(Wei::from_u256(U256::from(3u64)));
+        assert_eq!(wei, Wei::from_u256(U256::from(5u64)));
+    }
+
+    #[test]
+    fn saturating_add_saturates() {
+        let wei = Wei::from_u256(U256::MAX).saturating_add(Wei::from_u256(U256::one()));
+        assert_eq!(wei, Wei::from_u256(U256::MAX));
+    }
+
+    #[test]
+    fn checked_sub_subtracts() {
+        let wei = Wei::from_u256(U256::from(5u64))
+            .checked_sub(Wei::from_u256(U256::from(3u64)));
+        assert_eq!(wei, Ok(Wei::from_u256(U256::from(2u64))));
+    }
+
+    #[test]
+    fn checked_sub_rejects_underflow() {
+        let wei = Wei::ZERO.checked_sub(Wei::from_u256(U256::one()));
+        assert_eq!(wei, Err(WeiError::Underflow));
+    }
+
+    #[test]
+    fn checked_mul_scales() {
+        let wei = Wei::from_u256(U256::from(4u64)).checked_mul(3);
+        assert_eq!(wei, Ok(Wei::from_u256(U256::from(12u64))));
+    }
+
+    #[test]
+    fn checked_mul_rejects_overflow() {
+        let wei = Wei::from_u256(U256::MAX).checked_mul(2);
+        assert_eq!(wei, Err(WeiError::Overflow));
+    }
+
+    #[test]
+    fn display_prints_the_wei_digits() {
+        let wei = Mutez::try_from(3u64).unwrap().to_wei();
+        assert_eq!(wei.to_string(), (3 * ONE_MUTEZ_WEI).to_string());
     }
 
     #[test]

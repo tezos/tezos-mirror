@@ -19,6 +19,7 @@ use crate::storage::{
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{block_storage, journal};
 use crate::{error::Error, storage};
+use tezosx_types::Wei;
 
 use crate::{parsable, parsing};
 
@@ -26,7 +27,7 @@ use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
-    helpers::legacy::u256_to_alloy, EvmKernelError as RevmError, ExecutionOutcome,
+    helpers::legacy::wei_to_alloy, EvmKernelError as RevmError, ExecutionOutcome,
     TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
@@ -485,7 +486,7 @@ impl Evaluation {
         let gas = self
             .gas
             .map_or(max_gas_limit, |gas| u64::min(gas, max_gas_limit));
-        let max_gas_to_pay = constants.base_fee_per_gas() * gas;
+        let max_gas_to_pay = Wei::from_u256(constants.base_fee_per_gas() * gas);
 
         // If the simulation is performed with the zero address and has a non
         // null value, the simulation will fail with out of funds.
@@ -497,7 +498,8 @@ impl Evaluation {
         if from.is_zero() {
             if let Some(value) = self.value {
                 let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
-                info.balance = u256_to_alloy(&value.saturating_add(max_gas_to_pay));
+                info.balance =
+                    wei_to_alloy(Wei::from_u256(value).saturating_add(max_gas_to_pay));
                 // A fictional balance: the storage of a simulation is
                 // discarded when it ends, so this moves no value.
                 #[allow(clippy::disallowed_methods)]
@@ -506,7 +508,7 @@ impl Evaluation {
         }
 
         let mut info = simulation_caller.info(rk.eth_accounts_mut())?;
-        info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
+        info.balance = info.balance.saturating_add(wei_to_alloy(max_gas_to_pay));
         // A fictional balance: the storage of a simulation is discarded
         // when it ends, so this moves no value.
         #[allow(clippy::disallowed_methods)]
@@ -752,6 +754,7 @@ mod tests {
     use alloy_primitives::hex::FromHex;
     use primitive_types::H256;
     use revm::primitives::Address;
+    use revm_etherlink::helpers::legacy::u256_to_alloy;
     use revm_etherlink::{
         run_transaction, storage::world_state_handler::StorageAccount, GasData,
     };

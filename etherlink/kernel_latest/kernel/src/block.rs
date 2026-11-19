@@ -3387,7 +3387,8 @@ mod tests {
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
         let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[], 0);
-        let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee;
+        let expected_fees =
+            dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee.as_u256();
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
 
@@ -4359,6 +4360,59 @@ mod tests {
         let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
             .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
+    }
+
+    #[test]
+    fn uncomputable_fee_settlement_reverts_the_block() {
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let transactions = vec![Transaction {
+            tx_hash,
+            content: EthereumDelayed(dummy_eth_transaction_zero()),
+        }];
+        store_blueprints(&mut base, vec![blueprint(transactions)]);
+
+        set_balance(
+            rk.eth_accounts_mut(),
+            &dummy_eth_caller(),
+            U256::from(10000000000000000000u64),
+        );
+        let zero_base_fee =
+            BlockFees::new(U256::zero(), U256::zero(), U256::from(DUMMY_DA_FEE));
+        store_block_fees(rk.evm_world_state_mut(), &zero_base_fee).unwrap();
+        drop(rk);
+        drop(base);
+
+        let chain_config = TezosXChainConfig::create_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits {
+                minimum_base_fee_per_gas: U256::zero(),
+                ..EvmLimits::default()
+            },
+            SpecId::default(),
+            ExperimentalFeatures::default(),
+            DebugFeatures::default(),
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
+        );
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation = produce(
+            &mut host,
+            bk,
+            &chain_config,
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("A failed block is reverted, not propagated");
+
+        assert_eq!(ComputationResult::RebootNeeded, computation);
+        let base = load_base(&mut host).unwrap();
+        assert!(read_current_number(&base).is_err());
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert!(read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err());
     }
 
     // Comment out `ignore` when resigning the dummy transactions

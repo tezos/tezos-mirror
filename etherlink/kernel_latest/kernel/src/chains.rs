@@ -28,10 +28,7 @@ use mir::ast::PublicKeyHash;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
-use revm_etherlink::{
-    helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    storage::block::BLOCKS_STORED,
-};
+use revm_etherlink::{helpers::legacy::h160_to_alloy, storage::block::BLOCKS_STORED};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
@@ -475,6 +472,7 @@ impl TezosXChainConfig {
         coinbase: H160,
     ) -> anyhow::Result<TezosXBlockConstants> {
         let level: BlockNumber = block_in_progress.number.try_into()?;
+        // The fee per byte is read as the amount one byte costs.
         let da_fee_per_byte_mutez = Wei::from_u256(da_fee_per_byte)
             .to_mutez_exact()
             .map_err(|_| crate::Error::InvalidConversion)?;
@@ -949,18 +947,14 @@ impl CreditDaFees {
 
     /// The sequencer pool and what it is owed, for the commit to pay.
     /// `None` when no pool is configured or nothing is owed.
-    fn to_credit(&self) -> Option<(revm::primitives::Address, revm::primitives::U256)> {
+    fn to_credit(&self) -> Option<(revm::primitives::Address, Wei)> {
         match self {
             CreditDaFees::Skip => None,
             CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez,
-            } => sequencer_pool_address.map(|address| {
-                (
-                    h160_to_alloy(&address),
-                    u256_to_alloy(&da_fees_mutez.to_wei().as_u256()),
-                )
-            }),
+            } => sequencer_pool_address
+                .map(|address| (h160_to_alloy(&address), da_fees_mutez.to_wei())),
         }
     }
 }
