@@ -85,7 +85,7 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 # Test bare image. [create_docker_image.sh --push] already published it to
 # the registry, so [docker run] auto-pulls it when absent locally.
-REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
+REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version sapling
 
 # Sign images
 ./scripts/ci/docker_sign.sh
