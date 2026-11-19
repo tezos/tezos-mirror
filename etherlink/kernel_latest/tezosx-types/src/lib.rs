@@ -185,6 +185,14 @@ pub enum TezosXRuntimeError {
     OutOfGas,
     #[error("Native address verification error: {0}")]
     CheckNativeAddressError(CheckNativeAddressError),
+    /// A savepoint of a snapshot of the Michelson accounts could
+    /// not be opened, released or rolled back.
+    ///
+    /// Carries the message of the snapshot error rather than the error
+    /// itself, as [`KernelStorageError`] does, so that `tezosx-types` stays
+    /// free of `tezos-evm-runtime`.
+    #[error("Snapshot error: {0}")]
+    Snapshot(String),
 }
 
 impl From<tezos_smart_rollup_keyspace::KeySpaceError> for TezosXRuntimeError {

@@ -879,7 +879,7 @@ where
         }
         // The alias is materialized under a world-state snapshot, which no
         // EVM frame releases here.
-        let snapshots = journal.michelson.snapshot_count();
+        let savepoints = journal.michelson.savepoint_count();
         let resolution = registry.ensure_alias(
             rk,
             journal,
@@ -897,13 +897,14 @@ where
         if resolution.is_ok() {
             journal
                 .michelson
-                .release_snapshots_from(rk.host_mut(), snapshots)
+                .release_savepoints_from(rk, savepoints)
+                .map_err(|e| TezosXRuntimeError::Snapshot(e.to_string()))?;
         } else {
             journal
                 .michelson
-                .revert_snapshots_from(rk.host_mut(), snapshots)
+                .revert_savepoints_from(rk, savepoints)
+                .map_err(|e| TezosXRuntimeError::Snapshot(e.to_string()))?;
         }
-        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
         let (alias, resolution) = match resolution {
             Ok(resolution) => resolution,
             // Running out of gas means the creation used the whole budget.
@@ -1743,7 +1744,8 @@ where
             | TezosXRuntimeError::HeaderError(_)
             | TezosXRuntimeError::CheckNativeAddressError(_)
             | TezosXRuntimeError::Key(_)
-            | TezosXRuntimeError::KeySpace(_) => {
+            | TezosXRuntimeError::KeySpace(_)
+            | TezosXRuntimeError::Snapshot(_) => {
                 mir::interpreter::EnshrinedViewDispatchError::AliasResolution.into()
             }
         })?;

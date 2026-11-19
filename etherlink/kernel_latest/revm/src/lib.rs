@@ -796,7 +796,7 @@ where
             if let Some(cp) = credit_checkpoint {
                 evm_context.ctx.journaled_state.checkpoint_revert(cp);
             }
-            return Err(EvmKernelError::Runtime(err).into());
+            return Err(EvmKernelError::Snapshot(err).into());
         }
 
         if let Some(cp) = credit_checkpoint {
@@ -871,7 +871,7 @@ where
             if let Some(cp) = credit_checkpoint {
                 evm_context.ctx.journaled_state.checkpoint_revert(cp);
             }
-            return Err(EvmKernelError::Runtime(err).into());
+            return Err(EvmKernelError::Snapshot(err).into());
         }
 
         if let Some(cp) = credit_checkpoint {
@@ -6667,7 +6667,7 @@ mod test {
         journal
             .journal
             .michelson
-            .checkpoint(journal.database.rk.host_mut(), &world)
+            .checkpoint(journal.database.rk)
             .expect("michelson world-state snapshot");
         journal
             .database

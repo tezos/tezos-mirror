@@ -24,7 +24,10 @@ tezos_ethereum.workspace = true
 michelson-types.workspace = true
 tezosx-types.workspace = true
 anyhow.workspace = true
-tezos-smart-rollup-host.workspace = true
+
+# Storage snapshots
+tezos-evm-runtime.workspace = true
+tezos-smart-rollup-keyspace.workspace = true
 
 # Error handling
 thiserror.workspace = true
@@ -39,7 +42,7 @@ tezos_crypto_rs.workspace = true
 [dev-dependencies]
 tezos_crypto_rs.workspace = true
 tezos-evm-logging.workspace = true
-tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-encoding.workspace = true
 tezos_data_encoding.workspace = true
 tezos-protocol.workspace = true

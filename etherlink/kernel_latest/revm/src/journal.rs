@@ -41,7 +41,7 @@ use evm_types::{
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_evm_runtime::snapshot::SnapshotError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
 use tezosx_interfaces::{
@@ -71,7 +71,7 @@ pub struct Journal<
     /// Deferred error from michelson journal checkpoint operations.
     /// The `JournalTr` trait methods `checkpoint_commit` and `checkpoint_revert`
     /// cannot return errors, so we store them here for later retrieval.
-    deferred_error: Option<RuntimeError>,
+    deferred_error: Option<SnapshotError>,
 }
 
 impl<
@@ -93,7 +93,7 @@ impl<
     }
 
     /// Take any deferred error from michelson journal checkpoint operations.
-    pub fn take_deferred_error(&mut self) -> Option<RuntimeError> {
+    pub fn take_deferred_error(&mut self) -> Option<SnapshotError> {
         self.deferred_error.take()
     }
 }
@@ -376,7 +376,7 @@ impl<
     #[inline]
     fn checkpoint_commit(&mut self) {
         self.journal.evm.inner.checkpoint_commit();
-        if let Err(e) = self.journal.global_commit(self.database.rk.host_mut()) {
+        if let Err(e) = self.journal.global_commit(self.database.rk) {
             self.deferred_error.get_or_insert(e);
         }
     }
@@ -385,10 +385,9 @@ impl<
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
         self.journal.evm.inner.checkpoint_revert(checkpoint);
         // `global_revert` rolls back every runtime's durable overlay. The
-        // Michelson side recovers each snapshot's revert target from the
-        // snapshot itself (see `MichelsonJournal`), so no path is supplied
-        // — CRACs may snapshot subtrees other than `/evm/world_state`.
-        if let Err(e) = self.journal.global_revert(self.database.rk.host_mut()) {
+        // Michelson side restores `/tez/tez_accounts` from the frame's
+        // savepoint of its snapshot.
+        if let Err(e) = self.journal.global_revert(self.database.rk) {
             self.deferred_error.get_or_insert(e);
         }
     }
