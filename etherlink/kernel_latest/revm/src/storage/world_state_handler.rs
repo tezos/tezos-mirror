@@ -12,7 +12,7 @@ use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::public_key::PublicKey;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
-use tezos_ethereum::keyspace::KeySpaceExtU256;
+use tezos_ethereum::keyspace::{KeySpaceExtHash, KeySpaceExtU256};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_keyspace::extensions::KeySpaceExtNum;
 use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
@@ -445,9 +445,7 @@ impl StorageAccount {
         let info = AccountInfo {
             balance: eth_accounts.get_evm_u256_le_or(&balance_key, BALANCE_DEFAULT_VALUE),
             nonce: eth_accounts.get_le_or(&nonce_key, NONCE_DEFAULT_VALUE),
-            code_hash: eth_accounts
-                .get_prefix_exact::<32>(&code_hash_key)
-                .map_or(KECCAK_EMPTY, B256::from),
+            code_hash: eth_accounts.get_b256_or(&code_hash_key, KECCAK_EMPTY),
             // Split-field accounts predate classification.
             origin: AccountOrigin::Unclassified,
             code: None,

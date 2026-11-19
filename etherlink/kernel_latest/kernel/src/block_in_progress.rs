@@ -36,9 +36,7 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{
-    RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
-};
+use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -523,14 +521,12 @@ impl BlockInProgress {
             crate::state_hash::evm_state_hash(rk.eth_accounts(), &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
-            rk.host_mut(),
-            &EVM_WORLD_STATE_ROOT_PATH,
+            rk.evm_world_state_mut(),
             &self.cumulative_receipts,
         )?;
         let transactions_root = self.transactions_root();
         block_storage::store_current_transactions_objects(
-            rk.host_mut(),
-            &EVM_WORLD_STATE_ROOT_PATH,
+            rk.evm_world_state_mut(),
             &self.cumulative_tx_objects,
         )?;
         let base_fee_per_gas = base_fee_per_gas(
@@ -577,8 +573,7 @@ impl BlockInProgress {
             let tez_block = L2Block::Tezlink(tez_block);
             // Maintain the live_blocks set for the Michelson runtime (branch validation).
             block_storage::store_current(
-                rk.host_mut(),
-                &TEZ_WORLD_STATE_ROOT_PATH,
+                rk.tez_world_state_mut(),
                 &tez_block,
                 true, // maintain_live_blocks
             )
@@ -602,8 +597,7 @@ impl BlockInProgress {
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
         block_storage::store_current(
-            rk.host_mut(),
-            &EVM_WORLD_STATE_ROOT_PATH,
+            rk.evm_world_state_mut(),
             &new_block,
             false, // maintain_live_blocks
         )

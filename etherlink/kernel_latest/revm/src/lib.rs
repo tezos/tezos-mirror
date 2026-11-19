@@ -6596,6 +6596,44 @@ mod test {
         );
     }
 
+    /// `block_hash` returns the hash that the block index holds for a block
+    /// of the window, and fails with the `NotFound` read error of the
+    /// keyspace when it holds none.
+    #[test]
+    fn block_hash_reads_the_block_index() {
+        use crate::error::EvmDbError;
+        use crate::storage::block::block_index_key;
+        use crate::EtherlinkVMDB;
+        use revm::{primitives::B256, Database};
+        use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_KEYSPACE_NAME;
+        use tezos_smart_rollup_keyspace::{KeySpaceError, ReadKind};
+        use tezosx_types::StorageReadErrorKind;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let registry = Registry::new();
+        let mut block = BlockConstants::test_block_with_no_fees();
+        block.number = primitive_types::U256::from(2);
+
+        {
+            let mut db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
+            assert_eq!(
+                db.block_hash(1),
+                Err(EvmDbError::KeySpace(KeySpaceError::read(
+                    &EVM_WORLD_STATE_KEYSPACE_NAME,
+                    &block_index_key(1),
+                    ReadKind::Ext(StorageReadErrorKind::NotFound),
+                )))
+            );
+        }
+
+        rk.evm_world_state_mut()
+            .set(&block_index_key(1), [7; 32])
+            .unwrap();
+        let mut db = EtherlinkVMDB::new(&mut rk, &registry, &block, None).unwrap();
+        assert_eq!(db.block_hash(1), Ok(B256::from([7; 32])));
+    }
+
     /// Cross-frame atomicity: a successful Branch 3 materialization that is
     /// then discarded by an outer-frame revert must leave no durable alias,
     /// even when the enclosing operation goes on to commit other work.

@@ -271,13 +271,10 @@ where
                     return Ok(BlueprintParsing::Postponed);
                 }
             }
-            let tezos_parent_hash = block_storage::read_current_hash(
-                host,
-                &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
-            )
-            .unwrap_or_else(|_| {
-                H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
-            });
+            let tezos_parent_hash =
+                block_storage::read_current_hash(bk.tez_world_state()).unwrap_or_else(
+                    || H256(*tezos_tezlink::block::TezBlock::genesis_block_hash()),
+                );
             let bip: BlockInProgress = bip_from_blueprint(
                 bk.evm_world_state(),
                 chain_config,
@@ -767,7 +764,7 @@ mod tests {
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::path::{concat, RefPath};
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameters;
     use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL, TARGET_TEZOS_PROTOCOL};
@@ -1371,9 +1368,10 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity(host: &mut impl StorageV1) {
-        match block_storage::read_current_etherlink_block(host) {
-            Ok(_) => (),
+    fn assert_current_block_reading_validity(evm_world_state: &impl KeySpace) {
+        match block_storage::read_current_etherlink_block(evm_world_state) {
+            Ok(Some(_)) => (),
+            Ok(None) => panic!("No current block\n"),
             Err(e) => {
                 panic!("Block reading failed: {e:?}\n")
             }
@@ -1458,15 +1456,14 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Verify that a TezBlock was stored (under /tez/world_state)
-        let tez_block_number =
-            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock number should be readable");
+        let bk = load_keyspaces(&mut host).unwrap();
+        let tez_block_number = block_storage::read_current_number(bk.tez_world_state())
+            .expect("TezBlock number should be readable");
         // Block number is 0 for the first block (same as EVM block numbering)
         assert_eq!(U256::from(0), tez_block_number);
 
-        let tez_block_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock hash should be readable");
+        let tez_block_hash = block_storage::read_current_hash(bk.tez_world_state())
+            .expect("TezBlock hash should be readable");
         // The hash should not be zero (it's computed from the block content)
         assert_ne!(H256::zero(), tez_block_hash);
     }
@@ -1524,9 +1521,11 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Record block 0 hash
-        let block_0_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock 0 hash should be readable");
+        let block_0_hash = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            block_storage::read_current_hash(rk.tez_world_state())
+        }
+        .expect("TezBlock 0 hash should be readable");
         assert_ne!(H256::zero(), block_0_hash);
 
         // Block 1: transfer operation
@@ -1565,20 +1564,19 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Block 1 hash should be different from block 0
-        let block_1_hash =
-            block_storage::read_current_hash(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .expect("TezBlock 1 hash should be readable");
+        let block_1_hash = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            block_storage::read_current_hash(rk.tez_world_state())
+        }
+        .expect("TezBlock 1 hash should be readable");
         assert_ne!(block_0_hash, block_1_hash);
 
         // Read block 1 from storage and check its previous_hash equals block 0's hash
-        let block_path = concat(
-            &TEZ_WORLD_STATE_ROOT_PATH,
-            &RefPath::assert_from(b"/blocks/current/block"),
-        )
-        .expect("Block path should be valid");
-        let block_bytes = host
-            .store_read_all(&block_path)
-            .expect("Should read block bytes");
+        let block_bytes = {
+            let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            read_tez_current_block(rk.tez_world_state())
+        }
+        .expect("Should read block bytes");
         let rlp = rlp::Rlp::new(&block_bytes);
         // TezBlock RLP layout: [version, hash, number, previous_hash, timestamp, operations]
         let previous_hash: H256 = rlp
@@ -1619,11 +1617,8 @@ mod tests {
                 rk.tez_world_state()
             )
             .is_none());
+            assert!(block_storage::read_current_number(rk.tez_world_state()).is_none());
         }
-        assert!(
-            block_storage::read_current_number(&host, &TEZ_WORLD_STATE_ROOT_PATH)
-                .is_err()
-        );
         let alias_implementation = RefPath::assert_from(
             b"/tez/tez_accounts/tezosx/__system__/alias_implementation",
         );
@@ -2786,10 +2781,10 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "Invalid transaction should not have a receipt"
         );
     }
@@ -2836,9 +2831,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -2894,13 +2889,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &below_hash).is_err(),
             "The transaction below its intrinsic gas must be dropped without a receipt"
         );
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &valid_hash)
             .expect("The valid transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -2970,13 +2965,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &below_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &below_hash).is_err(),
             "The transaction below its calldata floor must be dropped without a receipt"
         );
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &valid_hash)
             .expect("The valid transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -3037,9 +3032,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("The transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
@@ -3107,9 +3102,9 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let status = read_transaction_receipt_status(rk.host_mut(), &tx_hash)
+        let status = read_transaction_receipt_status(rk.evm_world_state(), &tx_hash)
             .expect("The transaction should have a receipt");
         assert_eq!(TransactionStatus::Failure, status);
     }
@@ -3155,8 +3150,8 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(
@@ -3317,10 +3312,10 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        let receipt0 = read_transaction_receipt(rk.host_mut(), &tx_hash_0)
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let receipt0 = read_transaction_receipt(rk.evm_world_state(), &tx_hash_0)
             .expect("should have found receipt");
-        let receipt1 = read_transaction_receipt(rk.host_mut(), &tx_hash_1)
+        let receipt1 = read_transaction_receipt(rk.evm_world_state(), &tx_hash_1)
             .expect("should have found receipt");
 
         assert_eq!(receipt0.cumulative_gas_used, base_gas + gas_for_fees);
@@ -3339,7 +3334,8 @@ mod tests {
 
         produce_block_with_several_valid_txs(&mut host, bk);
 
-        assert_current_block_reading_validity(&mut host);
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_current_block_reading_validity(rk.evm_world_state());
     }
 
     #[test]
@@ -3477,15 +3473,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -3759,7 +3756,7 @@ mod tests {
         .expect("The block production failed.");
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert!(
-            read_transaction_receipt(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash).is_err(),
             "Transaction is invalid, so should not have a receipt"
         );
 
@@ -4204,15 +4201,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -4280,13 +4278,13 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // See address at https://www.multicall3.com/ on in the github repository linked above
         let expected_created_contract =
             H160::from_str("0xcA11bde05977b3631167028862bE2a173976CA11").unwrap();
 
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(Some(expected_created_contract), receipt.contract_address);
@@ -4348,17 +4346,18 @@ mod tests {
             None,
         )
         .expect("Block production must not be aborted by a delayed transaction");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // The poison transaction is skipped as invalid: it leaves no receipt.
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
 
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 
@@ -4411,8 +4410,8 @@ mod tests {
         assert_eq!(ComputationResult::RebootNeeded, computation);
         let base = load_base(&mut host).unwrap();
         assert!(read_current_number(&base).is_err());
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        assert!(read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err());
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert!(read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err());
     }
 
     // Comment out `ignore` when resigning the dummy transactions
@@ -4489,18 +4488,20 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        let receipt = read_transaction_receipt(rk.host_mut(), &tx_hash)
+        let receipt = read_transaction_receipt(rk.evm_world_state(), &tx_hash)
             .expect("Should have found receipt");
         assert_eq!(receipt.type_, TransactionType::Legacy);
 
-        let receipt_eip1559 = read_transaction_receipt(rk.host_mut(), &tx_hash_eip1559)
-            .expect("Should have found receipt");
+        let receipt_eip1559 =
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash_eip1559)
+                .expect("Should have found receipt");
         assert_eq!(receipt_eip1559.type_, TransactionType::Eip1559);
 
-        let receipt_eip2930 = read_transaction_receipt(rk.host_mut(), &tx_hash_eip2930)
-            .expect("Should have found receipt");
+        let receipt_eip2930 =
+            read_transaction_receipt(rk.evm_world_state(), &tx_hash_eip2930)
+                .expect("Should have found receipt");
         assert_eq!(receipt_eip2930.type_, TransactionType::Eip2930);
     }
 
@@ -4556,10 +4557,10 @@ mod tests {
         let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         let mut base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tez_current_block(rk.host_mut()).unwrap();
+        let block = read_tez_current_block(rk.tez_world_state()).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, previous_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -4578,10 +4579,10 @@ mod tests {
         let bk = load_keyspaces(&mut host).unwrap();
         let computation = produce(&mut host, bk, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tez_current_block(rk.host_mut()).unwrap();
+        let block = read_tez_current_block(rk.tez_world_state()).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, current_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -4726,15 +4727,16 @@ mod tests {
             None,
         )
         .expect("The block production failed.");
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         assert!(
-            read_transaction_receipt_status(rk.host_mut(), &tx_hash).is_err(),
+            read_transaction_receipt_status(rk.evm_world_state(), &tx_hash).is_err(),
             "The poison delayed transaction must be skipped without a receipt"
         );
         // The block is produced: the next transaction is applied.
-        let status = read_transaction_receipt_status(rk.host_mut(), &valid_tx_hash)
-            .expect("The next transaction should have a receipt");
+        let status =
+            read_transaction_receipt_status(rk.evm_world_state(), &valid_tx_hash)
+                .expect("The next transaction should have a receipt");
         assert_eq!(TransactionStatus::Success, status);
     }
 }

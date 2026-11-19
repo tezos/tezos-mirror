@@ -88,35 +88,33 @@ where
 
     fn handle_input<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         input: Self,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal;
+        Host: HostReveal;
 
     fn handle_deposit<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         deposit: Deposit,
-        chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal;
+        Host: HostReveal;
 
     fn handle_fa_deposit<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         fa_deposit: FaDeposit,
-        chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal;
+        Host: HostReveal;
 }
 
 impl InputHandler for ProxyInput {
@@ -125,15 +123,12 @@ impl InputHandler for ProxyInput {
     type Inbox = ProxyInboxContent;
 
     fn handle_input<Host>(
-        _host: &mut Host,
-        base: &mut impl KeySpace,
+        _: &mut Host,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         input: Self,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
-    ) -> anyhow::Result<()>
-    where
-        Host: StorageV1,
-    {
+    ) -> anyhow::Result<()> {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
                 .transactions
@@ -142,7 +137,12 @@ impl InputHandler for ProxyInput {
                 tx_hash,
                 num_chunks,
                 chunk_hashes,
-            } => create_chunked_transaction(base, &tx_hash, num_chunks, chunk_hashes)?,
+            } => create_chunked_transaction(
+                bk.base_mut(),
+                &tx_hash,
+                num_chunks,
+                chunk_hashes,
+            )?,
             Self::TransactionChunk {
                 tx_hash,
                 i,
@@ -150,7 +150,7 @@ impl InputHandler for ProxyInput {
                 data,
             } => {
                 if let Some(tx) =
-                    handle_transaction_chunk(base, tx_hash, i, chunk_hash, data)?
+                    handle_transaction_chunk(bk.base_mut(), tx_hash, i, chunk_hash, data)?
                 {
                     inbox_content.transactions.push(tx.into())
                 }
@@ -161,9 +161,8 @@ impl InputHandler for ProxyInput {
 
     fn handle_deposit<Host>(
         host: &mut Host,
-        _base: &mut impl KeySpace,
+        _bk: &mut BlueprintKeyspaces<impl KeySpace>,
         deposit: Deposit,
-        _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
@@ -172,16 +171,15 @@ impl InputHandler for ProxyInput {
     {
         inbox_content
             .transactions
-            .push(handle_deposit(host, deposit)?);
+            .push(handle_deposit(host, deposit));
         Ok(())
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
     fn handle_fa_deposit<Host>(
         host: &mut Host,
-        _base: &mut impl KeySpace,
+        _bk: &mut BlueprintKeyspaces<impl KeySpace>,
         fa_deposit: FaDeposit,
-        _chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
         _common_config: &CommonConfig,
     ) -> anyhow::Result<()>
@@ -190,7 +188,7 @@ impl InputHandler for ProxyInput {
     {
         inbox_content
             .transactions
-            .push(handle_fa_deposit(host, fa_deposit)?);
+            .push(handle_fa_deposit(host, fa_deposit));
         Ok(())
     }
 }
@@ -217,23 +215,22 @@ impl InputHandler for SequencerInput {
 
     fn handle_input<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
+        Host: HostReveal,
     {
         log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
-                let previous_timestamp = read_last_info_per_level_timestamp(base)?;
-                let level = read_l1_level(base)?;
+                let previous_timestamp = read_last_info_per_level_timestamp(bk.base())?;
+                let level = read_l1_level(bk.base())?;
                 log!(Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(
-                    host,
-                    base,
+                    bk,
                     TezosXTransaction::Ethereum(tx),
                     previous_timestamp,
                     level,
@@ -241,7 +238,7 @@ impl InputHandler for SequencerInput {
                 )
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
-                handle_blueprint_chunk(base, seq_blueprint)
+                handle_blueprint_chunk(bk.base_mut(), seq_blueprint)
             }
             Self::SequencerBlueprint(
                 InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
@@ -257,6 +254,7 @@ impl InputHandler for SequencerInput {
                 let params = host.reveal_dal_parameters();
                 let slot_size = params.slot_size;
                 let page_size = params.page_size;
+                let base = bk.base_mut();
                 let next_blueprint_number: U256 =
                     crate::blueprint_storage::read_next_blueprint_number(base)?;
                 for signal in signals.0.iter() {
@@ -297,37 +295,35 @@ impl InputHandler for SequencerInput {
 
     fn handle_deposit<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         deposit: Deposit,
-        _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
+        Host: HostReveal,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
-        let level = read_l1_level(base)?;
-        let tx = handle_deposit(host, deposit)?;
-        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(bk.base())?;
+        let level = read_l1_level(bk.base())?;
+        let tx = handle_deposit(host, deposit);
+        delayed_inbox.save_transaction(bk, tx, previous_timestamp, level, common)
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
     fn handle_fa_deposit<Host>(
         host: &mut Host,
-        base: &mut impl KeySpace,
+        bk: &mut BlueprintKeyspaces<impl KeySpace>,
         fa_deposit: FaDeposit,
-        _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
         common: &CommonConfig,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + HostReveal,
+        Host: HostReveal,
     {
-        let previous_timestamp = read_last_info_per_level_timestamp(base)?;
-        let level = read_l1_level(base)?;
-        let tx = handle_fa_deposit(host, fa_deposit)?;
-        delayed_inbox.save_transaction(host, base, tx, previous_timestamp, level, common)
+        let previous_timestamp = read_last_info_per_level_timestamp(bk.base())?;
+        let level = read_l1_level(bk.base())?;
+        let tx = handle_fa_deposit(host, fa_deposit);
+        delayed_inbox.save_transaction(bk, tx, previous_timestamp, level, common)
     }
 }
 
@@ -378,31 +374,28 @@ fn handle_transaction_chunk(
     Ok(None)
 }
 
-fn handle_deposit(
-    host: &mut impl HostReveal,
-    deposit: Deposit,
-) -> Result<TezosXTransaction, Error> {
+fn handle_deposit(host: &mut impl HostReveal, deposit: Deposit) -> TezosXTransaction {
     let seed = host.reveal_metadata().raw_rollup_address;
     let tx_hash = deposit.hash(&seed).into();
-    Ok(Transaction {
+    Transaction {
         tx_hash,
         content: TransactionContent::Deposit(deposit),
     }
-    .into())
+    .into()
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
 fn handle_fa_deposit(
     host: &mut impl HostReveal,
     fa_deposit: FaDeposit,
-) -> Result<TezosXTransaction, Error> {
+) -> TezosXTransaction {
     let seed = host.reveal_metadata().raw_rollup_address;
     let tx_hash = fa_deposit.hash(&seed).into();
-    Ok(Transaction {
+    Transaction {
         tx_hash,
         content: TransactionContent::FaDeposit(fa_deposit),
     }
-    .into())
+    .into()
 }
 
 fn force_kernel_upgrade<Host>(
@@ -511,7 +504,7 @@ where
     let base = bk.base_mut();
     match input {
         Input::ModeSpecific(input) => {
-            Mode::handle_input(host, base, input, inbox_content, common)?
+            Mode::handle_input(host, bk, input, inbox_content, common)?
         }
         Input::Upgrade(kernel_upgrade) => {
             store_kernel_upgrade(base, &kernel_upgrade, common)?
@@ -526,17 +519,12 @@ where
             store_last_info_per_level_timestamp(base, info.info.predecessor_timestamp)?;
             store_l1_level(base, info.level)?
         }
-        Input::Deposit((deposit, chain_id)) => {
-            Mode::handle_deposit(host, base, deposit, chain_id, inbox_content, common)?
+        Input::Deposit((deposit, _chain_id)) => {
+            Mode::handle_deposit(host, bk, deposit, inbox_content, common)?
         }
-        Input::FaDeposit((fa_deposit, chain_id)) => Mode::handle_fa_deposit(
-            host,
-            base,
-            fa_deposit,
-            chain_id,
-            inbox_content,
-            common,
-        )?,
+        Input::FaDeposit((fa_deposit, _chain_id)) => {
+            Mode::handle_fa_deposit(host, bk, fa_deposit, inbox_content, common)?
+        }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host, base)?,
         Input::DalAttestedSlots {
             published_level,

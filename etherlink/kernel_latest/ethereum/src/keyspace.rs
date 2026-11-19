@@ -4,15 +4,15 @@
 
 //! Reads and writes, at a key space key, the two 256-bit integers the kernel
 //! uses: the `primitive_types` one the storage speaks, and the `revm` one the
-//! EVM demands.
+//! EVM demands. Also reads the 32-byte hashes, stored as their bytes.
 //!
-//! Either one is the four `u64`s it is made of, stored least or most
+//! Either integer is the four `u64`s it is made of, stored least or most
 //! significant first depending on the accessor. This crate is the deepest one
 //! the storage and the EVM sides both depend on, which is why the accessors
 //! live here rather than next to either of them.
 
-use primitive_types::U256;
-use revm::primitives::U256 as EvmU256;
+use primitive_types::{H256, U256};
+use revm::primitives::{B256, U256 as EvmU256};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 /// Reads and writes 256-bit integers at a key.
@@ -92,6 +92,35 @@ pub trait KeySpaceExtU256: KeySpace {
 }
 
 impl<KS: KeySpace> KeySpaceExtU256 for KS {}
+
+/// Reads 32-byte hashes at a key.
+///
+/// Implemented for every [`KeySpace`], so bringing the trait into scope is
+/// enough to call these on any key space handle.
+pub trait KeySpaceExtHash: KeySpace {
+    /// Returns the hash at `key`, or `None` when the key is absent or holds
+    /// fewer than 32 bytes. A longer value reads as its first 32 bytes.
+    fn get_h256(&self, key: &Key) -> Option<H256> {
+        self.get_prefix_exact(key).map(H256)
+    }
+
+    /// [`Self::get_h256`], falling back to `default`.
+    fn get_h256_or(&self, key: &Key, default: H256) -> H256 {
+        self.get_h256(key).unwrap_or(default)
+    }
+
+    /// [`Self::get_h256`] for the EVM's own hash type.
+    fn get_b256(&self, key: &Key) -> Option<B256> {
+        self.get_prefix_exact(key).map(B256::from)
+    }
+
+    /// [`Self::get_b256`], falling back to `default`.
+    fn get_b256_or(&self, key: &Key, default: B256) -> B256 {
+        self.get_b256(key).unwrap_or(default)
+    }
+}
+
+impl<KS: KeySpace> KeySpaceExtHash for KS {}
 
 /// Returns the `N` `u64`s of the value at `key`, least significant first, or
 /// `None` when the key is absent or holds fewer than `N * 8` bytes.
@@ -277,6 +306,68 @@ mod tests {
         assert_eq!(
             ks.get_evm_u256_le(&k).unwrap().to_string(),
             value.to_string()
+        );
+    }
+
+    #[test]
+    fn a_hash_reads_its_first_32_bytes() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let hash = [7u8; 32];
+
+        ks.set(&key(b"/hash"), hash).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/hash")), Some(H256(hash)));
+
+        // A longer value reads as its first 32 bytes, a shorter one as missing.
+        ks.set(&key(b"/long"), [7u8; 33]).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/long")), Some(H256(hash)));
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(ks.get_h256(&key(b"/short")), None);
+        assert_eq!(ks.get_h256(&key(b"/absent")), None);
+    }
+
+    #[test]
+    fn both_hash_types_read_the_same_bytes() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let hash = [7u8; 32];
+
+        ks.set(&key(b"/hash"), hash).unwrap();
+        assert_eq!(ks.get_b256(&key(b"/hash")), Some(B256::from(hash)));
+        assert_eq!(
+            ks.get_b256(&key(b"/hash")).map(|hash| hash.0),
+            ks.get_h256(&key(b"/hash")).map(|hash| hash.0)
+        );
+
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(ks.get_b256(&key(b"/short")), None);
+    }
+
+    #[test]
+    fn a_missing_or_short_hash_takes_the_default() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
+        let default = [9u8; 32];
+
+        assert_eq!(
+            ks.get_h256_or(&key(b"/absent"), H256(default)),
+            H256(default)
+        );
+        assert_eq!(
+            ks.get_b256_or(&key(b"/absent"), B256::from(default)),
+            B256::from(default)
+        );
+
+        ks.set(&key(b"/short"), [7u8; 31]).unwrap();
+        assert_eq!(
+            ks.get_h256_or(&key(b"/short"), H256(default)),
+            H256(default)
+        );
+
+        ks.set(&key(b"/hash"), [7u8; 32]).unwrap();
+        assert_eq!(
+            ks.get_b256_or(&key(b"/hash"), B256::from(default)),
+            B256::from([7u8; 32])
         );
     }
 }
