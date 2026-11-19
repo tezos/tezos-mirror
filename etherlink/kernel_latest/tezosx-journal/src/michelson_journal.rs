@@ -109,8 +109,7 @@ impl std::error::Error for DispatchSlotError {}
 ///   held by a [`RuntimeKeyspaces`] for its `/tez/tez_accounts`. It is a
 ///   stack of backups of that keyspace, not a backup itself. There is one
 ///   per `RuntimeKeyspaces`: the transaction's and, during a Tezos operation
-///   batch, the one of the batch's `SafeStorage` mirror, nested in the
-///   transaction's.
+///   batch, the one of the batch's safe copy, nested in the transaction's.
 /// - **Savepoint**: one backup on a snapshot's stack, a copy of the accounts
 ///   taken at some point (`/__savepoint/<index><root>`). Released, it is
 ///   deleted and the writes made since are kept. Rolled back, it is moved
@@ -413,7 +412,7 @@ impl MichelsonJournal {
 
     /// Restore the origination-nonce index to a previously snapshotted
     /// value.  Needed on the native Michelson path, which reverts
-    /// through `SafeStorage` without opening a journal frame, so the
+    /// a safe copy without opening a journal frame, so the
     /// checkpoint machinery that rolls this back for EVM-driven frames
     /// does not fire: a backtracked batch must not consume indices, as
     /// on L1 the nonce dies with the reverted context.
@@ -630,10 +629,10 @@ impl MichelsonJournal {
     /// savepoints back to those of the enclosing snapshots. Savepoint
     /// indices and frame watermarks keep counting from the savepoints
     /// still open on an enclosing snapshot, e.g. the transaction's
-    /// while a Tezos operation batch runs on its mirror.
+    /// while a Tezos operation batch runs in a safe copy.
     ///
     /// Whoever runs a scope on `rk` (a transaction, a Tezos operation batch
-    /// on its mirror) calls it at the end, on every path, error paths
+    /// in a safe copy) calls it at the end, on every path, error paths
     /// included. Otherwise the journal would keep counting these savepoints,
     /// and every later index, watermark and release would be off by that
     /// many.
@@ -825,8 +824,8 @@ impl MichelsonJournal {
     }
 
     /// Number of savepoints open on the snapshots enclosing the accounts
-    /// snapshot of `rk`, e.g. the transaction's while `rk` is the mirror of a
-    /// Tezos operation batch.
+    /// snapshot of `rk`, e.g. the transaction's while `rk` is the safe copy of
+    /// a Tezos operation batch.
     ///
     /// `self.savepoints` counts the savepoints open across every snapshot the
     /// journal drives, oldest snapshot first, while the snapshot of `rk` holds
@@ -901,7 +900,6 @@ mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
-    use tezos_evm_runtime::safe_storage::SafeStorage;
     use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
     use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
@@ -2032,7 +2030,7 @@ mod tests {
     }
 
     // The native Michelson path opens no journal frame (it reverts
-    // through `SafeStorage`), so it hands indices back explicitly. A
+    // a safe copy), so it hands indices back explicitly. A
     // backtracked batch must not consume any.
     #[test]
     fn test_restore_origination_index_releases_claimed_indices() {
@@ -2405,10 +2403,8 @@ mod tests {
         write_data(&mut outer, b"v0");
         let idx_outer = journal.checkpoint(&mut outer).unwrap();
 
-        // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror =
-            SafeStorage::new(outer.host_mut().unprefixed_mut().unwrap(), vec![]);
-        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        // A safe copy, as for a Tezos operation batch.
+        let mut inner = outer.start_safe().unwrap();
         journal.checkpoint(&mut inner).unwrap();
         write_data(&mut inner, b"inner");
 
@@ -2424,8 +2420,8 @@ mod tests {
         assert_eq!(journal.savepoint_count(), 1);
     }
 
-    // While the transaction holds a savepoint, a frame reverted on a batch
-    // mirror restores the accounts as they were when the frame started.
+    // While the transaction holds a savepoint, a frame reverted in a batch's
+    // safe copy restores the accounts as they were when the frame started.
     #[test]
     fn test_revert_frame_inside_an_enclosing_snapshot() {
         let mut host = MockKernelHost::default();
@@ -2435,10 +2431,8 @@ mod tests {
         write_data(&mut outer, b"v0");
         journal.checkpoint(&mut outer).unwrap();
 
-        // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror =
-            SafeStorage::new(outer.host_mut().unprefixed_mut().unwrap(), vec![]);
-        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        // A safe copy, as for a Tezos operation batch.
+        let mut inner = outer.start_safe().unwrap();
         write_data(&mut inner, b"i0");
 
         // Watermark 1: savepoint 0 is on the enclosing snapshot.
@@ -2494,10 +2488,8 @@ mod tests {
 
         let idx_outer = journal.checkpoint(&mut outer).unwrap();
 
-        // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror =
-            SafeStorage::new(outer.host_mut().unprefixed_mut().unwrap(), vec![]);
-        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        // A safe copy, as for a Tezos operation batch.
+        let mut inner = outer.start_safe().unwrap();
         journal.checkpoint(&mut inner).unwrap();
 
         assert_eq!(
@@ -2524,10 +2516,8 @@ mod tests {
         journal.push_external_checkpoint();
         journal.checkpoint(&mut outer).unwrap();
 
-        // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror =
-            SafeStorage::new(outer.host_mut().unprefixed_mut().unwrap(), vec![]);
-        let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
+        // A safe copy, as for a Tezos operation batch.
+        let mut inner = outer.start_safe().unwrap();
         journal.checkpoint(&mut inner).unwrap();
 
         assert_eq!(

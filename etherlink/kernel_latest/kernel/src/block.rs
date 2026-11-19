@@ -1379,13 +1379,10 @@ mod tests {
         }
     }
 
-    fn dummy_tezosx_config_with_tezos_runtime<Host>(
-        host: &mut Host,
+    fn dummy_tezosx_config_with_tezos_runtime(
+        host: &mut impl StorageV1,
         base: &mut impl KeySpace,
-    ) -> TezosXChainConfig
-    where
-        Host: StorageV1 + KeySpaceLoader,
-    {
+    ) -> TezosXChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         init_safe_storage_roots(host);
@@ -2327,9 +2324,7 @@ mod tests {
             content: TransactionContent::TezosDelayed(call),
         }));
 
-        let mut block_constants = first_block(&mut rk, &base_ks);
-        block_constants.michelson_runtime_block_constants.safe_roots =
-            chain_config.world_states(U256::zero());
+        let block_constants = first_block(&mut rk, &base_ks);
         let block_in_progress = BlockInProgress::new(
             block_constants.evm_runtime_block_constants.number,
             VecDeque::new(),
@@ -2570,9 +2565,7 @@ mod tests {
 
             let base_ks = load_base(&mut host).unwrap();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-            let mut block_constants = first_block(&mut rk, &base_ks);
-            block_constants.michelson_runtime_block_constants.safe_roots =
-                chain_config.world_states(U256::zero());
+            let block_constants = first_block(&mut rk, &base_ks);
 
             // Seed the block's prior internal-op count to `base`: a single
             // synthetic applied operation carrying `base` internal results is
@@ -3443,7 +3436,6 @@ mod tests {
                 level: (0.into()),
                 da_fee_per_byte_mutez: tezosx_types::Mutez::ZERO,
                 michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
-                safe_roots: vec![],
             },
         }
     }
@@ -3627,13 +3619,11 @@ mod tests {
             .expect("Contract initialization should have succeeded");
 
         let chain_config = {
-            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
+            let (host, base) = (rk.host_mut(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
         let registry = RegistryImpl::default();
-        let mut block_constants = first_block(&mut rk, &base);
-        block_constants.michelson_runtime_block_constants.safe_roots =
-            chain_config.world_states(U256::zero());
+        let block_constants = first_block(&mut rk, &base);
 
         // Allocate bootstrap1 in TezosX storage with enough balance to
         // cover fees for both ops.
@@ -4558,7 +4548,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let chain_config = {
-            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
+            let (host, base) = (rk.host_mut(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
         let mut config = dummy_configuration();
@@ -4666,7 +4656,7 @@ mod tests {
         rk.host_mut().add_execution_gas(cumulative_gas_in_run);
 
         let chain_config = {
-            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
+            let (host, base) = (rk.host_mut(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
 

@@ -218,7 +218,6 @@ mod test {
                 level: 0.into(),
                 da_fee_per_byte_mutez: tezosx_types::Mutez::ZERO,
                 michelson_to_evm_gas_multiplier: 0,
-                safe_roots: vec![],
             },
         };
 

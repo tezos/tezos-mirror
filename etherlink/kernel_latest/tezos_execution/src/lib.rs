@@ -314,7 +314,7 @@ fn finalize_statuses<M: OperationKind>(
 /// written, so a per-entry burn failure returns the pre-burn
 /// internals: no stray balance_updates survive. Host-side debits
 /// applied by `burn_tez` are rolled back out-of-band by the
-/// caller's `SafeStorage` transaction.
+/// revert of the caller's safe copy.
 fn burn_pass<M, A>(
     tez_accounts: &mut impl KeySpace,
     payer: &A,
@@ -1492,13 +1492,8 @@ where
                 .consume(Cost::transaction())
                 .map_err(TransferError::OutOfGas)?;
 
-            // Safety coupling: `Operation::touches_only_accounts` (tezos crate)
-            // treats implicit-destination transfers as account-only and lets the
-            // caller narrow the per-operation SafeStorage snapshot to the accounts
-            // root. That relies on this guard rejecting any implicit transfer that
-            // could execute code or touch another root (non-default entrypoint /
-            // non-Unit parameter). Do not relax it without revisiting that
-            // classifier.
+            // Implicit accounts have no code: a transfer to one only takes
+            // the default entrypoint and a `Unit` parameter.
             if !entrypoint.is_default() {
                 return Err(TransferError::NoSuchEntrypoint(entrypoint.clone()).into());
             }
@@ -2938,7 +2933,6 @@ pub fn validate_and_apply_operation<Host>(
     skip_signature_check: bool,
     required_fees: Option<Mutez>,
     fee_refund_config: Option<FeeRefundConfig>,
-    safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1 + KeySpaceLoader,
@@ -2947,14 +2941,13 @@ where
 
     let validation_info = OperationScope::run(
         &mut *rk,
-        safe_roots,
         &mut *journal,
         Phase::Validation,
         |validation| -> Result<Close<_>, OperationError> {
             // The validation writes the counter and the balance of the source
             // on the validation scope. When the batch is invalid, the error
             // reverts the scope and drops these writes.
-            let (mut rk, _) = validation.parts_mut()?;
+            let (rk, _) = validation.parts_mut();
             match validate::execute_validation(
                 rk.tez_accounts_mut(),
                 operation,
@@ -2982,29 +2975,21 @@ where
     // so we append the refund balance updates to processed_ops afterwards.
     let mut processed_ops = OperationScope::run(
         &mut *rk,
-        safe_roots,
         &mut *journal,
         Phase::Application,
         |application| -> Result<Close<_>, OperationError> {
-            let (mut rk, journal) = application.parts_mut()?;
-            let applied = apply_batch(
-                &mut rk,
+            let (rk, journal) = application.parts_mut();
+            // The scope releases the savepoints left open in the safe copy
+            // when it closes, on every path.
+            let (processed_ops, applied) = apply_batch(
+                rk,
                 registry,
                 journal,
                 validation_info,
                 block_ctx,
                 &mut nonce_counter,
-            );
-            // Keep the batch's account writes and delete the backups of the
-            // savepoints still open on the mirror, before the scope promotes
-            // or reverts it: a backup restored after the revert would clear
-            // the live accounts. This also brings the journal's savepoint
-            // count back to the transaction's.
-            let released = journal.michelson.release_all_savepoints(&mut rk);
-            let (processed_ops, applied) = applied.map_err(OperationError::BlockAbort)?;
-            released.map_err(|e| {
-                OperationError::BlockAbort(format!("Batch savepoints release: {e}"))
-            })?;
+            )
+            .map_err(OperationError::BlockAbort)?;
 
             if applied {
                 log!(
@@ -3023,8 +3008,9 @@ where
         },
     )?;
 
-    // `apply_fee_refund` writes through `rk` outside `safe_host`, so a failed operation
-    // keeps the refund. A rollback of the storage under `rk` drops the refund too.
+    // `apply_fee_refund` writes through `rk` outside the safe copies of the
+    // batch, so a failed operation keeps the refund. A rollback of the storage
+    // under `rk` drops the refund too.
     if let Some((config, total_fees)) = fee_refund_config {
         let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
         // The refund credit is a `BlockAbort` on failure: it runs after
@@ -3401,9 +3387,7 @@ mod tests {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::{Narith, Zarith};
-    use tezos_evm_runtime::runtime_keyspaces::{
-        MockRuntimeKeyspaces, RuntimeKeyspaces, EVM_WORLD_STATE_ROOT_PATH,
-    };
+    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -3440,7 +3424,6 @@ mod tests {
         TaggedInternalOp,
     };
     use tezos_smart_rollup::types::Timestamp;
-    use tezos_smart_rollup_host::path::OwnedPath;
     use tezos_tezlink::enc_wrappers::BlockNumber;
 
     /// Journal seeded with `hash`, so the operation's origination nonce
@@ -3455,29 +3438,11 @@ mod tests {
         )
     }
 
-    /// A host with the `/evm/eth_accounts` root seeded, so the mirror
-    /// [`validate_and_apply_operation`] opens can copy it.
-    fn test_host() -> MockKernelHost {
-        let mut host = MockKernelHost::default();
-        host.store_write_all(
-            &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
-            b"seed",
-        )
-        .unwrap();
-        host
-    }
-
-    /// Test-only SafeStorage root matching the production Michelson accounts
-    /// root, used to build the account/big-map paths in tests.
-    fn test_root() -> OwnedPath {
-        OwnedPath::from(&tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH)
-    }
-
     /// Pins [`run_code`](crate::run_code)'s step-constant semantics where
     /// they differ from the applied path — a drift there is invisible
     /// until an RPC consumer notices the wrong answer.
     mod run_code {
-        use super::test_host;
+        use super::MockKernelHost;
         use crate::gas::TezlinkOperationGas;
         use crate::{run_code, RunCodeError, RunCodeParams};
         use mir::ast::{AddressHash, Entrypoint, Micheline};
@@ -3535,7 +3500,7 @@ mod tests {
         }
 
         fn run(params: &RunCodeParams) -> Result<Vec<u8>, RunCodeError> {
-            let mut host = test_host();
+            let mut host = MockKernelHost::default();
             let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
             run_code(
                 &mut rk,
@@ -3587,16 +3552,14 @@ mod tests {
             let parser = Parser::new();
             let (script, storage, input) = incr_fixture(&parser);
 
-            let mut host = test_host();
-            let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
+            let mut host = MockKernelHost::default();
             let probe = RefPath::assert_from(b"/tez/tez_accounts/probe");
-            rk.host_mut()
-                .store_write_all(&probe, b"before")
+            host.store_write_all(&probe, b"before")
                 .expect("the probe is written");
 
             {
                 let mut safe_host = SafeStorage::new(
-                    rk.host_mut().unprefixed_mut().unwrap(),
+                    &mut host,
                     vec![OwnedPath::from(
                         tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
                     )],
@@ -3615,14 +3578,11 @@ mod tests {
             }
 
             assert_eq!(
-                rk.host_mut()
-                    .store_read_all(&probe)
-                    .expect("the probe survives"),
+                host.store_read_all(&probe).expect("the probe survives"),
                 b"before"
             );
             assert!(
-                rk.host_mut()
-                    .store_has(&TMP_PATH)
+                host.store_has(&TMP_PATH)
                     .expect("/tmp is readable")
                     .is_none(),
                 "the reverted snapshot should leave no `/tmp` behind"
@@ -3723,14 +3683,6 @@ mod tests {
         }
     }
 
-    /// The roots production narrows an accounts-only operation to: the
-    /// Michelson accounts root and the EVM accounts keyspace root.
-    fn test_safe_roots() -> Vec<OwnedPath> {
-        vec![
-            test_root(),
-            OwnedPath::from(tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH),
-        ]
-    }
     use crate::{get_required_da_fees, TcCtx};
     use primitive_types::U256;
     use tezosx_interfaces::testing::NotWiredRegistry;
@@ -3746,13 +3698,12 @@ mod tests {
         };
     }
 
-    /// The inner mirror of an operation that is not accounts-only copies
-    /// `/evm/world_state` in and promotes it back, so trace output written
-    /// before the operation survives it. The root list is given here, so
-    /// `operation_safe_roots` is not exercised.
+    /// The safe copy of an operation copies `/evm/world_state` in and
+    /// promotes it back, so trace output written before the operation
+    /// survives it.
     #[test]
-    fn inner_mirror_keeps_earlier_traces() {
-        let mut host = test_host();
+    fn safe_copy_keeps_earlier_traces() {
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let trace = Key::from_static(b"/trace/call_trace/0");
         rk.evm_world_state_mut().set(&trace, b"earlier").unwrap();
@@ -3774,9 +3725,6 @@ mod tests {
             30,
             Script { code, storage },
         );
-        assert!(!operation.touches_only_accounts());
-        let mut roots = test_safe_roots();
-        roots.push(OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH));
 
         let processed = validate_and_apply_operation(
             &mut rk,
@@ -3787,7 +3735,6 @@ mod tests {
             false,
             None,
             None,
-            &roots,
         )
         .unwrap();
 
@@ -3966,7 +3913,7 @@ mod tests {
         use mir::ast::{AddressHash, Entrypoint, Type};
         use tezosx_interfaces::{AliasInfo, Origin, RuntimeId};
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let parser = mir::parser::Parser::new();
 
@@ -4019,7 +3966,7 @@ mod tests {
 
     #[test]
     fn upgrade_accepts_entrypoint_superset() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
             rk.tez_accounts_mut(),
@@ -4042,7 +3989,7 @@ mod tests {
 
     #[test]
     fn upgrade_rejects_dropped_entrypoint() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Start from the superset (default + foo)...
         account_storage::write_alias_implementation(
@@ -4069,7 +4016,7 @@ mod tests {
 
     #[test]
     fn upgrade_rejects_entrypoint_type_change() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
             rk.tez_accounts_mut(),
@@ -4092,7 +4039,7 @@ mod tests {
 
     #[test]
     fn upgrade_rejects_storage_type_change() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Base storage is `string` (like the forwarder).
         account_storage::write_alias_implementation(
@@ -4123,7 +4070,7 @@ mod tests {
         // implicit `default` entrypoint's type (it becomes the whole `or`), so
         // the upgrade is correctly rejected. The safe path is to annotate
         // `(unit %default)` — exercised by `upgrade_accepts_entrypoint_superset`.
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
             rk.tez_accounts_mut(),
@@ -4146,7 +4093,7 @@ mod tests {
 
     #[test]
     fn upgrade_rejects_invalid_script() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(
             rk.tez_accounts_mut(),
@@ -4171,7 +4118,7 @@ mod tests {
     #[test]
     fn upgrade_rejects_corrupt_current_implementation() {
         // A non-typeable slot means the current implementation is corrupt.
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         account_storage::write_alias_implementation(rk.tez_accounts_mut(), b"garbage")
             .unwrap();
@@ -4191,7 +4138,7 @@ mod tests {
     #[test]
     fn upgrade_into_empty_slot_is_accepted() {
         // No current implementation: nothing to preserve.
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let code = encode_script(UPGRADE_BASE_SCRIPT);
         upgrade_alias_implementation(rk.tez_accounts_mut(), &code, &mut Gas::default())
@@ -4484,7 +4431,7 @@ mod tests {
     // This should fail as an EmptyImplicitContract
     #[test]
     fn apply_operation_empty_account() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4506,7 +4453,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error =
@@ -4524,7 +4470,7 @@ mod tests {
     // Test that increasing the fees makes the operation fails
     #[test]
     fn apply_operation_cant_pay_fees() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4543,7 +4489,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(ValidityError::CantPayFees(
@@ -4562,7 +4507,7 @@ mod tests {
     // Test that a wrong counter should make the operation fails
     #[test]
     fn apply_operation_invalid_counter() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4581,7 +4526,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error =
@@ -4604,7 +4548,7 @@ mod tests {
     // fail there as a BalanceTooLow.
     #[test]
     fn apply_operation_amount_out_of_domain_is_invalid() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4634,7 +4578,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(
@@ -4653,7 +4596,7 @@ mod tests {
     // A crafted fee above the mutez domain is rejected the same way.
     #[test]
     fn apply_operation_fee_out_of_domain_is_invalid() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4671,7 +4614,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(
@@ -4689,7 +4631,7 @@ mod tests {
 
     #[test]
     fn apply_operation_origination_balance_out_of_domain_is_invalid() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4719,7 +4661,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(
@@ -4739,7 +4680,7 @@ mod tests {
     // Test a reveal operation on an already revealed account
     #[test]
     fn apply_reveal_operation_on_already_revealed_account() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4768,7 +4709,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4821,7 +4761,7 @@ mod tests {
     // the live account) rather than the standalone-only failure path.
     #[test]
     fn reveal_manager_is_always_consistent_on_live_account() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -4855,7 +4795,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4900,7 +4839,7 @@ mod tests {
     // Test an invalid operation where the provided public key is inconsistent for the source
     #[test]
     fn apply_reveal_operation_with_an_inconsistent_public_key() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Wrong public key for source
@@ -4925,7 +4864,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         // The mismatch between the payload key and the source is caught in
@@ -4950,7 +4888,7 @@ mod tests {
     // fee is debited or counter promoted.
     #[test]
     fn validate_reveal_with_attacker_key_does_not_charge_source() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let victim = bootstrap1();
@@ -4990,7 +4928,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         assert_eq!(
@@ -5017,7 +4954,7 @@ mod tests {
     // Test a valid reveal operation, the manager should go from NotRevealed to Revealed
     #[test]
     fn apply_reveal_operation() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -5046,7 +4983,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5093,7 +5029,7 @@ mod tests {
     // Test an invalid transfer operation, source has not enough balance to fulfill the Transfer
     #[test]
     fn apply_transfer_with_not_enough_balance() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -5126,7 +5062,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5186,9 +5121,75 @@ mod tests {
         );
     }
 
+    // Each operation is validated and applied in a safe copy of `rk`, which
+    // nothing outlives, whether the batch is applied, backtracked or invalid.
+    #[test]
+    fn operations_leave_no_safe_copy() {
+        use tezos_evm_runtime::safe_storage::TMP_PATH;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let source = bootstrap1();
+        let dest = bootstrap2();
+        let source_account = init_account(rk.tez_accounts_mut(), &source.pkh, 50);
+        reveal_account(rk.tez_accounts_mut(), &source);
+        let destination_account = init_account(rk.tez_accounts_mut(), &dest.pkh, 50);
+        let apply = |rk: &mut MockRuntimeKeyspaces<'_>, counter: u64, amount: u64| {
+            let operation = make_transfer_operation(
+                15,
+                counter,
+                21040,
+                5,
+                source.clone(),
+                amount.into(),
+                Contract::Implicit(dest.pkh.clone()),
+                Parameters::default(),
+            );
+            let result = validate_and_apply_operation(
+                rk,
+                &NotWiredRegistry,
+                &mut TezosXJournal::mock(RuntimeId::Ethereum),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+                None,
+            );
+            assert_eq!(rk.host().store_has(&TMP_PATH).unwrap(), None);
+            result
+        };
+
+        // Applied: fee 15 and amount 10, so 50 - 15 - 10 = 25 left.
+        apply(&mut rk, 1, 10).expect("the transfer should be applied");
+        // Backtracked: the amount 100 exceeds the 25 - 15 = 10 left after the
+        // fee, so only the fee is paid.
+        apply(&mut rk, 2, 100).expect("the transfer should be backtracked");
+        // Invalid: the counter is already used, so nothing is paid.
+        assert!(matches!(
+            apply(&mut rk, 2, 1),
+            Err(OperationError::Validation(_))
+        ));
+
+        assert_eq!(
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            10_u64.into()
+        );
+        assert_eq!(
+            destination_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            60_u64.into()
+        );
+        assert_eq!(source_account.counter(rk.tez_accounts()).unwrap(), 2.into());
+    }
+
     #[test]
     fn apply_transfer_to_full_balance_fails_with_balance_overflow() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let source = bootstrap1();
@@ -5221,7 +5222,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5276,7 +5276,7 @@ mod tests {
     // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
     #[test]
     fn apply_successful_transfer() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -5309,7 +5309,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5382,7 +5381,7 @@ mod tests {
     // Bootstrap 1 successfully transfers 30 mutez to itself
     #[test]
     fn apply_successful_self_transfer() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -5413,7 +5412,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5482,7 +5480,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_to_originated_faucet_with_success_receipt() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
         let src = bootstrap1();
@@ -5541,7 +5539,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0)
@@ -5661,7 +5658,7 @@ mod tests {
     /// any unknown KT1 would be a user-controllable block-abort handle.
     #[test]
     fn apply_transfer_to_nonexistent_originated_contract() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         // Never-originated KT1: no `init_contract` call, no code blob, no
@@ -5693,7 +5690,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5745,7 +5741,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_execution() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -5789,7 +5785,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5891,7 +5886,7 @@ mod tests {
     /// `set_storage` during execution.
     #[test]
     fn apply_transfer_bumps_paid_bytes_after_storage_growth() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -5934,7 +5929,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5959,7 +5953,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_burn_failure_backtracks_with_error() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -6006,7 +6000,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect("kernel error not expected — burn failure routes through Backtracked");
         let receipts = ProcessedOperation::into_receipts(processed);
@@ -6070,7 +6063,7 @@ mod tests {
 
         assert_eq!(receipts, expected_receipts);
 
-        // SafeStorage rollback: source paid the fee but neither the
+        // Safe copy reverted: source paid the fee but neither the
         // transfer amount nor the burn. Destination storage untouched.
         assert_eq!(
             source.balance(rk.tez_accounts()).unwrap().to_narith(),
@@ -6088,7 +6081,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_to_unallocated_implicit_burns_slot() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -6119,7 +6112,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not return a kernel error"),
         );
@@ -6203,7 +6195,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_to_unallocated_implicit_cannot_pay_slot() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -6233,7 +6225,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not return a kernel error"),
         );
@@ -6300,7 +6291,7 @@ mod tests {
 
         assert_eq!(receipts, expected_receipts);
 
-        // SafeStorage rolled back the allocation: the destination
+        // The safe copy revert dropped the allocation: the destination
         // account is gone again, and the source paid only the fee.
         assert_eq!(
             source.balance(rk.tez_accounts()).unwrap().to_narith(),
@@ -6316,7 +6307,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_failed_execution() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6363,7 +6354,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -6444,7 +6434,7 @@ mod tests {
     /// time, and never its decimal form, whose computation is quadratic.
     #[test]
     fn apply_transfer_failing_with_large_number() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6486,7 +6476,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -6523,7 +6512,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_argument_to_implicit_fails() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6559,7 +6548,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -6596,7 +6584,7 @@ mod tests {
 
     #[test]
     fn apply_transfer_with_non_default_entrypoint_to_implicit_fails() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6633,7 +6621,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -6673,7 +6660,7 @@ mod tests {
 
     #[test]
     fn apply_three_valid_operations() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6727,7 +6714,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -6874,7 +6860,7 @@ mod tests {
 
     #[test]
     fn apply_valid_then_invalid_operation_is_atomic() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -6915,7 +6901,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(ValidityError::CantPayFees(
@@ -6950,7 +6935,7 @@ mod tests {
 
     #[test]
     fn apply_smart_contract_failure_reverts_batch() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -7026,7 +7011,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -7082,7 +7066,7 @@ mod tests {
         );
 
         // Initial balance: 1050 tez, paid in fees: (3*10) tez,
-        // transfer + storage burn reverted via SafeStorage.
+        // transfer + storage burn reverted with the safe copy.
         assert_eq!(
             src_acc.balance(rk.tez_accounts()).unwrap().to_narith(),
             1020.into(),
@@ -7092,7 +7076,7 @@ mod tests {
 
     #[test]
     fn origination_of_a_smart_contract() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -7148,7 +7132,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -7320,7 +7303,7 @@ mod tests {
     /// top-level operation backtracks and the write is rolled back.
     #[test]
     fn test_internal_op_raise_after_applied_sibling_backtracks_top_level() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -7380,7 +7363,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -7446,7 +7428,7 @@ mod tests {
     // its own nonce at 0 and collide.
     #[test]
     fn test_native_origination_claims_from_journal_nonce() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -7481,7 +7463,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -7511,7 +7492,7 @@ mod tests {
 
     #[test]
     fn test_internal_receipts_failure_backtrack_all() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
 
@@ -7599,7 +7580,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -7758,7 +7738,7 @@ mod tests {
         std::thread::Builder::new()
             .stack_size(1024 * 1024)
             .spawn(|| {
-                let mut host = test_host();
+                let mut host = MockKernelHost::default();
                 let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
                 let src = bootstrap1();
                 init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -7800,7 +7780,6 @@ mod tests {
                         false,
                         None,
                         None,
-                        &test_safe_roots(),
                     )
                     .expect(
                         "validate_and_apply_operation should not have failed with a kernel error",
@@ -7856,7 +7835,7 @@ mod tests {
     fn test_deep_internal_transfer_recursion_bounded_by_gas() {
         const DEPTH: usize = 200;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -7899,7 +7878,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8018,7 +7996,7 @@ mod tests {
     /// pending parent from a raise rather than from a drained subtree.
     #[test]
     fn test_internal_op_error_fails_the_emitting_transfer() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -8091,7 +8069,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8177,7 +8154,7 @@ mod tests {
         // top-level operation.
         const CHAIN: usize = 5;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -8253,7 +8230,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8334,7 +8310,7 @@ mod tests {
     /// ticket-carrying transfer) would run twice while L1 backtracks.
     #[test]
     fn test_internal_transfer_replay_is_rejected() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -8411,7 +8387,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8473,7 +8448,7 @@ mod tests {
     /// same contract twice.
     #[test]
     fn test_internal_origination_replay_is_rejected() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -8535,7 +8510,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8592,7 +8566,7 @@ mod tests {
     /// adding an entry over the limit.
     #[test]
     fn test_internal_emit_replay_counts_towards_cap() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -8633,7 +8607,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -8648,7 +8621,7 @@ mod tests {
     /// the same event twice — exercising the `Emit` arm's replay path.
     #[test]
     fn test_internal_emit_replay_is_rejected() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -8709,7 +8682,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -8769,7 +8741,7 @@ mod tests {
     /// add nothing to the `nonce_counter` of the batch.
     #[test]
     fn test_reentrant_gateway_call_counts_towards_cap_of_next_operation() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -8849,7 +8821,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -8875,7 +8846,7 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 50);
@@ -8920,7 +8891,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -8949,7 +8919,7 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         // Fund source for fee + transfer + storage burn for
@@ -8995,7 +8965,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -9024,7 +8993,7 @@ mod tests {
                 PAIR
             }
         ";
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 50);
@@ -9072,7 +9041,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -9102,7 +9070,7 @@ mod tests {
 
     #[test]
     fn test_apply_origination_slot_burn_failure_backtracks() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
 
@@ -9148,7 +9116,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "kernel error not expected — burn failure routes through Backtracked",
@@ -9217,7 +9184,7 @@ mod tests {
 
         assert_eq!(receipts, expected_receipts);
 
-        // Source paid only the fee; SafeStorage rolled back the
+        // Source paid only the fee; the safe copy revert dropped the
         // initial-balance transfer, the variable burn, and the
         // pre-burn smart-contract setup.
         let src_account =
@@ -9227,7 +9194,7 @@ mod tests {
             (funded - fee).into()
         );
 
-        // SafeStorage rolled back the origination: the smart contract is
+        // The safe copy revert dropped the origination: the smart contract is
         // nowhere to be found in durable storage.
         let originated_account =
             account_storage::TezosOriginatedAccount::from_kt1(&expected_kt1)
@@ -9250,7 +9217,7 @@ mod tests {
 
     #[test]
     fn test_internal_origination_of_a_smart_contract() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
@@ -9309,7 +9276,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -9460,7 +9426,7 @@ mod tests {
         // internal op would allocate nonce 65535 fails IN ISOLATION (the block
         // is not aborted), like L1 backtracking the offending operation.
         let run = |base: u128| {
-            let mut host = test_host();
+            let mut host = MockKernelHost::default();
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
             let src = bootstrap1();
             init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -9510,7 +9476,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
         };
         let applied = |result| {
@@ -9542,7 +9507,7 @@ mod tests {
     /// internal op, so this also pins the post-renumber value.
     #[test]
     fn test_create_contract_kt1_uses_l1_canonical_index_zero() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100000);
@@ -9596,7 +9561,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -9670,7 +9634,7 @@ mod tests {
     /// up.
     #[test]
     fn test_internal_originations_generated_addresses() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut gas = Gas::default();
         let parser = mir::parser::Parser::new();
@@ -9738,7 +9702,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -9905,7 +9868,7 @@ mod tests {
 
     #[test]
     fn test_try_apply_three_origination_batch() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let parser = mir::parser::Parser::new();
 
@@ -10011,7 +9974,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -10263,7 +10225,7 @@ mod tests {
 
     #[test]
     fn test_origination_contract_typecheck_storage() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -10306,7 +10268,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10332,7 +10293,7 @@ mod tests {
     // invalid syntactic constant, with `1024` in binary Micheline.
     #[test]
     fn test_origination_dup_above_1023_is_an_invalid_syntactic_constant() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -10373,7 +10334,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10399,7 +10359,7 @@ mod tests {
     // `ScriptTooLarge`. The gate runs before decoding, so raw bytes suffice.
     #[test]
     fn test_origination_script_too_large() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -10432,7 +10392,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10463,7 +10422,7 @@ mod tests {
     // rejected with `MirTypecheckingError` (`TypeTooLarge`) instead of OOM.
     #[test]
     fn test_origination_deeply_nested_or_parameter_rejected() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -10516,7 +10475,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10543,7 +10501,7 @@ mod tests {
     // fail, and empty transfers (external or internal) to smart contracts
     // succeed.
     fn test_empty_transfers() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let dst = bootstrap2();
@@ -10596,7 +10554,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10645,7 +10602,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10695,7 +10651,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10753,7 +10708,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10780,7 +10734,7 @@ mod tests {
 
     #[test]
     fn test_view_instruction() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut gas = Gas::default();
         let src = bootstrap1();
@@ -10853,7 +10807,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -10878,7 +10831,7 @@ mod tests {
 
     #[test]
     fn test_view_balance() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut gas = Gas::default();
         let src = bootstrap1();
@@ -10952,7 +10905,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11066,7 +11018,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11093,7 +11044,7 @@ mod tests {
         expected_sender_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
         expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
     ) {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
@@ -11337,7 +11288,7 @@ mod tests {
 
     #[test]
     fn big_map_transfer_with_creation() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
@@ -11382,7 +11333,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11582,7 +11532,7 @@ mod tests {
     fn forged_big_map_id_in_external_parameter_is_rejected() {
         use mir::ast::big_map::LazyStorage;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
 
@@ -11656,7 +11606,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11695,7 +11644,7 @@ mod tests {
     fn forged_big_map_id_in_origination_storage_is_rejected() {
         use mir::ast::big_map::LazyStorage;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
 
@@ -11762,7 +11711,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11801,7 +11749,7 @@ mod tests {
 
     #[test]
     fn verify_temp_big_map_content_is_cleaned() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         make_default_ctx!(ctx, rk);
         let tz1 = bootstrap1();
@@ -11895,7 +11843,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -11944,7 +11891,7 @@ mod tests {
     /// This tests the happy path: source has enough balance, gateway executes, bridge succeeds.
     #[test]
     fn apply_transfer_to_gateway_happy_path() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -11997,7 +11944,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -12051,7 +11997,7 @@ mod tests {
     // DA fee check entirely, so zero-fee operations are accepted.
     #[test]
     fn da_fee_delayed_inbox_zero_fees_accepted() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
@@ -12081,7 +12027,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         assert!(
@@ -12093,7 +12038,7 @@ mod tests {
     // DA fee enforcement: batch with reveal + transfer whose combined fee covers DA cost.
     #[test]
     fn da_fee_batch_sufficient_fees_accepted() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
@@ -12134,7 +12079,6 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
-            &test_safe_roots(),
         );
 
         assert!(result.is_ok(), "Batch with sufficient fees should succeed");
@@ -12155,7 +12099,7 @@ mod tests {
     // DA fee enforcement: operation with sufficient fees is accepted.
     #[test]
     fn da_fee_sufficient_fees_accepted() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let dest = bootstrap2();
@@ -12188,7 +12132,6 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
-            &test_safe_roots(),
         );
 
         assert!(
@@ -12212,7 +12155,7 @@ mod tests {
     // DA fee enforcement: operation fees below DA cost are rejected.
     #[test]
     fn da_fee_insufficient_fees_rejected() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let _src_account = init_account(rk.tez_accounts_mut(), &source.pkh, 1_000_000);
@@ -12243,7 +12186,6 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
-            &test_safe_roots(),
         );
 
         assert_eq!(
@@ -12257,7 +12199,7 @@ mod tests {
     // — never a reason to abort the block.
     #[test]
     fn batch_fee_sum_out_of_domain_is_invalid_not_aborted() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         // Enough to pay the first operation's fee (2^62), so the second
@@ -12295,7 +12237,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         );
 
         assert!(
@@ -12312,7 +12253,7 @@ mod tests {
 
     #[test]
     fn batch_fee_sum_past_u64_with_fee_refund_is_invalid_not_aborted() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let source = bootstrap1();
         let _src_account =
@@ -12350,7 +12291,6 @@ mod tests {
             false,
             None,
             Some(fee_refund_config),
-            &test_safe_roots(),
         );
 
         assert!(
@@ -12373,7 +12313,7 @@ mod tests {
     /// encode this as absent storage rather than Some([]).
     #[test]
     fn gateway_tez_transfer_receipt_storage_is_none() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let gateway_kt1 =
@@ -12419,7 +12359,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail"),
         );
@@ -12444,7 +12383,7 @@ mod tests {
     /// value) produces an Applied receipt whose storage field is None.
     #[test]
     fn gateway_contract_call_receipt_storage_is_none() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut gas = Gas::default();
         let src = bootstrap1();
@@ -12509,7 +12448,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail"),
         );
@@ -12535,7 +12473,7 @@ mod tests {
     /// produce an Applied result with a spurious storage field.
     #[test]
     fn gateway_evm_revert_yields_failed_receipt() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let gateway_kt1 =
@@ -12577,7 +12515,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail at the protocol level"),
         );
@@ -12593,6 +12530,74 @@ mod tests {
             ),
             "Expected Failed transfer when EVM reverts, got {:?}",
             receipts[0].receipt
+        );
+    }
+
+    /// A gateway call answered with a 5xx aborts the block. The safe copy of
+    /// the application is reverted before the error is returned, so that
+    /// what the caller writes next lands in the keyspaces it lent before.
+    #[test]
+    fn block_abort_leaves_no_safe_copy() {
+        use tezos_evm_runtime::safe_storage::TMP_PATH;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let src = bootstrap1();
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .expect("Gateway KT1 address should be valid");
+        let source_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100);
+        reveal_account(rk.tez_accounts_mut(), &src);
+
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_abort")
+            .with_serve_response(500, b"broken".to_vec());
+        let arena = Arena::new();
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            100_000,
+            100,
+            src,
+            50_u64.into(),
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::try_from("call").unwrap(),
+                value: gateway_call_transfer_param(
+                    &arena,
+                    "0x3333333333333333333333333333333333333333",
+                )
+                .encode(&mut Gas::default())
+                .unwrap()
+                .unwrap(),
+            },
+        );
+
+        let result = validate_and_apply_operation(
+            &mut rk,
+            &registry,
+            &mut TezosXJournal::mock(RuntimeId::Ethereum),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            None,
+        );
+
+        assert!(
+            matches!(result, Err(OperationError::BlockAbort(_))),
+            "Expected a block abort, got {result:?}"
+        );
+        assert_eq!(rk.tez_accounts().name().to_string(), "/tez/tez_accounts");
+        assert_eq!(rk.tez_accounts_snapshot().len(), 0);
+        assert_eq!(rk.host().store_has(&TMP_PATH).unwrap(), None);
+        // The validation was promoted: the fee is paid, the amount is not.
+        assert_eq!(
+            source_account
+                .balance(rk.tez_accounts())
+                .unwrap()
+                .to_narith(),
+            85_u64.into()
         );
     }
 
@@ -12714,7 +12719,7 @@ mod tests {
     fn apply_through_gateway_forwarder(
         registry: &crate::test_utils::MockRegistry,
     ) -> Vec<OperationWithMetadata> {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1_000_000);
@@ -12769,7 +12774,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail"),
         )
@@ -12817,7 +12821,7 @@ mod tests {
         dest: &Contract,
         parameters: &Parameters,
     ) -> Result<crate::CrossRuntimeTransferResult, CracTransferError> {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         let sender_account = init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
@@ -13078,7 +13082,7 @@ mod tests {
     /// `%alias_materialized` event, and leaves no snapshot behind.
     #[test]
     fn materialize_alias_from_an_operation_fills_its_receipt() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100);
@@ -13136,7 +13140,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -13167,12 +13170,11 @@ mod tests {
             .take_pending_alias_origination_internals()
             .is_empty());
         assert_eq!(journal.michelson.savepoint_count(), 0);
-        // Where the operation's snapshot keeps its backups, in the mirror
-        // and once promoted.
-        for backups in [&b"/tmp/__savepoint"[..], &b"/__savepoint"[..]] {
-            let backups = tezos_smart_rollup_host::path::RefPath::assert_from(backups);
-            assert_eq!(rk.host().store_has(&backups).unwrap(), None);
-        }
+        // Where the snapshots keep their backups, those of the safe copies
+        // included.
+        let backups =
+            tezos_smart_rollup_host::path::RefPath::assert_from(b"/__savepoint");
+        assert_eq!(rk.host().store_has(&backups).unwrap(), None);
     }
 
     // --- Tezos alias forwarder tests ---
@@ -13182,7 +13184,7 @@ mod tests {
     /// which routes funds cross-runtime via registry.serve().
     #[test]
     fn tezos_alias_forwarder_forwards_on_transfer() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
@@ -13263,7 +13265,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -13335,7 +13336,7 @@ mod tests {
     /// 5. **Skipped**: batch where first op fails → second op Skipped, 0 gas
     #[test]
     fn gas_tracking_with_internal_operations() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 100_000);
@@ -13408,7 +13409,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("should not fail with a kernel error")
         };
@@ -13619,7 +13619,7 @@ mod tests {
         n: usize,
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Sender: an implicit account (tz1).
@@ -13764,7 +13764,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel \
@@ -13928,7 +13927,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel \
@@ -14108,7 +14106,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel \
@@ -14444,7 +14441,7 @@ mod tests {
         n: usize,
         milligas_limit: u64,
     ) -> (CracTransferError, u64 /* consumed milligas */) {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // Sender: implicit account.
@@ -14794,7 +14791,6 @@ mod tests {
             false,
             None,
             refund_config,
-            &test_safe_roots(),
         )
         .expect("validate_and_apply_operation should succeed");
 
@@ -14820,7 +14816,7 @@ mod tests {
         let initial_balance: u64 = 2000;
         let da_fees: u64 = 50;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
 
         let ctx =
             run_refund_transfer(&mut host, fee, amount, initial_balance, Some(da_fees));
@@ -14870,7 +14866,7 @@ mod tests {
         let amount: u64 = 5;
         let da_fees: u64 = 10;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
 
         let ctx = run_refund_transfer(&mut host, fee, amount, 100, Some(da_fees));
         let bus = ctx.balance_updates();
@@ -14892,7 +14888,7 @@ mod tests {
     fn fee_refund_credit_past_mutez_domain_fails() {
         let fee: u64 = 15;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -14922,7 +14918,6 @@ mod tests {
             false,
             None,
             None,
-            &test_safe_roots(),
         )
         .expect("validate_and_apply_operation should succeed");
 
@@ -14959,7 +14954,7 @@ mod tests {
         let initial_balance: u64 = 2000;
         let huge_base_fee_per_gas = (U256::one() << 64) * U256::exp10(12);
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let ctx = run_refund_transfer_with_base_fee(
             &mut host,
             fee,
@@ -14989,7 +14984,7 @@ mod tests {
         let fee: u64 = 1000;
         let amount: u64 = 30;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
 
         let ctx = run_refund_transfer(&mut host, fee, amount, 2000, None);
         let bus = ctx.balance_updates();
@@ -15012,7 +15007,7 @@ mod tests {
     // is enabled.
     #[test]
     fn apply_batch_with_overflowing_total_fees_and_fee_refund() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let src = bootstrap1();
@@ -15053,7 +15048,6 @@ mod tests {
             false,
             None,
             Some(refund_config),
-            &test_safe_roots(),
         );
 
         assert_eq!(
@@ -15080,7 +15074,7 @@ mod tests {
         // amount > balance after fee deduction → BalanceTooLow
         let amount: u64 = initial_balance;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
 
         let ctx =
             run_refund_transfer(&mut host, fee, amount, initial_balance, Some(da_fees));
@@ -15152,7 +15146,7 @@ mod tests {
         const DEST: &str = CONTRACT_1;
         const A: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
@@ -15206,7 +15200,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("first indexing operation should apply"),
         );
@@ -15274,7 +15267,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("second idempotent indexing operation should apply"),
         );
@@ -15350,7 +15342,7 @@ mod tests {
         const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
         const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
@@ -15404,7 +15396,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("parent operation should apply"),
         );
@@ -15485,7 +15476,7 @@ mod tests {
         const P: &str = "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw";
         const C: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
@@ -15548,7 +15539,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("operation should produce backtracked receipts"),
         );
@@ -15626,7 +15616,7 @@ mod tests {
         const B: &str = "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi";
         const C: &str = CONTRACT_2;
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
@@ -15683,7 +15673,6 @@ mod tests {
                     false,
                     None,
                     None,
-                    &test_safe_roots(),
                 )
                 .expect("indexing operation should apply"),
             )
@@ -15750,7 +15739,7 @@ mod tests {
         const DEST: &str = CONTRACT_1;
         const SR1: &str = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
 
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // Real networks seed the registry at activation; do the same here.
         crate::mir_ctx::init_address_registry(rk.tez_accounts_mut()).unwrap();
@@ -15796,7 +15785,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("sr1 indexing operation should apply"),
         );
@@ -15854,7 +15842,7 @@ mod tests {
     /// present in the initial storage.
     #[test]
     fn test_origination_bills_initial_big_map() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 10_000_000);
@@ -15897,7 +15885,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation must not return a kernel error"),
         );
@@ -15912,7 +15899,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let mut host2 = test_host();
+        let mut host2 = MockKernelHost::default();
         let mut rk2 = RuntimeKeyspaces::init(&mut host2).unwrap();
         let src2 = bootstrap2();
         init_account(rk2.tez_accounts_mut(), &src2.pkh, 10_000_000);
@@ -15941,7 +15928,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("baseline origination must not fail"),
         );
@@ -15963,7 +15949,7 @@ mod tests {
     /// be drained between them, not shared.
     #[test]
     fn test_origination_anti_contamination() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 20_000_000);
@@ -16025,7 +16011,6 @@ mod tests {
                 false,
                 None,
                 None,
-                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation must not return a kernel error"),
         );
@@ -16052,7 +16037,7 @@ mod tests {
     /// surfaced — no half-applied storage-fees entry survives.
     #[test]
     fn burn_pass_internal_overshoot_returns_quota_exceeded() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 10_000_000);
@@ -16105,7 +16090,7 @@ mod tests {
     /// payer-debit entry survives on any internal.
     #[test]
     fn burn_pass_two_internals_share_budget_with_rollback() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 10_000_000);
@@ -16174,7 +16159,7 @@ mod tests {
     /// as usual. The vec order is preserved.
     #[test]
     fn burn_pass_skips_crac_tagged_entries() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 100_000);
@@ -16318,7 +16303,7 @@ mod tests {
     /// internal of 3 bytes is not charged and no receipt gets a fee.
     #[test]
     fn burn_pass_parent_failure_charges_no_internal() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 5);
@@ -16361,7 +16346,7 @@ mod tests {
     /// internals keep their receipts and the limit stays at 4.
     #[test]
     fn burn_pass_charges_parent_first_and_stops_at_failing_entry() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 1_000);
@@ -16414,7 +16399,7 @@ mod tests {
     /// and the internals keep their order.
     #[test]
     fn burn_pass_aligns_updates_with_mixed_entries() {
-        let mut host = test_host();
+        let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let pkh = PublicKeyHash::from_b58check(PAYER_PKH).unwrap();
         let payer = init_account(rk.tez_accounts_mut(), &pkh, 1_000);

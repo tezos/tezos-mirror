@@ -90,42 +90,6 @@ pub(crate) fn is_valid_tez_branch(
     false
 }
 
-/// Choose the SafeStorage roots to snapshot for a single Tezos operation.
-///
-/// [validate_and_apply_operation] wraps each operation in a transactional
-/// snapshot of every root in `full_roots` (one `store_copy` + `store_move`
-/// per root, twice — once for validation, once for application). Most
-/// operations only read or write account state under
-/// [`TEZ_ACCOUNTS_ROOT_PATH`]. For these operations, a snapshot of the EVM
-/// world state and of the Tez block/global-state root is pure overhead. For
-/// batches that provably touch nothing else (see
-/// [Operation::touches_only_accounts]), narrow the snapshot to the two
-/// account roots; otherwise keep the full conservative set.
-///
-/// Both account roots always stay in the snapshot. The [`RuntimeKeyspaces`]
-/// value built inside the snapshot loads its keyspaces in the `/tmp` copy
-/// (the temporary copy that the snapshot writes to). A root that this copy
-/// does not hold reads as empty, and it loses its writes at
-/// [`SafeStorage::promote`](tezos_evm_runtime::safe_storage::SafeStorage::promote).
-/// `/common_world_state` is not in the narrowed set, so an accounts-only
-/// operation must not read or write it.
-fn operation_safe_roots(
-    operation: &Operation,
-    full_roots: &[OwnedPath],
-) -> Vec<OwnedPath> {
-    if !operation.touches_only_accounts() {
-        return full_roots.to_vec();
-    }
-    full_roots
-        .iter()
-        .filter(|root| {
-            root.as_bytes() == TEZ_ACCOUNTS_ROOT_PATH.as_bytes()
-                || root.as_bytes() == ETH_ACCOUNTS_ROOT_PATH.as_bytes()
-        })
-        .cloned()
-        .collect()
-}
-
 #[derive(Debug, Default)]
 pub struct DebugFeatures {
     pub enable_debug_precompiles: bool,
@@ -475,7 +439,6 @@ impl TezosXChainConfig {
             .map_err(|_| crate::Error::InvalidConversion)?;
         let michelson_to_evm_gas_multiplier =
             read_or_init_michelson_to_evm_gas_multiplier(evm_world_state);
-        let safe_roots = self.world_states(level.into());
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.evm_chain_id,
@@ -490,7 +453,6 @@ impl TezosXChainConfig {
                 level,
                 da_fee_per_byte_mutez,
                 michelson_to_evm_gas_multiplier,
-                safe_roots,
             },
         })
     }
@@ -924,11 +886,6 @@ pub struct TezlinkBlockConstants {
     /// Conversion factor from Michelson gas to EVM gas, read once at block
     /// start from durable storage (falls back to the compile-time constant).
     pub michelson_to_evm_gas_multiplier: u64,
-    /// SafeStorage roots to snapshot when validating/applying a Tezos
-    /// operation. Mirrors `TezosXChainConfig::storage_root_paths` so the
-    /// inner transactional wrap covers every subtree that a Tezos operation
-    /// may read or write.
-    pub safe_roots: Vec<OwnedPath>,
 }
 
 enum CreditDaFees {
@@ -1196,10 +1153,6 @@ where
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let journal = external_journal;
-            // Snapshot only the roots this operation can touch (often just the
-            // account roots) instead of the full conservative set.
-            let safe_roots =
-                operation_safe_roots(&operation, &block_constants.safe_roots);
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 rk,
                 registry,
@@ -1209,7 +1162,6 @@ where
                 skip_signature_check,
                 fees,
                 fee_refund_config,
-                &safe_roots,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
