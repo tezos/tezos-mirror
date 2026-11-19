@@ -46,8 +46,8 @@ use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 use tezos_evm_runtime::{
     extensions::WithGas,
     runtime_keyspaces::{
-        RuntimeKeyspaces, ETH_ACCOUNTS_ROOT_PATH, EVM_WORLD_STATE_ROOT_PATH,
-        TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
+        RuntimeKeyspaces, COMMON_WORLD_STATE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH,
+        EVM_WORLD_STATE_ROOT_PATH, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     },
 };
 use tezos_execution::{
@@ -107,6 +107,8 @@ pub(crate) fn is_valid_tez_branch(
 /// (the temporary copy that the snapshot writes to). A root that this copy
 /// does not hold reads as empty, and it loses its writes at
 /// [`SafeStorage::promote`](tezos_evm_runtime::safe_storage::SafeStorage::promote).
+/// `/common_world_state` is not in the narrowed set, so an accounts-only
+/// operation must not read or write it.
 fn operation_safe_roots(
     operation: &Operation,
     full_roots: &[OwnedPath],
@@ -735,9 +737,14 @@ impl TezosXChainConfig {
                 TEZ_WORLD_STATE_ROOT_PATH,
                 TEZ_ACCOUNTS_ROOT_PATH,
                 ETH_ACCOUNTS_ROOT_PATH,
+                COMMON_WORLD_STATE_ROOT_PATH,
             ]
         } else {
-            vec![EVM_WORLD_STATE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH]
+            vec![
+                EVM_WORLD_STATE_ROOT_PATH,
+                ETH_ACCOUNTS_ROOT_PATH,
+                COMMON_WORLD_STATE_ROOT_PATH,
+            ]
         }
     }
 }

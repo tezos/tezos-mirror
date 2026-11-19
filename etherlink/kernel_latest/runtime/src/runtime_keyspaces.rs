@@ -12,7 +12,8 @@
 //!
 //! The keyspaces are `/evm/eth_accounts` and `/tez/tez_accounts`, the account
 //! state of the two runtimes, and `/evm/world_state` and `/tez/world_state`,
-//! their chain-level state.
+//! their chain-level state. `/common_world_state` holds the chain-level state
+//! that the runtimes share.
 //!
 //! `trace` and `__http_trace` are reserved children of `/evm/world_state`:
 //! they hold the node-local output of `debug_trace*` and `http_trace*`, and
@@ -77,6 +78,18 @@ pub const TEZ_WORLD_STATE_KEYSPACE_NAME: Name = Name::from_static(TEZ_WORLD_STAT
 /// The durable path of the `/tez/world_state` root.
 pub const TEZ_WORLD_STATE_ROOT_PATH: RefPath =
     RefPath::assert_from(TEZ_WORLD_STATE_ROOT.as_bytes());
+
+/// Durable root of the `/common_world_state` keyspace.
+const COMMON_WORLD_STATE_ROOT: &str = "/common_world_state";
+
+/// Name of the `/common_world_state` keyspace, which holds the chain-level
+/// state that the runtimes share.
+pub const COMMON_WORLD_STATE_KEYSPACE_NAME: Name =
+    Name::from_static(COMMON_WORLD_STATE_ROOT);
+
+/// The durable path of the `/common_world_state` root.
+pub const COMMON_WORLD_STATE_ROOT_PATH: RefPath =
+    RefPath::assert_from(COMMON_WORLD_STATE_ROOT.as_bytes());
 
 /// Storage handle threaded through kernel execution.
 ///
@@ -203,6 +216,16 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
         &mut self.keyspaces.tez_world_state
     }
 
+    /// Returns the `/common_world_state` keyspace.
+    pub fn common_world_state(&self) -> &Host::KeySpace {
+        &self.keyspaces.common_world_state
+    }
+
+    /// Returns the `/common_world_state` keyspace for writing.
+    pub fn common_world_state_mut(&mut self) -> &mut Host::KeySpace {
+        &mut self.keyspaces.common_world_state
+    }
+
     /// The host, for the durable accesses that have no keyspace yet.
     pub fn host(&self) -> &Host {
         self.host
@@ -222,6 +245,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
         let tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)?;
         let evm_world_state = host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME)?;
         let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
+        let common_world_state = host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?;
         Ok(Self {
             host,
             keyspaces: Keyspaces {
@@ -229,6 +253,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
                 tez_accounts,
                 evm_world_state,
                 tez_world_state,
+                common_world_state,
             },
             tez_accounts_snapshot: Snapshot::new(),
         })
@@ -241,6 +266,7 @@ struct Keyspaces<KS> {
     tez_accounts: KS,
     evm_world_state: KS,
     tez_world_state: KS,
+    common_world_state: KS,
 }
 
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
@@ -332,6 +358,7 @@ mod tests {
             TEZ_ACCOUNTS_ROOT_PATH,
             EVM_WORLD_STATE_ROOT_PATH,
             TEZ_WORLD_STATE_ROOT_PATH,
+            COMMON_WORLD_STATE_ROOT_PATH,
         ];
         // `start` copies the roots, so they have to exist.
         for root in &roots {
@@ -361,10 +388,15 @@ mod tests {
                 rk.tez_world_state().name().to_string(),
                 "/tmp/tez/world_state"
             );
+            assert_eq!(
+                rk.common_world_state().name().to_string(),
+                "/tmp/common_world_state"
+            );
             rk.eth_accounts_mut().set(&PROBE, b"inside").unwrap();
             rk.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
             rk.evm_world_state_mut().set(&PROBE, b"inside").unwrap();
             rk.tez_world_state_mut().set(&PROBE, b"inside").unwrap();
+            rk.common_world_state_mut().set(&PROBE, b"inside").unwrap();
         }
         let probe_paths = roots.map(|root| {
             OwnedPath::try_from([root.as_bytes(), PROBE.as_bytes()].concat()).unwrap()

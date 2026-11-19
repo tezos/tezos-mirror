@@ -755,7 +755,8 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
-        EVM_WORLD_STATE_KEYSPACE_NAME, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
+        COMMON_WORLD_STATE_ROOT_PATH, EVM_WORLD_STATE_KEYSPACE_NAME,
+        TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
@@ -1097,6 +1098,8 @@ mod tests {
         host.store_write_all(&TEZ_WORLD_STATE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
         host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
     }
 
@@ -2748,6 +2751,8 @@ mod tests {
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -2793,6 +2798,8 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -2844,6 +2851,8 @@ mod tests {
     #[test]
     fn test_delayed_tx_below_intrinsic_gas_dropped() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -2908,6 +2917,8 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -2983,6 +2994,8 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3046,6 +3059,8 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3113,6 +3128,8 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3168,6 +3185,8 @@ mod tests {
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut bk = load_keyspaces(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             bk.evm_world_state_mut(),
@@ -3189,6 +3208,8 @@ mod tests {
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3262,6 +3283,8 @@ mod tests {
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3330,6 +3353,8 @@ mod tests {
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let bk = load_keyspaces(&mut host).unwrap();
 
         produce_block_with_several_valid_txs(&mut host, bk);
@@ -3342,6 +3367,8 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3426,6 +3453,8 @@ mod tests {
     #[test]
     fn test_delayed_creation_above_initcode_limit_does_not_abort_block() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3712,6 +3741,8 @@ mod tests {
     #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3958,6 +3989,8 @@ mod tests {
     fn test_reboot_many_tx_one_proposal() {
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4052,6 +4085,8 @@ mod tests {
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4159,6 +4194,8 @@ mod tests {
     #[test]
     fn test_delayed_value_above_balance_does_not_abort_block() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -4228,6 +4265,8 @@ mod tests {
 
         // init host
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4299,6 +4338,8 @@ mod tests {
     // valid.
     fn test_delayed_empty_eip7702_authorization_list_does_not_abort_block() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -4364,6 +4405,8 @@ mod tests {
     #[test]
     fn uncomputable_fee_settlement_reverts_the_block() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4437,6 +4480,8 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_type_propagation() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -4685,6 +4730,8 @@ mod tests {
     #[test]
     fn test_delayed_eip7702_creation_does_not_abort_block() {
         let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
