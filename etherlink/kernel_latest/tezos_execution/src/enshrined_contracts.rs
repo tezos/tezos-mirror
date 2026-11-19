@@ -220,7 +220,7 @@ pub(crate) fn execute_enshrined_contract<'a, 'host, Host>(
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     ctx: &mut (impl CtxTrait<'a>
-              + HasHost<Host>
+              + HasHost
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey
@@ -793,7 +793,7 @@ pub const ALIAS_MATERIALIZED_EVENT_TAG: &str = "alias_materialized";
 /// `(native_runtime, (native_address, alias))`.
 fn materialize_alias<'a, 'host, Host>(
     ctx: &mut (impl CtxTrait<'a>
-              + HasHost<Host>
+              + HasHost
               + HasOperationGas
               + HasCrossRuntime<'host, Host>
               + HasDelegatedStorageCost),
@@ -1272,7 +1272,7 @@ fn alias_creation_error(
 fn inject_context_headers<'a, 'host, Host>(
     mut request: http::Request<Vec<u8>>,
     ctx: &mut (impl CtxTrait<'a>
-              + HasHost<Host>
+              + HasHost
               + HasOperationGas
               + HasSourcePublicKey
               + HasOriginLookup
@@ -1559,12 +1559,9 @@ fn read_and_resolve_routing(
 }
 
 /// Build a `CrossRuntimeContext` from the current execution context.
-fn cross_runtime_ctx_from_ctx<'a, Host>(
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
-) -> Result<CrossRuntimeContext, TransferError>
-where
-    Host: StorageV1,
-{
+fn cross_runtime_ctx_from_ctx<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+) -> Result<CrossRuntimeContext, TransferError> {
     Ok(CrossRuntimeContext {
         timestamp: bigint_to_u256(&ctx.now())?,
         block_number: biguint_to_u256(ctx.level())?,
@@ -1598,7 +1595,7 @@ fn build_ethereum_request(
 /// the caller's own runtime is refused (see `ERR_SAME_RUNTIME_NAC`).
 fn dispatch_crac_call<'a, 'host, Host>(
     ctx: &mut (impl CtxTrait<'a>
-              + HasHost<Host>
+              + HasHost
               + HasContractAccount
               + HasOperationGas
               + HasSourcePublicKey

@@ -873,8 +873,9 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> Ctx<'_, 'a, '_, Host, R>
     }
 }
 
-pub trait HasHost<Host> {
-    fn host(&mut self) -> &mut Host;
+pub trait HasHost {
+    /// The host of the runtime keyspaces.
+    fn host(&mut self) -> &mut impl StorageV1;
 }
 
 pub trait HasContractAccount {
@@ -966,10 +967,10 @@ impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry>
     }
 }
 
-impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasHost<Host>
+impl<'a, 'operation, 'host, Host: KeySpaceLoader + StorageV1, R: Registry> HasHost
     for Ctx<'a, 'operation, 'host, Host, R>
 {
-    fn host(&mut self) -> &mut Host {
+    fn host(&mut self) -> &mut impl StorageV1 {
         self.tc_ctx.rk.host_mut()
     }
 }
@@ -3591,10 +3592,10 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> HasHost<Host>
+    impl<'rk, 'j, 'r, 'host, Host: StorageV1 + KeySpaceLoader, R: Registry> HasHost
         for MockCtx<'rk, 'j, 'r, 'host, Host, R>
     {
-        fn host(&mut self) -> &mut Host {
+        fn host(&mut self) -> &mut impl StorageV1 {
             self.rk.host_mut()
         }
     }

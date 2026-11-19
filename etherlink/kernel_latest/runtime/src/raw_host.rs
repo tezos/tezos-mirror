@@ -5,12 +5,16 @@
 //! [`RawHost`]: a host whose durable accesses are put under a prefix.
 //!
 //! A [`SafeStorage`](crate::safe_storage::SafeStorage) wraps one with prefix
-//! `/tmp`. Without a prefix, it forwards the accesses unchanged.
+//! `/tmp`, and a
+//! [`RuntimeKeyspaces`](crate::runtime_keyspaces::RuntimeKeyspaces) holds one
+//! with its own prefix. Without a prefix, it forwards the accesses unchanged.
 
 use tezos_smart_rollup_host::{
+    input::Message,
     path::{concat, OwnedPath, Path},
     runtime::{RuntimeError, ValueType},
     storage::StorageV1,
+    wasm::WasmHost,
 };
 
 use crate::extensions::WithGas;
@@ -20,6 +24,17 @@ use crate::extensions::WithGas;
 pub struct RawHost<H> {
     pub(crate) host: H,
     pub(crate) prefix: Option<OwnedPath>,
+}
+
+impl<Host> RawHost<&mut Host> {
+    /// The wrapped host, if the prefix is `None`: accesses through it are
+    /// then the same as through `self`.
+    pub fn unprefixed_mut(&mut self) -> Option<&mut Host> {
+        match self.prefix {
+            None => Some(&mut *self.host),
+            Some(_) => None,
+        }
+    }
 }
 
 /// `path` under `prefix`.
@@ -134,6 +149,48 @@ impl<Host: WithGas> WithGas for RawHost<&mut Host> {
 
     fn executed_gas(&self) -> u64 {
         self.host.executed_gas()
+    }
+}
+
+/// Forwards to the wrapped host: none of these accesses durable storage.
+///
+/// Needed by the simulation, which reads its inbox through
+/// [`RuntimeKeyspaces::host_mut`](crate::runtime_keyspaces::RuntimeKeyspaces::host_mut).
+impl<Host: WasmHost> WasmHost for RawHost<&mut Host> {
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.read_input()
+    }
+
+    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
+        self.host.mark_for_reboot()
+    }
+
+    fn clear_reboot_mark(&mut self) -> Result<(), RuntimeError> {
+        self.host.clear_reboot_mark()
+    }
+
+    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
+        self.host.last_run_aborted()
+    }
+
+    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
+        self.host.upgrade_failed()
+    }
+
+    fn restart_forced(&self) -> Result<bool, RuntimeError> {
+        self.host.restart_forced()
+    }
+
+    fn reboot_left(&self) -> Result<u32, RuntimeError> {
+        self.host.reboot_left()
+    }
+
+    fn runtime_version(&self) -> Result<String, RuntimeError> {
+        self.host.runtime_version()
     }
 }
 

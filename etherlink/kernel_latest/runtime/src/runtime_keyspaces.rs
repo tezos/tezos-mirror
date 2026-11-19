@@ -27,6 +27,7 @@
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
 
+use crate::raw_host::RawHost;
 use crate::runtime::MockKernelHost;
 use crate::snapshot::{Snapshot, SnapshotError};
 
@@ -96,7 +97,7 @@ pub const COMMON_WORLD_STATE_ROOT_PATH: RefPath =
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back
 /// once the handle is gone.
 pub struct RuntimeKeyspaces<'host, Host: KeySpaceLoader> {
-    host: &'host mut Host,
+    host: RawHost<&'host mut Host>,
     keyspaces: Keyspaces<Host::KeySpace>,
     /// The snapshot of `/tez/tez_accounts`, on which the Michelson journal
     /// opens, releases and rolls back the savepoints of its checkpoints.
@@ -155,7 +156,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     // Keep the count with the snapshot, so that nothing has to be in sync.
     pub fn tez_accounts_savepoint(&mut self) -> Result<(), SnapshotError> {
         self.tez_accounts_snapshot
-            .savepoint(self.host, &self.keyspaces.tez_accounts)
+            .savepoint(self.host.host, &self.keyspaces.tez_accounts)
     }
 
     /// Releases the savepoints of `/tez/tez_accounts` above the `height`
@@ -227,13 +228,18 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     }
 
     /// The host, for the durable accesses that have no keyspace yet.
-    pub fn host(&self) -> &Host {
-        self.host
+    pub fn host(&self) -> &RawHost<&'host mut Host> {
+        &self.host
     }
 
     /// The host, for the durable accesses that have no keyspace yet.
-    pub fn host_mut(&mut self) -> &mut Host {
-        self.host
+    pub fn host_mut(&mut self) -> &mut RawHost<&'host mut Host> {
+        &mut self.host
+    }
+
+    /// Drops the handle and gives the host back.
+    pub fn into_host(self) -> &'host mut Host {
+        self.host.host
     }
 
     /// Loads the keyspaces from `host`.
@@ -247,7 +253,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
         let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
         let common_world_state = host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?;
         Ok(Self {
-            host,
+            host: RawHost { host, prefix: None },
             keyspaces: Keyspaces {
                 eth_accounts,
                 tez_accounts,
@@ -517,9 +523,13 @@ mod tests {
             rk.tez_accounts_savepoint().unwrap();
             // The backup is named after the mirrored root, and loaded through
             // the mirror: it lands under `/tmp`, and nowhere else.
-            assert_eq!(rk.host().host().store_read_all(&backup).unwrap(), b"v0");
+            assert_eq!(
+                rk.host().host.host().store_read_all(&backup).unwrap(),
+                b"v0"
+            );
             assert!(rk
                 .host()
+                .host
                 .host()
                 .store_has(&RefPath::assert_from(b"/__savepoint"))
                 .unwrap()

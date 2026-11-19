@@ -47,11 +47,6 @@ impl CountingHost {
         Rc::clone(&self.bytes_read)
     }
 
-    /// Restart the tally, to measure one operation and not the setup too.
-    pub fn reset_bytes_read(&self) {
-        self.bytes_read.set(0);
-    }
-
     fn record(&self, bytes: usize) {
         self.bytes_read.set(self.bytes_read.get() + bytes as u64);
     }

@@ -396,7 +396,7 @@ where
         timestamp,
     );
     promote_block(
-        rk.host_mut(),
+        rk.into_host(),
         &mut base,
         &outbox_queue,
         &BlockInProgressProvenance::Storage,

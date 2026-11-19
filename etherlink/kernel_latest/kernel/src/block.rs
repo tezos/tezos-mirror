@@ -661,7 +661,7 @@ where
                 timestamp,
             );
             promote_block(
-                rk.host_mut(),
+                rk.into_host(),
                 &mut base,
                 &outbox_queue,
                 &block_in_progress_provenance,
@@ -684,7 +684,7 @@ where
         }
         Err(err) => {
             revert_block(
-                rk.host_mut(),
+                rk.into_host(),
                 &mut base,
                 config,
                 &block_in_progress_provenance,
@@ -3627,7 +3627,7 @@ mod tests {
             .expect("Contract initialization should have succeeded");
 
         let chain_config = {
-            let (host, base) = (rk.host_mut(), &mut base);
+            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
         let registry = RegistryImpl::default();
@@ -4558,7 +4558,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         let chain_config = {
-            let (host, base) = (rk.host_mut(), &mut base);
+            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
         let mut config = dummy_configuration();
@@ -4666,7 +4666,7 @@ mod tests {
         rk.host_mut().add_execution_gas(cumulative_gas_in_run);
 
         let chain_config = {
-            let (host, base) = (rk.host_mut(), &mut base);
+            let (host, base) = (rk.host_mut().unprefixed_mut().unwrap(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
         };
 

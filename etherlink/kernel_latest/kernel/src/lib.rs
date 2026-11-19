@@ -107,30 +107,6 @@ pub mod registry_impl;
 mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
-mod state_hash;
-mod storage;
-mod sub_block;
-mod tick_model;
-mod transaction;
-mod upgrade;
-
-extern crate alloc;
-
-// This needs to be set to the frozen commit on snapshot time
-const KERNEL_VERSION: &str = env!("GIT_HASH");
-
-#[trace_kernel]
-pub fn stage_zero<Host>(
-    host: &mut Host,
-    base: &mut impl KeySpace,
-) -> Result<MigrationStatus, Error>
-where
-    Host: StorageV1 + WasmHost,
-{
-    log!(Debug, "Entering stage zero.");
-    init_storage_versioning(host, base)?;
-    storage_migration(host)
-}
 
 // DO NOT RENAME: function name is used during benchmark
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
@@ -161,6 +137,30 @@ where
     );
     leave_stage_one(bk.base_mut())?;
     res
+}
+mod state_hash;
+mod storage;
+mod sub_block;
+mod tick_model;
+mod transaction;
+mod upgrade;
+
+extern crate alloc;
+
+// This needs to be set to the frozen commit on snapshot time
+const KERNEL_VERSION: &str = env!("GIT_HASH");
+
+#[trace_kernel]
+pub fn stage_zero<Host>(
+    host: &mut Host,
+    base: &mut impl KeySpace,
+) -> Result<MigrationStatus, Error>
+where
+    Host: StorageV1 + WasmHost,
+{
+    log!(Debug, "Entering stage zero.");
+    init_storage_versioning(host, base)?;
+    storage_migration(host)
 }
 
 fn set_kernel_version(base: &mut impl KeySpace) -> Result<(), Error> {
@@ -704,7 +704,12 @@ mod tests {
             store_evm_chain_id(rk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
 
             // run level in order to initialize outbox counter (by SOL message)
-            level = rk.host_mut().host.run_level(|_| ());
+            level = rk
+                .host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .run_level(|_| ());
 
             // provision sender account
             let sender =
@@ -765,7 +770,11 @@ mod tests {
                 contents,
             };
 
-            rk.host_mut().host.add_external(message);
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .add_external(message);
             // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
             // dropped at the end of this block.
         }
@@ -860,7 +869,11 @@ mod tests {
                 "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
                 "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
             );
-            rk.host_mut().host.add_transfer(payload, &metadata);
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .add_transfer(payload, &metadata);
             // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
             // dropped at the end of this block.
         }
@@ -932,7 +945,12 @@ mod tests {
             }
 
             // run level in order to initialize outbox counter (by SOL message)
-            level = rk.host_mut().host.run_level(|_| ());
+            level = rk
+                .host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .run_level(|_| ());
 
             // provision sender account
             let sender =
@@ -1021,7 +1039,11 @@ mod tests {
                 contents,
             };
 
-            rk.host_mut().host.add_external(message);
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .add_external(message);
             // `rk` holds `/evm/eth_accounts`, which `run` loads again: it is
             // dropped at the end of this block.
         }
