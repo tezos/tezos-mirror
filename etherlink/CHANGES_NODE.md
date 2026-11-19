@@ -7,6 +7,43 @@ Entries for the next release live as one file per merge request under
 stranded above a freshly cut release header. See
 [`.changes/README.md`](.changes/README.md).
 
+## Version 0.69 (2026-11-17)
+
+This new release notably aligns the sequencer prevalidation of
+`eth_sendRawTransaction` with the kernel, and brings L1-compatible FAILWITH
+errors for the Michelson runtime of Tezos X kernels. This release is also
+necessary before running a kernel at storage version 70 or higher, such as
+the Etherlink 8.0 kernel.
+
+This release will not apply any migration to the node’s store (version 25),
+meaning it is possible to downgrade to version 0.68.
+
+### RPCs changes
+
+- The sequencer prevalidation of `eth_sendRawTransaction` is now aligned with
+  the kernel: contract creations with empty init code are charged the contract
+  creation intrinsic cost, the access list is taken into account in the DA fee
+  part of the minimum gas limit, and contract creations with an init code larger
+  than 49,152 bytes (EIP-3860) are rejected. (!23148)
+- The errors of FAILWITHs in the Michelson runtime of Tezos X kernels
+  are now served as L1's `michelson_v1.script_rejected`, with the
+  failed value as a Micheline expression in the `with` field, in the
+  receipts of simulations and blocks. The reported location is the
+  dummy location (-1). (!23142)
+
+### Command-line interface changes
+
+- Remove the `transform dump <dump.json> to rlp <dump.rlp>` command. (!23124)
+
+### Storage changes
+
+- Resolve tracer output (`trace/`) and HTTP trace replay output
+  (`__http_trace/traces/`) from `/evm/world_state/` on kernels at storage
+  version 70 or higher, falling back to `/base/` (V60+) and the legacy
+  `/evm/` and `/evm/world_state/` paths otherwise. The tracer input stays at
+  `/base/trace/input`. Operators must upgrade to this release before running
+  a V70+ kernel; the release stays backward-compatible with pre-V70 kernels. (!23115)
+
 ## Version 0.68 (2026-11-10)
 
 This is a new quality-of-life improvement release, which notably harden the
