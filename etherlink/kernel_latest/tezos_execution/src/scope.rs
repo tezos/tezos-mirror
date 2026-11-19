@@ -251,10 +251,8 @@ impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
         Host: 'h,
         C: ScopeRuntimeKeyspace<'h, Host = Host>,
     {
-        let mut safe_host = SafeStorage {
-            host: ctx.rk_mut().host_mut(),
-            world_states: world_states.to_vec(),
-        };
+        let mut safe_host =
+            SafeStorage::new(ctx.rk_mut().host_mut(), world_states.to_vec());
         safe_host.start()?;
         let phase = match phase {
             Phase::Validation => PhaseState::Validation,

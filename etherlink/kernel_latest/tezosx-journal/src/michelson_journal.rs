@@ -2406,10 +2406,7 @@ mod tests {
         let idx_outer = journal.checkpoint(&mut outer).unwrap();
 
         // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror = SafeStorage {
-            host: outer.host_mut(),
-            world_states: vec![],
-        };
+        let mut mirror = SafeStorage::new(outer.host_mut(), vec![]);
         let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
         journal.checkpoint(&mut inner).unwrap();
         write_data(&mut inner, b"inner");
@@ -2438,10 +2435,7 @@ mod tests {
         journal.checkpoint(&mut outer).unwrap();
 
         // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror = SafeStorage {
-            host: outer.host_mut(),
-            world_states: vec![],
-        };
+        let mut mirror = SafeStorage::new(outer.host_mut(), vec![]);
         let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
         write_data(&mut inner, b"i0");
 
@@ -2499,10 +2493,7 @@ mod tests {
         let idx_outer = journal.checkpoint(&mut outer).unwrap();
 
         // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror = SafeStorage {
-            host: outer.host_mut(),
-            world_states: vec![],
-        };
+        let mut mirror = SafeStorage::new(outer.host_mut(), vec![]);
         let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
         journal.checkpoint(&mut inner).unwrap();
 
@@ -2531,10 +2522,7 @@ mod tests {
         journal.checkpoint(&mut outer).unwrap();
 
         // The accounts of a mirror, as for a Tezos operation batch.
-        let mut mirror = SafeStorage {
-            host: outer.host_mut(),
-            world_states: vec![],
-        };
+        let mut mirror = SafeStorage::new(outer.host_mut(), vec![]);
         let mut inner = RuntimeKeyspaces::init(&mut mirror).unwrap();
         journal.checkpoint(&mut inner).unwrap();
 

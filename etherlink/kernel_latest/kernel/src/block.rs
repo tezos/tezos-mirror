@@ -498,7 +498,7 @@ where
 
     event.store(base, &config.common)?;
 
-    let written = outbox_queue.flush_queue(host.host);
+    let written = outbox_queue.flush_queue(host.host_mut());
     // Log to Info only if we flushed messages.
     let level = if written > 0 { Info } else { Debug };
     log!(level, "Flushed outbox queue messages ({} flushed)", written);
@@ -540,7 +540,7 @@ where
 
     let world_states = chain_config.world_states(next_bip_number);
 
-    let mut safe_host = SafeStorage { host, world_states };
+    let mut safe_host = SafeStorage::new(host, world_states);
 
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
@@ -561,7 +561,7 @@ where
                 log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match build_next_bip_from_blueprints(
-                    safe_host.host,
+                    safe_host.host_mut(),
                     &mut bk,
                     chain_config,
                     next_bip_number,
@@ -1012,10 +1012,7 @@ mod tests {
 
     /// The block in progress a sub-block run left under the mirror.
     fn mirrored_block_in_progress(host: &mut MockKernelHost) -> Option<BlockInProgress> {
-        let safe = SafeStorage {
-            host,
-            world_states: vec![],
-        };
+        let safe = SafeStorage::new(host, vec![]);
         read_block_in_progress(&safe).unwrap()
     }
 
@@ -4059,10 +4056,8 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host = SafeStorage {
-            host: rk.host_mut(),
-            world_states: chain_config.world_states(U256::zero()),
-        };
+        let safe_host =
+            SafeStorage::new(rk.host_mut(), chain_config.world_states(U256::zero()));
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
@@ -4169,10 +4164,8 @@ mod tests {
         matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host = SafeStorage {
-            host: rk.host_mut(),
-            world_states: chain_config.world_states(U256::zero()),
-        };
+        let safe_host =
+            SafeStorage::new(rk.host_mut(), chain_config.world_states(U256::zero()));
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");

@@ -845,10 +845,10 @@ where
     // always reverted: no origination address it derives outlives the call.
     // The roots an applied Michelson operation mirrors, unnarrowed: nothing
     // here proves the run touches accounts only.
-    let mut safe_host = SafeStorage {
+    let mut safe_host = SafeStorage::new(
         host,
-        world_states: block_constants.michelson_runtime_block_constants.safe_roots,
-    };
+        block_constants.michelson_runtime_block_constants.safe_roots,
+    );
     safe_host.start().map_err(|err| {
         RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
     })?;

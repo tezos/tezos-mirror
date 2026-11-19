@@ -243,14 +243,8 @@ mod tests {
         // The batch snapshot's root is the accounts of a mirror of the block
         // mirror, and its backups are loaded through that same mirror.
         let mut host = MockKernelHost::default();
-        let mut block = SafeStorage {
-            host: &mut host,
-            world_states: vec![],
-        };
-        let mut batch = SafeStorage {
-            host: &mut block,
-            world_states: vec![],
-        };
+        let mut block = SafeStorage::new(&mut host, vec![]);
+        let mut batch = SafeStorage::new(&mut block, vec![]);
         let root = batch.load_or_create(ROOT_A.parse().unwrap()).unwrap();
         assert_eq!(root.name().as_ref(), "/tmp/tmp/tez/tez_accounts");
         let mut snapshot = Snapshot::new();

@@ -3595,12 +3595,12 @@ mod tests {
                 .expect("the probe is written");
 
             {
-                let mut safe_host = SafeStorage {
-                    host: rk.host_mut(),
-                    world_states: vec![OwnedPath::from(
+                let mut safe_host = SafeStorage::new(
+                    rk.host_mut(),
+                    vec![OwnedPath::from(
                         tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
                     )],
-                };
+                );
                 safe_host.start().expect("the snapshot is taken");
                 let mut inner_rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
                 run_code(

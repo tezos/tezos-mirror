@@ -364,10 +364,7 @@ mod tests {
         for root in &roots {
             host.store_write_all(root, b"root").unwrap();
         }
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: roots.map(OwnedPath::from).to_vec(),
-        };
+        let mut safe = SafeStorage::new(&mut host, roots.map(OwnedPath::from).to_vec());
         safe.start().unwrap();
 
         {
@@ -402,9 +399,9 @@ mod tests {
             OwnedPath::try_from([root.as_bytes(), PROBE.as_bytes()].concat()).unwrap()
         });
         for probe_path in &probe_paths {
-            assert!(safe.host.store_has(probe_path).unwrap().is_none());
+            assert!(safe.host().store_has(probe_path).unwrap().is_none());
             assert_eq!(
-                safe.host
+                safe.host()
                     .store_read_all(&safe_path(probe_path).unwrap())
                     .unwrap(),
                 b"inside"
@@ -413,7 +410,7 @@ mod tests {
 
         safe.promote().unwrap();
         for probe_path in &probe_paths {
-            assert_eq!(safe.host.store_read_all(probe_path).unwrap(), b"inside");
+            assert_eq!(safe.host().store_read_all(probe_path).unwrap(), b"inside");
         }
     }
 
@@ -508,10 +505,8 @@ mod tests {
         // `start` copies the roots, so they have to exist.
         host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"root")
             .unwrap();
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: vec![OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH)],
-        };
+        let mut safe =
+            SafeStorage::new(&mut host, vec![OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH)]);
         safe.start().unwrap();
 
         let backup =
@@ -522,17 +517,17 @@ mod tests {
             rk.tez_accounts_savepoint().unwrap();
             // The backup is named after the mirrored root, and loaded through
             // the mirror: it lands under `/tmp`, and nowhere else.
-            assert_eq!(rk.host().host.store_read_all(&backup).unwrap(), b"v0");
+            assert_eq!(rk.host().host().store_read_all(&backup).unwrap(), b"v0");
             assert!(rk
                 .host()
-                .host
+                .host()
                 .store_has(&RefPath::assert_from(b"/__savepoint"))
                 .unwrap()
                 .is_none());
         }
 
         safe.revert().unwrap();
-        assert!(safe.host.store_has(&backup).unwrap().is_none());
-        assert!(safe.host.store_has(&TMP_PATH).unwrap().is_none());
+        assert!(safe.host().store_has(&backup).unwrap().is_none());
+        assert!(safe.host().store_has(&TMP_PATH).unwrap().is_none());
     }
 }
