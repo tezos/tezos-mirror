@@ -54,6 +54,7 @@ type kernel =
   | Ganesha
   | GaneshaR1
   | GaneshaR2
+  | GaneshaR3
   | Latest
 
 let kernel_from_string = function
@@ -79,6 +80,7 @@ let kernel_from_string = function
   | "ganesha" -> Some Ganesha
   | "ganesha-r1" -> Some GaneshaR1
   | "ganesha-r2" -> Some GaneshaR2
+  | "ganesha-r3" -> Some GaneshaR3
   | "latest" -> Some Latest
   | _ -> None
 
@@ -155,6 +157,10 @@ let root_hash_from_released_kernel = function
       Some
         (`Hex
            "009e07373751a43acbf0cd747b404f45130e0ad561c4b7da937e02eb812bd0f7e8")
+  | GaneshaR3 ->
+      Some
+        (`Hex
+           "00e65e70dcbb99681c8a75eb1425b24ae8114a2f79f665ed8ecba905ab5285f595")
   | Previewnet02 | Previewnet04 | Previewnet05 | Previewnet06 | Latest -> None
 
 let michelson_runtime_node_version ~smart_rollup_address ~l2_chain_id =
