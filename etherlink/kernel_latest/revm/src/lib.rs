@@ -28,8 +28,10 @@ use revm::{
         BlockEnv, CfgEnv, ContextSetters, ContextTr, Evm, LocalContext, TxEnv,
     },
     context_interface::{
-        block::BlobExcessGasAndPrice, cfg::gas_params::Eip2780TxInfo,
-        journaled_state::JournalTr, Cfg, Transaction,
+        block::BlobExcessGasAndPrice,
+        cfg::gas_params::Eip2780TxInfo,
+        journaled_state::{JournalCheckpoint, JournalTr},
+        Cfg, Transaction,
     },
     database_interface::EmptyDB,
     handler::{
@@ -44,7 +46,8 @@ use revm::{
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
-    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
+    __trace_kernel, __trace_kernel_add_attrs, log, tracing::instrument, Level,
+    OTelAttrValue,
 };
 use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -683,6 +686,82 @@ fn install_alias_delegation<
     Ok(())
 }
 
+/// Apply a transaction's injected credit, behind a checkpoint of its
+/// own so that it can be taken back without touching what the caller
+/// had before.
+///
+/// `Ok(None)` when there is nothing to inject: no checkpoint is opened
+/// and [`close_credit_checkpoint`] has nothing to close.
+fn open_credit_checkpoint<Host, R>(
+    journaled_state: &mut Journal<'_, '_, Host, R>,
+    credit: Option<(Address, Wei)>,
+) -> Result<Option<JournalCheckpoint>, EvmRunError>
+where
+    Host: StorageV1 + KeySpaceLoader,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+{
+    let Some((address, amount)) = credit.filter(|(_, amount)| *amount > Wei::ZERO) else {
+        return Ok(None);
+    };
+    let checkpoint = journaled_state.checkpoint();
+    // The checkpoint spans the REVM journal, the Michelson external
+    // frame and the precompile layered state. All three are open here,
+    // so leaving without closing them leaks a level on each.
+    if let Err(err) = journaled_state.balance_incr(address, wei_to_alloy(amount)) {
+        abandon_credit_checkpoint(journaled_state, Some(checkpoint));
+        return Err(EVMError::Database(err).into());
+    }
+    Ok(Some(checkpoint))
+}
+
+/// Close the checkpoint [`open_credit_checkpoint`] opened: keep the
+/// credit when the transaction earned it, take it back otherwise.
+///
+/// Closing promotes or rolls back the Michelson frame, which touches
+/// durable storage and can fail. Callers on their way out with a state
+/// to commit must not skip it.
+fn close_credit_checkpoint<Host, R>(
+    journaled_state: &mut Journal<'_, '_, Host, R>,
+    checkpoint: Option<JournalCheckpoint>,
+    success: bool,
+) -> Result<(), EvmRunError>
+where
+    Host: StorageV1 + KeySpaceLoader,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+{
+    let Some(checkpoint) = checkpoint else {
+        return Ok(());
+    };
+    let closed = if success {
+        journaled_state.checkpoint_commit_checked()
+    } else {
+        journaled_state.checkpoint_revert_checked(checkpoint)
+    };
+    closed.map_err(|err| EvmKernelError::Snapshot(err).into())
+}
+
+/// Take the credit back on an exit that is already failing. The exit
+/// has one error to return and it is the one that caused it, so a
+/// failure closing the checkpoint is logged rather than returned: it
+/// must not replace the first error, and it must not vanish either,
+/// since a frame that failed to revert leaves durable storage where
+/// the frame left it.
+fn abandon_credit_checkpoint<Host, R>(
+    journaled_state: &mut Journal<'_, '_, Host, R>,
+    checkpoint: Option<JournalCheckpoint>,
+) where
+    Host: StorageV1 + KeySpaceLoader,
+    R: Registry<Journal = tezosx_journal::TezosXJournal>,
+{
+    if let Err(err) = close_credit_checkpoint(journaled_state, checkpoint, false) {
+        log!(
+            Level::Error,
+            "reverting the credit checkpoint failed on an exit that was already \
+             failing: {err:?}"
+        );
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn run_transaction<
@@ -721,6 +800,12 @@ where
         .evm
         .revm_call_depth()
         .unwrap_or(if is_cross_runtime { 1 } else { 0 }) as usize;
+    let injected_credit = match origin {
+        TransactionOrigin::CrossRuntime { credit } => credit,
+        TransactionOrigin::UserInput { .. } | TransactionOrigin::CrossRuntimeStatic => {
+            None
+        }
+    };
     let tx = tx_env(
         rk.eth_accounts_mut(),
         journal,
@@ -758,21 +843,10 @@ where
             alias_delegation,
         )?;
 
-        let credit_checkpoint = match origin {
-            TransactionOrigin::CrossRuntime {
-                credit: Some((addr, amount)),
-            } if amount > Wei::ZERO => {
-                let cp = evm_context.ctx.journaled_state.checkpoint();
-                // Note: an error here leaves the credit checkpoint open.
-                evm_context
-                    .ctx
-                    .journaled_state
-                    .balance_incr(addr, wei_to_alloy(amount))
-                    .map_err(EVMError::Database)?;
-                Some(cp)
-            }
-            _ => None,
-        };
+        let credit_checkpoint = open_credit_checkpoint(
+            &mut evm_context.ctx.journaled_state,
+            injected_credit,
+        )?;
 
         // Use `EtherlinkHandler` so our `first_frame_input` override
         // fires; stock `inspect_one_tx` would bypass it.
@@ -789,27 +863,27 @@ where
         let result = match handler.inspect_run(&mut evm_context) {
             Ok(r) => r,
             Err(e) => {
-                if let Some(cp) = credit_checkpoint {
-                    evm_context.ctx.journaled_state.checkpoint_revert(cp);
-                }
+                abandon_credit_checkpoint(
+                    &mut evm_context.ctx.journaled_state,
+                    credit_checkpoint,
+                );
                 return Err(e.into());
             }
         };
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
-            if let Some(cp) = credit_checkpoint {
-                evm_context.ctx.journaled_state.checkpoint_revert(cp);
-            }
+            abandon_credit_checkpoint(
+                &mut evm_context.ctx.journaled_state,
+                credit_checkpoint,
+            );
             return Err(EvmKernelError::Snapshot(err).into());
         }
 
-        if let Some(cp) = credit_checkpoint {
-            if result.is_success() {
-                evm_context.ctx.journaled_state.checkpoint_commit();
-            } else {
-                evm_context.ctx.journaled_state.checkpoint_revert(cp);
-            }
-        }
+        close_credit_checkpoint(
+            &mut evm_context.ctx.journaled_state,
+            credit_checkpoint,
+            result.is_success(),
+        )?;
 
         let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
             evm_context.commit_inner();
@@ -837,21 +911,10 @@ where
             alias_delegation,
         )?;
 
-        let credit_checkpoint = match origin {
-            TransactionOrigin::CrossRuntime {
-                credit: Some((addr, amount)),
-            } if amount > Wei::ZERO => {
-                let cp = evm_context.ctx.journaled_state.checkpoint();
-                // Note: an error here leaves the credit checkpoint open.
-                evm_context
-                    .ctx
-                    .journaled_state
-                    .balance_incr(addr, wei_to_alloy(amount))
-                    .map_err(EVMError::Database)?;
-                Some(cp)
-            }
-            _ => None,
-        };
+        let credit_checkpoint = open_credit_checkpoint(
+            &mut evm_context.ctx.journaled_state,
+            injected_credit,
+        )?;
 
         let is_static_top_frame = matches!(origin, TransactionOrigin::CrossRuntimeStatic);
         // Note: an error can leave global checkpoints open; the blueprint then aborts.
@@ -864,27 +927,27 @@ where
         ) {
             Ok(r) => r,
             Err(e) => {
-                if let Some(cp) = credit_checkpoint {
-                    evm_context.ctx.journaled_state.checkpoint_revert(cp);
-                }
+                abandon_credit_checkpoint(
+                    &mut evm_context.ctx.journaled_state,
+                    credit_checkpoint,
+                );
                 return Err(e.into());
             }
         };
 
         if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
-            if let Some(cp) = credit_checkpoint {
-                evm_context.ctx.journaled_state.checkpoint_revert(cp);
-            }
+            abandon_credit_checkpoint(
+                &mut evm_context.ctx.journaled_state,
+                credit_checkpoint,
+            );
             return Err(EvmKernelError::Snapshot(err).into());
         }
 
-        if let Some(cp) = credit_checkpoint {
-            if result.is_success() {
-                evm_context.ctx.journaled_state.checkpoint_commit();
-            } else {
-                evm_context.ctx.journaled_state.checkpoint_revert(cp);
-            }
-        }
+        close_credit_checkpoint(
+            &mut evm_context.ctx.journaled_state,
+            credit_checkpoint,
+            result.is_success(),
+        )?;
 
         let withdrawals = if matches!(origin, TransactionOrigin::UserInput { .. }) {
             evm_context.commit_inner();
@@ -2104,6 +2167,92 @@ mod test {
             run_with_journal_depth(Some(1024)),
             U256::ZERO,
             "with revm_call_depth=1024, REVM should reject the inner CALL"
+        );
+    }
+
+    /// A credit that cannot be applied leaves the checkpoint it was
+    /// applied behind open unless the failure closes it. The checkpoint
+    /// spans three stacks, so a leak costs a level on each and every
+    /// later close targets the wrong one.
+    #[test]
+    fn test_failed_credit_closes_its_checkpoint() {
+        use crate::error::{EvmDbError, EvmRunError};
+        use revm::context::result::EVMError;
+        use tezos_smart_rollup_keyspace::Key;
+
+        let mut host = MockKernelHost::default();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let credited =
+            Address::from_hex("4444444444444444444444444444444444444444").unwrap();
+
+        StorageAccount::from_address(&caller)
+            .unwrap()
+            .set_info_without_code(
+                rk.eth_accounts_mut(),
+                AccountInfo {
+                    balance: U256::MAX,
+                    ..AccountInfo::default()
+                },
+            )
+            .unwrap();
+        // An info record the account decoder rejects, so loading the
+        // credited account fails and the credit cannot be applied.
+        rk.eth_accounts_mut()
+            .set(
+                &Key::try_from(format!("/{credited:x}/info")).unwrap(),
+                [0xffu8; 3],
+            )
+            .unwrap();
+
+        let registry = Registry::new();
+        let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
+
+        let result = run_transaction(
+            &mut rk,
+            &registry,
+            &mut journal,
+            &block_constants,
+            None,
+            caller,
+            Some(caller),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            U256::ZERO,
+            None,
+            false,
+            TransactionOrigin::CrossRuntime {
+                credit: Some((credited, Wei::from_u256(42u64.into()))),
+            },
+        );
+
+        // Pinned to the credit's own failure: an earlier one would make
+        // the stack assertions below vacuous.
+        assert!(
+            matches!(
+                &result,
+                Err(EvmRunError::RevmDB(EVMError::Database(
+                    EvmDbError::Runtime(_)
+                )))
+            ),
+            "expected the credit's account load to fail, got {result:?}"
+        );
+        assert_eq!(
+            journal.evm.inner.depth, 0,
+            "the REVM journal level the checkpoint opened was left open"
+        );
+        assert_eq!(
+            journal.michelson.open_frame_count(),
+            0,
+            "the Michelson frame the checkpoint opened was left open"
+        );
+        assert_eq!(
+            journal.evm.layered_state.open_checkpoints(),
+            0,
+            "the precompile layered-state level the checkpoint opened was \
+             left open"
         );
     }
 

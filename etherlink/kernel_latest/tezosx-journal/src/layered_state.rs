@@ -228,6 +228,12 @@ impl LayeredState {
         self.depths.push(self.entries.len());
     }
 
+    /// How many checkpoints are open, for a scope to check that its own
+    /// are balanced.
+    pub fn open_checkpoints(&self) -> usize {
+        self.depths.len()
+    }
+
     pub fn checkpoint_commit(&mut self) {
         self.depths.pop();
     }

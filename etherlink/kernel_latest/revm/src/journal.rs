@@ -100,6 +100,36 @@ impl<
     }
 }
 
+/// The checkpoint operations with their durable-storage failure returned
+/// rather than deferred. The `JournalTr` forms below cannot return an
+/// error, so they call these and park the failure for
+/// [`Journal::take_deferred_error`]; kernel code that opens a checkpoint
+/// of its own has a return value to carry it and takes it from here.
+impl<
+        'a,
+        'host,
+        Host: StorageV1 + KeySpaceLoader,
+        R: Registry<Journal = tezosx_journal::TezosXJournal>,
+    > Journal<'a, 'host, Host, R>
+{
+    /// Commit the innermost checkpoint across every runtime's state.
+    pub fn checkpoint_commit_checked(&mut self) -> Result<(), SnapshotError> {
+        self.journal.evm.inner.checkpoint_commit();
+        self.journal.global_commit(self.database.rk)
+    }
+
+    /// Revert to `checkpoint` across every runtime's state. The Michelson
+    /// side restores `/tez/tez_accounts` from the frame's savepoint of its
+    /// snapshot.
+    pub fn checkpoint_revert_checked(
+        &mut self,
+        checkpoint: JournalCheckpoint,
+    ) -> Result<(), SnapshotError> {
+        self.journal.evm.inner.checkpoint_revert(checkpoint);
+        self.journal.global_revert(self.database.rk)
+    }
+}
+
 /// Expose the journal-owned tracer to the `TracerInspector` filling the
 /// `Evm` inspector slot (see `evm_inspectors::TracerInspector`).
 impl<
@@ -377,19 +407,14 @@ impl<
 
     #[inline]
     fn checkpoint_commit(&mut self) {
-        self.journal.evm.inner.checkpoint_commit();
-        if let Err(e) = self.journal.global_commit(self.database.rk) {
+        if let Err(e) = self.checkpoint_commit_checked() {
             self.deferred_error.get_or_insert(e);
         }
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
-        self.journal.evm.inner.checkpoint_revert(checkpoint);
-        // `global_revert` rolls back every runtime's durable overlay. The
-        // Michelson side restores `/tez/tez_accounts` from the frame's
-        // savepoint of its snapshot.
-        if let Err(e) = self.journal.global_revert(self.database.rk) {
+        if let Err(e) = self.checkpoint_revert_checked(checkpoint) {
             self.deferred_error.get_or_insert(e);
         }
     }
