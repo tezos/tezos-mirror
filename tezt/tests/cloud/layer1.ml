@@ -263,8 +263,9 @@ module Node = struct
         yes_wallet
     in
     let* delegates, consensus_keys, companion_keys, rich_account_opt =
-      let* known_addresses = Client.list_known_addresses client in
-      let get_account alias = Client.show_address ~alias client in
+      (* Read the keys directly from the wallet files instead of running
+         [octez-client show address] once per key (~0.7s each on an agent). *)
+      let* known_accounts = Yes_wallet.load_keys yes_wallet ~client in
       let cons key value map =
         String_map.update
           key
@@ -275,11 +276,12 @@ module Node = struct
       (Lwt_list.fold_left_s
          (fun
            ((delegates, consensus_keys, companion_keys, rich_accounts) as acc)
-           (alias, _pkh)
+           (account : Account.key)
          ->
+           let alias = account.alias in
            if alias =~ rex "rich_" then
              (* if the alias match "rich_n" *)
-             let* rich_account = get_account alias in
+             let rich_account = account in
              return
                ( delegates,
                  consensus_keys,
@@ -289,7 +291,7 @@ module Node = struct
              match alias =~* rex "(\\w+)_consensus_key_[0-9]+" with
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
-                 let* consensus_account = get_account alias in
+                 let consensus_account = account in
                  return
                    ( delegates,
                      cons consensus_key_alias consensus_account consensus_keys,
@@ -299,7 +301,7 @@ module Node = struct
                  match alias =~* rex "(\\w+)_companion_key_[0-9]+" with
                  | Some companion_key_alias ->
                      (* if the alias match "baker_n_companion_key" *)
-                     let* consensus_account = get_account alias in
+                     let consensus_account = account in
                      return
                        ( delegates,
                          consensus_keys,
@@ -311,7 +313,7 @@ module Node = struct
                  | None ->
                      if alias =~ rex "^baker_[0-9]+$" then
                        (* otherwise, if the alias match "baker_n" *)
-                       let* delegate_account = get_account alias in
+                       let delegate_account = account in
                        return
                          ( String_map.add alias delegate_account delegates,
                            consensus_keys,
@@ -321,7 +323,7 @@ module Node = struct
                        toplog "Discarded unexpected yes_wallet alias: %s" alias ;
                        return acc))))
         (String_map.empty, String_map.empty, String_map.empty, [])
-        (List.rev known_addresses)
+        (List.rev known_accounts)
     in
     let baker_accounts =
       String_map.mapi

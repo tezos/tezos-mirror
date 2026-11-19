@@ -62,3 +62,13 @@ val convert_wallet_inplace : client:Client.t -> t -> unit Lwt.t
     it. *)
 val load_consensus_key_mapping :
   t -> client:Client.t -> consensus_key_mapping list Lwt.t
+
+(** [load_keys t ~client] reads the [public_key_hashs], [public_keys] and
+    [secret_keys] files of the yes-wallet in the base directory of [client]
+    (through ssh if [t] has a runner) and returns all its keys, sorted by alias.
+
+    This is equivalent to, but much faster than, running
+    [Client.show_address ~alias client] for each alias returned by
+    [Client.list_known_addresses client]. Secret keys of a yes-wallet are
+    always unencrypted. *)
+val load_keys : t -> client:Client.t -> Account.key list Lwt.t
