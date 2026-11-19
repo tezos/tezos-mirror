@@ -19,16 +19,31 @@
 //! they hold the node-local output of `debug_trace*` and `http_trace*`, and
 //! only exist on the throwaway states of a replay or a simulation.
 //!
+//! [`RuntimeKeyspaces::start_safe`] gives a safe copy of a handle: a handle
+//! of its own, over copies of the keyspaces under `/tmp` and the prefix of
+//! the handle, whose raw accesses go under that same prefix (see
+//! [`RawHost`]). It is closed by [`RuntimeKeyspaces::into_keyspaces`] and
+//! [`RuntimeKeyspaces::promote_from`] on the handle it copies, which keep
+//! its writes, or by [`RuntimeKeyspaces::revert_safe`], which drops them.
+//! Safe copies nest: a copy of a copy is under `/tmp/tmp`.
+//!
+//! `/tmp` is reserved under every handle: a raw access to a path under `/tmp`
+//! lands under the prefix of the next safe copy, which deletes it when it
+//! starts or closes.
+//!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
 //! it holds `/base`, `/tez/world_state` and `/evm/world_state`, loaded on the
 //! live host, and [`BlueprintKeyspaces::into_base`] keeps only `/base` once
 //! the execution loads a [`RuntimeKeyspaces`].
 
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
 
 use crate::raw_host::RawHost;
 use crate::runtime::MockKernelHost;
+use crate::safe_storage::TMP_PATH;
 use crate::snapshot::{Snapshot, SnapshotError};
 
 /// Name of the `/base` keyspace, holding kernel configuration and
@@ -95,7 +110,8 @@ pub const COMMON_WORLD_STATE_ROOT_PATH: RefPath =
 /// Storage handle threaded through kernel execution.
 ///
 /// The host is borrowed for `'host`: its owner keeps it, and gets it back
-/// once the handle is gone.
+/// once the handle is gone. A handle built by [`Self::init`] has no prefix;
+/// a safe copy has `/tmp` and the prefix of the handle it copies.
 pub struct RuntimeKeyspaces<'host, Host: KeySpaceLoader> {
     host: RawHost<&'host mut Host>,
     keyspaces: Keyspaces<Host::KeySpace>,
@@ -247,32 +263,218 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     /// Errors with the loader's error: a keyspace already held elsewhere, or
     /// a name the loader cannot accept.
     pub fn init(host: &'host mut Host) -> Result<Self, KeySpaceLoaderError> {
-        let eth_accounts = host.load_or_create(ETH_ACCOUNTS_KEYSPACE_NAME)?;
-        let tez_accounts = host.load_or_create(TEZ_ACCOUNTS_KEYSPACE_NAME)?;
-        let evm_world_state = host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME)?;
-        let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
-        let common_world_state = host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?;
+        let keyspaces = Keyspaces::load(|name| host.load_or_create(name))?;
         Ok(Self {
             host: RawHost { host, prefix: None },
-            keyspaces: Keyspaces {
-                eth_accounts,
-                tez_accounts,
-                evm_world_state,
-                tez_world_state,
-                common_world_state,
-            },
+            keyspaces,
             tez_accounts_snapshot: Snapshot::new(),
         })
     }
+
+    /// The prefix of a safe copy of `self`: `/tmp` and `self`'s prefix.
+    ///
+    /// Errors with [`RuntimeError::PathNotFound`] if it exceeds the path size
+    /// limit.
+    fn copy_prefix(&self) -> Result<OwnedPath, RuntimeError> {
+        match &self.host.prefix {
+            None => Ok(OwnedPath::from(TMP_PATH)),
+            Some(prefix) => {
+                concat(&TMP_PATH, prefix).map_err(|_| RuntimeError::PathNotFound)
+            }
+        }
+    }
+
+    /// Loads the keyspaces of a safe copy of `self`, named after
+    /// [`Self::copy_prefix`], with that prefix.
+    fn load_copy(
+        &mut self,
+    ) -> Result<(Keyspaces<Host::KeySpace>, OwnedPath), SafeCopyError> {
+        let prefix = self.copy_prefix()?;
+        let host = &mut *self.host.host;
+        let keyspaces = Keyspaces::load(|name| {
+            host.load_or_create(Name::try_from(format!("{prefix}{name}"))?)
+        })?;
+        Ok((keyspaces, prefix))
+    }
+
+    /// The safe copy of `self` over `keyspaces`, under `prefix`.
+    fn copy_over(
+        &mut self,
+        keyspaces: Keyspaces<Host::KeySpace>,
+        prefix: OwnedPath,
+    ) -> RuntimeKeyspaces<'_, Host> {
+        RuntimeKeyspaces {
+            host: RawHost {
+                host: &mut *self.host.host,
+                prefix: Some(prefix),
+            },
+            keyspaces,
+            tez_accounts_snapshot: Snapshot::new(),
+        }
+    }
+
+    /// Errors with [`SafeCopyError::SavepointsOpen`] if a savepoint of
+    /// `/tez/tez_accounts` is open.
+    fn check_no_savepoint(&self) -> Result<(), SafeCopyError> {
+        match self.tez_accounts_snapshot.len() {
+            0 => Ok(()),
+            open => Err(SafeCopyError::SavepointsOpen(open)),
+        }
+    }
+
+    /// The keyspaces of a safe copy, ending its borrow of the handle it
+    /// copies, for [`Self::promote_from`].
+    ///
+    /// Errors with [`SafeCopyError::SavepointsOpen`] if a savepoint of
+    /// `/tez/tez_accounts` is open: the copy is dropped with its savepoints.
+    pub fn into_keyspaces(self) -> Result<Keyspaces<Host::KeySpace>, SafeCopyError> {
+        self.check_no_savepoint()?;
+        Ok(self.keyspaces)
+    }
 }
 
-/// The keyspaces the handle lends out.
-struct Keyspaces<KS> {
+impl<Host: KeySpaceLoader + StorageV1> RuntimeKeyspaces<'_, Host> {
+    /// A safe copy of `self`, with no side effect on it: loads the keyspaces
+    /// under `/tmp` and `self`'s prefix, deletes what an earlier copy left
+    /// there, then copies `self`'s keyspaces into them. The copy's snapshot
+    /// of `/tez/tez_accounts` holds no savepoint, and `self`'s cannot be
+    /// reached until the copy is gone.
+    ///
+    /// The copy must be closed by [`Self::into_keyspaces`] and
+    /// [`Self::promote_from`], or by [`Self::revert_safe`], once its
+    /// savepoints are released through the journal.
+    ///
+    /// Errors with [`SafeCopyError::Loader`], writing nothing, or with
+    /// [`SafeCopyError::Storage`] if the deletion fails.
+    pub fn start_safe(&mut self) -> Result<RuntimeKeyspaces<'_, Host>, SafeCopyError> {
+        let (mut keyspaces, prefix) = self.load_copy()?;
+        delete_if_present(self.host.host, &prefix)?;
+        keyspaces.zip_mut(&mut self.keyspaces, |copy, keyspace| {
+            copy.copy_from(keyspace)
+        });
+        Ok(self.copy_over(keyspaces, prefix))
+    }
+
+    /// The safe copy of `self` that a dropped handle left, e.g. on a kernel
+    /// reboot, without deleting or copying anything. Closed as the copy of
+    /// [`Self::start_safe`] is.
+    ///
+    /// Errors with [`SafeCopyError::NoCopy`] if nothing is under the prefix
+    /// of a safe copy of `self`, e.g. no copy was started or it was closed:
+    /// promoting empty keyspaces would clear `self`'s. Errors with
+    /// [`SafeCopyError::Loader`] or [`SafeCopyError::Storage`].
+    pub fn resume_safe(&mut self) -> Result<RuntimeKeyspaces<'_, Host>, SafeCopyError> {
+        if self.host.host.store_has(&self.copy_prefix()?)?.is_none() {
+            return Err(SafeCopyError::NoCopy);
+        }
+        let (keyspaces, prefix) = self.load_copy()?;
+        Ok(self.copy_over(keyspaces, prefix))
+    }
+
+    /// Moves `keyspaces` over `self`'s, then deletes what is left under the
+    /// prefix of a safe copy of `self`: what the copy wrote outside its
+    /// keyspaces.
+    ///
+    /// `keyspaces` may come from any safe copy, not strictly only from
+    /// a direct copy of `self`.
+    ///
+    /// Errors with [`SafeCopyError::Storage`] if the deletion fails, the
+    /// keyspaces having been moved.
+    pub fn promote_from(
+        &mut self,
+        mut keyspaces: Keyspaces<Host::KeySpace>,
+    ) -> Result<(), SafeCopyError> {
+        let prefix = self.copy_prefix()?;
+        self.keyspaces
+            .zip_mut(&mut keyspaces, |keyspace, copy| keyspace.move_from(copy));
+        drop(keyspaces);
+        delete_if_present(self.host.host, &prefix)?;
+        Ok(())
+    }
+
+    /// Clears the keyspaces of a safe copy and deletes what is left under its
+    /// prefix.
+    ///
+    /// Errors with [`SafeCopyError::SavepointsOpen`] if a savepoint of
+    /// `/tez/tez_accounts` is open, or with [`SafeCopyError::NotACopy`] if
+    /// `self` has no prefix: the handle is dropped and nothing is cleared or
+    /// deleted. Errors with [`SafeCopyError::Storage`] if the deletion fails.
+    pub fn revert_safe(mut self) -> Result<(), SafeCopyError> {
+        self.check_no_savepoint()?;
+        let Some(prefix) = self.host.prefix.take() else {
+            return Err(SafeCopyError::NotACopy);
+        };
+        self.keyspaces.for_each_mut(|copy| copy.clear());
+        drop(self.keyspaces);
+        delete_if_present(self.host.host, &prefix)?;
+        Ok(())
+    }
+}
+
+/// Why a safe copy cannot be started, resumed, promoted or reverted.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SafeCopyError {
+    #[error("safe copy keyspace loader error: {0}")]
+    Loader(#[from] KeySpaceLoaderError),
+    #[error("safe copy storage error: {0}")]
+    Storage(#[from] RuntimeError),
+    #[error("safe copy closed with {0} savepoints open")]
+    SavepointsOpen(usize),
+    #[error("reverted handle is not a safe copy")]
+    NotACopy,
+    #[error("no safe copy to resume")]
+    NoCopy,
+}
+
+/// Deletes `path` from `host`, if present.
+fn delete_if_present(
+    host: &mut impl StorageV1,
+    path: &OwnedPath,
+) -> Result<(), RuntimeError> {
+    if host.store_has(path)?.is_none() {
+        return Ok(());
+    }
+    host.store_delete(path)
+}
+
+/// The runtime keyspaces.
+pub struct Keyspaces<KS> {
     eth_accounts: KS,
     tez_accounts: KS,
     evm_world_state: KS,
     tez_world_state: KS,
     common_world_state: KS,
+}
+
+impl<KS> Keyspaces<KS> {
+    /// Loads each keyspace with `load`, by its name.
+    fn load<E>(mut load: impl FnMut(Name) -> Result<KS, E>) -> Result<Self, E> {
+        Ok(Self {
+            eth_accounts: load(ETH_ACCOUNTS_KEYSPACE_NAME)?,
+            tez_accounts: load(TEZ_ACCOUNTS_KEYSPACE_NAME)?,
+            evm_world_state: load(EVM_WORLD_STATE_KEYSPACE_NAME)?,
+            tez_world_state: load(TEZ_WORLD_STATE_KEYSPACE_NAME)?,
+            common_world_state: load(COMMON_WORLD_STATE_KEYSPACE_NAME)?,
+        })
+    }
+
+    /// Gives each keyspace to `f`.
+    fn for_each_mut(&mut self, mut f: impl FnMut(&mut KS)) {
+        f(&mut self.eth_accounts);
+        f(&mut self.tez_accounts);
+        f(&mut self.evm_world_state);
+        f(&mut self.tez_world_state);
+        f(&mut self.common_world_state);
+    }
+
+    /// Gives each keyspace to `f` with the same keyspace of `other`.
+    fn zip_mut(&mut self, other: &mut Self, mut f: impl FnMut(&mut KS, &mut KS)) {
+        f(&mut self.eth_accounts, &mut other.eth_accounts);
+        f(&mut self.tez_accounts, &mut other.tez_accounts);
+        f(&mut self.evm_world_state, &mut other.evm_world_state);
+        f(&mut self.tez_world_state, &mut other.tez_world_state);
+        f(&mut self.common_world_state, &mut other.common_world_state);
+    }
 }
 
 /// The handle over a borrowed [`MockKernelHost`], for the tests.
@@ -349,10 +551,9 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_storage::{safe_path, SafeStorage, TMP_PATH};
-    use tezos_smart_rollup_host::path::{OwnedPath, Path};
-    use tezos_smart_rollup_host::storage::StorageV1;
-    use tezos_smart_rollup_keyspace::{Key, KeySpace};
+    use crate::safe_storage::{safe_path, SafeStorage};
+    use tezos_smart_rollup_host::path::Path;
+    use tezos_smart_rollup_keyspace::Key;
 
     const PROBE: Key = Key::from_static(b"/probe");
 
@@ -539,5 +740,446 @@ mod tests {
         safe.revert().unwrap();
         assert!(safe.host().store_has(&backup).unwrap().is_none());
         assert!(safe.host().store_has(&TMP_PATH).unwrap().is_none());
+    }
+
+    // The safe-copy tests read keyspaces only through keyspace handles: under
+    // the NDS backend, a keyspace is not at the durable path of its name.
+
+    /// The number of runtime keyspaces.
+    const KEYSPACES: usize = 5;
+
+    const LIVE_NAMES: [&str; KEYSPACES] = [
+        "/evm/eth_accounts",
+        "/tez/tez_accounts",
+        "/evm/world_state",
+        "/tez/world_state",
+        "/common_world_state",
+    ];
+
+    const TMP_NAMES: [&str; KEYSPACES] = [
+        "/tmp/evm/eth_accounts",
+        "/tmp/tez/tez_accounts",
+        "/tmp/evm/world_state",
+        "/tmp/tez/world_state",
+        "/tmp/common_world_state",
+    ];
+
+    const TMP_TMP_NAMES: [&str; KEYSPACES] = [
+        "/tmp/tmp/evm/eth_accounts",
+        "/tmp/tmp/tez/tez_accounts",
+        "/tmp/tmp/evm/world_state",
+        "/tmp/tmp/tez/world_state",
+        "/tmp/tmp/common_world_state",
+    ];
+
+    const NONE: [Option<Vec<u8>>; KEYSPACES] = [const { None }; KEYSPACES];
+
+    /// The value at the probe of each keyspace of `names`, loaded on `loader`.
+    fn probes_in(
+        loader: &mut impl KeySpaceLoader,
+        names: [&str; KEYSPACES],
+    ) -> [Option<Vec<u8>>; KEYSPACES] {
+        names.map(|name| {
+            let keyspace = loader
+                .load_or_create(Name::try_from(name.to_string()).unwrap())
+                .unwrap();
+            keyspace.get(&PROBE).map(|value| value.to_vec())
+        })
+    }
+
+    /// A host whose keyspaces hold `before` at the probe.
+    fn seeded_host() -> MockKernelHost {
+        let mut host = MockKernelHost::default();
+        set_probes(&mut RuntimeKeyspaces::init(&mut host).unwrap(), b"before");
+        host
+    }
+
+    /// The name of each keyspace of `rk`.
+    fn names<Host: KeySpaceLoader>(
+        rk: &RuntimeKeyspaces<'_, Host>,
+    ) -> [String; KEYSPACES] {
+        [
+            rk.eth_accounts().name().to_string(),
+            rk.tez_accounts().name().to_string(),
+            rk.evm_world_state().name().to_string(),
+            rk.tez_world_state().name().to_string(),
+            rk.common_world_state().name().to_string(),
+        ]
+    }
+
+    /// Writes `value` at the probe of each keyspace of `rk`.
+    fn set_probes<Host: KeySpaceLoader>(
+        rk: &mut RuntimeKeyspaces<'_, Host>,
+        value: &[u8],
+    ) {
+        rk.eth_accounts_mut().set(&PROBE, value).unwrap();
+        rk.tez_accounts_mut().set(&PROBE, value).unwrap();
+        rk.evm_world_state_mut().set(&PROBE, value).unwrap();
+        rk.tez_world_state_mut().set(&PROBE, value).unwrap();
+        rk.common_world_state_mut().set(&PROBE, value).unwrap();
+    }
+
+    /// The value at the probe of each keyspace of `rk`.
+    fn get_probes<Host: KeySpaceLoader>(
+        rk: &RuntimeKeyspaces<'_, Host>,
+    ) -> [Option<Vec<u8>>; KEYSPACES] {
+        [
+            rk.eth_accounts().get(&PROBE),
+            rk.tez_accounts().get(&PROBE),
+            rk.evm_world_state().get(&PROBE),
+            rk.tez_world_state().get(&PROBE),
+            rk.common_world_state().get(&PROBE),
+        ]
+        .map(|value| value.map(|value| value.to_vec()))
+    }
+
+    fn all(value: &[u8]) -> [Option<Vec<u8>>; KEYSPACES] {
+        [(); KEYSPACES].map(|()| Some(value.to_vec()))
+    }
+
+    #[test]
+    fn start_safe_copies_every_keyspace_under_tmp() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            assert_eq!(names(&copy), TMP_NAMES);
+            assert_eq!(get_probes(&copy), all(b"before"));
+            set_probes(&mut copy, b"after");
+            let inner = copy.start_safe().unwrap();
+            assert_eq!(names(&inner), TMP_TMP_NAMES);
+            assert_eq!(get_probes(&inner), all(b"after"));
+        }
+        // Dropped unclosed: the writes stay in the copy.
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"before"));
+        assert_eq!(probes_in(&mut host, TMP_NAMES), all(b"after"));
+        assert_eq!(probes_in(&mut host, TMP_TMP_NAMES), all(b"after"));
+    }
+
+    #[test]
+    fn promote_from_moves_the_writes_to_the_parent() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            set_probes(&mut copy, b"after");
+            let keyspaces = copy.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
+            assert_eq!(get_probes(&rk), all(b"after"));
+        }
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"after"));
+        assert_eq!(probes_in(&mut host, TMP_NAMES), NONE);
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn revert_safe_leaves_the_parent_untouched() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            set_probes(&mut copy, b"after");
+            copy.revert_safe().unwrap();
+            assert_eq!(get_probes(&rk), all(b"before"));
+        }
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"before"));
+        assert_eq!(probes_in(&mut host, TMP_NAMES), NONE);
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn revert_safe_refuses_a_handle_that_is_not_a_copy() {
+        let mut host = seeded_host();
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(rk.revert_safe(), Err(SafeCopyError::NotACopy));
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"before"));
+    }
+
+    #[test]
+    fn a_reverted_inner_copy_leaves_the_outer_writes() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut outer = rk.start_safe().unwrap();
+            set_probes(&mut outer, b"outer");
+            let mut inner = outer.start_safe().unwrap();
+            assert_eq!(get_probes(&inner), all(b"outer"));
+            set_probes(&mut inner, b"inner");
+            inner.revert_safe().unwrap();
+            assert_eq!(get_probes(&outer), all(b"outer"));
+            let keyspaces = outer.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
+        }
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"outer"));
+        assert_eq!(probes_in(&mut host, TMP_TMP_NAMES), NONE);
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn a_promoted_inner_copy_reaches_live_only_with_the_outer_one() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut outer = rk.start_safe().unwrap();
+            let mut inner = outer.start_safe().unwrap();
+            set_probes(&mut inner, b"after");
+            let keyspaces = inner.into_keyspaces().unwrap();
+            outer.promote_from(keyspaces).unwrap();
+            assert_eq!(names(&outer), TMP_NAMES);
+            assert_eq!(get_probes(&outer), all(b"after"));
+        }
+        // The outer copy, dropped unclosed, holds the writes; live does not.
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"before"));
+        assert_eq!(probes_in(&mut host, TMP_TMP_NAMES), NONE);
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let outer = rk.resume_safe().unwrap();
+            let keyspaces = outer.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
+        }
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"after"));
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn the_keyspaces_of_a_grandchild_promote_into_the_root() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut outer = rk.start_safe().unwrap();
+            set_probes(&mut outer, b"outer");
+            let mut inner = outer.start_safe().unwrap();
+            set_probes(&mut inner, b"inner");
+            let keyspaces = inner.into_keyspaces().unwrap();
+            drop(outer);
+            rk.promote_from(keyspaces).unwrap();
+            assert_eq!(get_probes(&rk), all(b"inner"));
+        }
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"inner"));
+        assert_eq!(probes_in(&mut host, TMP_TMP_NAMES), NONE);
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn resume_safe_fails_without_a_copy() {
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(rk.resume_safe().err(), Some(SafeCopyError::NoCopy));
+
+        let mut copy = rk.start_safe().unwrap();
+        set_probes(&mut copy, b"after");
+        let keyspaces = copy.into_keyspaces().unwrap();
+        rk.promote_from(keyspaces).unwrap();
+        assert_eq!(rk.resume_safe().err(), Some(SafeCopyError::NoCopy));
+
+        rk.start_safe().unwrap().revert_safe().unwrap();
+        assert_eq!(rk.resume_safe().err(), Some(SafeCopyError::NoCopy));
+        assert_eq!(get_probes(&rk), all(b"after"));
+    }
+
+    #[test]
+    fn resume_safe_reopens_the_copy_of_a_dropped_handle() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            set_probes(&mut copy, b"after");
+        }
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(get_probes(&rk), all(b"before"));
+        let copy = rk.resume_safe().unwrap();
+        assert_eq!(names(&copy), TMP_NAMES);
+        assert_eq!(get_probes(&copy), all(b"after"));
+        let keyspaces = copy.into_keyspaces().unwrap();
+        rk.promote_from(keyspaces).unwrap();
+        assert_eq!(get_probes(&rk), all(b"after"));
+        assert_eq!(rk.host().store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    /// A raw path outside the keyspaces.
+    const RAW: RefPath = RefPath::assert_from(b"/raw");
+
+    #[test]
+    fn start_safe_deletes_what_a_dropped_copy_left_and_resume_safe_keeps_it() {
+        let tmp_raw = RefPath::assert_from(b"/tmp/raw");
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            copy.host_mut().store_write_all(&RAW, b"left").unwrap();
+            set_probes(&mut copy, b"left");
+        }
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let copy = rk.resume_safe().unwrap();
+            assert_eq!(copy.host().store_read_all(&RAW).unwrap(), b"left");
+            assert_eq!(get_probes(&copy), all(b"left"));
+        }
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let copy = rk.start_safe().unwrap();
+        assert_eq!(copy.host().host.store_has(&tmp_raw).unwrap(), None);
+        assert_eq!(get_probes(&copy), all(b"before"));
+    }
+
+    #[test]
+    fn start_safe_failing_partway_writes_nothing() {
+        let leftover = RefPath::assert_from(b"/tmp/raw");
+        let mut host = seeded_host();
+        host.store_write_all(&leftover, b"left").unwrap();
+        // Held, so loading the copy of `/tez/world_state` fails.
+        let held = host
+            .load_or_create(Name::from_static("/tmp/tez/world_state"))
+            .unwrap();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            assert_eq!(
+                rk.start_safe().err(),
+                Some(SafeCopyError::Loader(KeySpaceLoaderError::AlreadyLoaded))
+            );
+            assert_eq!(rk.host().store_read_all(&leftover).unwrap(), b"left");
+        }
+        assert_eq!(held.get(&PROBE), None);
+        drop(held);
+        assert_eq!(probes_in(&mut host, TMP_NAMES), NONE);
+    }
+
+    /// The raw accesses of a copy go under its prefix, and are dropped when it
+    /// closes: only its keyspaces are promoted.
+    #[test]
+    fn raw_accesses_follow_the_copy_and_are_not_promoted() {
+        let tmp_raw = RefPath::assert_from(b"/tmp/raw");
+        let tmp_tmp_raw = RefPath::assert_from(b"/tmp/tmp/raw");
+        let mut host = seeded_host();
+        host.store_write_all(&RAW, b"live").unwrap();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut outer = rk.start_safe().unwrap();
+            // Only the keyspaces are copied.
+            assert_eq!(outer.host().store_has(&RAW).unwrap(), None);
+            outer.host_mut().store_write_all(&RAW, b"outer").unwrap();
+            set_probes(&mut outer, b"outer");
+            assert_eq!(
+                outer.host().host.store_read_all(&tmp_raw).unwrap(),
+                b"outer"
+            );
+            assert_eq!(outer.host().host.store_read_all(&RAW).unwrap(), b"live");
+            let mut inner = outer.start_safe().unwrap();
+            assert_eq!(inner.host().store_has(&RAW).unwrap(), None);
+            inner.host_mut().store_write_all(&RAW, b"inner").unwrap();
+            assert_eq!(
+                inner.host().host.store_read_all(&tmp_tmp_raw).unwrap(),
+                b"inner"
+            );
+            inner.revert_safe().unwrap();
+            assert_eq!(outer.host().store_read_all(&RAW).unwrap(), b"outer");
+            let keyspaces = outer.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
+            assert_eq!(get_probes(&rk), all(b"outer"));
+        }
+        assert_eq!(host.store_read_all(&RAW).unwrap(), b"live");
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn revert_safe_deletes_the_raw_writes_outside_the_keyspaces() {
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        copy.host_mut().store_write_all(&RAW, b"inside").unwrap();
+        copy.revert_safe().unwrap();
+        assert_eq!(rk.host().store_has(&RAW).unwrap(), None);
+        assert_eq!(rk.host().store_has(&TMP_PATH).unwrap(), None);
+    }
+
+    #[test]
+    fn a_savepoint_of_the_parent_is_usable_again_after_promote() {
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        rk.tez_accounts_savepoint().unwrap();
+        rk.tez_accounts_mut().set(&PROBE, b"outer").unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        assert_eq!(copy.tez_accounts_snapshot().len(), 0);
+        assert_eq!(
+            copy.tez_accounts_rollback(),
+            Err(SnapshotError::NoSavepoint)
+        );
+        assert_eq!(
+            copy.tez_accounts_release_to(1),
+            Err(SnapshotError::ReleaseAboveHeight { height: 1, len: 0 })
+        );
+        copy.tez_accounts_mut().set(&PROBE, b"inner").unwrap();
+        let keyspaces = copy.into_keyspaces().unwrap();
+        rk.promote_from(keyspaces).unwrap();
+
+        assert_eq!(rk.tez_accounts_snapshot().len(), 1);
+        rk.tez_accounts_rollback().unwrap();
+        assert_eq!(
+            rk.tez_accounts().get(&PROBE).as_deref(),
+            Some(&b"before"[..])
+        );
+    }
+
+    #[test]
+    fn the_savepoints_of_a_copy_are_named_after_it() {
+        let backup = RefPath::assert_from(b"/__savepoint/0/tmp/tez/tez_accounts/probe");
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        copy.tez_accounts_savepoint().unwrap();
+        assert_eq!(copy.host().host.store_read_all(&backup).unwrap(), b"before");
+        copy.tez_accounts_mut().set(&PROBE, b"after").unwrap();
+        copy.tez_accounts_release_to(0).unwrap();
+        let keyspaces = copy.into_keyspaces().unwrap();
+        rk.promote_from(keyspaces).unwrap();
+        assert_eq!(rk.host().store_has(&backup).unwrap(), None);
+        assert_eq!(
+            rk.tez_accounts().get(&PROBE).as_deref(),
+            Some(&b"after"[..])
+        );
+    }
+
+    #[test]
+    fn closing_a_copy_with_a_savepoint_open_fails() {
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        copy.tez_accounts_savepoint().unwrap();
+        assert_eq!(
+            copy.into_keyspaces().err(),
+            Some(SafeCopyError::SavepointsOpen(1))
+        );
+        let mut copy = rk.resume_safe().unwrap();
+        copy.tez_accounts_savepoint().unwrap();
+        assert_eq!(copy.revert_safe(), Err(SafeCopyError::SavepointsOpen(1)));
+    }
+
+    #[test]
+    fn a_copy_over_safe_storage_is_under_tmp_tmp() {
+        let mut host = seeded_host();
+        let mut safe = SafeStorage::new(
+            &mut host,
+            [
+                ETH_ACCOUNTS_ROOT_PATH,
+                TEZ_ACCOUNTS_ROOT_PATH,
+                EVM_WORLD_STATE_ROOT_PATH,
+                TEZ_WORLD_STATE_ROOT_PATH,
+                COMMON_WORLD_STATE_ROOT_PATH,
+            ]
+            .map(OwnedPath::from)
+            .to_vec(),
+        );
+        safe.start().unwrap();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            assert_eq!(names(&copy), TMP_TMP_NAMES);
+            set_probes(&mut copy, b"after");
+            let keyspaces = copy.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
+        }
+        assert_eq!(probes_in(&mut safe, LIVE_NAMES), all(b"after"));
+        assert_eq!(probes_in(safe.host_mut(), LIVE_NAMES), all(b"before"));
+        safe.promote().unwrap();
+        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"after"));
     }
 }
