@@ -70,6 +70,11 @@ module Signer_implementation : Client_keys.SIGNER = struct
     Lwt_result_syntax.tzfail NoLedgerSupport
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_false
+
+  let list_known_keys _ = Lwt_result_syntax.tzfail NoLedgerSupport
+
+  let bls_prove_possession ?override_pk:_ _sk_uri =
+    Lwt_result_syntax.tzfail NoLedgerSupport
 end
 
 let commands () = []
