@@ -58,6 +58,10 @@ pub enum SnapshotError {
     /// the snapshots it drives: the count and the snapshot are out of sync.
     #[error("{held} snapshot savepoints held, only {tracked} tracked")]
     UntrackedSavepoints { held: usize, tracked: usize },
+    /// A frame still open has its revert point among or above the savepoints
+    /// released: it can no longer be reverted.
+    #[error("the revert point {watermark} of an open frame is released")]
+    FrameRevertPointReleased { watermark: usize },
 }
 
 const SAVEPOINT_PREFIX: &str = "/__savepoint";

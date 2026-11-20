@@ -640,14 +640,27 @@ impl MichelsonJournal {
     /// Fails `UntrackedSavepoints` if the snapshot of `rk` holds more
     /// savepoints than the journal counts. Its savepoints are released
     /// anyway, and the count is left as is.
+    ///
+    /// Fails `FrameRevertPointReleased` if an open EVM frame has its revert
+    /// point among the savepoints released, or would have it above them: its
+    /// watermark would then be past the count. They are released and counted
+    /// anyway.
     pub fn release_all_savepoints<Host: KeySpaceLoader>(
         &mut self,
         rk: &mut RuntimeKeyspaces<'_, Host>,
     ) -> Result<(), SnapshotError> {
         let enclosing = self.enclosing_savepoints(rk);
         rk.tez_accounts_release_all();
-        self.savepoints = enclosing?;
-        Ok(())
+        let released = enclosing?..self.savepoints;
+        self.savepoints = released.start;
+        match self.external_checkpoints.iter().find(|frame| {
+            !released.is_empty() && frame.savepoint_watermark >= released.start
+        }) {
+            Some(frame) => Err(SnapshotError::FrameRevertPointReleased {
+                watermark: frame.savepoint_watermark,
+            }),
+            None => Ok(()),
+        }
     }
 
     // Called by EVM journal on checkpoint commit.
@@ -2418,6 +2431,74 @@ mod tests {
 
         journal.release_all_savepoints(&mut inner).unwrap();
         assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // A frame left open in a batch's safe copy cannot be reverted once the
+    // copy's savepoints are released.
+    #[test]
+    fn test_release_all_fails_on_an_open_frame_in_the_copy() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.checkpoint(&mut outer).unwrap();
+
+        let mut inner = outer.start_safe().unwrap();
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut inner).unwrap();
+
+        assert_eq!(
+            journal.release_all_savepoints(&mut inner),
+            Err(SnapshotError::FrameRevertPointReleased { watermark: 1 })
+        );
+        assert!(inner.tez_accounts_snapshot().is_empty());
+        assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // A frame opened in a batch's safe copy after its savepoints would have
+    // its revert point past the count once they are released.
+    #[test]
+    fn test_release_all_fails_on_a_frame_opened_above_the_copy_savepoints() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut outer).unwrap();
+
+        let mut inner = outer.start_safe().unwrap();
+        journal.checkpoint(&mut inner).unwrap();
+        journal.push_external_checkpoint();
+
+        assert_eq!(
+            journal.release_all_savepoints(&mut inner),
+            Err(SnapshotError::FrameRevertPointReleased { watermark: 2 })
+        );
+        assert!(inner.tez_accounts_snapshot().is_empty());
+        assert_eq!(journal.savepoint_count(), 1);
+    }
+
+    // A frame whose revert point is on an enclosing snapshot, or opened in a
+    // batch's safe copy that holds no savepoint, survives the release.
+    #[test]
+    fn test_release_all_keeps_frames_outside_the_copy() {
+        let mut host = MockKernelHost::default();
+        let mut outer = start_world(&mut host);
+        let mut journal = MichelsonJournal::new(OperationHash::default());
+        journal.push_external_checkpoint();
+        journal.checkpoint(&mut outer).unwrap();
+
+        {
+            let mut inner = outer.start_safe().unwrap();
+            journal.checkpoint(&mut inner).unwrap();
+            journal.release_all_savepoints(&mut inner).unwrap();
+        }
+        assert_eq!(journal.savepoint_count(), 1);
+        assert_eq!(journal.open_frame_count(), 1);
+
+        let mut inner = outer.start_safe().unwrap();
+        journal.push_external_checkpoint();
+        journal.release_all_savepoints(&mut inner).unwrap();
+        assert_eq!(journal.savepoint_count(), 1);
+        assert_eq!(journal.open_frame_count(), 2);
     }
 
     // While the transaction holds a savepoint, a frame reverted in a batch's
