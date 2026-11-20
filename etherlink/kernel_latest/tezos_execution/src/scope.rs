@@ -251,10 +251,12 @@ impl<'s, Host: StorageV1 + KeySpaceLoader> OperationScope<'s, Host> {
         Host: 'h,
         C: ScopeRuntimeKeyspace<'h, Host = Host>,
     {
-        let mut safe_host = SafeStorage {
-            host: ctx.rk_mut().host_mut(),
-            world_states: world_states.to_vec(),
-        };
+        let host = ctx.rk_mut().host_mut().unprefixed_mut().ok_or_else(|| {
+            OperationError::BlockAbort(
+                "the operation scope needs an unprefixed host".into(),
+            )
+        })?;
+        let mut safe_host = SafeStorage::new(host, world_states.to_vec());
         safe_host.start()?;
         let phase = match phase {
             Phase::Validation => PhaseState::Validation,

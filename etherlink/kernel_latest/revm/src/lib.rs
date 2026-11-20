@@ -633,7 +633,7 @@ fn execute_transaction<
 where
     Host: StorageV1 + KeySpaceLoader,
 {
-    let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> = match transaction_hash {
+    let opt_attrs_fun: Box<dyn FnOnce()> = match transaction_hash {
         Some(hash) if cfg!(feature = "tracing") => {
             let hash = B256::from(hash);
             let pretty_hash = format!("{hash}");
@@ -641,15 +641,14 @@ where
                 "etherlink.transaction.hash".to_string(),
                 OTelAttrValue::String(pretty_hash),
             )];
-            Box::new(move |__host| {
-                let _ = __host;
+            Box::new(move || {
                 __trace_kernel_add_attrs!(__attrs);
             })
         }
-        _ => Box::new(|__host| ()),
+        _ => Box::new(|| ()),
     };
     __trace_kernel!("evm_context.transact_commit", {
-        opt_attrs_fun(evm_context.db_mut().rk.host_mut());
+        opt_attrs_fun();
         evm_context.set_tx(tx);
         let mut handler: EtherlinkHandler<_, EVMError<EvmDbError>, _> =
             if is_static_top_frame {

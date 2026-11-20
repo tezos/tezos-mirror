@@ -243,10 +243,8 @@ mod tests {
         let mut host = MockKernelHost::default();
         // `start` copies the root, so it has to exist.
         host.store_write_all(&TEZ_ACCOUNTS_PATH, b"tez").unwrap();
-        let mut safe = SafeStorage {
-            host: &mut host,
-            world_states: vec![OwnedPath::from(TEZ_ACCOUNTS_PATH)],
-        };
+        let mut safe =
+            SafeStorage::new(&mut host, vec![OwnedPath::from(TEZ_ACCOUNTS_PATH)]);
         safe.start().unwrap();
 
         let through_tmp_copy = {

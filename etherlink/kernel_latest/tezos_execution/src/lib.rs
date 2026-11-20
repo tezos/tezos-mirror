@@ -3595,12 +3595,12 @@ mod tests {
                 .expect("the probe is written");
 
             {
-                let mut safe_host = SafeStorage {
-                    host: rk.host_mut(),
-                    world_states: vec![OwnedPath::from(
+                let mut safe_host = SafeStorage::new(
+                    rk.host_mut().unprefixed_mut().unwrap(),
+                    vec![OwnedPath::from(
                         tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
                     )],
-                };
+                );
                 safe_host.start().expect("the snapshot is taken");
                 let mut inner_rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
                 run_code(
@@ -3916,7 +3916,7 @@ mod tests {
 
         // One milligas short: refused before the bytes move.
         let mut too_poor = TezlinkOperationGas::start_milligas(read_cost - 1).unwrap();
-        rk.host().reset_bytes_read();
+        bytes_read.set(0);
         assert_eq!(
             get_contract_entrypoint_metered(
                 rk.tez_accounts(),
@@ -3935,7 +3935,7 @@ mod tests {
 
         // Enough to pay for the read, and for the typechecking that follows.
         let mut rich = TezlinkOperationGas::default();
-        rk.host().reset_bytes_read();
+        bytes_read.set(0);
         let entrypoints = get_contract_entrypoint_metered(
             rk.tez_accounts(),
             &AddressHash::Kt1(kt1),
@@ -13754,7 +13754,7 @@ mod tests {
             );
 
             // Measure the operation, not the state setup that precedes it.
-            rk.host().reset_bytes_read();
+            bytes_read.set(0);
             let processed = validate_and_apply_operation(
                 &mut rk,
                 &NotWiredRegistry,
@@ -13918,7 +13918,7 @@ mod tests {
             );
 
             // Measure the operation, not the state setup that precedes it.
-            rk.host().reset_bytes_read();
+            bytes_read.set(0);
             let processed = validate_and_apply_operation(
                 &mut rk,
                 &NotWiredRegistry,
@@ -14098,7 +14098,7 @@ mod tests {
             );
 
             // Measure the operation, not the state setup that precedes it.
-            rk.host().reset_bytes_read();
+            bytes_read.set(0);
             let processed = validate_and_apply_operation(
                 &mut rk,
                 &NotWiredRegistry,
