@@ -364,6 +364,157 @@ let test_local_and_process_rpc_servers =
   Log.info "Checking if external RPC servers have been well started" ;
   Lwt_list.iter_p (fun p -> p) external_event_promises
 
+(* Absolute-form request targets ([http://host/path]) must be handled
+   exactly as their origin-form equivalent ([/path]), dot segments included,
+   by every layer of the RPC server (ACL, cache headers, routing), both on the
+   node's local RPC server and on the external RPC process. *)
+let test_acl_absolute_form_request_target ~rpc_external =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "RPC absolute-form request targets (%s RPC server)"
+         (if rpc_external then "process" else "local"))
+    ~tags:[team; "rpc"; "process"; "request_target"]
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun () ->
+  let acl =
+    JSON.annotate ~origin:"acl"
+    @@ `A
+         [
+           `O
+             [
+               ("address", `String Constant.default_host);
+               ("blacklist", `A [`String "POST /injection/**"]);
+             ];
+         ]
+  in
+  let node = Node.create ~rpc_external ~rpc_host:Constant.default_host [] in
+  let server_started =
+    wait_for_starting_rpc_server_event
+      ~local:(not rpc_external)
+      node
+      (Node.rpc_port node)
+  in
+  let* () = Node.config_init node [] in
+  let* () =
+    Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl)))
+  in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [Enable_http_cache_headers] in
+  let* () = Node.wait_for_ready node in
+  let* () = server_started in
+  let authority = sf "%s:%d" Constant.default_host (Node.rpc_port node) in
+  let check_status ~meth target expected =
+    (* [--request-target] makes curl send the request target verbatim,
+       without normalizing it. *)
+    let data =
+      match meth with
+      | "POST" -> ["-H"; "Content-Type: application/json"; "--data"; {|"00"|}]
+      | _ -> []
+    in
+    let* status =
+      Process.spawn
+        ~log_output:false
+        "curl"
+        (["-s"; "-o"; "/dev/null"; "-w"; "%{http_code}"; "-X"; meth]
+        @ data
+        @ ["--request-target"; target; sf "http://%s/" authority])
+      |> Process.check_and_read_stdout
+    in
+    Check.((String.trim status = expected) string)
+      ~error_msg:(sf "%s %s returned %%L, expected %%R" meth target) ;
+    unit
+  in
+  Log.info "Denied route, origin-form" ;
+  let* () = check_status ~meth:"POST" "/injection/operation" "401" in
+  let* () = check_status ~meth:"POST" "/junk/../injection/operation" "401" in
+  Log.info "Denied route, absolute-form" ;
+  let* () =
+    check_status
+      ~meth:"POST"
+      (sf "http://%s/injection/operation" authority)
+      "401"
+  in
+  let* () =
+    check_status
+      ~meth:"POST"
+      (sf "http://%s/junk/../injection/operation" authority)
+      "401"
+  in
+  let* () =
+    check_status
+      ~meth:"POST"
+      (sf "http://%s/junk/%%2e%%2e/injection/operation" authority)
+      "401"
+  in
+  let* () =
+    check_status
+      ~meth:"POST"
+      (sf "http://%s/../../injection/operation" authority)
+      "401"
+  in
+  Log.info "Denied route, absolute-form without authority" ;
+  let* () = check_status ~meth:"POST" "http:../injection/operation" "401" in
+  let* () =
+    check_status ~meth:"POST" "http:junk/../../injection/operation" "401"
+  in
+  Log.info "Allowed route, absolute-form" ;
+  let* () = check_status ~meth:"GET" (sf "http://%s/version" authority) "200" in
+  let* () =
+    check_status ~meth:"GET" (sf "http://%s/junk/../version" authority) "200"
+  in
+  Log.info "Cache headers, absolute-form" ;
+  let has_etag target =
+    let* headers =
+      Process.spawn
+        ~log_output:false
+        "curl"
+        [
+          "-s";
+          "-o";
+          "/dev/null";
+          "-D";
+          "-";
+          "--request-target";
+          target;
+          sf "http://%s/" authority;
+        ]
+      |> Process.check_and_read_stdout
+    in
+    return
+      (String.split_on_char '\n' headers
+      |> List.exists (fun line ->
+             String.starts_with
+               ~prefix:"etag:"
+               (String.lowercase_ascii (String.trim line))))
+  in
+  let check_etag target expected =
+    let* etag = has_etag target in
+    Check.((etag = expected) bool)
+      ~error_msg:(sf "GET %s: etag header presence is %%L, expected %%R" target) ;
+    unit
+  in
+  let* () =
+    check_etag (sf "http://%s/chains/main/blocks/head/header" authority) true
+  in
+  let* () =
+    check_etag
+      (sf "http://%s/version/../chains/main/blocks/head/header" authority)
+      true
+  in
+  let* () =
+    check_etag
+      (sf "http://%s/chains/main/blocks/head/../../../../version" authority)
+      false
+  in
+  unit
+
+let () =
+  test_acl_absolute_form_request_target ~rpc_external:false ;
+  test_acl_absolute_form_request_target ~rpc_external:true
+
 let wait_for_RPC_process_sync node =
   let filter json = JSON.(json |-> "level" |> as_int_opt) in
   Node.wait_for node "store_synchronized_on_head.v0" filter
