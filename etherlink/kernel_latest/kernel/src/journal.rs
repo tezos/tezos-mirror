@@ -102,7 +102,7 @@ where
         // Finalize the EVM tracer with the transaction's execution result.
         if let (Some(mut tracer), Some(result)) = (journal.evm.take_tracer(), result) {
             tracer
-                .finalize(rk.evm_world_state_mut(), result)
+                .finalize(rk.common_world_state_mut(), result)
                 .map_err(EvmRunError::from)
         } else {
             Ok(())

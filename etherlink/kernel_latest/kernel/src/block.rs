@@ -3258,6 +3258,99 @@ mod tests {
         );
     }
 
+    /// Produces a block with a deployment of hash `tx_hash`, traced by `tracer_input`.
+    fn produce_traced_deployment(
+        tx_hash: TransactionHash,
+        tracer_input: TracerInput,
+    ) -> MockKernelHost {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let deployment = Transaction {
+            tx_hash,
+            content: Ethereum(dummy_eth_transaction_deploy()),
+        };
+        store_blueprints(&mut base, vec![blueprint(vec![deployment])]);
+        set_balance(
+            rk.eth_accounts_mut(),
+            &H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap(),
+            U256::from(5000000000000000u64),
+        );
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        drop(rk);
+        drop(base);
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &dummy_tezosx_config(SpecId::default()),
+            &mut dummy_configuration(),
+            None,
+            Some(tracer_input),
+        )
+        .expect("The block production failed.");
+        host
+    }
+
+    /// Whether the durable storage of `host` has a value at `path`.
+    fn has_value(host: &MockKernelHost, path: &str) -> bool {
+        let path =
+            tezos_smart_rollup_host::path::OwnedPath::try_from(path.to_string()).unwrap();
+        host.store_has(&path).unwrap().is_some()
+    }
+
+    /// A call-traced block transaction leaves its trace in `/common_world_state/trace`.
+    #[test]
+    fn call_trace_of_a_block_transaction_is_in_common_world_state() {
+        let tx_hash = hash_from_nonce(1);
+        let host = produce_traced_deployment(
+            tx_hash,
+            TracerInput::CallTracer(evm_inspectors::call_tracer::CallTracerInput {
+                config: evm_inspectors::call_tracer::CallTracerConfig {
+                    only_top_call: false,
+                    with_logs: false,
+                },
+                transaction_hash: Some(tx_hash.into()),
+            }),
+        );
+        let trace = format!("/common_world_state/trace/{}", hex::encode(tx_hash));
+        assert!(has_value(&host, &format!("{trace}/call_trace/length")));
+        assert!(has_value(&host, &format!("{trace}/call_trace/0")));
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/world_state/trace"))
+            .unwrap()
+            .is_none());
+    }
+
+    /// A struct-logged block transaction leaves its logs in `/common_world_state/trace`.
+    #[test]
+    fn struct_logs_of_a_block_transaction_are_in_common_world_state() {
+        let tx_hash = hash_from_nonce(1);
+        let host = produce_traced_deployment(
+            tx_hash,
+            TracerInput::StructLogger(evm_inspectors::struct_logger::StructLoggerInput {
+                config: evm_inspectors::struct_logger::StructLoggerConfig {
+                    enable_memory: false,
+                    enable_return_data: false,
+                    disable_stack: false,
+                    disable_storage: false,
+                },
+                transaction_hash: Some(tx_hash.into()),
+            }),
+        );
+        let trace = format!("/common_world_state/trace/{}", hex::encode(tx_hash));
+        assert!(has_value(&host, &format!("{trace}/struct_logs/length")));
+        assert!(has_value(&host, &format!("{trace}/struct_logs/0")));
+        assert!(has_value(&host, &format!("{trace}/gas")));
+        assert!(has_value(&host, &format!("{trace}/failed")));
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/world_state/trace"))
+            .unwrap()
+            .is_none());
+    }
+
     #[test]
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {

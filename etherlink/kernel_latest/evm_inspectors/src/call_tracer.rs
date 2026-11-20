@@ -280,7 +280,7 @@ impl CallTracer {
     /// Flush the buffered traces to storage in one batch.
     pub fn finalize<KS>(
         &mut self,
-        evm_world_state: &mut KS,
+        common_world_state: &mut KS,
         _result: &ExecutionResult,
     ) -> Result<(), InspectorError>
     where
@@ -288,7 +288,7 @@ impl CallTracer {
     {
         if !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(evm_world_state, &traces, &self.transaction_hash)
+            flush_call_traces(common_world_state, &traces, &self.transaction_hash)
                 .inspect_err(|err| {
                     log!(Debug, "Flushing call traces failed with: {err:?}");
                 })
