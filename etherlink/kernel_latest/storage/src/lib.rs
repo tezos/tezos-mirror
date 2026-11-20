@@ -433,9 +433,9 @@ mod tests {
         let mut host = MockKernelHost::default();
         {
             let mut ks = host.load_or_create("/ks".parse().unwrap()).unwrap();
-            ks.store_le(&key(b"/level"), 7u32).unwrap();
-            ks.store_le(&key(b"/nb_chunks"), 7u16).unwrap();
-            ks.store_le(&key(b"/ts"), -42i64).unwrap();
+            ks.store_le(&key(b"/level"), &7u32).unwrap();
+            ks.store_le(&key(b"/nb_chunks"), &7u16).unwrap();
+            ks.store_le(&key(b"/ts"), &-42i64).unwrap();
         }
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/ks/level"))

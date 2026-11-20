@@ -201,7 +201,7 @@ fn retrieve_minimum_base_fee_per_gas(evm_world_state: &mut impl KeySpace) -> U25
         None => {
             let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
             if let Err(err) =
-                store_minimum_base_fee_per_gas(evm_world_state, minimum_base_fee_per_gas)
+                store_minimum_base_fee_per_gas(evm_world_state, &minimum_base_fee_per_gas)
             {
                 log!(Error, "Can't store the default minimum_base_fee: {:?}", err);
             }
@@ -233,7 +233,7 @@ fn retrieve_da_fee(evm_world_state: &mut impl KeySpace) -> Result<U256, Error> {
         Some(da_fee) => Ok(da_fee),
         None => {
             let da_fee = U256::from(fees::DA_FEE_PER_BYTE);
-            store_da_fee(evm_world_state, da_fee)?;
+            store_da_fee(evm_world_state, &da_fee)?;
             Ok(da_fee)
         }
     }
@@ -671,7 +671,7 @@ mod tests {
         let min_base_fee = U256::from(17);
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            min_base_fee,
+            &min_base_fee,
         )
         .unwrap();
 
@@ -701,7 +701,7 @@ mod tests {
                     b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
                 )
                 .unwrap();
-            store_evm_chain_id(rk.evm_world_state_mut(), DUMMY_CHAIN_ID).unwrap();
+            store_evm_chain_id(rk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
 
             // run level in order to initialize outbox counter (by SOL message)
             level = rk.host_mut().host.run_level(|_| ());
@@ -961,7 +961,7 @@ mod tests {
                     rk.eth_accounts_mut(),
                     &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
                     &h160_to_alloy(&sender),
-                    ticket_balance + u256_to_alloy(&amount),
+                    &(ticket_balance + u256_to_alloy(&amount)),
                 )
                 .unwrap();
 

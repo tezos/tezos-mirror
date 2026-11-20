@@ -483,7 +483,7 @@ where
                 self,
                 write_sequencer_change_counter(
                     self.rk.evm_world_state_mut(),
-                    sequencer_change_counter
+                    &sequencer_change_counter
                 ),
                 "DatabaseCommitPrecompileStateChanges `write_sequencer_change_counter`"
             );
@@ -492,7 +492,7 @@ where
             abort_on_error!(
                 self,
                 self.system
-                    .write_global_counter(self.rk.eth_accounts_mut(), global_counter),
+                    .write_global_counter(self.rk.eth_accounts_mut(), &global_counter),
                 "DatabaseCommitPrecompileStateChanges `write_global_counter`"
             );
         }
@@ -514,7 +514,7 @@ where
                         self.rk.eth_accounts_mut(),
                         &ticket_hash,
                         &owner,
-                        amount
+                        &amount
                     ),
                     "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
                 );

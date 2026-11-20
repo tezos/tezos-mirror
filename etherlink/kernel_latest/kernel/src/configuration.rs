@@ -275,7 +275,7 @@ pub fn fetch_evm_chain_id(
                 "No EVM chain id in storage, falling back to the default."
             );
             let evm_chain_id = U256::from(EVM_CHAIN_ID);
-            store_evm_chain_id(evm_world_state, evm_chain_id)?;
+            store_evm_chain_id(evm_world_state, &evm_chain_id)?;
             Ok(evm_chain_id)
         }
     }

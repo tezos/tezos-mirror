@@ -221,7 +221,7 @@ fn read_current_generation_or_default(
 
 fn store_current_generation(
     base: &mut impl KeySpace,
-    generation: U256,
+    generation: &U256,
 ) -> Result<(), Error> {
     base.store_u256_le(&BLUEPRINT_CURRENT_GENERATION_KEY, generation)
         .map_err(Error::from)
@@ -235,7 +235,7 @@ fn increment_current_generation(base: &mut impl KeySpace) -> Result<(), Error> {
             .ok_or(Error::Overflow(String::from(
                 "blueprint current generation",
             )))?;
-    store_current_generation(base, new_generation)?;
+    store_current_generation(base, &new_generation)?;
     Ok(())
 }
 
@@ -251,7 +251,7 @@ fn read_blueprint_generation_or_default(
 fn store_blueprint_generation(
     base: &mut impl KeySpace,
     number: U256,
-    generation: U256,
+    generation: &U256,
 ) -> Result<(), Error> {
     let key = blueprint_generation_key(number)?;
     base.store_u256_le(&key, generation).map_err(Error::from)
@@ -270,7 +270,7 @@ fn store_blueprint_nb_chunks(
     nb_chunks: u16,
 ) -> Result<(), Error> {
     let key = blueprint_nb_chunks_key(number)?;
-    base.store_le(&key, nb_chunks).map_err(Error::from)
+    base.store_le(&key, &nb_chunks).map_err(Error::from)
 }
 
 fn store_blueprint_chunk(
@@ -289,7 +289,7 @@ pub fn store_sequencer_blueprint(
 ) -> Result<(), Error> {
     store_blueprint_nb_chunks(base, blueprint.number, blueprint.nb_chunks)?;
     let current_generation = read_current_generation_or_default(base, U256::zero())?;
-    store_blueprint_generation(base, blueprint.number, current_generation)?;
+    store_blueprint_generation(base, blueprint.number, &current_generation)?;
     let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
     store_blueprint_chunk(
         base,
@@ -306,7 +306,7 @@ pub fn store_inbox_blueprint_by_number(
 ) -> Result<(), Error> {
     store_blueprint_nb_chunks(base, number, 1)?;
     let current_generation = read_current_generation_or_default(base, U256::zero())?;
-    store_blueprint_generation(base, number, current_generation)?;
+    store_blueprint_generation(base, number, &current_generation)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_blueprint_chunk(base, number, 0, &store_blueprint)
 }
@@ -338,7 +338,7 @@ pub fn store_forced_blueprint(
 ) -> Result<(), Error> {
     store_blueprint_nb_chunks(base, number, 1)?;
     let current_generation = read_current_generation_or_default(base, U256::zero())?;
-    store_blueprint_generation(base, number, current_generation)?;
+    store_blueprint_generation(base, number, &current_generation)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_blueprint_chunk(base, number, 0, &store_blueprint)
 }

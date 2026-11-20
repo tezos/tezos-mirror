@@ -642,7 +642,7 @@ impl StorageAccount {
     pub(crate) fn write_global_counter(
         &self,
         eth_accounts: &mut impl KeySpace,
-        value: U256,
+        value: &U256,
     ) -> Result<(), EvmDbError> {
         let key = self.segment_key(&GLOBAL_COUNTER)?;
         Ok(eth_accounts.store_evm_u256_le(&key, value)?)
@@ -669,7 +669,7 @@ impl StorageAccount {
         eth_accounts: &mut impl KeySpace,
         ticket_hash: &U256,
         owner: &Address,
-        amount: U256,
+        amount: &U256,
     ) -> Result<(), EvmDbError> {
         let key = self.ticket_key(ticket_hash, owner)?;
         eth_accounts.store_evm_u256_le(&key, amount)?;
@@ -1078,7 +1078,7 @@ mod test {
 
         // A non-zero balance creates the node.
         system
-            .write_ticket_balance(eth_accounts, &ticket_hash, &owner, U256::from(7))
+            .write_ticket_balance(eth_accounts, &ticket_hash, &owner, &U256::from(7))
             .unwrap();
         assert!(system
             .ticket_balance_node_exists(eth_accounts, &ticket_hash, &owner)

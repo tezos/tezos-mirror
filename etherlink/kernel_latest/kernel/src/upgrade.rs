@@ -362,7 +362,7 @@ mod tests {
             .store_evm_u256_le(
                 &revm_etherlink::storage::world_state_handler::
                     SEQUENCER_KEY_CHANGE_COUNTER_KEY,
-                U256::from(8),
+                &U256::from(8),
             )
             .unwrap();
         assert_eq!(

@@ -630,7 +630,7 @@ where
             {
                 crate::storage::store_michelson_runtime_sunrise_level(
                     rk.tez_world_state_mut(),
-                    processed_blueprint,
+                    &processed_blueprint,
                 )?;
                 // L2-1526: seed the shared Michelson alias implementation
                 // when the runtime activates on a fresh network. Migrations
@@ -995,7 +995,8 @@ mod tests {
         store_block_fees(&mut evm_world_state, &dummy_block_fees()).unwrap();
         // The run reads its chain configuration from storage: the dummy
         // transactions are signed for `DUMMY_CHAIN_ID`.
-        crate::storage::store_evm_chain_id(&mut evm_world_state, DUMMY_CHAIN_ID).unwrap();
+        crate::storage::store_evm_chain_id(&mut evm_world_state, &DUMMY_CHAIN_ID)
+            .unwrap();
         let mut eth_accounts = host
             .load_or_create(
                 tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_KEYSPACE_NAME,
@@ -1318,9 +1319,9 @@ mod tests {
     ) -> anyhow::Result<()> {
         storage::store_minimum_base_fee_per_gas(
             evm_world_state,
-            block_fees.minimum_base_fee_per_gas(),
+            &block_fees.minimum_base_fee_per_gas(),
         )?;
-        storage::store_da_fee(evm_world_state, block_fees.da_fee_per_byte())?;
+        storage::store_da_fee(evm_world_state, &block_fees.da_fee_per_byte())?;
         Ok(())
     }
 
@@ -1703,7 +1704,7 @@ mod tests {
 
         let mut bk = load_keyspaces(&mut host).unwrap();
         // Disable DA fees so the low-fee reveal operation is not rejected.
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         let chain_config =
             { dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut()) };
         let mut config = dummy_configuration();
@@ -1803,7 +1804,7 @@ mod tests {
 
         let mut bk = load_keyspaces(&mut host).unwrap();
         // Disable DA fees so the low-fee operations are not rejected.
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -1917,7 +1918,7 @@ mod tests {
         }
 
         let mut bk = load_keyspaces(&mut host).unwrap();
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -2028,7 +2029,7 @@ mod tests {
         }
 
         let mut bk = load_keyspaces(&mut host).unwrap();
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -2125,7 +2126,7 @@ mod tests {
 
         let mut bk = load_keyspaces(&mut host).unwrap();
         // Disable DA fees so the test operations are not rejected.
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let mut config = dummy_configuration();
@@ -2261,7 +2262,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         let mut bk = load_keyspaces(&mut host).unwrap();
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
@@ -2504,7 +2505,7 @@ mod tests {
             }
 
             let mut bk = load_keyspaces(&mut host).unwrap();
-            storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+            storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
             store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
             let chain_config =
                 dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
@@ -2664,9 +2665,9 @@ mod tests {
 
         let mut host = MockKernelHost::default();
         let mut bk = load_keyspaces(&mut host).unwrap();
-        storage::store_da_fee(bk.evm_world_state_mut(), U256::zero()).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
-        storage::store_evm_chain_id(bk.evm_world_state_mut(), DUMMY_CHAIN_ID).unwrap();
+        storage::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let base_ks = bk.into_base();
@@ -2757,7 +2758,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -2804,7 +2805,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -2857,7 +2858,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -2923,7 +2924,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -3000,7 +3001,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -3065,7 +3066,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -3190,7 +3191,7 @@ mod tests {
         let mut bk = load_keyspaces(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             bk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -3214,7 +3215,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -3459,7 +3460,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -4092,7 +4093,7 @@ mod tests {
 
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -4200,7 +4201,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -4344,7 +4345,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -4486,7 +4487,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 
@@ -4736,7 +4737,7 @@ mod tests {
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             rk.evm_world_state_mut(),
-            DUMMY_BASE_FEE_PER_GAS.into(),
+            &DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
 

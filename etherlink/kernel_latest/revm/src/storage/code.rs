@@ -67,7 +67,7 @@ impl CodeStorage {
         eth_accounts: &mut impl KeySpace,
         number_ref: u64,
     ) -> Result<(), EvmDbError> {
-        Ok(eth_accounts.store_le(&self.segment_key(&REFERENCE)?, number_ref)?)
+        Ok(eth_accounts.store_le(&self.segment_key(&REFERENCE)?, &number_ref)?)
     }
 
     fn increment_code_usage(
