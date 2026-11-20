@@ -120,7 +120,7 @@ pub fn compute<Host>(
     tracer_input: Option<TracerInput>,
     // Read once per block by [produce] / [handle_run_transaction]: when
     // [true], each transaction's HTTP CRAC traces are written into the
-    // [/evm/world_state] keyspace via [maybe_store_http_traces_for_tx].
+    // [/common_world_state] keyspace via [maybe_store_http_traces_for_tx].
     http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
@@ -2822,6 +2822,182 @@ mod tests {
         let mut receipts = bip.cumulative_tezos_operation_receipts.list;
         receipts.extend(info.pending_crac_receipts);
         renumber_nonces(&mut receipts).expect("the block must finalize");
+    }
+
+    /// An EVM transaction's HTTP trace is in `/common_world_state/__http_trace/traces`.
+    #[test]
+    fn http_trace_of_an_evm_transaction_is_in_common_world_state() {
+        use alloy_sol_types::SolCall;
+        use revm_etherlink::precompiles::runtime_gateway::RuntimeGateway;
+
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        storage::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
+        let base_ks = bk.into_base();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &dummy_eth_caller(),
+            U256::from(10u64).pow(U256::from(21)),
+        );
+        let calldata = RuntimeGateway::callMichelsonCall {
+            destination: "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".to_string(),
+            entrypoint: String::new(),
+            parameters: Default::default(),
+        }
+        .abi_encode();
+        let gas_price = U256::from(DUMMY_BASE_FEE_PER_GAS);
+        let gas_for_fees =
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &calldata, &[], 0)
+                .unwrap();
+        let tx = sign_transaction(EthereumTransactionCommon::new(
+            TransactionType::Legacy,
+            Some(DUMMY_CHAIN_ID),
+            0,
+            gas_price,
+            gas_price,
+            2_000_000 + gas_for_fees,
+            Some(address_from_str("ff00000000000000000000000000000000000007").unwrap()),
+            U256::zero(),
+            calldata,
+            vec![],
+            None,
+            None,
+        ));
+        let tx_hash = hash_from_nonce(1);
+        let block_constants = first_block(&mut rk, &base_ks);
+        let block_in_progress = BlockInProgress::new(
+            block_constants.evm_runtime_block_constants.number,
+            VecDeque::new(),
+            U256::from(MINIMUM_BASE_FEE_PER_GAS),
+        );
+        chain_config
+            .apply_transaction(
+                &block_in_progress,
+                &mut rk,
+                &RegistryImpl::default(),
+                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+                &block_constants,
+                TezosXTransaction::Ethereum(Box::new(Transaction {
+                    tx_hash,
+                    content: Ethereum(tx),
+                })),
+                0,
+                None,
+                None,
+                false,
+                false,
+                true, // http_trace_enabled
+            )
+            .unwrap();
+        drop(rk);
+        drop(base_ks);
+        assert!(has_value(
+            &host,
+            &format!(
+                "/common_world_state/__http_trace/traces/{}",
+                hex::encode(tx_hash)
+            )
+        ));
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/world_state/__http_trace"))
+            .unwrap()
+            .is_none());
+    }
+
+    /// A Tezos operation's HTTP trace is in `/common_world_state/__http_trace/traces`.
+    #[test]
+    fn http_trace_of_a_tezos_operation_is_in_common_world_state() {
+        use mir::gas::Gas;
+        use tezos_execution::account_storage::TezosAccountInfo;
+
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        let chain_config =
+            dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
+        let base_ks = bk.into_base();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let bootstrap = bootstrap1();
+        set_tezos_account_info(
+            rk.tez_accounts_mut(),
+            &bootstrap.pkh,
+            TezosAccountInfo {
+                balance: Mutez::try_from(500_000u64).unwrap(),
+                nonce: 0,
+                pub_key: Some(bootstrap.pk.clone()),
+            },
+        )
+        .unwrap();
+        let destination = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
+        let parameter = mir::parser::Parser::new()
+            .parse(&format!(r#"Pair "{destination}" (Pair "" (Pair 0x None))"#))
+            .unwrap()
+            .encode(&mut Gas::default())
+            .unwrap()
+            .unwrap();
+        let call = make_transaction_operation(
+            1,
+            1,
+            10_000,
+            1_000,
+            bootstrap,
+            0.into(),
+            Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw",
+                )
+                .unwrap(),
+            ),
+            Parameters {
+                entrypoint: mir::ast::Entrypoint::try_from("call_evm").unwrap(),
+                value: parameter,
+            },
+        );
+        let tx_hash: TransactionHash = call.hash().unwrap().into();
+        let block_constants = first_block(&mut rk, &base_ks);
+        let block_in_progress = BlockInProgress::new(
+            block_constants.evm_runtime_block_constants.number,
+            VecDeque::new(),
+            U256::from(MINIMUM_BASE_FEE_PER_GAS),
+        );
+        chain_config
+            .apply_transaction(
+                &block_in_progress,
+                &mut rk,
+                &RegistryImpl::default(),
+                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+                &block_constants,
+                TezosXTransaction::Ethereum(Box::new(Transaction {
+                    tx_hash,
+                    content: TransactionContent::TezosDelayed(call),
+                })),
+                0,
+                None,
+                None,
+                false,
+                true,
+                true, // http_trace_enabled
+            )
+            .unwrap();
+        drop(rk);
+        drop(base_ks);
+        assert!(has_value(
+            &host,
+            &format!(
+                "/common_world_state/__http_trace/traces/{}",
+                hex::encode(tx_hash)
+            )
+        ));
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/evm/world_state/__http_trace"))
+            .unwrap()
+            .is_none());
     }
 
     #[test]

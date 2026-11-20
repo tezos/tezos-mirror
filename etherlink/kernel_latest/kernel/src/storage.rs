@@ -224,9 +224,9 @@ const SIMULATION_HTTP_TRACES_KEY: Key = Key::from_static(b"/simulation_http_trac
 /// Resolves to the durable path `/base/__http_trace_enabled`.
 const HTTP_TRACE_ENABLED_KEY: Key = Key::from_static(b"/__http_trace_enabled");
 
-/// Root of the per-transaction HTTP traces, inside the `/evm/world_state`
+/// Root of the per-transaction HTTP traces, inside the `/common_world_state`
 /// keyspace. Resolves to the durable path
-/// `/evm/world_state/__http_trace/traces`.
+/// `/common_world_state/__http_trace/traces`.
 const HTTP_TRACES_KEY: Key = Key::from_static(b"/__http_trace/traces");
 
 // Key to the number of seconds until delayed txs are timed out, inside the
@@ -319,7 +319,7 @@ pub fn is_http_trace_enabled(base: &impl KeySpace) -> bool {
 }
 
 /// Key of the HTTP traces of the transaction `tx_hash`, inside the
-/// `/evm/world_state` keyspace.
+/// `/common_world_state` keyspace.
 pub fn http_traces_key(tx_hash: &TransactionHash) -> Result<Key, KeyError> {
     HTTP_TRACES_KEY.concat(format!("/{}", hex::encode(tx_hash)))
 }
@@ -329,7 +329,7 @@ pub fn http_traces_key(tx_hash: &TransactionHash) -> Result<Key, KeyError> {
 /// using the same shape as [`store_simulation_http_traces`] so both outputs
 /// share the EVM-node-side decoder.
 pub fn store_http_traces_for_tx(
-    evm_world_state: &mut impl KeySpace,
+    common_world_state: &mut impl KeySpace,
     tx_hash: &TransactionHash,
     traces: &[tezosx_journal::HttpTrace],
 ) -> Result<(), anyhow::Error> {
@@ -339,13 +339,13 @@ pub fn store_http_traces_for_tx(
         stream.append(trace);
     }
     let encoded = stream.out();
-    evm_world_state
+    common_world_state
         .set(&key, encoded)
         .context("Failed to write the per-transaction HTTP traces.")
 }
 
 /// When `enabled` is set and the journal captured at least one HTTP
-/// exchange, write the traces for `tx_hash` into the `/evm/world_state`
+/// exchange, write the traces for `tx_hash` into the `/common_world_state`
 /// keyspace. `enabled` comes from the single read of
 /// [`HTTP_TRACE_ENABLED_KEY`] done once per block (see `block::produce`).
 ///
@@ -356,7 +356,7 @@ pub fn store_http_traces_for_tx(
 /// transactions perform CRACs. Failures are logged but never
 /// propagated, so instrumentation cannot break the replay itself.
 pub fn maybe_store_http_traces_for_tx(
-    evm_world_state: &mut impl KeySpace,
+    common_world_state: &mut impl KeySpace,
     enabled: bool,
     tx_hash: &TransactionHash,
     journal: &tezosx_journal::TezosXJournal,
@@ -368,7 +368,7 @@ pub fn maybe_store_http_traces_for_tx(
     if traces.is_empty() {
         return;
     }
-    if let Err(err) = store_http_traces_for_tx(evm_world_state, tx_hash, traces) {
+    if let Err(err) = store_http_traces_for_tx(common_world_state, tx_hash, traces) {
         log!(
             Error,
             "Failed to store HTTP traces for tx {}: {:?}",
@@ -1622,13 +1622,13 @@ mod tests {
         );
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         super::maybe_store_http_traces_for_tx(
-            rk.evm_world_state_mut(),
+            rk.common_world_state_mut(),
             false,
             &tx_hash,
             &journal,
         );
         let key = super::http_traces_key(&tx_hash).unwrap();
-        assert_eq!(rk.evm_world_state().get(&key), None);
+        assert_eq!(rk.common_world_state().get(&key), None);
     }
 
     #[test]
@@ -1646,13 +1646,13 @@ mod tests {
         );
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         super::maybe_store_http_traces_for_tx(
-            rk.evm_world_state_mut(),
+            rk.common_world_state_mut(),
             true,
             &tx_hash,
             &journal,
         );
         let key = super::http_traces_key(&tx_hash).unwrap();
-        assert_eq!(rk.evm_world_state().get(&key), None);
+        assert_eq!(rk.common_world_state().get(&key), None);
     }
 
     #[test]
@@ -1687,16 +1687,19 @@ mod tests {
         let tx_hash = [0xABu8; 32];
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         super::maybe_store_http_traces_for_tx(
-            rk.evm_world_state_mut(),
+            rk.common_world_state_mut(),
             true,
             &tx_hash,
             &journal,
         );
 
         let key = super::http_traces_key(&tx_hash).unwrap();
-        let bytes = rk.evm_world_state().get(&key).unwrap();
-        // The traces resolve to `/evm/world_state/__http_trace/traces/<hex>`.
-        let path = format!("/evm/world_state/__http_trace/traces/{}", "ab".repeat(32));
+        let bytes = rk.common_world_state().get(&key).unwrap();
+        // The traces resolve to `/common_world_state/__http_trace/traces/<hex>`.
+        let path = format!(
+            "/common_world_state/__http_trace/traces/{}",
+            "ab".repeat(32)
+        );
         assert_eq!(
             rk.host()
                 .store_read_all(&RefPath::assert_from(path.as_bytes()))
@@ -1764,14 +1767,14 @@ mod tests {
         let tx_hash = [0xCDu8; 32];
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         super::maybe_store_http_traces_for_tx(
-            rk.evm_world_state_mut(),
+            rk.common_world_state_mut(),
             true,
             &tx_hash,
             &journal,
         );
 
         let key = super::http_traces_key(&tx_hash).unwrap();
-        let bytes = rk.evm_world_state().get(&key).unwrap();
+        let bytes = rk.common_world_state().get(&key).unwrap();
         let rlp = rlp::Rlp::new(&bytes);
         let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
 

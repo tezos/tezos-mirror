@@ -803,7 +803,7 @@ impl TezosXChainConfig {
                         // traces under each generated Ethereum fake hash once the
                         // mapping is available here.
                         crate::storage::maybe_store_http_traces_for_tx(
-                            rk.evm_world_state_mut(),
+                            rk.common_world_state_mut(),
                             http_trace_enabled,
                             &tx_hash,
                             journal,
