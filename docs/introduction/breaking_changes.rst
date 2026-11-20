@@ -428,6 +428,19 @@ Upcoming Octez Release
      "N/A" (unless there are already changes planned for the version
      after the newly released one, of course)
 
+Smart rollup node no longer in the Octez suite
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Octez suite no longer ships ``octez-smart-rollup-node``. The node is
+released on its own, from a dated tag ``octez-smart-rollup-node-vYYYYMMDD``, at
+https://octez.tezos.com/releases/octez-smart-rollup-node/. Install it with
+octez-manager, the standalone static binaries, or the
+``tezos/tezos-bare:octez-smart-rollup-node-latest`` Docker image; a
+docker-compose file is provided at :src:`scripts/docker/smart-rollup-node.yml`.
+The ``octez-smart-rollup-node`` Debian package is removed. The other Octez
+packages are deprecated, see :ref:`octez_packages_v25`. This mirrors how
+``octez-evm-node`` is already released.
+
 Node metrics no longer served on the RPC listener
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -439,18 +452,6 @@ This removes an ACL bypass by which metrics were exposed even under the
 ``secure`` RPC ACL policy, and aligns the node with the smart rollup and
 DAL nodes. Setups scraping ``/metrics`` on the RPC port must now run the
 node with ``--metrics-addr``.
-
-Smart rollup node ``/global/last_cemented_commitment`` RPC
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The smart rollup node RPC ``GET /global/last_cemented_commitment`` no
-longer returns an optional value. It now always returns an object with
-the last cemented commitment ``commitment_hash`` and ``level`` known from L1,
-and an optional ``commitment`` field containing the commitment content when
-it is available in the node's storage. Previously, the RPC returned
-``null`` whenever the commitment content was absent from the node's
-storage (e.g. after a snapshot import in full mode), even though the
-last cemented commitment hash and level were known.
 
 
 .. _alpha_breaking_changes:

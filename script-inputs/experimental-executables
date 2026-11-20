@@ -1,6 +1,7 @@
 fa-bridge-watchtower
 etherlink-governance-observer
 octez-evm-node
+octez-smart-rollup-node
 octez-accuser-alpha
 octez-baker-alpha
 octez-teztale-snitch

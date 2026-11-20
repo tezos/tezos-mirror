@@ -186,54 +186,16 @@ Packaging
 Smart Rollup node
 -----------------
 
-- The vendored Wasmer runtime used for fast execution was upgraded from 3.3.0
-  to 7.2.1. This fixes a misaligned ``ucontext_t`` dereference that made the
-  previous version crash with ``SIGILL`` or ``SIGSEGV`` on macOS ARM64. The set
-  of WebAssembly proposals accepted by fast execution is unchanged.
-
-- Fixed the WASM PVM fast execution engine (Wasmer) answering a different
-  error code than the interpreter when a kernel reads an empty, or a
-  negative, number of bytes from an address outside its memory. A kernel
-  making such a call computed a different state under the fast engine than
-  under the interpreter. (MR :gl:`!22837`)
-
-- The WASM PVM fast execution engine (Wasmer) now implements the new durable
-  storage (NDS) host functions of PVM version V6 and above, with the same
-  results as the interpreter. A kernel importing them no longer panics the
-  fast engine, so it runs at full speed without ``--slow-vm-fallback``.
-  (MR :gl:`!22822`)
-
-- Fixed the public ``secure`` RPC ACL, which did not deny the mutating
-  ``/local/dal/**`` endpoints (``POST /local/dal/batcher/injection``,
-  ``POST /local/dal/slot/indices`` and ``POST /local/dal/injection/<id>/forget``).
-  On a publicly exposed node an unauthenticated caller could enqueue DAL
-  payloads that the operator node published as an operator-funded
-  ``dal_publish_commitment`` operation on L1. These endpoints are now denied
-  like the other ``/local/**`` mutating endpoints.
-
-- The injector now splits batches when individual operations fail simulation
-  with gas exhaustion (instead of repeatedly dropping them), and re-queues the
-  operations set aside by a batch split so they are reconsidered in a later
-  injection round. This fixes a permanent stall with large backlogs of
-  same-tag operations (e.g. cementation). (MR :gl:`!22417`)
-
-- The injector now gives cementation operations strictly higher priority than
-  commitment publication, and the rollup node no longer enqueues commitments
-  that are beyond the protocol's ``smart_rollup_max_lookahead_in_blocks``
-  window. This prevents a backlog of failing publish operations from starving
-  cementation when the ``operating`` and ``cementing`` purposes share the same
-  key. (MR :gl:`!22414`)
-
-- **Breaking change** The RPC ``GET /global/last_cemented_commitment`` now
-  always returns the last cemented commitment ``commitment_hash`` and
-  ``level`` known from L1, with the commitment content in an optional
-  ``commitment`` field, instead of returning ``null`` when the content is
-  not available in the node's storage (e.g. after a snapshot import in
-  full mode). (MR :gl:`!22415`)
-
-- The RPC server now rejects with HTTP 413 requests whose body exceeds the cap
-  set by the new ``--rpc-max-request-body`` option (in bytes, 32 MiB by
-  default).
+- The Octez suite no longer ships ``octez-smart-rollup-node``. The node is now
+  released on its own, from a dated tag ``octez-smart-rollup-node-vYYYYMMDD``,
+  and listed at https://octez.tezos.com/releases/octez-smart-rollup-node/. Its
+  changes are listed in :doc:`/releases/smart_rollup_node_changelog`. Install
+  it with octez-manager, the standalone static binaries, or the
+  ``tezos/tezos-bare:octez-smart-rollup-node-latest`` Docker image. A
+  docker-compose file that runs it next to an Octez node is available at
+  :src:`scripts/docker/smart-rollup-node.yml`. The Debian package
+  ``octez-smart-rollup-node`` is removed. The other Octez packages are
+  deprecated, see :ref:`octez_packages_v25`.
 
 Smart Rollup WASM Debugger
 --------------------------

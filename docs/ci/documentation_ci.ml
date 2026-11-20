@@ -130,6 +130,10 @@ let job_manuals =
       [
         (Artifacts, Tezos_ci_jobs.Build.job_build_released Amd64);
         (Artifacts, Tezos_ci_jobs.Build.job_build_extra_dev Amd64);
+        (* octez-smart-rollup-node is an experimental executable (released on
+           its own dated tag), and [make -C docs octez-gen] runs it to generate
+           developer/rollup_metrics.csv. *)
+        (Artifacts, Tezos_ci_jobs.Build.job_build_exp Amd64);
       ]
     ~only_if:Cacio.Condition.(changes Files.odoc || mr_has_label "ci--docs")
     ~artifacts:

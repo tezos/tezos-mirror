@@ -1,8 +1,0 @@
-/var/log/tezos/smart-rollup-node.log{
-    daily
-    # we use copytruncate to avoid stopping node.
-    copytruncate
-    rotate 5
-    compress
-    minsize 1M
-}

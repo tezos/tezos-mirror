@@ -1,9 +1,0 @@
-# Defaults for the octez smart-rollup-node
-
-# For client and node data directories (including the wallet) needed by the smart rollup node,
-# we use the default ~/.tezos-client and ~/.tezos-node of the user "tezos".
-
-# The smart rollup data dir is ~/.tezos-smart-rollup-node
-
-# runtime options associated to the command `run`
-# RUNTIME_OPTS=

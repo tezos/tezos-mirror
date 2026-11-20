@@ -86,19 +86,6 @@ Description: Signing client for the Tezos blockchain.
  signer and the baker on different hosts and use a hardware ledger for key
  management.
 
-Package: octez-smart-rollup-node
-Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends},
- octez-node (= ${source:Version}),
- systemd, debconf (>= 0.5) | debconf-2.0
-Recommends: octez-client (= ${source:Version}), dialog
-Description: Smart Rollup node for the Tezos blockchain.
- The Octez Smart Rollup node enables rollup deployment, managing progress
- through commitment publication and refutation games. Similar to the Octez
- node, it offers an HTTP-accessible RPC interface.
- .
- This package installs the Octez rollup node.
-
 Package: octez-dal-node
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},

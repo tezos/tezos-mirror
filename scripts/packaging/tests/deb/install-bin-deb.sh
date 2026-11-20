@@ -40,8 +40,7 @@ apt_get install -y \
   octez-client \
   octez-node \
   octez-dal-node \
-  octez-baker \
-  octez-smart-rollup-node
+  octez-baker
 
 systemctl list-unit-files --type=service | grep "octez"
 
@@ -49,7 +48,6 @@ octez-node --version
 octez-client --version
 octez-dal-node --version
 octez-baker --version
-octez-smart-rollup-node --version
 
 apt_get autopurge -y \
   octez-client \

@@ -462,6 +462,31 @@ Baking keys management:
 		octez-node config show
 		octez-node config update ...
 
+Smart rollup node
+^^^^^^^^^^^^^^^^^
+
+The compose file :src:`scripts/docker/smart-rollup-node.yml` runs an Octez smart rollup node, in observer mode, next to an Octez node.
+It pairs the latest Octez suite image with the latest standalone rollup node image (``tezos/tezos-bare:octez-smart-rollup-node-latest``).
+The node data is stored in ``./node_data/`` and the rollup node data in ``./rollup_data/``.
+The RPC ports of both nodes listen on ``127.0.0.1`` only.
+
+A rollup node that starts without a rollup snapshot needs an archive L1 node.
+With the rolling L1 node of this compose file, start the L1 node from an L1 snapshot, and import a rollup snapshot before you start the rollup node::
+
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/smart-rollup-node.yml
+    export ROLLUP_ADDRESS=sr1... SNAPSHOT_URL=<L1 snapshot URL>
+    docker compose -f smart-rollup-node.yml up -d node
+    docker compose -f smart-rollup-node.yml exec node octez-client bootstrapped
+    docker compose -f smart-rollup-node.yml run --rm --no-deps rollup-node \
+      octez-smart-rollup-node --endpoint http://node:8732 \
+      snapshot import <rollup snapshot URL> \
+      --data-dir /var/run/tezos/smart-rollup-node
+    docker compose -f smart-rollup-node.yml up -d
+
+The import checks the snapshot against the L1 node.
+If the L1 node does not keep the block at the head level of the snapshot, give an archive L1 node to ``--endpoint``.
+``NETWORK`` defaults to ``mainnet`` and ``HISTORY_MODE`` to ``rolling``.
+
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -542,7 +567,6 @@ There are several packages:
 - ``octez-client``: the client for manipulating wallets and signing items
 - ``octez-node``: the Octez node
 - ``octez-baker``: the Octez baking and VDF daemons
-- ``octez-smartrollup``: the Octez Smart Rollup daemons
 - ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
 
 Appendix
