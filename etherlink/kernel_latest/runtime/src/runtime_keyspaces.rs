@@ -33,8 +33,8 @@
 //! the savepoints of the handle.
 //!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
-//! it holds `/base`, `/tez/world_state`, `/evm/world_state` and
-//! `/common_world_state`, loaded on the live host, and
+//! it holds `/base`, `/tez/world_state`, `/evm/world_state`,
+//! `/common_world_state` and `/kernel`, loaded on the live host, and
 //! [`BlueprintKeyspaces::into_base`] keeps only `/base` once the execution
 //! loads a [`RuntimeKeyspaces`].
 
@@ -51,6 +51,11 @@ use crate::snapshot::{Snapshot, SnapshotError};
 /// Name of the `/base` keyspace, holding kernel configuration and
 /// node-interaction values that do not belong to any world state.
 pub const BASE_KEYSPACE_NAME: Name = Name::from_static("/base");
+
+/// Name of the `/kernel` keyspace, which holds the kernel that the rollup
+/// boots. The reboot flag that the host writes at `/kernel/env/reboot` lies
+/// under it too.
+const KERNEL_KEYSPACE_NAME: Name = Name::from_static("/kernel");
 
 /// Durable root of the `/evm/eth_accounts` keyspace.
 const ETH_ACCOUNTS_ROOT: &str = "/evm/eth_accounts";
@@ -505,8 +510,8 @@ impl<KS> Keyspaces<KS> {
 pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 
 /// The keyspaces the kernel holds from the inbox to the blueprint, before
-/// block production: `/base`, `/tez/world_state`, `/evm/world_state` and
-/// `/common_world_state`.
+/// block production: `/base`, `/tez/world_state`, `/evm/world_state`,
+/// `/common_world_state` and `/kernel`.
 ///
 /// The handles address the durable roots, not the safe copy of a block.
 /// The kernel does not write through the world states while a safe copy is
@@ -517,11 +522,12 @@ pub struct BlueprintKeyspaces<KS> {
     tez_world_state: KS,
     evm_world_state: KS,
     common_world_state: KS,
+    kernel: KS,
 }
 
 impl<KS: KeySpace> BlueprintKeyspaces<KS> {
-    /// Loads `/base`, `/tez/world_state`, `/evm/world_state` then
-    /// `/common_world_state` from `host`.
+    /// Loads `/base`, `/tez/world_state`, `/evm/world_state`,
+    /// `/common_world_state` then `/kernel` from `host`.
     ///
     /// Errors with the loader's error: a keyspace already held elsewhere, or
     /// a name the loader cannot accept.
@@ -532,11 +538,13 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
         let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
         let evm_world_state = host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME)?;
         let common_world_state = host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?;
+        let kernel = host.load_or_create(KERNEL_KEYSPACE_NAME)?;
         Ok(Self {
             base,
             tez_world_state,
             evm_world_state,
             common_world_state,
+            kernel,
         })
     }
 
@@ -575,8 +583,15 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
         &self.common_world_state
     }
 
-    /// Keeps `/base` and drops the world states, so that a
-    /// [`RuntimeKeyspaces::init`] on the same host can load them again.
+    /// The `/base` and `/kernel` keyspaces, for a writer that needs both at
+    /// once.
+    pub fn base_and_kernel_mut(&mut self) -> (&mut KS, &mut KS) {
+        (&mut self.base, &mut self.kernel)
+    }
+
+    /// Keeps `/base` and drops the other keyspaces, so that a
+    /// [`RuntimeKeyspaces::init`] on the same host can load the world states
+    /// again.
     pub fn into_base(self) -> KS {
         self.base
     }
@@ -666,6 +681,7 @@ mod tests {
             bk.common_world_state().name().to_string(),
             "/common_world_state"
         );
+        assert_eq!(bk.base_and_kernel_mut().1.name().to_string(), "/kernel");
         bk.tez_world_state_mut().set(&PROBE, b"live").unwrap();
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/tez/world_state/probe"))
@@ -678,11 +694,13 @@ mod tests {
                 .unwrap(),
             b"live"
         );
-        // The world states are still held: they cannot be loaded again.
+        // The world states and `/kernel` are still held: they cannot be
+        // loaded again.
         for name in [
             TEZ_WORLD_STATE_KEYSPACE_NAME,
             EVM_WORLD_STATE_KEYSPACE_NAME,
             COMMON_WORLD_STATE_KEYSPACE_NAME,
+            KERNEL_KEYSPACE_NAME,
         ] {
             assert!(matches!(
                 host.load_or_create(name),
