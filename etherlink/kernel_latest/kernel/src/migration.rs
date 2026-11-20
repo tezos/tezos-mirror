@@ -602,6 +602,10 @@ where
             allow_path_not_found(host.store_delete(&legacy::TMP_BLOCK_IN_PROGRESS_PATH))?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V72 => {
+            // Traces only exist on replay and simulation states: nothing to move.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
