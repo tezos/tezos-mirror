@@ -15,6 +15,10 @@
 - `reveal_loop` fails with `RevealLoopError`, in place of a `&'static str`,
   and its `save_content` closure can fail with any error type.
   `SlicePageError` implements `Error` and derives `PartialEq` and `Eq`.
+- Add `KeySpaceExtDataReveal` behind the `data-reveal` feature,
+  `reveal_to_key` for every `KeySpace`. It writes at a key the content that a
+  preimage tree reveals, one content page at a time, and fails with
+  `DataRevealError`.
 - Remove `StoreBinError`: `store_bin` reports a value that does not encode as
   a write error.
 - Add `KeySpaceError`, the error of every fallible `KeySpace` operation, typed

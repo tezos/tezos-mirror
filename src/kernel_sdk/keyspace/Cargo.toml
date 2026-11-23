@@ -14,6 +14,7 @@ default = ["irmin-compat"]
 irmin-compat = []
 rlp = ["dep:rlp"]
 tezos-encoding = ["dep:tezos_data_encoding"]
+data-reveal = ["dep:tezos-smart-rollup-encoding"]
 
 [dependencies]
 hex-literal.workspace = true
@@ -39,6 +40,11 @@ default-features = false
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
 default-features = false
+
+[dependencies.tezos-smart-rollup-encoding]
+path = "../encoding"
+default-features = false
+optional = true
 
 [build-dependencies.tezos-smart-rollup-build-utils]
 path = "../build-utils"
