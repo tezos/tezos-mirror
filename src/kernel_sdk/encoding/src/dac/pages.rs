@@ -208,13 +208,25 @@ mod encoding {
 }
 
 /// Errors that may occur when dealing with [SlicePage].
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SlicePageError {
-    /// Unknown page tag.
+    /// Unknown page tag, `None` when the page is empty.
     InvalidTag(Option<u8>),
     /// Invalid size prefix.
     InvalidSizePrefix,
 }
+
+impl core::fmt::Display for SlicePageError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidTag(Some(tag)) => write!(f, "unknown page tag {tag:#04x}"),
+            Self::InvalidTag(None) => f.write_str("empty page"),
+            Self::InvalidSizePrefix => f.write_str("invalid page size prefix"),
+        }
+    }
+}
+
+impl core::error::Error for SlicePageError {}
 
 /// A Dac [Page] that borrows the underlying buffer.
 ///
@@ -331,32 +343,82 @@ pub fn fetch_page_raw<'a, Host: HostReveal>(
     Ok((page, rest))
 }
 
+/// Failure of [`reveal_loop`].
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum RevealLoopError<E> {
+    /// The preimage of `hash` does not reveal.
+    #[error("failed to reveal the preimage of hash {}: {error}", Hex(.hash))]
+    Preimage {
+        /// Hash of the preimage.
+        hash: [u8; PREIMAGE_HASH_SIZE],
+        /// Failure of the reveal.
+        error: RuntimeError,
+    },
+    /// The preimage of `hash` does not decode as a page.
+    #[error("preimage of hash {} is not a valid page", Hex(.hash))]
+    Page {
+        /// Hash of the preimage.
+        hash: [u8; PREIMAGE_HASH_SIZE],
+        /// Failure of the decoding.
+        #[source]
+        error: SlicePageError,
+    },
+    /// The tree has more than `max_levels` levels.
+    #[error("preimage tree has more than {max_levels} levels")]
+    TooDeep {
+        /// The `max_dac_levels` of the traversal.
+        max_levels: usize,
+    },
+    /// `save_content` failed on a content page.
+    #[error(transparent)]
+    Content(#[from] E),
+}
+
+/// Displays bytes in lowercase hexadecimal.
+struct Hex<'a>(&'a [u8]);
+
+impl core::fmt::Display for Hex<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.0.iter().try_for_each(|byte| write!(f, "{byte:02x}"))
+    }
+}
+
 /// Recursively traverses a Merkle Tree of hashes up to `max_dac_levels` depth where each hash
 /// corresponds to a preimage that can be revealed via [HostReveal::reveal_preimage]. The closure
-/// `save_content` is applied on each content page found.
+/// `save_content` is applied on each content page found, and the traversal stops at the first
+/// failure.
 ///
 /// N.B `max_dac_levels`, should probably be kept under 3 (3 gives 59MB of data). You are likely,
 /// however, to run into tick-limit issues while doing so, depending on what `save_content` does.
 ///
 /// Instead, it is recommended to use `DacCertificate::reveal_to_store` where possible.
-pub fn reveal_loop<Host: HostReveal>(
+///
+/// # Errors
+///
+/// - [`RevealLoopError::Preimage`] when a preimage does not reveal.
+/// - [`RevealLoopError::Page`] when a revealed preimage does not decode as a page.
+/// - [`RevealLoopError::TooDeep`] when the tree has more than `max_dac_levels` levels.
+/// - [`RevealLoopError::Content`] with the error of `save_content`.
+pub fn reveal_loop<Host: HostReveal, E>(
     host: &mut Host,
     level: usize,
     hash: &[u8; PREIMAGE_HASH_SIZE],
     rest: &mut [u8],
     max_dac_levels: usize,
-    save_content: &mut impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), &'static str>,
-) -> Result<(), &'static str> {
+    save_content: &mut impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), E>,
+) -> Result<(), RevealLoopError<E>> {
     if level >= max_dac_levels {
-        return Err("DAC preimage tree contains too many levels.");
+        return Err(RevealLoopError::TooDeep {
+            max_levels: max_dac_levels,
+        });
     }
 
-    let (page, rest) =
-        fetch_page_raw(host, hash, rest).map_err(|_| "Failed to retrieve preimage")?;
+    let (page, rest) = fetch_page_raw(host, hash, rest)
+        .map_err(|error| RevealLoopError::Preimage { hash: *hash, error })?;
 
-    let page = SlicePage::try_from(page)
-        .map_err(|_| "Unable to decode DAC page: Decode into SlicePage failed")?;
-    match page {
+    match SlicePage::try_from(page)
+        .map_err(|error| RevealLoopError::Page { hash: *hash, error })?
+    {
         SlicePage::V0HashPage(hashes) => {
             for hash in hashes.hashes() {
                 reveal_loop(host, level + 1, hash, rest, max_dac_levels, save_content)?;

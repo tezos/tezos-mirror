@@ -5,6 +5,7 @@
 
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::dac::pages::reveal_loop;
+use tezos_smart_rollup_encoding::dac::pages::RevealLoopError;
 use tezos_smart_rollup_encoding::dac::pages::V0SliceContentPage;
 use tezos_smart_rollup_encoding::dac::pages::MAX_PAGE_SIZE;
 use tezos_smart_rollup_host::path::Path;
@@ -38,6 +39,14 @@ where
         MAX_DAC_LEVELS,
         &mut write_kernel_page,
     )
+    .map_err(|error| match error {
+        RevealLoopError::TooDeep { .. } => "DAC preimage tree contains too many levels.",
+        RevealLoopError::Preimage { .. } => "Failed to retrieve preimage",
+        RevealLoopError::Page { .. } => {
+            "Unable to decode DAC page: Decode into SlicePage failed"
+        }
+        RevealLoopError::Content(reason) => reason,
+    })
 }
 
 /// Appends the content of the page path given.

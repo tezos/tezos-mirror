@@ -12,6 +12,9 @@
   `read_rlp_or` for every `KeySpace`.
 - Add `KeySpaceExtBin` behind the `tezos-encoding` feature, `store_bin`,
   `read_nom` and `read_nom_or` for every `KeySpace`.
+- `reveal_loop` fails with `RevealLoopError`, in place of a `&'static str`,
+  and its `save_content` closure can fail with any error type.
+  `SlicePageError` implements `Error` and derives `PartialEq` and `Eq`.
 - Remove `StoreBinError`: `store_bin` reports a value that does not encode as
   a write error.
 - Add `KeySpaceError`, the error of every fallible `KeySpace` operation, typed
