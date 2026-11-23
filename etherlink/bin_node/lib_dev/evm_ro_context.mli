@@ -169,7 +169,8 @@ val subkeys : Evm_state.t -> Durable_storage.dir -> string list tzresult Lwt.t
 
 (** [execute_entrypoint ctxt state ~input_path ~input ~output_path ~entrypoint]
     writes [input] to [input_path] in durable storage, calls the kernel
-    [entrypoint], and reads the result bytes from [output_path]. *)
+    [entrypoint], and reads the result bytes from [output_path]. As with
+    {!Evm_state.execute_entrypoint}, the resulting state is discarded. *)
 val execute_entrypoint :
   t ->
   Evm_state.t ->

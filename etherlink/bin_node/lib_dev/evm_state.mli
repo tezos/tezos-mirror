@@ -141,7 +141,9 @@ val execute_single_transaction :
 (** [execute_entrypoint ~data_dir ~pool ~native_execution ~config evm_state
     ~input_path ~input ~output_path ~entrypoint] writes [input] to
     [input_path] in durable storage, calls the kernel [entrypoint], and
-    reads the result bytes from [output_path]. *)
+    reads the result bytes from [output_path]. The resulting state is
+    discarded: entrypoints such as [tezosx_run_code] write freely to durable
+    storage and rely on it. *)
 val execute_entrypoint :
   data_dir:string ->
   pool:Lwt_domain.pool ->
