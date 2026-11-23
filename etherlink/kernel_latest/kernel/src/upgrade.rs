@@ -6,10 +6,10 @@
 
 use crate::blueprint_storage;
 use crate::configuration::CommonConfig;
-use crate::fallback_upgrade::backup_current_kernel;
+use crate::fallback_upgrade::{backup_current_kernel, restore_kernel_backup};
 use core::fmt;
 
-use crate::error::{Error, UpgradeProcessError};
+use crate::error::{Error, KernelUpgradeError};
 use crate::event::Event;
 use crate::storage;
 use crate::storage::{store_sequencer, store_sequencer_pool_address};
@@ -30,14 +30,14 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::reveal::HostReveal;
-use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::wasm::WasmHost;
-use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
-use tezos_smart_rollup_keyspace::extensions::KeySpaceExtRlp;
+use tezos_smart_rollup_keyspace::extensions::{KeySpaceExtDataReveal, KeySpaceExtRlp};
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
 
 const KERNEL_UPGRADE_KEY: Key = Key::from_static(b"/kernel_upgrade");
 pub const KERNEL_ROOT_HASH_KEY: Key = Key::from_static(b"/kernel_root_hash");
+
+/// Key of the kernel that the rollup boots, in the `/kernel` keyspace.
+pub const KERNEL_BOOT_KEY: Key = Key::from_static(b"/boot.wasm");
 use revm_etherlink::storage::sequencer_key_change::increment_sequencer_change_counter;
 use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_KEY;
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_KEY;
@@ -107,21 +107,31 @@ pub fn read_kernel_upgrade(
     base.read_rlp(&KERNEL_UPGRADE_KEY)
 }
 
-pub fn upgrade<Host>(
-    host: &mut Host,
+/// Installs the kernel whose preimage tree has root `root_hash`: backs up the
+/// current kernel with [`backup_current_kernel`], writes the revealed kernel at
+/// [`KERNEL_BOOT_KEY`] of the `/kernel` keyspace, records `root_hash` in
+/// `/base` and deletes the pending kernel upgrade.
+///
+/// When the new kernel fails to reveal or to be written, restores the kernel
+/// from its backup and errors with [`KernelUpgradeError::Reveal`], or with
+/// [`KernelUpgradeError::Restore`] when the restore fails too. Errors with
+/// [`KernelUpgradeError::KeySpace`] when a write of the backup or to `/base`
+/// fails.
+pub fn upgrade(
+    host: &mut impl HostReveal,
     base: &mut impl KeySpace,
+    kernel: &mut impl KeySpace,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
-) -> anyhow::Result<()>
-where
-    Host: StorageV1 + HostReveal + WasmHost,
-{
+) -> Result<(), KernelUpgradeError> {
     log!(Info, "Kernel upgrade initialisation.");
 
-    backup_current_kernel(host, base)?;
-    let config = upgrade_reveal_flow(root_hash);
-    config
-        .evaluate(host)
-        .map_err(UpgradeProcessError::InternalUpgrade)?;
+    backup_current_kernel(base, kernel)?;
+    if let Err(reveal) = kernel.reveal_to_key(host, &root_hash, &KERNEL_BOOT_KEY) {
+        return Err(match restore_kernel_backup(base, kernel) {
+            Ok(()) => reveal.into(),
+            Err(restore) => KernelUpgradeError::Restore { reveal, restore },
+        });
+    }
 
     base.set(&KERNEL_ROOT_HASH_KEY, root_hash)?;
     base.delete(&KERNEL_UPGRADE_KEY);
@@ -336,7 +346,10 @@ mod tests {
     use tezos_evm_runtime::runtime_keyspaces::{
         RuntimeKeyspaces, EVM_WORLD_STATE_KEYSPACE_NAME,
     };
+    use tezos_smart_rollup_encoding::dac::pages::{RevealLoopError, SlicePageError};
+    use tezos_smart_rollup_encoding::dac::prepare_preimages;
     use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
+    use tezos_smart_rollup_keyspace::extensions::DataRevealError;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     fn test_public_key() -> PublicKey {
@@ -555,5 +568,90 @@ mod tests {
         .unwrap();
         let encoded = rlp::encode(&upgrade_with(invalid));
         assert!(rlp::decode::<SequencerUpgrade>(&encoded).is_err());
+    }
+
+    const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
+
+    #[test]
+    fn upgrade_writes_the_revealed_kernel_at_its_absolute_path() {
+        let mut host = MockKernelHost::default();
+        // Several content pages, under a hash page.
+        let kernel = vec![1u8; 10_000];
+        let root_hash = prepare_preimages(&kernel, |_, preimage| {
+            host.host.set_preimage(preimage);
+        })
+        .unwrap();
+        let root_hash = *root_hash.as_ref();
+        let mut bk = crate::load_keyspaces(&mut host).unwrap();
+        // Longer than the new kernel: none of its bytes must stay.
+        host.store_write_all(&KERNEL_BOOT_PATH, &[2; 20_000])
+            .unwrap();
+
+        let (base, kernel_ks) = bk.base_and_kernel_mut();
+        upgrade(&mut host, base, kernel_ks, root_hash).unwrap();
+
+        assert_eq!(host.store_read_all(&KERNEL_BOOT_PATH).unwrap(), kernel);
+        assert_eq!(
+            bk.base().get(&KERNEL_ROOT_HASH_KEY),
+            Some(root_hash.to_vec())
+        );
+    }
+
+    /// Sets the preimages of a hash page over a content page, then a
+    /// preimage that is not a page, and returns the root hash: a reveal of it
+    /// writes the content page, then stops.
+    fn tree_that_fails_after_a_page(
+        host: &mut MockKernelHost,
+    ) -> [u8; PREIMAGE_HASH_SIZE] {
+        let content = host
+            .host
+            .set_preimage([&[0, 0, 0, 0, 4][..], b"page"].concat());
+        let not_a_page = host.host.set_preimage(vec![0xff; 8]);
+        let hashes = [content, not_a_page].concat();
+        host.host.set_preimage(
+            [&[1][..], &(hashes.len() as u32).to_be_bytes(), &hashes].concat(),
+        )
+    }
+
+    #[test]
+    fn upgrade_that_fails_after_a_page_restores_the_kernel() {
+        let mut host = MockKernelHost::default();
+        let root_hash = tree_that_fails_after_a_page(&mut host);
+        let mut bk = crate::load_keyspaces(&mut host).unwrap();
+        host.store_write_all(&KERNEL_BOOT_PATH, b"current kernel")
+            .unwrap();
+
+        let (base, kernel_ks) = bk.base_and_kernel_mut();
+        assert!(matches!(
+            upgrade(&mut host, base, kernel_ks, root_hash),
+            Err(KernelUpgradeError::Reveal(DataRevealError::Reveal(
+                RevealLoopError::Page {
+                    error: SlicePageError::InvalidTag(Some(0xff)),
+                    ..
+                }
+            )))
+        ));
+        assert_eq!(
+            host.store_read_all(&KERNEL_BOOT_PATH).unwrap(),
+            b"current kernel"
+        );
+        assert_eq!(bk.base().get(&KERNEL_ROOT_HASH_KEY), None);
+    }
+
+    #[test]
+    fn upgrade_without_a_current_kernel_writes_the_new_kernel() {
+        let mut host = MockKernelHost::default();
+        let kernel = vec![1u8; 10_000];
+        let root_hash = prepare_preimages(&kernel, |_, preimage| {
+            host.host.set_preimage(preimage);
+        })
+        .unwrap();
+        let root_hash = *root_hash.as_ref();
+        let mut bk = crate::load_keyspaces(&mut host).unwrap();
+
+        let (base, kernel_ks) = bk.base_and_kernel_mut();
+        upgrade(&mut host, base, kernel_ks, root_hash).unwrap();
+
+        assert_eq!(host.store_read_all(&KERNEL_BOOT_PATH).unwrap(), kernel);
     }
 }

@@ -257,7 +257,7 @@ fn build_next_bip_from_blueprints<Host>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
 where
-    Host: HostReveal + StorageV1 + WasmHost,
+    Host: HostReveal,
 {
     log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let base = bk.base_mut();
@@ -268,7 +268,8 @@ where
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
                 if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
-                    upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?;
+                    let (base, kernel) = bk.base_and_kernel_mut();
+                    upgrade::upgrade(host, base, kernel, kernel_upgrade.preimage_hash)?;
                     // We abort the call, as there is no blueprint to execute,
                     // the kernel will reboot.
                     return Ok(BlueprintParsing::Postponed);

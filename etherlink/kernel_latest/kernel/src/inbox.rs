@@ -17,7 +17,7 @@ use crate::parsing::{
     SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
-use crate::error::ChunkedTransactionError;
+use crate::error::{ChunkedTransactionError, KernelUpgradeError};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
     chunked_transaction_hash_exists, chunked_transaction_key,
@@ -398,13 +398,11 @@ fn handle_fa_deposit(
     .into()
 }
 
-fn force_kernel_upgrade<Host>(
-    host: &mut Host,
+fn force_kernel_upgrade(
+    host: &mut impl HostReveal,
     base: &mut impl KeySpace,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1 + HostReveal + WasmHost,
-{
+    kernel: &mut impl KeySpace,
+) -> Result<(), KernelUpgradeError> {
     match upgrade::read_kernel_upgrade(base)? {
         Some(kernel_upgrade) => {
             let current_timestamp = read_last_info_per_level_timestamp(base)?.i64();
@@ -413,7 +411,7 @@ where
             if current_timestamp >= (activation_timestamp + 86400i64) {
                 // If the kernel upgrade still exist 1 day after it was supposed
                 // to be activated. It is possible to force its execution.
-                upgrade::upgrade(host, base, kernel_upgrade.preimage_hash)?
+                upgrade::upgrade(host, base, kernel, kernel_upgrade.preimage_hash)?
             };
             Ok(())
         }
@@ -498,7 +496,7 @@ pub fn handle_input<Host, Mode>(
     common: &CommonConfig,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + HostReveal + WasmHost,
+    Host: StorageV1 + HostReveal,
     Mode: Parsable + InputHandler,
 {
     let base = bk.base_mut();
@@ -525,7 +523,10 @@ where
         Input::FaDeposit((fa_deposit, _chain_id)) => {
             Mode::handle_fa_deposit(host, bk, fa_deposit, inbox_content, common)?
         }
-        Input::ForceKernelUpgrade => force_kernel_upgrade(host, base)?,
+        Input::ForceKernelUpgrade => {
+            let (base, kernel) = bk.base_and_kernel_mut();
+            force_kernel_upgrade(host, base, kernel)?
+        }
         Input::DalAttestedSlots {
             published_level,
             slot_size,

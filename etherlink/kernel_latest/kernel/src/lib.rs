@@ -324,7 +324,8 @@ where
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
             log!(Error, "{error}");
-            fallback_backup_kernel(host, bk.base_mut())?;
+            let (base, kernel) = bk.base_and_kernel_mut();
+            fallback_backup_kernel(base, kernel)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
