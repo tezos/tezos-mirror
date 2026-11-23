@@ -41,15 +41,17 @@ change run the Etherlink tezt suite (`etherlink.daily` pipeline) on the rebuilt
 image: `etherlink/tezt/lib/eth_cli.ml` drives `eth-cli` (`abi:*`, `block:*`,
 `address:balance`, `transaction:*`, `contract:*`).
 
-Advisories that cannot be fixed with `eth-cli` 2.0.2 (as of October 2026):
+Advisories that cannot be fixed with `eth-cli` 2.0.2 (as of November 2026):
 
 - `elliptic` (low): no fixed release exists.
 - `request` (moderate, SSRF): unmaintained, no fixed release; it is only reached
   through `web3-bzz` -> `swarm-js` -> `eth-lib` 0.1 -> `servify` and is never
   loaded by the `eth-cli` commands used in the tests.
-- `decode-uri-component` (moderate): the fixed releases are ESM-only and break
+- `decode-uri-component` (high since GHSA-qr28-fpjm-wq7f, which affects every
+  release up to 0.5.0): the only fixed release, 0.5.1, is ESM-only and breaks
   the CommonJS `query-string` -> `xhr-request` chain used by `web3`'s HTTP
-  provider.
+  provider. `query-string`, `xhr-request` and `xhr-request-promise` are
+  reported as high for that reason alone.
 - `web3` 1.2.1 and its `web3-core-*` packages (moderate: prototype pollution,
   credential storage in the browser wallet): overriding the `web3` family to
   1.10.4 fixes them, but web3 1.10 encodes ABI arguments with the strict
