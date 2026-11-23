@@ -85,10 +85,6 @@ pub enum ChunkedTransactionError {
 pub enum UpgradeProcessError {
     #[error("Internal upgrade error: {0}")]
     InternalUpgrade(&'static str),
-    #[error("Fallback mechanism was triggered")]
-    Fallback,
-    #[error("Missing dictator key")]
-    NoDictator,
 }
 
 #[derive(Error, Debug)]
@@ -125,8 +121,9 @@ pub enum Error {
     InvalidRunTransaction(revm_etherlink::EvmRunError),
     #[error("Simulation failed: {0}")]
     Simulation(revm_etherlink::EvmRunError),
-    #[error(transparent)]
-    UpgradeError(UpgradeProcessError),
+    /// The storage migration of the kernel failed with the given error.
+    #[error("Storage migration failed: {0:#}")]
+    MigrationFailed(anyhow::Error),
     #[error(transparent)]
     InvalidSignature(SigError),
     #[error("Invalid signature check")]
@@ -212,12 +209,6 @@ impl From<TransferError> for Error {
 impl From<DecoderError> for Error {
     fn from(e: DecoderError) -> Self {
         Self::RlpDecoderError(e)
-    }
-}
-
-impl From<UpgradeProcessError> for Error {
-    fn from(e: UpgradeProcessError) -> Self {
-        Self::UpgradeError(e)
     }
 }
 

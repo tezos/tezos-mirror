@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::Error;
-use crate::error::UpgradeProcessError;
 use crate::storage::{read_evm_chain_id, StorageVersion};
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use tezos_evm_logging::{log, Level::*};
@@ -678,7 +677,7 @@ where
     Host: StorageV1,
 {
     let migration_result = migration(host);
-    migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
+    migration_result.map_err(Error::MigrationFailed)
 }
 
 #[cfg(test)]
@@ -1290,5 +1289,21 @@ mod tests {
         ] {
             assert!(host.store_has(path).unwrap().is_none());
         }
+    }
+
+    #[test]
+    fn failed_migration_keeps_its_error() {
+        // No storage version: the migration cannot read it.
+        let mut host = MockKernelHost::default();
+
+        let Err(Error::MigrationFailed(error)) = storage_migration(&mut host) else {
+            panic!("expected a failed migration");
+        };
+        assert!(matches!(
+            error.downcast_ref::<Error>(),
+            Some(Error::Storage(crate::error::StorageError::Runtime(
+                RuntimeError::PathNotFound
+            )))
+        ));
     }
 }
