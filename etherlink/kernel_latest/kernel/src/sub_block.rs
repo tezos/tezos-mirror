@@ -163,12 +163,10 @@ fn block_constants(
     let michelson_to_evm_gas_multiplier =
         read_michelson_to_evm_gas_multiplier(evm_world_state)
             .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
-    let safe_roots = config.world_states(number);
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
         da_fee_per_byte_mutez,
         michelson_to_evm_gas_multiplier,
-        safe_roots,
     };
     Ok(TezosXBlockConstants {
         evm_runtime_block_constants: BlockConstants {

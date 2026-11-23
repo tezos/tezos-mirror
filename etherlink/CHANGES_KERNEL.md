@@ -75,10 +75,6 @@
   cross-runtime `BadRequest` body (both the interpreter and typecheck view
   arms), and the BSON metadata — not only the previously-metered cross-runtime
   path. (!22312)
-- The Michelson runtime snapshots only the Tez accounts root, instead of
-  all world-state roots, for operations that provably touch nothing else
-  (reveals and transfers to implicit accounts), removing the per-operation
-  `store_copy`/`store_move` of the other roots. (!22276)
 - Michelson runtime: the operation receipt's `lazy_storage_diff` now matches
   L1's layout — all big_map removals are listed first (id descending), then
   allocations/updates/copies in the reverse of the storage AST traversal order

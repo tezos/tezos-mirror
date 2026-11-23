@@ -843,12 +843,9 @@ where
     let crac_id = tezosx_journal::CracId::new(0, 0);
     // There is no operation to seed the identities from, and the run is
     // always reverted: no origination address it derives outlives the call.
-    // The roots an applied Michelson operation mirrors, unnarrowed: nothing
-    // here proves the run touches accounts only.
-    let mut safe_host = SafeStorage::new(
-        host,
-        block_constants.michelson_runtime_block_constants.safe_roots,
-    );
+    // Every world-state root of the chain, which the run may touch.
+    let mut safe_host =
+        SafeStorage::new(host, chain_config.world_states(blueprint_header.number));
     safe_host.start().map_err(|err| {
         RunCodeError::Host(format!("cannot snapshot the state: {err:?}"))
     })?;
