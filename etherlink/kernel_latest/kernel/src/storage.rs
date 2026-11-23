@@ -27,8 +27,6 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::ValueType;
-use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::extensions::{
     KeySpaceExtBin, KeySpaceExtNum, KeySpaceExtRlp,
 };
@@ -80,6 +78,7 @@ pub enum StorageVersion {
     V68,
     V69,
     V70,
+    V71,
 }
 
 impl From<StorageVersion> for u64 {
@@ -94,7 +93,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V70;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V71;
 
 // Legacy storage version path, outside the `/base` keyspace. Only read once,
 // by `init_storage_versioning` at stage zero, which promotes the recorded
@@ -132,9 +131,8 @@ const STAGE_ONE_WITNESS_KEY: Key = Key::from_static(b"/stage_one_witness");
 const MAXIMUM_GAS_PER_TRANSACTION_KEY: Key =
     Key::from_static(b"/maximum_gas_per_transaction");
 
-// Path to the block in progress, used between reboots
-pub const EVM_BLOCK_IN_PROGRESS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
+// Key of the block in progress in the `/common_world_state` keyspace.
+const BLOCK_IN_PROGRESS_KEY: Key = Key::from_static(b"/block_in_progress");
 
 /// Relative key of the rollup events index inside the `/base` keyspace. It
 /// resolves to the absolute durable path `/base/rollup_events`, where the
@@ -890,56 +888,48 @@ pub fn store_kernel_version(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_block_in_progress<Host>(
-    host: &mut Host,
+pub fn store_block_in_progress(
+    common_world_state: &mut impl KeySpace,
     bip: &BlockInProgress,
-) -> anyhow::Result<()>
-where
-    Host: StorageV1,
-{
-    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
-    let bytes = &bip.rlp_bytes();
+) -> Result<(), KeySpaceError> {
+    // Raw bytes rather than `store_rlp`: the benchmark log needs their length.
+    let bytes = bip.rlp_bytes();
     log!(
         Benchmarking,
         "Storing Block In Progress of size {}",
         bytes.len()
     );
-    host.store_write_all(&path, bytes)
-        .context("Failed to store current block in progress")
+    common_world_state.set(&BLOCK_IN_PROGRESS_KEY, bytes)
 }
 
 // DO NOT RENAME: function name is used during benchmark
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn read_block_in_progress<Host>(
-    host: &Host,
-) -> anyhow::Result<Option<BlockInProgress>>
-where
-    Host: StorageV1,
-{
-    let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
-    if let Some(ValueType::Value) = host.store_has(&path)? {
-        let bytes = host
-            .store_read_all(&path)
-            .context("Failed to read current block in progress")?;
-        log!(
-            Benchmarking,
-            "Reading Block In Progress of size {}",
-            bytes.len()
-        );
-        let decoder = Rlp::new(bytes.as_slice());
-        let bip = BlockInProgress::decode(&decoder)
-            .context("Failed to decode current block in progress")?;
-        Ok(Some(bip))
-    } else {
-        Ok(None)
-    }
+pub fn read_block_in_progress(
+    common_world_state: &impl KeySpace,
+) -> Result<Option<BlockInProgress>, KeySpaceError> {
+    let Some(bytes) = common_world_state.get(&BLOCK_IN_PROGRESS_KEY) else {
+        return Ok(None);
+    };
+    log!(
+        Benchmarking,
+        "Reading Block In Progress of size {}",
+        bytes.len()
+    );
+    BlockInProgress::decode(&Rlp::new(&bytes))
+        .map(Some)
+        .map_err(|err| {
+            KeySpaceError::read(
+                common_world_state.name(),
+                &BLOCK_IN_PROGRESS_KEY,
+                err.into(),
+            )
+        })
 }
 
-pub fn delete_block_in_progress(host: &mut impl StorageV1) -> anyhow::Result<()> {
-    host.store_delete(&EVM_BLOCK_IN_PROGRESS)
-        .context("Failed to delete block in progress")
+pub fn delete_block_in_progress(common_world_state: &mut impl KeySpace) {
+    common_world_state.delete(&BLOCK_IN_PROGRESS_KEY);
 }
 
 pub fn enable_dal(base: &impl KeySpace, is_evm_node: bool) -> bool {
@@ -1140,10 +1130,14 @@ pub fn read_delayed_transaction_bridge(
 
 #[cfg(test)]
 mod tests {
+    use crate::block_in_progress::BlockInProgress;
     use crate::load_base;
+    use primitive_types::U256;
+    use rlp::Encodable;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
+    use tezos_evm_runtime::safe_storage::SafeStorage;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
@@ -2265,5 +2259,39 @@ mod tests {
         for suffix in ["/num_chunks", "/chunk_hashes", "/0", "/1"] {
             assert!(rk.host_mut().store_has(&path(suffix)).unwrap().is_none());
         }
+    }
+
+    /// Through the block mirror, the block in progress resolves to
+    /// `/tmp/common_world_state/block_in_progress`.
+    #[test]
+    fn block_in_progress_resolves_to_the_mirrored_common_world_state() {
+        let mut host = MockKernelHost::default();
+        let path = RefPath::assert_from(b"/tmp/common_world_state/block_in_progress");
+        let bip = BlockInProgress::new(
+            U256::from(7),
+            std::collections::VecDeque::new(),
+            U256::from(11),
+        );
+        {
+            let mut safe_host = SafeStorage::new(&mut host, vec![]);
+            let mut rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
+            let cws = rk.common_world_state_mut();
+            assert!(super::read_block_in_progress(cws).unwrap().is_none());
+            super::store_block_in_progress(cws, &bip).unwrap();
+            let read = super::read_block_in_progress(cws)
+                .unwrap()
+                .expect("a block is in progress");
+            assert_eq!(read.rlp_bytes(), bip.rlp_bytes());
+        }
+        assert_eq!(
+            host.store_read_all(&path).unwrap(),
+            bip.rlp_bytes().to_vec()
+        );
+
+        let mut safe_host = SafeStorage::new(&mut host, vec![]);
+        let mut rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
+        super::delete_block_in_progress(rk.common_world_state_mut());
+        drop(rk);
+        assert!(host.store_has(&path).unwrap().is_none());
     }
 }

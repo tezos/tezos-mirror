@@ -22,7 +22,7 @@ use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::migration::allow_path_not_found;
-use crate::storage::{self, EVM_BLOCK_IN_PROGRESS};
+use crate::storage;
 use crate::storage::{inside_stage_one, read_block_in_progress};
 use crate::transaction::TransactionContent;
 use crate::upgrade;
@@ -35,7 +35,9 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
+use tezos_evm_runtime::runtime_keyspaces::{
+    BlueprintKeyspaces, RuntimeKeyspaces, COMMON_WORLD_STATE_KEYSPACE_NAME,
+};
 use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
@@ -326,7 +328,10 @@ where
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
             log!(Info, "Ask for reboot.");
-            storage::store_block_in_progress(rk.host_mut(), &block_in_progress)?;
+            storage::store_block_in_progress(
+                rk.common_world_state_mut(),
+                &block_in_progress,
+            )?;
             Ok(BlockComputationResult::RebootNeeded)
         }
         BlockInProgressComputationResult::Finished {
@@ -395,7 +400,6 @@ where
             // related to stage 2. We clean-up potential leftovers of the interrupted execution.
 
             allow_path_not_found(host.store_delete(&TMP_PATH))?;
-            allow_path_not_found(host.store_delete(&EVM_BLOCK_IN_PROGRESS))?;
 
             drop_invalid_blueprint(base, config)?;
         }
@@ -476,7 +480,7 @@ fn clean_delayed_transactions(
 
 #[allow(clippy::too_many_arguments)]
 pub fn promote_block<Host>(
-    host: &mut SafeStorage<&mut Host>,
+    mut rk: RuntimeKeyspaces<'_, SafeStorage<&mut Host>>,
     base: &mut impl KeySpace,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
@@ -485,11 +489,13 @@ pub fn promote_block<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost,
+    Host: StorageV1 + WasmHost + KeySpaceLoader,
 {
+    // Drop the block in progress from the mirror so that `promote` does not carry it.
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
-        storage::delete_block_in_progress(host)?;
+        storage::delete_block_in_progress(rk.common_world_state_mut());
     }
+    let host = rk.into_host();
     host.promote()?;
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
@@ -547,52 +553,55 @@ where
     let registry = chain_config.init_registry();
 
     // Check if there's a BIP in storage to resume its execution
-    let (block_in_progress_provenance, block_in_progress) =
-        match read_block_in_progress(&safe_host)? {
-            Some(block_in_progress) => {
-                log!(Debug, "Restauring BIP from storage.");
-                (BlockInProgressProvenance::Storage, block_in_progress)
-            }
-            None => {
-                // The upgrade writes through `bk`, which addresses the durable
-                // roots: `safe_host.start` below copies them into the mirror.
-                upgrade::possible_sequencer_upgrade(&mut bk)?;
+    let stored_block_in_progress = read_block_in_progress(
+        &safe_host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?,
+    )?;
+    let (block_in_progress_provenance, block_in_progress) = match stored_block_in_progress
+    {
+        Some(block_in_progress) => {
+            log!(Debug, "Restauring BIP from storage.");
+            (BlockInProgressProvenance::Storage, block_in_progress)
+        }
+        None => {
+            // The upgrade writes through `bk`, which addresses the durable
+            // roots: `safe_host.start` below copies them into the mirror.
+            upgrade::possible_sequencer_upgrade(&mut bk)?;
 
-                log!(Debug, "Creating BIP from Blueprint.");
-                // Execute at most one of the stored blueprints
-                let block_in_progress = match build_next_bip_from_blueprints(
-                    safe_host.host_mut(),
-                    &mut bk,
-                    chain_config,
-                    next_bip_number,
-                    timestamp,
-                    &chain_header,
-                    config,
-                    &kernel_upgrade,
-                )? {
-                    BlueprintParsing::Next(bip) => {
-                        log!(Debug, "Creating BIP from Blueprint: Success.");
-                        bip
-                    }
-                    BlueprintParsing::Postponed => {
-                        log!(
-                            Debug,
-                            "Creating BIP from Blueprint: Postponed to apply an upgrade."
-                        );
-                        return Ok(ComputationResult::RebootNeeded);
-                    }
-                    BlueprintParsing::None => {
-                        log!(Debug, "Creating BIP from Blueprint: Failure.");
-                        return Ok(ComputationResult::Finished);
-                    }
-                };
+            log!(Debug, "Creating BIP from Blueprint.");
+            // Execute at most one of the stored blueprints
+            let block_in_progress = match build_next_bip_from_blueprints(
+                safe_host.host_mut(),
+                &mut bk,
+                chain_config,
+                next_bip_number,
+                timestamp,
+                &chain_header,
+                config,
+                &kernel_upgrade,
+            )? {
+                BlueprintParsing::Next(bip) => {
+                    log!(Debug, "Creating BIP from Blueprint: Success.");
+                    bip
+                }
+                BlueprintParsing::Postponed => {
+                    log!(
+                        Debug,
+                        "Creating BIP from Blueprint: Postponed to apply an upgrade."
+                    );
+                    return Ok(ComputationResult::RebootNeeded);
+                }
+                BlueprintParsing::None => {
+                    log!(Debug, "Creating BIP from Blueprint: Failure.");
+                    return Ok(ComputationResult::Finished);
+                }
+            };
 
-                // We are going to execute a new block, we copy the storage to allow
-                // to revert if the block fails.
-                safe_host.start()?;
-                (BlockInProgressProvenance::Blueprint, *block_in_progress)
-            }
-        };
+            // We are going to execute a new block, we copy the storage to allow
+            // to revert if the block fails.
+            safe_host.start()?;
+            (BlockInProgressProvenance::Blueprint, *block_in_progress)
+        }
+    };
 
     let processed_blueprint = block_in_progress.number;
 
@@ -661,7 +670,7 @@ where
                 timestamp,
             );
             promote_block(
-                rk.into_host(),
+                rk,
                 &mut base,
                 &outbox_queue,
                 &block_in_progress_provenance,
@@ -725,10 +734,18 @@ mod tests {
     use crate::configuration::fetch_evm_chain_id;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
+    use crate::migration::storage_migration;
     use crate::registry_impl::RegistryImpl;
     use crate::retrieve_block_fees;
-    use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
+    use crate::storage::{
+        read_block_in_progress, store_block_in_progress, store_storage_version,
+        StorageVersion,
+    };
+    use crate::sub_block::{
+        assemble_block, handle_run_transaction, AssembleBlockInput,
+        SingleTxExecutionInput,
+    };
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
@@ -741,6 +758,7 @@ mod tests {
         StorageAccount, SEQUENCER_KEY_CHANGE_KEY,
     };
     use sha3::{Digest, Keccak256};
+    use std::collections::VecDeque;
     use std::str::FromStr;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
@@ -975,8 +993,8 @@ mod tests {
         tx: EthereumTransactionCommon,
         tag: u8,
         number: u64,
-    ) -> crate::sub_block::SingleTxExecutionInput {
-        crate::sub_block::SingleTxExecutionInput {
+    ) -> SingleTxExecutionInput {
+        SingleTxExecutionInput {
             tx: TezosXTransaction::Ethereum(Box::new(Transaction {
                 tx_hash: [tag; TRANSACTION_HASH_SIZE],
                 content: TransactionContent::Ethereum(tx),
@@ -1010,10 +1028,26 @@ mod tests {
         host
     }
 
-    /// The block in progress a sub-block run left under the mirror.
+    /// Live path of the block in progress, which no promoted block leaves behind.
+    const PROMOTED_BLOCK_IN_PROGRESS: RefPath =
+        RefPath::assert_from(b"/common_world_state/block_in_progress");
+
+    /// The block in progress a run left under the mirror.
     fn mirrored_block_in_progress(host: &mut MockKernelHost) -> Option<BlockInProgress> {
-        let safe = SafeStorage::new(host, vec![]);
-        read_block_in_progress(&safe).unwrap()
+        let mut safe = SafeStorage::new(host, vec![]);
+        let common_world_state = safe
+            .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
+            .unwrap();
+        read_block_in_progress(&common_world_state).unwrap()
+    }
+
+    /// Leaves `bip` under the mirror, the way a run that asks for a reboot does.
+    fn mirror_block_in_progress(host: &mut MockKernelHost, bip: &BlockInProgress) {
+        let mut safe = SafeStorage::new(host, vec![]);
+        let mut common_world_state = safe
+            .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
+            .unwrap();
+        store_block_in_progress(&mut common_world_state, bip).unwrap();
     }
 
     /// A second sub-block call for the same block resumes the block in
@@ -1024,14 +1058,14 @@ mod tests {
         let mut host = sub_block_host();
 
         let bk = load_keyspaces(&mut host).unwrap();
-        crate::sub_block::handle_run_transaction(
+        handle_run_transaction(
             &mut host,
             bk,
             sub_block_input(dummy_eth_transaction_zero(), 0, 1),
         )
         .expect("the first transaction runs");
         let bk = load_keyspaces(&mut host).unwrap();
-        crate::sub_block::handle_run_transaction(
+        handle_run_transaction(
             &mut host,
             bk,
             sub_block_input(dummy_eth_transaction_one(), 1, 1),
@@ -1050,7 +1084,7 @@ mod tests {
         let mut host = sub_block_host();
 
         let bk = load_keyspaces(&mut host).unwrap();
-        crate::sub_block::handle_run_transaction(
+        handle_run_transaction(
             &mut host,
             bk,
             sub_block_input(dummy_eth_transaction_zero(), 0, 1),
@@ -1069,7 +1103,7 @@ mod tests {
             )
             .unwrap();
         let bk = load_keyspaces(&mut host).unwrap();
-        let result = crate::sub_block::handle_run_transaction(
+        let result = handle_run_transaction(
             &mut host,
             bk,
             sub_block_input(dummy_eth_transaction_one(), 1, 1),
@@ -1079,6 +1113,60 @@ mod tests {
         assert!(result.is_err());
         assert!(host.store_has(&TMP_PATH).unwrap().is_none());
         assert!(mirrored_block_in_progress(&mut host).is_none());
+    }
+
+    /// A resumed block that fails drops the mirror, and the block in progress
+    /// with it.
+    #[test]
+    fn failed_resumed_block_drops_the_block_in_progress() {
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        // A number out of the `BlockNumber` range makes the block constants fail.
+        let bip = BlockInProgress::new(U256::MAX, VecDeque::new(), U256::zero());
+        mirror_block_in_progress(&mut host, &bip);
+        let chain_config = dummy_tezosx_config(SpecId::default());
+        let mut config = dummy_configuration();
+
+        let produced = produce(&mut host, bk, &chain_config, &mut config, None, None);
+
+        assert!(matches!(produced, Ok(ComputationResult::RebootNeeded)));
+        assert!(host.store_has(&TMP_PATH).unwrap().is_none());
+    }
+
+    /// `assemble_block` finalizes the block the sub-block runs left in
+    /// progress under `/tmp`, and does not promote the block in progress.
+    #[test]
+    fn assemble_block_finalizes_the_mirrored_block() {
+        let mut host = sub_block_host();
+        for (tag, tx) in [
+            (0, dummy_eth_transaction_zero()),
+            (1, dummy_eth_transaction_one()),
+        ] {
+            let bk = load_keyspaces(&mut host).unwrap();
+            handle_run_transaction(&mut host, bk, sub_block_input(tx, tag, 1))
+                .expect("the transaction runs");
+        }
+        let bk = load_keyspaces(&mut host).unwrap();
+        let input = AssembleBlockInput {
+            timestamp: Timestamp::from(0),
+            block_number: U256::one(),
+        };
+
+        assemble_block(&mut host, bk, input).expect("the block assembles");
+
+        let block = block_storage::read_current_etherlink_block(
+            RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
+        )
+        .unwrap()
+        .expect("a current block");
+        assert_eq!(block.number, U256::one());
+        assert_eq!(block.transactions.len(), 2);
+        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(host
+            .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
+            .unwrap()
+            .is_none());
     }
 
     /// Pre-populate all safe storage roots so that `SafeStorage::start()`'s
@@ -2245,7 +2333,6 @@ mod tests {
         use crate::block_in_progress::BlockInProgress;
         use mir::gas::Gas;
         use revm_etherlink::storage::world_state_handler::AccountInfo;
-        use std::collections::VecDeque;
         use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezos_execution::account_storage::TezosAccountInfo;
         use tezos_tezlink::operation_result::{
@@ -2451,7 +2538,6 @@ mod tests {
         use crate::block_in_progress::BlockInProgress;
         use mir::gas::Gas;
         use mir::interpreter::{compute_contract_address, MAX_INTERNAL_OPERATIONS};
-        use std::collections::VecDeque;
         use tezos_execution::account_storage::TezosAccountInfo;
         use tezos_tezlink::block::OperationsWithReceipts;
         use tezos_tezlink::operation_result::{
@@ -3973,6 +4059,25 @@ mod tests {
         }
     }
 
+    /// The `loop.sol` transactions of the reboot tests: create the contract,
+    /// then call `loop(300)` twice.
+    fn loop_contract_transactions() -> [EthereumTransactionCommon; 3] {
+        let sender = H160::from_str(TEST_ADDR).unwrap();
+        let create_transaction =
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
+        let loop_addr: H160 = {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&sender);
+            stream.append(&0u64);
+            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
+        };
+        let loop_300_tx =
+            create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
+        let loop_300_tx2 =
+            create_and_sign_transaction(LOOP_300, 2, 230_000, Some(loop_addr), TEST_SK);
+        [create_transaction, loop_300_tx, loop_300_tx2]
+    }
+
     #[test]
     fn test_reboot_many_tx_one_proposal() {
         // init host
@@ -3993,22 +4098,8 @@ mod tests {
         let sender_initial_balance = U256::from(10000000000000000000u64);
         set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
-        // These transactions are generated with the loop.sol contract, which are:
-        // - create the contract
-        // - call `loop(300)`
-        // - call `loop(300)`
-        let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 = {
-            let mut stream = rlp::RlpStream::new_list(2);
-            stream.append(&sender);
-            stream.append(&0u64);
-            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
-        };
-        let loop_300_tx =
-            create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
-        let loop_300_tx2 =
-            create_and_sign_transaction(LOOP_300, 2, 230_000, Some(loop_addr), TEST_SK);
+        let [create_transaction, loop_300_tx, loop_300_tx2] =
+            loop_contract_transactions();
 
         let proposals = vec![
             wrap_transaction(0, create_transaction),
@@ -4034,7 +4125,6 @@ mod tests {
             produce(&mut host, bk, &chain_config, &mut configuration, None, None)
                 .expect("Should have produced");
         let base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // test no new block
         assert!(
@@ -4043,13 +4133,13 @@ mod tests {
         );
 
         // test reboot is set
-        matches!(computation_result, ComputationResult::RebootNeeded);
+        assert!(matches!(
+            computation_result,
+            ComputationResult::RebootNeeded
+        ));
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host =
-            SafeStorage::new(rk.host_mut(), chain_config.world_states(U256::zero()));
-        let bip = read_block_in_progress(&safe_host)
-            .expect("Should be able to read the block in progress")
+        let bip = mirrored_block_in_progress(&mut host)
             .expect("The reboot context should have a block in progress");
 
         assert_eq!(
@@ -4092,23 +4182,8 @@ mod tests {
         let sender_initial_balance = U256::from(10000000000000000000u64);
         set_balance(rk.eth_accounts_mut(), &sender, sender_initial_balance);
 
-        // These transactions are generated with the loop.sol contract, which are:
-        // - create the contract
-        // - call `loop(300)`
-        // - call `loop(300)`
-        let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 = {
-            let mut stream = rlp::RlpStream::new_list(2);
-            stream.append(&sender);
-            stream.append(&0u64);
-            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
-        };
-
-        let loop_300_tx =
-            create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
-        let loop_300_tx2 =
-            create_and_sign_transaction(LOOP_300, 2, 230_000, Some(loop_addr), TEST_SK);
+        let [create_transaction, loop_300_tx, loop_300_tx2] =
+            loop_contract_transactions();
 
         let proposals = vec![
             blueprint(vec![wrap_transaction(0, create_transaction)]),
@@ -4133,7 +4208,10 @@ mod tests {
                 .expect("Should have produced");
         let rk = RuntimeKeyspaces::init(&mut host).unwrap();
         // test reboot is set
-        matches!(computation_result, ComputationResult::RebootNeeded);
+        assert!(matches!(
+            computation_result,
+            ComputationResult::RebootNeeded
+        ));
 
         drop(rk);
         let bk = load_keyspaces(&mut host).unwrap();
@@ -4141,7 +4219,6 @@ mod tests {
             produce(&mut host, bk, &chain_config, &mut configuration, None, None)
                 .expect("Should have produced");
         let base = load_base(&mut host).unwrap();
-        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
         // test no new block
         assert_eq!(
@@ -4151,13 +4228,13 @@ mod tests {
         );
 
         // test reboot is set again
-        matches!(computation_result, ComputationResult::RebootNeeded);
+        assert!(matches!(
+            computation_result,
+            ComputationResult::RebootNeeded
+        ));
 
         // The block is in progress, therefore it is in the safe storage.
-        let safe_host =
-            SafeStorage::new(rk.host_mut(), chain_config.world_states(U256::zero()));
-        let bip = read_block_in_progress(&safe_host)
-            .expect("Should be able to read the block in progress")
+        let bip = mirrored_block_in_progress(&mut host)
             .expect("The reboot context should have a block in progress");
 
         assert_eq!(
@@ -4173,6 +4250,126 @@ mod tests {
             1,
             "One transaction should have been already applied"
         );
+
+        // The resumed block finishes: it is registered and no block is in
+        // progress anymore.
+        drop(base);
+        produce_until_finished(&mut host, &chain_config, &mut configuration);
+        let base = load_base(&mut host).unwrap();
+        assert_eq!(
+            read_current_number(&base).expect("should have found a block number"),
+            U256::from(1),
+            "The resumed block should have been registered"
+        );
+        let block = block_storage::read_current_etherlink_block(
+            RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
+        )
+        .unwrap()
+        .expect("a current block");
+        assert_eq!(block.transactions.len(), 2);
+        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(host
+            .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
+            .unwrap()
+            .is_none());
+    }
+
+    /// The V71 migration drops a block in progress a V70 kernel left under
+    /// `/tmp/evm/world_state`, and the next run rebuilds the block from its
+    /// blueprint.
+    #[test]
+    fn migrated_block_in_progress_is_rebuilt() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let sender = H160::from_str(TEST_ADDR).unwrap();
+        set_balance(
+            rk.eth_accounts_mut(),
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+        let [create_transaction, loop_300_tx, loop_300_tx2] =
+            loop_contract_transactions();
+        store_blueprints(
+            &mut base,
+            vec![blueprint(vec![
+                wrap_transaction(0, create_transaction),
+                wrap_transaction(1, loop_300_tx),
+                wrap_transaction(2, loop_300_tx2),
+            ])],
+        );
+        let mut chain_config = dummy_tezosx_config(SpecId::default());
+        chain_config.limits_mut().maximum_gas_limit = 560_000;
+        let mut configuration = dummy_configuration();
+        store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        drop(rk);
+        drop(base);
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        let computation_result =
+            produce(&mut host, bk, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
+        assert!(matches!(
+            computation_result,
+            ComputationResult::RebootNeeded
+        ));
+
+        // Lay the block in progress out the way a V70 kernel left it, then run
+        // the migration the way stage zero does.
+        let legacy = RefPath::assert_from(b"/tmp/evm/world_state/blocks/in_progress");
+        let current = RefPath::assert_from(b"/tmp/common_world_state/block_in_progress");
+        host.store_move(&current, &legacy).unwrap();
+        // A V70 mirror has no `/common_world_state`.
+        host.store_delete(&RefPath::assert_from(b"/tmp/common_world_state"))
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        store_storage_version(&mut base, StorageVersion::V70).unwrap();
+        drop(base);
+        storage_migration(&mut host).unwrap();
+        assert!(host.store_has(&legacy).unwrap().is_none());
+
+        // A rebuilt block starts a new mirror, so the probe is not promoted.
+        let probe = RefPath::assert_from(b"/tmp/evm/world_state/probe");
+        host.store_write_all(&probe, b"probe").unwrap();
+        produce_until_finished(&mut host, &chain_config, &mut configuration);
+        let base = load_base(&mut host).unwrap();
+        assert_eq!(read_current_number(&base).unwrap(), U256::zero());
+        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(host
+            .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
+            .unwrap()
+            .is_none());
+        let block = block_storage::read_current_etherlink_block(
+            RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
+        )
+        .unwrap()
+        .expect("a current block");
+        assert_eq!(block.transactions.len(), 3);
+        let promoted_probe = RefPath::assert_from(b"/evm/world_state/probe");
+        assert!(host.store_has(&promoted_probe).unwrap().is_none());
+    }
+
+    /// Runs `produce` until the block in progress finishes, a few reboots at
+    /// most.
+    fn produce_until_finished(
+        host: &mut MockKernelHost,
+        chain_config: &TezosXChainConfig,
+        configuration: &mut Configuration,
+    ) {
+        for _ in 0..5 {
+            // Each kernel run starts with no gas executed.
+            host.execution_gas_used = 0;
+            let bk = load_keyspaces(host).unwrap();
+            let computation_result =
+                produce(host, bk, chain_config, configuration, None, None)
+                    .expect("Should have produced");
+            if let ComputationResult::Finished = computation_result {
+                return;
+            }
+        }
+        panic!("The block in progress should have finished within five runs");
     }
 
     #[test]

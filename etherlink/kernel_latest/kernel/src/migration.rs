@@ -64,6 +64,9 @@ mod legacy {
     pub const BASE_CHUNKED_TRANSACTIONS_PATH: RefPath =
         RefPath::assert_from(b"/base/chunked_transactions");
 
+    pub const TMP_BLOCK_IN_PROGRESS_PATH: RefPath =
+        RefPath::assert_from(b"/tmp/evm/world_state/blocks/in_progress");
+
     pub fn migration_read_storage_version(
         host: &impl StorageV1,
     ) -> Result<StorageVersion, Error> {
@@ -592,6 +595,11 @@ where
             // The `debug_trace*` and `http_trace*` output lives in the
             // `/evm/world_state` keyspace and only exists on the throwaway
             // states of replays and simulations: nothing to move.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V71 => {
+            // The new kernel rebuilds a pending block from its blueprint, which stays stored until the block is promoted.
+            allow_path_not_found(host.store_delete(&legacy::TMP_BLOCK_IN_PROGRESS_PATH))?;
             Ok(MigrationStatus::Done)
         }
     }
@@ -1160,5 +1168,44 @@ mod tests {
             .store_has(&legacy::BASE_CHUNKED_TRANSACTIONS_PATH)
             .unwrap()
             .is_none());
+    }
+
+    /// V71 drops a block in progress left in the mirror, and leaves the rest
+    /// of the mirror to the next `SafeStorage::start`.
+    #[test]
+    fn v71_migration_drops_the_block_in_progress() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&legacy::TMP_BLOCK_IN_PROGRESS_PATH, &[0xABu8; 3000])
+            .unwrap();
+        let probe = RefPath::assert_from(b"/tmp/evm/world_state/probe");
+        host.store_write_all(&probe, b"probe").unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V71).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        assert!(host
+            .store_has(&legacy::TMP_BLOCK_IN_PROGRESS_PATH)
+            .unwrap()
+            .is_none());
+        assert_eq!(host.store_read_all(&probe).unwrap(), b"probe");
+
+        let status = migrate_to(&mut host, StorageVersion::V71).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+    }
+
+    /// V71 is a no-op when no block is in progress, and leaves the live
+    /// legacy path as is.
+    #[test]
+    fn v71_migration_without_block_in_progress_is_a_no_op() {
+        let mut host = MockKernelHost::default();
+        let live = RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
+        host.store_write_all(&live, b"live").unwrap();
+
+        let status = migrate_to(&mut host, StorageVersion::V71).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/tmp"))
+            .unwrap()
+            .is_none());
+        assert_eq!(host.store_read_all(&live).unwrap(), b"live");
     }
 }

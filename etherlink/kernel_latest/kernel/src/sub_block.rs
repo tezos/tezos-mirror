@@ -37,7 +37,9 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
+use tezos_evm_runtime::runtime_keyspaces::{
+    BlueprintKeyspaces, RuntimeKeyspaces, COMMON_WORLD_STATE_KEYSPACE_NAME,
+};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -234,8 +236,10 @@ where
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
-    let mut block_in_progress = match crate::storage::read_block_in_progress(&safe_host)?
-    {
+    let stored_block_in_progress = storage::read_block_in_progress(
+        &safe_host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?,
+    )?;
+    let mut block_in_progress = match stored_block_in_progress {
         Some(bip) => {
             if input_data.block_number != bip.number {
                 return Err(anyhow!(
@@ -311,7 +315,16 @@ where
 
     let err = match computed {
         Ok(BlockInProgressComputationResult::Finished { .. }) => {
-            match storage::store_block_in_progress(&mut safe_host, &block_in_progress) {
+            let stored = safe_host
+                .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
+                .map_err(anyhow::Error::from)
+                .and_then(|mut common_world_state| {
+                    Ok(storage::store_block_in_progress(
+                        &mut common_world_state,
+                        &block_in_progress,
+                    )?)
+                });
+            match stored {
                 Ok(()) => return Ok(()),
                 Err(err) => err,
             }
@@ -367,10 +380,10 @@ where
     let mut safe_host =
         SafeStorage::new(host, config.world_states(input_data.block_number));
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
+    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
+    let block_in_progress = storage::read_block_in_progress(rk.common_world_state())?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
-    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     crate::gas_price::register_block(
         rk.evm_world_state_mut(),
         block_in_progress.cumulative_execution_gas,
@@ -394,7 +407,7 @@ where
         timestamp,
     );
     promote_block(
-        rk.into_host(),
+        rk,
         &mut base,
         &outbox_queue,
         &BlockInProgressProvenance::Storage,
