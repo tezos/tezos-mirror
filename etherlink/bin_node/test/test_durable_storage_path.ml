@@ -11,7 +11,8 @@
     Invocation:   cd etherlink/bin_node/test/ ;
                   dune exec ./test_durable_storage_path.exe
     Subject:      Storage-version gating of the trace paths
-                  ([Durable_storage_path.Trace] and [Http_trace]). *)
+                  ([Durable_storage_path.Trace] and [Http_trace]) and of
+                  the gas backlog path. *)
 
 open Evm_node_lib_dev
 
@@ -75,6 +76,19 @@ let test_http_trace_for_tx () =
       (72, "/common_world_state/__http_trace/traces/ab");
     ]
 
+let test_backlog () =
+  List.iter
+    (fun (storage_version, expected) ->
+      check_path
+        ~storage_version
+        (Durable_storage_path.backlog ~storage_version)
+        expected)
+    [
+      (59, "/evm/world_state/fees/backlog");
+      (72, "/evm/world_state/fees/backlog");
+      (73, "/common_world_state/fees/backlog");
+    ]
+
 let tests =
   [
     ( "durable_storage_path",
@@ -82,6 +96,7 @@ let tests =
         ("tracer input", `Quick, test_trace_input);
         ("trace root", `Quick, test_trace_root);
         ("http trace per transaction", `Quick, test_http_trace_for_tx);
+        ("gas backlog", `Quick, test_backlog);
       ] );
   ]
 
