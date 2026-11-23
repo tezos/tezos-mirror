@@ -3698,7 +3698,7 @@ mod tests {
         };
     }
 
-    /// The safe copy of an operation copies `/evm/world_state` in and
+    /// The safe copy of an operation copies `/common_world_state` in and
     /// promotes it back, so trace output written before the operation
     /// survives it.
     #[test]
@@ -3706,7 +3706,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let trace = Key::from_static(b"/trace/call_trace/0");
-        rk.evm_world_state_mut().set(&trace, b"earlier").unwrap();
+        rk.common_world_state_mut().set(&trace, b"earlier").unwrap();
 
         let src = bootstrap1();
         init_account(rk.tez_accounts_mut(), &src.pkh, 1000000_u64);
@@ -3747,7 +3747,7 @@ mod tests {
             })
         ));
         assert_eq!(
-            rk.evm_world_state().get(&trace).as_deref(),
+            rk.common_world_state().get(&trace).as_deref(),
             Some(b"earlier".as_slice())
         );
     }

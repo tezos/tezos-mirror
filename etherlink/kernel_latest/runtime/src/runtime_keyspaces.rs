@@ -15,7 +15,7 @@
 //! their chain-level state. `/common_world_state` holds the chain-level state
 //! that the runtimes share.
 //!
-//! `trace` and `__http_trace` are reserved children of `/evm/world_state`:
+//! `trace` and `__http_trace` are reserved children of `/common_world_state`:
 //! they hold the node-local output of `debug_trace*` and `http_trace*`, and
 //! only exist on the throwaway states of a replay or a simulation.
 //!

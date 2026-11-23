@@ -33,6 +33,7 @@ let test_trace_input () =
       (60, "/base/trace/input");
       (69, "/base/trace/input");
       (70, "/base/trace/input");
+      (72, "/base/trace/input");
     ]
 
 let test_trace_root () =
@@ -50,6 +51,10 @@ let test_trace_root () =
       (69, Some "ab", "/base/trace/ab");
       (70, None, "/evm/world_state/trace");
       (70, Some "ab", "/evm/world_state/trace/ab");
+      (71, None, "/evm/world_state/trace");
+      (71, Some "ab", "/evm/world_state/trace/ab");
+      (72, None, "/common_world_state/trace");
+      (72, Some "ab", "/common_world_state/trace/ab");
     ]
 
 let test_http_trace_for_tx () =
@@ -66,6 +71,8 @@ let test_http_trace_for_tx () =
       (60, "/base/__http_trace/traces/ab");
       (69, "/base/__http_trace/traces/ab");
       (70, "/evm/world_state/__http_trace/traces/ab");
+      (71, "/evm/world_state/__http_trace/traces/ab");
+      (72, "/common_world_state/__http_trace/traces/ab");
     ]
 
 let tests =

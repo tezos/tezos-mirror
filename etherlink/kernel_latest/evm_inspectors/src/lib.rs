@@ -16,11 +16,11 @@ use revm::{
 use struct_logger::{StructLogger, StructLoggerInput};
 use tezos_smart_rollup_keyspace::KeySpace;
 
-/// Access to the `/evm/world_state` keyspace, where the tracers write.
-pub trait HasEvmWorldState {
+/// Access to the `/common_world_state` keyspace, where the tracers write.
+pub trait HasCommonWorldState {
     type KeySpace: KeySpace;
 
-    fn evm_world_state_mut(&mut self) -> &mut Self::KeySpace;
+    fn common_world_state_mut(&mut self) -> &mut Self::KeySpace;
 }
 
 pub mod call_tracer;
@@ -89,7 +89,7 @@ impl Tracer {
     /// cross-runtime legs must not finalize the tracer they share.
     pub fn finalize<KS>(
         &mut self,
-        evm_world_state: &mut KS,
+        common_world_state: &mut KS,
         result: &ExecutionResult,
     ) -> Result<(), InspectorError>
     where
@@ -97,10 +97,10 @@ impl Tracer {
     {
         match self {
             Tracer::CallTracer(call_tracer) => {
-                call_tracer.finalize(evm_world_state, result)
+                call_tracer.finalize(common_world_state, result)
             }
             Tracer::StructLogger(struct_logger) => {
-                struct_logger.finalize(evm_world_state, result)
+                struct_logger.finalize(common_world_state, result)
             }
         }
     }
@@ -184,7 +184,7 @@ pub struct TracerInspector;
 impl TracerInspector {
     fn with_tracer<CTX, F>(&mut self, context: &mut CTX, f: F)
     where
-        CTX: ContextTr<Db: HasEvmWorldState, Journal: TracerContainer>,
+        CTX: ContextTr<Db: HasCommonWorldState, Journal: TracerContainer>,
         F: FnOnce(&mut Tracer, &mut CTX),
     {
         let Some(mut tracer) = context.journal_mut().take_tracer() else {
@@ -196,7 +196,7 @@ impl TracerInspector {
 
     fn bind_tracer<CTX, T, F>(&mut self, context: &mut CTX, f: F) -> Option<T>
     where
-        CTX: ContextTr<Db: HasEvmWorldState, Journal: TracerContainer>,
+        CTX: ContextTr<Db: HasCommonWorldState, Journal: TracerContainer>,
         F: FnOnce(&mut Tracer, &mut CTX) -> Option<T>,
     {
         let mut tracer = context.journal_mut().take_tracer()?;
@@ -221,7 +221,7 @@ macro_rules! dispatch {
 
 impl<CTX, INTR> Inspector<CTX, INTR> for TracerInspector
 where
-    CTX: ContextTr<Db: HasEvmWorldState, Journal: TracerContainer>,
+    CTX: ContextTr<Db: HasCommonWorldState, Journal: TracerContainer>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {

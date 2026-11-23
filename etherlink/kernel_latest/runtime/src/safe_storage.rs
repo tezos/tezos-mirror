@@ -216,8 +216,8 @@ mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
     use crate::runtime_keyspaces::{
-        ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH,
-        EVM_WORLD_STATE_KEYSPACE_NAME, EVM_WORLD_STATE_ROOT_PATH,
+        COMMON_WORLD_STATE_KEYSPACE_NAME, COMMON_WORLD_STATE_ROOT_PATH,
+        ETH_ACCOUNTS_KEYSPACE_NAME, ETH_ACCOUNTS_ROOT_PATH, EVM_WORLD_STATE_ROOT_PATH,
     };
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
@@ -276,19 +276,24 @@ mod tests {
     fn start_clears_stale_mirror_data() {
         let mut host = MockKernelHost::default();
         // `start` copies the root, so it has to exist.
-        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
-        host.store_write_all(&world_state_data, b"some_account_data")
+        let world_state_data =
+            RefPath::assert_from(b"/common_world_state/block_in_progress");
+        host.store_write_all(&world_state_data, b"some_world_state_data")
             .unwrap();
         let trace = Key::from_static(b"/trace/call_trace/0");
-        let tmp_trace = RefPath::assert_from(b"/tmp/evm/world_state/trace/call_trace/0");
-        let mut safe =
-            SafeStorage::new(&mut host, vec![OwnedPath::from(EVM_WORLD_STATE_ROOT_PATH)]);
+        let tmp_trace =
+            RefPath::assert_from(b"/tmp/common_world_state/trace/call_trace/0");
+        let mut safe = SafeStorage::new(
+            &mut host,
+            vec![OwnedPath::from(COMMON_WORLD_STATE_ROOT_PATH)],
+        );
 
         // An interrupted block leaves a trace in the mirror.
         safe.start().unwrap();
         {
-            let mut keyspace =
-                safe.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME).unwrap();
+            let mut keyspace = safe
+                .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
+                .unwrap();
             keyspace.set(&trace, [0xAA, 0xBB]).unwrap();
         }
         assert_eq!(
@@ -303,7 +308,7 @@ mod tests {
             safe.host()
                 .store_read_all(&safe_path(&world_state_data).unwrap())
                 .unwrap(),
-            b"some_account_data"
+            b"some_world_state_data"
         );
     }
 

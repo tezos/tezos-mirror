@@ -38,6 +38,12 @@ module EVM = struct
   end
 end
 
+module Common_world_state = struct
+  let root = "/common_world_state"
+
+  let make s = root ^ s
+end
+
 module TEZ = struct
   let root = "/tez"
 
@@ -536,13 +542,15 @@ module Evm_events = struct
 end
 
 module Http_trace = struct
-  (* Reserved child of [/evm/world_state], replay-only output: the root on
-     V70+ kernels, and on kernels before V60. *)
+  (* Replay-only output: in [/common_world_state] on V72+ kernels, in
+     [/evm/world_state] on V70-V71 kernels and before V60. *)
   let world_state_root = EVM.World_state.make "/__http_trace/traces"
 
   let root ~storage_version =
-    if Storage_version.traces_moved_to_evm_world_state ~storage_version then
-      world_state_root
+    if Storage_version.traces_moved_to_common_world_state ~storage_version then
+      Common_world_state.make "/__http_trace/traces"
+    else if Storage_version.traces_moved_to_evm_world_state ~storage_version
+    then world_state_root
     else if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version
     then BASE.make "/__http_trace/traces"
     else world_state_root
@@ -554,12 +562,12 @@ module Http_trace = struct
 end
 
 module Trace = struct
-  (* V70+: reserved child of [/evm/world_state], replay/simulation output. *)
-  let world_state_root = EVM.World_state.make "/trace"
-
+  (* Replay/simulation output. *)
   let root ~storage_version =
-    if Storage_version.traces_moved_to_evm_world_state ~storage_version then
-      world_state_root
+    if Storage_version.traces_moved_to_common_world_state ~storage_version then
+      Common_world_state.make "/trace"
+    else if Storage_version.traces_moved_to_evm_world_state ~storage_version
+    then EVM.World_state.make "/trace"
     else if Storage_version.simulation_trace_ipc_moved_to_base ~storage_version
     then BASE.make "/trace"
     else EVM.make "/trace"

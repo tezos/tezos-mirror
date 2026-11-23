@@ -5942,7 +5942,7 @@ let test_crac_debug_trace_normal_tx_in_crac_block () =
     incoming Michelson-originated CRAC operations.
 
     Each applied Michelson operation runs in its own SafeStorage cycle over
-    [/evm/world_state]. The cycle copies the traces of the earlier operations
+    [/common_world_state]. The cycle copies the traces of the earlier operations
     in and promotes them back. The call tracer flushes the operation's own
     traces afterwards, on the block mirror. Block-mode tracing therefore
     recovers one trace per transaction, and [trace_block]'s positional

@@ -376,17 +376,17 @@ module Http_trace : sig
 
   (** Path at which the kernel writes the RLP-encoded list of HTTP traces
       for the transaction [transaction_hash] (a hex string, without [0x]
-      prefix). On V70+ kernels it is under
-      [/evm/world_state/__http_trace/traces],
-      and exists only on replay states. A missing key means the transaction
+      prefix). On V72+ kernels it is under
+      [/common_world_state/__http_trace/traces], and exists only on replay
+      states. A missing key means the transaction
       performed no cross-runtime HTTP call. *)
   val for_tx : storage_version:int -> transaction_hash:path -> path
 end
 
 module Trace : sig
   (** Path under which the traces of [transaction_hash] are stored, or the
-      root when [transaction_hash] is [None]. On V70+ kernels the root is
-      [/evm/world_state/trace], and exists only on replay and simulation
+      root when [transaction_hash] is [None]. On V72+ kernels the root is
+      [/common_world_state/trace], and exists only on replay and simulation
       states. *)
   val root_indexed_by_hash :
     storage_version:int -> transaction_hash:path option -> path

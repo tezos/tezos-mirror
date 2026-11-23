@@ -29,7 +29,7 @@ use super::{
     storage::{
         store_return_value, store_struct_log, store_trace_failed, store_trace_gas,
     },
-    HasEvmWorldState,
+    HasCommonWorldState,
 };
 
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
@@ -137,11 +137,11 @@ impl StructLog {
         }
     }
 
-    pub fn store<KS>(&self, evm_world_state: &mut KS, transaction_hash: &Option<B256>)
+    pub fn store<KS>(&self, common_world_state: &mut KS, transaction_hash: &Option<B256>)
     where
         KS: KeySpace,
     {
-        store_struct_log(evm_world_state, self, transaction_hash)
+        store_struct_log(common_world_state, self, transaction_hash)
             .inspect_err(|err| log!(Debug, "Storing call trace failed with: {err:?}"))
             .ok();
     }
@@ -190,7 +190,7 @@ impl StructLogger {
 
     #[instrument(skip_all)]
     pub fn store_outcome<KS>(
-        evm_world_state: &mut KS,
+        common_world_state: &mut KS,
         is_success: bool,
         output: Option<&Bytes>,
         gas_used: u64,
@@ -199,24 +199,24 @@ impl StructLogger {
     where
         KS: KeySpace,
     {
-        store_trace_failed(evm_world_state, is_success, &transaction_hash)?;
-        store_trace_gas(evm_world_state, gas_used, &transaction_hash)?;
+        store_trace_failed(common_world_state, is_success, &transaction_hash)?;
+        store_trace_gas(common_world_state, gas_used, &transaction_hash)?;
         if let Some(return_value) = output {
-            store_return_value(evm_world_state, return_value, &transaction_hash)?;
+            store_return_value(common_world_state, return_value, &transaction_hash)?;
         };
         Ok(())
     }
 
     pub fn finalize<KS>(
         &mut self,
-        evm_world_state: &mut KS,
+        common_world_state: &mut KS,
         result: &ExecutionResult,
     ) -> Result<(), InspectorError>
     where
         KS: KeySpace,
     {
         Self::store_outcome(
-            evm_world_state,
+            common_world_state,
             result.is_success(),
             result.output(),
             result.tx_gas_used(),
@@ -244,7 +244,7 @@ fn to_structured_stack(st: &Stack) -> Vec<B256> {
 
 impl<CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
-    CTX: ContextTr<Db: HasEvmWorldState>,
+    CTX: ContextTr<Db: HasCommonWorldState>,
     INTR: InterpreterTypes<Stack = Stack, ReturnData = ReturnDataImpl, Memory: MemoryTr>,
 {
     fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, _: &mut CTX) {
@@ -327,7 +327,7 @@ where
             let struct_log =
                 struct_log.complete(depth, self.gas_inspector.last_gas_cost(), error);
             struct_log.store(
-                context.db_mut().evm_world_state_mut(),
+                context.db_mut().common_world_state_mut(),
                 &self.transaction_hash,
             );
         }

@@ -592,14 +592,17 @@ where
             Ok(MigrationStatus::Done)
         }
         StorageVersion::V70 => {
-            // The `debug_trace*` and `http_trace*` output lives in the
-            // `/evm/world_state` keyspace and only exists on the throwaway
-            // states of replays and simulations: nothing to move.
+            // The `debug_trace*` and `http_trace*` output only exists on the
+            // throwaway states of replays and simulations: nothing to move.
             Ok(MigrationStatus::Done)
         }
         StorageVersion::V71 => {
             // The new kernel rebuilds a pending block from its blueprint, which stays stored until the block is promoted.
             allow_path_not_found(host.store_delete(&legacy::TMP_BLOCK_IN_PROGRESS_PATH))?;
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V72 => {
+            // Traces only exist on replay and simulation states: nothing to move.
             Ok(MigrationStatus::Done)
         }
     }

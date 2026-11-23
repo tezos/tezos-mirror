@@ -121,3 +121,6 @@ let michelson_runtime_target_sunrise_level_moved_to_base ~storage_version =
 (* V70: trace output in [/evm/world_state]. The tracer input and the HTTP trace
    flag stay in [/base]. *)
 let traces_moved_to_evm_world_state ~storage_version = storage_version >= 70
+
+(* V72: trace output in [/common_world_state]. *)
+let traces_moved_to_common_world_state ~storage_version = storage_version >= 72
