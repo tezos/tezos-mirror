@@ -204,14 +204,15 @@ enum BlueprintParsing<BIP> {
 }
 
 pub fn bip_from_blueprint(
-    evm_world_state: &impl KeySpace,
+    common_world_state: &impl KeySpace,
     chain_config: &TezosXChainConfig,
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
     blueprint: Blueprint,
 ) -> BlockInProgress {
-    let gas_price = chain_config.base_fee_per_gas(evm_world_state, blueprint.timestamp);
+    let gas_price =
+        chain_config.base_fee_per_gas(common_world_state, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
         blueprint,
@@ -278,7 +279,7 @@ where
                     || H256(*tezos_tezlink::block::TezBlock::genesis_block_hash()),
                 );
             let bip: BlockInProgress = bip_from_blueprint(
-                bk.evm_world_state(),
+                bk.common_world_state(),
                 chain_config,
                 next_bip_number,
                 chain_header.hash(),
@@ -338,7 +339,7 @@ where
             included_delayed_transactions,
         } => {
             crate::gas_price::register_block(
-                rk.evm_world_state_mut(),
+                rk.common_world_state_mut(),
                 block_in_progress.cumulative_execution_gas,
                 block_in_progress.timestamp,
                 block_in_progress.queue_length(),
@@ -1167,6 +1168,192 @@ mod tests {
             .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
             .unwrap()
             .is_none());
+    }
+
+    const EVM_BACKLOG_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/fees/backlog");
+    const EVM_BACKLOG_TIMESTAMP_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
+    const COMMON_BACKLOG_PATH: RefPath =
+        RefPath::assert_from(b"/common_world_state/fees/backlog");
+    const COMMON_BACKLOG_TIMESTAMP_PATH: RefPath =
+        RefPath::assert_from(b"/common_world_state/fees/last_timestamp");
+    /// A gas backlog high enough to raise the base fee above its minimum.
+    const HIGH_BACKLOG: u64 = 1_000_000_000;
+    /// The gas the backlog loses per second, `TARGET` of `gas_price`.
+    const GAS_TARGET_PER_SECOND: u64 = 13_500_000;
+
+    /// A finished block reads the gas backlog of `/common_world_state`, and
+    /// promotes the backlog it registers there, not in `/evm/world_state`: one
+    /// second after the last block, the backlog is one second of target lower.
+    #[test]
+    fn finished_block_registers_the_gas_backlog_in_common_world_state() {
+        let mut host = MockKernelHost::default();
+        init_safe_storage_roots(&mut host);
+        host.store_write_all(&COMMON_BACKLOG_PATH, &HIGH_BACKLOG.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&COMMON_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
+            .unwrap();
+        let mut base = load_base(&mut host).unwrap();
+        let mut blueprint = almost_empty_blueprint();
+        blueprint.timestamp = Timestamp::from(1);
+        store_inbox_blueprint(&mut base, blueprint).unwrap();
+        drop(base);
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
+        drop(bk);
+        let chain_config = dummy_tezosx_config(SpecId::default());
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &chain_config,
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("the block is produced");
+
+        let block = block_storage::read_current_etherlink_block(
+            RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
+        )
+        .unwrap()
+        .expect("a current block");
+        assert!(
+            block.base_fee_per_gas > chain_config.get_limits().minimum_base_fee_per_gas
+        );
+        assert_eq!(
+            host.store_read_all(&COMMON_BACKLOG_PATH).unwrap(),
+            (HIGH_BACKLOG - GAS_TARGET_PER_SECOND).to_le_bytes()
+        );
+        assert_eq!(
+            host.store_read_all(&COMMON_BACKLOG_TIMESTAMP_PATH).unwrap(),
+            1u64.to_le_bytes()
+        );
+        for old in [&EVM_BACKLOG_PATH, &EVM_BACKLOG_TIMESTAMP_PATH] {
+            assert!(host.store_has(old).unwrap().is_none());
+        }
+    }
+
+    /// A sub-block run prices its block with the gas backlog of
+    /// `/common_world_state`.
+    #[test]
+    fn sub_block_run_reads_the_gas_backlog_in_common_world_state() {
+        let mut host = sub_block_host();
+        host.store_write_all(&COMMON_BACKLOG_PATH, &HIGH_BACKLOG.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&COMMON_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
+            .unwrap();
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_zero(), 0, 1),
+        )
+        .expect("the transaction runs");
+
+        let bip = mirrored_block_in_progress(&mut host).expect("a block is in progress");
+        assert!(bip.base_fee_per_gas > U256::from(DUMMY_BASE_FEE_PER_GAS));
+    }
+
+    /// A block registered in the mirror updates the backlog `start` copied,
+    /// and its revert leaves the live gas backlog unchanged.
+    #[test]
+    fn reverted_block_leaves_the_gas_backlog_unchanged() {
+        let mut host = MockKernelHost::default();
+        init_safe_storage_roots(&mut host);
+        let live_backlog = 10 * GAS_TARGET_PER_SECOND + 1_000;
+        host.store_write_all(&COMMON_BACKLOG_PATH, &live_backlog.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&COMMON_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
+            .unwrap();
+        let chain_config = dummy_tezosx_config(SpecId::default());
+        let mut safe =
+            SafeStorage::new(&mut host, chain_config.world_states(U256::zero()));
+        safe.start().unwrap();
+
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
+            crate::gas_price::register_block(
+                rk.common_world_state_mut(),
+                U256::from(5_000u64),
+                Timestamp::from(10),
+                0,
+            )
+            .unwrap();
+            assert_eq!(
+                crate::storage::read_backlog(rk.common_world_state()),
+                Some(6_000)
+            );
+            assert_eq!(
+                crate::storage::read_backlog_timestamp(rk.common_world_state()),
+                Some(10)
+            );
+        }
+        safe.revert().unwrap();
+
+        assert_eq!(
+            host.store_read_all(&COMMON_BACKLOG_PATH).unwrap(),
+            live_backlog.to_le_bytes()
+        );
+        assert_eq!(
+            host.store_read_all(&COMMON_BACKLOG_TIMESTAMP_PATH).unwrap(),
+            0u64.to_le_bytes()
+        );
+    }
+
+    /// A gas backlog stored by a V72 kernel gives the next block the same base
+    /// fee per gas once the V73 migration moves it.
+    #[test]
+    fn v73_migration_keeps_the_base_fee_per_gas() {
+        let mut host = MockKernelHost::default();
+        init_safe_storage_roots(&mut host);
+        host.store_write_all(&EVM_BACKLOG_PATH, &HIGH_BACKLOG.to_le_bytes())
+            .unwrap();
+        host.store_write_all(&EVM_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
+            .unwrap();
+        let chain_config = dummy_tezosx_config(SpecId::default());
+        // A V72 kernel reads the backlog from `/evm/world_state`.
+        let v72_base_fee_per_gas = {
+            let bk = load_keyspaces(&mut host).unwrap();
+            bip_from_blueprint(
+                bk.evm_world_state(),
+                &chain_config,
+                U256::zero(),
+                H256::zero(),
+                H256::zero(),
+                almost_empty_blueprint(),
+            )
+            .base_fee_per_gas
+        };
+        assert!(
+            v72_base_fee_per_gas > chain_config.get_limits().minimum_base_fee_per_gas
+        );
+        let mut base = load_base(&mut host).unwrap();
+        store_storage_version(&mut base, StorageVersion::V72).unwrap();
+        store_inbox_blueprint(&mut base, almost_empty_blueprint()).unwrap();
+        drop(base);
+
+        storage_migration(&mut host).unwrap();
+
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let parsed = build_next_bip_from_blueprints(
+            &mut host,
+            &mut bk,
+            &chain_config,
+            U256::zero(),
+            Timestamp::from(0),
+            &EVMBlockHeader::genesis_header(),
+            &mut dummy_configuration(),
+            &None,
+        )
+        .unwrap();
+        let BlueprintParsing::Next(bip) = parsed else {
+            panic!("the blueprint parses into a block in progress")
+        };
+        assert_eq!(bip.base_fee_per_gas, v72_base_fee_per_gas);
     }
 
     /// Pre-populate all safe storage roots so that `SafeStorage::start()`'s

@@ -67,6 +67,18 @@ mod legacy {
     pub const TMP_BLOCK_IN_PROGRESS_PATH: RefPath =
         RefPath::assert_from(b"/tmp/evm/world_state/blocks/in_progress");
 
+    pub const EVM_BACKLOG_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/fees/backlog");
+
+    pub const EVM_BACKLOG_TIMESTAMP_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
+
+    pub const COMMON_BACKLOG_PATH: RefPath =
+        RefPath::assert_from(b"/common_world_state/fees/backlog");
+
+    pub const COMMON_BACKLOG_TIMESTAMP_PATH: RefPath =
+        RefPath::assert_from(b"/common_world_state/fees/last_timestamp");
+
     pub fn migration_read_storage_version(
         host: &impl StorageV1,
     ) -> Result<StorageVersion, Error> {
@@ -603,6 +615,17 @@ where
         }
         StorageVersion::V72 => {
             // Traces only exist on replay and simulation states: nothing to move.
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V73 => {
+            // The gas backlog and its timestamp are block state of both runtimes, mirrored in `/common_world_state`.
+            allow_path_not_found(
+                host.store_move(&legacy::EVM_BACKLOG_PATH, &legacy::COMMON_BACKLOG_PATH),
+            )?;
+            allow_path_not_found(host.store_move(
+                &legacy::EVM_BACKLOG_TIMESTAMP_PATH,
+                &legacy::COMMON_BACKLOG_TIMESTAMP_PATH,
+            ))?;
             Ok(MigrationStatus::Done)
         }
     }
@@ -1210,5 +1233,62 @@ mod tests {
             .unwrap()
             .is_none());
         assert_eq!(host.store_read_all(&live).unwrap(), b"live");
+    }
+
+    /// V73 moves the gas backlog and its timestamp to `/common_world_state`,
+    /// bytes unchanged, and a second run changes nothing.
+    #[test]
+    fn v73_migration_moves_the_gas_backlog() {
+        let mut host = MockKernelHost::default();
+        let backlog = 123_456_789u64.to_le_bytes();
+        let timestamp = 1_700_000_000u64.to_le_bytes();
+        host.store_write_all(&legacy::EVM_BACKLOG_PATH, &backlog)
+            .unwrap();
+        host.store_write_all(&legacy::EVM_BACKLOG_TIMESTAMP_PATH, &timestamp)
+            .unwrap();
+        let config = RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
+        host.store_write_all(&config, b"config").unwrap();
+
+        for _ in 0..2 {
+            let status = migrate_to(&mut host, StorageVersion::V73).unwrap();
+            assert!(matches!(status, MigrationStatus::Done));
+            for old in [
+                &legacy::EVM_BACKLOG_PATH,
+                &legacy::EVM_BACKLOG_TIMESTAMP_PATH,
+            ] {
+                assert!(host.store_has(old).unwrap().is_none());
+            }
+            assert_eq!(
+                host.store_read_all(&legacy::COMMON_BACKLOG_PATH).unwrap(),
+                backlog
+            );
+            assert_eq!(
+                host.store_read_all(&legacy::COMMON_BACKLOG_TIMESTAMP_PATH)
+                    .unwrap(),
+                timestamp
+            );
+            assert_eq!(host.store_read_all(&config).unwrap(), b"config");
+            assert!(host
+                .store_has(&RefPath::assert_from(b"/tmp"))
+                .unwrap()
+                .is_none());
+        }
+    }
+
+    /// V73 is a no-op when no block ever wrote the gas backlog.
+    #[test]
+    fn v73_migration_without_gas_backlog_is_a_no_op() {
+        let mut host = MockKernelHost::default();
+
+        let status = migrate_to(&mut host, StorageVersion::V73).unwrap();
+        assert!(matches!(status, MigrationStatus::Done));
+        for path in [
+            &legacy::EVM_BACKLOG_PATH,
+            &legacy::EVM_BACKLOG_TIMESTAMP_PATH,
+            &legacy::COMMON_BACKLOG_PATH,
+            &legacy::COMMON_BACKLOG_TIMESTAMP_PATH,
+        ] {
+            assert!(host.store_has(path).unwrap().is_none());
+        }
     }
 }
