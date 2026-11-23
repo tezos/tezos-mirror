@@ -2069,7 +2069,9 @@ module State = struct
              evm_execution_gas,
              michelson_execution_gas,
              tezos_nb_operations ) =
-        let* () = apply_evm_events conn ctxt events in
+        (* No intermediate commit: the blueprint is applied on top of the
+           events, and its resulting state is committed right after. *)
+        let* () = apply_evm_events ~commit:false conn ctxt events in
         apply_blueprint_store_unsafe
           ctxt
           conn
@@ -2240,7 +2242,12 @@ module State = struct
         let+ () = on_dropped_delayed_transaction ctxt txn_hash in
         true
 
-  and apply_evm_events ?finalized_level conn (ctxt : t) events =
+  (** [apply_evm_events ?finalized_level ?commit conn ctxt events] applies
+      [events]. Unless [commit] is [false] (default [true]), the resulting
+      state is committed as the state of the current head if any event
+      modified it. *)
+  and apply_evm_events ?finalized_level ?(commit = true) conn (ctxt : t) events
+      =
     let open Lwt_result_syntax in
     let* needs_process =
       match finalized_level with
@@ -2286,9 +2293,10 @@ module State = struct
       in
       (* Avoid an unnecessary {!replace_current_commit} if no event left an
          uncommitted change in the kernel state (e.g. only [Blueprint_applied]
-         events). *)
+         events), or if the caller commits the state itself. *)
       let* () =
-        when_ state_modified (fun () -> replace_current_commit ctxt conn)
+        when_ (commit && state_modified) (fun () ->
+            replace_current_commit ctxt conn)
       in
       let (Qty latest_finalized_number) = ctxt.session.finalized_number in
       Option.iter_es
