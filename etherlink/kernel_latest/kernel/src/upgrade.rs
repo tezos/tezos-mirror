@@ -99,11 +99,12 @@ pub fn store_kernel_upgrade(
         .context("Failed to store kernel upgrade")
 }
 
+/// Reads the pending kernel upgrade from `/base`. Returns `None` when it is
+/// absent, and errors when it does not decode.
 pub fn read_kernel_upgrade(
     base: &impl KeySpace,
-) -> anyhow::Result<Option<KernelUpgrade>> {
+) -> Result<Option<KernelUpgrade>, KeySpaceError> {
     base.read_rlp(&KERNEL_UPGRADE_KEY)
-        .context("Failed to decode kernel upgrade")
 }
 
 pub fn upgrade<Host>(

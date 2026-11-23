@@ -549,7 +549,8 @@ where
     // Read the HTTP-trace replay flag once per block, on the live host.
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
-    let kernel_upgrade = upgrade::read_kernel_upgrade(bk.base())?;
+    let kernel_upgrade = upgrade::read_kernel_upgrade(bk.base())
+        .context("Failed to read the pending kernel upgrade")?;
 
     // If there's a pool address, the coinbase in block constants and miner
     // in blocks is set to the pool address.
