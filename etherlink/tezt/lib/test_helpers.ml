@@ -882,7 +882,7 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
     ?tez_bootstrap_accounts ?set_account_code ?da_fee_per_byte
     ?minimum_base_fee_per_gas ~tags ?patch_config ?fail_on_divergence
     ?websockets ?genesis_timestamp ?(sequencer_keys = [Constant.bootstrap1])
-    ?with_runtimes body =
+    ?with_runtimes ?(extra_uses = []) ?observer_extra_arguments body =
   Test.register
     ~__FILE__
     ~title
@@ -896,11 +896,13 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
     ~uses_client
     ~uses_node:false
     ~uses:
-      [
-        Constant.octez_evm_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ]
+      ([
+         Constant.octez_evm_node;
+         Constant.WASM.evm_kernel;
+         Constant.smart_rollup_installer;
+       ]
+      @ Option.to_list (Option.map Kernel.to_uses kernel)
+      @ extra_uses)
   @@ fun () ->
   let* sandbox =
     init_sequencer_sandbox
@@ -923,6 +925,8 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
       ?patch_config
       ?fail_on_divergence
       ?websockets
+      ?extra_arguments:
+        (Option.map (fun arguments -> arguments ()) observer_extra_arguments)
       ~sc_rollup_node:None
       sandbox
   in

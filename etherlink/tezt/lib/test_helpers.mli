@@ -426,6 +426,8 @@ val register_sandbox_with_observer :
   ?genesis_timestamp:Client.timestamp ->
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?extra_uses:Uses.t list ->
+  ?observer_extra_arguments:(unit -> string list) ->
   (sandbox_test -> unit Lwt.t) ->
   unit
 

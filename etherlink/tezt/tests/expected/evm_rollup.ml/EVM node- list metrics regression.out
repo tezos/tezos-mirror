@@ -56,6 +56,14 @@
 # TYPE octez_evm_node_pruning_history gauge
 # HELP octez_evm_node_queue_size Size of the execution queue of simulations
 # TYPE octez_evm_node_queue_size gauge
+# HELP octez_evm_node_shadow_executed_level Last level applied with the shadow kernel
+# TYPE octez_evm_node_shadow_executed_level gauge
+# HELP octez_evm_node_shadow_execution_seconds Duration of the last execution of the shadow kernel
+# TYPE octez_evm_node_shadow_execution_seconds gauge
+# HELP octez_evm_node_shadow_patch_seconds Duration of the last patching of a state with the shadow kernel, which is done in the main thread of the node
+# TYPE octez_evm_node_shadow_patch_seconds gauge
+# HELP octez_evm_node_shadow_skipped_blocks Number of blocks not applied with the shadow kernel, which was too slow
+# TYPE octez_evm_node_shadow_skipped_blocks counter
 # HELP octez_evm_node_signals_sent Number of DAL import signals sent on the inbox
 # TYPE octez_evm_node_signals_sent counter
 # HELP octez_evm_node_time_processed Time to process the blocks

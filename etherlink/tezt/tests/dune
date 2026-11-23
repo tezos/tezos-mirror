@@ -61,7 +61,8 @@
   cross_runtime
   compact_receipt_encoding
   tezosx_address_translation
-  faults))
+  faults
+  shadow_kernel))
 
 (executable
  (name main)

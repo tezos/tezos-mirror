@@ -89,3 +89,19 @@ module type PERFORMANCE = sig
 end
 
 val performance_metrics : (module PERFORMANCE) Lazy.t
+
+(** [set_shadow_executed_level ~level] registers that the shadow kernel applied
+    the blueprint of level [level] (whether it succeeded or not). *)
+val set_shadow_executed_level : level:Z.t -> unit
+
+(** [inc_shadow_skipped ()] registers that a blueprint was not applied with the
+    shadow kernel, which was too slow. *)
+val inc_shadow_skipped : unit -> unit
+
+(** [set_shadow_execution_time ~seconds] registers the duration of the last
+    execution of the shadow kernel. *)
+val set_shadow_execution_time : seconds:float -> unit
+
+(** [set_shadow_patch_time ~seconds] registers the duration of the last
+    patching of a state with the shadow kernel. *)
+val set_shadow_patch_time : seconds:float -> unit

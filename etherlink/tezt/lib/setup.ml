@@ -158,7 +158,7 @@ let observer_counter =
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     ?(fail_on_divergence = true) ~sc_rollup_node ?rpc_server ?websockets
-    ?history_mode ?tx_queue ?l2_chain evm_node =
+    ?history_mode ?tx_queue ?l2_chain ?extra_arguments evm_node =
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
   incr observer_counter ;
   let patch_config =
@@ -226,6 +226,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
       ~node_setup
       ~mode:observer_mode
       ~end_test_on_failure:true
+      ?extra_arguments
       ()
   in
   let* () = Evm_node.wait_for_blueprint_applied observer 0

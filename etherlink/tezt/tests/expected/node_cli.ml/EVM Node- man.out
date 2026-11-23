@@ -255,7 +255,7 @@ Run commands:
       [--dont-track-rollup-node] [--no-sync]
       [--init-from-snapshot [snapshot url or file path]]
       [--history <archive|full:N|rolling:N|seed:N>] [--gc-time <HH:MM>] [--network <network>]
-      [--sandbox]
+      [--sandbox] [--shadow-kernel <evm_kernel.wasm>]
     Start the EVM node in observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -341,6 +341,9 @@ Run commands:
     --sandbox: Enable sandbox mode
       At startup, the observer node will fetch the public key used by its remote EVM endpoint
       and patch its local state accordingly.
+    --shadow-kernel <evm_kernel.wasm>: Shadow mode: also apply each blueprint with this kernel
+      on the same pre-state, and discard the result. It never makes the node fail. It cannot
+      be used with the preconfirmation stream.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--rpc-max-request-body <BYTES>]

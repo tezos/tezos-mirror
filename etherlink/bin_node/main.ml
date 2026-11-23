@@ -807,6 +807,16 @@ let kernel_arg ?(long = "kernel") ?(placeholder = "evm_kernel.wasm") () =
 let initial_kernel_arg =
   kernel_arg ~long:"initial-kernel" ~placeholder:"evm_installer.wasm" ()
 
+let shadow_kernel_arg =
+  Tezos_clic.arg
+    ~long:"shadow-kernel"
+    ~placeholder:"evm_kernel.wasm"
+    ~doc:
+      "Shadow mode: also apply each blueprint with this kernel on the same \
+       pre-state, and discard the result. It never makes the node fail. It \
+       cannot be used with the preconfirmation stream."
+    Params.kernel_path
+
 let force_arg ~doc = Tezos_clic.switch ~long:"force" ~short:'f' ~doc ()
 
 let preimages_arg =
@@ -1739,7 +1749,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
     ~no_sync ~init_from_snapshot ?history_mode ?gc_time_of_day ~finalized_view
-    ?network ~sandbox config_file =
+    ?network ~sandbox ?shadow_kernel config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1786,6 +1796,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ~no_sync
     ~init_from_snapshot
     ?kernel_path:kernel
+    ?shadow_kernel
     ~config
     ~sandbox
     ()
@@ -3434,7 +3445,7 @@ let sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args13
+  Tezos_clic.args14
     private_rpc_port_arg
     evm_node_endpoint_arg
     preimages_arg
@@ -3451,6 +3462,7 @@ let observer_run_args =
          "If set, additional sanity checks are performed on the node’s startup."
        ())
     sandbox_arg
+    shadow_kernel_arg
 
 let observer_command =
   let open Tezos_clic in
@@ -3496,7 +3508,8 @@ let observer_command =
              history_mode,
              gc_time_of_day,
              network,
-             sandbox ) )
+             sandbox,
+             shadow_kernel ) )
          ()
        ->
       let open Lwt_result_syntax in
@@ -3542,6 +3555,7 @@ let observer_command =
         ~finalized_view
         ?network
         ~sandbox
+        ?shadow_kernel
         config_file)
 
 let export_snapshot
