@@ -228,8 +228,7 @@ where
     // [block::produce].
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
-    let mut safe_host =
-        SafeStorage::new(host, config.world_states(input_data.block_number));
+    let mut safe_host = SafeStorage::new(host, config.world_states());
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
@@ -374,8 +373,7 @@ where
 
     let mut configuration = fetch_configuration(&bk);
     let mut base = bk.into_base();
-    let mut safe_host =
-        SafeStorage::new(host, config.world_states(input_data.block_number));
+    let mut safe_host = SafeStorage::new(host, config.world_states());
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     let block_in_progress = storage::read_block_in_progress(rk.common_world_state())?
