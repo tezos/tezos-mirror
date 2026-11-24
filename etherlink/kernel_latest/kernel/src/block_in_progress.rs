@@ -530,7 +530,7 @@ impl BlockInProgress {
             &self.cumulative_tx_objects,
         )?;
         let base_fee_per_gas = base_fee_per_gas(
-            rk.evm_world_state(),
+            rk.common_world_state(),
             self.timestamp,
             block_constants
                 .evm_runtime_block_constants

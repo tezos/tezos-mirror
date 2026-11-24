@@ -32,9 +32,10 @@
 //! starts or closes.
 //!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
-//! it holds `/base`, `/tez/world_state` and `/evm/world_state`, loaded on the
-//! live host, and [`BlueprintKeyspaces::into_base`] keeps only `/base` once
-//! the execution loads a [`RuntimeKeyspaces`].
+//! it holds `/base`, `/tez/world_state`, `/evm/world_state` and
+//! `/common_world_state`, loaded on the live host, and
+//! [`BlueprintKeyspaces::into_base`] keeps only `/base` once the execution
+//! loads a [`RuntimeKeyspaces`].
 
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -481,7 +482,8 @@ impl<KS> Keyspaces<KS> {
 pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 
 /// The keyspaces the kernel holds from the inbox to the blueprint, before
-/// block production: `/base`, `/tez/world_state` and `/evm/world_state`.
+/// block production: `/base`, `/tez/world_state`, `/evm/world_state` and
+/// `/common_world_state`.
 ///
 /// The handles address the durable roots, not the `/tmp` mirror of a block.
 /// The kernel does not write through the world states while a mirror is
@@ -491,10 +493,12 @@ pub struct BlueprintKeyspaces<KS> {
     base: KS,
     tez_world_state: KS,
     evm_world_state: KS,
+    common_world_state: KS,
 }
 
 impl<KS: KeySpace> BlueprintKeyspaces<KS> {
-    /// Loads `/base`, `/tez/world_state` then `/evm/world_state` from `host`.
+    /// Loads `/base`, `/tez/world_state`, `/evm/world_state` then
+    /// `/common_world_state` from `host`.
     ///
     /// Errors with the loader's error: a keyspace already held elsewhere, or
     /// a name the loader cannot accept.
@@ -504,10 +508,12 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
         let base = host.load_or_create(BASE_KEYSPACE_NAME)?;
         let tez_world_state = host.load_or_create(TEZ_WORLD_STATE_KEYSPACE_NAME)?;
         let evm_world_state = host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME)?;
+        let common_world_state = host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?;
         Ok(Self {
             base,
             tez_world_state,
             evm_world_state,
+            common_world_state,
         })
     }
 
@@ -539,6 +545,11 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
     /// The `/evm/world_state` keyspace, for the writers.
     pub fn evm_world_state_mut(&mut self) -> &mut KS {
         &mut self.evm_world_state
+    }
+
+    /// The `/common_world_state` keyspace.
+    pub fn common_world_state(&self) -> &KS {
+        &self.common_world_state
     }
 
     /// Keeps `/base` and drops the world states, so that a
@@ -628,6 +639,10 @@ mod tests {
         assert_eq!(bk.base().name().to_string(), "/base");
         assert_eq!(bk.tez_world_state().name().to_string(), "/tez/world_state");
         assert_eq!(bk.evm_world_state().name().to_string(), "/evm/world_state");
+        assert_eq!(
+            bk.common_world_state().name().to_string(),
+            "/common_world_state"
+        );
         bk.tez_world_state_mut().set(&PROBE, b"live").unwrap();
         assert_eq!(
             host.store_read_all(&RefPath::assert_from(b"/tez/world_state/probe"))
@@ -641,7 +656,11 @@ mod tests {
             b"live"
         );
         // The world states are still held: they cannot be loaded again.
-        for name in [TEZ_WORLD_STATE_KEYSPACE_NAME, EVM_WORLD_STATE_KEYSPACE_NAME] {
+        for name in [
+            TEZ_WORLD_STATE_KEYSPACE_NAME,
+            EVM_WORLD_STATE_KEYSPACE_NAME,
+            COMMON_WORLD_STATE_KEYSPACE_NAME,
+        ] {
             assert!(matches!(
                 host.load_or_create(name),
                 Err(KeySpaceLoaderError::AlreadyLoaded)

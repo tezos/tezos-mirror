@@ -139,7 +139,9 @@ val michelson_runtime_chain_id : path
 
 val minimum_base_fee_per_gas : path
 
-val backlog : path
+(** Path of the gas backlog: [/common_world_state/fees/backlog] on V73+
+    kernels, [/evm/world_state/fees/backlog] before. *)
+val backlog : storage_version:int -> path
 
 val da_fee_per_byte : path
 

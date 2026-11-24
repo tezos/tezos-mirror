@@ -124,3 +124,6 @@ let traces_moved_to_evm_world_state ~storage_version = storage_version >= 70
 
 (* V72: trace output in [/common_world_state]. *)
 let traces_moved_to_common_world_state ~storage_version = storage_version >= 72
+
+(* V73: gas backlog in [/common_world_state]. *)
+let backlog_moved_to_common_world_state ~storage_version = storage_version >= 73

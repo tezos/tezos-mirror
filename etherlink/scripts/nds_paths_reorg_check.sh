@@ -153,6 +153,12 @@ for new in chain_id evm_version sequencer sequencer_governance \
   if in_list "$new" "$WS_LS"; then ok "present /evm/world_state/$new"; else info "/evm/world_state/$new absent (may be unset on this network)"; fi
 done
 
+hdr "V73 gas backlog: /common_world_state/fees (configuration stays in /evm/world_state/fees)"
+for k in backlog last_timestamp; do
+  gone /evm/world_state/fees/$k
+  if exists /common_world_state/fees/$k; then ok "present /common_world_state/fees/$k"; else info "/common_world_state/fees/$k absent (no block ever registered a backlog)"; fi
+done
+
 hdr "V58 block-index inversion: blocks/indexes (not indexes/blocks)"
 echo "    /evm/world_state/blocks -> $(echo "$BLOCKS_LS" | head -5 | tr '\n' ' ')$([ "$(wc -l <<< "$BLOCKS_LS")" -gt 5 ] && echo '...')"
 if in_list indexes "$BLOCKS_LS"; then ok "present /evm/world_state/blocks/indexes"; else bad "MISSING /evm/world_state/blocks/indexes"; fi
@@ -310,7 +316,7 @@ if [ -n "$TXH" ]; then
 else
   echo "    no non-empty block within 256 of head -- tx-dependent reads will SKIP"
 fi
-func "eth_gasPrice        (fees)" eth_gasPrice '[]'
+func "eth_gasPrice        (common_world_state/fees/backlog V73)" eth_gasPrice '[]'
 func "eth_maxPriorityFeePerGas (fees)" eth_maxPriorityFeePerGas '[]'
 func "eth_coinbase        (sequencer_pool_address)" eth_coinbase '[]'
 func "eth_feeHistory      (fees backlog)" eth_feeHistory "[\"0x4\",\"$BN\",[]]"

@@ -243,7 +243,10 @@ let michelson_runtime_chain_id = TEZ.World_state.make "/chain_id"
 let minimum_base_fee_per_gas =
   EVM.World_state.make "/fees/minimum_base_fee_per_gas"
 
-let backlog = EVM.World_state.make "/fees/backlog"
+let backlog ~storage_version =
+  if Storage_version.backlog_moved_to_common_world_state ~storage_version then
+    Common_world_state.make "/fees/backlog"
+  else EVM.World_state.make "/fees/backlog"
 
 let da_fee_per_byte = EVM.World_state.make "/fees/da_fee_per_byte"
 

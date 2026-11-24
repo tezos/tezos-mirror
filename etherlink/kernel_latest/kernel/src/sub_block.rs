@@ -146,16 +146,16 @@ pub fn read_single_tx_execution_input(
 }
 
 fn block_constants(
-    evm_world_state: &mut impl KeySpace,
+    bk: &mut BlueprintKeyspaces<impl KeySpace>,
     config: &TezosXChainConfig,
     timestamp: Timestamp,
     number: U256,
 ) -> Result<TezosXBlockConstants, Error> {
-    let coinbase = read_sequencer_pool_address(evm_world_state).unwrap_or_default();
-    let da_fee_per_byte = retrieve_da_fee(evm_world_state)?;
+    let coinbase = read_sequencer_pool_address(bk.evm_world_state()).unwrap_or_default();
+    let da_fee_per_byte = retrieve_da_fee(bk.evm_world_state_mut())?;
     let minimum_base_fee_per_gas = config.get_limits().minimum_base_fee_per_gas;
     let base_fee_per_gas =
-        base_fee_per_gas(evm_world_state, timestamp, minimum_base_fee_per_gas);
+        base_fee_per_gas(bk.common_world_state(), timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
     // The fee per byte is read as the amount one byte costs.
@@ -163,7 +163,7 @@ fn block_constants(
         .to_mutez_exact()
         .map_err(|_| Error::InvalidConversion)?;
     let michelson_to_evm_gas_multiplier =
-        read_michelson_to_evm_gas_multiplier(evm_world_state)
+        read_michelson_to_evm_gas_multiplier(bk.evm_world_state())
             .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
@@ -218,7 +218,7 @@ where
 
     let config = fetch_tezosx_configuration(&mut bk)?;
     let block_constants = block_constants(
-        bk.evm_world_state_mut(),
+        &mut bk,
         &config,
         input_data.timestamp,
         input_data.block_number,
@@ -369,7 +369,7 @@ where
 
     let config = fetch_tezosx_configuration(&mut bk)?;
     let block_constants = block_constants(
-        bk.evm_world_state_mut(),
+        &mut bk,
         &config,
         input_data.timestamp,
         input_data.block_number,
@@ -385,7 +385,7 @@ where
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
     crate::gas_price::register_block(
-        rk.evm_world_state_mut(),
+        rk.common_world_state_mut(),
         block_in_progress.cumulative_execution_gas,
         block_in_progress.timestamp,
         block_in_progress.queue_length(),

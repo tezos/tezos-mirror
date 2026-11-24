@@ -468,11 +468,11 @@ impl TezosXChainConfig {
 
     pub fn base_fee_per_gas(
         &self,
-        evm_world_state: &impl KeySpace,
+        common_world_state: &impl KeySpace,
         timestamp: Timestamp,
     ) -> U256 {
         crate::gas_price::base_fee_per_gas(
-            evm_world_state,
+            common_world_state,
             timestamp,
             self.get_limits().minimum_base_fee_per_gas,
         )

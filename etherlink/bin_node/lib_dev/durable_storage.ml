@@ -725,7 +725,10 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               ~index
               block_in_progress_hash;
         }
-  | Backlog -> static_ro (int64_le_ro_codec ~path:Durable_storage_path.backlog)
+  | Backlog ->
+      versioned_ro (fun ~storage_version ->
+          int64_le_ro_codec
+            ~path:(Durable_storage_path.backlog ~storage_version))
   | Minimum_base_fee_per_gas ->
       static_ro
         {
