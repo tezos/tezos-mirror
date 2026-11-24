@@ -36,12 +36,12 @@ module Event = struct
   let section = ["test"; "p2p"; "node"]
 
   let process_timeout =
-    declare_0
+    declare_1
       ~section
       ~name:"process_timeout"
-      ~msg:"Process timeout"
-      ~level:Debug
-      ()
+      ~msg:"Node did not finish within {timeout} seconds, stopping it"
+      ~level:Error
+      ("timeout", Data_encoding.float)
 
   let node_ready =
     declare_1
@@ -211,7 +211,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       let open Lwt_result_syntax in
       let timer ti =
         let*! () = Lwt_unix.sleep ti in
-        Event.(emit process_timeout) ()
+        Event.(emit process_timeout) ti
       in
       (* The [fd] is a socket bind to a point. This point is the one
          that will be stolen by the welcome worker fd. This process
