@@ -9,6 +9,8 @@
 //! [`RuntimeKeyspaces`](crate::runtime_keyspaces::RuntimeKeyspaces) holds one
 //! with its own prefix. Without a prefix, it forwards the accesses unchanged.
 
+use std::fmt::Display;
+
 use tezos_smart_rollup_host::{
     input::Message,
     path::{concat, OwnedPath, Path},
@@ -16,6 +18,7 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
     wasm::WasmHost,
 };
+use tezos_smart_rollup_keyspace::{KeySpaceLoaderError, Name};
 
 use crate::extensions::WithGas;
 
@@ -43,6 +46,17 @@ impl<Host> RawHost<&mut Host> {
 /// limit.
 fn prefixed(prefix: &OwnedPath, path: &impl Path) -> Result<OwnedPath, RuntimeError> {
     concat(prefix, path).map_err(|_| RuntimeError::PathNotFound)
+}
+
+/// The keyspace name `name` under `prefix`.
+///
+/// Errors with [`KeySpaceLoaderError::InvalidName`] if it exceeds the name
+/// size limit.
+pub(crate) fn prefixed_name(
+    prefix: &impl Display,
+    name: &Name,
+) -> Result<Name, KeySpaceLoaderError> {
+    Ok(Name::try_from(format!("{prefix}{name}"))?)
 }
 
 /// Calls `$host.$method` with each path argument under the prefix, if any.

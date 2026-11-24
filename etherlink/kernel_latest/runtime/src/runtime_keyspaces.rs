@@ -42,7 +42,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError, Name};
 
-use crate::raw_host::RawHost;
+use crate::raw_host::{prefixed_name, RawHost};
 use crate::runtime::MockKernelHost;
 use crate::safe_storage::TMP_PATH;
 use crate::snapshot::{Snapshot, SnapshotError};
@@ -292,9 +292,8 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     ) -> Result<(Keyspaces<Host::KeySpace>, OwnedPath), SafeCopyError> {
         let prefix = self.copy_prefix()?;
         let host = &mut *self.host.host;
-        let keyspaces = Keyspaces::load(|name| {
-            host.load_or_create(Name::try_from(format!("{prefix}{name}"))?)
-        })?;
+        let keyspaces =
+            Keyspaces::load(|name| host.load_or_create(prefixed_name(&prefix, &name)?))?;
         Ok((keyspaces, prefix))
     }
 
