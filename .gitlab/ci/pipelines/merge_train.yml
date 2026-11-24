@@ -84,6 +84,7 @@ build-layer1-profiling:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -693,6 +694,7 @@ etherlink.build_tezt:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -1137,6 +1139,7 @@ etherlink.tezt:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - select_tezts
@@ -2352,6 +2355,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -2421,6 +2425,7 @@ oc.build:static-x86_64-linux-released-binaries:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -2491,6 +2496,7 @@ oc.build_kernels:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -2574,7 +2580,7 @@ oc.build_x86_64-exp:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -2668,7 +2674,7 @@ oc.build_x86_64-extra-dev:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -2762,7 +2768,7 @@ oc.build_x86_64-released:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3012,6 +3018,7 @@ oc.integration:compiler-rejections:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3255,6 +3262,7 @@ oc.script:test-gen-genesis:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3396,6 +3404,7 @@ oc.unit:non-proto-arm64:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - oc.build_kernels
@@ -3472,6 +3481,7 @@ oc.unit:non-proto-x86_64:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - oc.build_kernels
@@ -3555,6 +3565,7 @@ oc.unit:other-x86_64:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3636,6 +3647,7 @@ oc.unit:proto-x86_64:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3717,6 +3729,7 @@ oc.unit:protocol_compiles:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -3779,6 +3792,7 @@ oc.unit:webassembly-x86_64:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -4152,6 +4166,7 @@ select_tezts:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []
@@ -4298,6 +4313,7 @@ tezt:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - select_tezts
@@ -4381,6 +4397,7 @@ tezt-static-binaries:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - select_tezts
@@ -4464,6 +4481,7 @@ tezt-time-sensitive:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - select_tezts
