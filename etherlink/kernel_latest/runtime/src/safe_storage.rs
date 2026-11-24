@@ -10,7 +10,7 @@
 //! reverted.
 
 use crate::extensions::WithGas;
-use crate::raw_host::{prefixed_name, RawHost};
+use crate::raw_host::RawHost;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
@@ -196,9 +196,7 @@ impl<Host: KeySpaceLoader> KeySpaceLoader for SafeStorage<&mut Host> {
         &mut self,
         name: Name,
     ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
-        self.raw
-            .host
-            .load_or_create(prefixed_name(&TMP_PATH, &name)?)
+        self.raw.load_or_create(name)
     }
 }
 

@@ -11,7 +11,8 @@
 //! - live: the handle on `root` where reads and writes happen. The snapshot
 //!   borrows it for each call.
 //! - backup: a copy of the live `root` taken at some point, stored in its
-//!   own keyspace `/__savepoint/<index><root>`.
+//!   own keyspace `/__savepoint/<index><root>`, under the prefix of the
+//!   handle that owns the live `root`.
 //! - savepoint: taking such a backup. Backups form a stack, oldest at index
 //!   0. The height is the number of backups held, and the top is the most
 //!   recent one, at index height - 1.
@@ -27,7 +28,7 @@
 //! lends it to the operations that read or restore it. Only the backups are
 //! owned by the [`Snapshot`]. The operations are crate-private:
 //! [`crate::runtime_keyspaces::RuntimeKeyspaces`] is the owner, and lends
-//! its own handle and the loader it came from.
+//! its own handle and its prefixed host as the loader.
 //!
 //! Backups live in durable storage, but the stack bookkeeping (which backups
 //! are held) is kept in memory only, so a snapshot cannot outlive a reboot:
@@ -117,13 +118,12 @@ impl<KS: KeySpace> Snapshot<KS> {
     /// Copy the borrowed `live` root into a new backup on top of the stack.
     /// Overwrites any stale backup of the same name.
     ///
-    /// `loader` must be the loader `live` was loaded from. The backup is
-    /// named after the full name of `live`, mirror prefixes included, and
-    /// loaded through `loader`: a mirroring loader keeps it inside its
-    /// mirror, while another loader would put it elsewhere, e.g. outside the
-    /// `/tmp` that [`crate::safe_storage::SafeStorage::revert`] drops.
-    /// Nothing checks it: both loaders yield the same keyspace type, hence
-    /// the operations are crate-private.
+    /// `loader` must be the prefixed host of the handle that owns `live`.
+    /// The backup is named after the full name of `live`, prefixes included,
+    /// and loaded through `loader`, which keeps it under the prefix of that
+    /// handle: another loader would put it elsewhere, e.g. outside the copy
+    /// that a revert drops. Nothing checks it: every loader yields the same
+    /// keyspace type, hence the operations are crate-private.
     ///
     /// Fails `Loader(AlreadyLoaded)` if another snapshot of `root` holds
     /// the backup keyspace and `loader` tracks the keyspaces it lent (the

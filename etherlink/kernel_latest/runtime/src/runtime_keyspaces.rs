@@ -29,7 +29,8 @@
 //!
 //! `/tmp` is reserved under every handle: a raw access to a path under `/tmp`
 //! lands under the prefix of the next safe copy, which deletes it when it
-//! starts or closes.
+//! starts or closes. `/__savepoint` is reserved too: it holds the backups of
+//! the savepoints of the handle.
 //!
 //! [`BlueprintKeyspaces`] is the handle of the stages before block production:
 //! it holds `/base`, `/tez/world_state`, `/evm/world_state` and
@@ -157,7 +158,8 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     }
 
     /// Opens a savepoint of `/tez/tez_accounts` on its snapshot, loading its
-    /// backup through the host the keyspace was loaded from.
+    /// backup under the prefix of the handle: the backup of a safe copy is
+    /// deleted with the copy.
     ///
     /// Fails with [`SnapshotError::Loader`], and opens no savepoint, when the
     /// host cannot load the backup keyspace, e.g. when its name exceeds the
@@ -173,7 +175,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     // Keep the count with the snapshot, so that nothing has to be in sync.
     pub fn tez_accounts_savepoint(&mut self) -> Result<(), SnapshotError> {
         self.tez_accounts_snapshot
-            .savepoint(self.host.host, &self.keyspaces.tez_accounts)
+            .savepoint(&mut self.host, &self.keyspaces.tez_accounts)
     }
 
     /// Releases the savepoints of `/tez/tez_accounts` above the `height`
@@ -277,12 +279,7 @@ impl<'host, Host: KeySpaceLoader> RuntimeKeyspaces<'host, Host> {
     /// Errors with [`RuntimeError::PathNotFound`] if it exceeds the path size
     /// limit.
     fn copy_prefix(&self) -> Result<OwnedPath, RuntimeError> {
-        match &self.host.prefix {
-            None => Ok(OwnedPath::from(TMP_PATH)),
-            Some(prefix) => {
-                concat(&TMP_PATH, prefix).map_err(|_| RuntimeError::PathNotFound)
-            }
-        }
+        copy_prefix_of(self.host.prefix.as_ref())
     }
 
     /// Loads the keyspaces of a safe copy of `self`, named after
@@ -437,6 +434,31 @@ fn delete_if_present(
         return Ok(());
     }
     host.store_delete(path)
+}
+
+/// The prefix of a safe copy of a handle with `prefix`: `/tmp` and `prefix`.
+///
+/// Errors with [`RuntimeError::PathNotFound`] if it exceeds the path size
+/// limit.
+fn copy_prefix_of(prefix: Option<&OwnedPath>) -> Result<OwnedPath, RuntimeError> {
+    match prefix {
+        None => Ok(OwnedPath::from(TMP_PATH)),
+        Some(prefix) => concat(&TMP_PATH, prefix).map_err(|_| RuntimeError::PathNotFound),
+    }
+}
+
+/// Loads the copy of the keyspace `name` that a safe copy of a handle built
+/// by [`RuntimeKeyspaces::init`] on `host` holds, e.g. to read what a dropped
+/// copy left on a kernel reboot. The keyspace is empty when no copy holds it.
+///
+/// Errors with [`SafeCopyError::Loader`] with the loader's error: a keyspace
+/// already held elsewhere, or a name the loader cannot accept.
+pub fn load_in_safe_copy<Host: KeySpaceLoader>(
+    host: &mut Host,
+    name: Name,
+) -> Result<Host::KeySpace, SafeCopyError> {
+    let prefix = copy_prefix_of(None)?;
+    Ok(host.load_or_create(prefixed_name(&prefix, &name)?)?)
 }
 
 /// The runtime keyspaces.
@@ -1140,13 +1162,21 @@ mod tests {
     }
 
     #[test]
-    fn the_savepoints_of_a_copy_are_named_after_it() {
-        let backup = RefPath::assert_from(b"/__savepoint/0/tmp/tez/tez_accounts/probe");
+    fn the_savepoints_of_a_copy_are_under_tmp() {
+        let backup =
+            RefPath::assert_from(b"/tmp/__savepoint/0/tmp/tez/tez_accounts/probe");
         let mut host = seeded_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut copy = rk.start_safe().unwrap();
         copy.tez_accounts_savepoint().unwrap();
         assert_eq!(copy.host().host.store_read_all(&backup).unwrap(), b"before");
+        assert_eq!(
+            copy.host()
+                .host
+                .store_has(&RefPath::assert_from(b"/__savepoint"))
+                .unwrap(),
+            None
+        );
         copy.tez_accounts_mut().set(&PROBE, b"after").unwrap();
         copy.tez_accounts_release_to(0).unwrap();
         let keyspaces = copy.into_keyspaces().unwrap();
@@ -1156,6 +1186,38 @@ mod tests {
             rk.tez_accounts().get(&PROBE).as_deref(),
             Some(&b"after"[..])
         );
+    }
+
+    #[test]
+    fn the_savepoints_of_a_copy_of_a_copy_are_under_its_prefix() {
+        let backup = RefPath::assert_from(
+            b"/tmp/tmp/__savepoint/0/tmp/tmp/tez/tez_accounts/probe",
+        );
+        let mut host = seeded_host();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        let mut nested = copy.start_safe().unwrap();
+        nested.tez_accounts_savepoint().unwrap();
+        assert_eq!(
+            nested.host().host.store_read_all(&backup).unwrap(),
+            b"before"
+        );
+        nested.tez_accounts_release_to(0).unwrap();
+        assert_eq!(nested.host().host.store_has(&backup).unwrap(), None);
+    }
+
+    #[test]
+    fn load_in_safe_copy_reads_what_a_dropped_copy_left() {
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            copy.common_world_state_mut().set(&PROBE, b"left").unwrap();
+        }
+        let left = load_in_safe_copy(&mut host, COMMON_WORLD_STATE_KEYSPACE_NAME)
+            .unwrap()
+            .get(&PROBE);
+        assert_eq!(left.as_deref(), Some(&b"left"[..]));
     }
 
     #[test]
@@ -1172,7 +1234,7 @@ mod tests {
 
     #[test]
     fn revert_safe_releases_the_savepoints_left_open() {
-        let backups = RefPath::assert_from(b"/__savepoint");
+        let backups = RefPath::assert_from(b"/tmp/__savepoint");
         let mut host = seeded_host();
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -1181,13 +1243,13 @@ mod tests {
             copy.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
             copy.tez_accounts_savepoint().unwrap();
             assert_eq!(copy.tez_accounts_snapshot().len(), 2);
+            assert!(copy.host().host.store_has(&backups).unwrap().is_some());
             copy.revert_safe().unwrap();
             assert_eq!(
                 rk.tez_accounts().get(&PROBE).as_deref(),
                 Some(&b"before"[..])
             );
         }
-        assert_eq!(host.store_has(&backups).unwrap(), None);
         assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
     }
 
@@ -1211,6 +1273,15 @@ mod tests {
             let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
             let mut copy = rk.start_safe().unwrap();
             assert_eq!(names(&copy), TMP_TMP_NAMES);
+            copy.tez_accounts_savepoint().unwrap();
+            let backup = RefPath::assert_from(
+                b"/tmp/tmp/__savepoint/0/tmp/tmp/tez/tez_accounts/probe",
+            );
+            assert_eq!(
+                copy.host().host.host().store_read_all(&backup).unwrap(),
+                b"before"
+            );
+            copy.tez_accounts_release_to(0).unwrap();
             set_probes(&mut copy, b"after");
             let keyspaces = copy.into_keyspaces().unwrap();
             rk.promote_from(keyspaces).unwrap();
