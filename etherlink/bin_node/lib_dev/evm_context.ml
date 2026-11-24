@@ -2069,7 +2069,9 @@ module State = struct
              evm_execution_gas,
              michelson_execution_gas,
              tezos_nb_operations ) =
-        let* () = apply_evm_events conn ctxt events in
+        (* No intermediate commit: the blueprint is applied on top of the
+           events, and its resulting state is committed right after. *)
+        let* () = apply_evm_events ~commit:false conn ctxt events in
         apply_blueprint_store_unsafe
           ctxt
           conn
@@ -2160,6 +2162,9 @@ module State = struct
     in
     (current_block, current_tezos_block)
 
+  (** [apply_evm_event_unsafe ctxt conn event] applies [event] and returns
+      [true] iff it modified [ctxt.session.evm_state] without committing it,
+      that is, iff a {!replace_current_commit} is needed afterwards. *)
   and apply_evm_event_unsafe ctxt conn event =
     let open Lwt_result_syntax in
     let*! () = Evm_events_follower_events.new_event event in
@@ -2189,7 +2194,7 @@ module State = struct
             upgrade
         in
         let*! () = Events.pending_upgrade upgrade in
-        return_unit
+        return_true
     | Sequencer_upgrade_event sequencer_upgrade ->
         ctxt.session.pending_sequencer_upgrade <-
           Some
@@ -2216,21 +2221,33 @@ module State = struct
             sequencer_upgrade
         in
         let*! () = Events.pending_sequencer_upgrade sequencer_upgrade in
-        return_unit
-    | Blueprint_applied event -> blueprint_applied_event ctxt conn event
+        return_true
+    | Blueprint_applied event ->
+        let+ () = blueprint_applied_event ctxt conn event in
+        false
     | New_delayed_transaction delayed_transaction ->
-        on_new_delayed_transaction ctxt ~delayed_transaction
+        let+ () = on_new_delayed_transaction ctxt ~delayed_transaction in
+        true
     | Flush_delayed_inbox flushed_blueprint ->
         let*! () =
           Evm_events_follower_events.flush_delayed_inbox
             ~timestamp:flushed_blueprint.timestamp
             flushed_blueprint.level
         in
-        flush_delayed_inbox ctxt conn flushed_blueprint
+        let+ () = flush_delayed_inbox ctxt conn flushed_blueprint in
+        (* [flush_delayed_inbox] applies a blueprint, which commits the
+           resulting state. *)
+        false
     | Dropped_delayed_transaction txn_hash ->
-        on_dropped_delayed_transaction ctxt txn_hash
+        let+ () = on_dropped_delayed_transaction ctxt txn_hash in
+        true
 
-  and apply_evm_events ?finalized_level conn (ctxt : t) events =
+  (** [apply_evm_events ?finalized_level ?commit conn ctxt events] applies
+      [events]. Unless [commit] is [false] (default [true]), the resulting
+      state is committed as the state of the current head if any event
+      modified it. *)
+  and apply_evm_events ?finalized_level ?(commit = true) conn (ctxt : t) events
+      =
     let open Lwt_result_syntax in
     let* needs_process =
       match finalized_level with
@@ -2264,15 +2281,22 @@ module State = struct
     in
     if needs_process then
       let start_finalized_number = ctxt.session.finalized_number in
+      let* state_modified =
+        List.fold_left_es
+          (fun state_modified event ->
+            let+ event_modified_state =
+              apply_evm_event_unsafe ctxt conn event
+            in
+            state_modified || event_modified_state)
+          false
+          events
+      in
+      (* Avoid an unnecessary {!replace_current_commit} if no event left an
+         uncommitted change in the kernel state (e.g. only [Blueprint_applied]
+         events), or if the caller commits the state itself. *)
       let* () =
-        match events with
-        | [] ->
-            (* Avoid an uncessary {!replace_current_commit} if the list is
-               empty. *)
-            return_unit
-        | events ->
-            let* () = List.iter_es (apply_evm_event_unsafe ctxt conn) events in
-            replace_current_commit ctxt conn
+        when_ (commit && state_modified) (fun () ->
+            replace_current_commit ctxt conn)
       in
       let (Qty latest_finalized_number) = ctxt.session.finalized_number in
       Option.iter_es
