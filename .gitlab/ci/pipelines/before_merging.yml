@@ -1813,7 +1813,7 @@ images.alpine-ci-all.merge:
   - gcp
   rules:
   - changes:
-    - images/ci/**
+    - images/ci/**/*
     - images/common/install-nvm.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
@@ -1888,7 +1888,7 @@ images.alpine-ci-all:amd64:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - images/ci/**
+    - images/ci/**/*
     - images/common/install-nvm.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
@@ -1938,7 +1938,7 @@ images.alpine-ci-all:arm64:
   - gcp_arm64
   rules:
   - changes:
-    - images/ci/**
+    - images/ci/**/*
     - images/common/install-nvm.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh

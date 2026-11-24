@@ -30,6 +30,39 @@ To update the npm dependencies locally on your machine, follow these steps:
 Ensure that `nvm` is installed and properly configured on your machine to set
 up a fully functional Node.js/npm environment.
 
+## Overrides and known advisories
+
+`package.json` carries an `overrides` block: `eth-cli` 2.0.2 (the last release,
+unmaintained) pins `web3@1.2.1` and drags in old transitive dependencies, so the
+advisories reported by `npm audit` (and by the `npm_audit` CI job, see
+`scripts/ci/npm_audit.sh`) can only be fixed by forcing patched versions. Keep
+the overrides within the major version the dependent expects, and after any
+change run the Etherlink tezt suite (`etherlink.daily` pipeline) on the rebuilt
+image: `etherlink/tezt/lib/eth_cli.ml` drives `eth-cli` (`abi:*`, `block:*`,
+`address:balance`, `transaction:*`, `contract:*`).
+
+Advisories that cannot be fixed with `eth-cli` 2.0.2 (as of November 2026):
+
+- `elliptic` (low): no fixed release exists.
+- `request` (moderate, SSRF): unmaintained, no fixed release; it is only reached
+  through `web3-bzz` -> `swarm-js` -> `eth-lib` 0.1 -> `servify` and is never
+  loaded by the `eth-cli` commands used in the tests.
+- `decode-uri-component` (high since GHSA-qr28-fpjm-wq7f, which affects every
+  release up to 0.5.0): the only fixed release, 0.5.1, is ESM-only and breaks
+  the CommonJS `query-string` -> `xhr-request` chain used by `web3`'s HTTP
+  provider. `query-string`, `xhr-request` and `xhr-request-promise` are
+  reported as high for that reason alone.
+- `web3` 1.2.1 and its `web3-core-*` packages (moderate: prototype pollution,
+  credential storage in the browser wallet): overriding the `web3` family to
+  1.10.4 fixes them, but web3 1.10 encodes ABI arguments with the strict
+  ethers v5 coder, which rejects a negative value for a `uint` argument, and
+  the Etherlink test "Check L2 contract call" relies on `set(-1)` being encoded
+  as `uint256` max. Switch the test to the explicit value before bumping.
+
+Everything else reported is a dependency of one of these. Fixing them for good
+means replacing `eth-cli` (for example with `cast` from Foundry, already in the
+image) in `etherlink/tezt/lib/eth_cli.ml`.
+
 ## Notes on NPM and Alpine
 
 - To use a newer version of Node.js (v22), add `npm` from the `3.21` repository
