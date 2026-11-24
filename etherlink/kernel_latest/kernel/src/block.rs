@@ -479,25 +479,19 @@ fn clean_delayed_transactions(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn promote_block<Host>(
-    mut rk: RuntimeKeyspaces<'_, SafeStorage<&mut Host>>,
+/// Records the block that was just promoted as applied, on the live `host`:
+/// drops its blueprint, stores its header and flushes the outbox queue.
+pub fn record_applied_block<Host>(
+    host: &mut Host,
     base: &mut impl KeySpace,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress_provenance: &BlockInProgressProvenance,
     block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost + KeySpaceLoader,
+    Host: StorageV1 + WasmHost,
 {
-    // Drop the block in progress from the mirror so that `promote` does not carry it.
-    if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
-        storage::delete_block_in_progress(rk.common_world_state_mut());
-    }
-    let host = rk.into_host();
-    host.promote()?;
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
 
@@ -505,7 +499,7 @@ where
 
     event.store(base, &config.common)?;
 
-    let written = outbox_queue.flush_queue(host.host_mut());
+    let written = outbox_queue.flush_queue(host);
     // Log to Info only if we flushed messages.
     let level = if written > 0 { Info } else { Debug };
     log!(level, "Flushed outbox queue messages ({} flushed)", written);
@@ -630,7 +624,7 @@ where
             block,
         }) => {
             let timestamp = block.timestamp();
-            // `promote_block` commits these writes with the Tezos genesis block. The
+            // The promotion commits these writes with the Tezos genesis block. The
             // block hashed its state first, so the next Michelson state_root shows them.
             if chain_config.is_tezos_runtime_enabled(processed_blueprint)
                 && crate::storage::read_michelson_runtime_sunrise_level(
@@ -662,7 +656,7 @@ where
                     })?;
             }
             // The key change writes into the block mirror, which
-            // `promote_block` moves to `/evm/world_state`. Its error is
+            // `promote` moves to `/evm/world_state`. Its error is
             // returned after the promotion: a rejected block fails again on
             // each retry.
             let key_change = upgrade::possible_sequencer_key_change(
@@ -670,11 +664,17 @@ where
                 &mut base,
                 timestamp,
             );
-            promote_block(
-                rk,
+            // Drop the block in progress from the mirror so that `promote`
+            // does not carry it.
+            if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
+                storage::delete_block_in_progress(rk.common_world_state_mut());
+            }
+            let safe_host = rk.into_host();
+            safe_host.promote()?;
+            record_applied_block(
+                safe_host.host_mut(),
                 &mut base,
                 &outbox_queue,
-                &block_in_progress_provenance,
                 block.header(),
                 config,
                 included_delayed_transactions,
@@ -1864,7 +1864,7 @@ mod tests {
     }
 
     /// Makes sure that a failure of `init_address_registry` at activation
-    /// fails the block before `promote_block`. The Tezos genesis block, the
+    /// fails the block before its promotion. The Tezos genesis block, the
     /// sunrise level and the alias implementation do not reach the live
     /// storage.
     #[test]
