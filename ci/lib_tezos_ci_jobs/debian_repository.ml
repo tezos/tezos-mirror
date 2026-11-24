@@ -15,6 +15,8 @@ let only_if =
   Cacio.Condition.changes
     [
       "scripts/packaging/build-deb-local.sh";
+      "images/ci/zcash-params/*";
+      "script-inputs/sapling-params.md5";
       "scripts/packaging/Release.conf";
       "scripts/packaging/octez/debian/*";
       "scripts/ci/build-debian-packages_current.sh";

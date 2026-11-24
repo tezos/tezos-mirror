@@ -118,7 +118,8 @@ at least one of those directories contains both files ``sapling-spend.params``
 and ``sapling-output.params``. Here is where you should expect to find those files:
 
 * if you are compiling from source, parameters should be in
-  ``_opam/share/zcash-params`` (you may need to run ``eval $(opam env)``
+  ``_opam/share/zcash-params``, where ``make build-deps`` copies them from
+  ``images/ci/zcash-params`` (you may need to run ``eval $(opam env)``
   before running the node);
 
 * if you used ``fetch-params.sh``, parameters should be in ``~/.zcash-params``.

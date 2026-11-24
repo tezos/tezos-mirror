@@ -3807,7 +3807,6 @@ let octez_sapling =
         octez_stdlib |> open_;
         octez_crypto;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        tezos_sapling_parameters;
         octez_lwt_result_stdlib;
       ]
     ~link_deps:lib_rustzcash
