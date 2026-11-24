@@ -269,3 +269,25 @@ swap activity using:
 
 The log file (``tezos_build_swap.log``) can be reviewed after the build
 completes or following a system reboot.
+
+Failure to set protocol to SSLv3
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When compiling the sources on a system where OpenSSL 4 is installed (e.g. recent ``brew`` installations on MacOS, or rolling-release Linux distributions), ``make`` may fail with errors such as::
+
+  Fatal error: exception Invalid_argument("Failed to set protocol to SSLv3")
+  Raised by primitive operation at Conduit_lwt_unix_ssl.Client.create_ctx ...
+
+This happens because the OCaml ``ssl`` library was built against OpenSSL 4, which no longer supports SSLv3, so that any executable linking it crashes at startup (including the generators run during the build).
+
+To work around this issue, rebuild the ``ssl`` library against OpenSSL 3, and then rebuild Octez.
+For instance, on MacOS with ``brew``:
+
+.. code:: sh
+
+   brew install openssl@3
+   export PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH
+   opam reinstall ssl
+   make
+
+On Linux, install your distribution's OpenSSL 3 development package instead, and point ``PKG_CONFIG_PATH`` to its ``pkgconfig`` directory.
