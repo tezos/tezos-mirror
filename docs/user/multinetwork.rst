@@ -102,8 +102,12 @@ Not all the `predefined test networks <https://teztnets.com>`__ are built in Oct
 For instance, the "protocol testnets" or periodic teztnets are not built in.
 
 In this case, you can pass to the ``--network`` option the corresponding predefined network description file.
-For instance, for running on weeklynet, you may use ``--network https://teztnets.com/weeklynet``.
 Note that this also works for builtin networks, albeit a bit longer.
+For instance, for running on weeklynet, you may use ``--network https://teztnets.com/shadownet``.
+
+The following pre-defined network can be used this way:
+
+- ``bakingnet``: a long-term test network for bakers
 
 .. _network_aliases:
 
@@ -115,7 +119,7 @@ There are also the following *predefined network aliases*:
 
 For instance, for running on the current protocol's testnet, you may:
 
-- use option ``octez-node --network https://teztnets.com/currentnet`` to connect to it
+- use option ``octez-node run --network https://teztnets.com/currentnet`` to connect to it
 - get tokens from its faucet at ``https://faucet.currentnet.teztnets.com/``
 - download snapshots from ``https://snapshots.tzinit.org/currentnet/rolling``
 
