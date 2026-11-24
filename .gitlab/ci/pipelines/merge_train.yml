@@ -3861,6 +3861,8 @@ ocaml-check:
   - . ./scripts/version.sh
   - eval $(opam env)
   - scripts/ci/dune.sh build @check --stop-on-first-error
+  - opam remove --yes ledgerwallet
+  - scripts/ci/dune.sh build @src/lib_signer_backends/unix/check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

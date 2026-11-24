@@ -407,6 +407,21 @@ let job_oc_unit_other_x86_64 =
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
 
+(* [ledgerwallet] is installed in the CI images and is a dependency of
+   [octez-deps], so [@check] below only ever typechecks
+   [src/lib_signer_backends/unix/ledger.available.ml]. Its fallback,
+   [ledger.none.ml], is selected when the package is absent and is typechecked
+   nowhere, so it can stop compiling without anything noticing -- which is what
+   happened when [Client_keys.SIGNER] gained members.
+
+   Removing the package and rechecking only that library costs about a second,
+   so it runs in every pipeline rather than daily.
+
+   The manifest's only other [select] dependency, [utop], needs no such step: it
+   is not installed in the CI images (it is not among the roots that
+   [images/ci/scripts/create_opam_repo.sh] filters the opam repository to), so
+   [devtools/tztop/tztop.vanilla.ml] is already the branch that [@check]
+   compiles. *)
 let job_ocaml_check =
   CI.job
     "ocaml-check"
@@ -429,6 +444,9 @@ let job_ocaml_check =
            the log and to reduce time to merge of other MRs further
            down the merge train. *)
         "scripts/ci/dune.sh build @check --stop-on-first-error";
+        (* Must come last: this removes a package from the switch. *)
+        "opam remove --yes ledgerwallet";
+        "scripts/ci/dune.sh build @src/lib_signer_backends/unix/check";
       ]
 
 let job_test_sdk_rust =
