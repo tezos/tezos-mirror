@@ -89,6 +89,13 @@ let partitioni f l =
   let remove_i l = snd (List.split l) in
   (remove_i l1, remove_i l2)
 
+(* Time after which each node of a test fails, which makes the whole test
+   fail. Both tests normally take a few seconds, but they contain loops that
+   wait or retry forever (see https://gitlab.com/tezos/tezos/-/issues/8295):
+   without this timeout, a run that goes wrong hangs until the CI job times
+   out, and the log does not say which test hung. *)
+let node_timeout = 120.
+
 let rec connect ~timeout connect_handler point =
   let open Lwt_syntax in
   let* () =
@@ -360,6 +367,7 @@ module Triggers = struct
         partitioni (fun i _ -> i < expected_connections) client_points
       in
       Node.detach_nodes
+        ~timeout:node_timeout
         ~prefix
         ~expected_connections:(fun _ -> expected_connections)
         ~max_connections
@@ -492,6 +500,7 @@ module Triggers = struct
       let expected_connections = 36 in
       let min_connections i = if i = 0 then expected_connections / 2 else 0 in
       Node.detach_nodes
+        ~timeout:node_timeout
         ~prefix
         ~expected_connections:(fun _ -> expected_connections)
         ~min_connections
