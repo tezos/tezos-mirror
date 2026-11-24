@@ -40,11 +40,12 @@ depends: [
   "lwt" { with-test & >= "5.7.0" & < "5.9.0" }
 ]
 depopts: [
+  "ledgerwallet"
   "ledgerwallet-tezos"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
-  "ledgerwallet-tezos" { < "0.4.1" }
+  "ledgerwallet" { < "0.4.1" }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

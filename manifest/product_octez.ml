@@ -5102,6 +5102,14 @@ let octez_signer_backends_unix =
         octez_signer_backends |> open_;
         octez_shell_services |> open_;
         uri;
+        (* [ledgerwallet] is a dependency of the vendored [ledgerwallet_tezos].
+           Declaring it here makes it an optional dependency in [.opam] files,
+           so that [make build-deps] installs it.
+           It is optional so that Octez can be built without hidapi, the C
+           library that [ledgerwallet] binds (see commit 4234580e02, "Signer:
+           Ledger backend is optional"). The signer then uses [ledger.none.ml]
+           instead of [ledger.available.ml]. *)
+        optional ledgerwallet;
         select
           ~package:ledgerwallet_tezos
           ~source_if_present:"ledger.available.ml"

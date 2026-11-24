@@ -127,9 +127,10 @@ let () =
     ~default_profile:"octez-deps"
     ~add_to_meta_package:
       [
-        (* [ledgerwallet_tezos] is an optional dependency, but we want
-           [opam install octez] to always install it. *)
-        ledgerwallet_tezos;
+        (* [ledgerwallet] is an optional dependency (of the vendored
+           [ledgerwallet-tezos] library), but we want [opam install octez]
+           to always install it. *)
+        ledgerwallet;
       ]
 
 (* Generate a dune-workspace file at the root of the repo *)

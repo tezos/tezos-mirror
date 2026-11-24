@@ -21,6 +21,9 @@
   octez-shell-libs.signer-backends
   octez-shell-libs.shell-services
   uri
+  (select void_for_linking-ledgerwallet from
+   (ledgerwallet -> void_for_linking-ledgerwallet.empty)
+   (-> void_for_linking-ledgerwallet.empty))
   (select ledger.ml from
    (ledgerwallet-tezos -> ledger.available.ml)
    (-> ledger.none.ml)))
@@ -36,3 +39,5 @@
   -open Tezos_signer_services
   -open Tezos_signer_backends
   -open Tezos_shell_services))
+
+(rule (action (progn (write-file void_for_linking-ledgerwallet.empty ""))))

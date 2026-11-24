@@ -1,0 +1,11 @@
+; Vendored from ocaml-ledger-wallet 0.4.1, see vendors/README.md.
+; [optional]: if [ledgerwallet] is not installed, this library is not built,
+; and the Octez signer is built without Ledger support.
+
+(library
+ (name ledgerwallet_tezos)
+ (public_name ledgerwallet-tezos)
+ (optional)
+ (modules Ledgerwallet_tezos)
+ (synopsis "Ledger wallet library for OCaml: Tezos app")
+ (libraries ledgerwallet))

@@ -349,7 +349,10 @@ let dmap = external_lib "dmap" V.True
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith = external_lib "zarith" V.(at_least "1.13" && less_than "1.14")
 
-let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.1")
+let ledgerwallet = external_lib "ledgerwallet" V.(at_least "0.4.1")
+
+(* Vendored in [vendors/ledgerwallet-tezos], see [vendors/README.md]. *)
+let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos" V.True
 
 let crowbar = external_lib "crowbar" V.(at_least "0.2")
 
