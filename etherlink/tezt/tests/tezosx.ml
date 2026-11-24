@@ -8175,6 +8175,41 @@ let test_run_script_view_unsupported_fields () =
        ~extra_big_maps:{|{Big_map 0 nat nat {}}|}
        client)
 
+(** The kernel's [tezosx_run_code] writes its input and result under
+    [/base/tezosx_run_code] on every call, with no snapshot to revert: the
+    node must run it on a state it discards. *)
+let test_run_script_view_leaves_state_untouched () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"run_script_view leaves the durable state untouched"
+    ~tags:["rpc"; "run_script_view"; "view"; "michelson"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@ fun sandbox ->
+  let source = Constant.bootstrap5 in
+  let* kt1 =
+    sandbox_originate_michelson_contract
+      ~source
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      sandbox
+  in
+  let* client = tezlink_client sandbox in
+  let* sum = Client.run_view ~view:"add" ~contract:kt1 ~input:"10" client in
+  Check.((String.trim sum = "15") string)
+    ~error_msg:"view add: expected %R but got %L" ;
+  let check_absent ~when_ =
+    Lwt_list.iter_s
+      (fun path ->
+        let*@ value = Rpc.state_value sandbox path in
+        Check.((value = None) (option string))
+          ~error_msg:(sf "%s %s: expected %%R but got %%L" path when_) ;
+        unit)
+      ["/base/tezosx_run_code/input"; "/base/tezosx_run_code/result"]
+  in
+  let* () = check_absent ~when_:"after the call" in
+  let*@ _ = Rpc.produce_block sandbox in
+  check_absent ~when_:"after the next block"
+
 (* Regression test for BB-35: a delayed cross-runtime abort must not
    promote unbacked Michelson credit.
 
@@ -9124,4 +9159,5 @@ let () =
   test_run_script_view () ;
   test_run_script_view_crac_step_constants () ;
   test_run_script_view_unsupported_fields () ;
+  test_run_script_view_leaves_state_untouched () ;
   test_run_script_view_enshrined_sender ()
