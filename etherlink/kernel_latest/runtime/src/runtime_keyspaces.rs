@@ -342,8 +342,8 @@ impl<Host: KeySpaceLoader + StorageV1> RuntimeKeyspaces<'_, Host> {
     /// reached until the copy is gone.
     ///
     /// The copy must be closed by [`Self::into_keyspaces`] and
-    /// [`Self::promote_from`], or by [`Self::revert_safe`], once its
-    /// savepoints are released through the journal.
+    /// [`Self::promote_from`], once its savepoints are released through the
+    /// journal, or by [`Self::revert_safe`].
     ///
     /// Errors with [`SafeCopyError::Loader`], writing nothing, or with
     /// [`SafeCopyError::Storage`] if the deletion fails.
@@ -393,18 +393,20 @@ impl<Host: KeySpaceLoader + StorageV1> RuntimeKeyspaces<'_, Host> {
         Ok(())
     }
 
-    /// Clears the keyspaces of a safe copy and deletes what is left under its
-    /// prefix.
+    /// Releases the savepoints of `/tez/tez_accounts` still open, clears the
+    /// keyspaces of a safe copy and deletes what is left under its prefix.
     ///
-    /// Errors with [`SafeCopyError::SavepointsOpen`] if a savepoint of
-    /// `/tez/tez_accounts` is open, or with [`SafeCopyError::NotACopy`] if
-    /// `self` has no prefix: the handle is dropped and nothing is cleared or
-    /// deleted. Errors with [`SafeCopyError::Storage`] if the deletion fails.
+    /// The release bypasses the Michelson journal: the caller must drop or
+    /// reset the journal that counts these savepoints.
+    ///
+    /// Errors with [`SafeCopyError::NotACopy`] if `self` has no prefix: the
+    /// handle is dropped and nothing is released, cleared or deleted. Errors
+    /// with [`SafeCopyError::Storage`] if the deletion fails.
     pub fn revert_safe(mut self) -> Result<(), SafeCopyError> {
-        self.check_no_savepoint()?;
         let Some(prefix) = self.host.prefix.take() else {
             return Err(SafeCopyError::NotACopy);
         };
+        self.tez_accounts_snapshot.commit();
         self.keyspaces.for_each_mut(|copy| copy.clear());
         drop(self.keyspaces);
         delete_if_present(self.host.host, &prefix)?;
@@ -419,7 +421,7 @@ pub enum SafeCopyError {
     Loader(#[from] KeySpaceLoaderError),
     #[error("safe copy storage error: {0}")]
     Storage(#[from] RuntimeError),
-    #[error("safe copy closed with {0} savepoints open")]
+    #[error("safe copy promoted with {0} savepoints open")]
     SavepointsOpen(usize),
     #[error("reverted handle is not a safe copy")]
     NotACopy,
@@ -1158,7 +1160,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_a_copy_with_a_savepoint_open_fails() {
+    fn promoting_a_copy_with_a_savepoint_open_fails() {
         let mut host = seeded_host();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let mut copy = rk.start_safe().unwrap();
@@ -1167,9 +1169,27 @@ mod tests {
             copy.into_keyspaces().err(),
             Some(SafeCopyError::SavepointsOpen(1))
         );
-        let mut copy = rk.resume_safe().unwrap();
-        copy.tez_accounts_savepoint().unwrap();
-        assert_eq!(copy.revert_safe(), Err(SafeCopyError::SavepointsOpen(1)));
+    }
+
+    #[test]
+    fn revert_safe_releases_the_savepoints_left_open() {
+        let backups = RefPath::assert_from(b"/__savepoint");
+        let mut host = seeded_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut copy = rk.start_safe().unwrap();
+            copy.tez_accounts_savepoint().unwrap();
+            copy.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
+            copy.tez_accounts_savepoint().unwrap();
+            assert_eq!(copy.tez_accounts_snapshot().len(), 2);
+            copy.revert_safe().unwrap();
+            assert_eq!(
+                rk.tez_accounts().get(&PROBE).as_deref(),
+                Some(&b"before"[..])
+            );
+        }
+        assert_eq!(host.store_has(&backups).unwrap(), None);
+        assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
     }
 
     #[test]

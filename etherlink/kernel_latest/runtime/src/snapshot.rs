@@ -89,6 +89,8 @@ fn frame_name(root: &Name, index: usize) -> Result<Name, KeySpaceLoaderError> {
 /// were loaded through: an empty backup cannot be told apart from a missing
 /// one in storage (both are an absent path), so restoring a backup dropped
 /// by [`crate::safe_storage::SafeStorage::revert`] clears the live `root`.
+/// [`crate::runtime_keyspaces::RuntimeKeyspaces::revert_safe`] drops the
+/// backups of the safe copy itself.
 pub struct Snapshot<KS: KeySpace> {
     /// Backup stack, oldest first: `backups[i]` is named after index `i`.
     backups: Vec<KS>,
@@ -187,7 +189,8 @@ impl<KS: KeySpace> Snapshot<KS> {
 
     /// Drop every backup still held. The live `root` keeps every write.
     ///
-    /// Nothing does it implicitly: a snapshot dropped without `commit` (e.g.
+    /// Only [`crate::runtime_keyspaces::RuntimeKeyspaces::revert_safe`] does
+    /// it implicitly: a snapshot otherwise dropped without `commit` (e.g.
     /// when a caller leaves early on an error) leaves its backups in storage.
     /// They are harmless, as the next `savepoint` at the same index
     /// overwrites them, but they occupy durable storage until then.
