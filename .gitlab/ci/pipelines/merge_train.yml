@@ -3898,11 +3898,11 @@ release_site.build:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    name: release_page_exe
+    name: release_site_exe
     expire_in: 1 day
     paths:
     - _build/default/release_site/src/version_manager.exe
-    - _build/default/release_site/src/release_page.exe
+    - _build/default/release_site/src/release_site.exe
     when: on_success
 
 release_site.build_tezt:

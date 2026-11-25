@@ -3,7 +3,7 @@
 # Renders the whole release site and publishes it.
 #
 # It renders every component's page at once from the built-in catalog in
-# [release_page.ml], reading each component's published versions.json. It
+# [release_site.ml], reading each component's published versions.json. It
 # renders nothing that has not already been deployed: the assets and
 # versions.json are deployed beforehand by the per-component
 # [deploy_release_page_assets.sh] scripts, so this can be re-run at any time to
@@ -30,8 +30,7 @@ fi
 
 dune build release_site/src/
 
-RELEASE_PAGE="_build/default/release_site/src/release_page.exe"
-VM="_build/default/release_site/src/version_manager.exe"
+RELEASE_SITE="_build/default/release_site/src/release_site.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
 # Render into a fixed workspace directory so the CI job can keep it as an artifact.
@@ -41,18 +40,12 @@ mkdir -p "${site_dir}"
 
 # Render every component's page from its published versions.json into [site_dir],
 # mirroring the site layout (octez at the root, each other component under its
-# own subdirectory).
+# own subdirectory). The octez tab also emits the RSS [feed.xml], driven by the
+# built-in catalog.
 echo "Rendering release site..."
-$RELEASE_PAGE --site \
+$RELEASE_SITE \
   --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path "${BUCKET_PATH:-}" \
   --output-dir "${site_dir}"
-
-# Generate the octez RSS feed from the published octez versions.json.
-echo "Generating RSS feed..."
-$VM --file "${site_dir}/versions.json" download --path "${S3_PATH}"
-$VM --file "${site_dir}/versions.json" generate-rss \
-  --path "${S3_PATH}" --base-url "${URL:-https://${S3_BUCKET}}" \
-  --output "${site_dir}/feed.xml"
 
 # The stylesheet is shared by every page and lives at the root of the site.
 cp "./docs/release_page/style.css" "${site_dir}/style.css"

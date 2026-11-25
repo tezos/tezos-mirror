@@ -45,63 +45,6 @@ let predicate_from_args ?major ?minor ?date ?counter ?version_qualifier () =
   | Some Stable -> Option.is_none version.prerelease
   | Some (Prerelease p) -> version.prerelease = Some p
 
-(* [version_to_rss_items ~component version] converts a [version] of [component]
-   to a list of RSS items. The base release item is always included. An
-   additional item is generated for each packaging revision in
-   [version.revisions], preserving the full revision history in the feed. *)
-let version_to_rss_items ~component version =
-  let version_str = Version.to_string version in
-  (* TODO: Deduce from command line arguments. *)
-  let link = Uri.of_string "https://octez.tezos.com/releases" in
-  let rc_suffix =
-    match version.prerelease with
-    | Some (RC n) -> sf "-rc%d" n
-    | Some (Beta n) -> sf "-beta%d" n
-    | None -> ""
-  in
-  let base_item =
-    let title =
-      sf "%s %s" (String.capitalize_ascii component.name) version_str
-    in
-    let guid = Rss.Guid_name (sf "%s-%s" component.name version_str) in
-    let pubdate = version.publication_date |> Ptime.of_float_s in
-    let desc =
-      sf
-        "%s version %s%s"
-        (String.capitalize_ascii component.name)
-        (number_to_string version.number)
-        rc_suffix
-    in
-    Rss.item ~title ~desc ~guid ~link ?pubdate ()
-  in
-  let revision_items =
-    List.map
-      (fun (rev : revision) ->
-        let title =
-          sf
-            "%s %s (packaging revision %d)"
-            (String.capitalize_ascii component.name)
-            version_str
-            rev.build_number
-        in
-        let guid =
-          Rss.Guid_name
-            (sf "%s-%s-%d" component.name version_str rev.build_number)
-        in
-        let pubdate = Ptime.of_float_s rev.revision_date in
-        let desc =
-          sf
-            "%s version %s%s - packaging revision %d"
-            (String.capitalize_ascii component.name)
-            (number_to_string version.number)
-            rc_suffix
-            rev.build_number
-        in
-        Rss.item ~title ~desc ~guid ~link ?pubdate ())
-      version.revisions
-  in
-  base_item :: revision_items
-
 let () =
   Clap.description
     "Manage versions.json files for Octez release pages. This tool provides \
@@ -393,38 +336,28 @@ let () =
         "Updated build number of %s to %d@."
         (Base.Version.tag ~number ?prerelease ())
         bn
-  | `generate_rss -> (
-      let component_name = "octez" in
+  | `generate_rss ->
       let path = require_path () in
-      let url = Option.value base_url ~default:("https://" ^ path) in
+      let base = Option.value base_url ~default:("https://" ^ path) in
+      (* Keep the feed link absolute even when [--base-url] omits the scheme. *)
+      let url =
+        if
+          String.starts_with ~prefix:"http://" base
+          || String.starts_with ~prefix:"https://" base
+        then base
+        else "https://" ^ base
+      in
       let component =
         {
-          name = component_name;
+          name = "octez";
           path;
           asset_path = (fun _ _ -> "");
           (* [asset_path] is not used for RSS generation *)
           url;
         }
       in
-      let title = String.capitalize_ascii component.name in
-      let desc = sf "%s releases" component.name in
-      (* TODO: Deduce from command line arguments. *)
-      let link = Uri.of_string "https://octez.tezos.com/releases" in
-      let last_build_date = Unix.time () |> Ptime.of_float_s in
       let versions = load_from_file file in
-      let items =
-        List.concat_map
-          (fun version -> version_to_rss_items ~component version)
-          versions
-      in
-      let channel = Rss.channel ~title ~desc ~link ?last_build_date items in
-      let output_file = output in
-      Format.printf "Generating RSS feed...@." ;
-      try
-        Rss.print_file ~indent:2 ~encoding:"UTF-8" output_file channel ;
-        Printf.printf "RSS feed generated: %s\n%!" output_file
-      with Sys_error msg ->
-        failwith (sf "System error writing %s: %s" output_file msg))
+      Release_page.generate_rss ~component ~link_url:url ~versions ~output
   | `download ->
       let path = require_path () in
       Storage.download_file ~path ~remote_file:"versions.json" ~local_file:file

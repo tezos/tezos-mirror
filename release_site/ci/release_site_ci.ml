@@ -22,12 +22,12 @@ let job_build =
     ~image:Images.Base_images.alpine_release_page
     ~artifacts:
       (Gitlab_ci.Util.artifacts
-         ~name:"release_page_exe"
+         ~name:"release_site_exe"
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
          [
            "_build/default/release_site/src/version_manager.exe";
-           "_build/default/release_site/src/release_page.exe";
+           "_build/default/release_site/src/release_site.exe";
          ])
     ~script:["eval $(opam env)"; "make -C release_site/ build"]
 

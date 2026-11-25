@@ -10,6 +10,6 @@ test: build
 test-version-manager: build
 	dune exec tezt/main.exe -- --file test_version_manager.ml
 
-.PHONY: test-generate-release-page
-test-generate-release-page: build
-	dune exec tezt/main.exe -- --file test_generate_release_page.ml
+.PHONY: test-release-site
+test-release-site: build
+	dune exec tezt/main.exe -- --file test_release_site.ml

@@ -24,15 +24,32 @@ let _release_page_base_lib =
     ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib]
 
-let _release_page =
-  private_exe
+let _release_page_lib =
+  private_lib
     "release_page"
     ~opam:""
     ~path:"release_site/src"
     ~release_status:Unreleased
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
-    ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
+    ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
+
+let _release_site =
+  private_exe
+    "release_site"
+    ~opam:""
+    ~path:"release_site/src"
+    ~release_status:Unreleased
+    ~modules:["release_site"]
+    ~profile:"release-tools-deps"
+    ~deps:
+      [
+        unix;
+        clap;
+        tezt_json_lib;
+        _release_page_base_lib |> open_;
+        _release_page_lib;
+      ]
 
 let _version_manager =
   private_exe
@@ -42,7 +59,14 @@ let _version_manager =
     ~release_status:Unreleased
     ~modules:["version_manager"]
     ~profile:"release-tools-deps"
-    ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
+    ~deps:
+      [
+        unix;
+        clap;
+        tezt_json_lib;
+        _release_page_base_lib |> open_;
+        _release_page_lib;
+      ]
 
 let _release_page_tests =
   private_exe
@@ -51,7 +75,7 @@ let _release_page_tests =
     ~opam:""
     ~synopsis:"Tests for the release page tools"
     ~release_status:Unreleased
-    ~modules:["main"; "test_version_manager"; "test_generate_release_page"]
+    ~modules:["main"; "test_version_manager"; "test_release_site"]
     ~profile:"release-tools-deps"
     ~deps:
       [tezt_lib |> open_ |> open_ ~m:"Base"; _release_page_base_lib |> open_]
