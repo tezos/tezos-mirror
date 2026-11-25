@@ -31,8 +31,6 @@ let job_mirror_master =
          "Push the 'master' branch, and only this branch, to %s."
          Tezos_ci_pipelines.public_mirror_project_path)
     ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
-      (* Keep this job minimal: only run the push. *)
-    ~disable_datadog:true
       (* Serialize pushes so that an older pipeline can never run after a
          newer one. *)
     ~resource_group:"public-mirror"

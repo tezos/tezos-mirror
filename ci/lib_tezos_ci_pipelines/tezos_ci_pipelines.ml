@@ -127,7 +127,6 @@ let master_branch_mirror =
         If.(
           Predefined_vars.ci_project_path == str private_project_path
           && push && on_branch "margebot-test")))
-    ~with_datadog_pipeline_trace:false
     ~description:
       (sf
          "Mirrors the 'master' branch of %s to %s.\n\n\
