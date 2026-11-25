@@ -691,7 +691,7 @@ mod tests {
 
     /// The backup of the first savepoint of a safe copy's accounts.
     const COPY_BACKUP: RefPath =
-        RefPath::assert_from(b"/__savepoint/0/tmp/tez/tez_accounts");
+        RefPath::assert_from(b"/tmp/__savepoint/0/tmp/tez/tez_accounts");
 
     /// Runs one application scope whose body opens a savepoint in the safe
     /// copy on top of the one the caller holds, writes to the accounts and

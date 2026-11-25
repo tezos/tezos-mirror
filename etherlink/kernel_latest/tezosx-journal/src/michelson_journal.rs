@@ -111,7 +111,8 @@ impl std::error::Error for DispatchSlotError {}
 ///   per `RuntimeKeyspaces`: the transaction's and, during a Tezos operation
 ///   batch, the one of the batch's safe copy, nested in the transaction's.
 /// - **Savepoint**: one backup on a snapshot's stack, a copy of the accounts
-///   taken at some point (`/__savepoint/<index><root>`). Released, it is
+///   taken at some point (`/__savepoint/<index><root>`, under the prefix of
+///   its `RuntimeKeyspaces`). Released, it is
 ///   deleted and the writes made since are kept. Rolled back, it is moved
 ///   back over the accounts. `savepoints` counts those open across every
 ///   snapshot the journal drives, oldest first.

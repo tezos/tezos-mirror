@@ -36,9 +36,10 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
-    BlueprintKeyspaces, RuntimeKeyspaces, COMMON_WORLD_STATE_KEYSPACE_NAME,
+    load_in_safe_copy, BlueprintKeyspaces, RuntimeKeyspaces,
+    COMMON_WORLD_STATE_KEYSPACE_NAME,
 };
-use tezos_evm_runtime::safe_storage::{SafeStorage, TMP_PATH};
+use tezos_evm_runtime::safe_storage::TMP_PATH;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
@@ -355,8 +356,9 @@ where
     }
 }
 
+/// Reverts the safe copy `rk` the block ran in, then drops its blueprint.
 fn revert_block<Host>(
-    host: &mut SafeStorage<&mut Host>,
+    rk: RuntimeKeyspaces<'_, Host>,
     base: &mut impl KeySpace,
     config: &mut Configuration,
     block_in_progress_provenance: &BlockInProgressProvenance,
@@ -364,7 +366,7 @@ fn revert_block<Host>(
     error: anyhow::Error,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1,
+    Host: StorageV1 + KeySpaceLoader,
 {
     log!(
         Error,
@@ -380,7 +382,7 @@ where
         number,
         error
     );
-    host.revert()?;
+    rk.revert_safe()?;
     drop_invalid_blueprint(base, config)?;
     Ok(())
 }
@@ -479,25 +481,19 @@ fn clean_delayed_transactions(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn promote_block<Host>(
-    mut rk: RuntimeKeyspaces<'_, SafeStorage<&mut Host>>,
+/// Records the block that was just promoted as applied, on the live `host`:
+/// drops its blueprint, stores its header and flushes the outbox queue.
+pub fn record_applied_block<Host>(
+    host: &mut Host,
     base: &mut impl KeySpace,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress_provenance: &BlockInProgressProvenance,
     block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost + KeySpaceLoader,
+    Host: StorageV1 + WasmHost,
 {
-    // Drop the block in progress from the mirror so that `promote` does not carry it.
-    if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
-        storage::delete_block_in_progress(rk.common_world_state_mut());
-    }
-    let host = rk.into_host();
-    host.promote()?;
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
 
@@ -505,7 +501,7 @@ where
 
     event.store(base, &config.common)?;
 
-    let written = outbox_queue.flush_queue(host.host_mut());
+    let written = outbox_queue.flush_queue(host);
     // Log to Info only if we flushed messages.
     let level = if written > 0 { Info } else { Debug };
     log!(level, "Flushed outbox queue messages ({} flushed)", written);
@@ -545,18 +541,15 @@ where
 
     let (next_bip_number, timestamp, chain_header) = get_next_bip_info(bk.base());
 
-    let world_states = chain_config.world_states(next_bip_number);
-
-    let mut safe_host = SafeStorage::new(host, world_states);
-
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let registry = chain_config.init_registry();
 
-    // Check if there's a BIP in storage to resume its execution
-    let stored_block_in_progress = read_block_in_progress(
-        &safe_host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?,
-    )?;
+    // Check if a safe copy holds a BIP to resume its execution
+    let stored_block_in_progress = read_block_in_progress(&load_in_safe_copy(
+        host,
+        COMMON_WORLD_STATE_KEYSPACE_NAME,
+    )?)?;
     let (block_in_progress_provenance, block_in_progress) = match stored_block_in_progress
     {
         Some(block_in_progress) => {
@@ -564,14 +557,14 @@ where
             (BlockInProgressProvenance::Storage, block_in_progress)
         }
         None => {
-            // The upgrade writes through `bk`, which addresses the durable
-            // roots: `safe_host.start` below copies them into the mirror.
+            // The upgrade writes through `bk`, on the live keyspaces:
+            // `start_safe` below copies them.
             upgrade::possible_sequencer_upgrade(&mut bk)?;
 
             log!(Debug, "Creating BIP from Blueprint.");
             // Execute at most one of the stored blueprints
             let block_in_progress = match build_next_bip_from_blueprints(
-                safe_host.host_mut(),
+                host,
                 &mut bk,
                 chain_config,
                 next_bip_number,
@@ -597,21 +590,25 @@ where
                 }
             };
 
-            // We are going to execute a new block, we copy the storage to allow
-            // to revert if the block fails.
-            safe_host.start()?;
             (BlockInProgressProvenance::Blueprint, *block_in_progress)
         }
     };
 
     let processed_blueprint = block_in_progress.number;
 
-    // The block runs on the mirror: only `/base`, which is not mirrored,
-    // stays in hand.
+    // The block runs in a safe copy of the runtime keyspaces: only `/base`,
+    // which is not copied, stays in hand.
     let mut base = bk.into_base();
-    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
+    let mut rk = RuntimeKeyspaces::init(host)?;
+    let mut safe_rk = match block_in_progress_provenance {
+        // The copy the previous run left, which holds the BIP.
+        BlockInProgressProvenance::Storage => rk.resume_safe()?,
+        // We are going to execute a new block, we copy the storage to allow
+        // to revert if the block fails.
+        BlockInProgressProvenance::Blueprint => rk.start_safe()?,
+    };
     let computation_result = compute_bip(
-        &mut rk,
+        &mut safe_rk,
         &registry,
         chain_config,
         &outbox_queue,
@@ -630,16 +627,16 @@ where
             block,
         }) => {
             let timestamp = block.timestamp();
-            // `promote_block` commits these writes with the Tezos genesis block. The
+            // The promotion commits these writes with the Tezos genesis block. The
             // block hashed its state first, so the next Michelson state_root shows them.
             if chain_config.is_tezos_runtime_enabled(processed_blueprint)
                 && crate::storage::read_michelson_runtime_sunrise_level(
-                    rk.tez_world_state(),
+                    safe_rk.tez_world_state(),
                 )
                 .is_none()
             {
                 crate::storage::store_michelson_runtime_sunrise_level(
-                    rk.tez_world_state_mut(),
+                    safe_rk.tez_world_state_mut(),
                     &processed_blueprint,
                 )?;
                 // L2-1526: seed the shared Michelson alias implementation
@@ -648,7 +645,7 @@ where
                 // The write is the same on every replica, and a second run
                 // changes nothing.
                 tezosx_tezos_runtime::alias_forwarder::init_alias_implementation(
-                    rk.tez_accounts_mut(),
+                    safe_rk.tez_accounts_mut(),
                 )
                 .map_err(|e| {
                     anyhow::anyhow!("seeding alias implementation failed: {e}")
@@ -656,25 +653,30 @@ where
                 // Seed the address registry (null address at index 0) when
                 // the runtime activates on a fresh network. Activation is the
                 // only seeding point.
-                tezos_execution::mir_ctx::init_address_registry(rk.tez_accounts_mut())
-                    .map_err(|e| {
-                        anyhow::anyhow!("seeding address registry failed: {e}")
-                    })?;
+                tezos_execution::mir_ctx::init_address_registry(
+                    safe_rk.tez_accounts_mut(),
+                )
+                .map_err(|e| anyhow::anyhow!("seeding address registry failed: {e}"))?;
             }
-            // The key change writes into the block mirror, which
-            // `promote_block` moves to `/evm/world_state`. Its error is
-            // returned after the promotion: a rejected block fails again on
-            // each retry.
+            // The key change writes into the safe copy, which is promoted
+            // below. Its error is returned after the promotion: a rejected
+            // block fails again on each retry.
             let key_change = upgrade::possible_sequencer_key_change(
-                rk.evm_world_state_mut(),
+                safe_rk.evm_world_state_mut(),
                 &mut base,
                 timestamp,
             );
-            promote_block(
-                rk,
+            // Drop the block in progress from the copy so that the promotion
+            // does not carry it.
+            if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
+                storage::delete_block_in_progress(safe_rk.common_world_state_mut());
+            }
+            let safe_keyspaces = safe_rk.into_keyspaces()?;
+            rk.promote_from(safe_keyspaces)?;
+            record_applied_block(
+                rk.into_host(),
                 &mut base,
                 &outbox_queue,
-                &block_in_progress_provenance,
                 block.header(),
                 config,
                 included_delayed_transactions,
@@ -688,13 +690,13 @@ where
             }
         }
         Ok(BlockComputationResult::RebootNeeded) => {
-            // The computation will resume at next reboot, we leave the
-            // storage untouched.
+            // The computation will resume at next reboot from the safe copy,
+            // which is left open.
             Ok(ComputationResult::RebootNeeded)
         }
         Err(err) => {
             revert_block(
-                rk.into_host(),
+                safe_rk,
                 &mut base,
                 config,
                 &block_in_progress_provenance,
@@ -722,6 +724,7 @@ mod tests {
     };
     use crate::block_storage::{self, read_tez_current_block};
     use crate::blueprint::Blueprint;
+    use crate::blueprint_storage::blueprint_exists;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::blueprint_storage::{
         store_current_tez_block_header, store_inbox_blueprint, TezBlockHeader,
@@ -778,6 +781,7 @@ mod tests {
         TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
     use tezos_execution::context;
+    use tezos_smart_rollup_keyspace::Key;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
 
     use tezos_protocol::contract::Contract;
@@ -1033,21 +1037,22 @@ mod tests {
     const PROMOTED_BLOCK_IN_PROGRESS: RefPath =
         RefPath::assert_from(b"/common_world_state/block_in_progress");
 
-    /// The block in progress a run left under the mirror.
-    fn mirrored_block_in_progress(host: &mut MockKernelHost) -> Option<BlockInProgress> {
-        let mut safe = SafeStorage::new(host, vec![]);
-        let common_world_state = safe
-            .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
-            .unwrap();
+    /// The block in progress a run left in its safe copy.
+    fn block_in_progress_in_safe_copy(
+        host: &mut MockKernelHost,
+    ) -> Option<BlockInProgress> {
+        let common_world_state =
+            load_in_safe_copy(host, COMMON_WORLD_STATE_KEYSPACE_NAME).unwrap();
         read_block_in_progress(&common_world_state).unwrap()
     }
 
-    /// Leaves `bip` under the mirror, the way a run that asks for a reboot does.
-    fn mirror_block_in_progress(host: &mut MockKernelHost, bip: &BlockInProgress) {
-        let mut safe = SafeStorage::new(host, vec![]);
-        let mut common_world_state = safe
-            .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
-            .unwrap();
+    /// Leaves `bip` in a safe copy, the way a run that asks for a reboot does.
+    fn leave_block_in_progress_in_safe_copy(
+        host: &mut MockKernelHost,
+        bip: &BlockInProgress,
+    ) {
+        let mut common_world_state =
+            load_in_safe_copy(host, COMMON_WORLD_STATE_KEYSPACE_NAME).unwrap();
         store_block_in_progress(&mut common_world_state, bip).unwrap();
     }
 
@@ -1073,7 +1078,8 @@ mod tests {
         )
         .expect("the second transaction runs");
 
-        let bip = mirrored_block_in_progress(&mut host).expect("a block is in progress");
+        let bip =
+            block_in_progress_in_safe_copy(&mut host).expect("a block is in progress");
         assert_eq!(bip.valid_txs.len(), 2);
         assert_eq!(bip.cumulative_receipts.len(), 2);
     }
@@ -1091,7 +1097,7 @@ mod tests {
             sub_block_input(dummy_eth_transaction_zero(), 0, 1),
         )
         .expect("the first transaction runs");
-        assert!(mirrored_block_in_progress(&mut host).is_some());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_some());
 
         // Holding the mirrored accounts keyspace makes the run's own load
         // fail, the way a storage failure inside the run would.
@@ -1113,11 +1119,11 @@ mod tests {
 
         assert!(result.is_err());
         assert!(host.store_has(&TMP_PATH).unwrap().is_none());
-        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
     }
 
-    /// A resumed block that fails drops the mirror, and the block in progress
-    /// with it.
+    /// A resumed block that fails drops its safe copy, and the block in
+    /// progress with it.
     #[test]
     fn failed_resumed_block_drops_the_block_in_progress() {
         let mut host = MockKernelHost::default();
@@ -1125,7 +1131,7 @@ mod tests {
         store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
         // A number out of the `BlockNumber` range makes the block constants fail.
         let bip = BlockInProgress::new(U256::MAX, VecDeque::new(), U256::zero());
-        mirror_block_in_progress(&mut host, &bip);
+        leave_block_in_progress_in_safe_copy(&mut host, &bip);
         let chain_config = dummy_tezosx_config(SpecId::default());
         let mut config = dummy_configuration();
 
@@ -1133,6 +1139,81 @@ mod tests {
 
         assert!(matches!(produced, Ok(ComputationResult::RebootNeeded)));
         assert!(host.store_has(&TMP_PATH).unwrap().is_none());
+    }
+
+    /// A failed block drops the safe copy it ran in, even with a savepoint
+    /// left open in it, and its blueprint.
+    #[test]
+    fn failed_block_drops_its_safe_copy_and_its_blueprint() {
+        let probe = Key::from_static(b"/probe");
+        let mut host = MockKernelHost::default();
+        let mut base = load_base(&mut host).unwrap();
+        store_blueprints(&mut base, vec![blueprint(vec![])]);
+        let mut config = dummy_configuration();
+        let mut live = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = live.start_safe().unwrap();
+        copy.tez_accounts_mut().set(&probe, b"block").unwrap();
+        copy.tez_accounts_savepoint().unwrap();
+
+        revert_block(
+            copy,
+            &mut base,
+            &mut config,
+            &BlockInProgressProvenance::Blueprint,
+            U256::zero(),
+            anyhow::anyhow!("the block failed"),
+        )
+        .expect("the block is reverted");
+
+        assert!(live.tez_accounts().get(&probe).is_none());
+        assert!(live.host().store_has(&TMP_PATH).unwrap().is_none());
+        assert!(!blueprint_exists(&base, U256::zero()).unwrap());
+    }
+
+    /// Before the Michelson runtime is enabled, block production resumes a
+    /// block the sub-block flow started and keeps the live Michelson state.
+    #[test]
+    fn block_resumed_from_a_sub_block_run_keeps_the_michelson_state() {
+        let probe = Key::from_static(b"/probe");
+        let mut host = sub_block_host();
+        {
+            let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+            rk.tez_accounts_mut().set(&probe, b"accounts").unwrap();
+            rk.tez_world_state_mut().set(&probe, b"state").unwrap();
+        }
+        let chain_config = dummy_tezosx_config(SpecId::default());
+        assert!(!chain_config.is_tezos_runtime_enabled(U256::zero()));
+        let bk = load_keyspaces(&mut host).unwrap();
+        handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_zero(), 0, 0),
+        )
+        .expect("the transaction runs");
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        produce(
+            &mut host,
+            bk,
+            &chain_config,
+            &mut dummy_configuration(),
+            None,
+            None,
+        )
+        .expect("the block is produced");
+
+        let base = load_base(&mut host).unwrap();
+        assert_eq!(read_current_number(&base).unwrap(), U256::zero());
+        drop(base);
+        let rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        assert_eq!(
+            rk.tez_accounts().get(&probe).as_deref(),
+            Some(&b"accounts"[..])
+        );
+        assert_eq!(
+            rk.tez_world_state().get(&probe).as_deref(),
+            Some(&b"state"[..])
+        );
     }
 
     /// `assemble_block` finalizes the block the sub-block runs left in
@@ -1163,7 +1244,7 @@ mod tests {
         .expect("a current block");
         assert_eq!(block.number, U256::one());
         assert_eq!(block.transactions.len(), 2);
-        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
         assert!(host
             .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
             .unwrap()
@@ -1254,12 +1335,13 @@ mod tests {
         )
         .expect("the transaction runs");
 
-        let bip = mirrored_block_in_progress(&mut host).expect("a block is in progress");
+        let bip =
+            block_in_progress_in_safe_copy(&mut host).expect("a block is in progress");
         assert!(bip.base_fee_per_gas > U256::from(DUMMY_BASE_FEE_PER_GAS));
     }
 
-    /// A block registered in the mirror updates the backlog `start` copied,
-    /// and its revert leaves the live gas backlog unchanged.
+    /// A block registered in a safe copy updates the backlog `start_safe`
+    /// copied, and its revert leaves the live gas backlog unchanged.
     #[test]
     fn reverted_block_leaves_the_gas_backlog_unchanged() {
         let mut host = MockKernelHost::default();
@@ -1269,13 +1351,9 @@ mod tests {
             .unwrap();
         host.store_write_all(&COMMON_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
             .unwrap();
-        let chain_config = dummy_tezosx_config(SpecId::default());
-        let mut safe =
-            SafeStorage::new(&mut host, chain_config.world_states(U256::zero()));
-        safe.start().unwrap();
-
         {
-            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
+            let mut live = RuntimeKeyspaces::init(&mut host).unwrap();
+            let mut rk = live.start_safe().unwrap();
             crate::gas_price::register_block(
                 rk.common_world_state_mut(),
                 U256::from(5_000u64),
@@ -1291,8 +1369,8 @@ mod tests {
                 crate::storage::read_backlog_timestamp(rk.common_world_state()),
                 Some(10)
             );
+            rk.revert_safe().unwrap();
         }
-        safe.revert().unwrap();
 
         assert_eq!(
             host.store_read_all(&COMMON_BACKLOG_PATH).unwrap(),
@@ -1864,7 +1942,7 @@ mod tests {
     }
 
     /// Makes sure that a failure of `init_address_registry` at activation
-    /// fails the block before `promote_block`. The Tezos genesis block, the
+    /// fails the block before its promotion. The Tezos genesis block, the
     /// sunrise level and the alias implementation do not reach the live
     /// storage.
     #[test]
@@ -4594,8 +4672,8 @@ mod tests {
             ComputationResult::RebootNeeded
         ));
 
-        // The block is in progress, therefore it is in the safe storage.
-        let bip = mirrored_block_in_progress(&mut host)
+        // The block is in progress, therefore it is in the safe copy.
+        let bip = block_in_progress_in_safe_copy(&mut host)
             .expect("The reboot context should have a block in progress");
 
         assert_eq!(
@@ -4689,8 +4767,8 @@ mod tests {
             ComputationResult::RebootNeeded
         ));
 
-        // The block is in progress, therefore it is in the safe storage.
-        let bip = mirrored_block_in_progress(&mut host)
+        // The block is in progress, therefore it is in the safe copy.
+        let bip = block_in_progress_in_safe_copy(&mut host)
             .expect("The reboot context should have a block in progress");
 
         assert_eq!(
@@ -4723,7 +4801,7 @@ mod tests {
         .unwrap()
         .expect("a current block");
         assert_eq!(block.transactions.len(), 2);
-        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
         assert!(host
             .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
             .unwrap()
@@ -4792,7 +4870,7 @@ mod tests {
         produce_until_finished(&mut host, &chain_config, &mut configuration);
         let base = load_base(&mut host).unwrap();
         assert_eq!(read_current_number(&base).unwrap(), U256::zero());
-        assert!(mirrored_block_in_progress(&mut host).is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
         assert!(host
             .store_has(&PROMOTED_BLOCK_IN_PROGRESS)
             .unwrap()

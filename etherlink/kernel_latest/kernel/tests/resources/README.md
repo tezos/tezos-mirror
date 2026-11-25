@@ -124,7 +124,7 @@ index 5c5086b640e..941b593fb29 100644
      let (next_bip_number, timestamp, chain_header) = get_next_bip_info(bk.base());
 +    drop_blueprint(bk.base_mut(), next_bip_number)?;
 
-     let world_states = chain_config.world_states(next_bip_number);
+     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 ```
 
 Then, similarly to `failed_migration.wasm`

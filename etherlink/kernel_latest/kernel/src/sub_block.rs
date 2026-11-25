@@ -7,10 +7,7 @@ use std::collections::VecDeque;
 
 use crate::{
     apply::WITHDRAWAL_OUTBOX_QUEUE,
-    block::{
-        compute, promote_block, BlockInProgressComputationResult,
-        BlockInProgressProvenance, GAS_LIMIT,
-    },
+    block::{compute, record_applied_block, BlockInProgressComputationResult, GAS_LIMIT},
     block_in_progress::BlockInProgress,
     block_storage,
     chains::{
@@ -231,8 +228,7 @@ where
     // [block::produce].
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
-    let mut safe_host =
-        SafeStorage::new(host, config.world_states(input_data.block_number));
+    let mut safe_host = SafeStorage::new(host, config.world_states());
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
@@ -377,8 +373,7 @@ where
 
     let mut configuration = fetch_configuration(&bk);
     let mut base = bk.into_base();
-    let mut safe_host =
-        SafeStorage::new(host, config.world_states(input_data.block_number));
+    let mut safe_host = SafeStorage::new(host, config.world_states());
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
     let block_in_progress = storage::read_block_in_progress(rk.common_world_state())?
@@ -398,7 +393,7 @@ where
     )?;
 
     let timestamp = block.timestamp();
-    // The key change writes into the block mirror, which `promote_block` moves
+    // The key change writes into the block mirror, which `promote` moves
     // to `/evm/world_state`. Its error is returned after the promotion: a
     // rejected block fails again on each retry.
     let key_change = upgrade::possible_sequencer_key_change(
@@ -406,11 +401,15 @@ where
         &mut base,
         timestamp,
     );
-    promote_block(
-        rk,
+    // Drop the block in progress from the mirror so that `promote` does not
+    // carry it.
+    storage::delete_block_in_progress(rk.common_world_state_mut());
+    let safe_host = rk.into_host();
+    safe_host.promote()?;
+    record_applied_block(
+        safe_host.host_mut(),
         &mut base,
         &outbox_queue,
-        &BlockInProgressProvenance::Storage,
         block.header(),
         &mut configuration,
         delayed_hashes,

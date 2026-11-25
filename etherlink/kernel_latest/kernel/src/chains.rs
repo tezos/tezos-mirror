@@ -55,7 +55,7 @@ use tezos_execution::{
     ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::{OwnedPath, Path, RefPath};
+use tezos_smart_rollup_host::path::{OwnedPath, Path};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
@@ -683,31 +683,20 @@ impl TezosXChainConfig {
         start_simulation_mode(rk, base, registry, &self.spec_id)
     }
 
-    /// The durable roots the failsafe mirror shadows: the world-state roots
-    /// this chain configuration owns at `block_number`.
-    pub fn world_states(&self, block_number: U256) -> Vec<OwnedPath> {
-        self.storage_root_paths(block_number)
-            .iter()
-            .map(OwnedPath::from)
-            .collect()
-    }
-
-    pub fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath<'_>> {
-        if self.is_tezos_runtime_enabled(block_number) {
-            vec![
-                EVM_WORLD_STATE_ROOT_PATH,
-                TEZ_WORLD_STATE_ROOT_PATH,
-                TEZ_ACCOUNTS_ROOT_PATH,
-                ETH_ACCOUNTS_ROOT_PATH,
-                COMMON_WORLD_STATE_ROOT_PATH,
-            ]
-        } else {
-            vec![
-                EVM_WORLD_STATE_ROOT_PATH,
-                ETH_ACCOUNTS_ROOT_PATH,
-                COMMON_WORLD_STATE_ROOT_PATH,
-            ]
-        }
+    /// The durable roots the failsafe mirror shadows: those of the runtime
+    /// keyspaces, which a safe copy of a `RuntimeKeyspaces` holds too, so
+    /// that block production can resume a block the mirror started.
+    pub fn world_states(&self) -> Vec<OwnedPath> {
+        [
+            EVM_WORLD_STATE_ROOT_PATH,
+            TEZ_WORLD_STATE_ROOT_PATH,
+            TEZ_ACCOUNTS_ROOT_PATH,
+            ETH_ACCOUNTS_ROOT_PATH,
+            COMMON_WORLD_STATE_ROOT_PATH,
+        ]
+        .iter()
+        .map(OwnedPath::from)
+        .collect()
     }
 }
 

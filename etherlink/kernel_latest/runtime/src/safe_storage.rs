@@ -196,8 +196,7 @@ impl<Host: KeySpaceLoader> KeySpaceLoader for SafeStorage<&mut Host> {
         &mut self,
         name: Name,
     ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
-        let tmp_name = Name::try_from(format!("{TMP}{name}"))?;
-        self.raw.host.load_or_create(tmp_name)
+        self.raw.load_or_create(name)
     }
 }
 

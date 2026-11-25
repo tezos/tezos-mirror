@@ -2,12 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! [`RawHost`]: a host whose durable accesses are put under a prefix.
+//! [`RawHost`]: a host whose durable accesses and keyspace loads are put
+//! under a prefix.
 //!
 //! A [`SafeStorage`](crate::safe_storage::SafeStorage) wraps one with prefix
 //! `/tmp`, and a
 //! [`RuntimeKeyspaces`](crate::runtime_keyspaces::RuntimeKeyspaces) holds one
 //! with its own prefix. Without a prefix, it forwards the accesses unchanged.
+
+use std::fmt::Display;
 
 use tezos_smart_rollup_host::{
     input::Message,
@@ -16,6 +19,7 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
     wasm::WasmHost,
 };
+use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 
 use crate::extensions::WithGas;
 
@@ -43,6 +47,17 @@ impl<Host> RawHost<&mut Host> {
 /// limit.
 fn prefixed(prefix: &OwnedPath, path: &impl Path) -> Result<OwnedPath, RuntimeError> {
     concat(prefix, path).map_err(|_| RuntimeError::PathNotFound)
+}
+
+/// The keyspace name `name` under `prefix`.
+///
+/// Errors with [`KeySpaceLoaderError::InvalidName`] if it exceeds the name
+/// size limit.
+pub(crate) fn prefixed_name(
+    prefix: &impl Display,
+    name: &Name,
+) -> Result<Name, KeySpaceLoaderError> {
+    Ok(Name::try_from(format!("{prefix}{name}"))?)
 }
 
 /// Calls `$host.$method` with each path argument under the prefix, if any.
@@ -142,6 +157,21 @@ impl<Host: StorageV1> StorageV1 for RawHost<&mut Host> {
     }
 }
 
+/// Loads the keyspace `name` under the prefix, if any.
+impl<Host: KeySpaceLoader> KeySpaceLoader for RawHost<&mut Host> {
+    type KeySpace = Host::KeySpace;
+
+    fn load_or_create(
+        &mut self,
+        name: Name,
+    ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
+        match &self.prefix {
+            None => self.host.load_or_create(name),
+            Some(prefix) => self.host.load_or_create(prefixed_name(prefix, &name)?),
+        }
+    }
+}
+
 impl<Host: WithGas> WithGas for RawHost<&mut Host> {
     fn add_execution_gas(&mut self, gas: u64) {
         self.host.add_execution_gas(gas)
@@ -198,8 +228,9 @@ impl<Host: WasmHost> WasmHost for RawHost<&mut Host> {
 mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
-    use crate::safe_storage::{SafeStorage, TMP};
+    use crate::safe_storage::{SafeStorage, TMP, TMP_PATH};
     use tezos_smart_rollup_host::path::PATH_MAX_SIZE;
+    use tezos_smart_rollup_keyspace::{KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
 
     /// A path of `len` bytes.
     fn path_of_len(len: usize) -> OwnedPath {
@@ -225,5 +256,23 @@ mod tests {
         safe.store_write_all(&path, b"v").unwrap();
         let path = path_of_len(PATH_MAX_SIZE);
         assert_eq!(safe.store_read_all(&path), Err(RuntimeError::PathNotFound));
+    }
+
+    #[test]
+    fn load_or_create_rejects_a_name_the_prefix_overflows() {
+        let mut host = MockKernelHost::default();
+        // The longest name the loader takes on its own.
+        let name = Name::try_from(format!("/{}", "a".repeat(MAX_KEYSPACE_NAME_SIZE - 1)))
+            .unwrap();
+        let mut raw = RawHost {
+            host: &mut host,
+            prefix: Some(OwnedPath::from(TMP_PATH)),
+        };
+        assert!(matches!(
+            raw.load_or_create(name.clone()),
+            Err(KeySpaceLoaderError::InvalidName(NameError::NameTooLong))
+        ));
+        raw.prefix = None;
+        assert_eq!(raw.load_or_create(name.clone()).unwrap().name(), &name);
     }
 }
