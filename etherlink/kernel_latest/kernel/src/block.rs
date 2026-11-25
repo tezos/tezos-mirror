@@ -23,7 +23,7 @@ use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::migration::allow_path_not_found;
 use crate::storage;
-use crate::storage::{inside_stage_one, read_block_in_progress};
+use crate::storage::{inside_stage_one, read_block_in_progress_in_safe_copy};
 use crate::transaction::TransactionContent;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
@@ -36,8 +36,7 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
-    load_in_safe_copy, BlueprintKeyspaces, RuntimeKeyspaces,
-    COMMON_WORLD_STATE_KEYSPACE_NAME,
+    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError,
 };
 use tezos_evm_runtime::safe_storage::TMP_PATH;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -356,6 +355,23 @@ where
     }
 }
 
+/// The safe copy of `rk` a block runs in.
+pub fn block_safe_copy<'a, Host>(
+    rk: &'a mut RuntimeKeyspaces<'_, Host>,
+    block_in_progress_provenance: &BlockInProgressProvenance,
+) -> Result<RuntimeKeyspaces<'a, Host>, SafeCopyError>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    match block_in_progress_provenance {
+        // The copy the previous run left, which holds the BIP.
+        BlockInProgressProvenance::Storage => rk.resume_safe(),
+        // We are going to execute a new block, we copy the storage to allow
+        // to revert if the block fails.
+        BlockInProgressProvenance::Blueprint => rk.start_safe(),
+    }
+}
+
 /// Reverts the safe copy `rk` the block ran in, then drops its blueprint.
 fn revert_block<Host>(
     rk: RuntimeKeyspaces<'_, Host>,
@@ -546,10 +562,7 @@ where
     let registry = chain_config.init_registry();
 
     // Check if a safe copy holds a BIP to resume its execution
-    let stored_block_in_progress = read_block_in_progress(&load_in_safe_copy(
-        host,
-        COMMON_WORLD_STATE_KEYSPACE_NAME,
-    )?)?;
+    let stored_block_in_progress = read_block_in_progress_in_safe_copy(host)?;
     let (block_in_progress_provenance, block_in_progress) = match stored_block_in_progress
     {
         Some(block_in_progress) => {
@@ -600,13 +613,7 @@ where
     // which is not copied, stays in hand.
     let mut base = bk.into_base();
     let mut rk = RuntimeKeyspaces::init(host)?;
-    let mut safe_rk = match block_in_progress_provenance {
-        // The copy the previous run left, which holds the BIP.
-        BlockInProgressProvenance::Storage => rk.resume_safe()?,
-        // We are going to execute a new block, we copy the storage to allow
-        // to revert if the block fails.
-        BlockInProgressProvenance::Blueprint => rk.start_safe()?,
-    };
+    let mut safe_rk = block_safe_copy(&mut rk, &block_in_progress_provenance)?;
     let computation_result = compute_bip(
         &mut safe_rk,
         &registry,
@@ -743,8 +750,7 @@ mod tests {
     use crate::retrieve_block_fees;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{
-        read_block_in_progress, store_block_in_progress, store_storage_version,
-        StorageVersion,
+        store_block_in_progress, store_storage_version, StorageVersion,
     };
     use crate::sub_block::{
         assemble_block, handle_run_transaction, AssembleBlockInput,
@@ -777,6 +783,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
+        load_in_safe_copy, COMMON_WORLD_STATE_KEYSPACE_NAME,
         COMMON_WORLD_STATE_ROOT_PATH, EVM_WORLD_STATE_KEYSPACE_NAME,
         TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
@@ -1041,9 +1048,7 @@ mod tests {
     fn block_in_progress_in_safe_copy(
         host: &mut MockKernelHost,
     ) -> Option<BlockInProgress> {
-        let common_world_state =
-            load_in_safe_copy(host, COMMON_WORLD_STATE_KEYSPACE_NAME).unwrap();
-        read_block_in_progress(&common_world_state).unwrap()
+        read_block_in_progress_in_safe_copy(host).unwrap()
     }
 
     /// Leaves `bip` in a safe copy, the way a run that asks for a reboot does.
