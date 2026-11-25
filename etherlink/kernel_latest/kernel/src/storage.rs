@@ -315,7 +315,7 @@ pub fn store_simulation_http_traces(
 /// Returns whether per-transaction HTTP trace capture is enabled for the
 /// current kernel run. Called exactly once per block, at the top of
 /// `block::produce` (and of `sub_block::handle_run_transaction`) before
-/// any `SafeStorage` wrapping, so the lookup is a single host call per
+/// the safe copy starts, so the lookup is a single host call per
 /// block and the result is passed down through the apply chain as a
 /// plain boolean. A missing key (the common case) returns `false`; an
 /// error is treated as "flag absent" so a transient storage failure

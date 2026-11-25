@@ -508,9 +508,9 @@ pub type MockRuntimeKeyspaces<'host> = RuntimeKeyspaces<'host, MockKernelHost>;
 /// block production: `/base`, `/tez/world_state`, `/evm/world_state` and
 /// `/common_world_state`.
 ///
-/// The handles address the durable roots, not the `/tmp` mirror of a block.
-/// The kernel does not write through the world states while a mirror is
-/// active, and calls [`Self::into_base`] before it loads a
+/// The handles address the durable roots, not the safe copy of a block.
+/// The kernel does not write through the world states while a safe copy is
+/// open, and calls [`Self::into_base`] before it loads a
 /// [`RuntimeKeyspaces`] on the same host, which holds the world states again.
 pub struct BlueprintKeyspaces<KS> {
     base: KS,

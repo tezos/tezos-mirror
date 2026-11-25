@@ -43,19 +43,13 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 use tezosx_types::{michelson_gas_to_mutez, Mutez, Wei};
 
-use tezos_evm_runtime::{
-    extensions::WithGas,
-    runtime_keyspaces::{
-        RuntimeKeyspaces, COMMON_WORLD_STATE_ROOT_PATH, ETH_ACCOUNTS_ROOT_PATH,
-        EVM_WORLD_STATE_ROOT_PATH, TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
-    },
-};
+use tezos_evm_runtime::{extensions::WithGas, runtime_keyspaces::RuntimeKeyspaces};
 use tezos_execution::{
     get_required_da_fees, mir_ctx::BlockCtx, DaFeesError, FeeRefundConfig,
     ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
-use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader};
@@ -681,22 +675,6 @@ impl TezosXChainConfig {
         Host: StorageV1 + KeySpaceLoader + WasmHost,
     {
         start_simulation_mode(rk, base, registry, &self.spec_id)
-    }
-
-    /// The durable roots the failsafe mirror shadows: those of the runtime
-    /// keyspaces, which a safe copy of a `RuntimeKeyspaces` holds too, so
-    /// that block production can resume a block the mirror started.
-    pub fn world_states(&self) -> Vec<OwnedPath> {
-        [
-            EVM_WORLD_STATE_ROOT_PATH,
-            TEZ_WORLD_STATE_ROOT_PATH,
-            TEZ_ACCOUNTS_ROOT_PATH,
-            ETH_ACCOUNTS_ROOT_PATH,
-            COMMON_WORLD_STATE_ROOT_PATH,
-        ]
-        .iter()
-        .map(OwnedPath::from)
-        .collect()
     }
 }
 
