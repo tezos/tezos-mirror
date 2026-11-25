@@ -105,6 +105,46 @@ let master_branch =
        on each push, typically resulting from the merge of a merge request, to \
        the 'master' branch on tezos/tezos."
 
+(* Private project where development happens.
+   Its 'master' branch is mirrored to [public_mirror_project_path]. *)
+let private_project_path = "nomadic-labs/private/tezos"
+
+let public_mirror_project_path = "tezos/tezos"
+
+(* This pipeline is restricted to [private_project_path] with [CI_PROJECT_PATH]
+   and not [CI_PROJECT_NAMESPACE], because other projects in the [nomadic-labs]
+   namespace, such as [nomadic-labs/tezos], must not run it.
+
+   It must not run in [public_mirror_project_path]: this configuration is
+   mirrored there, and the mirror would push to itself.
+   On [public_mirror_project_path], pushes to 'master', which are made by this
+   pipeline, create [master_branch] pipelines instead. *)
+let master_branch_mirror =
+  Cacio.new_global_pipeline
+    "master_branch_mirror"
+    (lazy
+      Rules.(
+        If.(
+          Predefined_vars.ci_project_path == str private_project_path
+          && push && on_branch "margebot-test")))
+    ~with_datadog_pipeline_trace:false
+    ~description:
+      (sf
+         "Mirrors the 'master' branch of %s to %s.\n\n\
+          Development happens in the private project %s. This pipeline is \
+          created automatically by GitLab on each push, typically resulting \
+          from the merge of a merge request, to its 'master' branch. It pushes \
+          this branch, and only this branch (no other branch, no tag), to the \
+          public project %s. This push in turn creates a 'master_branch' \
+          pipeline in %s.\n\n\
+          This replaces a GitLab push mirror, because push mirrors always push \
+          all tags."
+         private_project_path
+         public_mirror_project_path
+         private_project_path
+         public_mirror_project_path
+         public_mirror_project_path)
+
 (* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
 let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/"
 

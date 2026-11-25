@@ -1,0 +1,27 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- publish
+
+public_mirror:master:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-d74b3dc3
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script: []
+  script:
+  - git -c credential.helper= -c credential.helper='!f() { test "$1" = get && echo
+    username=mirror && echo "password=${PUBLIC_MIRROR_TOKEN}"; }; f' push --no-follow-tags
+    https://mirror@gitlab.com/tezos/tezos.git "${CI_COMMIT_SHA}:refs/heads/margebot-test"
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script: []
+  variables:
+    GIT_DEPTH: "0"
+    GIT_STRATEGY: clone
+  resource_group: public-mirror
+  retry: 0

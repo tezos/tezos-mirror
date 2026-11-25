@@ -28,6 +28,19 @@ val register_merge_request_jobs : (Cacio.trigger * Cacio.job) list -> unit
 (** Publishes artifacts (docs, static binaries) from master on each merge. *)
 val master_branch : Cacio.global_pipeline
 
+(** Path of the private project where development happens:
+    [nomadic-labs/private/tezos]. *)
+val private_project_path : string
+
+(** Path of the public project that mirrors the 'master' branch of
+    {!private_project_path}: [tezos/tezos]. *)
+val public_mirror_project_path : string
+
+(** Mirrors 'master' from {!private_project_path} to {!public_mirror_project_path}.
+
+    Only runs in {!private_project_path}. *)
+val master_branch_mirror : Cacio.global_pipeline
+
 (** Updates the 'latest' tag of the Octez Docker distribution on Docker Hub. *)
 val octez_latest_release : Cacio.global_pipeline
 
