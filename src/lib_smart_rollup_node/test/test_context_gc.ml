@@ -52,6 +52,10 @@ let test_gc data_dir =
   let*! b = Context.checkout index hash3 in
   assert (Option.is_some b) ;
 
+  (* TODO: https://linear.app/tezos/issue/TZX-191
+     Finalise the NDS states of earlier tests here, the forked GC child hangs
+     if it finalises them. *)
+  Gc.full_major () ;
   let*! () = Context.gc index hash3 in
   let*! () = Context.wait_gc_completion index in
   assert (Context.is_gc_finished index) ;
