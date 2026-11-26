@@ -105,6 +105,24 @@ let master_branch =
        on each push, typically resulting from the merge of a merge request, to \
        the 'master' branch on tezos/tezos."
 
+let nl_tezos_path = "nomadic-labs/private/tezos"
+
+let tezos_tezos_path = "tezos/tezos"
+
+let master_branch_mirror =
+  Cacio.new_global_pipeline
+    "master_branch_mirror"
+    (lazy
+      Rules.(
+        If.(
+          Predefined_vars.ci_project_path == str nl_tezos_path
+          && push && on_branch "margebot-test")))
+    ~description:
+      (sf
+         "Mirrors the 'master' branch of %s to %s on each push."
+         nl_tezos_path
+         tezos_tezos_path)
+
 (* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
 let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/"
 
