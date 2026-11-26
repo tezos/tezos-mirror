@@ -115,6 +115,11 @@ workflow:
     variables:
       PIPELINE_TYPE: master_branch
     when: always
+  - if: $CI_PROJECT_PATH == "nomadic-labs/private/tezos" && $CI_PIPELINE_SOURCE ==
+      "push" && $CI_COMMIT_BRANCH == "margebot-test"
+    variables:
+      PIPELINE_TYPE: master_branch_mirror
+    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
     variables:
@@ -406,6 +411,11 @@ include:
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == $CI_DEFAULT_BRANCH
+    when: always
+- local: .gitlab/ci/pipelines/master_branch_mirror.yml
+  rules:
+  - if: $CI_PROJECT_PATH == "nomadic-labs/private/tezos" && $CI_PIPELINE_SOURCE ==
+      "push" && $CI_COMMIT_BRANCH == "margebot-test"
     when: always
 - local: .gitlab/ci/pipelines/octez_latest_release.yml
   rules:

@@ -28,6 +28,13 @@ val register_merge_request_jobs : (Cacio.trigger * Cacio.job) list -> unit
 (** Publishes artifacts (docs, static binaries) from master on each merge. *)
 val master_branch : Cacio.global_pipeline
 
+val nl_tezos_path : string
+
+val tezos_tezos_path : string
+
+(** Mirrors 'master' from {!nl_tezos_path} to {!tezos_tezos_path}. *)
+val master_branch_mirror : Cacio.global_pipeline
+
 (** Updates the 'latest' tag of the Octez Docker distribution on Docker Hub. *)
 val octez_latest_release : Cacio.global_pipeline
 
