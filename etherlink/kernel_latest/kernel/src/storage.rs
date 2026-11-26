@@ -21,6 +21,9 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::keyspace::KeySpaceExtU256;
 use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime_keyspaces::{
+    load_in_safe_copy, COMMON_WORLD_STATE_KEYSPACE_NAME,
+};
 use tezos_indexable_storage::KeyspaceIndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -30,7 +33,9 @@ use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_keyspace::extensions::{
     KeySpaceExtBin, KeySpaceExtNum, KeySpaceExtRlp,
 };
-use tezos_smart_rollup_keyspace::{Key, KeyError, KeySpace, KeySpaceError};
+use tezos_smart_rollup_keyspace::{
+    Key, KeyError, KeySpace, KeySpaceError, KeySpaceLoader,
+};
 use tezos_storage::keyspace::KeySpaceExtB58;
 use tezosx_types::StorageReadErrorKind;
 use tezosx_types::Wei;
@@ -310,7 +315,7 @@ pub fn store_simulation_http_traces(
 /// Returns whether per-transaction HTTP trace capture is enabled for the
 /// current kernel run. Called exactly once per block, at the top of
 /// `block::produce` (and of `sub_block::handle_run_transaction`) before
-/// any `SafeStorage` wrapping, so the lookup is a single host call per
+/// the safe copy starts, so the lookup is a single host call per
 /// block and the result is passed down through the apply chain as a
 /// plain boolean. A missing key (the common case) returns `false`; an
 /// error is treated as "flag absent" so a transient storage failure
@@ -928,6 +933,15 @@ pub fn read_block_in_progress(
                 err.into(),
             )
         })
+}
+
+/// Reads the block in progress that a safe copy of the runtime keyspaces of
+/// `host` holds, e.g. the copy a previous run left open.
+pub fn read_block_in_progress_in_safe_copy(
+    host: &mut impl KeySpaceLoader,
+) -> anyhow::Result<Option<BlockInProgress>> {
+    let common_world_state = load_in_safe_copy(host, COMMON_WORLD_STATE_KEYSPACE_NAME)?;
+    Ok(read_block_in_progress(&common_world_state)?)
 }
 
 pub fn delete_block_in_progress(common_world_state: &mut impl KeySpace) {

@@ -7,7 +7,10 @@ use std::collections::VecDeque;
 
 use crate::{
     apply::WITHDRAWAL_OUTBOX_QUEUE,
-    block::{compute, record_applied_block, BlockInProgressComputationResult, GAS_LIMIT},
+    block::{
+        block_safe_copy, compute, record_applied_block, BlockInProgressComputationResult,
+        BlockInProgressProvenance, GAS_LIMIT,
+    },
     block_in_progress::BlockInProgress,
     block_storage,
     chains::{
@@ -34,10 +37,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
-use tezos_evm_runtime::runtime_keyspaces::{
-    BlueprintKeyspaces, RuntimeKeyspaces, COMMON_WORLD_STATE_KEYSPACE_NAME,
-};
-use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -55,6 +55,13 @@ const SINGLE_TX_EXECUTION_INPUT_KEY: Key =
 // durable path `/base/instant_confirmation/assemble_block/input`.
 const ASSEMBLE_BLOCK_INPUT_KEY: Key =
     Key::from_static(b"/instant_confirmation/assemble_block/input");
+
+/// Why a sub-block run fails outside the execution of its transaction.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SubBlockError {
+    #[error("Critical: Reboot is required by a single transaction execution")]
+    RebootNeeded,
+}
 
 pub struct SingleTxExecutionInput {
     pub tx: TezosXTransaction,
@@ -224,119 +231,126 @@ where
         != H160::default())
     .then_some(block_constants.evm_runtime_block_constants.coinbase);
 
-    // Read the HTTP-trace replay flag once, on the live host, as in
+    // Read the HTTP-trace replay flag once, in `/base`, as in
     // [block::produce].
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
-    let mut safe_host = SafeStorage::new(host, config.world_states());
     let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
-    let stored_block_in_progress = storage::read_block_in_progress(
-        &safe_host.load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)?,
-    )?;
-    let mut block_in_progress = match stored_block_in_progress {
-        Some(bip) => {
-            if input_data.block_number != bip.number {
-                return Err(anyhow!(
-                    "Critical: Transaction and BIP block numbers do not match"
-                ));
+    let stored_block_in_progress = storage::read_block_in_progress_in_safe_copy(host)?;
+    let (block_in_progress_provenance, mut block_in_progress) =
+        match stored_block_in_progress {
+            Some(bip) => {
+                if input_data.block_number != bip.number {
+                    return Err(anyhow!(
+                        "Critical: Transaction and BIP block numbers do not match"
+                    ));
+                }
+                (BlockInProgressProvenance::Storage, bip)
             }
-            bip
-        }
-        None => {
-            safe_host.start()?;
-
-            BlockInProgress {
-                number: input_data.block_number,
-                tx_queue: VecDeque::new(),
-                valid_txs: Vec::new(),
-                delayed_txs: Vec::new(),
-                cumulative_gas: U256::zero(),
-                index: 0,
-                michelson_index: 0,
-                ethereum_parent_hash: match block_storage::read_current_hash(
-                    bk.evm_world_state(),
-                ) {
-                    Some(hash) => hash,
-                    None => H256::zero(),
+            // A block that this run starts has no copy to resume, as one
+            // that comes from a blueprint.
+            None => (
+                BlockInProgressProvenance::Blueprint,
+                BlockInProgress {
+                    number: input_data.block_number,
+                    tx_queue: VecDeque::new(),
+                    valid_txs: Vec::new(),
+                    delayed_txs: Vec::new(),
+                    cumulative_gas: U256::zero(),
+                    index: 0,
+                    michelson_index: 0,
+                    ethereum_parent_hash: match block_storage::read_current_hash(
+                        bk.evm_world_state(),
+                    ) {
+                        Some(hash) => hash,
+                        None => H256::zero(),
+                    },
+                    logs_bloom: Bloom::default(),
+                    logs_offset: 0,
+                    timestamp: input_data.timestamp,
+                    base_fee_per_gas: block_constants
+                        .evm_runtime_block_constants
+                        .base_fee_per_gas(),
+                    cumulative_execution_gas: U256::zero(),
+                    cumulative_receipts: Vec::new(),
+                    cumulative_tx_objects: Vec::new(),
+                    cumulative_tezos_operation_receipts: OperationsWithReceipts::default(
+                    ),
+                    tezos_parent_hash: match block_storage::read_current_hash(
+                        bk.tez_world_state(),
+                    ) {
+                        Some(hash) => hash,
+                        None => {
+                            H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
+                        }
+                    },
                 },
-                logs_bloom: Bloom::default(),
-                logs_offset: 0,
-                timestamp: input_data.timestamp,
-                base_fee_per_gas: block_constants
-                    .evm_runtime_block_constants
-                    .base_fee_per_gas(),
-                cumulative_execution_gas: U256::zero(),
-                cumulative_receipts: Vec::new(),
-                cumulative_tx_objects: Vec::new(),
-                cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
-                tezos_parent_hash: match block_storage::read_current_hash(
-                    bk.tez_world_state(),
-                ) {
-                    Some(hash) => hash,
-                    None => H256(*tezos_tezlink::block::TezBlock::genesis_block_hash()),
-                },
-            }
-        }
-    };
+            ),
+        };
 
     block_in_progress.repush_tx(input_data.tx);
 
     drop(bk);
-    let computed = RuntimeKeyspaces::init(&mut safe_host)
-        .map_err(anyhow::Error::from)
-        .and_then(|mut rk| {
-            let computed = compute(
-                &mut rk,
-                &registry,
-                &config,
-                &outbox_queue,
-                &mut block_in_progress,
-                &block_constants,
-                sequencer_pool_address,
-                None,
-                http_trace_enabled,
+    let mut rk = RuntimeKeyspaces::init(host)?;
+    let mut safe_rk = block_safe_copy(&mut rk, &block_in_progress_provenance)?;
+    let computed = compute(
+        &mut safe_rk,
+        &registry,
+        &config,
+        &outbox_queue,
+        &mut block_in_progress,
+        &block_constants,
+        sequencer_pool_address,
+        None,
+        http_trace_enabled,
+    )
+    .and_then(|computed| {
+        if let BlockInProgressComputationResult::Finished { .. } = computed {
+            block_storage::store_current_transactions_receipts(
+                safe_rk.evm_world_state_mut(),
+                &block_in_progress.cumulative_receipts,
             )?;
+        }
 
-            if let BlockInProgressComputationResult::Finished { .. } = computed {
-                block_storage::store_current_transactions_receipts(
-                    rk.evm_world_state_mut(),
-                    &block_in_progress.cumulative_receipts,
-                )?;
-            }
-
-            Ok(computed)
-        });
+        Ok(computed)
+    });
 
     let err = match computed {
         Ok(BlockInProgressComputationResult::Finished { .. }) => {
-            let stored = safe_host
-                .load_or_create(COMMON_WORLD_STATE_KEYSPACE_NAME)
-                .map_err(anyhow::Error::from)
-                .and_then(|mut common_world_state| {
-                    Ok(storage::store_block_in_progress(
-                        &mut common_world_state,
-                        &block_in_progress,
-                    )?)
-                });
+            let stored = storage::store_block_in_progress(
+                safe_rk.common_world_state_mut(),
+                &block_in_progress,
+            );
             match stored {
                 Ok(()) => return Ok(()),
-                Err(err) => err,
+                Err(err) => err.into(),
             }
         }
         Ok(BlockInProgressComputationResult::RebootNeeded) => {
-            anyhow!("Critical: Reboot is required by a single transaction execution")
+            SubBlockError::RebootNeeded.into()
         }
         Err(err) => err,
     };
 
-    // A run that fails, in the transaction or in a write after it, takes the
-    // whole block with it: the mirror holds the block in progress and every
-    // write since its start.
-    match safe_host.revert() {
-        Ok(()) => Err(err),
-        Err(why) => Err(err.context(why)),
+    Err(revert_failed_block(safe_rk, err))
+}
+
+/// Reverts the safe copy `safe_rk` of a block that failed with `err`. A run
+/// that fails, in the transaction or in a write after it, takes the whole
+/// block with it: the safe copy holds the block in progress and every write
+/// since its start.
+fn revert_failed_block<Host>(
+    safe_rk: RuntimeKeyspaces<'_, Host>,
+    err: anyhow::Error,
+) -> anyhow::Error
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    match safe_rk.revert_safe() {
+        Ok(()) => err,
+        Err(why) => err.context(why),
     }
 }
 
@@ -373,41 +387,47 @@ where
 
     let mut configuration = fetch_configuration(&bk);
     let mut base = bk.into_base();
-    let mut safe_host = SafeStorage::new(host, config.world_states());
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let mut rk = RuntimeKeyspaces::init(&mut safe_host)?;
-    let block_in_progress = storage::read_block_in_progress(rk.common_world_state())?
+    let block_in_progress = storage::read_block_in_progress_in_safe_copy(host)?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
+    let mut rk = RuntimeKeyspaces::init(host)?;
+    let mut safe_rk = rk.resume_safe()?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
-    crate::gas_price::register_block(
-        rk.common_world_state_mut(),
+    let number = block_in_progress.number;
+    let finalized = crate::gas_price::register_block(
+        safe_rk.common_world_state_mut(),
         block_in_progress.cumulative_execution_gas,
         block_in_progress.timestamp,
         block_in_progress.queue_length(),
-    )?;
-    let number = block_in_progress.number;
-    let block = block_in_progress.finalize_and_store(
-        &mut rk,
-        &block_constants,
-        config.is_tezos_runtime_enabled(number),
-    )?;
+    )
+    .and_then(|()| {
+        block_in_progress.finalize_and_store(
+            &mut safe_rk,
+            &block_constants,
+            config.is_tezos_runtime_enabled(number),
+        )
+    });
+    let block = match finalized {
+        Ok(block) => block,
+        Err(err) => return Err(revert_failed_block(safe_rk, err)),
+    };
 
     let timestamp = block.timestamp();
-    // The key change writes into the block mirror, which `promote` moves
-    // to `/evm/world_state`. Its error is returned after the promotion: a
-    // rejected block fails again on each retry.
+    // The key change writes into the safe copy, which is promoted below. Its
+    // error is returned after the promotion: a rejected block fails again on
+    // each retry.
     let key_change = upgrade::possible_sequencer_key_change(
-        rk.evm_world_state_mut(),
+        safe_rk.evm_world_state_mut(),
         &mut base,
         timestamp,
     );
-    // Drop the block in progress from the mirror so that `promote` does not
+    // Drop the block in progress from the copy so that the promotion does not
     // carry it.
-    storage::delete_block_in_progress(rk.common_world_state_mut());
-    let safe_host = rk.into_host();
-    safe_host.promote()?;
+    storage::delete_block_in_progress(safe_rk.common_world_state_mut());
+    let safe_keyspaces = safe_rk.into_keyspaces()?;
+    rk.promote_from(safe_keyspaces)?;
     record_applied_block(
-        safe_host.host_mut(),
+        rk.into_host(),
         &mut base,
         &outbox_queue,
         block.header(),

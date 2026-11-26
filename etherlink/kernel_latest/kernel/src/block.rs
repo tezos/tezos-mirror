@@ -23,7 +23,7 @@ use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::migration::allow_path_not_found;
 use crate::storage;
-use crate::storage::{inside_stage_one, read_block_in_progress};
+use crate::storage::{inside_stage_one, read_block_in_progress_in_safe_copy};
 use crate::transaction::TransactionContent;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
@@ -36,8 +36,7 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
-    load_in_safe_copy, BlueprintKeyspaces, RuntimeKeyspaces,
-    COMMON_WORLD_STATE_KEYSPACE_NAME,
+    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError,
 };
 use tezos_evm_runtime::safe_storage::TMP_PATH;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -356,6 +355,23 @@ where
     }
 }
 
+/// The safe copy of `rk` a block runs in.
+pub fn block_safe_copy<'a, Host>(
+    rk: &'a mut RuntimeKeyspaces<'_, Host>,
+    block_in_progress_provenance: &BlockInProgressProvenance,
+) -> Result<RuntimeKeyspaces<'a, Host>, SafeCopyError>
+where
+    Host: StorageV1 + KeySpaceLoader,
+{
+    match block_in_progress_provenance {
+        // The copy the previous run left, which holds the BIP.
+        BlockInProgressProvenance::Storage => rk.resume_safe(),
+        // We are going to execute a new block, we copy the storage to allow
+        // to revert if the block fails.
+        BlockInProgressProvenance::Blueprint => rk.start_safe(),
+    }
+}
+
 /// Reverts the safe copy `rk` the block ran in, then drops its blueprint.
 fn revert_block<Host>(
     rk: RuntimeKeyspaces<'_, Host>,
@@ -546,10 +562,7 @@ where
     let registry = chain_config.init_registry();
 
     // Check if a safe copy holds a BIP to resume its execution
-    let stored_block_in_progress = read_block_in_progress(&load_in_safe_copy(
-        host,
-        COMMON_WORLD_STATE_KEYSPACE_NAME,
-    )?)?;
+    let stored_block_in_progress = read_block_in_progress_in_safe_copy(host)?;
     let (block_in_progress_provenance, block_in_progress) = match stored_block_in_progress
     {
         Some(block_in_progress) => {
@@ -600,13 +613,7 @@ where
     // which is not copied, stays in hand.
     let mut base = bk.into_base();
     let mut rk = RuntimeKeyspaces::init(host)?;
-    let mut safe_rk = match block_in_progress_provenance {
-        // The copy the previous run left, which holds the BIP.
-        BlockInProgressProvenance::Storage => rk.resume_safe()?,
-        // We are going to execute a new block, we copy the storage to allow
-        // to revert if the block fails.
-        BlockInProgressProvenance::Blueprint => rk.start_safe()?,
-    };
+    let mut safe_rk = block_safe_copy(&mut rk, &block_in_progress_provenance)?;
     let computation_result = compute_bip(
         &mut safe_rk,
         &registry,
@@ -743,12 +750,11 @@ mod tests {
     use crate::retrieve_block_fees;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{
-        read_block_in_progress, store_block_in_progress, store_storage_version,
-        StorageVersion,
+        store_block_in_progress, store_storage_version, StorageVersion,
     };
     use crate::sub_block::{
         assemble_block, handle_run_transaction, AssembleBlockInput,
-        SingleTxExecutionInput,
+        SingleTxExecutionInput, SubBlockError,
     };
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
@@ -777,12 +783,14 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
+        load_in_safe_copy, COMMON_WORLD_STATE_KEYSPACE_NAME,
         COMMON_WORLD_STATE_ROOT_PATH, EVM_WORLD_STATE_KEYSPACE_NAME,
         TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
     };
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::Key;
     use tezos_smart_rollup_keyspace::KeySpaceLoader;
+    use tezos_smart_rollup_keyspace::KeySpaceLoaderError;
 
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
@@ -1009,10 +1017,9 @@ mod tests {
         }
     }
 
-    /// A host with the mirrored roots seeded and the dummy caller funded.
+    /// A host with the runtime roots seeded and the dummy caller funded.
     fn sub_block_host() -> MockKernelHost {
         let mut host = MockKernelHost::default();
-        init_safe_storage_roots(&mut host);
         let mut evm_world_state =
             host.load_or_create(EVM_WORLD_STATE_KEYSPACE_NAME).unwrap();
         store_block_fees(&mut evm_world_state, &dummy_block_fees()).unwrap();
@@ -1041,9 +1048,7 @@ mod tests {
     fn block_in_progress_in_safe_copy(
         host: &mut MockKernelHost,
     ) -> Option<BlockInProgress> {
-        let common_world_state =
-            load_in_safe_copy(host, COMMON_WORLD_STATE_KEYSPACE_NAME).unwrap();
-        read_block_in_progress(&common_world_state).unwrap()
+        read_block_in_progress_in_safe_copy(host).unwrap()
     }
 
     /// Leaves `bip` in a safe copy, the way a run that asks for a reboot does.
@@ -1060,7 +1065,7 @@ mod tests {
     /// progress the first one left under `/tmp`, so the two transactions
     /// end up in one block.
     #[test]
-    fn sub_block_run_resumes_the_mirrored_block() {
+    fn sub_block_run_resumes_the_block_in_progress() {
         let mut host = sub_block_host();
 
         let bk = load_keyspaces(&mut host).unwrap();
@@ -1085,7 +1090,7 @@ mod tests {
     }
 
     /// A sub-block run that fails once a block is in progress drops the
-    /// whole mirror: the block in progress and its transactions are gone.
+    /// whole safe copy: the block in progress and its transactions are gone.
     #[test]
     fn failed_sub_block_run_drops_the_block_in_progress() {
         let mut host = sub_block_host();
@@ -1099,8 +1104,40 @@ mod tests {
         .expect("the first transaction runs");
         assert!(block_in_progress_in_safe_copy(&mut host).is_some());
 
-        // Holding the mirrored accounts keyspace makes the run's own load
-        // fail, the way a storage failure inside the run would.
+        // With no gas left in the kernel run, the transaction asks for a
+        // reboot, which fails a sub-block run.
+        host.add_execution_gas(u64::MAX / 2);
+        let bk = load_keyspaces(&mut host).unwrap();
+        let result = handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_one(), 1, 1),
+        );
+
+        let error = result.expect_err("the run asks for a reboot");
+        assert_eq!(
+            error.downcast_ref::<SubBlockError>(),
+            Some(&SubBlockError::RebootNeeded)
+        );
+        assert!(host.store_has(&TMP_PATH).unwrap().is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
+    }
+
+    /// A sub-block run that fails to load its safe copy writes nothing: the
+    /// block in progress keeps the transactions of the previous runs.
+    #[test]
+    fn sub_block_run_failing_to_load_keeps_the_block_in_progress() {
+        let mut host = sub_block_host();
+
+        let bk = load_keyspaces(&mut host).unwrap();
+        handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_zero(), 0, 1),
+        )
+        .expect("the first transaction runs");
+
+        // Holding a keyspace of the copy makes the run fail to resume it.
         let held = host
             .load_or_create(
                 tezos_smart_rollup_keyspace::Name::try_from(
@@ -1117,7 +1154,80 @@ mod tests {
         );
         drop(held);
 
-        assert!(result.is_err());
+        let error = result.expect_err("the run fails to resume its safe copy");
+        assert_eq!(
+            error.downcast_ref::<SafeCopyError>(),
+            Some(&SafeCopyError::Loader(KeySpaceLoaderError::AlreadyLoaded))
+        );
+        let bip =
+            block_in_progress_in_safe_copy(&mut host).expect("a block is in progress");
+        assert_eq!(bip.valid_txs.len(), 1);
+        assert_eq!(bip.cumulative_receipts.len(), 1);
+
+        // The next run resumes the block in progress.
+        let bk = load_keyspaces(&mut host).unwrap();
+        handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_one(), 1, 1),
+        )
+        .expect("the second transaction runs");
+        let bip =
+            block_in_progress_in_safe_copy(&mut host).expect("a block is in progress");
+        assert_eq!(bip.valid_txs.len(), 2);
+        assert_eq!(bip.cumulative_receipts.len(), 2);
+    }
+
+    /// A sub-block run that fails to start its safe copy starts no block.
+    #[test]
+    fn sub_block_run_failing_to_start_leaves_no_block_in_progress() {
+        let mut host = sub_block_host();
+
+        // Holding a keyspace of the copy makes the run fail to start it.
+        let held = host
+            .load_or_create(
+                tezos_smart_rollup_keyspace::Name::try_from(
+                    "/tmp/evm/eth_accounts".to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let bk = load_keyspaces(&mut host).unwrap();
+        let result = handle_run_transaction(
+            &mut host,
+            bk,
+            sub_block_input(dummy_eth_transaction_zero(), 0, 1),
+        );
+        drop(held);
+
+        let error = result.expect_err("the run fails to start its safe copy");
+        assert_eq!(
+            error.downcast_ref::<SafeCopyError>(),
+            Some(&SafeCopyError::Loader(KeySpaceLoaderError::AlreadyLoaded))
+        );
+        assert!(host.store_has(&TMP_PATH).unwrap().is_none());
+        assert!(block_in_progress_in_safe_copy(&mut host).is_none());
+    }
+
+    /// An `assemble_block` that fails to finalize the block in progress
+    /// drops the whole safe copy.
+    #[test]
+    fn failed_assemble_block_drops_the_block_in_progress() {
+        let mut host = sub_block_host();
+        // A block in progress with a transaction left to run cannot be
+        // finalized.
+        let queue =
+            VecDeque::from([sub_block_input(dummy_eth_transaction_zero(), 0, 1).tx]);
+        let bip = BlockInProgress::new(U256::one(), queue, U256::zero());
+        leave_block_in_progress_in_safe_copy(&mut host, &bip);
+        let bk = load_keyspaces(&mut host).unwrap();
+        let input = AssembleBlockInput {
+            timestamp: Timestamp::from(0),
+            block_number: U256::one(),
+        };
+
+        assemble_block(&mut host, bk, input).expect_err("the block is not assembled");
+
         assert!(host.store_has(&TMP_PATH).unwrap().is_none());
         assert!(block_in_progress_in_safe_copy(&mut host).is_none());
     }
@@ -1217,9 +1327,10 @@ mod tests {
     }
 
     /// `assemble_block` finalizes the block the sub-block runs left in
-    /// progress under `/tmp`, and does not promote the block in progress.
+    /// progress under `/tmp`, does not promote the block in progress, and
+    /// deletes what the block left under `/tmp` outside its keyspaces.
     #[test]
-    fn assemble_block_finalizes_the_mirrored_block() {
+    fn assemble_block_finalizes_the_block_in_progress() {
         let mut host = sub_block_host();
         for (tag, tx) in [
             (0, dummy_eth_transaction_zero()),
@@ -1229,6 +1340,8 @@ mod tests {
             handle_run_transaction(&mut host, bk, sub_block_input(tx, tag, 1))
                 .expect("the transaction runs");
         }
+        host.store_write_all(&RefPath::assert_from(b"/tmp/leftover"), b"raw")
+            .unwrap();
         let bk = load_keyspaces(&mut host).unwrap();
         let input = AssembleBlockInput {
             timestamp: Timestamp::from(0),
@@ -1236,6 +1349,8 @@ mod tests {
         };
 
         assemble_block(&mut host, bk, input).expect("the block assembles");
+
+        assert!(host.store_has(&TMP_PATH).unwrap().is_none());
 
         let block = block_storage::read_current_etherlink_block(
             RuntimeKeyspaces::init(&mut host).unwrap().evm_world_state(),
