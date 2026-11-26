@@ -15,6 +15,7 @@ use tezos_smart_rollup_encoding::entrypoint::EntrypointError;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_keyspace::extensions::DataRevealError;
 use tezos_smart_rollup_keyspace::{KeyError, KeySpaceError};
 use tezos_storage::error::{Error as GenStorageError, StorageReadErrorKind};
 use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
@@ -81,14 +82,30 @@ pub enum ChunkedTransactionError {
     KeySpace(#[from] KeySpaceError),
 }
 
+/// Failure of a kernel upgrade.
 #[derive(Error, Debug)]
-pub enum UpgradeProcessError {
-    #[error("Internal upgrade error: {0}")]
-    InternalUpgrade(&'static str),
-    #[error("Fallback mechanism was triggered")]
-    Fallback,
-    #[error("Missing dictator key")]
-    NoDictator,
+pub enum KernelUpgradeError {
+    /// The new kernel does not reveal, or the write of one of its pages
+    /// fails. The kernel is restored from its backup.
+    #[error("Kernel upgrade failed, the previous kernel is restored")]
+    Reveal(#[from] DataRevealError),
+    /// The new kernel fails as `reveal` says, then the restore of the kernel
+    /// from its backup fails as `restore` says.
+    #[error("Kernel upgrade failed, then the restore of the previous kernel failed: {restore}")]
+    Restore {
+        #[source]
+        reveal: DataRevealError,
+        restore: KeySpaceError<StorageReadErrorKind>,
+    },
+    /// A read or a write of a keyspace failed.
+    #[error("Kernel upgrade failed")]
+    KeySpace(#[from] KeySpaceError<StorageReadErrorKind>),
+}
+
+impl From<KeySpaceError> for KernelUpgradeError {
+    fn from(e: KeySpaceError) -> Self {
+        Self::KeySpace(e.widen())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -125,8 +142,9 @@ pub enum Error {
     InvalidRunTransaction(revm_etherlink::EvmRunError),
     #[error("Simulation failed: {0}")]
     Simulation(revm_etherlink::EvmRunError),
-    #[error(transparent)]
-    UpgradeError(UpgradeProcessError),
+    /// The storage migration of the kernel failed with the given error.
+    #[error("Storage migration failed: {0:#}")]
+    MigrationFailed(anyhow::Error),
     #[error(transparent)]
     InvalidSignature(SigError),
     #[error("Invalid signature check")]
@@ -212,12 +230,6 @@ impl From<TransferError> for Error {
 impl From<DecoderError> for Error {
     fn from(e: DecoderError) -> Self {
         Self::RlpDecoderError(e)
-    }
-}
-
-impl From<UpgradeProcessError> for Error {
-    fn from(e: UpgradeProcessError) -> Self {
-        Self::UpgradeError(e)
     }
 }
 

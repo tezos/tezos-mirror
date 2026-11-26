@@ -30,7 +30,8 @@ time = { version = "0.3.53", features = [
 ], optional = true }
 proptest = { version = "1.0", optional = true }
 hex = { version = "0.4.3", optional = true }
-thiserror = { workspace = true, optional = true }
+# Without `std`: the crate is `no_std` when `alloc` is off.
+thiserror = { version = "2.0.18", default-features = false }
 regex = { version = "1.4.6", optional = true }
 paste = "1.0.6"
 
@@ -64,7 +65,7 @@ default = ["alloc", "tezos-encoding", "crypto", "bls"]
 testing = ["crypto", "num-bigint", "num-traits", "proptest", "tezos-protocol/testing"]
 crypto = ["tezos_crypto_rs", "tezos-protocol"]
 bls = ["tezos_crypto_rs/bls"]
-alloc = ["crypto", "thiserror", "hex", "num-traits", "num-bigint", "regex"]
+alloc = ["crypto", "hex", "num-traits", "num-bigint", "regex"]
 tezos-encoding = ["dep:tezos_data_encoding", "time"]
 proto-alpha = [
   "tezos-smart-rollup-core/proto-alpha",

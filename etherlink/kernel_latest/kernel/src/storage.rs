@@ -34,7 +34,7 @@ use tezos_smart_rollup_keyspace::extensions::{
     KeySpaceExtBin, KeySpaceExtNum, KeySpaceExtRlp,
 };
 use tezos_smart_rollup_keyspace::{
-    Key, KeyError, KeySpace, KeySpaceError, KeySpaceLoader,
+    Key, KeyError, KeySpace, KeySpaceError, KeySpaceLoader, ReadKind,
 };
 use tezos_storage::keyspace::KeySpaceExtB58;
 use tezosx_types::StorageReadErrorKind;
@@ -782,12 +782,20 @@ pub fn store_last_info_per_level_timestamp(
     Ok(())
 }
 
+/// Reads the timestamp of the last info-per-level message from `/base`.
+///
+/// Errors with [`StorageReadErrorKind::NotFound`] when it is absent or holds
+/// fewer than 8 bytes.
 pub fn read_last_info_per_level_timestamp(
     base: &impl KeySpace,
-) -> Result<Timestamp, Error> {
-    let timestamp: i64 = base
-        .get_le(&INFO_PER_LEVEL_TIMESTAMP_KEY)
-        .ok_or_else(path_not_found)?;
+) -> Result<Timestamp, KeySpaceError<StorageReadErrorKind>> {
+    let timestamp: i64 = base.get_le(&INFO_PER_LEVEL_TIMESTAMP_KEY).ok_or_else(|| {
+        KeySpaceError::read(
+            base.name(),
+            &INFO_PER_LEVEL_TIMESTAMP_KEY,
+            ReadKind::Ext(StorageReadErrorKind::NotFound),
+        )
+    })?;
     Ok(timestamp.into())
 }
 

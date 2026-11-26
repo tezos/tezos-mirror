@@ -10,6 +10,14 @@
 
 use crate::{Key, KeySpace, KeySpaceError};
 use num_traits::{FromBytes, ToBytes};
+#[cfg(feature = "data-reveal")]
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+#[cfg(feature = "data-reveal")]
+use tezos_smart_rollup_encoding::dac::pages::{
+    reveal_loop, RevealLoopError, MAX_PAGE_SIZE,
+};
+#[cfg(feature = "data-reveal")]
+use tezos_smart_rollup_host::reveal::HostReveal;
 
 /// Typed integer reads and writes over a [`KeySpace`].
 pub trait KeySpaceExtNum: KeySpace {
@@ -172,11 +180,78 @@ pub trait KeySpaceExtBin: KeySpace {
 #[cfg(feature = "tezos-encoding")]
 impl<KS: KeySpace> KeySpaceExtBin for KS {}
 
+/// Depth of the preimage trees that [`KeySpaceExtDataReveal::reveal_to_key`]
+/// reveals: up to three levels of hash pages above the content pages.
+#[cfg(feature = "data-reveal")]
+const MAX_TREE_LEVELS: usize = 4;
+
+/// Failure of [`KeySpaceExtDataReveal::reveal_to_key`].
+#[cfg(feature = "data-reveal")]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum DataRevealError {
+    /// The reveal of the preimage tree failed, or the write of one of its
+    /// content pages.
+    #[error(transparent)]
+    Reveal(#[from] RevealLoopError<KeySpaceError>),
+    /// The value at the key could not be emptied before the reveal.
+    #[error(transparent)]
+    KeySpace(#[from] KeySpaceError),
+}
+
+/// Reveals of a preimage tree into a [`KeySpace`].
+#[cfg(feature = "data-reveal")]
+pub trait KeySpaceExtDataReveal: KeySpace {
+    /// Writes at `key`, in place of the value there, the content that the
+    /// preimage tree of root `root_hash` reveals through `host`, one content
+    /// page at a time: the content never sits whole in memory.
+    ///
+    /// The tree holds up to three levels of hash pages above its content
+    /// pages.
+    ///
+    /// # Errors
+    ///
+    /// - [`DataRevealError::Reveal`] with the failure of [`reveal_loop`]: a
+    ///   preimage that does not reveal or is not a page, a tree that is too
+    ///   deep, or the write of a content page
+    ///   ([`RevealLoopError::Content`]).
+    /// - [`DataRevealError::KeySpace`] when the value at `key` cannot be
+    ///   emptied first.
+    ///
+    /// On an error, the value at `key` holds the content written before it.
+    fn reveal_to_key(
+        &mut self,
+        host: &mut impl HostReveal,
+        root_hash: &[u8; PREIMAGE_HASH_SIZE],
+        key: &Key,
+    ) -> Result<(), DataRevealError> {
+        self.set(key, [])?;
+        let mut offset = 0;
+        let mut buffer = [0; MAX_PAGE_SIZE * MAX_TREE_LEVELS];
+        reveal_loop(
+            host,
+            0,
+            root_hash,
+            &mut buffer,
+            MAX_TREE_LEVELS,
+            &mut |_, page| {
+                offset += self.write(key, offset, page.as_ref())?;
+                Ok::<_, KeySpaceError>(())
+            },
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "data-reveal")]
+impl<KS: KeySpace> KeySpaceExtDataReveal for KS {}
+
 /// Tests for the extension traits, over a key space minted on a mock host.
 #[cfg(all(test, feature = "irmin-compat"))]
 mod tests {
     use super::*;
     use crate::irmin_ds::{IrminKeySpaceRegistry, StorageV1KeySpaceCompat};
+    #[cfg(feature = "data-reveal")]
+    use tezos_smart_rollup_encoding::dac::pages::SlicePageError;
     use tezos_smart_rollup_mock::{InMemoryStore, MockHost};
 
     fn key(s: &[u8]) -> Key {
@@ -193,6 +268,19 @@ mod tests {
         // and it rejects overlapping names.
         unsafe { registry.load_or_create(host, name.parse().unwrap()) }
             .expect("name does not overlap a loaded one")
+    }
+
+    /// A content page holding `content`.
+    #[cfg(feature = "data-reveal")]
+    fn content_page(content: &[u8]) -> Vec<u8> {
+        [&[0][..], &(content.len() as u32).to_be_bytes(), content].concat()
+    }
+
+    /// A hash page holding `hashes`.
+    #[cfg(feature = "data-reveal")]
+    fn hash_page(hashes: &[[u8; PREIMAGE_HASH_SIZE]]) -> Vec<u8> {
+        let hashes = hashes.concat();
+        [&[1][..], &(hashes.len() as u32).to_be_bytes(), &hashes].concat()
     }
 
     #[test]
@@ -283,5 +371,45 @@ mod tests {
         assert!(ks.read_nom_or(&k, fallback.clone()).is_err());
         ks.set(&k, [0x01, 0x01]).unwrap();
         assert!(ks.read_nom::<Narith>(&k).is_err());
+    }
+
+    #[cfg(feature = "data-reveal")]
+    #[test]
+    fn data_reveal_writes_the_content_pages_in_place_of_the_value() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/data-reveal");
+        let k = key(b"/value");
+        let first = host.set_preimage(content_page(b"first "));
+        let second = host.set_preimage(content_page(b"second"));
+        let root_hash = host.set_preimage(hash_page(&[first, second]));
+        // Longer than the content: none of its bytes stay.
+        ks.set(&k, [0xff; 64]).unwrap();
+
+        ks.reveal_to_key(&mut host, &root_hash, &k).unwrap();
+
+        assert_eq!(ks.get(&k), Some(b"first second".to_vec()));
+    }
+
+    #[cfg(feature = "data-reveal")]
+    #[test]
+    fn data_reveal_stops_on_a_preimage_that_is_not_a_page() {
+        let mut host = MockHost::default();
+        let mut registry = IrminKeySpaceRegistry::new();
+        let mut ks = load(&mut registry, &mut host, "/data-reveal");
+        let k = key(b"/value");
+        let first = host.set_preimage(content_page(b"first"));
+        let not_a_page = host.set_preimage(vec![0xff; 8]);
+        let root_hash = host.set_preimage(hash_page(&[first, not_a_page]));
+
+        assert_eq!(
+            ks.reveal_to_key(&mut host, &root_hash, &k),
+            Err(DataRevealError::Reveal(RevealLoopError::Page {
+                hash: not_a_page,
+                error: SlicePageError::InvalidTag(Some(0xff))
+            }))
+        );
+        // The content written before the failure stays.
+        assert_eq!(ks.get(&k), Some(b"first".to_vec()));
     }
 }

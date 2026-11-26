@@ -172,3 +172,57 @@ fn save_content<Host>(
         Ok(())
     }
 }
+
+#[test]
+fn reveal_loop_reports_each_failure_by_its_kind() {
+    let mut host = tezos_smart_rollup_mock::MockHost::default();
+    let root_hash = prepare_preimages(&[1; 10_000], |_hash, page| {
+        host.set_preimage(page);
+    })
+    .unwrap();
+    let not_a_page = host.set_preimage(vec![0xff; 8]);
+    let mut buffer = [0; MAX_PAGE_SIZE * 4];
+
+    // The tree has a hash page above its content pages: one level is too few.
+    assert_eq!(
+        reveal_loop(
+            &mut host,
+            0,
+            root_hash.as_ref(),
+            &mut buffer,
+            1,
+            &mut ignore_content
+        ),
+        Err(RevealLoopError::TooDeep { max_levels: 1 })
+    );
+    assert_eq!(
+        reveal_loop(
+            &mut host,
+            0,
+            &not_a_page,
+            &mut buffer,
+            4,
+            &mut ignore_content
+        ),
+        Err(RevealLoopError::Page {
+            hash: not_a_page,
+            error: SlicePageError::InvalidTag(Some(0xff))
+        })
+    );
+    // The first content page stops the traversal with the error of the closure.
+    assert_eq!(
+        reveal_loop(
+            &mut host,
+            0,
+            root_hash.as_ref(),
+            &mut buffer,
+            4,
+            &mut |_, _| Err("full")
+        ),
+        Err(RevealLoopError::Content("full"))
+    );
+}
+
+fn ignore_content<Host>(_: &mut Host, _: V0SliceContentPage) -> Result<(), &'static str> {
+    Ok(())
+}

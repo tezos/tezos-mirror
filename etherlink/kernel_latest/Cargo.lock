@@ -1317,7 +1317,6 @@ dependencies = [
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
- "tezos-smart-rollup-installer-config",
  "tezos-smart-rollup-keyspace",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
@@ -3528,21 +3527,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-smart-rollup-installer-config"
-version = "0.2.2"
-dependencies = [
- "hex",
- "nom",
- "serde",
- "serde_yaml",
- "tezos-smart-rollup-core",
- "tezos-smart-rollup-encoding",
- "tezos-smart-rollup-host",
- "tezos_data_encoding",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "tezos-smart-rollup-keyspace"
 version = "0.0.0"
 dependencies = [
@@ -3552,6 +3536,7 @@ dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-core",
+ "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos_data_encoding",
  "thiserror 2.0.18",

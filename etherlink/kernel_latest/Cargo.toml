@@ -117,7 +117,6 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
   "crypto",
   "proto-alpha",
 ] }
-tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
 tezos-smart-rollup-keyspace = { path = "../../src/kernel_sdk/keyspace", features = [

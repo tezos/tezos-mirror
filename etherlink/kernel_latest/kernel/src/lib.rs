@@ -9,7 +9,6 @@ use crate::configuration::{
     fetch_configuration, fetch_tezosx_configuration, Configuration,
 };
 use crate::error::Error;
-use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::stage_one::fetch_blueprints;
 use crate::storage::read_sequencer_pool_address;
@@ -321,10 +320,12 @@ where
             log!(Info, "Configuration after migration: {}", configuration);
             return Ok(SingleRunStatus::Reboot);
         }
-        Err(Error::UpgradeError(Fallback)) => {
+        Err(error @ Error::MigrationFailed(_)) => {
             // If the migration failed we backup to the previous kernel
             // and force a reboot to reload the kernel.
-            fallback_backup_kernel(host, bk.base_mut())?;
+            log!(Error, "{error}");
+            let (base, kernel) = bk.base_and_kernel_mut();
+            fallback_backup_kernel(base, kernel)?;
             return Ok(SingleRunStatus::Reboot);
         }
         Err(err) => return Err(err.into()),
