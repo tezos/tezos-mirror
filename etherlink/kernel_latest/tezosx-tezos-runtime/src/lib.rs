@@ -1932,14 +1932,8 @@ mod tests {
         }
     }
 
-    // Seed the Michelson world state so the alias snapshot has a subtree
-    // to copy, as in production where migration creates it.
     fn test_rk(host: &mut MockKernelHost) -> MockRuntimeKeyspaces<'_> {
-        let mut rk = RuntimeKeyspaces::init(host).unwrap();
-        let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).unwrap();
-        let account = context::implicit_from_public_key_hash(&null_pkh).unwrap();
-        account.allocate(rk.tez_accounts_mut()).unwrap();
-        rk
+        RuntimeKeyspaces::init(host).unwrap()
     }
 
     #[test]
@@ -3303,8 +3297,6 @@ mod tests {
         const MISSING_DEST_KT1: &str = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
 
         let mut host = MockKernelHost::default();
-        // The accounts root must exist for the transfer's checkpoint to
-        // succeed and the transfer to run at all.
         let mut rk = test_rk(&mut host);
         let runtime = test_runtime();
         let registry = NotWiredRegistry;

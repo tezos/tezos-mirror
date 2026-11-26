@@ -67,10 +67,6 @@ const ETH_ACCOUNTS_ROOT: &str = "/evm/eth_accounts";
 /// account state.
 pub const ETH_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(ETH_ACCOUNTS_ROOT);
 
-/// The durable path of [`ETH_ACCOUNTS_KEYSPACE_NAME`].
-pub const ETH_ACCOUNTS_ROOT_PATH: RefPath =
-    RefPath::assert_from(ETH_ACCOUNTS_ROOT.as_bytes());
-
 /// Durable root of the `/tez/tez_accounts` keyspace.
 const TEZ_ACCOUNTS_ROOT: &str = "/tez/tez_accounts";
 
@@ -78,7 +74,8 @@ const TEZ_ACCOUNTS_ROOT: &str = "/tez/tez_accounts";
 /// the Michelson runtime.
 pub const TEZ_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(TEZ_ACCOUNTS_ROOT);
 
-/// The durable path of [`TEZ_ACCOUNTS_KEYSPACE_NAME`].
+/// The durable path of [`TEZ_ACCOUNTS_KEYSPACE_NAME`], for the raw accesses
+/// to the big maps, which have no keyspace yet.
 pub const TEZ_ACCOUNTS_ROOT_PATH: RefPath =
     RefPath::assert_from(TEZ_ACCOUNTS_ROOT.as_bytes());
 
@@ -89,7 +86,8 @@ const EVM_WORLD_STATE_ROOT: &str = "/evm/world_state";
 /// of the EVM runtime.
 pub const EVM_WORLD_STATE_KEYSPACE_NAME: Name = Name::from_static(EVM_WORLD_STATE_ROOT);
 
-/// The durable path of the `/evm/world_state` root.
+/// The durable path of [`EVM_WORLD_STATE_KEYSPACE_NAME`], for the raw
+/// accesses of the storage migrations.
 pub const EVM_WORLD_STATE_ROOT_PATH: RefPath =
     RefPath::assert_from(EVM_WORLD_STATE_ROOT.as_bytes());
 
@@ -100,10 +98,6 @@ const TEZ_WORLD_STATE_ROOT: &str = "/tez/world_state";
 /// of the Michelson runtime.
 pub const TEZ_WORLD_STATE_KEYSPACE_NAME: Name = Name::from_static(TEZ_WORLD_STATE_ROOT);
 
-/// The durable path of the `/tez/world_state` root.
-pub const TEZ_WORLD_STATE_ROOT_PATH: RefPath =
-    RefPath::assert_from(TEZ_WORLD_STATE_ROOT.as_bytes());
-
 /// Durable root of the `/common_world_state` keyspace.
 const COMMON_WORLD_STATE_ROOT: &str = "/common_world_state";
 
@@ -111,10 +105,6 @@ const COMMON_WORLD_STATE_ROOT: &str = "/common_world_state";
 /// state that the runtimes share.
 pub const COMMON_WORLD_STATE_KEYSPACE_NAME: Name =
     Name::from_static(COMMON_WORLD_STATE_ROOT);
-
-/// The durable path of the `/common_world_state` root.
-pub const COMMON_WORLD_STATE_ROOT_PATH: RefPath =
-    RefPath::assert_from(COMMON_WORLD_STATE_ROOT.as_bytes());
 
 /// Storage handle threaded through kernel execution.
 ///
@@ -365,7 +355,9 @@ impl<Host: KeySpaceLoader + StorageV1> RuntimeKeyspaces<'_, Host> {
     ///
     /// Errors with [`SafeCopyError::NoCopy`] if nothing is under the prefix
     /// of a safe copy of `self`, e.g. no copy was started or it was closed:
-    /// promoting empty keyspaces would clear `self`'s. Errors with
+    /// promoting empty keyspaces would clear `self`'s. A copy that holds no
+    /// key cannot be told apart from no copy: the caller must have written
+    /// to the copy it resumes, e.g. the block in progress. Errors with
     /// [`SafeCopyError::Loader`] or [`SafeCopyError::Storage`].
     pub fn resume_safe(&mut self) -> Result<RuntimeKeyspaces<'_, Host>, SafeCopyError> {
         if self.host.host.store_has(&self.copy_prefix()?)?.is_none() {

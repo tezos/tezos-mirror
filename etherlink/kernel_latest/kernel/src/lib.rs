@@ -28,7 +28,6 @@ use storage::{
 use tezos_evm_logging::{log, set_global_verbosity, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{read_logs_verbosity, KernelHost};
-use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
 use tezos_evm_runtime::runtime_keyspaces::{
     BlueprintKeyspaces, RuntimeKeyspaces, BASE_KEYSPACE_NAME,
 };
@@ -462,89 +461,6 @@ where
         )
     }
 
-    let world_state_subkeys = kernel_host
-        .store_count_subkeys(&EVM_WORLD_STATE_ROOT_PATH)
-        .expect("The kernel failed to read the number of /evm/world_state subkeys");
-
-    // In order to setup the temporary directory, we need to move something
-    // from /evm to /tmp, so /evm must be non empty, this only happen
-    // at the first run.
-    if world_state_subkeys == 0 {
-        kernel_host
-            .store_write(
-                &EVM_WORLD_STATE_ROOT_PATH,
-                "Un festival de GADT".as_bytes(),
-                0,
-            )
-            .unwrap();
-    }
-
-    let tez_world_state_subkeys = kernel_host
-        .store_count_subkeys(
-            &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
-        )
-        .expect("The kernel failed to read the number of /tez/world_state subkeys");
-
-    if tez_world_state_subkeys == 0 {
-        kernel_host
-            .store_write(
-                &tezos_evm_runtime::runtime_keyspaces::TEZ_WORLD_STATE_ROOT_PATH,
-                b"Une sarabande de monades",
-                0,
-            )
-            .unwrap();
-    }
-
-    let tez_tez_accounts_subkeys = kernel_host
-        .store_count_subkeys(
-            &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-        )
-        .expect("The kernel failed to read the number of /tez/tez_accounts subkeys");
-
-    if tez_tez_accounts_subkeys == 0 {
-        kernel_host
-            .store_write(
-                &tezos_evm_runtime::runtime_keyspaces::TEZ_ACCOUNTS_ROOT_PATH,
-                b"Un carnaval de foncteur",
-                0,
-            )
-            .unwrap();
-    }
-
-    // `SafeStorage::start` copies every mirrored root and `store_copy` fails
-    // on a missing source: seed `/evm/eth_accounts` like the roots above.
-    let eth_accounts_subkeys = kernel_host
-        .store_count_subkeys(
-            &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
-        )
-        .expect("The kernel failed to read the number of /evm/eth_accounts subkeys");
-
-    if eth_accounts_subkeys == 0 {
-        kernel_host
-            .store_write(
-                &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
-                "Un défilé d'isomorphismes".as_bytes(),
-                0,
-            )
-            .unwrap();
-    }
-
-    let common_world_state_subkeys = kernel_host
-        .store_count_subkeys(
-            &tezos_evm_runtime::runtime_keyspaces::COMMON_WORLD_STATE_ROOT_PATH,
-        )
-        .expect("The kernel failed to read the number of /common_world_state subkeys");
-
-    if common_world_state_subkeys == 0 {
-        kernel_host
-            .store_write(
-                &tezos_evm_runtime::runtime_keyspaces::COMMON_WORLD_STATE_ROOT_PATH,
-                b"Une ribambelle de catamorphismes",
-                0,
-            )
-            .unwrap();
-    }
-
     let Some(bk) = load_keyspaces_or_log(&mut kernel_host) else {
         return;
     };
@@ -588,9 +504,7 @@ mod tests {
     use tezos_ethereum::{
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
-    use tezos_evm_runtime::runtime_keyspaces::{
-        RuntimeKeyspaces, COMMON_WORLD_STATE_ROOT_PATH,
-    };
+    use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
 
     use alloy_sol_types::SolCall;
     use tezos_protocol::contract::Contract;
@@ -691,8 +605,6 @@ mod tests {
     fn test_xtz_withdrawal_applied() {
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -825,8 +737,6 @@ mod tests {
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -932,8 +842,6 @@ mod tests {
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let level;
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();

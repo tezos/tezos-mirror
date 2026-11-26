@@ -27,15 +27,8 @@ pub struct CountingHost {
 
 impl Default for CountingHost {
     fn default() -> Self {
-        let mut inner = MockKernelHost::default();
-        inner
-            .store_write_all(
-                &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
-                b"seed",
-            )
-            .unwrap();
         Self {
-            inner,
+            inner: MockKernelHost::default(),
             bytes_read: Rc::new(Cell::new(0)),
         }
     }
