@@ -6,9 +6,7 @@
 //!
 //! It borrows the host and holds the keyspaces the execution reads and
 //! writes, and lends them out one at a time. [`RuntimeKeyspaces::init`]
-//! builds it over any [`KeySpaceLoader`]: the live host, or a
-//! [`SafeStorage`](crate::safe_storage::SafeStorage) whose `/tmp` mirror then
-//! covers the keyspaces.
+//! builds it over the live host.
 //!
 //! The keyspaces are `/evm/eth_accounts` and `/tez/tez_accounts`, the account
 //! state of the two runtimes, and `/evm/world_state` and `/tez/world_state`,
@@ -45,8 +43,13 @@ use tezos_smart_rollup_keyspace::{KeySpace, KeySpaceLoader, KeySpaceLoaderError,
 
 use crate::raw_host::{prefixed_name, RawHost};
 use crate::runtime::MockKernelHost;
-use crate::safe_storage::TMP_PATH;
 use crate::snapshot::{Snapshot, SnapshotError};
+
+/// The prefix a safe copy adds to the prefix of the handle it copies.
+pub(crate) const TMP: &str = "/tmp";
+
+/// [`TMP`] as a path.
+pub const TMP_PATH: RefPath = RefPath::assert_from(TMP.as_bytes());
 
 /// Name of the `/base` keyspace, holding kernel configuration and
 /// node-interaction values that do not belong to any world state.
@@ -64,8 +67,7 @@ const ETH_ACCOUNTS_ROOT: &str = "/evm/eth_accounts";
 /// account state.
 pub const ETH_ACCOUNTS_KEYSPACE_NAME: Name = Name::from_static(ETH_ACCOUNTS_ROOT);
 
-/// [`ETH_ACCOUNTS_KEYSPACE_NAME`] as a path, for the raw copies and moves of
-/// the `/tmp` mirror.
+/// The durable path of [`ETH_ACCOUNTS_KEYSPACE_NAME`].
 pub const ETH_ACCOUNTS_ROOT_PATH: RefPath =
     RefPath::assert_from(ETH_ACCOUNTS_ROOT.as_bytes());
 
@@ -600,75 +602,9 @@ impl<KS: KeySpace> BlueprintKeyspaces<KS> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::safe_storage::{safe_path, SafeStorage};
-    use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_keyspace::Key;
 
     const PROBE: Key = Key::from_static(b"/probe");
-
-    #[test]
-    fn init_loads_the_keyspaces_in_the_tmp_copy() {
-        let mut host = MockKernelHost::default();
-        let roots = [
-            ETH_ACCOUNTS_ROOT_PATH,
-            TEZ_ACCOUNTS_ROOT_PATH,
-            EVM_WORLD_STATE_ROOT_PATH,
-            TEZ_WORLD_STATE_ROOT_PATH,
-            COMMON_WORLD_STATE_ROOT_PATH,
-        ];
-        // `start` copies the roots, so they have to exist.
-        for root in &roots {
-            host.store_write_all(root, b"root").unwrap();
-        }
-        let mut safe = SafeStorage::new(&mut host, roots.map(OwnedPath::from).to_vec());
-        safe.start().unwrap();
-
-        {
-            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
-            assert_eq!(
-                rk.eth_accounts().name().to_string(),
-                "/tmp/evm/eth_accounts"
-            );
-            assert_eq!(
-                rk.tez_accounts().name().to_string(),
-                "/tmp/tez/tez_accounts"
-            );
-            assert_eq!(
-                rk.evm_world_state().name().to_string(),
-                "/tmp/evm/world_state"
-            );
-            assert_eq!(
-                rk.tez_world_state().name().to_string(),
-                "/tmp/tez/world_state"
-            );
-            assert_eq!(
-                rk.common_world_state().name().to_string(),
-                "/tmp/common_world_state"
-            );
-            rk.eth_accounts_mut().set(&PROBE, b"inside").unwrap();
-            rk.tez_accounts_mut().set(&PROBE, b"inside").unwrap();
-            rk.evm_world_state_mut().set(&PROBE, b"inside").unwrap();
-            rk.tez_world_state_mut().set(&PROBE, b"inside").unwrap();
-            rk.common_world_state_mut().set(&PROBE, b"inside").unwrap();
-        }
-        let probe_paths = roots.map(|root| {
-            OwnedPath::try_from([root.as_bytes(), PROBE.as_bytes()].concat()).unwrap()
-        });
-        for probe_path in &probe_paths {
-            assert!(safe.host().store_has(probe_path).unwrap().is_none());
-            assert_eq!(
-                safe.host()
-                    .store_read_all(&safe_path(probe_path).unwrap())
-                    .unwrap(),
-                b"inside"
-            );
-        }
-
-        safe.promote().unwrap();
-        for probe_path in &probe_paths {
-            assert_eq!(safe.host().store_read_all(probe_path).unwrap(), b"inside");
-        }
-    }
 
     #[test]
     fn load_holds_the_live_roots_until_into_base() {
@@ -764,42 +700,6 @@ mod tests {
         // And the stack starts again at index 0.
         rk.tez_accounts_savepoint().unwrap();
         assert_eq!(rk.host().store_read_all(&backup).unwrap(), b"v4");
-    }
-
-    #[test]
-    fn tez_accounts_savepoint_in_a_mirror_is_dropped_by_revert() {
-        let mut host = MockKernelHost::default();
-        // `start` copies the roots, so they have to exist.
-        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"root")
-            .unwrap();
-        let mut safe =
-            SafeStorage::new(&mut host, vec![OwnedPath::from(TEZ_ACCOUNTS_ROOT_PATH)]);
-        safe.start().unwrap();
-
-        let backup =
-            RefPath::assert_from(b"/tmp/__savepoint/0/tmp/tez/tez_accounts/probe");
-        {
-            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
-            rk.tez_accounts_mut().set(&PROBE, b"v0").unwrap();
-            rk.tez_accounts_savepoint().unwrap();
-            // The backup is named after the mirrored root, and loaded through
-            // the mirror: it lands under `/tmp`, and nowhere else.
-            assert_eq!(
-                rk.host().host.host().store_read_all(&backup).unwrap(),
-                b"v0"
-            );
-            assert!(rk
-                .host()
-                .host
-                .host()
-                .store_has(&RefPath::assert_from(b"/__savepoint"))
-                .unwrap()
-                .is_none());
-        }
-
-        safe.revert().unwrap();
-        assert!(safe.host().store_has(&backup).unwrap().is_none());
-        assert!(safe.host().store_has(&TMP_PATH).unwrap().is_none());
     }
 
     // The safe-copy tests read keyspaces only through keyspace handles: under
@@ -1059,6 +959,9 @@ mod tests {
     /// A raw path outside the keyspaces.
     const RAW: RefPath = RefPath::assert_from(b"/raw");
 
+    /// A key that only a copy holds, e.g. a trace of an interrupted block.
+    const STALE: Key = Key::from_static(b"/trace/call_trace/0");
+
     #[test]
     fn start_safe_deletes_what_a_dropped_copy_left_and_resume_safe_keeps_it() {
         let tmp_raw = RefPath::assert_from(b"/tmp/raw");
@@ -1068,6 +971,7 @@ mod tests {
             let mut copy = rk.start_safe().unwrap();
             copy.host_mut().store_write_all(&RAW, b"left").unwrap();
             set_probes(&mut copy, b"left");
+            copy.common_world_state_mut().set(&STALE, b"left").unwrap();
         }
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -1079,6 +983,7 @@ mod tests {
         let copy = rk.start_safe().unwrap();
         assert_eq!(copy.host().host.store_has(&tmp_raw).unwrap(), None);
         assert_eq!(get_probes(&copy), all(b"before"));
+        assert_eq!(copy.common_world_state().get(&STALE), None);
     }
 
     #[test]
@@ -1271,42 +1176,19 @@ mod tests {
         assert_eq!(host.store_has(&TMP_PATH).unwrap(), None);
     }
 
+    /// Far beyond any realistic nesting of cross-runtime calls: the names of
+    /// the backups still fit the keyspace name size limit.
     #[test]
-    fn a_copy_over_safe_storage_is_under_tmp_tmp() {
+    fn a_copy_of_a_copy_fits_a_thousand_savepoints() {
         let mut host = seeded_host();
-        let mut safe = SafeStorage::new(
-            &mut host,
-            [
-                ETH_ACCOUNTS_ROOT_PATH,
-                TEZ_ACCOUNTS_ROOT_PATH,
-                EVM_WORLD_STATE_ROOT_PATH,
-                TEZ_WORLD_STATE_ROOT_PATH,
-                COMMON_WORLD_STATE_ROOT_PATH,
-            ]
-            .map(OwnedPath::from)
-            .to_vec(),
-        );
-        safe.start().unwrap();
-        {
-            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
-            let mut copy = rk.start_safe().unwrap();
-            assert_eq!(names(&copy), TMP_TMP_NAMES);
-            copy.tez_accounts_savepoint().unwrap();
-            let backup = RefPath::assert_from(
-                b"/tmp/tmp/__savepoint/0/tmp/tmp/tez/tez_accounts/probe",
-            );
-            assert_eq!(
-                copy.host().host.host().store_read_all(&backup).unwrap(),
-                b"before"
-            );
-            copy.tez_accounts_release_to(0).unwrap();
-            set_probes(&mut copy, b"after");
-            let keyspaces = copy.into_keyspaces().unwrap();
-            rk.promote_from(keyspaces).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        let mut copy = rk.start_safe().unwrap();
+        let mut nested = copy.start_safe().unwrap();
+        for _ in 0..1000 {
+            nested.tez_accounts_savepoint().unwrap();
         }
-        assert_eq!(probes_in(&mut safe, LIVE_NAMES), all(b"after"));
-        assert_eq!(probes_in(safe.host_mut(), LIVE_NAMES), all(b"before"));
-        safe.promote().unwrap();
-        assert_eq!(probes_in(&mut host, LIVE_NAMES), all(b"after"));
+        assert_eq!(nested.tez_accounts_snapshot().len(), 1000);
+        nested.tez_accounts_release_all();
+        nested.revert_safe().unwrap();
     }
 }

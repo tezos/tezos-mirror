@@ -5073,7 +5073,7 @@ mod tests {
     // nothing outlives, whether the batch is applied, backtracked or invalid.
     #[test]
     fn operations_leave_no_safe_copy() {
-        use tezos_evm_runtime::safe_storage::TMP_PATH;
+        use tezos_evm_runtime::runtime_keyspaces::TMP_PATH;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
@@ -12486,7 +12486,7 @@ mod tests {
     /// what the caller writes next lands in the keyspaces it lent before.
     #[test]
     fn block_abort_leaves_no_safe_copy() {
-        use tezos_evm_runtime::safe_storage::TMP_PATH;
+        use tezos_evm_runtime::runtime_keyspaces::TMP_PATH;
 
         let mut host = MockKernelHost::default();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();

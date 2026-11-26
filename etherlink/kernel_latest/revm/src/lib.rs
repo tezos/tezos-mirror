@@ -953,7 +953,7 @@ where
 
             if !evm_context.db_mut().commit_status() {
                 // No need to revert the possible database changes because
-                // we are in a safe storage.
+                // we are in a safe copy.
                 return Err(EvmDbError::CommitMismatch.into());
             }
 

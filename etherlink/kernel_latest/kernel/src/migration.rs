@@ -1195,8 +1195,8 @@ mod tests {
             .is_none());
     }
 
-    /// V71 drops a block in progress left in the mirror, and leaves the rest
-    /// of the mirror to the next `SafeStorage::start`.
+    /// V71 drops a block in progress left in the safe copy, and leaves the
+    /// rest of that copy for the next one to delete.
     #[test]
     fn v71_migration_drops_the_block_in_progress() {
         let mut host = MockKernelHost::default();

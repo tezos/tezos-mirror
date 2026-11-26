@@ -306,9 +306,8 @@ mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::{
-        MockRuntimeKeyspaces, TEZ_ACCOUNTS_ROOT_PATH,
+        MockRuntimeKeyspaces, TEZ_ACCOUNTS_ROOT_PATH, TMP_PATH,
     };
-    use tezos_evm_runtime::safe_storage::TMP_PATH;
     use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace};

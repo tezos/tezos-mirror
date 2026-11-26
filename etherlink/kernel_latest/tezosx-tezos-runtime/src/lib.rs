@@ -468,8 +468,8 @@ fn build_failed_crac_receipt(
     // `pre_transfer_internals` (alias-forwarder originations) are
     // backtracked for the same reason: the forwarder KT1 is written to
     // Michelson durable storage inside the enclosing EVM frame, so it
-    // does NOT survive that frame's revert nor the enclosing batch's
-    // SafeStorage revert.
+    // does NOT survive that frame's revert nor the revert of the enclosing
+    // batch's safe copy.
     pre_transfer_internals
         .iter_mut()
         .for_each(InternalOperationSum::transform_result_backtrack);

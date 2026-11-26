@@ -1034,8 +1034,8 @@ mod tests {
     /// succeeded): the L1-shaped trace is returned and the success
     /// body's `balance_updates` is left in its pre-burn state — no
     /// half-applied burn pair survives in the receipt. The variable
-    /// burn was applied to the payer's balance; SafeStorage revert
-    /// at the caller level is what undoes that state effect.
+    /// burn was applied to the payer's balance; the revert of the safe
+    /// copy at the caller level is what undoes that state effect.
     #[test]
     fn origination_insolvent_on_slot_burn_returns_cannot_pay() {
         let mut host = MockKernelHost::default();
@@ -1355,8 +1355,8 @@ mod tests {
     /// An Origination whose variable burn fits exactly within
     /// `storage_limit` but whose slot burn pushes the running total
     /// over the cap returns `[OperationQuotaExceeded]`. The variable
-    /// burn already debited the payer; SafeStorage rollback at the
-    /// caller is what reverts that — the trace itself is single-element.
+    /// burn already debited the payer; the revert of the safe copy at the
+    /// caller is what undoes that. The trace itself is single-element.
     #[test]
     fn origination_overshoot_on_slot_burn_returns_quota_exceeded() {
         let mut host = MockKernelHost::default();

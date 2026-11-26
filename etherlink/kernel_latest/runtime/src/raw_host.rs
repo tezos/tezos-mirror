@@ -5,10 +5,9 @@
 //! [`RawHost`]: a host whose durable accesses and keyspace loads are put
 //! under a prefix.
 //!
-//! A [`SafeStorage`](crate::safe_storage::SafeStorage) wraps one with prefix
-//! `/tmp`, and a
-//! [`RuntimeKeyspaces`](crate::runtime_keyspaces::RuntimeKeyspaces) holds one
-//! with its own prefix. Without a prefix, it forwards the accesses unchanged.
+//! A [`RuntimeKeyspaces`](crate::runtime_keyspaces::RuntimeKeyspaces) holds
+//! one with its own prefix. Without a prefix, it forwards the accesses
+//! unchanged.
 
 use std::fmt::Display;
 
@@ -228,7 +227,7 @@ impl<Host: WasmHost> WasmHost for RawHost<&mut Host> {
 mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
-    use crate::safe_storage::{SafeStorage, TMP, TMP_PATH};
+    use crate::runtime_keyspaces::{TMP, TMP_PATH};
     use tezos_smart_rollup_host::path::PATH_MAX_SIZE;
     use tezos_smart_rollup_keyspace::{KeySpace, NameError, MAX_KEYSPACE_NAME_SIZE};
 
@@ -252,10 +251,10 @@ mod tests {
             Err(RuntimeError::PathNotFound)
         );
 
-        let mut safe = SafeStorage::new(&mut host, vec![]);
-        safe.store_write_all(&path, b"v").unwrap();
+        raw.prefix = Some(OwnedPath::from(TMP_PATH));
+        raw.store_write_all(&path, b"v").unwrap();
         let path = path_of_len(PATH_MAX_SIZE);
-        assert_eq!(safe.store_read_all(&path), Err(RuntimeError::PathNotFound));
+        assert_eq!(raw.store_read_all(&path), Err(RuntimeError::PathNotFound));
     }
 
     #[test]

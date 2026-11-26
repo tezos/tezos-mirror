@@ -36,9 +36,8 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
-    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError,
+    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError, TMP_PATH,
 };
-use tezos_evm_runtime::safe_storage::TMP_PATH;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
@@ -2905,7 +2904,7 @@ mod tests {
             Some(Mutez::try_from(500_000 - 1 - storage_cost).unwrap())
         );
 
-        // No backup of the accounts is left behind, in the mirror or once
+        // No backup of the accounts is left behind, in the safe copy or once
         // promoted.
         for backups in [&b"/tmp/__savepoint"[..], &b"/__savepoint"[..]] {
             let backups = tezos_smart_rollup_host::path::RefPath::assert_from(backups);
@@ -4981,7 +4980,7 @@ mod tests {
         storage_migration(&mut host).unwrap();
         assert!(host.store_has(&legacy).unwrap().is_none());
 
-        // A rebuilt block starts a new mirror, so the probe is not promoted.
+        // A rebuilt block starts a new safe copy, so the probe is not promoted.
         let probe = RefPath::assert_from(b"/tmp/evm/world_state/probe");
         host.store_write_all(&probe, b"probe").unwrap();
         produce_until_finished(&mut host, &chain_config, &mut configuration);

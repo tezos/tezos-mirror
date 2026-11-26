@@ -1154,14 +1154,10 @@ pub fn read_delayed_transaction_bridge(
 
 #[cfg(test)]
 mod tests {
-    use crate::block_in_progress::BlockInProgress;
     use crate::load_base;
-    use primitive_types::U256;
-    use rlp::Encodable;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::RuntimeKeyspaces;
-    use tezos_evm_runtime::safe_storage::SafeStorage;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_host::path::RefPath;
@@ -2288,39 +2284,5 @@ mod tests {
         for suffix in ["/num_chunks", "/chunk_hashes", "/0", "/1"] {
             assert!(rk.host_mut().store_has(&path(suffix)).unwrap().is_none());
         }
-    }
-
-    /// Through the block mirror, the block in progress resolves to
-    /// `/tmp/common_world_state/block_in_progress`.
-    #[test]
-    fn block_in_progress_resolves_to_the_mirrored_common_world_state() {
-        let mut host = MockKernelHost::default();
-        let path = RefPath::assert_from(b"/tmp/common_world_state/block_in_progress");
-        let bip = BlockInProgress::new(
-            U256::from(7),
-            std::collections::VecDeque::new(),
-            U256::from(11),
-        );
-        {
-            let mut safe_host = SafeStorage::new(&mut host, vec![]);
-            let mut rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
-            let cws = rk.common_world_state_mut();
-            assert!(super::read_block_in_progress(cws).unwrap().is_none());
-            super::store_block_in_progress(cws, &bip).unwrap();
-            let read = super::read_block_in_progress(cws)
-                .unwrap()
-                .expect("a block is in progress");
-            assert_eq!(read.rlp_bytes(), bip.rlp_bytes());
-        }
-        assert_eq!(
-            host.store_read_all(&path).unwrap(),
-            bip.rlp_bytes().to_vec()
-        );
-
-        let mut safe_host = SafeStorage::new(&mut host, vec![]);
-        let mut rk = RuntimeKeyspaces::init(&mut safe_host).unwrap();
-        super::delete_block_in_progress(rk.common_world_state_mut());
-        drop(rk);
-        assert!(host.store_has(&path).unwrap().is_none());
     }
 }
