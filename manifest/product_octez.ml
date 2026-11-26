@@ -42,6 +42,11 @@ include Product (struct
       "brassaia-eio/";
       "rust-toolchain";
       "lwt_domain/";
+      (* [vendors/ledgerwallet-tezos] is the library that
+         [src/lib_signer_backends/unix] selects for Ledger support; without
+         it the tarball builds with [ledger.none.ml]. Entries are matched on
+         top-level paths only, so the whole of [vendors/] is shipped. *)
+      "vendors/";
     ]
     @ Product_data_encoding.product_source @ Product_prometheus.product_source
     @ Product_resto.product_source

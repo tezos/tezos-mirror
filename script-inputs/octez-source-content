@@ -15,6 +15,7 @@ brassaia
 brassaia-eio
 rust-toolchain
 lwt_domain
+vendors
 data-encoding
 prometheus
 resto
