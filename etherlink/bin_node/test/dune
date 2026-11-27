@@ -15,7 +15,8 @@
   test_compute_alias_codec
   test_durable_storage_path
   test_tezlink_prevalidation
-  test_transaction_object)
+  test_transaction_object
+  test_evm_store_range)
  (libraries
   octez-evm-node-libs.evm_node_rust_deps
   bls12-381.archive
@@ -169,3 +170,12 @@
   invalidRLPTest.json
   ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_transaction_object.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
+ (action (run %{dep:./test_evm_store_range.exe})))

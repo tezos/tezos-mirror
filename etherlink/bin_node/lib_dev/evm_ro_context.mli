@@ -337,6 +337,12 @@ type evm_services_methods = {
   next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
   find_blueprint :
     Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprints_range :
+    from:Ethereum_types.quantity ->
+    to_:Ethereum_types.quantity ->
+    Blueprint_types.with_events list tzresult Lwt.t;
+      (** Consecutive blueprints from [from] to [to_] (included), read with a
+          constant number of queries. *)
   find_blueprint_legacy :
     Ethereum_types.quantity ->
     Blueprint_types.Legacy.with_events option tzresult Lwt.t;

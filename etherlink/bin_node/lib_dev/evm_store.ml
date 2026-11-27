@@ -480,6 +480,14 @@ module Q = struct
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
+    (* See {Note cast} *)
+    let select_range_with_timestamp =
+      (t2 level level ->* t3 level payload timestamp) ~name:__FUNCTION__ ~table
+      @@ {|SELECT id, zstd_decompress(CAST(payload AS BLOB)), timestamp
+           FROM blueprints
+           WHERE ? <= id AND id <= ?
+           ORDER BY id ASC|}
+
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM blueprints WHERE id > ?|}
@@ -546,6 +554,13 @@ module Q = struct
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before = ?|}
 
+    let find_injected_in_range =
+      (t2 level level ->* t2 level upgrade) ~name:__FUNCTION__ ~table
+      @@ {|SELECT injected_before, root_hash, activation_timestamp
+           FROM kernel_upgrades
+           WHERE ? <= injected_before AND injected_before <= ?
+           ORDER BY injected_before ASC, rowid ASC|}
+
     let find_latest_injected_after =
       (level ->? upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT root_hash, activation_timestamp
@@ -598,6 +613,13 @@ module Q = struct
       @@ {|SELECT sequencer, pool_address, activation_timestamp
            FROM sequencer_upgrades WHERE injected_before = ?|}
 
+    let find_injected_in_range =
+      (t2 level level ->* t2 level sequencer_upgrade)
+      @@ {|SELECT injected_before, sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades
+           WHERE ? <= injected_before AND injected_before <= ?
+           ORDER BY injected_before ASC, rowid ASC|}
+
     let find_latest_injected_after =
       (level ->? sequencer_upgrade)
       @@ {|SELECT sequencer, pool_address, activation_timestamp
@@ -637,6 +659,16 @@ module Q = struct
     let select_at_level =
       (level ->* delayed_transaction) ~name:__FUNCTION__ ~table
       @@ {|SELECT CAST(payload AS BLOB) FROM delayed_transactions WHERE ? = injected_before|}
+
+    (* See {Note cast} *)
+    let select_in_range =
+      (t2 level level ->* t2 level delayed_transaction)
+        ~name:__FUNCTION__
+        ~table
+      @@ {|SELECT injected_before, CAST(payload AS BLOB)
+           FROM delayed_transactions
+           WHERE ? <= injected_before AND injected_before <= ?
+           ORDER BY injected_before ASC, rowid ASC|}
 
     (* See {Note cast} *)
     let select_at_hash =
@@ -1384,6 +1416,77 @@ module Blueprints = struct
           "Could not read blueprint %a from store"
           Ethereum_types.pp_quantity
           level
+
+  let find_range_with_events store ~from ~to_ =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* blueprints =
+      Db.collect_list conn Q.Blueprints.select_range_with_timestamp (from, to_)
+    in
+    let* kernel_upgrades =
+      Db.collect_list conn Q.Kernel_upgrades.find_injected_in_range (from, to_)
+    in
+    let* sequencer_upgrades =
+      Db.collect_list
+        conn
+        Q.Sequencer_upgrades.find_injected_in_range
+        (from, to_)
+    in
+    let* delayed_transactions =
+      Db.collect_list conn Q.Delayed_transactions.select_in_range (from, to_)
+    in
+    (* [events_at level events] splits [events], sorted by level, into the
+       events attached to [level] and the events of the following levels.
+       Events of lower levels have no matching blueprint and are dropped. *)
+    let rec events_at (Ethereum_types.Qty level as qty) rev_acc = function
+      | (Ethereum_types.Qty l, _) :: rest when Z.lt l level ->
+          events_at qty rev_acc rest
+      | (Ethereum_types.Qty l, event) :: rest when Z.equal l level ->
+          events_at qty (event :: rev_acc) rest
+      | rest -> (List.rev rev_acc, rest)
+    in
+    let first = function [] -> None | event :: _ -> Some event in
+    (* Only keep the consecutive blueprints starting at [from], like
+       [find_with_events] called level by level would. *)
+    let rec assemble (Ethereum_types.Qty expected) rev_acc kernel_upgrades
+        sequencer_upgrades delayed_transactions = function
+      | ((Ethereum_types.Qty n as number), payload, timestamp) :: rest
+        when Z.equal n expected ->
+          let kernel_upgrade, kernel_upgrades =
+            events_at number [] kernel_upgrades
+          in
+          let sequencer_upgrade, sequencer_upgrades =
+            events_at number [] sequencer_upgrades
+          in
+          let delayed_transactions_at_level, delayed_transactions =
+            events_at number [] delayed_transactions
+          in
+          let blueprint =
+            Blueprint_types.
+              {
+                delayed_transactions = delayed_transactions_at_level;
+                kernel_upgrade = first kernel_upgrade;
+                sequencer_upgrade = first sequencer_upgrade;
+                blueprint = {number; timestamp; payload};
+              }
+          in
+          assemble
+            (Ethereum_types.Qty (Z.succ expected))
+            (blueprint :: rev_acc)
+            kernel_upgrades
+            sequencer_upgrades
+            delayed_transactions
+            rest
+      | _ -> List.rev rev_acc
+    in
+    return
+      (assemble
+         from
+         []
+         kernel_upgrades
+         sequencer_upgrades
+         delayed_transactions
+         blueprints)
 
   let find_range store ~from ~to_ =
     with_connection store @@ fun conn ->

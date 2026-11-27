@@ -51,6 +51,9 @@ val register :
   (Ethereum_types.quantity ->
   Blueprint_types.Legacy.with_events option tzresult Lwt.t) ->
   (Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t) ->
+  (from:Ethereum_types.quantity ->
+  to_:Ethereum_types.quantity ->
+  Blueprint_types.with_events list tzresult Lwt.t) ->
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.time_between_blocks ->
   Evm_directory.t ->

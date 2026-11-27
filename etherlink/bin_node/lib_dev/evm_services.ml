@@ -167,28 +167,16 @@ let register_blueprint_service blueprint_service find_blueprint dir =
       let* blueprint = find_blueprint number in
       return blueprint)
 
-let register_blueprints_service blueprints_service find_blueprint dir =
-  let open Ethereum_types in
+let register_blueprints_service blueprints_service find_blueprints_range dir =
   let open Lwt_result_syntax in
-  let rec find_blueprints ?(rev_res = []) (Qty from) (Qty to_excluded) =
-    if Z.Compare.(from < to_excluded) then
-      let* blueprint = find_blueprint (Qty from) in
-      match blueprint with
-      | Some blueprint ->
-          find_blueprints
-            ~rev_res:(blueprint :: rev_res)
-            (Qty (Z.succ from))
-            (Qty to_excluded)
-      | None -> return (List.rev rev_res)
-    else return (List.rev rev_res)
-  in
   Evm_directory.opt_register0 dir blueprints_service (fun selector () ->
-      let from = Ethereum_types.Qty (Z.of_int64 selector.from_level) in
       let count = Int64.min 500L selector.count in
-      let to_excluded =
-        Ethereum_types.Qty (Z.of_int64 (Int64.add selector.from_level count))
+      let from = Ethereum_types.Qty (Z.of_int64 selector.from_level) in
+      let to_ =
+        Ethereum_types.Qty
+          (Z.pred (Z.of_int64 (Int64.add selector.from_level count)))
       in
-      let* blueprints = find_blueprints from to_excluded in
+      let* blueprints = find_blueprints_range ~from ~to_ in
       match blueprints with
       | [] -> return_none
       | blueprints -> return_some blueprints)
@@ -245,13 +233,13 @@ let register_broadcast_service find_blueprint get_next_blueprint_number dir =
       (stream, stopper))
 
 let register get_next_blueprint_number find_blueprint_legacy find_blueprint
-    smart_rollup_address time_between_blocks dir =
+    find_blueprints_range smart_rollup_address time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
   |> register_blueprint_service get_blueprint_service find_blueprint_legacy
   |> register_blueprint_service get_blueprint_with_events_service find_blueprint
   |> register_blueprints_service
        get_blueprints_with_events_service
-       find_blueprint
+       find_blueprints_range
   |> register_blueprint_watcher_service
        find_blueprint_legacy
        get_next_blueprint_number
