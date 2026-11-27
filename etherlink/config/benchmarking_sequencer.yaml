@@ -1,5 +1,9 @@
 instructions:
   - set:
+      # EVM chain id 1337
+      value: 3905000000000000000000000000000000000000000000000000000000000000
+      to: /evm/world_state/chain_id
+  - set:
       value: 00000000000000000000dc0a0713000c1e020000000000000000000000000000
       to: /evm/eth_accounts/d9e5c94a12f78a96640757ac97ba0c257e8aa262/balance
   - set:

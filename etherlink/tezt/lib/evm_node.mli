@@ -213,8 +213,9 @@ type kernel_setup = {
     the default kernel.  [eth_bootstrap_accounts] defaults to
     {!eth_default_bootstrap_accounts}.  [tez_bootstrap_accounts] defaults to
     {!tez_default_bootstrap_accounts} when [with_runtimes] includes [Tezos],
-    and to the empty list otherwise.  All other option fields are set to
-    [None] and can be overridden via optional arguments. *)
+    and to the empty list otherwise.  [chain_id] defaults to [1337].  All
+    other option fields are set to [None] and can be overridden via optional
+    arguments. *)
 val make_kernel_setup :
   ?kernel:Kernel.t ->
   ?l2_chain_ids:int list ->

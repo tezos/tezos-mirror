@@ -743,7 +743,7 @@ mod tests {
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
         TezosXChainConfig, TezosXTransaction,
     };
-    use crate::configuration::fetch_evm_chain_id;
+    use crate::configuration::EVM_CHAIN_ID;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
     use crate::migration::storage_migration;
@@ -1024,7 +1024,7 @@ mod tests {
         store_block_fees(&mut evm_world_state, &dummy_block_fees()).unwrap();
         // The run reads its chain configuration from storage: the dummy
         // transactions are signed for `DUMMY_CHAIN_ID`.
-        crate::storage::store_evm_chain_id(&mut evm_world_state, &DUMMY_CHAIN_ID)
+        crate::storage::tests::store_evm_chain_id(&mut evm_world_state, &DUMMY_CHAIN_ID)
             .unwrap();
         let mut eth_accounts = host
             .load_or_create(
@@ -3069,7 +3069,8 @@ mod tests {
         let mut bk = load_keyspaces(&mut host).unwrap();
         storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
-        storage::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
+        storage::tests::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID)
+            .unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let base_ks = bk.into_base();
@@ -3160,7 +3161,8 @@ mod tests {
         let mut bk = load_keyspaces(&mut host).unwrap();
         storage::store_da_fee(bk.evm_world_state_mut(), &U256::zero()).unwrap();
         store_block_fees(bk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
-        storage::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID).unwrap();
+        storage::tests::store_evm_chain_id(bk.evm_world_state_mut(), &DUMMY_CHAIN_ID)
+            .unwrap();
         let chain_config =
             dummy_tezosx_config_with_tezos_runtime(&mut host, bk.base_mut());
         let base_ks = bk.into_base();
@@ -4075,7 +4077,13 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut()).unwrap();
+        let evm_chain_id = crate::storage::read_evm_chain_id(rk.evm_world_state())
+            .unwrap_or_else(|_| U256::from(EVM_CHAIN_ID));
+        crate::storage::tests::store_evm_chain_id(
+            rk.evm_world_state_mut(),
+            &evm_chain_id,
+        )
+        .unwrap();
         let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block fees should be defined");
         TezosXBlockConstants {

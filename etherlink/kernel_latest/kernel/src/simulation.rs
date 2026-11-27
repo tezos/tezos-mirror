@@ -10,11 +10,11 @@
 
 use crate::apply::revm_run_transaction;
 use crate::chains::{DebugFeatures, ExperimentalFeatures};
-use crate::configuration::fetch_evm_chain_id;
 use crate::fees::simulation_add_gas_for_fees;
 use crate::storage::{
-    read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
-    read_sequencer_pool_address, read_tracer_input,
+    read_evm_chain_id, read_last_info_per_level_timestamp,
+    read_or_set_maximum_gas_per_transaction, read_sequencer_pool_address,
+    read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{block_storage, journal};
@@ -400,7 +400,7 @@ impl Evaluation {
     where
         Host: StorageV1 + KeySpaceLoader,
     {
-        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut())?;
+        let evm_chain_id = read_evm_chain_id(rk.evm_world_state())?;
         let minimum_base_fee_per_gas =
             crate::retrieve_minimum_base_fee_per_gas(rk.evm_world_state_mut());
         let da_fee = crate::retrieve_da_fee(rk.evm_world_state_mut())?;
@@ -848,7 +848,12 @@ mod tests {
         let timestamp =
             read_last_info_per_level_timestamp(base).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
-        let evm_chain_id = fetch_evm_chain_id(rk.evm_world_state_mut()).unwrap();
+        let evm_chain_id = U256::from(crate::configuration::EVM_CHAIN_ID);
+        crate::storage::tests::store_evm_chain_id(
+            rk.evm_world_state_mut(),
+            &evm_chain_id,
+        )
+        .unwrap();
         let block_fees = retrieve_block_fees(rk);
         assert!(block_fees.is_ok(), "block_fees should be defined");
         let block = BlockConstants::first_block(

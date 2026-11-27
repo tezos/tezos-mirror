@@ -169,6 +169,12 @@ pub enum Error {
     BlockNumberOverflowError(BlockNumberOverflowError),
 }
 
+impl From<KeySpaceError<StorageReadErrorKind>> for Error {
+    fn from(e: KeySpaceError<StorageReadErrorKind>) -> Self {
+        Self::Storage(StorageError::KeySpace(e))
+    }
+}
+
 impl From<revm_etherlink::EvmKernelError> for Error {
     fn from(err: revm_etherlink::EvmKernelError) -> Self {
         Error::Simulation(err.into())

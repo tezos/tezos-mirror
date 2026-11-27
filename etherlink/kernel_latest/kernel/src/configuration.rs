@@ -14,9 +14,8 @@ use crate::{
         read_kernel_governance, read_kernel_security_governance,
         read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
         read_or_set_maximum_gas_per_transaction, read_sequencer_governance,
-        store_evm_chain_id, store_michelson_runtime_chain_id, ADMIN_KEY,
-        DELAYED_BRIDGE_KEY, KERNEL_GOVERNANCE_KEY, KERNEL_SECURITY_GOVERNANCE_KEY,
-        SEQUENCER_GOVERNANCE_KEY,
+        store_michelson_runtime_chain_id, ADMIN_KEY, DELAYED_BRIDGE_KEY,
+        KERNEL_GOVERNANCE_KEY, KERNEL_SECURITY_GOVERNANCE_KEY, SEQUENCER_GOVERNANCE_KEY,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -34,9 +33,9 @@ use tezos_evm_runtime::runtime::evm_node_flag;
 use tezos_evm_runtime::runtime_keyspaces::BlueprintKeyspaces;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceError};
+use tezos_storage::error::StorageReadErrorKind;
 
-/// The chain id will need to be unique when the EVM rollup is deployed in
-/// production.
+/// EVM chain id of the sandbox chain that the test suites run on.
 pub const EVM_CHAIN_ID: u32 = 1337;
 
 #[derive(Debug, Clone, Default)]
@@ -261,26 +260,6 @@ fn fetch_dal_configuration(
     }
 }
 
-/// Reads the EVM chain id from `evm_world_state`, the `/evm/world_state`
-/// keyspace. When it is absent, writes the default there and returns it.
-/// Errors when that write fails.
-pub fn fetch_evm_chain_id(
-    evm_world_state: &mut impl KeySpace,
-) -> Result<U256, KeySpaceError> {
-    match read_evm_chain_id(evm_world_state) {
-        Some(evm_chain_id) => Ok(evm_chain_id),
-        None => {
-            log!(
-                Info,
-                "No EVM chain id in storage, falling back to the default."
-            );
-            let evm_chain_id = U256::from(EVM_CHAIN_ID);
-            store_evm_chain_id(evm_world_state, &evm_chain_id)?;
-            Ok(evm_chain_id)
-        }
-    }
-}
-
 /// Derive the Michelson runtime chain ID from the EVM chain ID by
 /// hashing the EVM chain ID bytes with Blake2B-256 and taking the
 /// first 4 bytes.  This follows the same pattern as Tezos L1's
@@ -300,6 +279,10 @@ fn fetch_michelson_runtime_chain_id(
         Some(michelson_chain_id) => Ok(michelson_chain_id),
         None => {
             let michelson_chain_id = derive_michelson_chain_id(evm_chain_id);
+            log!(
+                Info,
+                "No Michelson runtime chain id in storage, deriving it from the EVM chain id."
+            );
             store_michelson_runtime_chain_id(tez_world_state, &michelson_chain_id)?;
             Ok(michelson_chain_id)
         }
@@ -309,8 +292,7 @@ fn fetch_michelson_runtime_chain_id(
 /// Reads the chain configuration of the TezosX kernel.
 ///
 /// The EVM chain id is read from the `/evm/world_state` keyspace of `bk`.
-/// When it is absent, the default is written there. Errors when that write
-/// fails.
+/// Errors with [`StorageReadErrorKind::NotFound`] when it is absent.
 ///
 /// The Michelson chain id is read from the `/tez/world_state` keyspace of
 /// `bk`. When it is absent, the id is derived from the EVM chain id and
@@ -325,11 +307,10 @@ fn fetch_michelson_runtime_chain_id(
 /// failed write is ignored.
 pub fn fetch_tezosx_configuration(
     bk: &mut BlueprintKeyspaces<impl KeySpace>,
-) -> Result<TezosXChainConfig, KeySpaceError> {
-    // Read both runtime chain ids from storage. The EVM chain id falls back to
-    // the default and is persisted on first use; the Michelson runtime chain id
-    // is derived from it and persisted if absent.
-    let evm_chain_id = fetch_evm_chain_id(bk.evm_world_state_mut())?;
+) -> Result<TezosXChainConfig, KeySpaceError<StorageReadErrorKind>> {
+    // Read both runtime chain ids from storage. The Michelson runtime chain id
+    // is derived from the EVM chain id and persisted if absent.
+    let evm_chain_id = read_evm_chain_id(bk.evm_world_state())?;
     let limits = fetch_evm_limits(bk.evm_world_state_mut());
     let spec_id = read_or_set_evm_version(bk.evm_world_state_mut())?.into();
     let experimental_features = ExperimentalFeatures::read_from_storage(bk.base());

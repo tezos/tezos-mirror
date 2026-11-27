@@ -1146,12 +1146,13 @@ mod tests {
             store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
             EVMBlockHeader,
         };
-        use crate::configuration::fetch_tezosx_configuration;
+        use crate::configuration::{fetch_tezosx_configuration, EVM_CHAIN_ID};
         use crate::load_keyspaces;
+        use crate::storage::tests::store_evm_chain_id;
         use mir::ast::Micheline;
         use mir::gas::Gas;
         use mir::parser::Parser;
-        use primitive_types::H256;
+        use primitive_types::{H256, U256};
         use tezos_data_encoding::enc::BinWriter;
         use tezos_data_encoding::nom::NomReader;
         use tezos_evm_runtime::runtime::MockKernelHost;
@@ -1232,6 +1233,8 @@ mod tests {
             input: Micheline<'_>,
         ) -> Result<RunCodeOutput, RunCodeError> {
             let mut bk = load_keyspaces(host).unwrap();
+            store_evm_chain_id(bk.evm_world_state_mut(), &U256::from(EVM_CHAIN_ID))
+                .unwrap();
             store_current_block_header(
                 bk.base_mut(),
                 &BlockHeader {
