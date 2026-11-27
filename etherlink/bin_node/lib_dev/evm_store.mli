@@ -66,6 +66,18 @@ module Blueprints : sig
     to_:Ethereum_types.quantity ->
     (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
 
+  (** [find_range_with_events conn ~from ~to_] returns the consecutive
+      blueprints with their events starting at [from] and up to [to_]
+      (included). It stops at the first missing level, and returns the empty
+      list if [from] is missing. It runs four queries whatever the size of
+      the range, and is equivalent to calling {!find_with_events} on each
+      level. *)
+  val find_range_with_events :
+    conn ->
+    from:Ethereum_types.quantity ->
+    to_:Ethereum_types.quantity ->
+    Blueprint_types.with_events list tzresult Lwt.t
+
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 

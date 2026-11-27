@@ -31,14 +31,6 @@ val get_blueprint :
   Ethereum_types.quantity ->
   Blueprint_types.Legacy.with_events tzresult Lwt.t
 
-val get_blueprints :
-  keep_alive:bool ->
-  timeout:float ->
-  evm_node_endpoint:Uri.t ->
-  count:int64 ->
-  Ethereum_types.quantity ->
-  Blueprint_types.Legacy.with_events list tzresult Lwt.t
-
 val get_blueprint_with_events :
   keep_alive:bool ->
   timeout:float ->
@@ -59,6 +51,9 @@ val register :
   (Ethereum_types.quantity ->
   Blueprint_types.Legacy.with_events option tzresult Lwt.t) ->
   (Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t) ->
+  (from:Ethereum_types.quantity ->
+  to_:Ethereum_types.quantity ->
+  Blueprint_types.with_events list tzresult Lwt.t) ->
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.time_between_blocks ->
   Evm_directory.t ->

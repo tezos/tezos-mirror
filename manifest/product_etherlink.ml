@@ -433,6 +433,7 @@ let _octez_evm_node_tests =
       "test_durable_storage_path";
       "test_tezlink_prevalidation";
       "test_transaction_object";
+      "test_evm_store_range";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"

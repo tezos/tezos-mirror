@@ -41,28 +41,6 @@ let get_blueprint_with_events_service =
 
 type blueprints_selector = {from_level : int64; count : int64}
 
-let get_blueprints_service =
-  let query =
-    Query.(
-      query (fun from_level count ->
-          let from_level =
-            match from_level with
-            | Some from_level -> from_level
-            | None -> raise (Query.Invalid "`from_level` is missing")
-          in
-          {from_level; count})
-      |+ opt_field "from_level" Arg.uint63 (fun s -> Some s.from_level)
-      |+ field "max_count" Arg.uint63 1L (fun s -> s.count)
-      |> seal)
-  in
-  Service.get_service
-    ~description:
-      "Fetch a sequence of consecutive blueprints, starting from (and \
-       containing at least the blueprint for) a given level"
-    ~query
-    ~output:(Data_encoding.list Blueprint_types.Legacy.with_events_encoding)
-    Path.(evm_services_root / "blueprints" / "range")
-
 let get_blueprints_with_events_service =
   let query =
     Query.(
@@ -189,28 +167,16 @@ let register_blueprint_service blueprint_service find_blueprint dir =
       let* blueprint = find_blueprint number in
       return blueprint)
 
-let register_blueprints_service blueprints_service find_blueprint dir =
-  let open Ethereum_types in
+let register_blueprints_service blueprints_service find_blueprints_range dir =
   let open Lwt_result_syntax in
-  let rec find_blueprints ?(rev_res = []) (Qty from) (Qty to_excluded) =
-    if Z.Compare.(from < to_excluded) then
-      let* blueprint = find_blueprint (Qty from) in
-      match blueprint with
-      | Some blueprint ->
-          find_blueprints
-            ~rev_res:(blueprint :: rev_res)
-            (Qty (Z.succ from))
-            (Qty to_excluded)
-      | None -> return (List.rev rev_res)
-    else return (List.rev rev_res)
-  in
   Evm_directory.opt_register0 dir blueprints_service (fun selector () ->
-      let from = Ethereum_types.Qty (Z.of_int64 selector.from_level) in
       let count = Int64.min 500L selector.count in
-      let to_excluded =
-        Ethereum_types.Qty (Z.of_int64 (Int64.add selector.from_level count))
+      let from = Ethereum_types.Qty (Z.of_int64 selector.from_level) in
+      let to_ =
+        Ethereum_types.Qty
+          (Z.pred (Z.of_int64 (Int64.add selector.from_level count)))
       in
-      let* blueprints = find_blueprints from to_excluded in
+      let* blueprints = find_blueprints_range ~from ~to_ in
       match blueprints with
       | [] -> return_none
       | blueprints -> return_some blueprints)
@@ -267,14 +233,13 @@ let register_broadcast_service find_blueprint get_next_blueprint_number dir =
       (stream, stopper))
 
 let register get_next_blueprint_number find_blueprint_legacy find_blueprint
-    smart_rollup_address time_between_blocks dir =
+    find_blueprints_range smart_rollup_address time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
   |> register_blueprint_service get_blueprint_service find_blueprint_legacy
   |> register_blueprint_service get_blueprint_with_events_service find_blueprint
-  |> register_blueprints_service get_blueprints_service find_blueprint_legacy
   |> register_blueprints_service
        get_blueprints_with_events_service
-       find_blueprint
+       find_blueprints_range
   |> register_blueprint_watcher_service
        find_blueprint_legacy
        get_next_blueprint_number
@@ -322,18 +287,6 @@ let get_blueprint ~keep_alive ~timeout ~evm_node_endpoint
     get_blueprint_service
     ((), Z.to_int64 level)
     ()
-    ()
-
-let get_blueprints ~keep_alive ~timeout ~evm_node_endpoint ~count
-    Ethereum_types.(Qty level) =
-  Rollup_services.call_service
-    ~keep_alive
-    ~timeout
-    ~media_types:[Media_type.octet_stream]
-    ~base:evm_node_endpoint
-    get_blueprints_service
-    ()
-    {from_level = Z.to_int64 level; count}
     ()
 
 let get_blueprint_with_events ~keep_alive ~timeout ~evm_node_endpoint

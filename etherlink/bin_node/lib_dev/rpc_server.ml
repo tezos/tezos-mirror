@@ -201,6 +201,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
           impl.next_blueprint_number
           impl.find_blueprint_legacy
           impl.find_blueprint
+          impl.find_blueprints_range
           impl.smart_rollup_address
           impl.time_between_blocks
   in

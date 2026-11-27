@@ -965,6 +965,10 @@ type evm_services_methods = {
   next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
   find_blueprint :
     Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprints_range :
+    from:Ethereum_types.quantity ->
+    to_:Ethereum_types.quantity ->
+    Blueprint_types.with_events list tzresult Lwt.t;
   find_blueprint_legacy :
     Ethereum_types.quantity ->
     Blueprint_types.Legacy.with_events option tzresult Lwt.t;
@@ -989,6 +993,10 @@ let evm_services_methods ctxt time_between_blocks =
       (fun level ->
         Evm_store.use ctxt.store (fun conn ->
             Evm_store.Blueprints.find_with_events conn level));
+    find_blueprints_range =
+      (fun ~from ~to_ ->
+        Evm_store.use ctxt.store (fun conn ->
+            Evm_store.Blueprints.find_range_with_events conn ~from ~to_));
     smart_rollup_address = ctxt.smart_rollup_address;
     time_between_blocks;
   }
