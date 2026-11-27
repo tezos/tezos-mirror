@@ -37,6 +37,8 @@ module Files = struct
   let evm_compatibility =
     [
       "etherlink.mk";
+      "etherlink/kernel_latest/Cargo.toml";
+      "etherlink/kernel_latest/Cargo.lock";
       "etherlink/kernel_latest/revm/**/*";
       "etherlink/kernel_latest/evm_evaluation/**/*";
     ]
@@ -44,6 +46,8 @@ module Files = struct
   let revm_compatibility =
     [
       "etherlink.mk";
+      "etherlink/kernel_latest/Cargo.toml";
+      "etherlink/kernel_latest/Cargo.lock";
       "etherlink/kernel_latest/revm/**/*";
       "etherlink/kernel_latest/revm_evaluation/**/*";
     ]

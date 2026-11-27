@@ -963,6 +963,8 @@ etherlink.test_evm_compatibility:
   rules:
   - changes:
     - etherlink.mk
+    - etherlink/kernel_latest/Cargo.lock
+    - etherlink/kernel_latest/Cargo.toml
     - etherlink/kernel_latest/evm_evaluation/**/*
     - etherlink/kernel_latest/revm/**/*
     when: on_success
@@ -1069,6 +1071,8 @@ etherlink.test_revm_compatibility:
   rules:
   - changes:
     - etherlink.mk
+    - etherlink/kernel_latest/Cargo.lock
+    - etherlink/kernel_latest/Cargo.toml
     - etherlink/kernel_latest/revm/**/*
     - etherlink/kernel_latest/revm_evaluation/**/*
     when: on_success
