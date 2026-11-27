@@ -231,15 +231,16 @@ fn prepare_message(
 /// The serialized outbox message is bounded by [`MAX_OUTPUT_SIZE`]. A
 /// caller-controlled field (e.g. the fast-withdrawal `payload`, or the FA
 /// `routing_info`/`content`) can push the message past that limit. If we let
-/// such a message reach the outbox queue, serialization fails there with
-/// `InputOutputTooLarge` *after* the EVM transaction has already succeeded --
-/// and for a forced (delayed-inbox) transaction that error aborts block
-/// production and wedges the sequencer.
+/// such a message reach the outbox queue, queueing fails there with
+/// `OutboxQueueError::TooLarge` *after* the EVM transaction has already
+/// succeeded -- and for a forced (delayed-inbox) transaction that error aborts
+/// block production and wedges the sequencer.
 ///
-/// Instead, replicate the same serialization here (matching `queue_message`)
-/// and reject oversized messages eagerly. The precompile reverts, the
-/// surrounding `require` in the predeployed contract reverts the whole
-/// transaction, and no unserializable message is ever produced.
+/// Instead, replicate the same serialization here (matching
+/// `queue_outbox_message`) and reject oversized messages eagerly. The
+/// precompile reverts, the surrounding `require` in the predeployed contract
+/// reverts the whole transaction, and no unserializable message is ever
+/// produced.
 pub(crate) fn check_outbox_message_size(
     withdrawal: &Withdrawal,
 ) -> Result<(), SendOutboxRevertReason> {

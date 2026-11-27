@@ -100,6 +100,7 @@ mod journal;
 mod l2block;
 mod linked_list;
 mod migration;
+mod outbox_queue;
 mod parsing;
 pub mod registry_impl;
 mod sequencer_blueprint;

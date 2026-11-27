@@ -6,7 +6,6 @@
 use std::collections::VecDeque;
 
 use crate::{
-    apply::WITHDRAWAL_OUTBOX_QUEUE,
     block::{
         block_safe_copy, compute, record_applied_block, BlockInProgressComputationResult,
         BlockInProgressProvenance, GAS_LIMIT,
@@ -38,7 +37,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{BlueprintKeyspaces, RuntimeKeyspaces};
-use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceLoader};
@@ -236,7 +235,6 @@ where
     let http_trace_enabled = crate::storage::is_http_trace_enabled(bk.base());
 
     let registry = config.init_registry();
-    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let stored_block_in_progress = storage::read_block_in_progress_in_safe_copy(host)?;
     let (block_in_progress_provenance, mut block_in_progress) =
@@ -299,7 +297,6 @@ where
         &mut safe_rk,
         &registry,
         &config,
-        &outbox_queue,
         &mut block_in_progress,
         &block_constants,
         sequencer_pool_address,
@@ -387,7 +384,6 @@ where
 
     let mut configuration = fetch_configuration(&bk);
     let mut base = bk.into_base();
-    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let block_in_progress = storage::read_block_in_progress_in_safe_copy(host)?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let mut rk = RuntimeKeyspaces::init(host)?;
@@ -427,9 +423,8 @@ where
     let safe_keyspaces = safe_rk.into_keyspaces()?;
     rk.promote_from(safe_keyspaces)?;
     record_applied_block(
-        rk.into_host(),
+        &mut rk,
         &mut base,
-        &outbox_queue,
         block.header(),
         &mut configuration,
         delayed_hashes,

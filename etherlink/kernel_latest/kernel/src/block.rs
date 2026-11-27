@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
+use crate::apply::ExecutionResult;
 use crate::block_in_progress;
 use crate::block_storage;
 use crate::blueprint::Blueprint;
@@ -22,6 +22,7 @@ use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::migration::allow_path_not_found;
+use crate::outbox_queue::flush_outbox_queue;
 use crate::storage;
 use crate::storage::{inside_stage_one, read_block_in_progress_in_safe_copy};
 use crate::transaction::TransactionContent;
@@ -38,9 +39,7 @@ use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
     BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError, TMP_PATH,
 };
-use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
-use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -112,7 +111,6 @@ pub fn compute<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut BlockInProgress,
     block_constants: &TezosXBlockConstants,
     sequencer_pool_address: Option<H160>,
@@ -160,7 +158,6 @@ where
                 block_in_progress,
                 rk,
                 registry,
-                outbox_queue,
                 block_constants,
                 transaction,
                 block_in_progress.index,
@@ -297,7 +294,6 @@ pub fn compute_bip<Host>(
     rk: &mut RuntimeKeyspaces<'_, Host>,
     registry: &impl Registry<Journal = tezosx_journal::TezosXJournal>,
     chain_config: &TezosXChainConfig,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -319,7 +315,6 @@ where
         rk,
         registry,
         chain_config,
-        outbox_queue,
         &mut block_in_progress,
         &constants,
         sequencer_pool_address,
@@ -497,18 +492,18 @@ fn clean_delayed_transactions(
     Ok(())
 }
 
-/// Records the block that was just promoted as applied, on the live `host`:
-/// drops its blueprint, stores its header and flushes the outbox queue.
+/// Records the block that was just promoted as applied, on the live `rk`:
+/// drops its blueprint, stores its header and flushes the outbox queue. A
+/// failed flush is logged, not returned.
 pub fn record_applied_block<Host>(
-    host: &mut Host,
+    rk: &mut RuntimeKeyspaces<'_, Host>,
     base: &mut impl KeySpace,
-    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + WasmHost,
+    Host: KeySpaceLoader + WasmHost,
 {
     drop_blueprint(base, block_header.blueprint_header.number)?;
     store_current_block_header(base, &block_header)?;
@@ -517,15 +512,22 @@ where
 
     event.store(base, &config.common)?;
 
-    let written = outbox_queue.flush_queue(host);
-    // Log to Info only if we flushed messages.
-    let level = if written > 0 { Info } else { Debug };
-    log!(level, "Flushed outbox queue messages ({} flushed)", written);
-
     if let ConfigurationMode::Sequencer(SequencerConfig { delayed_inbox, .. }) =
         &mut config.mode
     {
         clean_delayed_transactions(base, delayed_inbox, delayed_txs)?;
+    }
+
+    // Flush last, once the blueprint cannot run again: the outbox keeps every
+    // message it gets. The block is recorded by now, so a failed flush is
+    // logged and does not fail the record.
+    match flush_outbox_queue(rk) {
+        Ok(written) => {
+            // Log to Info only if we flushed messages.
+            let level = if written > 0 { Info } else { Debug };
+            log!(level, "Flushed outbox queue messages ({} flushed)", written);
+        }
+        Err(err) => log!(Error, "Failed to flush the outbox queue: {err}"),
     }
 
     Ok(())
@@ -557,8 +559,6 @@ where
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
     let (next_bip_number, timestamp, chain_header) = get_next_bip_info(bk.base());
-
-    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let registry = chain_config.init_registry();
 
@@ -619,7 +619,6 @@ where
         &mut safe_rk,
         &registry,
         chain_config,
-        &outbox_queue,
         block_in_progress,
         sequencer_pool_address,
         tracer_input,
@@ -682,9 +681,8 @@ where
             let safe_keyspaces = safe_rk.into_keyspaces()?;
             rk.promote_from(safe_keyspaces)?;
             record_applied_block(
-                rk.into_host(),
+                &mut rk,
                 &mut base,
-                &outbox_queue,
                 block.header(),
                 config,
                 included_delayed_transactions,
@@ -735,7 +733,8 @@ mod tests {
     use crate::blueprint_storage::blueprint_exists;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::blueprint_storage::{
-        store_current_tez_block_header, store_inbox_blueprint, TezBlockHeader,
+        store_current_tez_block_header, store_inbox_blueprint, BlueprintHeader,
+        TezBlockHeader,
     };
     use crate::chains::TezlinkOperation;
     use crate::chains::{DebugFeatures, TezlinkContent};
@@ -743,10 +742,12 @@ mod tests {
         ExperimentalFeatures, TezlinkBlockConstants, TezosXBlockConstants,
         TezosXChainConfig, TezosXTransaction,
     };
-    use crate::configuration::EVM_CHAIN_ID;
+    use crate::configuration::{CommonConfig, EVM_CHAIN_ID};
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
     use crate::migration::storage_migration;
+    use crate::outbox_queue::queue_outbox_message;
+    use crate::outbox_queue::tests::{message, output};
     use crate::registry_impl::RegistryImpl;
     use crate::retrieve_block_fees;
     use crate::storage::read_last_info_per_level_timestamp;
@@ -2751,13 +2752,11 @@ mod tests {
             U256::from(MINIMUM_BASE_FEE_PER_GAS),
         );
         let registry = RegistryImpl::default();
-        let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
         let result = chain_config
             .apply_transaction(
                 &block_in_progress,
                 &mut rk,
                 &registry,
-                &outbox_queue,
                 &block_constants,
                 transaction,
                 0,
@@ -2998,8 +2997,6 @@ mod tests {
                 };
 
             let registry = RegistryImpl::default();
-            let outbox_queue =
-                OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap();
 
             // skip_fees_check keeps the assertion focused on the internal-op
             // cap; fee payment on the delayed path is covered elsewhere.
@@ -3008,7 +3005,6 @@ mod tests {
                     &block_in_progress,
                     &mut rk,
                     &registry,
-                    &outbox_queue,
                     &block_constants,
                     transaction,
                     0,
@@ -3128,7 +3124,6 @@ mod tests {
                 &bip,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash: hash_from_nonce(0),
@@ -3208,7 +3203,6 @@ mod tests {
                 &block_in_progress,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash,
@@ -3299,7 +3293,6 @@ mod tests {
                 &block_in_progress,
                 &mut rk,
                 &RegistryImpl::default(),
-                &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
                 &block_constants,
                 TezosXTransaction::Ethereum(Box::new(Transaction {
                     tx_hash,
@@ -4212,7 +4205,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
@@ -4343,7 +4335,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
@@ -5408,7 +5399,6 @@ mod tests {
             &mut rk,
             &registry,
             &chain_config,
-            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
@@ -5422,6 +5412,123 @@ mod tests {
             BlockInProgressComputationResult::RebootNeeded,
             "Tezos operation should not fit when gas is nearly exhausted"
         );
+    }
+
+    fn genesis_block_header() -> BlockHeader<ChainHeader> {
+        BlockHeader {
+            blueprint_header: BlueprintHeader {
+                number: U256::zero(),
+                timestamp: Timestamp::from(0),
+            },
+            chain_header: ChainHeader::Eth(EVMBlockHeader::genesis_header()),
+        }
+    }
+
+    /// Makes sure that recording a promoted block flushes, once each, the
+    /// message left in the live queue before the block and the message that
+    /// the block queued in its safe copy.
+    #[test]
+    fn record_flushes_the_promoted_queue() {
+        let mut host = MockKernelHost::default();
+        let level = host.host.level();
+        let mut base = load_base(&mut host).unwrap();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        queue_outbox_message(&mut rk, message(vec![0])).unwrap();
+        let mut safe_rk = rk.start_safe().unwrap();
+        queue_outbox_message(&mut safe_rk, message(vec![1])).unwrap();
+        let safe_keyspaces = safe_rk.into_keyspaces().unwrap();
+        rk.promote_from(safe_keyspaces).unwrap();
+
+        record_applied_block(
+            &mut rk,
+            &mut base,
+            genesis_block_header(),
+            &mut dummy_configuration(),
+            vec![],
+        )
+        .unwrap();
+
+        assert_eq!(
+            rk.host_mut()
+                .unprefixed_mut()
+                .unwrap()
+                .host
+                .outbox_at(level),
+            vec![output(0), output(1)]
+        );
+    }
+
+    /// Makes sure that a failed flush does not fail the record of a block,
+    /// and that the record deletes the delayed transactions of the block from
+    /// the delayed inbox.
+    #[test]
+    fn failed_flush_cleans_the_delayed_inbox() {
+        let mut host = MockKernelHost::default();
+        let mut bk = load_keyspaces(&mut host).unwrap();
+        let mut delayed_inbox = DelayedInbox::from_base(bk.base()).unwrap();
+        let tx = Transaction {
+            tx_hash: [7; TRANSACTION_HASH_SIZE],
+            content: EthereumDelayed(dummy_eth_gen_transaction(
+                0,
+                TransactionType::Eip1559,
+            )),
+        };
+        delayed_inbox
+            .save_transaction(
+                &mut bk,
+                tx.clone().into(),
+                Timestamp::from(0i64),
+                0,
+                &CommonConfig::default(),
+            )
+            .unwrap();
+        let mut base = bk.into_base();
+        let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
+        // The metadata counts one message that the queue does not hold: the
+        // flush fails on it.
+        let meta_key = Key::from_static(b"/__outbox_queue/meta");
+        rk.evm_world_state_mut()
+            .set(&meta_key, [0, 0, 0, 0, 1, 0, 0, 0])
+            .unwrap();
+        let mut config = Configuration {
+            mode: ConfigurationMode::Sequencer(SequencerConfig {
+                delayed_bridge: ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+                delayed_inbox: Box::new(delayed_inbox),
+                sequencer: PublicKey::from_b58check(
+                    "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
+                )
+                .unwrap(),
+                dal: None,
+                max_blueprint_lookahead_in_seconds: 0,
+            }),
+            ..dummy_configuration()
+        };
+
+        record_applied_block(
+            &mut rk,
+            &mut base,
+            genesis_block_header(),
+            &mut config,
+            vec![tx.tx_hash],
+        )
+        .unwrap();
+
+        assert_eq!(
+            rk.evm_world_state().get(&meta_key),
+            Some(vec![0, 0, 0, 0, 1, 0, 0, 0])
+        );
+        let ConfigurationMode::Sequencer(SequencerConfig { delayed_inbox, .. }) =
+            &config.mode
+        else {
+            panic!("the configuration is in sequencer mode")
+        };
+        assert!(delayed_inbox
+            .find_transaction(&base, tx.tx_hash.into())
+            .unwrap()
+            .is_none());
     }
 
     fn get_tezos_account_info(
