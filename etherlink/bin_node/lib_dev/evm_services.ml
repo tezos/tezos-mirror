@@ -41,28 +41,6 @@ let get_blueprint_with_events_service =
 
 type blueprints_selector = {from_level : int64; count : int64}
 
-let get_blueprints_service =
-  let query =
-    Query.(
-      query (fun from_level count ->
-          let from_level =
-            match from_level with
-            | Some from_level -> from_level
-            | None -> raise (Query.Invalid "`from_level` is missing")
-          in
-          {from_level; count})
-      |+ opt_field "from_level" Arg.uint63 (fun s -> Some s.from_level)
-      |+ field "max_count" Arg.uint63 1L (fun s -> s.count)
-      |> seal)
-  in
-  Service.get_service
-    ~description:
-      "Fetch a sequence of consecutive blueprints, starting from (and \
-       containing at least the blueprint for) a given level"
-    ~query
-    ~output:(Data_encoding.list Blueprint_types.Legacy.with_events_encoding)
-    Path.(evm_services_root / "blueprints" / "range")
-
 let get_blueprints_with_events_service =
   let query =
     Query.(
@@ -271,7 +249,6 @@ let register get_next_blueprint_number find_blueprint_legacy find_blueprint
   register_get_smart_rollup_address_service smart_rollup_address dir
   |> register_blueprint_service get_blueprint_service find_blueprint_legacy
   |> register_blueprint_service get_blueprint_with_events_service find_blueprint
-  |> register_blueprints_service get_blueprints_service find_blueprint_legacy
   |> register_blueprints_service
        get_blueprints_with_events_service
        find_blueprint
@@ -322,18 +299,6 @@ let get_blueprint ~keep_alive ~timeout ~evm_node_endpoint
     get_blueprint_service
     ((), Z.to_int64 level)
     ()
-    ()
-
-let get_blueprints ~keep_alive ~timeout ~evm_node_endpoint ~count
-    Ethereum_types.(Qty level) =
-  Rollup_services.call_service
-    ~keep_alive
-    ~timeout
-    ~media_types:[Media_type.octet_stream]
-    ~base:evm_node_endpoint
-    get_blueprints_service
-    ()
-    {from_level = Z.to_int64 level; count}
     ()
 
 let get_blueprint_with_events ~keep_alive ~timeout ~evm_node_endpoint
