@@ -687,8 +687,8 @@ let test_two_internal_transfers_burn_each () =
     call is bootstrap5 funded with just enough balance to cover the
     top-level variable burn plus a single slot burn — not two. The
     second internal burn must therefore fail with
-    [CannotPayStorageFee], rolling the whole batch back via
-    [SafeStorage] (bootstrap5's balance loses only the call fee). *)
+    [CannotPayStorageFee], rolling the whole batch back with its safe
+    copy (bootstrap5's balance loses only the call fee). *)
 let test_partial_internal_burn_failure_backtracks_all () =
   Setup.register_sandbox_test
     ~uses_client:true

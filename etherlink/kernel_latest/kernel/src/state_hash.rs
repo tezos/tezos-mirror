@@ -118,9 +118,8 @@ pub fn tez_accounts_state_hash(
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::{MockRuntimeKeyspaces, RuntimeKeyspaces};
-    use tezos_evm_runtime::safe_storage::SafeStorage;
-    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_evm_runtime::runtime_keyspaces::MockRuntimeKeyspaces;
+    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::Key;
 
@@ -229,40 +228,37 @@ mod tests {
         assert_eq!(through_keyspace, through_host);
     }
 
-    /// Makes sure that the Tez keyspace hash equals the raw host hash in the
-    /// `/tmp` copy (the temporary copy that a `SafeStorage` writes to).
+    /// Makes sure that the Tez keyspace hash equals the raw host hash in a
+    /// safe copy.
     ///
-    /// Both sides hash the `/tmp` copy, with the big-map writes that go
-    /// through the raw host. After `promote`, the live root keeps that hash.
-    /// The block computes `state_root` before `promote`, so a difference on
+    /// Both sides hash the copy, with the big-map writes that go through the
+    /// raw host. After the promotion, the live root keeps that hash. The
+    /// block computes `state_root` before the promotion, so a difference on
     /// either side changes the `state_root`.
     #[test]
-    fn tez_hash_matches_the_durable_root_hash_in_the_tmp_copy() {
+    fn tez_hash_matches_the_durable_root_hash_in_a_safe_copy() {
         let (valid, delayed, michelson, ts) = fixture_inputs();
         let bh = blueprint_hash(&valid, &delayed, &michelson, ts);
         let mut host = MockKernelHost::default();
-        // `start` copies the root, so it has to exist.
-        host.store_write_all(&TEZ_ACCOUNTS_PATH, b"tez").unwrap();
-        let mut safe =
-            SafeStorage::new(&mut host, vec![OwnedPath::from(TEZ_ACCOUNTS_PATH)]);
-        safe.start().unwrap();
+        let mut rk = MockRuntimeKeyspaces::init(&mut host).unwrap();
 
-        let through_tmp_copy = {
-            let mut rk = RuntimeKeyspaces::init(&mut safe).unwrap();
-            rk.tez_accounts_mut()
+        let through_copy = {
+            let mut copy = rk.start_safe().unwrap();
+            copy.tez_accounts_mut()
                 .set(&Key::from_static(b"/contracts/index/kt1"), b"contract")
                 .unwrap();
             let big_map = RefPath::assert_from(b"/tez/tez_accounts/big_map/0/key");
-            rk.host_mut().store_write_all(&big_map, b"value").unwrap();
+            copy.host_mut().store_write_all(&big_map, b"value").unwrap();
 
-            let through_keyspace = tez_accounts_state_hash(rk.tez_accounts(), &bh);
-            let raw = rk.host_mut().store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
+            let through_keyspace = tez_accounts_state_hash(copy.tez_accounts(), &bh);
+            let raw = copy.host().store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
             assert_eq!(through_keyspace, runtime_state_hash(&raw, &bh));
+            let keyspaces = copy.into_keyspaces().unwrap();
+            rk.promote_from(keyspaces).unwrap();
             through_keyspace
         };
 
-        safe.promote().unwrap();
-        let live = host.store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
-        assert_eq!(through_tmp_copy, runtime_state_hash(&live, &bh));
+        let live = rk.host().store_get_hash(&TEZ_ACCOUNTS_PATH).unwrap();
+        assert_eq!(through_copy, runtime_state_hash(&live, &bh));
     }
 }

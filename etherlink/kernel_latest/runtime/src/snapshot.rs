@@ -84,12 +84,11 @@ fn frame_name(root: &Name, index: usize) -> Result<Name, KeySpaceLoaderError> {
 /// second one's `savepoint` with [`KeySpaceLoaderError::AlreadyLoaded`]. The
 /// NDS loader tracks nothing: both snapshots then share the same backups,
 /// and each one overwrites the other's. Nested snapshots must be of distinct
-/// roots, e.g. a root and its mirror.
+/// roots, e.g. a root and its safe copy.
 ///
-/// Commit the snapshot before reverting or promoting the mirror its backups
-/// were loaded through: an empty backup cannot be told apart from a missing
-/// one in storage (both are an absent path), so restoring a backup dropped
-/// by [`crate::safe_storage::SafeStorage::revert`] clears the live `root`.
+/// Commit the snapshot before deleting the prefix its backups were loaded
+/// under: an empty backup cannot be told apart from a missing one in storage
+/// (both are an absent path), so restoring a deleted backup clears `root`.
 /// [`crate::runtime_keyspaces::RuntimeKeyspaces::revert_safe`] drops the
 /// backups of the safe copy itself.
 pub struct Snapshot<KS: KeySpace> {
@@ -203,7 +202,6 @@ impl<KS: KeySpace> Snapshot<KS> {
 mod tests {
     use super::*;
     use crate::runtime::MockKernelHost;
-    use crate::safe_storage::SafeStorage;
     use tezos_smart_rollup_keyspace::Key;
 
     type MockKeySpace = <MockKernelHost as KeySpaceLoader>::KeySpace;
@@ -243,24 +241,6 @@ mod tests {
         let root: Name = ROOT_A.parse().unwrap();
         assert_eq!(frame_name(&root, 0).unwrap().as_ref(), BACKUP_0);
         assert_eq!(frame_name(&root, 1).unwrap().as_ref(), BACKUP_1);
-    }
-
-    #[test]
-    fn frame_name_fits_under_nested_mirrors() {
-        // The batch snapshot's root is the accounts of a mirror of the block
-        // mirror, and its backups are loaded through that same mirror.
-        let mut host = MockKernelHost::default();
-        let mut block = SafeStorage::new(&mut host, vec![]);
-        let mut batch = SafeStorage::new(&mut block, vec![]);
-        let root = batch.load_or_create(ROOT_A.parse().unwrap()).unwrap();
-        assert_eq!(root.name().as_ref(), "/tmp/tmp/tez/tez_accounts");
-        let mut snapshot = Snapshot::new();
-        // Far beyond any realistic nesting of cross-runtime calls.
-        for _ in 0..1000 {
-            snapshot.savepoint(&mut batch, &root).unwrap();
-        }
-        assert_eq!(snapshot.len(), 1000);
-        snapshot.commit();
     }
 
     #[test]

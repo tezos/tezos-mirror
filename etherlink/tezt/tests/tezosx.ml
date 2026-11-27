@@ -8231,7 +8231,7 @@ let test_run_script_view_leaves_state_untouched () =
 
         delayed EVM tx (UserInput)
           |
-          +-- CRAC #1  callMichelson{value}  --> credit tz1  (SafeStorage write)
+          +-- CRAC #1  callMichelson{value}  --> credit tz1  (safe copy write)
           |
           +-- CRAC #2  callMichelson{gas:lo} --> originOf OOG --> 500 BlockAbort
                                                      |

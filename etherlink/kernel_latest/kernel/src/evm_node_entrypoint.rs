@@ -402,8 +402,8 @@ where
             // setup it shares. The live simulation block goes in, not
             // `BlockConstants::dummy()`, so a CRAC dispatched here observes
             // `BASEFEE`, `GASLIMIT`, ... as execution would. The HTTP-trace
-            // flag is read on the base host, before any `SafeStorage`
-            // wrapping, exactly as the applied path does. The simulation block
+            // flag is read on the base host, before any safe copy, exactly
+            // as the applied path does. The simulation block
             // carries no prior operation, hence an internal-operation base of
             // 0, and no tracer: this entrypoint reports HTTP traces, not EVM
             // call traces.

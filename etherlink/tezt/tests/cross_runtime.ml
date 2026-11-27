@@ -5941,11 +5941,11 @@ let test_crac_debug_trace_normal_tx_in_crac_block () =
 (** L2-1212 — [debug_traceBlockByNumber] on a block with 1 normal tx + 2
     incoming Michelson-originated CRAC operations.
 
-    Each applied Michelson operation runs in its own SafeStorage cycle over
-    [/common_world_state]. The cycle copies the traces of the earlier operations
+    Each applied Michelson operation runs in its own safe copy of
+    [/common_world_state]. The copy takes the traces of the earlier operations
     in and promotes them back. The call tracer flushes the operation's own
-    traces afterwards, on the block mirror. Block-mode tracing therefore
-    recovers one trace per transaction, and [trace_block]'s positional
+    traces afterwards, on the safe copy of the block. Block-mode tracing
+    therefore recovers one trace per transaction, and [trace_block]'s positional
     [List.combine] does not raise [Inconsistent_traces]. The test drives two
     CRAC operations into one block and checks that the RPC succeeds, that it
     returns one entry per transaction, and that each entry's [result] equals

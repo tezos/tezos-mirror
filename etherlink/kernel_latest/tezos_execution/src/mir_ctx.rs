@@ -580,8 +580,8 @@ impl<'a, Host: KeySpaceLoader + StorageV1, R: Registry> CtxTrait<'a>
     }
 
     /// Register an address or return its existing index. The entry and
-    /// counter writes are not individually atomic, but `SafeStorage` reverts
-    /// the whole batch on error, so partial writes cannot persist.
+    /// counter writes are not individually atomic, but the safe copy of the
+    /// batch is reverted on error, so partial writes cannot persist.
     fn index_address(
         &mut self,
         address: &AddressHash,

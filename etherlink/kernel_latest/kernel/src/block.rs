@@ -36,9 +36,8 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime_keyspaces::{
-    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError,
+    BlueprintKeyspaces, RuntimeKeyspaces, SafeCopyError, TMP_PATH,
 };
-use tezos_evm_runtime::safe_storage::TMP_PATH;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
@@ -783,11 +782,9 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime_keyspaces::EVM_WORLD_STATE_ROOT_PATH;
     use tezos_evm_runtime::runtime_keyspaces::{
         load_in_safe_copy, COMMON_WORLD_STATE_KEYSPACE_NAME,
-        COMMON_WORLD_STATE_ROOT_PATH, EVM_WORLD_STATE_KEYSPACE_NAME,
-        TEZ_ACCOUNTS_ROOT_PATH, TEZ_WORLD_STATE_ROOT_PATH,
+        EVM_WORLD_STATE_KEYSPACE_NAME,
     };
     use tezos_execution::context;
     use tezos_smart_rollup_keyspace::Key;
@@ -1387,7 +1384,6 @@ mod tests {
     #[test]
     fn finished_block_registers_the_gas_backlog_in_common_world_state() {
         let mut host = MockKernelHost::default();
-        init_safe_storage_roots(&mut host);
         host.store_write_all(&COMMON_BACKLOG_PATH, &HIGH_BACKLOG.to_le_bytes())
             .unwrap();
         host.store_write_all(&COMMON_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
@@ -1462,7 +1458,6 @@ mod tests {
     #[test]
     fn reverted_block_leaves_the_gas_backlog_unchanged() {
         let mut host = MockKernelHost::default();
-        init_safe_storage_roots(&mut host);
         let live_backlog = 10 * GAS_TARGET_PER_SECOND + 1_000;
         host.store_write_all(&COMMON_BACKLOG_PATH, &live_backlog.to_le_bytes())
             .unwrap();
@@ -1504,7 +1499,6 @@ mod tests {
     #[test]
     fn v73_migration_keeps_the_base_fee_per_gas() {
         let mut host = MockKernelHost::default();
-        init_safe_storage_roots(&mut host);
         host.store_write_all(&EVM_BACKLOG_PATH, &HIGH_BACKLOG.to_le_bytes())
             .unwrap();
         host.store_write_all(&EVM_BACKLOG_TIMESTAMP_PATH, &0u64.to_le_bytes())
@@ -1549,26 +1543,6 @@ mod tests {
             panic!("the blueprint parses into a block in progress")
         };
         assert_eq!(bip.base_fee_per_gas, v72_base_fee_per_gas);
-    }
-
-    /// Pre-populate all safe storage roots so that `SafeStorage::start()`'s
-    /// `store_copy` of each root succeeds. Required by every test that
-    /// produces blocks. Mirrors the production bootstrap performed by
-    /// [`crate::kernel`].
-    fn init_safe_storage_roots(host: &mut impl StorageV1) {
-        host.store_write_all(&EVM_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .expect("Write in durable storage should have succeeded");
-        host.store_write_all(
-            &tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH,
-            b"placeholder",
-        )
-        .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&TEZ_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&TEZ_ACCOUNTS_ROOT_PATH, b"placeholder")
-            .expect("Write in durable storage should have succeeded");
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .expect("Write in durable storage should have succeeded");
     }
 
     fn dummy_configuration() -> Configuration {
@@ -1855,7 +1829,6 @@ mod tests {
     ) -> TezosXChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
-        init_safe_storage_roots(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(base);
         let debug_features = DebugFeatures::read_from_storage(base);
         TezosXChainConfig::create_config(
@@ -2136,13 +2109,6 @@ mod tests {
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-            // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-            // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
-            context::implicit_from_public_key_hash(&bootstrap2().pkh)
-                .expect("Account interface should be correct")
-                .allocate(rk.tez_accounts_mut())
-                .expect("Contract initialization should have succeeded");
-
             // Seed bootstrap1 in the TezosX storage with a small balance and no
             // revealed public key.
             set_tezos_account_info(
@@ -2227,14 +2193,6 @@ mod tests {
         // loads the world states again.
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-
-            // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-            // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
-            // (bootstrap2's TezosX balance is established below.)
-            context::implicit_from_public_key_hash(&dst_pkh)
-                .expect("Account interface should be correct")
-                .allocate(rk.tez_accounts_mut())
-                .expect("Contract initialization should have succeeded");
 
             set_tezos_account_info(
                 rk.tez_accounts_mut(),
@@ -2567,13 +2525,6 @@ mod tests {
         {
             let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-            // Allocate bootstrap2 in the Tezlink context so the SafeStorage
-            // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds.
-            context::implicit_from_public_key_hash(&bootstrap2().pkh)
-                .expect("Account interface should be correct")
-                .allocate(rk.tez_accounts_mut())
-                .expect("Contract initialization should have succeeded");
-
             // Seed bootstrap1 with mutez and a revealed manager so it can
             // originate and call without a separate reveal operation.
             set_tezos_account_info(
@@ -2905,7 +2856,7 @@ mod tests {
             Some(Mutez::try_from(500_000 - 1 - storage_cost).unwrap())
         );
 
-        // No backup of the accounts is left behind, in the mirror or once
+        // No backup of the accounts is left behind, in the safe copy or once
         // promoted.
         for backups in [&b"/tmp/__savepoint"[..], &b"/__savepoint"[..]] {
             let backups = tezos_smart_rollup_host::path::RefPath::assert_from(backups);
@@ -2944,13 +2895,6 @@ mod tests {
             // loads the world states again.
             {
                 let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-
-                // Allocate bootstrap2 so the SafeStorage backup of the Tezos
-                // accounts root succeeds.
-                context::implicit_from_public_key_hash(&bootstrap2().pkh)
-                    .unwrap()
-                    .allocate(rk.tez_accounts_mut())
-                    .unwrap();
 
                 set_tezos_account_info(
                     rk.tez_accounts_mut(),
@@ -3386,8 +3330,6 @@ mod tests {
     // Test if the invalid transactions are producing receipts
     fn test_invalid_transactions_receipt_status() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3433,8 +3375,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_valid_transactions_receipt_status() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3486,8 +3426,6 @@ mod tests {
     #[test]
     fn test_delayed_tx_below_intrinsic_gas_dropped() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3552,8 +3490,6 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3629,8 +3565,6 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3694,8 +3628,6 @@ mod tests {
         use revm::interpreter::gas::calculate_initial_tx_gas;
 
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -3763,8 +3695,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -3822,8 +3752,6 @@ mod tests {
         tracer_input: TracerInput,
     ) -> MockKernelHost {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let deployment = Transaction {
@@ -3913,8 +3841,6 @@ mod tests {
     // Test if several valid transactions can be performed
     fn test_several_valid_transactions() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut bk = load_keyspaces(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
             bk.evm_world_state_mut(),
@@ -3936,8 +3862,6 @@ mod tests {
     // Test if several valid proposals can produce valid blocks
     fn test_several_valid_proposals() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -4011,8 +3935,6 @@ mod tests {
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4081,8 +4003,6 @@ mod tests {
     // a block production
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let bk = load_keyspaces(&mut host).unwrap();
 
         produce_block_with_several_valid_txs(&mut host, bk);
@@ -4095,8 +4015,6 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4180,8 +4098,6 @@ mod tests {
     #[test]
     fn test_delayed_creation_above_initcode_limit_does_not_abort_block() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -4347,14 +4263,6 @@ mod tests {
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
-        // Allocate bootstrap2 in Tezlink storage so the SafeStorage
-        // backup of TEZ_ACCOUNTS_ROOT_PATH succeeds,
-        // mirroring `test_tezblock_stored_after_tezos_operation`.
-        context::implicit_from_public_key_hash(&bootstrap2().pkh)
-            .expect("Account interface should be correct")
-            .allocate(rk.tez_accounts_mut())
-            .expect("Contract initialization should have succeeded");
-
         let chain_config = {
             let (host, base) = (rk.host_mut(), &mut base);
             dummy_tezosx_config_with_tezos_runtime(host, base)
@@ -4466,8 +4374,6 @@ mod tests {
     #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4548,8 +4454,6 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        // SafeStorage::start()'s store_copy needs each safe root to exist.
-        init_safe_storage_roots(rk.host_mut());
 
         let chain_config = dummy_tezosx_config(SpecId::default());
         // first block should be 0
@@ -4618,8 +4522,6 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
-        // SafeStorage::start()'s store_copy needs each safe root to exist.
-        init_safe_storage_roots(rk.host_mut());
         store_inbox_blueprint(&mut base, almost_empty_blueprint())
             .expect("Should store a blueprint");
         store_block_fees(rk.evm_world_state_mut(), &dummy_block_fees()).unwrap();
@@ -4733,8 +4635,6 @@ mod tests {
     fn test_reboot_many_tx_one_proposal() {
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4812,8 +4712,6 @@ mod tests {
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -4931,8 +4829,6 @@ mod tests {
     #[test]
     fn migrated_block_in_progress_is_rebuilt() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         let sender = H160::from_str(TEST_ADDR).unwrap();
@@ -4972,16 +4868,18 @@ mod tests {
         let legacy = RefPath::assert_from(b"/tmp/evm/world_state/blocks/in_progress");
         let current = RefPath::assert_from(b"/tmp/common_world_state/block_in_progress");
         host.store_move(&current, &legacy).unwrap();
-        // A V70 mirror has no `/common_world_state`.
-        host.store_delete(&RefPath::assert_from(b"/tmp/common_world_state"))
-            .unwrap();
+        // As under a V70 kernel, the safe copy holds no `/common_world_state`.
+        assert!(host
+            .store_has(&RefPath::assert_from(b"/tmp/common_world_state"))
+            .unwrap()
+            .is_none());
         let mut base = load_base(&mut host).unwrap();
         store_storage_version(&mut base, StorageVersion::V70).unwrap();
         drop(base);
         storage_migration(&mut host).unwrap();
         assert!(host.store_has(&legacy).unwrap().is_none());
 
-        // A rebuilt block starts a new mirror, so the probe is not promoted.
+        // A rebuilt block starts a new safe copy, so the probe is not promoted.
         let probe = RefPath::assert_from(b"/tmp/evm/world_state/probe");
         host.store_write_all(&probe, b"probe").unwrap();
         produce_until_finished(&mut host, &chain_config, &mut configuration);
@@ -5026,8 +4924,6 @@ mod tests {
     #[test]
     fn test_delayed_value_above_balance_does_not_abort_block() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -5097,8 +4993,6 @@ mod tests {
 
         // init host
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -5170,8 +5064,6 @@ mod tests {
     // valid.
     fn test_delayed_empty_eip7702_authorization_list_does_not_abort_block() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -5237,8 +5129,6 @@ mod tests {
     #[test]
     fn uncomputable_fee_settlement_reverts_the_block() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
 
@@ -5312,8 +5202,6 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a success status
     fn test_type_propagation() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(
@@ -5562,8 +5450,6 @@ mod tests {
     #[test]
     fn test_delayed_eip7702_creation_does_not_abort_block() {
         let mut host = MockKernelHost::default();
-        host.store_write_all(&COMMON_WORLD_STATE_ROOT_PATH, b"placeholder")
-            .unwrap();
         let mut base = load_base(&mut host).unwrap();
         let mut rk = RuntimeKeyspaces::init(&mut host).unwrap();
         crate::storage::store_minimum_base_fee_per_gas(

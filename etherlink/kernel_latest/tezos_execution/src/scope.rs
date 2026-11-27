@@ -306,9 +306,8 @@ mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime_keyspaces::{
-        MockRuntimeKeyspaces, TEZ_ACCOUNTS_ROOT_PATH,
+        MockRuntimeKeyspaces, TEZ_ACCOUNTS_ROOT_PATH, TMP_PATH,
     };
-    use tezos_evm_runtime::safe_storage::TMP_PATH;
     use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_keyspace::{Key, KeySpace};
@@ -605,13 +604,10 @@ mod tests {
     /// `eth_accounts` keyspace it lends, commits or reverts it, and returns
     /// what the live keyspace holds afterwards.
     fn eth_accounts_probe_after(commit: bool) -> Option<Vec<u8>> {
-        use tezos_evm_runtime::runtime_keyspaces::ETH_ACCOUNTS_ROOT_PATH;
         use tezos_smart_rollup_keyspace::{Key, KeySpace};
 
         let key = Key::from_static(b"/probe");
         let mut host = MockKernelHost::default();
-        host.store_write_all(&ETH_ACCOUNTS_ROOT_PATH, b"seed")
-            .expect("the root is written");
         let mut rk = MockRuntimeKeyspaces::init(&mut host).expect("the handle is built");
         let mut journal = TezosXJournal::mock(RuntimeId::Ethereum);
 
